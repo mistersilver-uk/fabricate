@@ -1,10 +1,15 @@
 /** The ONE dependency manifest every mounted CHECKS suite compiles against (issue 1095, BM9). */
 
 /** Raw `.js` modules the checks editor tree imports directly or transitively (issue 1095). */
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
+  // The ramp `BandedBar` reads its fills from (issue 1782).
+  'src/ui/svelte/util/dropRateTier.js',
+  // The range bar's pure geometry (issue 2431).
+  'src/ui/svelte/util/rangeBarGeometry.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
@@ -188,19 +193,26 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // modifier row's eligibility control was a checkbox plus an inert pill, and it is now ONE
   // `aria-pressed` toggle button that the card renders itself.
   'src/ui/svelte/components/FillBar.svelte',
+  // The odds histogram's rows (issue 1782).
+  'src/ui/svelte/components/BandedBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   // The product's ONE ordered list (issue 1512), which the difficulty-tier card renders, and the
   // icon button it draws every one of its controls through.
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/IconButton.svelte',
+  // Each trigger is a rule row restating itself as a rule sentence (issue 1782).
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // The range bar's marker (issue 2431).
+  'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).
   'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The shared on/off switch (issue 1040).
   'src/ui/svelte/components/StatusToggle.svelte',
   // The shared card shell (issue 1427).
@@ -213,10 +225,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // for its trailing badge, so it is now in the row's STATIC closure.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker.
   'src/ui/svelte/components/SearchablePopover.svelte',
   // The shared one-of-n picker (issue 1510). The checks studio renders it at each converted select

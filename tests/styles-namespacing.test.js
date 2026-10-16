@@ -1,10 +1,8 @@
 /** Guard against CSS bleed out of Fabricate's windows. */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { describe, it } from 'node:test';
 
-const cssPath = fileURLToPath(new URL('../styles/fabricate.css', import.meta.url));
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
 // Selector preludes that are allowed to apply globally. `:root` carries the
 // `--fab-*` custom property definitions (inert until referenced, so no bleed).
@@ -66,9 +64,9 @@ function collectSelectors(css) {
   return selectors;
 }
 
-describe('fabricate.css namespacing', () => {
-  const selectors = collectSelectors(stripComments(readFileSync(cssPath, 'utf8')));
+const selectors = collectSelectors(stripComments(readStylesheet()));
 
+describe('fabricate.css namespacing', () => {
   it('parses a non-trivial number of selectors', () => {
     // Sanity check so a parser regression can't make the guard vacuously pass.
     assert.ok(selectors.length > 100, `expected many selectors, got ${selectors.length}`);

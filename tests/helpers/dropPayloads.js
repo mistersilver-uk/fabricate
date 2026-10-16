@@ -4,6 +4,7 @@
  * Dispatch a Foundry drag payload as a real `drop` event on a node.
  *
  * @param {object} payload the parsed Foundry drag data.
+ * @returns {Event} the dispatched event, so a caller can read `defaultPrevented`.
  */
 export function dispatchDrop(node, payload) {
   const event = new Event('drop', { bubbles: true, cancelable: true });
@@ -11,6 +12,7 @@ export function dispatchDrop(node, payload) {
     value: { getData: () => JSON.stringify(payload) },
   });
   node.dispatchEvent(event);
+  return event;
 }
 
 /** Payloads an Item drop zone must refuse, whatever else changes about it. */

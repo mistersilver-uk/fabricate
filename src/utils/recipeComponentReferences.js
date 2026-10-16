@@ -9,6 +9,12 @@
 
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
 
+/** A result's component-bearing rows: itself, or a choice group's members (issue 1773). */
+const resultRows = (results) =>
+  (results || []).flatMap((result) =>
+    Array.isArray(result?.alternatives) ? result.alternatives : [result]
+  );
+
 /** Whether a recipe references the given component as an ingredient or a result. */
 export function recipeReferencesComponent(recipe, componentId) {
   const data = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
@@ -32,9 +38,9 @@ export function recipeReferencesComponent(recipe, componentId) {
     if ((set?.ingredients || []).some(matchesId)) return true;
   }
   for (const group of resultGroups) {
-    if ((group?.results || []).some(matchesId)) return true;
+    if (resultRows(group?.results).some(matchesId)) return true;
   }
-  return (data?.results || []).some(matchesId);
+  return resultRows(data?.results).some(matchesId);
 }
 
 /**
@@ -107,13 +113,23 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
           Object.keys(set.essences || {}).length > 0
       );
 
+  // A choice group loses its deleted members; one left with a single member is that member again,
+  // without group settings, and one left with none is gone (Result requirement 8).
+  const stripResult = (result) => {
+    if (!Array.isArray(result?.alternatives)) return isDeletedLegacy(result) ? [] : [result];
+    const members = result.alternatives.filter((member) => !isDeletedLegacy(member));
+    if (members.length === result.alternatives.length) return [result];
+    if (members.length < 2) return members.map(({ selectionRange: _range, ...member }) => member);
+    return [{ ...result, alternatives: members }];
+  };
+
   // Only a group THIS strip emptied is residue. A group that ARRIVED empty is authored data —
   // the reserved `role: 'failure'` group, and a non-terminal step's deliberately empty group
   // (issue 1907) — so pruning it would turn a valid recipe into one missing a step's result group.
   const stripResultGroups = (groups) =>
     (groups || []).flatMap((group) => {
       const authored = (group?.results || []).length;
-      const results = (group?.results || []).filter((res) => !isDeletedLegacy(res));
+      const results = (group?.results || []).flatMap(stripResult);
       if (authored > 0 && results.length === 0) return [];
       return [{ ...group, results }];
     });

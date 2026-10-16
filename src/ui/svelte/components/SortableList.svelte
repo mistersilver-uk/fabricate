@@ -8,6 +8,10 @@
   Snippets: `row(item, index)` between the badge and the trailing cluster, `body(item, index)`
   below the row's line, and `footer` as the list's own last child.
 
+  Rest spread:
+  - `{...rest}` lands on the list root, written after `class`, and carries a caller's `data-*`
+    hook; `class` is appended to the root's own.
+
   Invariants:
   - The row is never a button: no `role`, no `tabindex`, no `onclick`, because a whole-row button
     would nest this list's own grip, chevrons, disclosure and delete.
@@ -16,10 +20,16 @@
   - A move reads the name first, returns focus to the control that initiated it (the grip for its
     arrow keys, the pressed chevron for a rocker click, the grip when that chevron has disabled
     itself at an end) and only then writes the live region, which is not announced otherwise.
+  - The live region is never gated on `reorderable`; it speaks the caller's `announcement` on each
+    new non-empty value after mount, never the mount value, and never clears for an empty one.
+    It re-speaks a value only when it differs from what the region shows, which a list move
+    between two reverts guarantees.
+  - Only the grip arms a drag; any other origin in the row, art or bare text, arms nothing.
   - The family is rooted at `fabricate-sortable-list` in `styles/fabricate.css`, never in a scoped
     block.
 -->
 <script>
+  import { untrack } from 'svelte';
   import IconButton from './IconButton.svelte';
   import RowDisclosure from './RowDisclosure.svelte';
   import { localize } from '../util/foundryBridge.js';
@@ -47,14 +57,17 @@
     rowClass = () => '',
     rowData = () => ({}),
     removeData = () => ({}),
-    dataAttr = '',
-    dataValue = '',
     ariaLabel = '',
+    announcement = '',
+    onReorderSettled = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
 
-  // The rocker reuses the three existing callers' keys verbatim, so it adds none (issue 1512).
-  const MOVE_UP_KEY = 'FABRICATE.Admin.Manager.ListErgonomics.MoveUp';
-  const MOVE_DOWN_KEY = 'FABRICATE.Admin.Manager.ListErgonomics.MoveDown';
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
+
+  const MOVE_UP_KEY = 'FABRICATE.Common.SortableList.MoveUp';
+  const MOVE_DOWN_KEY = 'FABRICATE.Common.SortableList.MoveDown';
   const REORDER_KEY = 'FABRICATE.Common.SortableList.Reorder';
   const REMOVE_KEY = 'FABRICATE.Common.SortableList.Remove';
 
@@ -65,11 +78,11 @@
   const list = $derived(Array.isArray(items) ? items : []);
   const ordered = $derived(reorderable !== false);
   const hasBody = $derived(Boolean(body) && (alwaysOpen || expandable));
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 
   let dragIndex = $state(-1);
-  let announcement = $state('');
+  let spoken = $state('');
   let listElement = $state(null);
+  let heard = untrack(() => announcement);
 
   // The emitted move whose focus has not landed. State, not a local: the effect reads it after the
   // caller has round-tripped the array, which is a later render.
@@ -169,12 +182,26 @@
     moveAndFollow(index, delta, `[data-sortable-move="${delta < 0 ? 'up' : 'down'}"]`);
   }
 
+  /** Arm a drag only when it began on this row's own grip; a Text node origin reads its parent. */
+  function armDrag(event, index) {
+    // `nodeType`, not `instanceof Element`: a node from another window is not this realm's Element.
+    const target = event.target;
+    const origin = target?.nodeType === 1 ? target : target?.parentElement;
+    const grip = origin?.closest(GRIP_SELECTOR);
+    // The grip must sit in this row's own line: a grip a body or nested list carries is not ours.
+    const owned =
+      grip?.closest('.fabricate-sortable-list-line')?.parentElement === event.currentTarget;
+    dragIndex = owned ? index : -1;
+  }
+
   /** The pointer path: the drop lands where the pointer is, so focus is left where it is. */
   function dropOn(targetIndex) {
     const from = dragIndex;
     dragIndex = -1;
     const moved = moveFrom(from, targetIndex);
-    if (moved) announcement = moved.sentence;
+    if (!moved) return;
+    spoken = moved.sentence;
+    onReorderSettled();
   }
 
   function onGripKeydown(event, index) {
@@ -202,26 +229,28 @@
     // A chevron that has just disabled itself at an end cannot take focus, so the grip takes it.
     const focusTarget = wanted && wanted.disabled !== true ? wanted : grip;
     focusTarget?.focus?.();
-    announcement = sentence;
+    spoken = sentence;
+  });
+
+  $effect(() => {
+    if (announcement === heard) return;
+    heard = announcement;
+    if (announcement) spoken = announcement;
   });
 </script>
 
 <ul
-  class="fabricate-sortable-list"
+  class={`fabricate-sortable-list${extraClasses}`}
   role="list"
   aria-label={ariaLabel || undefined}
   bind:this={listElement}
-  {...hookAttributes}
+  {...rest}
 >
   {#each list as item, index (idOf(item) || index)}
     <li
       class={`fabricate-sortable-list-row ${rowStateClasses(item, index)}`}
       {...rowAttributes(item)}
-      ondragstart={ordered
-        ? () => {
-            dragIndex = index;
-          }
-        : undefined}
+      ondragstart={ordered ? (event) => armDrag(event, index) : undefined}
       ondragend={ordered
         ? () => {
             dragIndex = -1;
@@ -264,9 +293,8 @@
             side="leading"
             expanded={isOpen(item)}
             controls={bodyId(item)}
-            label={nameOf(item)}
-            dataAttr="data-sortable-disclosure"
-            dataValue={idOf(item)}
+            ariaLabel={nameOf(item)}
+            data-sortable-disclosure={idOf(item) || true}
             onToggle={() => toggle(item)}
           />
         {/if}
@@ -279,7 +307,7 @@
               class="fabricate-sortable-list-move"
               size={CONTROL_SIZE}
               data-sortable-move="up"
-              ariaLabel={named(MOVE_UP_KEY, 'Move up', item)}
+              ariaLabel={named(MOVE_UP_KEY, 'Move {name} up', item)}
               disabled={index === 0}
               onclick={() => moveByRocker(index, -1)}
             >
@@ -289,7 +317,7 @@
               class="fabricate-sortable-list-move"
               size={CONTROL_SIZE}
               data-sortable-move="down"
-              ariaLabel={named(MOVE_DOWN_KEY, 'Move down', item)}
+              ariaLabel={named(MOVE_DOWN_KEY, 'Move {name} down', item)}
               disabled={index === list.length - 1}
               onclick={() => moveByRocker(index, 1)}
             >
@@ -330,4 +358,4 @@
   {#if footer}{@render footer()}{/if}
 </ul>
 
-<p class="visually-hidden" aria-live="polite" data-sortable-list-status>{announcement}</p>
+<p class="visually-hidden" aria-live="polite" data-sortable-list-status>{spoken}</p>

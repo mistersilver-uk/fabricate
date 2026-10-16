@@ -19,14 +19,12 @@ const DECLARED_PROPS = Object.freeze([
   'label',
   'icon',
   'tone',
-  'dataAttr',
-  'dataValue',
   'valueDataAttr',
   'labelDataAttr',
 ]);
 
-/** The hook props whose VALUE is an attribute name the component spreads onto an element. */
-const HOOK_NAME_PROPS = Object.freeze(['dataAttr', 'valueDataAttr', 'labelDataAttr']);
+/** The hook props whose value is an attribute name the component spreads onto an element. */
+const HOOK_NAME_PROPS = Object.freeze(['valueDataAttr', 'labelDataAttr']);
 
 const contract = defineClosedTokenContract({
   label: 'stat-box',
@@ -58,11 +56,11 @@ const contract = defineClosedTokenContract({
 
   keepInstead:
     "The grid the boxes sit in stays the caller's own element and carries the layout, and a " +
-    'per-site test hook rides the four named props — see `StatBox.svelte`',
+    'per-site test hook rides the rest spread and the two named props — see `StatBox.svelte`',
 
   hookAdvice:
     'All six hooks these two screens carry were written bare, and every assertion that reads ' +
-    'them is a presence selector. Pass the name through a hook prop instead',
+    'them is a presence selector. Write the root hook `data-x=""` instead',
 });
 
 /**
@@ -93,10 +91,14 @@ test('the stat box accepts exactly its declared props, none of which is a handle
   contract.assertNothingInteractive('the stat box emits an interactive element');
 });
 
-/** The second clause: a hook NAME is caller-supplied and spread, so it must be a `data-` name. */
+/**
+ * The second clause: a hook name is caller-supplied and spread, so it must be a `data-` name. The
+ * root's hook rides the rest spread, so every name a tag writes that is not a declared prop counts.
+ */
 test('every literal hook name a stat-box call site passes is a data- attribute', () => {
   contract.assertCallSitesAlive();
 
+  const declared = new Set(DECLARED_PROPS);
   const offenders = [];
   let literals = 0;
   for (const [file, tagSource] of contract.callSiteTags) {
@@ -107,6 +109,11 @@ test('every literal hook name a stat-box call site passes is a data- attribute',
         literals += 1;
         if (!value.startsWith('data-')) offenders.push(`${file}: ${prop}="${value}"`);
       }
+    }
+    for (const [, name] of tagSource.matchAll(/\s([A-Za-z][\w:-]*)=/g)) {
+      if (declared.has(name)) continue;
+      literals += 1;
+      if (!name.startsWith('data-')) offenders.push(`${file}: ${name}`);
     }
   }
 

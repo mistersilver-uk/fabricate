@@ -194,7 +194,7 @@ export function registerTagsCases() {
       !calls.some((call) => call[0] === 'removeCategory'),
       'nothing is removed before confirming'
     );
-    target.querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger').click();
+    target.querySelector('[data-vocabulary-confirm="potions"] .fabricate-button.is-danger').click();
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
@@ -313,7 +313,7 @@ export function registerTagsCases() {
     flushSync();
     assert.ok(target.querySelector('[data-vocabulary-confirm="reagent"]'));
     target
-      .querySelector('[data-vocabulary-confirm="reagent"] .manager-button:not(.is-danger)')
+      .querySelector('[data-vocabulary-confirm="reagent"] .fabricate-button:not(.is-danger)')
       .click();
     await tick();
     flushSync();
@@ -324,7 +324,7 @@ export function registerTagsCases() {
     target.querySelector('[aria-label="Remove component category Reagent"]').click();
     await tick();
     flushSync();
-    target.querySelector('[data-vocabulary-confirm="reagent"] .manager-button.is-danger').click();
+    target.querySelector('[data-vocabulary-confirm="reagent"] .fabricate-button.is-danger').click();
     await tick();
     flushSync();
     assert.ok(
@@ -706,7 +706,7 @@ export function registerTagsCases() {
       target.querySelector('[aria-label="Remove category Potions"]').click();
       await tick();
       flushSync();
-      target.querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger').click();
+      target.querySelector('[data-vocabulary-confirm="potions"] .fabricate-button.is-danger').click();
       await tick();
       flushSync();
       assert.ok(

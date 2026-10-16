@@ -1489,6 +1489,40 @@ test('CraftingEngine executes a matured v1 stage with only its trusted check res
   assert.equal(runManager.getRunHistory(actor)[0].runRevision, committedRevision);
 });
 
+// Issue 1644: the crafting detail marks the tier a roll routed through from the craft result.
+test('CraftingEngine records a successful stage outcome id on the craft result, a failed one none', async () => {
+  for (const [success, expected] of [[true, 'tier-fine'], [false, undefined]]) {
+    const { engine } = setupEngineFixture();
+    const actor = new FakeActor('crafter');
+    const source = new FakeActor('source');
+    engine.installVersionedRunAuthority({
+      consumeExecutionGrant: async (_grant, context) => ({
+        operationId: context.operation === 'start' ? 'start-operation' : 'execute-operation',
+        resolvedCheckResult: { success, outcome: 'Fine', value: 14, data: { outcomeId: 'tier-fine' } },
+      }),
+    });
+    const started = await engine.startVersionedRun({
+      viewer: game.user,
+      actor,
+      sourceActors: [source],
+      recipeId: 'recipe-1',
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+      executionGrant: 'start-grant',
+    });
+    game.time.worldTime = 1120;
+    const result = await engine.executeVersionedStage({
+      actor,
+      componentSourceActors: [source],
+      runId: started.runId,
+      expectedRevision: started.runRevision,
+      requestId: 'request-execute',
+      executionGrant: 'execute-grant',
+    });
+    assert.equal(result.success, success);
+    assert.equal(result.checkResult?.data?.outcomeId, expected, `success ${success}`);
+  }
+});
+
 test('CraftingEngine persists successful spend receipts before a later award ambiguity', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');

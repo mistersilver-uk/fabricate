@@ -8,7 +8,7 @@ import { mount } from 'svelte';
 import en from '../../../lang/en.json';
 import GatheringModifierEditor from '../../../src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
 import GatheringTaskEditView from '../../../src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
-import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import PickerRow from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 import RecipeItemLimitsTab from '../../../src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte';
 import { installFixtureI18n } from '../select-fixture-shared.js';
 
@@ -75,12 +75,13 @@ const FAMILIES = {
     clip: 'manager-editor-tab-panel',
     input: '[data-recipe-option-search]',
     mount: (target) =>
-      mount(RecipeIngredientOption, {
+      mount(PickerRow, {
         target,
         props: {
-          option: { quantity: 1, match: { type: 'component', componentId: null } },
-          componentOptions: NAMES,
-          onChange: (next) => commit(next.match.componentId),
+          value: { kind: 'component', id: '', tags: [], tagMatch: 'any', quantity: 1 },
+          kinds: ['component', 'tags'],
+          catalogue: { component: NAMES.map((entry) => ({ ...entry, icon: 'fas fa-cube' })) },
+          onChange: (next) => commit(next.id),
         },
       }),
   },
@@ -117,15 +118,19 @@ const FAMILIES = {
     clip: 'manager-task-component-browser-card',
     input: '[data-gathering-component-tag-search] input',
     ownsScroller: true,
-    mount: (target) =>
-      mount(GatheringTaskEditView, {
+    mount: (target) => {
+      // The component browser is a Results card (issue 1522), so the page above it is drawn here.
+      target.append(element('div', 'fixture-above'));
+      return mount(GatheringTaskEditView, {
         target,
         props: {
           task: { id: 'task-1', name: 'Forage', dropRows: [] },
+          activeTab: 'results',
           resolutionMode: 'd100',
           itemCards: NAMES.map((entry) => ({ ...entry, tags: [entry.id.replace('-', '')] })),
         },
-      }),
+      });
+    },
   },
 };
 

@@ -169,7 +169,7 @@ describe('the product axis switches losslessly (N1)', () => {
       '[data-check-roll-formula]',
       '[data-check-formula-average]',
       '[data-check-formula-average-withheld]',
-      '[data-check-formula-tokens]',
+      '.fab-expr-input-row',
     ]) {
       assert.ok(!state.root.querySelector(selector), `${selector} does not render in count`);
     }
@@ -235,10 +235,11 @@ describe('every pool control writes its own field (N1)', () => {
     const option = (value) => state.root.querySelector(`[data-check-count-base-mode-option="${value}"]`);
     assert.ok(option('value').classList.contains('is-active'), 'an expression reads Character value');
     assert.equal(state.root.querySelector('[data-check-count-base-expression]').value, AUTHORED_POOL.base);
-    assert.match(
-      state.root.querySelector('[data-check-count-base-resolution]').textContent,
-      /Idrin → 10/
-    );
+    const baseField = state.root
+      .querySelector('[data-check-count-base-expression]')
+      .closest('.manager-checks-value-field');
+    assert.equal(baseField.querySelector('[data-expr-input-reading="resolved"]').textContent, '= 10');
+    assert.ok(!baseField.querySelector('[data-check-count-base-resolution]'), 'and no line beside it');
     const writes = state.emitted.length;
     await state.act((root) => choose(root, 'data-check-count-base-mode-option', 'number'));
     assert.equal(state.emitted.length, writes, 'switching the mode writes nothing');

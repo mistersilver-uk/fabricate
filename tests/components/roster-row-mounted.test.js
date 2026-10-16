@@ -28,7 +28,7 @@ describe('RosterRow (mounted)', () => {
 
   it('reflects the granted state on the toggle (on)', async () => {
     const root = await harness.mount({ name: 'Bob', granted: true });
-    const toggle = root.querySelector('.manager-status-toggle');
+    const toggle = root.querySelector('.fabricate-toggle');
     assert.ok(toggle.classList.contains('is-on'));
     assert.equal(toggle.getAttribute('aria-pressed'), 'true');
     assert.equal(root.querySelector('.manager-status-toggle-label').textContent, 'On');
@@ -36,7 +36,7 @@ describe('RosterRow (mounted)', () => {
 
   it('reflects the revoked state on the toggle (off)', async () => {
     const root = await harness.mount({ name: 'Bob', granted: false });
-    const toggle = root.querySelector('.manager-status-toggle');
+    const toggle = root.querySelector('.fabricate-toggle');
     assert.ok(toggle.classList.contains('is-off'));
     assert.equal(toggle.getAttribute('aria-pressed'), 'false');
     assert.equal(root.querySelector('.manager-status-toggle-label').textContent, 'Off');
@@ -45,7 +45,7 @@ describe('RosterRow (mounted)', () => {
   it('calls onToggle with the negated granted value when clicked', async () => {
     const calls = [];
     const root = await harness.mount({ name: 'Bob', granted: false, onToggle: (v) => calls.push(v) });
-    root.querySelector('.manager-status-toggle').click();
+    root.querySelector('.fabricate-toggle').click();
     assert.deepEqual(calls, [true]);
   });
 

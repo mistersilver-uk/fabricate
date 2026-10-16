@@ -84,7 +84,7 @@
 
   .check-evidence {
     --journal-fact-key-width: 120px;
-    container-type: inline-size;
+    container: fabricate-check-evidence / inline-size;
     overflow: hidden;
   }
 
@@ -95,7 +95,7 @@
   }
 
   /* The Crafting run column is about 289px wide: the rows take the chat card's key column. */
-  @container (max-width: 360px) {
+  @container fabricate-check-evidence (max-width: 360px) {
     .check-evidence-row {
       --journal-fact-key-width: 88px;
     }

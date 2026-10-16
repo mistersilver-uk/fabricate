@@ -1,6 +1,5 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -15,7 +14,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    'src/ui/svelte/util/gatheringFormat.js'
+    'src/ui/svelte/util/gatheringFormat.js',
+    'src/ui/svelte/util/dropRateTier.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive
   // `ui-visual-style/spec.md` §Shared product UI primitives names. Omitting it does not fail
@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/BandedBar.svelte',
     'src/ui/svelte/apps/gathering/ChanceBar.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/gathering/ChanceBar.svelte'
@@ -36,99 +37,66 @@ afterEach(() => harness.remount());
 describe('ChanceBar (mounted)', () => {
   it('renders nothing when value is null', async () => {
     const root = await harness.mount({ value: null, scale: 'success' });
-    assert.equal(root.querySelector('[role="meter"]'), null);
+    assert.ok(!root.querySelector('[role="meter"]'), 'no meter for a null value');
   });
 
   it('renders a success meter with the success data-attribute and no tier', async () => {
     const root = await harness.mount({ value: 1, scale: 'success' });
-    const meter = root.querySelector('.chance-bar');
-    assert.ok(meter, 'expected a .chance-bar root (success)');
+    // A single-row `BandedBar` is a meter (issue 1782).
+    const meter = root.querySelector('.fab-banded-bar[role="meter"]');
+    assert.ok(meter, 'expected a single-row banded meter (success)');
     assert.equal(meter.getAttribute('data-gathering-success-value'), '100');
     assert.equal(meter.getAttribute('aria-valuenow'), '100');
     assert.equal(meter.getAttribute('aria-valuemin'), '0');
     assert.equal(meter.getAttribute('aria-valuemax'), '100');
-    assert.equal(meter.getAttribute('data-gathering-event-value'), null);
-    // The caption moved onto the shared `Kicker` leaf (issue 1514).
+    assert.ok(!meter.hasAttribute('data-gathering-event-value'), 'no event hook on the success scale');
+    assert.match(
+      meter.getAttribute('aria-label'),
+      /^FABRICATE\.App\.Gathering\.Detail\.SuccessChance:/,
+      'the sentence naming the chance replaces the caption as the name'
+    );
     assert.ok(Boolean(root.querySelector('.fab-kicker')), 'the caption renders as a kicker');
-    // The fill moved into the shared `FillBar` leaf (issue 1096). Retargeted rather than
-    // deleted: the value-width binding is the thing this line has always been proving, and
-    // an assertion left pointing at the retired `.chance-bar-fill` would have passed
-    // vacuously the moment `querySelector` started returning null had it been a truthiness
-    // check instead of a read.
     assert.match(
       root.querySelector('.fab-fill-bar-fill').getAttribute('style'),
       /^width: 100%;?$/
     );
-    assert.equal(root.querySelector('.chance-bar-percent').textContent, '100%');
+    assert.equal(root.querySelector('[data-banded-bar-percent]').textContent, '100%');
   });
 
   it('hides the caption when showCaption is false', async () => {
     const root = await harness.mount({ value: 0.5, scale: 'success', showCaption: false });
     assert.ok(!root.querySelector('.fab-kicker'), 'no kicker is rendered');
-    assert.ok(root.querySelector('.chance-bar'));
+    assert.ok(root.querySelector('[role="meter"]').getAttribute('aria-label'), 'and it stays named');
   });
 
   it('renders an event meter with the event data-attributes', async () => {
     const root = await harness.mount({ value: 0.5, scale: 'event' });
-    const meter = root.querySelector('.chance-bar');
-    assert.ok(meter, 'expected a .chance-bar root (event)');
+    const meter = root.querySelector('[role="meter"]');
+    assert.ok(meter, 'expected a meter (event)');
     assert.equal(meter.getAttribute('data-gathering-event-value'), '50');
-    assert.equal(meter.getAttribute('data-gathering-success-value'), null);
+    assert.ok(!meter.hasAttribute('data-gathering-success-value'), 'no success hook on the event scale');
     assert.equal(meter.getAttribute('aria-valuenow'), '50');
   });
 
-  it('maps the event tier ladder to the right class and data-attribute', async () => {
+  it('reads the event scale off the risk ramp, one named fill per tier', async () => {
+    // Ruling 4 (issue 1782): four bands, and the middle one is a named theme colour.
     const cases = [
-      [0.8, 'red'],
-      [0.6, 'amber'],
-      [0.3, 'yellow'],
-      [0.1, 'green']
+      [0.8, 'red', { tone: 'danger', style: '' }],
+      [0.6, 'amber', { tone: 'success', style: 'var(--fab-hazard-mid)' }],
+      [0.3, 'yellow', { tone: 'warning', style: '' }],
+      [0.1, 'green', { tone: 'success', style: '' }],
     ];
-    for (const [value, tier] of cases) {
+    for (const [value, tier, fill] of cases) {
       const root = await harness.mount({ value, scale: 'event' });
-      const meter = root.querySelector('.chance-bar');
-      assert.ok(meter.classList.contains(`tier-${tier}`), `value ${value} should be tier-${tier}`);
-      assert.equal(meter.getAttribute('data-gathering-event-tier'), tier);
+      const meter = root.querySelector('[role="meter"]');
+      assert.equal(meter.getAttribute('data-gathering-event-tier'), tier, `${value} is ${tier}`);
+      const bar = root.querySelector('.fab-fill-bar');
+      assert.equal(bar.getAttribute('data-fill-bar-tone'), fill.tone, `${tier} takes its tone`);
+      const style = root.querySelector('.fab-fill-bar-fill').getAttribute('style') || '';
+      if (fill.style) assert.ok(style.includes(fill.style), `${tier} paints ${fill.style}`);
+      else assert.doesNotMatch(style, /background/, `${tier} leaves the tone in charge`);
       harness.remount();
     }
-  });
-
-  it('routes the event fill through the tier custom property, and keeps four DISTINCT values', async () => {
-    // The tier classes used to select four rules in this component's own scoped block.
-    const root = await harness.mount({ value: 0.6, scale: 'event' });
-    const fill = root.querySelector('.fab-fill-bar-fill');
-    assert.match(fill.getAttribute('style') || '', /background:\s*var\(--chance-bar-fill\)/);
-
-    const source = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/gathering/ChanceBar.svelte'),
-      'utf8'
-    );
-    const declared = [...source.matchAll(/\.chance-bar\.tier-\w+\s*\{\s*--chance-bar-fill:\s*([^;]+);/g)].map(
-      ([, value]) => value.trim()
-    );
-    assert.equal(declared.length, 4, `expected four tier declarations, got ${declared.length}`);
-    assert.equal(new Set(declared).size, 4, `expected four distinct fills, got ${declared}`);
-    for (const colour of declared) {
-      assert.match(colour, /var\(--fab-/, `${colour} should resolve through a theme token`);
-    }
-
-    // And a DEFAULT on the base class. `var()` with no value and no fallback resolves to the
-    // guaranteed-invalid value, so `background` falls back to `transparent` — a fill that
-    // paints nothing, under a caption reading a real percentage. The default is declared at
-    // lower specificity than the four tiers, so it can only ever apply when none of them does.
-    const base = /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*(var\(--fab-[\w-]+\));/.exec(
-      source
-    );
-    assert.ok(Boolean(base), 'the base .chance-bar rule declares a fallback fill');
-    // And it is a NAMED neutral, not "any theme token". Accepting any `--fab-*` let the fill
-    // of last resort be `--fab-danger` — byte-identical to `tier-red`, so a bar whose tier
-    // rule never applied was indistinguishable from the scale's most alarming reading — and
-    // would equally accept `--fab-success` under a danger caption.
-    assert.equal(base[1], 'var(--fab-text-subtle)', 'the last-resort fill is a subtle neutral');
-    assert.ok(
-      !declared.includes(base[1]),
-      `the fallback must not be one of the four tier colours, got ${base[1]}`
-    );
   });
 
   it('leaves the success scale on the primitive semantic tone, with no inline colour', async () => {

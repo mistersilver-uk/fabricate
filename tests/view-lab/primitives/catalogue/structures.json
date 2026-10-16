@@ -1,0 +1,1415 @@
+[
+  {
+    "spec": "<PageHeader> <TabBar>",
+    "draws": ".stage.b0.col > div > div:nth-child(2)",
+    "path": "src/ui/svelte/components/EditorTabs.svelte",
+    "undrawn": {
+      "Frontier Outpost sections": "the tab list’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "tabs": [
+        {
+          "id": "tiers",
+          "label": "Tiers"
+        },
+        {
+          "id": "businesses",
+          "label": "Businesses"
+        },
+        {
+          "id": "validation",
+          "label": "Validation"
+        },
+        {
+          "id": "settings",
+          "label": "Settings"
+        }
+      ],
+      "activeTab": "tiers",
+      "badges": {
+        "tiers": {
+          "vehicle": "count",
+          "label": 3
+        },
+        "businesses": {
+          "vehicle": "count",
+          "label": 23
+        },
+        "validation": {
+          "tone": "warning",
+          "label": 3
+        }
+      },
+      "ariaLabel": "Frontier Outpost sections"
+    }
+  },
+  {
+    "spec": "<SelectionBar> <BulkEditPanel>",
+    "draws": ".stage.col > div:nth-child(1)",
+    "path": "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte",
+    "props": {
+      "pageSelectionState": "some",
+      "count": 4,
+      "showSelectAllResults": true,
+      "selectAllResultsCount": 412
+    }
+  },
+  {
+    "spec": "<SelectionBar> <BulkEditPanel>",
+    "draws": ".stage.col > div:nth-child(2)",
+    "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
+    "inset": 12,
+    "fixture": "BulkEditPanelStatus",
+    "undrawn": {
+      "unchanged": "an option’s value, which its segment shows by its label",
+      "enable": "an option’s value, which its segment shows by its label",
+      "disable": "an option’s value, which its segment shows by its label"
+    },
+    "props": {
+      "heading": "4 essences selected",
+      "applyLabel": "Apply to 3 essences",
+      "canApply": true,
+      "subjectCount": 4,
+      "blocked": [
+        {
+          "id": "moonsilver",
+          "reason": "Moonsilver is referenced by a locked compendium."
+        }
+      ]
+    },
+    "data": {
+      "labelKey": "FABRICATE.Admin.Manager.Essence.Status.Label",
+      "options": [
+        {
+          "value": "unchanged",
+          "labelKey": "FABRICATE.Admin.Manager.BulkEdit.Unchanged"
+        },
+        {
+          "value": "enable",
+          "labelKey": "FABRICATE.Admin.Manager.Essence.BulkEdit.Enable"
+        },
+        {
+          "value": "disable",
+          "labelKey": "FABRICATE.Admin.Manager.Essence.BulkEdit.Disable"
+        }
+      ],
+      "value": "unchanged",
+      "groupName": "essence-bulk-status"
+    },
+    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it, and the track is 34px where the drawing’s is 36."
+  },
+  {
+    "spec": "<Modal>",
+    "draws": ".stage.b0 > div",
+    "path": "src/ui/svelte/components/Modal.svelte",
+    "slot": {
+      "width": 640,
+      "height": 300
+    },
+    "undrawn": {
+      "Close": "the close button’s accessible name; the drawing draws its glyph"
+    },
+    "props": {
+      "open": true,
+      "title": "Map imported folders",
+      "subtitle": "Three folders in this pack have no match in your world.",
+      "closeLabel": "Close"
+    },
+    "snippets": {
+      "body": [
+        {
+          "tag": "div",
+          "attrs": {
+            "style": "display:flex;align-items:center;gap:10px"
+          },
+          "children": [
+            {
+              "tag": "strong",
+              "attrs": {
+                "style": "flex:1;font-size:12px"
+              },
+              "text": "Karrun / Metals"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "width:160px;padding:4px 8px;border-radius:6px;font-size:12px;background:var(--fab-surface-soft);color:var(--fab-text)"
+              },
+              "text": "Metals"
+            }
+          ]
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "style": "display:flex;align-items:center;gap:10px"
+          },
+          "children": [
+            {
+              "tag": "strong",
+              "attrs": {
+                "style": "flex:1;font-size:12px"
+              },
+              "text": "Karrun / Hafts"
+            },
+            {
+              "tag": "span",
+              "attrs": {
+                "style": "width:160px;padding:4px 8px;border-radius:6px;font-size:12px;background:var(--fab-surface-soft);color:var(--fab-text)"
+              },
+              "text": "Create new"
+            }
+          ]
+        }
+      ],
+      "footer": [
+        {
+          "tag": "button",
+          "attrs": {
+            "type": "button",
+            "class": "fabricate-button fab-manager-button is-ghost",
+            "data-keyboard-focus": "true"
+          },
+          "text": "Cancel"
+        },
+        {
+          "tag": "button",
+          "attrs": {
+            "type": "button",
+            "class": "fabricate-button fab-manager-button is-primary",
+            "data-keyboard-focus": "true"
+          },
+          "text": "Import 412 records"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Pagination> <FilterBar>",
+    "cap": "pagination — count left, pager centred, size right",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/Pagination.svelte",
+    "props": {
+      "totalCount": 412,
+      "pageSize": 25,
+      "pageIndex": 0,
+      "pageSizeOptions": [10, 25, 50]
+    },
+    "note": "The per-page choice ships as a `Select`, so the drawn segments are not a `SegmentedControl` and keep the kit's default paint."
+  },
+  {
+    "spec": "<Pagination> <FilterBar>",
+    "cap": "filter bar — inline form, with sort",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/FilterBar.svelte",
+    "fixture": "FilterBarRecipes",
+    "partial": "no toggles",
+    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so Enabled only and Craftable stay drawn. The sort button draws only the caller’s direction word, Asc: the shipped button draws its arrow glyph beside that word and the drawing draws the glyph alone, but no shared button takes a glyph as a prop and a fixture may not author an `<i>`, so neither glyph stands live.",
+    "undrawn": {
+      "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "all": "an option’s value, not its words",
+      "mine": "an option’s value, not its words",
+      "shared": "an option’s value, not its words",
+      "name": "an option’s value, not its words",
+      "Recipe scope": "the scope switch’s accessible name; the drawing draws no name",
+      "toolbar": "the sort select’s size rung, a value rather than a word",
+      "Sort recipes": "the sort select’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "Toggle sort direction": "the sort button’s accessible name, the shipped recipe browser’s; the drawing draws no name",
+      "Asc": "the sort button’s direction word, as the shipped recipe browser draws it beside its arrow glyph; the drawing draws the glyph alone, and a fixture cannot author either glyph"
+    },
+    "props": { "ariaLabel": "Recipe filters", "class": "manager-recipe-toolbar" },
+    "data": {
+      "searchLabel": "Search recipes",
+      "scopes": [
+        { "value": "all", "fallback": "All" },
+        { "value": "mine", "fallback": "Mine" },
+        { "value": "shared", "fallback": "Shared" }
+      ],
+      "scope": "all",
+      "scopeLabel": "Recipe scope",
+      "sorts": [{ "value": "name", "label": "Name" }],
+      "sort": "name",
+      "sortSize": "toolbar",
+      "sortLabelKey": "FABRICATE.Admin.Manager.Recipe.SortLabel",
+      "directionKey": "FABRICATE.Admin.Manager.Recipe.SortAscending",
+      "directionLabelKey": "FABRICATE.Admin.Manager.Recipe.ToggleSortDirection",
+      "class": "manager-recipe-sort-direction"
+    },
+    "content": [
+      { "tag": "span", "attrs": { "class": "manager-recipe-count" }, "text": "18 of 412" }
+    ]
+  },
+  {
+    "spec": "<AppTitleBar>",
+    "draws": ".stage.col > div",
+    "path": "src/ui/svelte/components/AppTitleBar.svelte",
+    "props": { "premiumInstalled": true, "statusLabel": "Routed by check · 3 outcome tiers" }
+  },
+  {
+    "spec": "<NavSidebar>",
+    "cap": "app rail 72",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/NavSidebar.svelte",
+    "window": "player",
+    "note": "The icon variant, the player rail. The sidebar and collapsed units stay drawn: the labelled variant draws its rows through `content(rows)`, a snippet handed the rows to draw, which a row cannot carry. It stands in the player window’s area class, as `SvelteFabricateApp` frames the rail: in the manager’s frame, Foundry core’s `button.active` ring drew an orange outline on Crafting, which `fabricate.css` removes only under `.fabricate-app`. The square, full-bleed ground is the shipped rail’s own; the drawing frames the rail as a rounded panel.",
+    "undrawn": {
+      "Fabricate sections": "the tab list’s accessible name; the drawing draws no name"
+    },
+    "props": {
+      "variant": "icon",
+      "label": "Fabricate sections",
+      "panelId": "pl-player-nav-panel",
+      "items": [
+        {
+          "id": "crafting",
+          "domId": "pl-player-nav-tab-crafting",
+          "icon": "fas fa-hammer",
+          "label": "Crafting",
+          "current": true
+        },
+        {
+          "id": "alchemy",
+          "domId": "pl-player-nav-tab-alchemy",
+          "icon": "fas fa-flask",
+          "label": "Alchemy"
+        },
+        {
+          "id": "gathering",
+          "domId": "pl-player-nav-tab-gathering",
+          "icon": "fas fa-leaf",
+          "label": "Gather"
+        },
+        {
+          "id": "journal",
+          "domId": "pl-player-nav-tab-journal",
+          "icon": "fas fa-book-open",
+          "label": "Journal",
+          "markers": [
+            {
+              "kind": "count",
+              "value": 4
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<NavSidebar>",
+    "cap": "sidebar 220 — expanded",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/NavSidebarRows.svelte",
+    "fixture": "InNavSidebar",
+    "partial": "rows only — no scope card, section kickers or rail box",
+    "undrawn": {
+      "page": "the current row's `aria-current` value, which the drawing shows as the active plate",
+      "Manager sections": "the nav’s accessible name, the shipped rail’s own copy; the drawing names no landmark",
+      "Collapse crafting menu": "the chevron’s accessible name; the drawing draws its glyph",
+      "Crafting sections": "the submenu group’s accessible name; the drawing names no group"
+    },
+    "props": {
+      "entries": [
+        {
+          "id": "overview",
+          "domId": "pl-nav-overview",
+          "icon": "fas fa-table-cells-large",
+          "label": "System Overview",
+          "active": false,
+          "markers": [
+            {
+              "kind": "count",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "kind": "group",
+          "id": "crafting",
+          "expanded": true,
+          "parent": {
+            "id": "crafting",
+            "domId": "pl-nav-crafting",
+            "icon": "fas fa-hammer",
+            "label": "Crafting",
+            "active": false,
+            "markers": [
+              {
+                "kind": "count",
+                "value": 418
+              }
+            ]
+          },
+          "toggle": {
+            "domId": "pl-nav-crafting-toggle",
+            "label": "Collapse crafting menu"
+          },
+          "submenu": {
+            "domId": "pl-nav-crafting-submenu",
+            "label": "Crafting sections"
+          },
+          "children": [
+            {
+              "id": "recipes",
+              "domId": "pl-nav-recipes",
+              "icon": "fas fa-list",
+              "label": "Recipes",
+              "current": "page",
+              "active": true,
+              "markers": [
+                {
+                  "kind": "count",
+                  "value": 412
+                }
+              ]
+            },
+            {
+              "id": "books",
+              "domId": "pl-nav-books",
+              "icon": "fas fa-book",
+              "label": "Books & Scrolls",
+              "active": false,
+              "markers": [
+                {
+                  "kind": "count",
+                  "value": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "component-catalogue",
+          "domId": "pl-nav-component-catalogue",
+          "icon": "fas fa-table-cells-large",
+          "label": "Component catalogue",
+          "active": false,
+          "markers": [
+            {
+              "kind": "count",
+              "value": 412
+            }
+          ]
+        }
+      ]
+    },
+    "data": {
+      "labelKey": "FABRICATE.Admin.Manager.ManagerSections"
+    },
+    "note": "The rows stand inside `<NavSidebar variant=\"labelled\">`'s own `content` snippet, the parent the sheet roots their family at; the scope card, the kickers and the box around them are the manager rail's own markup."
+  },
+  {
+    "spec": "<PageHeader> <TabBar>",
+    "draws": ".stage.b0.col > div > div:nth-child(1)",
+    "path": "src/ui/svelte/components/PageHeader.svelte",
+    "note": "The header block above the tab bar, its two actions passed as the `actions` snippet.",
+    "props": {
+      "breadcrumbs": [
+        {
+          "label": "World"
+        },
+        {
+          "label": "Economy"
+        },
+        {
+          "label": "Templates"
+        },
+        {
+          "label": "Frontier Outpost"
+        }
+      ],
+      "title": "Frontier Outpost",
+      "subtitle": "Curate the growth path: which businesses a tier activates, how far they are granted free, and the gates that advance or decline the settlement."
+    },
+    "snippets": {
+      "actions": [
+        {
+          "tag": "div",
+          "attrs": {
+            "class": "manager-header-actions"
+          },
+          "children": [
+            {
+              "tag": "button",
+              "attrs": {
+                "type": "button",
+                "class": "fabricate-button fab-manager-button is-ghost",
+                "data-keyboard-focus": "true"
+              },
+              "children": [
+                {
+                  "tag": "i",
+                  "attrs": {
+                    "class": "fas fa-arrow-left",
+                    "aria-hidden": "true"
+                  }
+                },
+                "All templates"
+              ]
+            },
+            {
+              "tag": "button",
+              "attrs": {
+                "type": "button",
+                "class": "fabricate-button fab-manager-button is-primary",
+                "data-keyboard-focus": "true"
+              },
+              "children": ["Save"]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "default — 38px chip, 12px sans name",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowDefaultBrowse",
+    "partial": "status button stays drawn",
+    "undrawn": {
+      "Export system": "a menu item’s label; the drawing draws the menu closed",
+      "Delete system": "a menu item’s label; the drawing draws the menu closed",
+      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+    },
+    "props": {
+      "name": "Riverbridge",
+      "icon": "fas fa-book",
+      "tint": "peach",
+      "density": "default",
+      "markSize": 38,
+      "selected": true
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-table-cells-large",
+                "aria-hidden": "true"
+              }
+            },
+            " Frontier Mining Town"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-leaf",
+                "aria-hidden": "true"
+              }
+            },
+            " Ironvale"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-star",
+                "aria-hidden": "true"
+              }
+            },
+            " 3 businesses"
+          ]
+        }
+      ]
+    },
+    "data": {
+      "chips": [
+        {
+          "label": "Reopened Mine",
+          "tone": "success"
+        },
+        {
+          "label": "L 2",
+          "tone": "neutral"
+        }
+      ],
+      "items": [
+        {
+          "id": "export",
+          "labelKey": "FABRICATE.Admin.Manager.ExportSystem",
+          "icon": "fas fa-file-export"
+        },
+        {
+          "id": "delete",
+          "labelKey": "FABRICATE.Admin.Manager.DeleteSystem",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ],
+      "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+    },
+    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and the kebab is `ActionMenu`’s `IconButton` trigger, 34px with a 1px border at radius 9 and the vertical `fa-ellipsis-vertical` every shipped menu uses, where the drawing’s is a 28px borderless square at radius 7 with horizontal dots."
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "default — 38px chip, 12px sans name",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowDefaultBrowse",
+    "partial": "status button stays drawn",
+    "undrawn": {
+      "Export system": "a menu item’s label; the drawing draws the menu closed",
+      "Delete system": "a menu item’s label; the drawing draws the menu closed",
+      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+    },
+    "props": {
+      "name": "Oakhollow",
+      "icon": "fas fa-leaf",
+      "tint": "sage",
+      "density": "default",
+      "markSize": 38,
+      "selected": false
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-table-cells-large",
+                "aria-hidden": "true"
+              }
+            },
+            " Farming Hamlet"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-leaf",
+                "aria-hidden": "true"
+              }
+            },
+            " Greenmarch"
+          ]
+        }
+      ]
+    },
+    "data": {
+      "chips": [
+        {
+          "label": "L 1",
+          "tone": "neutral"
+        }
+      ],
+      "items": [
+        {
+          "id": "export",
+          "labelKey": "FABRICATE.Admin.Manager.ExportSystem",
+          "icon": "fas fa-file-export"
+        },
+        {
+          "id": "delete",
+          "labelKey": "FABRICATE.Admin.Manager.DeleteSystem",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ],
+      "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+    },
+    "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "selectable dense — the Journal’s Active run",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowRunCard",
+    "partial": "no countdown",
+    "undrawn": {
+      "Progress": "the stage bars' accessible name, the Journal's own copy; the drawing names no group"
+    },
+    "props": {
+      "name": "Karrun Warblade",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "markSize": 30,
+      "truncateName": true,
+      "selected": true
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Brenna"
+        },
+        {
+          "tag": "span",
+          "text": "Stage 2 of 2"
+        }
+      ]
+    },
+    "content": [
+      {
+        "tag": "span",
+        "attrs": {
+          "role": "img",
+          "aria-label": "Finishes this stage as time passes",
+          "data-tooltip": "Finishes this stage as time passes",
+          "style": "flex:0 0 auto;color:var(--fab-accent);font-size:10px;line-height:1"
+        },
+        "children": [
+          {
+            "tag": "i",
+            "attrs": {
+              "class": "fas fa-bolt",
+              "aria-hidden": "true"
+            }
+          }
+        ]
+      }
+    ],
+    "data": {
+      "statusKey": "FABRICATE.App.Journal.Status.inProgress",
+      "statusIcon": "fas fa-gear",
+      "tone": "info",
+      "stages": [
+        {
+          "status": "done"
+        },
+        {}
+      ],
+      "current": 1,
+      "progress": 40,
+      "progressKey": "FABRICATE.App.Journal.Progress.Label"
+    },
+    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars as the aside beneath the one button. The bolt arrives as the row's `content`, its paint restated from `RunCard`'s scoped `.journal-run-card-bolt`. The countdown stays drawn: it shares the aside with the bars inside `RunCard`'s own timing block, which a row's one `content` cannot reach."
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "selectable dense — the Journal’s Active run",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowRunCard",
+    "props": {
+      "name": "Ingotwort Oil",
+      "icon": "fas fa-flask",
+      "tint": "lavender",
+      "markSize": 30,
+      "truncateName": true,
+      "selected": false
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Brenna"
+        },
+        {
+          "tag": "span",
+          "text": "Stage 1 of 2"
+        }
+      ]
+    },
+    "data": {
+      "statusKey": "FABRICATE.App.Journal.Status.paused",
+      "statusIcon": "fas fa-pause",
+      "tone": "neutral"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "default with an aside — a leading thumb, block content beneath",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "fixture": "ListRowGatheringTask",
+    "partial": "art mark, not the 56px thumb; no badges; the caption stands above its bar",
+    "props": {
+      "name": "Gather Ironvale ore",
+      "icon": "fas fa-leaf",
+      "tint": "sage",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Ironvale"
+        },
+        {
+          "tag": "span",
+          "text": "Mining"
+        }
+      ]
+    },
+    "data": {
+      "chanceLabelKey": "FABRICATE.App.Gathering.Detail.SuccessChanceLabel",
+      "chanceKey": "FABRICATE.App.Gathering.Detail.SuccessChance",
+      "percent": 62,
+      "fill": "success"
+    },
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button, `ChanceBar`'s composition inlined because `ChanceBar` is app-scoped. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "dense — the cross-reference and result form",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/XrefList.svelte",
+    "props": {
+      "label": "Appears in",
+      "items": [
+        {
+          "id": "karrun-warblade",
+          "name": "Karrun Warblade",
+          "icon": "fas fa-hammer",
+          "tint": "mist",
+          "quantity": "×2"
+        },
+        {
+          "id": "ironvale-plate",
+          "name": "Ironvale Plate",
+          "icon": "fas fa-hammer",
+          "tint": "mist",
+          "quantity": "×4"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/components/ViewToggle.svelte",
+    "props": {
+      "view": "list",
+      "listLabel": "List",
+      "gridLabel": "Grid",
+      "ariaLabel": "Presentation"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "note": "The card layout, the same row model on one track, its facts passed as the `meta` snippet. The list and grid switcher above it is the live ViewToggle row.",
+    "props": {
+      "name": "Steel Ingot",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "layout": "card",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Metal"
+        },
+        {
+          "tag": "span",
+          "text": "#Refined"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "props": {
+      "name": "Ingotwort Oil",
+      "icon": "fas fa-flask",
+      "tint": "lavender",
+      "layout": "card",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Reagent"
+        },
+        {
+          "tag": "span",
+          "text": "#Alchemy"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "check rows — systems, one staged, paged",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
+    "props": {
+      "id": "systems",
+      "kind": "check",
+      "placeholder": "Search systems",
+      "rows": [
+        {
+          "id": "karrun",
+          "name": "Karrun Forgecraft",
+          "state": "on",
+          "meta": "Staged"
+        },
+        {
+          "id": "wildwood",
+          "name": "Wildwood Alchemy",
+          "state": "off"
+        },
+        {
+          "id": "glassworks",
+          "name": "Glassworks",
+          "state": "off"
+        },
+        {
+          "id": "herbcraft",
+          "name": "Herbcraft",
+          "state": "off"
+        },
+        {
+          "id": "jewelcraft",
+          "name": "Jewelcraft",
+          "state": "off"
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 2,
+        "rangeStart": 1,
+        "rangeEnd": 5,
+        "total": 7
+      }
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "tri rows — tags, one added and one removed, with n/N",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
+    "props": {
+      "id": "tags",
+      "kind": "tri",
+      "placeholder": "Search tags",
+      "rows": [
+        {
+          "id": "ore",
+          "name": "ore",
+          "state": "add",
+          "meta": "1/2"
+        },
+        {
+          "id": "ingot",
+          "name": "ingot",
+          "state": "remove",
+          "meta": "2/2"
+        },
+        {
+          "id": "moss",
+          "name": "moss",
+          "state": "off",
+          "meta": "0/2"
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 1,
+        "rangeStart": 1,
+        "rangeEnd": 3,
+        "total": 3
+      }
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "stepper rows — essence values, one set",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "Debt (#2368): the n/N and range inks are 9px --fab-text-subtle, which falls under 4.5:1 in six themes, so the drawing uses --fab-text-muted, and --fab-text-secondary on a staged row, the lowest inks that pass.",
+    "props": {
+      "id": "essences",
+      "kind": "stepper",
+      "placeholder": "Search essences",
+      "rows": [
+        {
+          "id": "fire",
+          "name": "Fire",
+          "icon": "fas fa-flask",
+          "colorToken": "rose",
+          "meta": "1/2",
+          "value": 2,
+          "state": "set",
+          "active": true,
+          "min": 0
+        },
+        {
+          "id": "earth",
+          "name": "Earth",
+          "icon": "fas fa-leaf",
+          "colorToken": "sage",
+          "meta": "0/2",
+          "value": null,
+          "state": "unchanged",
+          "min": 0
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 1,
+        "rangeStart": 1,
+        "rangeEnd": 2,
+        "total": 2
+      }
+    }
+  },
+  {
+    "spec": "<ValidationSummary>",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/EditorValidationSurface.svelte",
+    "note": "No title and no intro, so no head block, as drawn. The count tiles and the status pills keep the surface's own words, which no caller passes. Each row’s `viewLabel` is the plain word “Fix” where the API takes a lang key: it renders through `localize`’s fallback, which returns an unknown key as written.",
+    "props": {
+      "title": "",
+      "summary": {
+        "status": "warn",
+        "icon": "fas fa-triangle-exclamation",
+        "title": "Nearly ready",
+        "sub": "Three warnings, one blocking issue. Players cannot craft this until the blocker clears."
+      },
+      "counts": {
+        "passing": 12,
+        "warnings": 3,
+        "blocking": 1
+      },
+      "groups": [
+        {
+          "id": "steps",
+          "icon": "fas fa-clipboard-check",
+          "label": "Steps",
+          "rows": [
+            {
+              "id": "step-ingredients",
+              "status": "block",
+              "title": "Step 2 has no ingredients",
+              "detail": "A step must consume at least one component, tag or essence.",
+              "target": "steps",
+              "viewLabel": "Fix"
+            },
+            {
+              "id": "critical-tier",
+              "status": "warn",
+              "title": "Critical routes to a missing tier",
+              "detail": "The result set will never be produced.",
+              "target": "results",
+              "viewLabel": "Fix"
+            },
+            {
+              "id": "counting-formula",
+              "status": "warn",
+              "title": "This formula counts successes, but the check adds the dice",
+              "detail": "The total of 2d20cs<=@skills.survival.value is a count, so every bonus and DC here is measured against the wrong number.",
+              "action": {
+                "labelKey": "FABRICATE.Admin.Manager.Checks.Count.Convert.Action"
+              }
+            },
+            {
+              "id": "ingredients-resolve",
+              "status": "pass",
+              "title": "Every ingredient resolves"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<DataTable>",
+    "draws": ".spec-head + .stage.col > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "fixture": "DataTableHistory",
+    "undrawn": {
+      "desc": "the sort’s direction, which the drawing shows as the When column’s glyph",
+      "Search runs": "the search field’s accessible name; the drawing names no field"
+    },
+    "props": {
+      "heading": "Craft history",
+      "count": 128,
+      "columns": [
+        {
+          "key": "when",
+          "label": "When",
+          "sortable": true,
+          "mono": true
+        },
+        {
+          "key": "recipe",
+          "label": "Recipe"
+        },
+        {
+          "key": "crafter",
+          "label": "Crafter"
+        },
+        {
+          "key": "outcome",
+          "label": "Outcome"
+        },
+        {
+          "key": "produced",
+          "label": "Produced"
+        }
+      ],
+      "rows": [
+        {
+          "id": "day-214",
+          "when": "Day 214",
+          "recipe": "Karrun Warblade",
+          "crafter": "Brenna",
+          "outcome": "Critical",
+          "tone": "success",
+          "produced": "Masterwork ×1"
+        },
+        {
+          "id": "day-211",
+          "when": "Day 211",
+          "recipe": "Ingotwort Draught",
+          "crafter": "Vosk",
+          "outcome": "Failed",
+          "tone": "danger",
+          "produced": "—"
+        },
+        {
+          "id": "day-209",
+          "when": "Day 209",
+          "recipe": "Karrun Warblade",
+          "crafter": "Brenna",
+          "outcome": "Success",
+          "tone": "success",
+          "produced": "Fine blade ×1"
+        }
+      ],
+      "sort": {
+        "key": "when",
+        "dir": "desc"
+      },
+      "selectedKey": "day-211",
+      "perPage": 10,
+      "perPageOptions": [10, 25, 50]
+    },
+    "data": {
+      "badgeColumnId": "outcome",
+      "searchKey": "FABRICATE.App.Journal.Filters.SearchLabel",
+      "placeholder": "Search"
+    },
+    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the per-page choice is a `Select` where the drawing draws segments; the drawing’s pager figures (1–3 of 128, page 1 of 43) mean three a page against its chosen 10, so the live pager reads 1–10 and page 1 of 13 over the drawing’s three rows; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; the Outcome chips carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and `Pagination` adds a ‘Per page’ label, a footer ground lighter than the drawn bg-1, and bordered arrows."
+  },
+  {
+    "spec": "<DataTable>",
+    "draws": ".stage.col ~ .stage.col > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "props": {
+      "heading": "Craft history",
+      "count": 0,
+      "empty": {
+        "hint": "No crafts recorded yet. A row lands here each time a character completes a craft with this system."
+      }
+    },
+    "note": "The empty table: the heading and the count, and no header row."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "inspector rail section",
+    "draws": ":scope > div > section:nth-child(1)",
+    "path": "src/ui/svelte/components/Rail.svelte",
+    "props": {
+      "label": "Settlement snapshot"
+    },
+    "content": [
+      {
+        "tag": "div",
+        "attrs": {
+          "class": "manager-essence-stat-grid",
+          "style": "grid-template-columns:repeat(3,minmax(0,1fr))"
+        },
+        "children": [
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "2"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Active"
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "2"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Extract"
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "1"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Craft"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "note": "The first section, its three stats in the shipped inspector stat grid at three columns, as drawn."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "inspector rail section",
+    "draws": ":scope > div > section:nth-child(2)",
+    "path": "src/ui/svelte/components/Rail.svelte",
+    "fixture": "RailAppearsIn",
+    "props": {
+      "label": "Appears in"
+    },
+    "data": {
+      "name": "Karrun Warblade"
+    },
+    "note": "The second section, its body a dense `ListRow`. No shipped `Rail` caller hosts a list row, so this composition is the drawing’s. Drawn differently: the untinted `Medallion` takes the accent ink, at 14.4px, where the drawing draws a 10px glyph in text-secondary; the tile carries a 1px border the drawn tile lacks."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "log list",
+    "draws": ":scope > div[role=\"list\"]",
+    "path": "src/ui/svelte/components/LogList.svelte",
+    "fixture": "LogListHistory",
+    "props": {
+      "ariaLabel": "History",
+      "selectedKey": "warblade",
+      "entries": [
+        {
+          "key": "warblade",
+          "text": "Karrun Warblade",
+          "when": "Today",
+          "art": "icons/weapons/swords/greatsword-crossguard-blue.webp",
+          "outcome": {
+            "icon": "fa-circle-check",
+            "label": "Succeeded",
+            "tone": "success"
+          }
+        },
+        {
+          "key": "draught",
+          "text": "Healing draught",
+          "when": "2 days ago",
+          "tone": "danger",
+          "art": "icons/consumables/potions/bottle-bulb-corked-glowing-red.webp",
+          "outcome": {
+            "icon": "fa-circle-xmark",
+            "label": "Failed",
+            "tone": "danger"
+          }
+        },
+        {
+          "key": "moonpetal",
+          "text": "Moonpetal harvest",
+          "when": "Yesterday",
+          "art": "icons/commodities/flowers/blooms-purple.webp",
+          "outcome": {
+            "icon": "fa-ban",
+            "label": "Cancelled",
+            "tone": "neutral"
+          }
+        }
+      ]
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ],
+    "data": {
+      "dismissKey": "FABRICATE.App.Journal.History.Dismiss",
+      "class": "is-ghost"
+    },
+    "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`. Drawn differently: the dismiss glyph takes the ghost `IconButton`’s text-subtle ink where the drawing’s is text-muted."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "tier track",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TierTrack.svelte",
+    "props": {
+      "tiers": [
+        { "name": "Thorpe" },
+        { "name": "Hamlet" },
+        { "name": "Village" },
+        { "name": "Town" }
+      ],
+      "currentIndex": 1,
+      "ariaLabel": "Settlement tier",
+      "currentLabel": "You are here",
+      "reachedLabel": "Reached",
+      "aheadLabel": "Ahead",
+      "hint": "You are here · 40 population to Village."
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "tier ladder",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TierTrack.svelte",
+    "props": {
+      "tiers": [
+        {
+          "name": "Revered",
+          "figure": "+20",
+          "notes": ["A seat at the guild table"],
+          "valence": "positive"
+        },
+        {
+          "name": "Honoured",
+          "figure": "+10",
+          "notes": ["Guild rates at every forge"],
+          "valence": "positive"
+        },
+        {
+          "name": "Accepted",
+          "figure": "0",
+          "notes": ["Trade at the market"],
+          "valence": "positive"
+        },
+        {
+          "name": "Wary",
+          "figure": "−10",
+          "notes": ["Watched in the guild hall"],
+          "valence": "neutral"
+        },
+        {
+          "name": "Hated",
+          "figure": "−20",
+          "notes": ["Refused service"],
+          "valence": "negative"
+        }
+      ],
+      "currentIndex": 2,
+      "direction": "descending",
+      "layout": "column",
+      "ariaLabel": "Standing with the Ironvale Guild",
+      "currentLabel": "You are here",
+      "reachedLabel": "Reached",
+      "aheadLabel": "Ahead"
+    },
+    "note": "The View Lab specimen's five rungs and words, mounted directly here rather than through the seam."
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(1)",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "note": "Each name is the initials the drawing shows, the only words it gives a person.",
+    "props": {
+      "name": "BK",
+      "tint": "rose"
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(2)",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "VK",
+      "tint": "mist",
+      "shape": "square"
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "note": "The stacked rung. The overlap and the ground ring belong to the stack and are drawn on each replaced tile, so the live tiles sit side by side.",
+    "props": {
+      "name": "IA",
+      "size": 26
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "VK",
+      "size": 26
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "BK",
+      "size": 26
+    }
+  }
+]

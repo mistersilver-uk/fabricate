@@ -14,7 +14,7 @@ import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/syst
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
-import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import PickerRow from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
@@ -385,6 +385,10 @@ function railColumn() {
   return rail;
 }
 
+/** What a subject reported to its host, in order, for a suite to read as `__fixtureCalls`. */
+const hostCalls = [];
+Object.defineProperty(globalThis, '__fixtureCalls', { value: hostCalls });
+
 const SUBJECTS = {
   prerequisites: () =>
     mount(CharacterPrerequisitesCard, {
@@ -478,18 +482,25 @@ const SUBJECTS = {
     }),
   // One requirement row, so the kind picker renders inside the row's own flex line.
   'recipe-option': () =>
-    mount(RecipeIngredientOption, {
+    mount(PickerRow, {
       target: mountPoint,
       props: {
-        option: {
+        value: {
+          kind: startValue === 'tags' ? 'tags' : 'component',
+          id: startValue === 'tags' ? '' : 'cmp-iron',
+          tags: [],
+          tagMatch: 'any',
           quantity: 2,
-          match: { type: startValue === 'tags' ? 'tags' : 'component', componentId: 'cmp-iron' },
         },
-        componentOptions: [{ id: 'cmp-iron', name: 'Iron ingot' }],
-        itemTags: ['herb', 'rare'],
+        kinds: ['component', 'tags'],
+        catalogue: {
+          component: [{ id: 'cmp-iron', label: 'Iron ingot', icon: 'fas fa-cube' }],
+          tags: ['herb', 'rare'].map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' })),
+        },
       },
     }),
   // The overview's three: two add controls measurable only at their sentinel, and the ceiling.
+  // Its two mode controls start on `?selectionMode=` / `?compositionMode=` and record each report.
   'environment-overview': () =>
     mount(EnvironmentOverviewTab, {
       target: mountPoint,
@@ -503,11 +514,19 @@ const SUBJECTS = {
           dangerLevel: OVERVIEW_DANGERS.some((entry) => entry.id === startValue)
             ? startValue
             : 'safe',
+          selectionMode: params.get('selectionMode') ?? undefined,
+          compositionMode: params.get('compositionMode') ?? undefined,
         },
         realmsEnabled: true,
         realmRecords: OVERVIEW_REALMS,
         biomeOptions: OVERVIEW_BIOMES,
         dangerOptions: OVERVIEW_DANGERS,
+        onUpdate: (patch) => {
+          hostCalls.push(['update', patch]);
+        },
+        onSetCompositionMode: (mode) => {
+          hostCalls.push(['composition', mode]);
+        },
       },
     }),
   // The three browse toolbars, whose filter values are component state rather than props: each is

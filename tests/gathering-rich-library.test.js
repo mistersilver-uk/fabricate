@@ -6,7 +6,6 @@ import { GatheringEnvironmentStore } from '../src/systems/GatheringEnvironmentSt
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
-import { overrideRollPromptSurface } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 const actor = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items: [] };
 const viewer = { id: 'user-1', isGM: false };
@@ -1819,211 +1818,27 @@ test('normalizeLibraryTask coerces toolIds entries to trimmed strings and drops 
   assert.deepEqual(task.toolIds, ['tool-axe', '7', 'tool-saw']);
 });
 
-// Interactive d100: confirm-roll prompt + Dice So Nice animation (pooled Nd100).
+// A prompted d100 attempt resolves with the face its answer carries (issue 2398); the prompt, the
+// evaluator and the Journal settle are pinned in tests/gathering-d100-prompt.test.js.
 
-function stubDialog(response) {
-  return overrideRollPromptSurface(async () => response);
-}
-
-/**
- * Stub `globalThis.Roll` as a fake `Nd100` pool: `evaluate()` exposes the supplied faces at
- * `dice[0].results[].result`, and `toMessage` records into `spy`.
- */
-function stubPoolRoll(faces, spy, bonusTotal = 0) {
-  const original = globalThis.Roll;
-  globalThis.Roll = class {
-    constructor(formula) {
-      this.formula = formula;
-    }
-    async evaluate() {
-      if (/^\d+d100$/.test(String(this.formula))) {
-        this.dice = [{ results: faces.map((face) => ({ result: face })) }];
-      } else {
-        this.total = bonusTotal;
-      }
-      return this;
-    }
-    async toMessage(messageData, options) {
-      spy.push({ messageData, options, formula: this.formula });
-      return {};
-    }
+test('resolveD100Attempt grades every item row against a preset attempt roll plus the bonus', async () => {
+  const task = {
+    id: 'task-d100',
+    dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 45 }],
   };
-  return () => {
-    if (original === undefined) delete globalThis.Roll;
-    else globalThis.Roll = original;
-  };
-}
-
-function d100ForageConfig(dropRate = 100) {
-  return {
-    systems: {
-      'system-a': {
-        tasks: [
-          {
-            id: 'task-d100',
-            name: 'Gather Meadow Herbs',
-            dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate }],
-          },
-        ],
-      },
-    },
-  };
-}
-
-test('interactive d100 cancel: dismissing the roll dialog aborts with zero mutation', async () => {
-  const { service, rollCalls } = makeRichState({ rolls: [50], config: d100ForageConfig(100) });
-  const calls = {};
-  const engine = makeEngine({ richState: service, calls });
-  const restoreDialog = stubDialog({ confirmed: false });
-  try {
-    const result = await engine.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
+  for (const [extraModifier, dropped] of [
+    [10, 1],
+    [0, 0],
+  ]) {
+    const { service, rollCalls } = makeRichState({ rolls: [1] });
+    const result = await service.resolveD100Attempt({
+      task,
+      environment: { rules: { rewardSelectionMode: 'allDrops' } },
+      attemptRoll: 50,
+      extraModifier,
     });
-
-    assert.equal(result.accepted, false, 'a cancelled attempt is not accepted');
-    assert.equal(result.cancelled, true, 'the cancelled flag is surfaced for a silent no-op');
-    assert.deepEqual(result.blockedReasons, [], 'no blocked reasons — a cancel is not a rejection');
-    assert.deepEqual(calls.terminal, [], 'no terminal run written');
-    assert.deepEqual(calls.created, [], 'no results created');
-    assert.deepEqual(rollCalls, [], 'no d100 rolled — the cancel returns before resolution');
-  } finally {
-    restoreDialog();
-  }
-});
-
-test('interactive d100 confirm: pre-rolls an Nd100 pool, uses its faces, and posts to chat (DSN)', async () => {
-  const { service, rollCalls } = makeRichState({ rolls: [1], config: d100ForageConfig(100) });
-  const calls = {};
-  const engine = makeEngine({ richState: service, calls });
-  const restoreDialog = stubDialog({ confirmed: true, bonus: '0' });
-  const toMessageSpy = [];
-  const restoreRoll = stubPoolRoll([50], toMessageSpy);
-  try {
-    const result = await engine.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
-    });
-
-    assert.equal(result.accepted, true, 'confirmed attempt proceeds');
-    assert.equal(result.state, 'succeeded');
-    assert.equal(
-      calls.created.length,
-      1,
-      'the always-dropping row awarded its item from the pooled face'
-    );
-    assert.deepEqual(rollCalls, [], 'the pooled Nd100 faces were used, NOT the rollD100 seam');
-    assert.equal(toMessageSpy.length, 1, 'the pooled roll was posted to chat (DSN trigger)');
-    assert.equal(toMessageSpy[0].formula, '1d100', 'one throw for the single enabled drop row');
-    assert.equal(toMessageSpy[0].options.create, true);
-  } finally {
-    restoreRoll();
-    restoreDialog();
-  }
-});
-
-test('interactive d100 situational bonus shifts a borderline drop outcome', async () => {
-  const calls = {};
-  // dropRate 45 → threshold 56. A pooled face of 50 misses without a bonus, but a
-  // +10 situational modifier lifts the effective roll to 60 and clears the row.
-  const withBonus = makeRichState({ rolls: [1], config: d100ForageConfig(45) });
-  const engineBonus = makeEngine({ richState: withBonus.service, calls });
-  const restoreDialogBonus = stubDialog({ confirmed: true, bonus: '10' });
-  const restoreRollBonus = stubPoolRoll([50], []);
-  try {
-    const result = await engineBonus.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
-    });
-    assert.equal(result.accepted, true);
-    assert.equal(
-      calls.created.length,
-      1,
-      '+10 bonus clears the 56 threshold with a 50 face → item awarded'
-    );
-  } finally {
-    restoreRollBonus();
-    restoreDialogBonus();
-  }
-
-  // Control: the same face with no bonus misses the threshold — no item awarded.
-  const noBonusCalls = {};
-  const noBonus = makeRichState({ rolls: [1], config: d100ForageConfig(45) });
-  const engineNoBonus = makeEngine({ richState: noBonus.service, calls: noBonusCalls });
-  const restoreDialogNo = stubDialog({ confirmed: true, bonus: '0' });
-  const restoreRollNo = stubPoolRoll([50], []);
-  try {
-    const result = await engineNoBonus.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
-    });
-    assert.equal(result.accepted, true);
-    assert.deepEqual(noBonusCalls.created, [], 'without a bonus a 50 face misses the 56 threshold');
-  } finally {
-    restoreRollNo();
-    restoreDialogNo();
-  }
-});
-
-// Regression: the bonus field is free text, so a player can enter a dice expression. `Number('1d4 +
-// 1')` is NaN, which the d100 path silently degraded to 0 — the bonus vanished.
-test('interactive d100 dice situational bonus is rolled rather than coerced to zero', async () => {
-  const calls = {};
-  const { service } = makeRichState({ rolls: [1], config: d100ForageConfig(45) });
-  const engine = makeEngine({ richState: service, calls });
-  const restoreDialog = stubDialog({ confirmed: true, bonus: '1d4 + 1' });
-  // The bonus expression rolls 10 → effective roll 60, clearing the 56 threshold.
-  const restoreRoll = stubPoolRoll([50], [], 10);
-  try {
-    const result = await engine.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
-    });
-    assert.equal(result.accepted, true);
-    assert.equal(
-      calls.created.length,
-      1,
-      'the dice bonus rolled to 10 and lifted the 50 face over the 56 threshold'
-    );
-  } finally {
-    restoreRoll();
-    restoreDialog();
-  }
-
-  // Control: the SAME dice expression rolling low leaves the row short, proving the
-  // rolled value is what moves the outcome rather than a constant "non-zero bonus".
-  const lowCalls = {};
-  const low = makeRichState({ rolls: [1], config: d100ForageConfig(45) });
-  const engineLow = makeEngine({ richState: low.service, calls: lowCalls });
-  const restoreDialogLow = stubDialog({ confirmed: true, bonus: '1d4 + 1' });
-  const restoreRollLow = stubPoolRoll([50], [], 2);
-  try {
-    const result = await engineLow.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'task-d100',
-      interactive: true,
-    });
-    assert.equal(result.accepted, true);
-    assert.deepEqual(lowCalls.created, [], 'a bonus of 2 leaves the 50 face short of 56');
-  } finally {
-    restoreRollLow();
-    restoreDialogLow();
+    assert.equal(result.roll, 50, 'the preset face is the item-row roll');
+    assert.equal(result.items.length, dropped, `50 + ${extraModifier} against the 56 threshold`);
+    assert.deepEqual(rollCalls, [], 'the rollD100 seam is not drawn');
   }
 });

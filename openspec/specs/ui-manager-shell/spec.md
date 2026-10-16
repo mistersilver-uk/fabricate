@@ -18,7 +18,7 @@ Header hierarchy:
 - A screen renders **one** page header.
   A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the rail's crafting-system selector already carry.
 - The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
-- The page header holds exactly two blocks — the breadcrumb/title/subtitle heading and the trailing page actions — on every route.
+- The page header holds its breadcrumb trail as a first row above exactly two blocks — the title/subtitle heading and the trailing page actions, aligned to the top of the title — on every route.
   No route leads its header with a route glyph or identity tile of its own.
 
 Selected-system rail:

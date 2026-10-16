@@ -70,7 +70,7 @@ const membershipHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',

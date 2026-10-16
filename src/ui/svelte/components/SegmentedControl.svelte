@@ -7,14 +7,17 @@
   | --- | --- | --- | --- |
   | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
-  | `dataAttr` / `optionDataAttr` / `fill` / `iconOnly` | | `''` / `false` | the two data-* hook names, whether segments share the track `flex: 1 1 0`, and whether each renders its `icon` alone with the label CLIPPED |
-  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the CONSTRUCTION, the SCALE and the PAINT, as variants ON the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a PREFIX of `is-accent-soft`, so only a whole-token match tells the two apart. |
+  | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
+  | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
 
   Callbacks:
   - `onChange(value)` — the chosen option's `value`.
+
+  Rest spread:
+  - `{...rest}` lands on the radiogroup root, written after `class`, and carries a caller's hook.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     options = [],
@@ -22,22 +25,20 @@
     onChange = () => {},
     groupName = '',
     ariaLabel = '',
-    dataAttr = '',
     optionDataAttr = '',
     fill = false,
     iconOnly = false,
     density = 'default',
     // `variant` says what choosing a segment MEANS, `tone` what the track is ABOUT. 'tag' carries
-    // the track's SCALE too, so a `tone="tag"` consumer passes no `density`.
+    // its own 22px SCALE, so a `tone="tag"` consumer in a row that must not grow passes no `density`;
+    // `inline` (30px) and `field` (34px) lift it to those rungs for a row of taller siblings.
     tone = '',
     shape = '',
+    class: extraClass = '',
+    ...rest
   } = $props();
 
-  function text(key, fallback) {
-    if (!key) return fallback ?? '';
-    const translated = localize(key);
-    return translated && translated !== key ? translated : (fallback ?? key);
-  }
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   function select(next) {
     if (next !== value) onChange(next);
@@ -52,17 +53,17 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${density === 'inline' ? ' is-inline' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}${extraClasses}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
-  {...dataAttr ? { [dataAttr]: true } : {}}
+  {...rest}
 >
   {#each options as option (option.value)}
     <!-- `title` ONLY in the icon-only variant, the pointer half of what the clipped label already
          gives the a11y tree; `undefined` omits it, so a labelled consumer's markup is untouched. -->
     <label
       class={segmentClass(option)}
-      title={iconOnly ? text(option.labelKey, option.fallback) : undefined}
+      title={iconOnly ? localizeOr(option.labelKey, option.fallback) : undefined}
       {...optionDataAttr ? { [optionDataAttr]: option.value } : {}}
     >
       <input
@@ -76,7 +77,7 @@
         onchange={() => select(option.value)}
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
-      <span class="manager-segment-label">{text(option.labelKey, option.fallback)}</span>
+      <span class="manager-segment-label">{localizeOr(option.labelKey, option.fallback)}</span>
       {#if Number.isFinite(option.count)}
         <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
       {/if}
@@ -111,19 +112,19 @@
     flex: 1 1 0;
   }
 
-  /* COMPACT density, in px because the parity fixture asserts the value, and declared BEFORE
-     `.is-active` so the active tile's weight still wins at equal specificity. */
+  /* COMPACT density, declared BEFORE `.is-active` so the active tile's weight still wins at equal
+     specificity. */
   .manager-segmented.is-compact {
-    gap: 3px;
-    padding: 3px;
-    border-radius: 8px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1);
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
   .manager-segmented.is-compact .manager-segment {
     flex: 1 1 0;
     height: 26px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border-radius: 6px;
     font-size: 10.5px;
   }
@@ -137,8 +138,8 @@
   /* FIELD density: a third density rather than a rule written from the Difficulty card, because
      those four properties are the primitive's to state. */
   .manager-segmented.is-field {
-    gap: 4px;
-    padding: 4px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -146,7 +147,7 @@
   .manager-segmented.is-field .manager-segment {
     flex: 1 1 0;
     height: 26px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border-radius: 6px;
     font-size: 10.5px;
   }
@@ -159,7 +160,30 @@
 
   .manager-segmented.is-field .manager-segment.is-active {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-raised);
+    background: var(--fab-surface-active);
+  }
+
+  /* Inline density: a 30px track (24px segments, 2px padding, 1px border) for a row whose other
+     controls are 30px, so the track never makes its row taller than its siblings. */
+  .manager-segmented.is-inline {
+    gap: var(--fab-space-2xs);
+    padding: var(--fab-space-2xs);
+    border-radius: 7px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-segmented.is-inline .manager-segment {
+    flex: 1 1 0;
+    height: 24px;
+    padding: 0 var(--fab-space-2);
+    border-radius: 6px;
+    font-size: 10px;
+  }
+
+  /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
+  .manager-segmented.is-inline .manager-segment:not(.is-active) {
+    color: var(--fab-text-subtle);
+    font-weight: 500;
   }
 
   /* TAG tone. `overflow: hidden` is why no segment restates a corner radius and why the track
@@ -185,14 +209,50 @@
     font-weight: 600;
   }
 
-  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. */
+  /* `:not(.is-active)` again: at (0,4,0) this would otherwise out-specify `.is-active`'s ink. The
+     weight is restated because `is-inline` and `is-field` set an idle 500 at the same specificity. */
   .manager-segmented.is-tag .manager-segment:not(.is-active) {
     color: var(--fab-text-subtle);
+    font-weight: 600;
+  }
+
+  /* TAG tone on a taller rung: `density` lifts the track to the height of its row's siblings and
+     nothing else, so the well, the gap and the equal-width segments the density would bring stay
+     out. The track owns the rung and the segments stretch to fill it inside its border. */
+  .manager-segmented.is-tag.is-inline {
+    box-sizing: border-box;
+    height: 30px;
+  }
+
+  .manager-segmented.is-tag.is-field {
+    box-sizing: border-box;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .manager-segmented.is-tag.is-inline .manager-segment,
+  .manager-segmented.is-tag.is-field .manager-segment {
+    align-self: stretch;
+    padding: 0 var(--fab-space-2);
+  }
+
+  /* `:not(.is-fill)`: at (0,4,0) this would otherwise out-specify `.is-fill`'s shared width. */
+  .manager-segmented.is-tag.is-inline:not(.is-fill) .manager-segment,
+  .manager-segmented.is-tag.is-field:not(.is-fill) .manager-segment {
+    flex: 0 1 auto;
+  }
+
+  .manager-segmented.is-tag.is-inline .manager-segment {
+    font-size: 10px;
+  }
+
+  .manager-segmented.is-tag.is-field .manager-segment {
+    font-size: 10.5px;
   }
 
   .manager-segmented.is-tag .manager-segment.is-active {
     border-color: transparent;
-    background: color-mix(in srgb, var(--fab-purple) 22%, transparent);
+    background: var(--fab-purple-soft);
     color: var(--fab-text);
   }
 

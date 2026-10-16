@@ -7,6 +7,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 // The DC preset control is the shared `<Select>` since issue 1510: choosing a value is an
 // open-then-click on a panel portaled onto the mount target, and the chosen value is read back off
@@ -50,6 +51,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-salvage-enable-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -244,7 +246,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     // The hint must be VISIBLE TEXT — not a `title`.
     const hint = target.querySelector('[data-salvage-disabled-notice]');
     assert.ok(hint, 'the zero-group explanation renders as visible body copy');
-    assert.match(hint.textContent, /Add a result below/);
+    assert.match(hint.textContent, /Add a result set below/);
     assert.equal(
       enableToggle(target).getAttribute('title'),
       null,

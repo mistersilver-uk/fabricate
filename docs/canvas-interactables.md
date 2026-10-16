@@ -120,6 +120,8 @@ The **Manage Interactables** panel is a GM-only, scene-level window launched fro
 It is the single place to see and manage every interactable on the current scene, and the supported way to author **arbitrary-shaped** interactables.
 
 **List.** The panel lists every interactable on the current scene with its **name**, **type** (tool or gathering task), **source**, **state** (enabled, locked, or used up), and **marker status** (tile, drawing, token, region-only, or missing).
+A tool's source reads as its **Display label** (see [Tools]({% link tools.md %})), else its name, else its linked component's name.
+The interactable's config panel names its linked tool the same way.
 Each row offers:
 
 - **Open configuration** opens the config panel for that interactable.
@@ -272,7 +274,7 @@ From it a GM can:
 - **Relink** points the interactable at a different existing marker (tile, drawing, or token).
 - **Create / Recreate marker** makes a fresh tile or drawing marker (for example after the original was deleted, or to add a marker to a region-only interactable).
 - **Remove** drops the marker but keeps the interactable working region-only.
-- **Enable / Lock** toggles the interactable's enabled and locked state.
+- **Disabled / Locked** toggle buttons set the interactable's disabled and locked state; each keeps its label and reads as pressed while that state is on.
   These are **distinct**.
   **Disabling** (or setting "Hidden from players") conceals the interactable, so the marker is hidden from players and no prompt fires, while **locking** keeps the marker visible and the prompt firing, but denies Interact with "This is locked."
   A summary line shows the first reason that would block activation, in order: disabled, then locked, then used up, then uses exhausted, then cooling down.

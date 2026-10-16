@@ -13,7 +13,10 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -23,6 +26,7 @@ const SCOPED_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
@@ -62,8 +66,8 @@ const FRAME_MODULES = [
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
   // (`...FRAME_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
   'src/ui/svelte/components/SegmentedControl.svelte',
@@ -79,6 +83,8 @@ const catalogueHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+    // The world-default cards render through the fact row (issue 1521).
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
@@ -355,14 +361,17 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
       // harness supplies none: what it measures is that the FALLBACK is still the one shared
       // section-name list, which is the property this case was written for.
       assert.deepEqual(
-        cells.map((cell) =>
-          cell.querySelector('.manager-scoped-catalogue-card-title').textContent.trim()
-        ),
+        cells.map((cell) => cell.querySelector('strong').textContent.trim()),
         sections.map((section) => LABELS[section])
       );
       // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
       for (const cell of cells) {
         assert.match(cell.textContent, /Falls back to /);
+        assert.ok(cell.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'a rule-density tile');
+        assert.ok(
+          Boolean(cell.querySelector(':scope > i.fa-sliders')),
+          'the sliders glyph stands in when the lane names none'
+        );
       }
       const bare = await catalogueHarness.mount({
         ...props,

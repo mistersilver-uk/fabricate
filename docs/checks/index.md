@@ -118,7 +118,8 @@ See [One library, three activities](#one-library-three-activities).
 Each shows the library read-only and links to World › Rules & Resources › Modifiers.
 
 Because an eligible modifier never appears in the formula you type, **The roll** section restates it for you.
-Under the formula field, **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
+Under the formula field, a row of term buttons adds a term to the formula, and **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
+A term button inserts its term where the cursor is, joined with ` + ` to the operand beside it, and joins it to the end when the cursor is inside a term or the whole formula is selected.
 
 ### What a check rolls today
 
@@ -139,6 +140,7 @@ Open **World > Rules & Resources > Modifiers**, then choose **Add modifier**.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**.
 Write a character-data path with its leading `@` — for example `@abilities.med.mod` — because the field supplies nothing for you.
 A number or a dice expression takes no `@` at all: write `2` or `1d4` as they stand, and `@abilities.med.mod + 1d4` mixes the two.
+Under the field, a row of term buttons offers your world's suggested character-data paths, `2` and `1d4`, and each inserts its term where the cursor is, the same way the formula's term buttons do.
 There is nothing to add to the roll formula: an entry that is eligible applies automatically.
 
 This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.

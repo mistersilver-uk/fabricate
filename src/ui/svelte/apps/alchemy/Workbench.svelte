@@ -20,12 +20,13 @@
   the focus/hover `−` control REMOVES one; and the `×` button REMOVES ALL (it
   `stopPropagation`s so it never also adds). The status pill is `aria-live="polite"`;
   the drop zone has an accessible name/role plus a non-color dragover cue (the
-  dashed border thickens). The ready-state `brewpulse` animation honors
-  prefers-reduced-motion.
+  dashed border thickens).
 -->
 <script>
   import Kicker from '../../components/Kicker.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
   import Notice from '../../components/Notice.svelte';
@@ -164,10 +165,8 @@
     return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Fizzled');
   });
 
-  function handleDrop(event) {
-    event.preventDefault();
-    dragOver = false;
-    const componentId = event.dataTransfer?.getData('text/plain');
+  function handleDrop(data) {
+    const componentId = data?.componentId;
     if (componentId) onDrop?.(componentId);
   }
 </script>
@@ -178,16 +177,10 @@
       <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
       <h2>{localize('FABRICATE.App.Alchemy.Workbench')}</h2>
     </div>
-    <button
-      type="button"
-      class="alchemy-clear"
-      data-alchemy-clear
-      disabled={benchEmpty}
-      onclick={() => onClear?.()}
-    >
+    <Button role="ghost" data-alchemy-clear="" disabled={benchEmpty} onclick={() => onClear?.()}>
       <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
       {localize('FABRICATE.App.Alchemy.Clear')}
-    </button>
+    </Button>
   </div>
   <p class="alchemy-workbench-intro">{localize('FABRICATE.App.Alchemy.WorkbenchIntro')}</p>
 
@@ -198,29 +191,17 @@
     role="group"
     aria-label={localize('FABRICATE.App.Alchemy.DropZone')}
     data-alchemy-dropzone
-    ondragover={(event) => {
-      event.preventDefault();
-      dragOver = true;
+    use:dragDrop={{
+      // `is-dragover` is written by the directive above, never by the action: a class only the
+      // action adds can leave the scoped rule matching nothing, and silently in this file.
+      onActiveChange: (active) => (dragOver = active),
+      onDrop: handleDrop,
     }}
-    ondragleave={() => (dragOver = false)}
-    ondrop={handleDrop}
   >
     {#if benchEmpty}
       <!--
-        THE BENCH'S OWN EMPTY IS DEFERRED, and this one was converted and then measured back
-        out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
-
-        The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
-        var(--fab-border-strong)` at `border-radius: 14px`, and `.is-empty` insets it a
-        further `40px 20px`. Every `EmptyState` variant that CENTRES its stack also keeps a
-        box — base, `compact` and `inline` all draw the dashed panel, and only `note`
-        releases it, at the price of `place-items: start` and a left-aligned 10px line. So the
-        base panel measured 478x203.25 at `1.5px dashed` r12 sitting inside 520x285.25 at
-        `1.5px dashed` r14: two concentric dashed rounded boxes 40px apart, and the bench
-        grew 121.25 to 203.25. That is the exact shape `EmptyState.svelte:275-282` refuses for
-        the popover — "a second bordered box drawn inside it reads as a card the GM might be
-        able to act on" — and here the outer box is a DROP AFFORDANCE whose `is-dragover` cue
-        is that same border thickening, so it cannot be given up to the panel either.
+        The bench's own empty stays hand-drawn (issue 1514): `.alchemy-bench` is already the
+        dashed drop zone, and every centring `EmptyState` variant draws a second box inside it.
       -->
       <div class="alchemy-bench-empty">
         <span class="alchemy-bench-empty-icon"
@@ -252,7 +233,7 @@
           >
             <button
               type="button"
-              class="alchemy-chip-remove-one"
+              class="alchemy-chip-remove-one fab-hit-area"
               data-alchemy-chip-remove-one={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveOneComponent', { name: chip.name })}
               onclick={(event) => {
@@ -264,7 +245,7 @@
             </button>
             <button
               type="button"
-              class="alchemy-chip-remove"
+              class="alchemy-chip-remove fab-hit-area"
               data-alchemy-chip-remove={chip.componentId}
               aria-label={localize('FABRICATE.App.Alchemy.RemoveAllComponent', { name: chip.name })}
               onclick={(event) => {
@@ -277,8 +258,8 @@
             <Medallion
               art={chip.img}
               alt=""
-              size={40}
-              glyph={16}
+              size={38}
+              glyph={15}
               tint="peach"
               icon="fas fa-flask"
             />
@@ -341,7 +322,7 @@
   </div>
   {#if showResult}
     <div class="alchemy-result" class:is-ready={mode === 'ready'} data-alchemy-result>
-      <Medallion art={result.img} alt="" size={46} glyph={19} tint="peach" icon="fas fa-flask" />
+      <Medallion art={result.img} alt="" size={38} glyph={15} tint="peach" icon="fas fa-flask" />
       <div class="alchemy-result-meta">
         <div class="alchemy-result-name">{result.name}</div>
         {#if result.essences?.length}
@@ -396,32 +377,28 @@
 
   <div class="alchemy-brew-area">
     {#if lastBrew}
-      <!-- The wrapper survives the conversion carrying ONE property, and it is the
-           caller's own layout rather than the notice's geometry: `.alchemy-brew-area` is
-           a plain block, so this 12px is the only separation between the banner and the
-           52px Brew button beneath it. -->
+      <!-- The wrapper carries the caller's own layout, not the notice's geometry: in the plain
+           `.alchemy-brew-area` block this 12px is all that separates the banner from Brew. -->
       <div class="alchemy-banner">
         <Notice
           tone={bannerTone}
           icon="fas {bannerIcon}"
           title={bannerText}
-          dataAttr="data-alchemy-banner"
-          stateDataAttr="data-alchemy-banner-status"
-          stateDataValue={bannerStatus}
+          data-alchemy-banner=""
+          data-alchemy-banner-status={bannerStatus}
         />
       </div>
     {/if}
-    <button
-      type="button"
-      class="alchemy-brew"
-      class:is-ready={mode === 'ready'}
-      data-alchemy-brew
+    <Button
+      role="primary"
+      fullWidth
+      data-alchemy-brew=""
       disabled={!brewEnabled || brewInFlight}
       onclick={(event) => onBrew?.(event)}
     >
       <i class="fas {brewInFlight ? 'fa-spinner fa-spin' : brewIcon}" aria-hidden="true"></i>
       {brewLabel}
-    </button>
+    </Button>
   </div>
 </div>
 
@@ -431,11 +408,11 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-    padding: 22px 24px;
+    padding: var(--fab-space-6);
     overflow-y: auto;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     color: var(--fab-text);
   }
 
@@ -443,13 +420,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: var(--fab-space-1);
   }
 
   .alchemy-workbench-title {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: var(--fab-space-2);
   }
 
   .alchemy-workbench-title i {
@@ -466,42 +443,22 @@
     border: none;
   }
 
-  .alchemy-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 8px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .alchemy-clear:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
   .alchemy-workbench-intro {
-    margin: 0 0 16px;
+    margin: 0 0 var(--fab-space-4);
     font-size: 11.5px;
     color: var(--fab-text-muted);
   }
 
   .alchemy-bench {
     border: 1.5px dashed var(--fab-border-strong);
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
-    padding: 16px;
-    margin-bottom: 14px;
+    padding: var(--fab-space-4);
+    margin-bottom: var(--fab-space-4);
   }
 
   .alchemy-bench.is-empty {
-    padding: 40px 20px;
+    padding: var(--fab-space-6) var(--fab-space-5);
   }
 
   .alchemy-bench.is-dragover {
@@ -514,14 +471,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
     text-align: center;
   }
 
   .alchemy-bench-empty-icon {
     width: 52px;
     height: 52px;
-    border-radius: 13px;
+    border-radius: 11px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
@@ -546,7 +503,7 @@
   .alchemy-bench-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .alchemy-chip {
@@ -554,16 +511,16 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface);
-    padding: 12px 10px;
+    padding: var(--fab-space-3);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-2);
     cursor: pointer;
   }
 
   .alchemy-chip:hover {
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .alchemy-chip:focus-visible {
@@ -599,7 +556,7 @@
     left: 6px;
     color: var(--fab-text-muted);
     opacity: 0;
-    transition: opacity 0.12s ease;
+    transition: opacity var(--fab-motion-control);
   }
 
   .alchemy-chip:hover .alchemy-chip-remove-one,
@@ -633,16 +590,16 @@
   }
 
   .alchemy-result-meta :global([data-alchemy-essences]) {
-    margin-top: 5px;
+    margin-top: var(--fab-space-1);
   }
 
   .alchemy-signature {
-    margin-top: 14px;
-    padding-top: 12px;
+    margin-top: var(--fab-space-4);
+    padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .alchemy-signature-text {
@@ -652,19 +609,19 @@
   }
 
   .alchemy-bench-essences {
-    margin-top: 9px;
+    margin-top: var(--fab-space-2);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     flex-wrap: wrap;
   }
 
   .alchemy-status {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 10px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3) var(--fab-space-4);
+    border-radius: 11px;
     font-size: 12px;
     font-weight: 600;
     border: 1px solid var(--fab-border);
@@ -699,15 +656,15 @@
   /* The ONE property the deleted `.alchemy-produces-label` rule declared that `Kicker`
      cannot carry. See the markup comment. */
   .alchemy-produces-slot {
-    margin: 18px 0 10px;
+    margin: var(--fab-space-5) 0 var(--fab-space-3);
   }
 
   .alchemy-result {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    border-radius: 12px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4) var(--fab-space-5);
+    border-radius: 11px;
     border: 1px solid var(--fab-accent-border);
     background: var(--fab-surface-soft);
   }
@@ -740,24 +697,24 @@
   .alchemy-unknown {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    border-radius: 12px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4) var(--fab-space-5);
+    border-radius: 11px;
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
   }
 
   .alchemy-unknown-icon {
-    width: 46px;
-    height: 46px;
+    width: 38px;
+    height: 38px;
     flex: 0 0 auto;
-    border-radius: 11px;
+    border-radius: 9px;
     background: var(--fab-surface-raised);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--fab-warning-text);
-    font-size: 20px;
+    font-size: 15px;
   }
 
   .alchemy-unknown-title {
@@ -771,13 +728,13 @@
     font-size: 11px;
     line-height: 1.45;
     color: var(--fab-text-muted);
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
   }
 
   .alchemy-missing {
-    margin-top: 10px;
-    padding: 11px 13px;
-    border-radius: 10px;
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border-radius: 11px;
     background: var(--fab-info-soft);
     border: 1px solid var(--fab-info-border);
   }
@@ -788,20 +745,20 @@
     text-transform: uppercase;
     color: var(--fab-info);
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: var(--fab-space-2);
   }
 
   .alchemy-missing-rows {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .alchemy-missing-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 9px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1) var(--fab-space-2);
     border-radius: 999px;
     background: var(--fab-surface);
     border: 1px solid var(--fab-border);
@@ -812,7 +769,7 @@
 
   .alchemy-brew-area {
     margin-top: auto;
-    padding-top: 18px;
+    padding-top: var(--fab-space-5);
   }
 
   /* Stripped to the one property that is this caller's LAYOUT (issue 1505). The tint,
@@ -820,49 +777,6 @@
      are now the primitive's; what is left is the separation between this banner and the
      Brew button, which `.alchemy-brew-area` does not provide. */
   .alchemy-banner {
-    margin-bottom: 12px;
-  }
-
-  .alchemy-brew {
-    width: 100%;
-    height: 52px;
-    border-radius: 11px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    border: 1px solid var(--fab-accent-border);
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-
-  .alchemy-brew:disabled {
-    cursor: not-allowed;
-    border-color: var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-disabled);
-  }
-
-  .alchemy-brew.is-ready:not(:disabled) {
-    animation: alchemy-brewpulse 2.2s ease-in-out infinite;
-  }
-
-  @keyframes alchemy-brewpulse {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 transparent;
-    }
-    50% {
-      box-shadow: 0 0 0 4px var(--fab-accent-soft);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .alchemy-brew.is-ready:not(:disabled) {
-      animation: none;
-    }
+    margin-bottom: var(--fab-space-3);
   }
 </style>

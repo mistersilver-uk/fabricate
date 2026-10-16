@@ -264,7 +264,7 @@ test('every call site that hooks a count also reports it', () => {
   );
 });
 
-test('the sites hooking the row action are the two producers and the shell, and none restates its name', () => {
+test('the sites hooking the row action are exactly the listed tabs, and none restates its name', () => {
   // `viewDataAttr` is the surface's one-caller hook prop.
   const rendered = Object.keys(SOURCES)
     .map((file) => [file, surfaceAttributeNames(file)])
@@ -284,7 +284,9 @@ test('the sites hooking the row action are the two producers and the shell, and 
   assert.deepEqual(
     withHook,
     [
+      'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
       'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
+      'src/ui/svelte/apps/manager/gathering-task/GatheringTaskValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
       'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
@@ -295,7 +297,9 @@ test('the sites hooking the row action are the two producers and the shell, and 
       'surface only through it, and then the environment tab, whose adoption made this prop ' +
       'ordinary rather than a recipe-editor habit. That last one is the ' +
       'arrival the previous wording said was welcome; its hook value carries the `data-` prefix ' +
-      'because the surface uses the prop as the WHOLE attribute name. This pin is here so that ' +
+      'because the surface uses the prop as the WHOLE attribute name. Issue 1522 added the ' +
+      'Component Rules tab, whose rows route to its Rules tab, and the gathering task tab, whose ' +
+      'rows route to Overview or Results. This pin is here so that ' +
       'a further arrival is a deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(
@@ -351,12 +355,12 @@ function surfaceRowAction() {
 
   const buttons = [];
   walkTemplate(ast.fragment, (node) => {
-    if (node.type === 'Component' && node.name === 'ManagerButton') buttons.push(node);
+    if (node.type === 'Component' && node.name === 'Button') buttons.push(node);
   });
   assert.equal(
     buttons.length,
     1,
-    `${SURFACE_PATH} renders ${buttons.length} <ManagerButton>s; the row action is one button ` +
+    `${SURFACE_PATH} renders ${buttons.length} <Button>s; the row action is one button ` +
       'and the clauses below read it by being the only one'
   );
   return { defaults, constants, button: buttons[0], source };

@@ -1,10 +1,13 @@
-import { describe, it } from 'node:test';
 // Shared with recipe-edit-editor.test.js: the aside/column pairing is ONE question.
-import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -13,23 +16,17 @@ const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/Reci
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const editSource = readFileSync(editPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
-// The header's trail and action branches moved out of the root in issue 1720.
-const breadcrumbsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte'),
-  'utf8'
-);
 const craftingActionsSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte'),
   'utf8'
 );
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 
@@ -63,10 +60,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
   it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {
     const block = inspectorActionBlock();
-    // `<ManagerButton`, not `<button` (issue 1118). The three actions render through the
+    // `<Button`, not `<button` (issue 1118). The three actions render through the
     // shared primitive now, and a count of the raw element would read 0 while the group is
     // intact — a guard going VACUOUS, which is worse than one going red.
-    const buttonCount = (block.match(/<ManagerButton[\s/>]/g) || []).length;
+    const buttonCount = (block.match(/<Button[\s/>]/g) || []).length;
     assert.equal(buttonCount, 3, 'inspector action group should contain exactly three buttons');
     const copyIdx = block.indexOf('fa-copy');
     const penIdx = block.indexOf('fa-pen');
@@ -79,12 +76,12 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   // The three inspector actions are FULL-WIDTH buttons.
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
-    // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
-    // primitive emits `fabricate-button manager-button fab-manager-button` from its own
+    // A hand-written button class literal is gone from this file entirely (issue 1118): the
+    // primitive emits `fabricate-button fab-manager-button` from its own
     // `.join(' ')`, and each site passes only its BESPOKE class through the appending `class`
     // prop. So the three are counted by the class each one still contributes — the class the
     // rules below are keyed on — rather than by a string the component no longer writes.
-    assert.equal((block.match(/<ManagerButton[\s/>]/g) || []).length, 3, 'three controls');
+    assert.equal((block.match(/<Button[\s/>]/g) || []).length, 3, 'three controls');
     for (const bespoke of [
       'manager-recipe-browser-inspector-duplicate',
       'manager-recipe-browser-inspector-edit',
@@ -96,22 +93,22 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       );
     }
     assert.equal(
-      block.includes('class="manager-button'),
+      block.includes('class="fabricate-button'),
       false,
       'and no site in this group writes the convention class by hand any more'
     );
     // Each of the three is full width, and that is a CASCADE question.
     for (const selector of [
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-duplicate',
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-edit',
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-delete'
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-duplicate',
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit',
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete'
     ]) {
       const pattern = selector
         .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
         .replaceAll(/\s+/g, String.raw`\s+`)
         .replaceAll(
-          String.raw`\.manager-button`,
-          String.raw`\.manager-button(?:\.fab-manager-button)?`
+          String.raw`\.fabricate-button`,
+          String.raw`\.fabricate-button(?:\.fab-manager-button)?`
         );
       const rule = css.match(new RegExp(String.raw`${pattern}[^{}]*\{[^}]*\}`));
       assert.ok(rule, `${selector} should own a rule`);
@@ -226,15 +223,28 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     // ASKED AS SET MEMBERSHIP since issue 1362.
     assertFullWidthRoute({
       rootSource,
-      css: readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'),
+      css: readStylesheet(),
       routeId: 'recipe-edit',
     });
   });
 
+  // The trail is `headerBreadcrumbs.js`'s since issue 1777, so this asks the model itself.
   it('renders a recipe-edit breadcrumb crumb back to Recipes', () => {
-    const idx = breadcrumbsSource.indexOf("currentView === 'recipe-edit'");
-    assert.ok(idx >= 0, 'recipe-edit branch should exist');
-    assert.ok(breadcrumbsSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'), 'breadcrumb uses the EditBreadcrumb key');
+    const backToRecipesBrowse = () => {};
+    const crumbs = headerBreadcrumbs({
+      currentView: 'recipe-edit',
+      text: (key) => key,
+      recipeDraft: null,
+      backToRecipesBrowse,
+    });
+    assert.deepEqual(
+      crumbs.slice(-2).map(({ label, onSelect }) => [label, onSelect]),
+      [
+        ['FABRICATE.Admin.Manager.Nav.Recipes', backToRecipesBrowse],
+        ['FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', undefined],
+      ],
+      'the trail steps back to Recipes and names an untitled recipe with the EditBreadcrumb key'
+    );
   });
 });
 

@@ -558,6 +558,7 @@ ConditionOption = {
   id: string,
   label: string,
   icon: string,
+  startHour?: number, // time-of-day options only (requirement 25)
 }
 ```
 
@@ -577,7 +578,7 @@ GM-authored option metadata lives in the per-system `conditions[kind].values` an
 An entry whose normalized id is the lower-cased stringification of a plain object — `[object object]`, or `object-object` once condition-id normalization has stripped the brackets — is not a tag and is discarded.
 `weather` and `timeOfDay` ids are condition-option ids and are kebab-cased; `biomes` and `danger` ids are tags and are lower-cased only.
 7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day condition settings with `enabled`, `current`, and `values` fields. `current` stores a condition option id.
-8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes.
+8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes, and a time-of-day option may also store a start hour (requirement 25).
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
 10. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night` as option records.
 11. Legacy top-level `conditions`, per-system string condition values, and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
@@ -597,6 +598,19 @@ A crafting system with no persisted `conditions` block continues to inherit the 
 22. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
 23. Player-facing UI may show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
 24. Changing current global conditions must not retroactively rewrite completed gathering history.
+25. Each time-of-day option names a period of the day and may carry a `startHour`, the whole hour of the world calendar's day at which that period begins.
+The normalizers keep a `startHour` only when it is a whole number at or above zero, given as a number or a digit-only string; `0` is midnight and is kept.
+They treat an absent, `null`, empty-string, boolean or any other value as not set, never as `0`.
+Weather options never carry one.
+An option with no start hour of its own stores none.
+Wherever a start hour is read, an option whose id is a default id takes that id's default (`dawn` 4, `day` 8, `dusk` 17, `night` 21), and any other option has none.
+Normalization never writes a default back.
+26. Start hours are descriptive: they place each period on the day and never gate, match or change the current time of day, which stays GM-selected (requirement 17).
+Day order is ascending start hour.
+Each period runs from its start hour to the next period's in day order, and the latest wraps past the day's end to the earliest.
+The periods tile the day when every period has a start hour and the start hours are distinct and below the calendar's hours per day, which is 24 when the world calendar defines none.
+Otherwise they do not tile, and no surface infers the missing hours.
+27. Adding, deleting or relabelling a time-of-day value leaves every other value's start hour unchanged, so a deleted period's hours pass to the period before it in day order, wrapping.
 
 ## Gathering Task Library
 
@@ -925,6 +939,7 @@ Applying phases and actual receipts are updated in that same history record by r
 Versioned Journal history MUST prefer the applied createGatheredResults receipt over pre-effect planned createdResults, including failure awards; missing or opaque receipts MUST NOT establish itemized awards.
 Recorded d100 roll, threshold and cleared/missed evidence remains usable when individual awarded quantities cannot be attributed; the Journal retains unknown per-row amounts and shows the unattributed actual receipt once.
 Native d100 item rows clear when `effectiveRoll >= 101 - finalDropRate`; historical presentation MUST honor recorded outcomes rather than reinterpret them as a low-roll check.
+The drop preview MUST carry each row's `threshold` from the same expression the roll evaluation uses, so the preview and the roll cannot disagree.
 The d100 resolver's status is independent of item hits: it returns failed when selected events exist under `failureWithEvent`, otherwise succeeded, including an all-miss item result.
 Subsequent engine failure rules still apply; the Journal MUST use the recorded terminal status rather than derive success or failure from item quantities.
 Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.
@@ -989,7 +1004,7 @@ Because the environment adjustment is clamped into the base before the modifier 
 The attempt then rolls a SINGLE `d100`, and every enabled item row is tested against that same roll: add the gathering modifier and drop the row when `effectiveRoll >= 101 - finalDropRate`.
 Each row's marginal chance is unchanged by this — a row at 40 still drops on 40 of the 100 faces — but rows are not independent draws: within one attempt they succeed and fail together in rarity order, so a low roll yields only the commonest rows and a high roll yields the rare ones too.
 That is what makes a gathering attempt one reportable check; per-row draws could only ever be published as a pool whose total is the sum of unrelated checks.
-The roll is drawn only when the task has at least one enabled item row.
+The roll is drawn only when the task has at least one enabled item row, except that a prompted attempt's `1d100` is drawn and posted when its answer is evaluated (requirement 21) and is the item-row roll only when an item row reads it.
 `environmentDropRateAdjustment` is zero when the selected environment disables task drop-rate adjustments for that task.
 An additive system mode yields `multiplicativeFactor === 1` and is byte-identical to the prior flat sum.
 3. For every enabled composed event in the environment whose runtime condition gates are satisfied, resolve event character modifier references and matching condition modifiers, calculate `finalEventRate = round(clamp((foldedBase + additiveTotal) * multiplicativeFactor, 0, 100))` where `foldedBase = clamp(dropRate + environmentDropRateAdjustment, 0, 100)` is folded at compose time, using the same two-clamp additive-then-multiplicative-then-round aggregation (over both character and condition modifiers) as item rows, roll `d100`, add the event modifier, and drop the event when `effectiveRoll >= 101 - finalEventRate`.
@@ -1012,6 +1027,21 @@ Events are environment hazards rather than part of the gathering check, and one 
 18. Timed d100 runs must snapshot the start-time task, events, conditions, character modifier library evidence, and rules so later configuration changes do not alter completion.
 19. D100 resolution must preserve history-before-side-effects ordering.
 20. Existing routed and progressive task resolution modes remain valid compatibility behavior.
+21. An interactive immediate d100 attempt — one whose run started with no time requirement — opens the roll prompt before its stage resolves.
+The prompt is a versioned player check (`resolution-modes/spec.md` § Versioned Check Entitlement): it names the task, states the `1d100` it rolls, and offers the situational bonus and the roll mode.
+It shows no target and no modifier, because every item row and every event is graded against its own threshold with its own roll-side modifier.
+d100 has no authored check configuration, so its prompt always offers and permits the situational bonus.
+When the answer is evaluated the active GM rolls the attempt's `1d100` and resolves the bonus once to a number: a plain number as typed, any other entry rolled against the actor's roll data, and a malformed entry `0`.
+The stage then resolves with that face as the shared item-row roll, and adds that flat bonus to the item-row roll and to every event's own roll, so a positive bonus makes each event likelier as well as each item row.
+The evaluation grades nothing itself: requirements 2 and 3 grade every row and event, and requirement 17 records the bonus inside the roll-side modifier.
+Nothing resolves, spends or awards between the prompt opening and the answer.
+A non-secret roll is handed back, subject to the post-commit entitlement recheck, for the requesting client to post, so a dice-animation module animates it.
+An opaque blind attempt's check is a secret check (`data-models/spec.md`): its prompt is generic and names no formula, and its roll posts GM-private.
+A bonus entered as anything other than a plain number posts its dice in the same message as the `1d100`, under the same visibility, and the message's flavor states the resolved bonus.
+A dismissed prompt executes nothing: the run stays ready in the Journal with its start-time costs, and its ready action prompts again.
+A caller that is not interactive settles the check without a prompt and with no bonus; nothing is posted from its client, while a secret check still posts GM-private.
+22. A timed d100 run is not a player check: it opens no prompt at start or collection, completes manually or at world time as before, and applies no bonus.
+Whether an attempt is immediate or timed is fixed when its run starts, so a later edit to the task's time requirement never adds a prompt to a started run or removes one.
 
 ## Natural Gathering Expressions
 

@@ -1,14 +1,9 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import {
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES,
-  STATUS_TONE_RAW_MODULES,
-  createMountedComponentHarness
-} from '../helpers/svelte-component-harness.js';
-import { chipToneOf } from '../helpers/chipTone.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -17,193 +12,127 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alt-selector-',
   rawModules: [
-    // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
-    // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
-    ...SEARCHABLE_POPOVER_RAW_MODULES,
-    // Issue 1506: the tone map and the quantity readings the retired tag's six sites now use.
-    ...STATUS_TONE_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
-    'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
-  'src/ui/svelte/util/foundryIconCatalogue.json',
+    'src/ui/svelte/util/focusWhenEnabled.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    // Issue 1506: the have/need tag retired into the shared chip.
-    ...SELECT_COMPILED_MODULES,
-    // The shared eyebrow (issue 1505). The Alternatives title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
+    // Issue 1644: the stack picker is the shared radiogroup's adapter.
+    'src/ui/svelte/components/ChoiceOptionList.svelte',
     'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
 });
 
-function optionChoice(overrides = {}) {
+function stackChoice(overrides = {}) {
   return {
-    kind: 'option',
+    kind: 'stack',
     groupId: 'g1',
-    groupName: 'Herb slot',
-    selectedOptionIndex: 0,
-    options: [
-      { optionIndex: 0, name: 'Red Herb', img: null, need: 1, have: 2, satisfied: true, isCurrency: false, costLabel: '', affordable: true },
-      { optionIndex: 1, name: 'Blue Herb', img: null, need: 1, have: 0, satisfied: false, isCurrency: false, costLabel: '', affordable: true },
+    groupName: 'Hardwood',
+    optionIndex: 0,
+    selectedHeldItemId: 'Item.oak',
+    stacks: [
+      { itemId: 'Item.oak', name: 'Oak Haft', img: null, have: 12 },
+      { itemId: 'Item.bog', name: 'Bog Oak', img: null, have: 1 },
     ],
     ...overrides,
   };
 }
 
+const readingOf = (target, radio) =>
+  target.querySelector(`[id="${radio.getAttribute('aria-describedby')}"]`)?.textContent;
+
+// The option alternatives are the requirement chooser's tiles (issue 1518); this is the stack picker.
 describe('IngredientOptionSelector mounted behavior', () => {
   before(harness.setup);
   after(harness.teardown);
   afterEach(harness.remount);
 
-  it('renders nothing when there are no choices (single-option groups)', async () => {
-    const target = await harness.mount({ choices: [], onChoose: null });
-    assert.equal(target.querySelector('[data-recipe-section="alternatives"]'), null);
-    assert.equal(target.querySelector('[role="radiogroup"]'), null);
+  it('renders nothing without a stack choice, and ignores an option choice', async () => {
+    const option = { kind: 'option', groupId: 'g1', groupName: 'Herb', selectedOptionIndex: 0, options: [] };
+    const target = await harness.mount({ choices: [option], onChoose: null });
+    assert.ok(!target.querySelector('[data-recipe-section]'));
+    assert.ok(!target.querySelector('[role="radiogroup"]'));
   });
 
-  it('renders a radiogroup with one radio per option for a multi-option group', async () => {
-    const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
-    const group = target.querySelector('[role="radiogroup"][data-alt-kind="option"]');
-    assert.ok(group, 'a radiogroup renders for the multi-option group');
-    assert.equal(group.getAttribute('aria-label'), 'Herb slot', 'aria-label is the group name');
-    const radios = group.querySelectorAll('[role="radio"]');
-    assert.equal(radios.length, 2, 'one radio per option');
-    assert.equal(radios[0].getAttribute('aria-checked'), 'true', 'the selected option is checked');
-    assert.equal(radios[1].getAttribute('aria-checked'), 'false');
-    // Roving tabindex: exactly one tabbable radio per group.
-    assert.equal(radios[0].getAttribute('tabindex'), '0');
-    assert.equal(radios[1].getAttribute('tabindex'), '-1');
+  it('draws each stack group as the shared radiogroup, titled visibly and named by that title', async () => {
+    const target = await harness.mount({ choices: [stackChoice()], need: 2 });
+    const section = target.querySelector(
+      '[data-recipe-section="stacks"][data-alt-group="g1"][data-alt-kind="stack"]'
+    );
+    assert.ok(section.matches('.fab-choice-option-list[data-choice-options="g1"]'));
+    const title = section.querySelector('.fab-kicker').textContent.trim();
+    assert.match(title, /Io\.ChooseStackTitle/);
+    assert.match(title, /"name":"Hardwood"/);
+    assert.equal(section.querySelector('[role="radiogroup"]').getAttribute('aria-label'), title);
+    assert.deepEqual(
+      [...section.querySelectorAll('[role="radio"]')].map((radio) => radio.dataset.choiceId),
+      ['Item.oak', 'Item.bog']
+    );
   });
 
-  it('renders an authored essence glyph at 40px without changing radio semantics', async () => {
-    const choice = optionChoice();
-    choice.options[1] = {
-      ...choice.options[1],
-      name: 'Restorative essence',
-      img: null,
-      isEssence: true,
-      icon: 'fa-solid fa-heart',
-    };
-    const target = await harness.mount({ choices: [choice], onChoose: null });
-    const radio = target.querySelectorAll('[role="radio"]')[1];
-    // Issue 1506 retired the crafting essence tile into the ONE shared tile.
-    const thumb = radio.querySelector('[data-medallion="glyph"]');
-    assert.ok(thumb, 'essence alternative uses a glyph tile');
-    assert.match(thumb.getAttribute('style'), /40px/, 'alternative glyph keeps 40px geometry');
-    assert.ok(thumb.querySelector('i').classList.contains('fa-heart'));
-    assert.ok(!radio.querySelector('img'), 'and draws no artwork beside it');
-    assert.equal(radio.getAttribute('aria-checked'), 'false');
-    assert.match(radio.getAttribute('aria-label'), /Restorative essence/);
-    assert.match(radio.textContent, /0\/1/, 'have/need remains visible');
-  });
-
-  it('flags an insufficient option as selectable-but-flagged', async () => {
-    const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
-    const radios = target.querySelectorAll('[role="radio"]');
-    assert.equal(radios[1].getAttribute('data-option-satisfied'), 'false', 'insufficient option is flagged');
-    assert.equal(radios[1].hasAttribute('disabled'), false, 'but stays reachable (not disabled)');
-  });
-
-  it('invokes onChoose with the group id and option index on click', async () => {
+  it('dims a held stack short of the slot need, describes it by its reading, and keeps it offered', async () => {
     const calls = [];
     const target = await harness.mount({
-      choices: [optionChoice()],
-      onChoose: (groupId, choice) => calls.push([groupId, choice]),
+      choices: [stackChoice()],
+      need: 2,
+      onChoose: (groupId, choice) => {
+        calls.push([groupId, choice]);
+      },
     });
-    const radios = target.querySelectorAll('[role="radio"]');
-    radios[1].click();
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'commits the clicked option');
+    const [oak, bog] = target.querySelectorAll('[role="radio"]');
+    assert.ok(!oak.classList.contains('is-short'));
+    assert.ok(bog.classList.contains('is-short'), 'one held against a need of two');
+    assert.equal(bog.disabled, false, 'crafting claims no stack elsewhere, so none is disabled');
+    assert.match(readingOf(target, bog), /Io\.StackReading:\{"have":1,"need":2\}/);
+    assert.ok(!oak.hasAttribute('aria-describedby'), 'a met stack names its reading instead');
+    assert.match(oak.textContent, /Oak Haft.*Io\.StackReading:\{"have":12,"need":2\}/s);
+    assert.ok(!bog.hasAttribute('title'));
+    bog.click();
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.bog' }]);
   });
 
-  // Issue 917 moved this component behind the requirement rail.
-  it('keeps the roving-tabindex keyboard model when rendering a single focused group', async () => {
+  it('keeps the roving keyboard model over the stacks, moving focus with the choice', async () => {
     const calls = [];
     const target = await harness.mount({
-      choices: [optionChoice()],
+      choices: [stackChoice({ optionIndex: 1 })],
       onChoose: (groupId, choice) => calls.push([groupId, choice]),
     });
     const radios = [...target.querySelectorAll('[role="radio"]')];
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'ArrowRight moves the selection');
-
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'End', bubbles: true }));
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'End jumps to the last option');
-
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0 }], 'Space commits the focused radio');
+    assert.deepEqual(
+      radios.map((radio) => [radio.getAttribute('aria-checked'), radio.getAttribute('tabindex')]),
+      [
+        ['true', '0'],
+        ['false', '-1'],
+      ]
+    );
+    const press = (key) =>
+      radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    press('ArrowRight');
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.bog' }], 'the stack keeps its option');
+    assert.ok(globalThis.document.activeElement === radios[1], 'focus follows the choice');
+    press(' ');
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.oak' }]);
+    press('End');
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.bog' }]);
   });
 
-  it('renders a stack radiogroup keyed to held item ids', async () => {
-    const stackChoice = {
-      kind: 'stack',
-      groupId: 'g1',
-      groupName: 'metal',
-      optionIndex: 0,
-      selectedHeldItemId: 'iron',
-      stacks: [
-        { itemId: 'iron', name: 'Iron', img: null, have: 3 },
-        { itemId: 'copper', name: 'Copper', img: null, have: 2 },
-      ],
-    };
-    const calls = [];
+  it('reads a stack in English as held against the need', () => {
+    const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    assert.equal(en.FABRICATE.App.Crafting.Io.StackReading, '{have} held · needs {need}');
+  });
+
+  it('draws a stack with no linked image as the crafting default art', async () => {
     const target = await harness.mount({
-      choices: [stackChoice],
-      onChoose: (groupId, choice) => calls.push([groupId, choice]),
+      choices: [stackChoice({ stacks: [{ itemId: 'iron', name: 'Iron', img: null, have: 3 }] })],
+      need: 1,
+      onChoose: null,
     });
-    const group = target.querySelector('[role="radiogroup"][data-alt-kind="stack"]');
-    assert.ok(group, 'a stack radiogroup renders');
-    const radios = group.querySelectorAll('[role="radio"]');
-    assert.equal(radios.length, 2);
-    radios[1].click();
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'copper' }], 'commits the chosen stack');
-  });
-
-  // Issue 1506: the have/need tag retired into the shared chip. Three of this picker's readings
-  // pass `success` for a satisfied or affordable option, and `Chip` paints no tone by that name —
-  // it drops one it does not know, so the satisfied option would have lost its green silently.
-  it('draws each option reading as a chip, in the tone the map routes it to', async () => {
-    const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
-    const radios = target.querySelectorAll('[role="radio"]');
-
-    const satisfied = radios[0].querySelector('.manager-chip');
-    assert.equal(chipToneOf(satisfied), 'positive', 'a satisfied option still reads as green');
-    assert.equal(satisfied.textContent.trim(), '2/1', 'held against needed, from the one reading');
-
-    const short = radios[1].querySelector('.manager-chip');
-    assert.equal(chipToneOf(short), 'danger', 'an insufficient option is still flagged red');
-    assert.equal(short.textContent.trim(), '0/1');
-  });
-
-  it('draws an affordable currency option as a green coin chip', async () => {
-    const choice = optionChoice();
-    choice.options[0] = { ...choice.options[0], isCurrency: true, costLabel: '12 gp' };
-    const target = await harness.mount({ choices: [choice], onChoose: null });
-
-    const chip = target.querySelector('[role="radio"] .manager-chip');
-    assert.equal(chipToneOf(chip), 'positive', 'an affordable cost reads as green');
-    assert.ok(chip.querySelector('i.fa-coins'), 'and keeps its coin glyph');
-    assert.equal(chip.textContent.trim(), '12 gp', 'the cost label is the chip');
-  });
-
-  it('draws a held stack count behind the multiplication sign', async () => {
-    const stackChoice = {
-      kind: 'stack',
-      groupId: 'g1',
-      groupName: 'metal',
-      optionIndex: 0,
-      selectedHeldItemId: 'iron',
-      stacks: [{ itemId: 'iron', name: 'Iron', img: null, have: 3 }],
-    };
-    const target = await harness.mount({ choices: [stackChoice], onChoose: null });
-
-    const chip = target.querySelector('[data-alt-kind="stack"] .manager-chip');
-    assert.equal(chipToneOf(chip), 'neutral', 'a held count is a fact that is merely present');
-    assert.equal(chip.textContent.trim(), '×3');
+    const medallion = target.querySelector('[data-alt-kind="stack"] [role="radio"] .fab-medallion');
+    assert.equal(medallion.dataset.medallion, 'image');
+    assert.equal(medallion.querySelector('img').getAttribute('alt'), '');
   });
 });

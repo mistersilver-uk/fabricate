@@ -14,6 +14,15 @@ import { createHarness, makeDocument, makePack } from './helpers/sourceIdentityC
 const ENTRY_UUID = 'Compendium.kit.templates.Item.blank';
 const ENTRY_NAME = 'Blank Scroll';
 const SCROLL_PACK = 'world.scrolls';
+// What a translation module records on an entry, and `fromCompendium` copies to its copies.
+const TRANSLATED_ENTRY_FLAGS = { babele: { originalName: ENTRY_NAME } };
+/** A definition registered from the entry itself. */
+const ENTRY_DEFINITION = {
+  id: 'def-entry',
+  name: ENTRY_NAME,
+  registeredItemUuid: ENTRY_UUID,
+  originItemUuid: ENTRY_UUID,
+};
 
 /** A resolvable Item document. `storedName` is the `_source` name where it differs from the
  * prepared `name`; `id` is the pack document id. */
@@ -217,8 +226,6 @@ describe('the derivative test compares names, and errs toward the existing rule'
 
   const OWN_KEYED = { canonicalUuid: 'Item.scroll-x', references: ['Item.scroll-x'] };
   const ENTRY_KEYED = { canonicalUuid: ENTRY_UUID, references: ['Item.scroll-x', ENTRY_UUID] };
-  // What a translation module records on an entry, and `fromCompendium` copies to its copies.
-  const TRANSLATED = { babele: { originalName: ENTRY_NAME } };
 
   const ROWS = [
     ['a renamed copy is a derivative', worldScroll('x'), entry(), OWN_KEYED],
@@ -236,20 +243,20 @@ describe('the derivative test compares names, and errs toward the existing rule'
     ],
     [
       'a derivative of a translated entry is one despite the original name it inherited',
-      worldScroll('x', { flags: TRANSLATED }),
-      entry({ name: 'Parchemin vierge', flags: TRANSLATED }),
+      worldScroll('x', { flags: TRANSLATED_ENTRY_FLAGS }),
+      entry({ name: 'Parchemin vierge', flags: TRANSLATED_ENTRY_FLAGS }),
       OWN_KEYED,
     ],
     [
       'and stays one against the untranslated entry, with the translation module disabled',
-      worldScroll('x', { flags: TRANSLATED }),
+      worldScroll('x', { flags: TRANSLATED_ENTRY_FLAGS }),
       entry(),
       OWN_KEYED,
     ],
     [
       'a same-name copy matches a translated entry through the original name the entry records',
       worldScroll('x', { name: ENTRY_NAME }),
-      entry({ name: 'Parchemin vierge', flags: TRANSLATED }),
+      entry({ name: 'Parchemin vierge', flags: TRANSLATED_ENTRY_FLAGS }),
       ENTRY_KEYED,
     ],
     [
@@ -363,6 +370,16 @@ describe('replacing a component source', () => {
     );
   });
 
+  it('refuses an Item whose recorded entry no longer resolves and another component claims', async () => {
+    const scroll = worldScroll('fire');
+    const { manager } = world({ documents: [scroll], components: COMPONENTS });
+
+    await assert.rejects(
+      () => manager.replaceItemSource('sys1', 'comp-other', scroll.uuid),
+      /already belongs to "Blank Scroll"/
+    );
+  });
+
   it('still refuses a copy that keeps the entry name', async () => {
     const copy = worldScroll('copy', { name: ENTRY_NAME });
     const { manager } = world({ documents: [entry(), copy], components: COMPONENTS });
@@ -375,13 +392,6 @@ describe('replacing a component source', () => {
 });
 
 describe('a re-registration neither adds nor releases a compendium-source claim', () => {
-  const ENTRY_DEFINITION = {
-    id: 'def-entry',
-    name: ENTRY_NAME,
-    registeredItemUuid: ENTRY_UUID,
-    originItemUuid: ENTRY_UUID,
-  };
-
   for (const { kind, library, register } of KINDS) {
     it(`a ${kind} registered from a derivative before the gate moves to its own uuid and keeps the entry`, async () => {
       const scroll = worldScroll('fire');
@@ -547,6 +557,13 @@ describe('the legacy recipe-item scalar at find-existing', () => {
 
 describe('an unresolvable shared entry', () => {
   const unresolved = () => ['fire', 'frost', 'storm'].map((id) => worldScroll(id));
+  // Built from the entry while it resolved, so each carries the flags `fromCompendium` copied.
+  const SIBLINGS = [
+    ['world Items', (id) => worldScroll(id, { flags: TRANSLATED_ENTRY_FLAGS })],
+    ['pack Items', (id) => packedScroll(id, { flags: TRANSLATED_ENTRY_FLAGS })],
+  ];
+  const siblings = (make) => ['fire', 'frost', 'storm'].map((id) => make(id));
+  const fallbackCounts = (results) => results.map((result) => result.sourceFallbacks.length);
 
   it('three tools whose shared entry no longer resolves stay three tools', async () => {
     const scrolls = unresolved();
@@ -581,22 +598,117 @@ describe('an unresolvable shared entry', () => {
     assert.equal(system().tools.length, 2);
   });
 
-  for (const { kind, library, register } of KINDS.slice(0, 2)) {
-    it(`three ${kind}s sharing it still merge, the declared residual`, async () => {
-      const scrolls = unresolved();
-      const { manager, system } = world({ documents: scrolls });
+  for (const [shape, make] of SIBLINGS) {
+    for (const { kind, library, register } of KINDS.slice(0, 2)) {
+      it(`three ${shape} sharing it are three ${kind}s, and importing them again adds nothing`, async () => {
+        const uuids = siblings(make).map((scroll) => scroll.uuid);
+        const { manager, system } = world({ documents: siblings(make) });
 
+        assert.deepEqual(await registerAll(register, manager, uuids), ['added', 'added', 'added']);
+        assert.deepEqual(await registerAll(register, manager, uuids), [
+          'skipped',
+          'skipped',
+          'skipped',
+        ]);
+        assert.equal(system()[library].length, 3);
+      });
+    }
+
+    it(`three ${shape} sharing it report a fallback each, then only the first, which keeps the entry`, async () => {
+      const scrolls = siblings(make);
+      const { manager, system } = world({ documents: scrolls });
+      const importAll = async () => {
+        const results = [];
+        for (const scroll of scrolls)
+          results.push(await manager.addItemFromUuid('sys1', scroll.uuid));
+        return results;
+      };
+      const aliases = () => system().components.map((component) => component.aliasItemUuids);
+
+      assert.deepEqual(fallbackCounts(await importAll()), [1, 1, 1]);
+      assert.deepEqual(aliases(), [[ENTRY_UUID], [], []]);
+
+      const again = await importAll();
       assert.deepEqual(
-        await registerAll(
-          register,
-          manager,
-          scrolls.map((scroll) => scroll.uuid)
-        ),
-        ['added', 'updated', 'updated']
+        again.map((result) => result.action),
+        ['skipped', 'skipped', 'skipped']
       );
-      assert.equal(system()[library].length, 1);
+      assert.deepEqual(fallbackCounts(again), [1, 0, 0]);
+      assert.deepEqual(aliases(), [[ENTRY_UUID], [], []]);
     });
   }
+
+  it('addItemsFromPack imports three pack Items sharing it as three components, then skips them', async () => {
+    const scrolls = siblings(SIBLINGS[1][1]);
+    const { manager, system } = world({
+      documents: scrolls,
+      packs: [makePack(SCROLL_PACK, { documents: scrolls })],
+    });
+    const summary = ({ added, updated, skipped, sourceFallbacks }) => ({
+      added,
+      updated,
+      skipped,
+      fallbacks: sourceFallbacks.map((fallback) => fallback.itemName),
+    });
+
+    assert.deepEqual(summary(await manager.addItemsFromPack('sys1', SCROLL_PACK)), {
+      added: 3,
+      updated: 0,
+      skipped: 0,
+      fallbacks: scrolls.map((scroll) => scroll.name),
+    });
+    assert.deepEqual(summary(await manager.addItemsFromPack('sys1', SCROLL_PACK)), {
+      added: 0,
+      updated: 0,
+      skipped: 3,
+      fallbacks: [scrolls[0].name],
+    });
+    assert.deepEqual(
+      system().components.map((component) => component.aliasItemUuids),
+      [[ENTRY_UUID], [], []]
+    );
+  });
+
+  for (const { kind, library, register } of KINDS.slice(0, 2)) {
+    it(`a ${kind} registered from the entry is not joined by an Item recording it`, async () => {
+      const scroll = worldScroll('fire');
+      const { manager, system } = world({ documents: [scroll], [library]: [ENTRY_DEFINITION] });
+      const entryBefore = structuredClone(system()[library][0]);
+
+      const result = await register(manager, scroll.uuid);
+
+      assert.equal(result.action, 'added');
+      assert.equal(system()[library].length, 2);
+      assert.deepEqual(system()[library][0], entryBefore);
+    });
+  }
+
+  it('a component claiming the entry in its type-less spelling withholds it from a sibling recording the four-part one', async () => {
+    const scroll = worldScroll('fire');
+    const typelessEntry = 'Compendium.kit.templates.blank';
+    const { manager } = world({
+      documents: [scroll],
+      components: [
+        { ...ENTRY_DEFINITION, registeredItemUuid: typelessEntry, originItemUuid: typelessEntry },
+      ],
+    });
+
+    const result = await manager.addItemFromUuid('sys1', scroll.uuid);
+
+    assert.equal(result.action, 'added');
+    assert.deepEqual(result.item.aliasItemUuids, []);
+    assert.deepEqual(fallbackCounts([result]), [1], 'the first import still reports its fallback');
+  });
+
+  it('three imported components sharing it pass system normalization and the uniqueness check', async () => {
+    const scrolls = unresolved();
+    const { manager, system } = world({ documents: scrolls });
+    for (const scroll of scrolls) await manager.addItemFromUuid('sys1', scroll.uuid);
+
+    const normalized = manager._normalizeSystem(structuredClone(system()));
+
+    assert.doesNotThrow(() => manager._assertUniqueComponentSourcesForSystem(normalized));
+  });
 });
 
 describe('a withheld compendium claim reports no broken-source fallback', () => {
@@ -643,18 +755,11 @@ describe('a durable leaf at find-existing', () => {
   ];
 
   for (const { kind, library, register, role } of LEAVES) {
-    const entryDefinition = {
-      id: 'def-entry',
-      name: ENTRY_NAME,
-      registeredItemUuid: ENTRY_UUID,
-      originItemUuid: ENTRY_UUID,
-    };
-
     it(`a derivative whose inherited leaf names the entry's ${kind} registers as a new one`, async () => {
       const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
       const { manager, system } = world({
         documents: [entry(), scroll],
-        [library]: [entryDefinition],
+        [library]: [ENTRY_DEFINITION],
       });
 
       const result = await register(manager, scroll.uuid);
@@ -677,7 +782,7 @@ describe('a durable leaf at find-existing', () => {
       });
       const { manager, system } = world({
         documents: [entry(), clone],
-        [library]: [entryDefinition],
+        [library]: [ENTRY_DEFINITION],
       });
 
       const result = await register(manager, clone.uuid);
@@ -709,13 +814,58 @@ describe('a durable leaf at find-existing', () => {
       assert.deepEqual(result.item.aliasItemUuids, [], 'a re-link keeps no origin it left');
     });
 
-    it(`a source whose entry no longer resolves re-links to the ${kind} its leaf names`, async () => {
+    it(`a source whose entry no longer resolves, with a leaf naming a ${kind} of another name, registers as a new one`, async () => {
       const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
-      const { manager, system } = world({ documents: [scroll], [library]: [entryDefinition] });
+      const { manager, system } = world({ documents: [scroll], [library]: [ENTRY_DEFINITION] });
 
       const result = await register(manager, scroll.uuid);
 
-      assert.equal(result.item.id, 'def-entry');
+      assert.equal(result.action, 'added');
+      assert.notEqual(result.item.id, 'def-entry');
+      assert.equal(system()[library].length, 2);
+      assert.equal(stamped(scroll, role), result.item.id, 'the world leaf is overwritten');
+    });
+
+    it(`a sibling whose leaf names the ${kind} of another sibling of an unresolvable entry registers as a new one`, async () => {
+      // The leaf Repair Item Data stamps through the entry the first sibling's definition claims.
+      const frost = worldScroll('frost', { flags: leaf(role, 'def-fire') });
+      const { manager, system } = world({
+        documents: [frost],
+        [library]: [
+          {
+            id: 'def-fire',
+            name: 'Scroll of fire',
+            registeredItemUuid: 'Item.scroll-fire',
+            originItemUuid: 'Item.scroll-fire',
+            aliasItemUuids: [ENTRY_UUID],
+          },
+        ],
+      });
+
+      const result = await register(manager, frost.uuid);
+
+      assert.equal(result.action, 'added');
+      assert.equal(system()[library].length, 2);
+      assert.equal(stamped(frost, role), result.item.id);
+    });
+
+    it(`a source whose entry no longer resolves re-links to the ${kind} its leaf names when that carries its name`, async () => {
+      const scroll = worldScroll('fire', { flags: leaf(role, 'def-linked') });
+      const { manager, system } = world({
+        documents: [scroll],
+        [library]: [
+          {
+            id: 'def-linked',
+            name: scroll.name,
+            registeredItemUuid: 'Item.elsewhere',
+            originItemUuid: 'Item.elsewhere',
+          },
+        ],
+      });
+
+      const result = await register(manager, scroll.uuid);
+
+      assert.equal(result.item.id, 'def-linked');
       assert.equal(system()[library].length, 1);
     });
 
@@ -779,7 +929,7 @@ describe('a durable leaf at find-existing', () => {
       const { manager, system } = world({
         documents: [entry(), scroll],
         [library]: [
-          entryDefinition,
+          ENTRY_DEFINITION,
           {
             id: 'def-fire',
             name: scroll.name,

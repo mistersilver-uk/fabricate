@@ -114,12 +114,16 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    // A recipe result naming no component, for the result row's suggestion list (issue 1516).
+    resultRowState: params.get('resultRowState') ?? null,
     // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
     runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
     checkOverride: params.get('checkOverride') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
     checkPreviewState: params.get('checkPreviewState') ?? null,
+    // Brenna holds a knowledge book she can learn whole, for the Read & learn header action.
+    learnableBook: params.get('learnableBook') === '1',
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -130,8 +134,21 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Refuse every editor save the save-failed frames photograph (issue 1522).
+    saveFails: params.get('saveFails') === '1',
+    // Strip Herbalism's progressive formula, for the System Overview's blocker (issue 1522).
+    systemBlocked: params.get('systemBlocked') === '1',
+    // Give Prospect the Seam a depleted-marker image, for the art picker's filled frame (issue 1522).
+    depletedImage: params.get('depletedImage') === '1',
+    // List the lab's script macro in `game.macros`, for a macro picker's option (issue 2466).
+    scriptMacros: params.get('scriptMacros') === '1',
+    // Bend Horseshoe asks for any ingot, for the held-stack picker's frame (issue 1644).
+    tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
+    // Withhold the world essence scope from the manager, so an essence editor renders unscoped,
+    // with the On craft primer the rules screen drops.
+    noEssenceScope: params.get('noEssenceScope') === '1',
     // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
     // — with `clearSystem` beside it — its component catalogue is too (issue 1540).
     noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
@@ -141,6 +158,9 @@ function readParams() {
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
+    // Give herbalism the four default periods and the clock 14:34 for the time-of-day bar's
+    // frames: `1` tiles the day, `fallback` does not (issue 2431).
+    timeOfDayBar: params.get('timeOfDayBar') ?? '',
     longDowntimeLabels: params.get('longDowntimeLabels') === '1',
     // An active scene with no regions, for the Map Region Links no-regions empty state.
     noSceneRegions: params.get('noSceneRegions') === '1',
@@ -195,6 +215,9 @@ function readParams() {
         ? { width: Number(params.get('w')), height: Number(params.get('h')) }
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
+    // Mount a fixture-only SPECIMEN in the window instead of the window's own root, by the key
+    // `LAB_SPECIMENS` declares (issue 1782).
+    specimen: params.get('specimen') ?? null,
     // Who is looking. Defaults below to the viewer each window is normally used by — player for the
     // player app, GM for the manager — because that is what every existing case assumes (issue
     // 901).
@@ -664,14 +687,63 @@ async function mountManagerApp(content, params) {
         }
       : {}),
   });
+  if (params.noEssenceScope) game.fabricate.getEssenceScopeStore = () => null;
   const props = app._prepareSvelteProps();
   const services = props.services;
   if (params.downtimeProvider) {
     props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
   }
   if (params.clearSystem) await props.store.selectSystem('');
+  if (params.saveFails) {
+    for (const action of ['updateRecipe', 'updateComponent', 'updateEssence', 'saveRecipeItem']) {
+      props.store[action] = async () => false;
+    }
+    // The Tool save reports its failure through the store's own catch, so the write throws.
+    globalThis.game.fabricate.getCraftingSystemManager().upsertTool = async () => {
+      throw new Error('view lab: save refused');
+    };
+  }
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
+}
+
+// view-lab-region:lab-specimens
+/**
+ * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
+ * shipped component, directly or through the published seam a companion calls (issue 2424), in a
+ * state no shipped caller draws. Nothing in `src/` imports them, so a specimen frame depicts a
+ * state no GM can reach, and its case label says so.
+ */
+const LAB_SPECIMENS = Object.freeze({
+  'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
+  // Issue 2424: the published tier track, mounted through the seam a companion calls.
+  'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
+  // Issue 2448's seven data-only leaves, then issue 2451's `Kicker` and `Chip`, by the same seam.
+  'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
+  // Issue 2452: notices whose action reports each press through a callback, by the same seam.
+  'published-controls': () => import('./fixtures/PublishedControls.svelte'),
+});
+// view-lab-region:end
+
+/**
+ * Mount a specimen into the built frame in place of the window's own root.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<{instance: object, services: null, props: object}>} The mounted specimen.
+ */
+async function mountSpecimen(content, params) {
+  const load = LAB_SPECIMENS[params.specimen];
+  // Loudly, and by name, as an unknown interactable is: a blank window would publish as evidence.
+  if (!load) {
+    throw new Error(
+      `view lab: unknown specimen "${params.specimen}"; ` +
+        `mount.js declares ${Object.keys(LAB_SPECIMENS).join(', ')}`
+    );
+  }
+  const { default: Specimen } = await load();
+  const props = {};
+  return { instance: mount(Specimen, { target: content, props }), services: null, props };
 }
 
 /**
@@ -682,6 +754,7 @@ async function mountManagerApp(content, params) {
  * @returns {Promise<object>} The mounted window.
  */
 async function mountAppFor(content, params) {
+  if (params.specimen) return mountSpecimen(content, params);
   if (params.appId === 'fabricate-app') return mountPlayerApp(content, params);
   if (params.appId === 'fabricate-crafting-system-manager') return mountManagerApp(content, params);
   if (CANVAS_APP_MOUNTS[params.appId]) return mountCanvasApp(content, params);
@@ -908,13 +981,20 @@ async function boot() {
         noTools: params.noTools,
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
+        timeOfDayBar: params.timeOfDayBar,
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        resultRowState: params.resultRowState,
         runeworkCheckMode: params.runeworkCheckMode,
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
+        learnableBook: params.learnableBook,
+        systemBlocked: params.systemBlocked,
+        depletedImage: params.depletedImage,
+        scriptMacros: params.scriptMacros,
+        tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

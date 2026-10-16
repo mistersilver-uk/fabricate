@@ -3805,8 +3805,8 @@ describe('createAdminStore', () => {
       assert.deepEqual(persisted.updates.steps[0].resultGroups[0].checkOutcomeIds, []);
       // Two result groups (one recipe-level, one step-level) carried the deleted id.
       assert.ok(
-        infoMessages.some((m) => m.includes('2 recipe result group')),
-        `expected a "2 recipe result group(s)" notification, got: ${JSON.stringify(infoMessages)}`
+        infoMessages.some((m) => m.includes('2 recipe result set')),
+        `expected a "2 recipe result set(s)" notification, got: ${JSON.stringify(infoMessages)}`
       );
     });
 
@@ -3842,7 +3842,7 @@ describe('createAdminStore', () => {
 
       assert.equal(updateCount, 0, 'no recipe is rewritten when nothing is stale');
       assert.equal(
-        infoMessages.some((m) => m.includes('recipe result group')),
+        infoMessages.some((m) => m.includes('recipe result set')),
         false,
         'no cleanup notification when nothing changed'
       );

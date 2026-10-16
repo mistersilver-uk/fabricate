@@ -10,6 +10,7 @@ import {
 } from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
+const { recipeResultKinds } = await import('../../src/ui/svelte/apps/manager/recipe/resultRows.js');
 
 function recipeItemById(vs, id) {
   return (vs.selectedSystem?.recipeItemDefinitions || []).find((d) => d.id === id);
@@ -290,6 +291,24 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
       'membership is a fact about the book, resolved over the roster rather than the filtered rows'
     );
     assert.equal(bookA.derivedType, 'Book', 'a two-recipe book stays a Book rather than falling to Incomplete');
+  });
+
+  // Issue 1773, the same class: a knowledge result names its taught recipe from the published
+  // roster, so a search left live in the library must not empty the table it resolves against.
+  it('publishes the whole roster beside the searched rows, so a taught recipe still resolves', async () => {
+    const store = createAdminStore(createServices(bookSystem(), BOOK_RECIPES(), []));
+    await store.selectSystem('sys1');
+    await store.setRecipeSearch(NO_MATCH);
+    const vs = get(store.viewState);
+    assert.equal(vs.recipes.length, 0, 'control: the search IS live');
+    assert.deepEqual(vs.recipeRoster, [
+      { id: 'r1', name: 'Smelt Copper', img: vs.recipeRoster[0].img },
+      { id: 'r2', name: 'Forge Rivets', img: vs.recipeRoster[1].img },
+    ]);
+    assert.deepEqual(Object.keys(vs.recipeRoster[0]), ['id', 'name', 'img'], 'a table, not rows');
+    const taught = recipeResultKinds({ recipeOptions: vs.recipeRoster, knowledgeObservable: true })
+      .catalogue.knowledge.find((entry) => entry.id === 'r2');
+    assert.equal(taught?.label, 'Forge Rivets', 'the taught recipe resolves by name');
   });
 
   it('keeps the learned-by count of a book intact while a search matching nothing is live', async () => {

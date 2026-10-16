@@ -36,6 +36,8 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   'recipes[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.componentId',
   'recipes[].resultGroups[].results[].componentId',
   'recipes[].resultGroups[].results[].systemItemId',
+  'recipes[].resultGroups[].results[].alternatives[].componentId',
+  'recipes[].resultGroups[].results[].alternatives[].systemItemId',
   'recipes[].steps[].toolIds[]',
   'recipes[].steps[].ingredientSets[].toolIds[]',
   'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].componentId',
@@ -44,6 +46,8 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   'recipes[].steps[].ingredientSets[].ingredientGroups[].options[].alternatives[].match.componentId',
   'recipes[].steps[].resultGroups[].results[].componentId',
   'recipes[].steps[].resultGroups[].results[].systemItemId',
+  'recipes[].steps[].resultGroups[].results[].alternatives[].componentId',
+  'recipes[].steps[].resultGroups[].results[].alternatives[].systemItemId',
   // --- gatheringConfig ---
   'gatheringConfig.systems.*.tasks[].toolIds[]',
   'gatheringConfig.systems.*.tasks[].dropRows[].componentId',
@@ -252,11 +256,12 @@ export function rewriteEssenceQuantityMap(container, { remapEssence = identity }
   container.essences = Object.fromEntries(merged);
 }
 
-/** Rewrite one result reference in place. */
+/** Rewrite one result reference in place, a choice group's members included (issue 1773). */
 function rewriteResultRef(result, remapComponent) {
   if (!isPlainObject(result)) return;
   if ('componentId' in result) result.componentId = remapComponent(result.componentId);
   if ('systemItemId' in result) result.systemItemId = remapComponent(result.systemItemId);
+  for (const member of arrayOf(result.alternatives)) rewriteResultRef(member, remapComponent);
 }
 
 function rewriteResultGroups(resultGroups, remapComponent) {

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Expression field — token insertion, keyboard path and focus chrome</title>
+    <!--
+      Served by `tests/components/expr-input-rendered.test.js` from a Vite dev server, so
+      `mount.js` imports the real component through the real Svelte plugin and
+      `styles/fabricate.css` is served raw. What is measured is where a pressed token lands, where
+      focus and the caret go, and what `Tab` selects, none of which happy-dom computes.
+    -->
+    <link rel="stylesheet" href="/@expr-input-styles/fabricate.css" />
+    <style>
+      /* Foundry core's universal border-box reset, which the product page always carries. */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0b0a13;
+      }
+
+      /* Arial, so every text-derived box reproduces on a runner without Foundry's licensed face. */
+      body {
+        font-family: Arial, sans-serif;
+      }
+
+      .fabricate-manager {
+        width: 640px;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/expr-input/mount.js"></script>
+  </body>
+</html>

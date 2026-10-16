@@ -28,7 +28,7 @@
   import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Select from '../../../components/Select.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -210,7 +210,7 @@
         {options}
         ariaLabelledBy={titleId}
         {disabled}
-        triggerData={{ 'data-salvage-dc-preset': '' }}
+        triggerProps={{ 'data-salvage-dc-preset': '' }}
         onChange={choose}
       />
       {#if selection === SALVAGE_DC_CUSTOM}
@@ -264,7 +264,7 @@
         {/if}
       {/if}
       <!-- Kept by decision 7: with no authored tiers, the common case, this is the way forward. -->
-      <ManagerButton
+      <Button
         class="manager-salvage-manage-presets"
         data-salvage-manage-presets
         onclick={() => onManagePresets()}
@@ -277,7 +277,7 @@
             'Manage presets'
           )}</span
         >
-      </ManagerButton>
+      </Button>
     </div>
     <span class="manager-salvage-dc-note" data-salvage-override-hint>{hint}</span>
     {#if invalidOverride}
@@ -296,7 +296,7 @@
   </div>
   <!-- A Callout, not a Notice: a kept value is a standing fact about the record (library routing rule). -->
   {#each keptNotices as notice (notice)}
-    <Callout text={notice} dataAttr="data-salvage-override-kept" />
+    <Callout text={notice} data-salvage-override-kept />
   {/each}
   <OverridePlayerSees
     subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}

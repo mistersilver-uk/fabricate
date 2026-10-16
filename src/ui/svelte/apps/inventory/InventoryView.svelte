@@ -356,34 +356,19 @@
     min-height: 0;
   }
 
+  /* No padding and no gap of its own: the left column carries the view's padding, and the detail
+     column is a full rail section flush to the content area's edges, so the grid's pager can run
+     to that rail's border as the left column's footer. */
   .inventory-view-grid {
     display: grid;
     /* Left (filters + grid) carries the denser weight; the detail column keeps a
        comfortable minimum. Below the breakpoint the two columns stack. */
     grid-template-columns: minmax(320px, 1.6fr) minmax(300px, 1fr);
-    gap: var(--fab-space-4);
     height: 100%;
     min-height: 0;
-    padding: var(--fab-space-4);
     box-sizing: border-box;
     background: var(--fab-surface);
     color: var(--fab-text);
-  }
-
-  /* At the supported 1024px window floor this container's content box is roughly
-     938px wide, so the shared 960px boundary is deliberately reachable. */
-  @container fabricate-inventory (max-width: 960px) {
-    .inventory-view-grid {
-      grid-template-columns: 1fr;
-      grid-auto-rows: minmax(min-content, max-content);
-      height: auto;
-      min-height: 100%;
-      overflow-y: auto;
-    }
-
-    .inventory-view-column {
-      min-height: 220px;
-    }
   }
 
   .inventory-view-column {
@@ -394,10 +379,39 @@
     gap: var(--fab-space-3);
   }
 
+  .inventory-view-column-left {
+    padding: var(--fab-space-4);
+  }
+
+  /* The grid's pager is the left column's footer: it bleeds out through that column's padding to
+     the nav rail, the window's bottom edge and the detail rail's border. */
+  .inventory-view-column-left :global(.inventory-grid-pagination) {
+    margin: 0 calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
+  }
+
+  /* A rail section, not a card: one border against the grid, square, filling the column. */
   .inventory-view-column-right {
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-left: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
     overflow: hidden;
+  }
+
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable. Stacked, the
+     rail runs the window's width beneath the left column, its border turned to the top.
+     The two panes split the height at the wide layout's ratio and each scrolls on its own, so
+     both footers stay at their pane's foot; the floors are the browse chrome plus one card row
+     and the bulk footer plus a little body, and below them the grid scrolls as a whole. */
+  @container fabricate-inventory (max-width: 960px) {
+    .inventory-view-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(360px, 1.6fr) minmax(290px, 1fr);
+      overflow-y: auto;
+    }
+
+    .inventory-view-column-right {
+      border-top: 1px solid var(--fab-border);
+      border-left: 0;
+    }
   }
 </style>

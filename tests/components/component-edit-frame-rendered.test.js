@@ -6,14 +6,15 @@
  * runs edge to edge — and the rail's left hairline ending about 80% of the way down the screen.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import {
   COMPONENT_SYSTEMS,
@@ -36,7 +37,7 @@ import {
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 /** Foundry's own stylesheet, where a harvest exists; `''` in CI, where the arms below skip. */
 const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 
@@ -52,6 +53,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-edit-frame-rendered-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });

@@ -58,6 +58,19 @@ function selectedQuantityItems(items, quantity) {
   return selected;
 }
 
+/** `ctx.refusal`, having first completed a resumed run (`options.runId`) `failed` with its message,
+ * as a short stock does, so a run refused before it resumes is never left in progress. */
+export async function refuseSalvage(engine, ctx) {
+  const { actor, options, refusal } = ctx;
+  const salvageRunManager = actor && options?.runId ? engine._getSalvageRunManager() : null;
+  const salvageRun = salvageRunManager?.getActiveRun(actor, options.runId);
+  if (!salvageRun) return refusal;
+  const failed = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+    failureReason: refusal.message,
+  });
+  return { ...refusal, salvageRun: failed };
+}
+
 /** The run this salvage runs against, the stock it will spend, and the two refusals reachable
  * before anything is created. */
 export async function resolveSalvageRunRecord(engine, ctx) {

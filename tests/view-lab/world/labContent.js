@@ -3370,6 +3370,30 @@ export function buildLabContent({ journalCaseState = null } = {}) {
   return seedJournalPrototype(content, journalCaseState, { component, recipe });
 }
 
+/** The four default periods, each with its default start hour authored (issue 2431). */
+const TIME_OF_DAY_PERIODS = Object.freeze([
+  { id: 'dawn', label: 'Dawn', icon: 'fas fa-cloud-sun', startHour: 4 },
+  { id: 'day', label: 'Day', icon: 'fas fa-sun', startHour: 8 },
+  { id: 'dusk', label: 'Dusk', icon: 'fas fa-cloud-moon', startHour: 17 },
+  { id: 'night', label: 'Night', icon: 'fas fa-moon', startHour: 21 },
+]);
+
+/**
+ * Give herbalism the four periods the time-of-day bar's frames draw: `'1'` tiles the day, and
+ * `'fallback'` starts Night at Day's hour, so the panel names both in its fallback note.
+ *
+ * @param {ReturnType<typeof buildLabContent>} content Fresh lab content, mutated in place.
+ * @param {string} mode The `timeOfDayBar` query value, or `''` to leave the world as authored.
+ */
+export function seedTimeOfDayBar(content, mode) {
+  if (mode !== '1' && mode !== 'fallback') return;
+  const values = TIME_OF_DAY_PERIODS.map((period) =>
+    mode === 'fallback' && period.id === 'night' ? { ...period, startHour: 8 } : { ...period }
+  );
+  const conditions = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM].conditions;
+  conditions.timeOfDay = { enabled: true, current: 'day', values };
+}
+
 /**
  * Author the Journal's ready single-step fixture as a real optional no-check craft.
  *

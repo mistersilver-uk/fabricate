@@ -79,6 +79,7 @@ import {
 import { computeSystemVisibility } from '../../systems/systemValidation.js';
 import { effectiveToolBreakageAuthority } from '../../systems/toolBreakageAuthority.js';
 import { ingredientSetToolsAreActive } from '../../systems/toolCheckBonus.js';
+import { awardedResults } from '../../utils/choiceGroupShape.js';
 import { findMatchingComponent } from '../../utils/essenceResolver.js';
 // The player-visible per-stage complication forecast, attached to the stage rows this
 // builder already publishes. Another deliberately import-free leaf (its one import is the
@@ -89,6 +90,7 @@ import { attachStageComplications } from '../../utils/progressiveStageComplicati
 // A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../../utils/progressiveStageThresholds.js';
 import {
+  arrayOrEmpty,
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
@@ -2428,22 +2430,14 @@ export class InventoryListingBuilder {
 
   /**
    * The set of component ids a recipe outputs, gathered from its top-level result
-   * groups and every explicit step's result groups.
+   * groups and every explicit step's result groups, a choice group's alternatives included.
    * @private
    * @returns {Set<string>}
    */
   _recipeResultComponentIds(recipe) {
-    const ids = new Set();
-    for (const result of Array.isArray(recipe?.results) ? recipe.results : []) {
-      if (result?.componentId) ids.add(result.componentId);
-    }
-    for (const step of Array.isArray(recipe?.steps) ? recipe.steps : []) {
-      for (const group of Array.isArray(step?.resultGroups) ? step.resultGroups : []) {
-        for (const result of Array.isArray(group?.results) ? group.results : []) {
-          if (result?.componentId) ids.add(result.componentId);
-        }
-      }
-    }
-    return ids;
+    const groups = arrayOrEmpty(recipe?.steps).flatMap((step) => arrayOrEmpty(step?.resultGroups));
+    const lists = [recipe?.results, ...groups.map((group) => group?.results)];
+    const results = lists.flatMap(arrayOrEmpty);
+    return new Set(results.flatMap(awardedResults).flatMap((result) => result?.componentId || []));
   }
 }

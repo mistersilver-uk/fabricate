@@ -92,12 +92,14 @@ Relatedly, if a complication you kept off is also set to roll a dice expression,
 
 Fabricate shows your authored complications, read-only, everywhere else that component appears as a progressive result, so you do not have to remember which component you last edited.
 
-- The component editor's own **Salvage** panel shows a read-only strip under any progressive stage that produces a component carrying complications.
-- The recipe editor's progressive stage cards show the same read-only strip for each result whose component carries complications.
+- The component editor's own **Salvage** panel lists, read-only, the salvage complications of the component each progressive stage produces, inside that stage's row.
+- The recipe editor's progressive stages list the crafting complications of each stage's component the same way.
 
-The salvage strip carries its own **Edit** control, named for complications so it reads apart from the row's other links, and a recipe stage's **Edit** control targets the same component.
-Either one opens the component the complications belong to, which is the only place they can be changed.
-These read-only strips always show everything you authored, whatever **Tell the player** says, because they are for you.
+Each list sits under a quiet **Complications** label, one row per complication: its name over a one-line summary of when it fires and what it does, a **Player** tag when you chose to tell the player, and its severity.
+Hover a summary that is cut short to read it in full.
+A list shows only the complications enabled for that activity, so one you enabled only for crafting does not appear under a salvage stage.
+Nothing in the list can be changed there: use the stage row's **Edit** control, which opens the component the complications belong to.
+These lists always show every complication you authored for that activity, whatever **Tell the player** says, because they are for you.
 
 {% include screenshot.html case="manager-recipe-edit-results-progressive" alt="The Results tab of the recipe editor for a progressive recipe, showing three ordered stages with the difficulty attached to each, and the read-only complications carried by two of them." caption="A recipe's progressive stages in the recipe editor, two of them carrying their component's complications read-only." %}
 

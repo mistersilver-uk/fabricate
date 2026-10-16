@@ -660,7 +660,8 @@ export class AlchemyListingBuilder {
    *  - none / simple → the first non-failure (success) group;
    *  - tiered → the TOP SUCCESS TIER's assigned group (routed outcome-tier order),
    *    falling back to the first non-failure group when no tier is routed yet.
-   * The projected result is the first result in that group, resolved to its component.
+   * The projected result is the group's first COMPONENT result, resolved to its component: a
+   * currency or knowledge reward names no item to headline (issue 1773).
    */
   _projectResult(recipe, set, system, components) {
     const groups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
@@ -682,7 +683,7 @@ export class AlchemyListingBuilder {
       }
     }
     const results = Array.isArray(group?.results) ? group.results : [];
-    const first = results[0];
+    const first = results.find((result) => (result?.kind ?? 'component') === 'component');
     if (!first) return null;
     const component = first.componentId
       ? findById(getDefinitionIndex(components), first.componentId)

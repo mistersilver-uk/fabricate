@@ -46,12 +46,7 @@
   } = $props();
 
   const classes = $derived(
-    [
-      'fabricate-icon-button',
-      'manager-icon-button',
-      { 24: 'is-size-24', 26: 'is-size-26' }[size] || '',
-      extraClass,
-    ]
+    ['fabricate-icon-button', { 24: 'is-size-24', 26: 'is-size-26' }[size] || '', extraClass]
       .filter(Boolean)
       .join(' ')
   );

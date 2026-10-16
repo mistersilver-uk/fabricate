@@ -1,14 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Notice from '../../components/Notice.svelte';
-  import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { RUN_KINDS } from '../../util/journalRunKinds.js';
   import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';
+  import JournalKindFilter from './JournalKindFilter.svelte';
   import RunDetail from './RunDetail.svelte';
 
   let { services = null } = $props();
@@ -42,12 +43,12 @@
     }
   );
 
-  const kindOptions = $derived([
-    { value: 'all', label: localize('FABRICATE.App.Journal.Filters.Kind.All') },
-    { value: 'crafting', label: localize('FABRICATE.App.Journal.Filters.Kind.Crafting') },
-    { value: 'gathering', label: localize('FABRICATE.App.Journal.Filters.Kind.Gathering') },
-    { value: 'salvage', label: localize('FABRICATE.App.Journal.Filters.Kind.Salvage') },
-    { value: 'alchemy', label: localize('FABRICATE.App.Journal.Filters.Kind.Alchemy') },
+  // The store holds the shown kind set and owns the union; the filter only flips one kind.
+  const shownKinds = $derived(Array.isArray(journal?.kindFilter) ? journal.kindFilter : RUN_KINDS);
+  const kindFiltered = $derived(RUN_KINDS.some((kind) => !shownKinds.includes(kind)));
+  const listedRuns = $derived([
+    ...(journal?.listing?.activeRuns ?? []),
+    ...(journal?.listing?.history ?? []),
   ]);
   const statusOptions = $derived([
     {
@@ -119,44 +120,36 @@
         <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
           <div class="journal-browse-controls">
             <div class="journal-search-field">
-              <ManagerSearchField
+              <SearchField
                 class="journal-search-control"
-                size="30"
                 value={journal?.search ?? ''}
-                onInput={(value) => journal?.setSearch?.(value)}
+                onChange={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
                 data-journal-search="true"
               />
             </div>
-            <div class="journal-kind-field">
-              <Select
-                size="inline"
-                minWidth={240}
-                maxWidth={340}
-                value={journal?.kindFilter ?? 'all'}
-                options={kindOptions}
-                ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
-                triggerData={{ 'data-journal-kind-filter': true }}
-                onChange={(value) => journal?.setKindFilter?.(value)}
-              />
-            </div>
+            <JournalKindFilter
+              {shownKinds}
+              runs={listedRuns}
+              onToggle={(kind) => journal?.toggleKind?.(kind)}
+            />
+            <SegmentedControl
+              options={statusOptions}
+              value={journal?.activeStatusFilter ?? 'all'}
+              onChange={(value) => journal?.setActiveStatusFilter?.(value)}
+              groupName="journal-active-status"
+              ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
+              data-journal-status-filter
+              fill
+            />
           </div>
-          <SegmentedControl
-            options={statusOptions}
-            value={journal?.activeStatusFilter ?? 'all'}
-            onChange={(value) => journal?.setActiveStatusFilter?.(value)}
-            groupName="journal-active-status"
-            ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
-            dataAttr="data-journal-status-filter"
-            fill
-          />
 
           <div class="journal-browse-lists">
             <ActiveRunsList
               runs={activeRuns}
               filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all' ||
+                kindFiltered ||
                 (journal?.activeStatusFilter ?? 'all') !== 'all'}
               totalCount={journal?.activeCount ?? activeRuns.length}
               {selectedRunKey}
@@ -172,8 +165,7 @@
             />
             <HistoryList
               runs={historyRuns}
-              filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all'}
+              filtered={Boolean(journal?.search?.trim()) || kindFiltered}
               totalCount={journal?.historyCount ?? historyRuns.length}
               pageIndex={journal?.historyPage ?? 0}
               pageSize={journal?.historyPageSize ?? 4}
@@ -198,8 +190,7 @@
             <EmptyState
               icon="fas fa-book-open"
               title={localize('FABRICATE.App.Journal.Empty.Detail')}
-              dataAttr="data-journal-empty"
-              dataValue="detail"
+              data-journal-empty="detail"
             />
           {/if}
         </main>
@@ -235,14 +226,17 @@
     min-height: 0;
     flex-direction: column;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
+    padding: var(--fab-space-2) 0 0;
     border-right: 1px solid var(--fab-border);
     background: var(--fab-bg-1);
   }
+  /* The column has no inline padding, so each list's pager can span it; its contents keep the
+     inset themselves, and each section hands its own to its pager through `--fab-section-inset`. */
   .journal-browse-controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--fab-space-2);
+    margin: 0 var(--fab-space-2);
   }
   .journal-search-field {
     display: grid;
@@ -251,22 +245,19 @@
   .journal-search-field > :global(.journal-search-control) {
     min-width: 0;
   }
-  .journal-kind-field {
-    min-width: 0;
-  }
-  .journal-kind-field > :global(.fabricate-select) {
-    width: 100%;
-  }
-  .journal-kind-field > :global(.fabricate-select .fabricate-select-trigger) {
-    width: 100%;
-  }
   .journal-browse-lists {
     display: grid;
     /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. */
     grid-template-rows: minmax(0, 1fr) 280px;
     min-height: 0;
     flex: 1 1 auto;
-    gap: var(--fab-space-2);
+    gap: 0;
+  }
+  .journal-browse-lists > :global(.journal-list-section) {
+    --fab-section-inset: var(--fab-space-2);
+  }
+  .journal-browse-lists :global(:is(.journal-list-header, .journal-list-body)) {
+    padding-inline: var(--fab-section-inset);
   }
   .journal-browse-lists > :global([data-journal-list='finished']) {
     padding-top: var(--fab-space-2);
@@ -290,9 +281,12 @@
     .journal-browse {
       display: contents;
     }
-    .journal-browse-controls,
-    .journal-browse > :global(.manager-segmented) {
+    .journal-browse-controls {
       margin: var(--fab-space-3) var(--fab-space-3) 0;
+    }
+    /* Keeps the status filter's stacked 12px step from the kind filter. */
+    .journal-browse-controls > :global([data-journal-status-filter]) {
+      margin-top: var(--fab-space-1);
     }
     .journal-browse-lists {
       display: contents;
@@ -301,11 +295,12 @@
       box-sizing: border-box;
       height: 360px;
       min-height: 360px;
-      padding: var(--fab-space-3);
-      border-bottom: 1px solid var(--fab-border);
+      padding: var(--fab-space-3) 0 0;
+      --fab-section-inset: var(--fab-space-3);
     }
     .journal-detail-pane {
       min-height: 220px;
+      border-top: 1px solid var(--fab-border);
       overflow: visible;
     }
   }

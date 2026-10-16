@@ -1,0 +1,2161 @@
+[
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "expression — resolved only where an actor is in scope",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/RollDataExpressionInput.svelte",
+    "fixture": "ExprInputReading",
+    "note": "The fixture stands the field in `<Field as=\"div\">`, because the field draws no box and states no gap: both are its host's.",
+    "undrawn": {
+      "Expression": "the field’s accessible name; the drawing draws the field alone",
+      "Add a term": "the token group’s accessible name; the drawing draws the tokens alone",
+      "Unresolved": "the caller’s statement for an expression that does not reduce; the drawing draws one that does"
+    },
+    "props": {
+      "value": "@prof + @abilities.dex.mod + 8",
+      "aria-label": "Expression",
+      "tokens": ["@prof", "@abilities.dex.mod", "@skills.cra.rank"],
+      "tokensLabel": "Add a term"
+    },
+    "data": {
+      "rollData": { "prof": 3, "abilities": { "dex": { "mod": 2 } } },
+      "unresolvedKey": "FABRICATE.Admin.Manager.Checks.Evaluation.ReadingUnresolved"
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "empty — where every row starts",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "fixture": "PickerRowSearchOpen",
+    "slot": { "width": 620, "height": 163 },
+    "data": { "typed": "ingot" },
+    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window. Measured: at 620 by 163 the row holds one line, the search is 221px wide and the list opens 4px beneath it at its left edge, 221 by 104, unclamped and unflipped; 163 is the least height that holds the whole list (162 clips it to 103), and below 619 the search falls under the list's 220px floor, so the list outgrows the field.",
+    "props": {
+      "value": {
+        "kind": "component",
+        "quantity": 1
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "steel-ingot",
+            "label": "Steel Ingot",
+            "icon": "fas fa-cube"
+          },
+          {
+            "id": "iron-ingot",
+            "label": "Iron Ingot",
+            "icon": "fas fa-cube"
+          },
+          {
+            "id": "silver-ingot",
+            "label": "Silver Ingot",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "ingredient side — the kinds this context offers",
+    "draws": ":scope > div > div:nth-child(1)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "component",
+        "id": "steel-ingot",
+        "quantity": 2
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "steel-ingot",
+            "label": "Steel Ingot",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "ingredient side — the kinds this context offers",
+    "draws": ":scope > div > div:nth-child(2)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "tags",
+        "tags": ["#Hardwood", "#Seasoned"],
+        "tagMatch": "any",
+        "quantity": 1
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "tags": [
+          {
+            "id": "#Hardwood",
+            "label": "#Hardwood",
+            "icon": "fas fa-tag"
+          },
+          {
+            "id": "#Seasoned",
+            "label": "#Seasoned",
+            "icon": "fas fa-tag"
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "ingredient side — the kinds this context offers",
+    "draws": ":scope > div > div:nth-child(3)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "essence",
+        "id": "vitality",
+        "quantity": 4
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "essence": [
+          {
+            "id": "vitality",
+            "label": "Vitality",
+            "icon": "fas fa-flask-vial"
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "ingredient side — the kinds this context offers",
+    "draws": ":scope > div > div:nth-child(4)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "currency",
+        "id": "gp",
+        "quantity": 250
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "currency": [
+          {
+            "id": "gp",
+            "label": "Gold",
+            "icon": "fa-solid fa-coins"
+          }
+        ]
+      },
+      "amount": {
+        "unit": "gp"
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "result side — the same row, a different offered set",
+    "draws": ":scope > div > div:nth-child(1)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "note": "A result row, offering the result kinds.",
+    "props": {
+      "value": {
+        "kind": "knowledge",
+        "id": "warblade"
+      },
+      "kinds": ["component", "currency", "knowledge"],
+      "catalogue": {
+        "knowledge": [
+          {
+            "id": "warblade",
+            "label": "Warblade",
+            "icon": "fa-solid fa-book-open"
+          }
+        ]
+      },
+      "class": "is-result",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "result side — the same row, a different offered set",
+    "draws": ":scope > div > div:nth-child(2)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "currency",
+        "id": "gp",
+        "quantity": 50
+      },
+      "kinds": ["component", "currency", "knowledge"],
+      "catalogue": {
+        "currency": [
+          {
+            "id": "gp",
+            "label": "Gold",
+            "icon": "fa-solid fa-coins"
+          }
+        ]
+      },
+      "amount": {
+        "unit": "gp"
+      },
+      "rollable": true,
+      "class": "is-result",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "result quantity — fixed, or rolled",
+    "draws": ":scope > div > div:nth-child(1)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "component",
+        "id": "warblade",
+        "quantity": 2
+      },
+      "kinds": ["component", "currency", "knowledge"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "warblade",
+            "label": "Karrun Warblade",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "rollable": true,
+      "class": "is-result",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "result quantity — fixed, or rolled",
+    "draws": ":scope > div > div:nth-child(2)",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "component",
+        "id": "ironwort-draught",
+        "quantityFormula": "1d4 + @abilities.dex.mod"
+      },
+      "kinds": ["component", "currency", "knowledge"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "ironwort-draught",
+            "label": "Ironwort Draught",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "rollable": true,
+      "class": "is-result",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "adding a tag — the adder opens the catalogue",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "fixture": "TagAdderOpen",
+    "slot": { "width": 745, "height": 287 },
+    "data": { "typed": "wood" },
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone. A boxed slot, because the panel is portalled to the window. Measured: at 745 by 287 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 231, unclamped and unflipped; below 745 the stepper, `or…` and remove wrap to a second line, and 287 is the least height that holds the whole panel (286 clips it to 230). The tag panel opens at its 300px site minimum, so the held `#Hardwood` reads whole and only `#Seasoned-Heartwood-Planks` ellipsizes beside its count chip.",
+    "props": {
+      "value": {
+        "kind": "tags",
+        "tags": ["#Hardwood", "#Seasoned"],
+        "tagMatch": "any",
+        "quantity": 1
+      },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "tags": [
+          { "id": "#Hardwood", "label": "#Hardwood", "icon": "fas fa-tag", "count": 24 },
+          { "id": "#Seasoned", "label": "#Seasoned", "icon": "fas fa-tag", "count": 11 },
+          { "id": "#Softwood", "label": "#Softwood", "icon": "fas fa-tag", "count": 9 },
+          { "id": "#Driftwood", "label": "#Driftwood", "icon": "fas fa-tag", "count": 3 },
+          { "id": "#Dirftwood", "label": "#Dirftwood", "icon": "fas fa-tag", "count": 0 },
+          {
+            "id": "#Seasoned-Heartwood-Planks",
+            "label": "#Seasoned-Heartwood-Planks",
+            "icon": "fas fa-tag",
+            "count": 1
+          }
+        ]
+      },
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "the only route in — a standalone result row’s inline convert control",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "component",
+        "id": "iron-ore",
+        "quantity": 1
+      },
+      "kinds": ["component", "currency", "knowledge"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "iron-ore",
+            "label": "Iron Ore",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "rollable": true,
+      "reward": true,
+      "class": "is-result is-reward",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "a currency reward — the body is open because a value is picked",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "note": "A reward row, so a named currency opens its naming body beneath it.",
+    "props": {
+      "value": {
+        "kind": "currency",
+        "id": "gp",
+        "quantity": 25,
+        "label": "Wages",
+        "reason": "Paid for the pelts at the trading post"
+      },
+      "kinds": ["component", "currency"],
+      "catalogue": {
+        "currency": [
+          {
+            "id": "gp",
+            "label": "Gold",
+            "icon": "fa-solid fa-coins"
+          }
+        ]
+      },
+      "amount": {
+        "unit": "gp"
+      },
+      "rollable": true,
+      "reward": true,
+      "class": "is-result is-reward",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
+    "draws": ":scope > div:nth-of-type(1) > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: `KindAdder` renders them for `RecipeResultGroupCard`, which no library entry names, so a row for them would stand outside its entry. The adder's menu is drawn in the kind menu's inks, which carry its #2368 debt.",
+    "props": {
+      "value": {
+        "kind": "component",
+        "id": "green-branches",
+        "quantity": 1
+      },
+      "kinds": ["component", "currency"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "green-branches",
+            "label": "Green Branches",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "rollable": true,
+      "reward": true,
+      "class": "is-result is-reward",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
+    "draws": ":scope > div:nth-of-type(1) > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "props": {
+      "value": {
+        "kind": "component",
+        "quantity": 1
+      },
+      "kinds": ["component", "currency"],
+      "catalogue": {
+        "component": [
+          {
+            "id": "green-branches",
+            "label": "Green Branches",
+            "icon": "fas fa-cube"
+          }
+        ]
+      },
+      "rollable": true,
+      "reward": true,
+      "class": "is-result is-reward",
+      "allowAny": true
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "choice group — what “or…” produces",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "note": "An ingredient group of the three drawn alternatives, its pill's note in the drawing's words.",
+    "props": {
+      "group": {
+        "id": "haft",
+        "options": [
+          {
+            "quantity": 1,
+            "match": {
+              "type": "component",
+              "componentId": "oak-haft"
+            }
+          },
+          {
+            "quantity": 1,
+            "match": {
+              "type": "currency",
+              "unit": "sp",
+              "amount": 40
+            }
+          },
+          {
+            "quantity": 1,
+            "match": {
+              "type": "tags",
+              "tags": ["#Hardwood", "#Seasoned"],
+              "tagMatch": "any"
+            }
+          }
+        ]
+      },
+      "componentOptions": [
+        {
+          "id": "oak-haft",
+          "name": "Oak Haft"
+        }
+      ],
+      "itemTags": ["#Hardwood", "#Seasoned"],
+      "currencyUnits": [
+        {
+          "id": "sp",
+          "label": "Silver",
+          "abbreviation": "sp"
+        }
+      ],
+      "anyOneOfHint": "the crafter picks one of these three"
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "player chooses — the alternatives are an offer",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "note": "A result group, so its header and help line are the shipped group's own words.",
+    "props": {
+      "side": "result",
+      "offer": {
+        "kinds": ["component", "currency"],
+        "readonlyKinds": [],
+        "catalogue": {
+          "component": [
+            {
+              "id": "warblade",
+              "label": "Karrun Warblade",
+              "icon": "fas fa-cube"
+            }
+          ],
+          "currency": [
+            {
+              "id": "sp",
+              "label": "Silver",
+              "icon": "fa-solid fa-coins"
+            }
+          ]
+        }
+      },
+      "group": {
+        "id": "offer",
+        "alternatives": [
+          {
+            "id": "warblade",
+            "componentId": "warblade",
+            "quantity": 1
+          },
+          {
+            "id": "silver",
+            "kind": "currency",
+            "unit": "sp",
+            "quantity": 40
+          }
+        ]
+      }
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "rolled — the same alternatives, decided by an expression",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "props": {
+      "side": "result",
+      "offer": {
+        "kinds": ["component", "currency"],
+        "readonlyKinds": [],
+        "catalogue": {
+          "component": [
+            {
+              "id": "warblade",
+              "label": "Karrun Warblade",
+              "icon": "fas fa-cube"
+            }
+          ],
+          "currency": [
+            {
+              "id": "sp",
+              "label": "Silver",
+              "icon": "fa-solid fa-coins"
+            }
+          ]
+        }
+      },
+      "group": {
+        "id": "rolled",
+        "chooser": "rolled",
+        "selectionFormula": "1d20 + @abilities.wis.mod",
+        "alternatives": [
+          {
+            "id": "warblade",
+            "componentId": "warblade",
+            "quantity": 1,
+            "selectionRange": {
+              "from": 1,
+              "to": 10
+            }
+          },
+          {
+            "id": "silver",
+            "kind": "currency",
+            "unit": "sp",
+            "quantity": 40,
+            "selectionRange": {
+              "from": 11,
+              "to": 20
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "up to N, player chooses — a ceiling on a subset, N fixed",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "props": {
+      "side": "result",
+      "offer": {
+        "kinds": ["component", "currency"],
+        "readonlyKinds": [],
+        "catalogue": {
+          "component": [
+            {
+              "id": "pelt",
+              "label": "Balehound Pelt",
+              "icon": "fas fa-cube"
+            },
+            {
+              "id": "fang",
+              "label": "Balehound Fang",
+              "icon": "fas fa-cube"
+            }
+          ]
+        }
+      },
+      "group": {
+        "id": "up-to",
+        "awardStrategy": "upTo",
+        "awardCount": 2,
+        "alternatives": [
+          {
+            "id": "pelt",
+            "componentId": "pelt",
+            "quantity": 1
+          },
+          {
+            "id": "fang",
+            "componentId": "fang",
+            "quantity": 2
+          }
+        ]
+      }
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "up to N, by roll — the one cell where repeats are a setting",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "props": {
+      "side": "result",
+      "offer": {
+        "kinds": ["component", "currency"],
+        "readonlyKinds": [],
+        "catalogue": {
+          "component": [
+            {
+              "id": "sap",
+              "label": "Bright Sap",
+              "icon": "fas fa-cube"
+            },
+            {
+              "id": "branch",
+              "label": "Green Branch",
+              "icon": "fas fa-cube"
+            }
+          ]
+        }
+      },
+      "group": {
+        "id": "up-to-rolled",
+        "chooser": "rolled",
+        "awardStrategy": "upTo",
+        "awardCountFormula": "1d3",
+        "withReplacement": true,
+        "selectionFormula": "1d20 + @abilities.wis.mod",
+        "alternatives": [
+          {
+            "id": "sap",
+            "componentId": "sap",
+            "quantity": 1,
+            "selectionRange": {
+              "from": 1,
+              "to": 10
+            }
+          },
+          {
+            "id": "branch",
+            "componentId": "branch",
+            "quantityFormula": "1d4",
+            "selectionRange": {
+              "from": 11,
+              "to": 20
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "the kind menu — one menu, two triggers",
+    "draws": ":scope > div > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "fixture": "KindMenuOpen",
+    "slot": { "width": 515, "height": 197 },
+    "undrawn": {
+      "Oak Haft": "the row’s named component; the drawing draws the trigger without its row"
+    },
+    "props": {
+      "value": { "kind": "component", "id": "oak-haft", "quantity": 1 },
+      "kinds": ["component", "tags", "essence", "currency"],
+      "catalogue": {
+        "component": [{ "id": "oak-haft", "label": "Oak Haft", "icon": "fas fa-cube" }]
+      },
+      "allowAny": true
+    },
+    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 515 by 197 holds the row on one line with its named pill whole, and the menu opens beneath its trigger, unclamped and unflipped; below 507 the pill is squeezed under the stepper. On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
+  },
+  {
+    "spec": "<PickerRow> <ChoiceGroup>",
+    "cap": "the kind menu — one menu, two triggers",
+    "draws": ":scope > div > div > div",
+    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "fixture": "KindMenuOpen",
+    "slot": { "width": 630, "height": 375 },
+    "undrawn": {
+      "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
+      "#Hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
+      "Vitality": "the system’s essence, whose presence offers Essence; the drawing draws no essence catalogue",
+      "Gold": "the currency unit’s name, whose presence offers Currency; the drawing draws no currency catalogue",
+      "gp": "the currency unit’s abbreviation; the drawing draws no currency catalogue"
+    },
+    "props": {
+      "group": {
+        "id": "haft",
+        "options": [
+          { "quantity": 1, "match": { "type": "component", "componentId": "oak-haft" } },
+          {
+            "quantity": 1,
+            "match": { "type": "tags", "tags": ["#Hardwood"], "tagMatch": "any" }
+          }
+        ]
+      },
+      "componentOptions": [{ "id": "oak-haft", "name": "Oak Haft" }],
+      "itemTags": ["#Hardwood"],
+      "essenceOptions": [{ "id": "vitality", "name": "Vitality" }],
+      "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
+      "currencyEnabled": true
+    },
+    "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. Its drawn inks carry the bare row's #2368 debt."
+  },
+  {
+    "spec": "<SetPicker>",
+    "cap": "membership — one record’s set",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/SetPicker.svelte",
+    "note": "Seven members, so three tokens and \"+4 more\". The open panel is live through the `SetPickerOpen` row.",
+    "undrawn": {
+      "#Smithy": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Blacksmith": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Raw": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Hardwood": "the fourth member behind “+4 more”; the picker it opens names only three more"
+    },
+    "props": {
+      "label": "Tags",
+      "value": ["#Refined", "#Metal", "#Smithing", "#Smithy", "#Blacksmith", "#Raw", "#Hardwood"],
+      "options": [
+        {
+          "id": "#Refined",
+          "label": "#Refined"
+        },
+        {
+          "id": "#Metal",
+          "label": "#Metal"
+        },
+        {
+          "id": "#Smithing",
+          "label": "#Smithing"
+        },
+        {
+          "id": "#Smithy",
+          "label": "#Smithy"
+        },
+        {
+          "id": "#Blacksmith",
+          "label": "#Blacksmith"
+        },
+        {
+          "id": "#Raw",
+          "label": "#Raw"
+        },
+        {
+          "id": "#Hardwood",
+          "label": "#Hardwood"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<SetPicker>",
+    "cap": "the picker it opens — searchable, scrolling, counted, staged",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SetPicker.svelte",
+    "fixture": "SetPickerOpen",
+    "slot": {
+      "width": 386,
+      "height": 363
+    },
+    "props": {
+      "value": ["#Smithing", "#Refined"],
+      "options": [
+        {
+          "id": "#Smithing",
+          "label": "#Smithing"
+        },
+        {
+          "id": "#Refined",
+          "label": "#Refined"
+        }
+      ],
+      "ariaLabel": "Recipe tags"
+    },
+    "data": {
+      "typed": "smith",
+      "total": 412,
+      "matches": [
+        {
+          "id": "#Smithing",
+          "label": "#Smithing"
+        },
+        {
+          "id": "#Smithy",
+          "label": "#Smithy"
+        },
+        {
+          "id": "#Blacksmith",
+          "label": "#Blacksmith"
+        },
+        {
+          "id": "#Refined",
+          "label": "#Refined"
+        },
+        {
+          "id": "#Raw",
+          "label": "#Raw"
+        },
+        {
+          "id": "#Smithcraft",
+          "label": "#Smithcraft"
+        }
+      ]
+    },
+    "note": "A boxed slot, because the panel is portalled to the window beneath the token run and its Add: 386 by 363 is the least box in which it opens at the Add's left edge, unclamped and unflipped. The act opens Add and types the query, nothing more, so the footer reads 2 selected and Apply stays disabled until something is staged. The shipped 9px `--fab-text-subtle` count falls under 4.5:1 on bg-0 in six themes (3.64 to 4.10:1), so the drawing inks it in `--fab-text-muted`: debt owned by #2368."
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "unauthored — presets only",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "note": "An unauthored rule, its two presets. The collapsed rule is live through `RuleRowCollapsed` and the one-line rule through `RuleRowOneLine`. The open rule stays drawn: its steps are `CheckTriggers`' own cells and plain number input, which a fixture may not author.",
+    "props": {
+      "class": "manager-checks-trigger-presets",
+      "presets": [
+        {
+          "id": "high",
+          "icon": "fas fa-arrow-up",
+          "label": "Natural 20 on 1d20 → step up a tier"
+        },
+        {
+          "id": "low",
+          "icon": "fas fa-arrow-down",
+          "label": "Natural 1 on 1d20 → step down a tier"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "collapsible — one rule open, the next collapsed",
+    "draws": ":scope > div > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "fixture": "RuleRowCollapsed",
+    "props": {
+      "value": {
+        "id": "natural-one"
+      },
+      "class": "manager-checks-breakage-trigger"
+    },
+    "data": {
+      "icon": "fas fa-arrow-down",
+      "tone": "warning",
+      "title": "Any die of 1d20 is exactly 1",
+      "chip": "Step down 1",
+      "sentence": {
+        "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
+        "clauseKeys": ["FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown"],
+        "joinKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin",
+        "params": {
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence": {
+            "condition": {
+              "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryDiceGroupInSentence",
+              "params": {
+                "aggregate": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryAnyDieInSentence",
+                  "params": {}
+                },
+                "die": "1d20",
+                "comparison": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.OpExactly",
+                  "params": {}
+                },
+                "value": "1"
+              }
+            }
+          },
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepDown": {
+            "steps": "1"
+          }
+        }
+      },
+      "removeLabel": "Remove trigger",
+      "expandKey": "FABRICATE.Admin.Manager.Checks.Breakage.ExpandTrigger"
+    },
+    "undrawn": {
+      ", and": "the sentence's clause join, which a one-clause rule never draws"
+    },
+    "note": "Wired as `CheckTriggers` wires a trigger, collapsed: the effect's glyph, tone and chip head it, the condition titles it, and its sentence is the structured one the sentence rows carry. `role=\"listitem\"` is left off, because the card stands without the trigger list around it. The shipped glyph is an arrow down, which the drawing draws with its chevron."
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "collapsible — one rule open, the next collapsed",
+    "draws": "button[aria-expanded=\"true\"] > span:nth-of-type(2) > span:nth-of-type(2)",
+    "path": "src/ui/svelte/components/RuleSentence.svelte",
+    "note": "The sentence, from the shipped trigger summary over the drawn rule. It carries no type of its own, so it stands in the frame's body face rather than the head's 10.5px muted line.",
+    "props": {
+      "sentence": {
+        "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
+        "clauseKeys": ["FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepUp"],
+        "joinKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin",
+        "params": {
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence": {
+            "condition": {
+              "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryDiceGroupInSentence",
+              "params": {
+                "aggregate": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryAnyDieInSentence",
+                  "params": {}
+                },
+                "die": "1d20",
+                "comparison": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.OpExactly",
+                  "params": {}
+                },
+                "value": "20"
+              }
+            }
+          },
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepUp": {
+            "steps": "1"
+          }
+        }
+      }
+    }
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "collapsible — one rule open, the next collapsed",
+    "draws": "p > span:nth-of-type(2)",
+    "path": "src/ui/svelte/components/RuleSentence.svelte",
+    "note": "The quote’s sentence, in the type the shipped `.fabricate-rule-row-quote` gives it, 11px at 1.5 and muted, passed as `style` because a lone specimen has no quote box to inherit it from: in the frame’s body face it wrapped inside the drawn width. The opening quote beside it is the drawing’s own 10px glyph.",
+    "props": {
+      "sentence": {
+        "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
+        "clauseKeys": ["FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepUp"],
+        "joinKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin",
+        "params": {
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence": {
+            "condition": {
+              "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryDiceGroupInSentence",
+              "params": {
+                "aggregate": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.SummaryAnyDieInSentence",
+                  "params": {}
+                },
+                "die": "1d20",
+                "comparison": {
+                  "key": "FABRICATE.Admin.Manager.Checks.Breakage.OpExactly",
+                  "params": {}
+                },
+                "value": "20"
+              }
+            }
+          },
+          "FABRICATE.Admin.Manager.Checks.Breakage.SummaryStepUp": {
+            "steps": "1"
+          }
+        }
+      },
+      "style": "font-size: 11px; line-height: 1.5; color: var(--fab-text-muted)"
+    }
+  },
+  {
+    "spec": "<RuleRow> <RuleSentence>",
+    "cap": "one line — a rule that does not collapse",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RuleRow.svelte",
+    "fixture": "RuleRowOneLine",
+    "partial": "no value field",
+    "props": {
+      "value": {
+        "conditionId": "forest"
+      },
+      "class": "manager-condition-modifier-row-reference is-positive"
+    },
+    "data": {
+      "icon": "fas fa-leaf",
+      "title": "Forest",
+      "removeLabel": "Delete modifier"
+    },
+    "note": "Wired as `GatheringModifierEditor` wires a condition modifier, with its sheet class for the positive tone. The value field is that editor's own snippet markup, so the rule carries no steps; a follow-up renders it through `Stepper`."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "expanded — the row opens to its editing body",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "fixture": "SortableListExpanded",
+    "partial": "no row hints or name field",
+    "props": {
+      "numbered": true,
+      "removable": true,
+      "expandable": true,
+      "expandedId": "brittle",
+      "items": [
+        {
+          "id": "brittle",
+          "name": "Brittle temper",
+          "badge": "Major",
+          "tone": "warning",
+          "severity": "Major",
+          "shown": true
+        },
+        {
+          "id": "shattered",
+          "name": "Shattered edge",
+          "badge": "Severe",
+          "tone": "danger",
+          "severity": "Severe",
+          "shown": false
+        }
+      ]
+    },
+    "data": {
+      "severityLabel": "Severity",
+      "shownLabel": "Shown to the player",
+      "severities": [
+        {
+          "value": "Minor",
+          "fallback": "Minor"
+        },
+        {
+          "value": "Major",
+          "fallback": "Major"
+        },
+        {
+          "value": "Severe",
+          "fallback": "Severe"
+        }
+      ],
+      "shownHint": "They see the complication when it fires.",
+      "wellStyle": "display: grid; gap: var(--fab-space-3)",
+      "severityStyle": "justify-self: start"
+    },
+    "note": "Wired as `RecipeStepAccordion` wires its expandable list. No caller ships the complication body, so it is the primitives the drawing shows: the severity under the well's label, at the `field` density `ComponentComplicationsSection` gives it, then the player toggle. The trailing badge is a bare `Chip`, its placement the caller's scoped style. The adder beneath stays drawn."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "always-open — no disclosure, every row rendered",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "fixture": "SortableListAlwaysOpen",
+    "props": {
+      "numbered": true,
+      "reorderable": false,
+      "alwaysOpen": true,
+      "items": [
+        {
+          "id": "billet",
+          "name": "Draw the billet",
+          "badge": "4 h"
+        },
+        {
+          "id": "fold",
+          "name": "Fold & quench",
+          "badge": "6 h"
+        }
+      ]
+    },
+    "data": {
+      "bodyLabel": "Results"
+    },
+    "note": "Wired as `RecipeStepAccordion` wires `alwaysOpen`, without the delete the drawing omits, on a tab whose subject is the body: every row open, no disclosure. The trailing badge is a bare `Chip`, its placement the caller's scoped style."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "player — progressive stages, reorderable, one stage with a forecast band",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SortableList.svelte",
+    "window": "player",
+    "fixture": "SortableListPlayerStages",
+    "props": {
+      "numbered": true,
+      "reorderable": true,
+      "alwaysOpen": true,
+      "items": [
+        {
+          "id": "vial",
+          "name": "Empty Vial",
+          "img": "icons/consumables/potions/bottle-bulb-empty-glass.webp",
+          "difficulty": 1,
+          "threshold": 1
+        },
+        {
+          "id": "reagent",
+          "name": "Ground Reagent",
+          "img": "icons/commodities/materials/bowl-powder-grey.webp",
+          "difficulty": 2,
+          "threshold": 3,
+          "complications": [
+            {
+              "id": "dust-cloud",
+              "name": "Choking dust",
+              "severity": "severe",
+              "description": "The reagent goes up in a fine bitter cloud. Everyone at the bench coughs through the next exchange."
+            },
+            {
+              "id": "dust-spoiled",
+              "name": "Spoiled batch",
+              "severity": "minor"
+            }
+          ]
+        },
+        {
+          "id": "frostcap",
+          "name": "Frostcap Mushroom",
+          "img": "icons/consumables/mushrooms/campanulate-bell-shiny-blue.webp",
+          "difficulty": 4,
+          "threshold": 7
+        }
+      ]
+    },
+    "data": {
+      "tense": "forecast"
+    },
+    "undrawn": {
+      "icons/consumables/potions/bottle-bulb-empty-glass.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "icons/commodities/materials/bowl-powder-grey.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "icons/consumables/mushrooms/campanulate-bell-shiny-blue.webp": "the stage's art path, drawn as its 22px picture rather than as text",
+      "severe": "the lead complication's severity value, drawn as its label",
+      "minor": "the second complication's severity value; the band draws only its lead and a count"
+    },
+    "note": "Wired as `ProgressiveBody` wires its stage list: the row's module helpers, `ProgressiveStageRow` in `row` and `ProgressiveStageBand` in the forecast tense in `body`, standing in the player window. The stages are the lab world's Stillroom batch."
+  },
+  {
+    "spec": "<SortableList>",
+    "cap": "read-only — a GM stage’s complications, nested and fixed",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
+    "fixture": "SortableListGmComplications",
+    "partial": "no DC or Edit link",
+    "props": {
+      "ownerName": "Ground Reagent",
+      "complications": [
+        {
+          "id": "dust-cloud",
+          "name": "Choking dust",
+          "severity": "severe",
+          "visibility": "visible",
+          "when": { "stageMissed": true },
+          "effectRoll": { "enabled": true, "expr": "1d4" }
+        },
+        {
+          "id": "dust-spoiled",
+          "name": "Spoiled batch",
+          "severity": "minor",
+          "visibility": "gmOnly",
+          "when": { "stagePartial": true }
+        }
+      ]
+    },
+    "data": {
+      "stages": [{ "id": "reagent", "name": "Ground Reagent" }]
+    },
+    "undrawn": {
+      "severe": "the first complication's severity value, drawn as its label",
+      "minor": "the second complication's severity value, drawn as its label",
+      "visible": "the first complication's visibility value, drawn as its Player chip",
+      "gmOnly": "the second complication's visibility value, drawn as the absence of a Player chip"
+    },
+    "note": "Wired as `ComponentSalvageStages` wires its stage list: one numbered, reorderable stage row naming its component, with the shipped `StageComplicationList` in the row's `body`. The stage's DC and Edit link are the caller's own scoped markup and stay drawn."
+  },
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "a tag requirement — several items satisfy it",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RequirementChooser.svelte",
+    "note": "The chooser's root: the #Hardwood slot open in the tile row, and its alternatives in the well beneath, Oak Haft chosen and Bog Oak short with no reading. The shipped chooser dims a short alternative to .6 as a whole, which puts its danger pip at 2.43 to 3.42:1 in every theme and its danger caption at 4.11 to 4.38:1 on `--fab-bg-1` in four, so the drawing draws Bog Oak undimmed: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
+    "props": {
+      "ariaLabel": "Requirements",
+      "alternativesLabel": "Alternatives",
+      "openSlotId": "hardwood",
+      "slots": [
+        {
+          "key": "hardwood",
+          "slotId": "hardwood",
+          "kind": "choice",
+          "state": "met",
+          "name": "#Hardwood",
+          "label": "#Hardwood",
+          "icon": "fas fa-tag",
+          "pip": "12/2",
+          "alternatives": [
+            {
+              "id": "oak-haft",
+              "name": "Oak Haft",
+              "label": "Oak Haft",
+              "icon": "fas fa-leaf",
+              "tint": "sage",
+              "pip": "12/2",
+              "selected": true
+            },
+            {
+              "id": "ash-haft",
+              "name": "Ash Haft",
+              "label": "Ash Haft",
+              "icon": "fas fa-leaf",
+              "tint": "peach",
+              "pip": "5/2"
+            },
+            {
+              "id": "yew-stave",
+              "name": "Yew Stave",
+              "label": "Yew Stave",
+              "icon": "fas fa-leaf",
+              "tint": "butter",
+              "pip": "3/2"
+            },
+            {
+              "id": "bog-oak",
+              "name": "Bog Oak",
+              "label": "Bog Oak",
+              "icon": "fas fa-leaf",
+              "tint": "mist",
+              "pip": "1/2",
+              "short": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "an essence requirement — contributions add up",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RequirementChooser.svelte",
+    "fixture": "RequirementChooserEssence",
+    "note": "The chooser's root: the Vitality slot open, and beneath it the stage's pool as the chooser's `panel`, wired as crafting's `EssencePoolPanel` wires its pool, the only shipped caller that puts a pool in a chooser: its title, hint, `capAtHeld`, stepper names and overshoot. Steel Ingot ×2 and Ash Haft ×1 deliver 6 of 4. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The pool's 9px kicker, its hint and overshoot (`--fab-text-subtle`, 3.54 to 3.98:1 on `--fab-bg-1` in six themes) and its readings (3.34 to 3.78:1 on `--fab-bg-2` in six) are drawn in `--fab-text-muted`: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
+    "props": {
+      "ariaLabel": "Requirements",
+      "openSlotId": "vitality",
+      "slots": [
+        {
+          "key": "vitality",
+          "slotId": "vitality",
+          "kind": "essence",
+          "state": "met",
+          "name": "Vitality",
+          "label": "Vitality",
+          "icon": "fas fa-flask",
+          "pip": "6/4"
+        }
+      ]
+    },
+    "data": {
+      "thresholds": [
+        {
+          "essence": "Vitality",
+          "amount": 4,
+          "icon": "fas fa-flask",
+          "sources": [
+            {
+              "id": "steel-ingot",
+              "label": "Steel Ingot",
+              "icon": "fas fa-hammer",
+              "tint": "mist"
+            },
+            { "id": "ash-haft", "label": "Ash Haft", "icon": "fas fa-hammer", "tint": "peach" }
+          ]
+        }
+      ],
+      "allocation": { "steel-ingot": 2, "ash-haft": 1 },
+      "readings": {
+        "steel-ingot": "+2 Vitality · You own 3.",
+        "ash-haft": "+2 Vitality · You own 1."
+      },
+      "yields": { "steel-ingot": { "Vitality": 2 }, "ash-haft": { "Vitality": 2 } },
+      "held": { "steel-ingot": 3, "ash-haft": 1 },
+      "labelKey": "FABRICATE.App.Crafting.Pool.Title",
+      "hintKey": "FABRICATE.App.Crafting.Pool.AddComponents",
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Crafting.Pool.Allocate",
+      "decreaseKey": "FABRICATE.App.Crafting.Pool.AllocateLess",
+      "increaseKey": "FABRICATE.App.Crafting.Pool.AllocateMore",
+      "overshootKey": "FABRICATE.App.Crafting.Pool.Overshoot"
+    }
+  },
+  {
+    "spec": "<ExprInput> <RequirementChooser>",
+    "cap": "requirement chooser — the player side",
+    "draws": ":scope > div:nth-of-type(1)",
+    "path": "src/ui/svelte/components/RequirementChooser.svelte",
+    "note": "The chooser's root, the tile row with the haft slot open on the pressed fill and Moonsilver short. The \"This craft will use\" panel below is crafting's `ConsumptionPlanPanel`, an app surface beside the chooser rather than a primitive, so it stays drawn; its 10px \"You own\" line ships in `--fab-text-subtle`, 3.36 to 3.88:1 on `--fab-surface-soft` over `--fab-bg-1` in six themes, and is drawn in `--fab-text-muted`: debt owned by #2368. The default Medallion glyph ships in `--fab-accent` on `--fab-bg-3`, 2.85 and 2.51:1 in ironblood-forge and hearth-herb against the 3:1 glyph floor, so the drawing draws it in `--fab-text-secondary`: debt owned by #2368.",
+    "props": {
+      "ariaLabel": "Requirements",
+      "openSlotId": "haft",
+      "slots": [
+        {
+          "key": "haft",
+          "slotId": "haft",
+          "kind": "choice",
+          "state": "met",
+          "name": "Oak Haft",
+          "label": "Oak Haft",
+          "icon": "fas fa-leaf",
+          "tint": "sage",
+          "pip": "12/2"
+        },
+        {
+          "key": "iron",
+          "slotId": null,
+          "kind": "fixed",
+          "state": "met",
+          "name": "Iron Ingot",
+          "label": "Iron Ingot",
+          "icon": "fas fa-hammer",
+          "tint": "mist",
+          "pip": "5/2"
+        },
+        {
+          "key": "moonsilver",
+          "slotId": null,
+          "kind": "fixed",
+          "state": "short",
+          "name": "Moonsilver",
+          "label": "Moonsilver",
+          "icon": "fas fa-star",
+          "tint": "lavender",
+          "pip": "0/1"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "the slot row — four tile states, one row",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SlotRow.svelte",
+    "fixture": "SlotRowReadings",
+    "inset": 8,
+    "props": {
+      "requirements": [
+        {
+          "id": "charcoal",
+          "label": "Charcoal",
+          "kind": "fixed",
+          "componentId": "charcoal",
+          "needed": 1,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "moonsilver",
+          "label": "Moonsilver",
+          "kind": "fixed",
+          "componentId": "moonsilver",
+          "needed": 2,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        },
+        {
+          "id": "binder",
+          "label": "Any binder",
+          "kind": "choice",
+          "needed": 1,
+          "affordanceLabel": "1 of 3",
+          "candidates": [
+            {
+              "id": "rune-stylus",
+              "label": "Rune Stylus",
+              "icon": "fas fa-star",
+              "tint": "butter"
+            },
+            {
+              "id": "rune-chalk",
+              "label": "Rune Chalk",
+              "icon": "fas fa-leaf",
+              "tint": "sage"
+            },
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            }
+          ]
+        },
+        {
+          "id": "essence",
+          "label": "Essence pool",
+          "kind": "essence",
+          "icon": "fas fa-atom",
+          "tint": "aqua",
+          "poolsMet": 1,
+          "poolsRequired": 2,
+          "affordanceLabel": "channel"
+        }
+      ],
+      "openSlot": "binder"
+    },
+    "data": {
+      "held": {
+        "charcoal": 4,
+        "moonsilver": 0,
+        "rune-stylus": 2,
+        "rune-chalk": 5,
+        "duskglass": 2
+      },
+      "claimed": {
+        "duskglass": 2
+      },
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
+      "chooseKey": "FABRICATE.App.Journal.Stage.Choose",
+      "choicesKey": "FABRICATE.App.Journal.Stage.Choices",
+      "labelKey": "FABRICATE.App.Journal.Stage.Requirements",
+      "hintKey": "FABRICATE.App.Journal.Stage.RequirementsHint"
+    },
+    "note": "Wired as `StepDetails.svelte:438-458` wires its row: `held` and `claimed` read stock by component, each tile is named by its slot's label, and the heading and the open slot's list take the Journal's own copy. `StepDetails` sets no affordance line, so the drawing's comes through each requirement's `affordanceLabel`. Inset by 8, because the pip sits 7px above the tile and the pressed outline 4px outside it."
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "the open slot’s candidates — one 44px row each, in flow beneath",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
+    "fixture": "ChoiceOptionListReadings",
+    "props": {
+      "slotId": "binder",
+      "needed": 1,
+      "selectedId": "rune-stylus",
+      "options": [
+        {
+          "id": "rune-stylus",
+          "label": "Rune Stylus",
+          "icon": "fas fa-star",
+          "tint": "butter"
+        },
+        {
+          "id": "rune-chalk",
+          "label": "Rune Chalk",
+          "icon": "fas fa-leaf",
+          "tint": "sage"
+        },
+        {
+          "id": "duskglass",
+          "label": "Duskglass",
+          "icon": "fas fa-flask",
+          "tint": "aqua"
+        },
+        {
+          "id": "bone-ash",
+          "label": "Bone Ash",
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        }
+      ]
+    },
+    "data": {
+      "held": {
+        "rune-stylus": 2,
+        "rune-chalk": 5,
+        "duskglass": 2,
+        "bone-ash": 0
+      },
+      "claimed": {
+        "duskglass": 2
+      },
+      "readingKey": "FABRICATE.App.Journal.Stage.CandidateReading",
+      "labelKey": "FABRICATE.App.Journal.Stage.Choose",
+      "summaryKey": "FABRICATE.App.Journal.Stage.Choices"
+    },
+    "note": "Wired as `SlotRow.svelte:115-127` hands its list the heading, `held`, `claimed` and reading `StepDetails.svelte:438-458` supplies."
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "a slot with several candidates — the tile counts them, it never summarises them",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Any binder",
+      "ariaLabel": "Choose a binder — 3 candidates",
+      "state": "open",
+      "pip": "3",
+      "pipKind": "candidate",
+      "affordance": "1 of 3",
+      "interactive": true
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "a slot with several candidates — the tile counts them, it never summarises them",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Any hardwood",
+      "ariaLabel": "Choose a hardwood — 12 candidates",
+      "state": "open",
+      "pip": "12",
+      "pipKind": "candidate",
+      "affordance": "1 of 12",
+      "interactive": true
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "a slot with several candidates — the tile counts them, it never summarises them",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Any solvent",
+      "ariaLabel": "Choose 2 solvents — 2 candidates",
+      "state": "open",
+      "pip": "2",
+      "pipKind": "candidate",
+      "affordance": "2 of 2",
+      "interactive": true
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "a slot with several candidates — the tile counts them, it never summarises them",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Pine Resin",
+      "ariaLabel": "Pine Resin fills this slot",
+      "icon": "fas fa-leaf",
+      "tint": "sage",
+      "state": "met",
+      "pip": "6/1",
+      "affordance": "change",
+      "interactive": true
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "locked — a stage you cannot change",
+    "draws": ":scope > div:nth-of-type(2) > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Rune Stylus",
+      "icon": "fas fa-star",
+      "tint": "butter",
+      "state": "met",
+      "pip": "2/1"
+    }
+  },
+  {
+    "spec": "<SlotRow> <SlotTile> <ChoiceOptionList>",
+    "cap": "locked — a stage you cannot change",
+    "draws": ":scope > div:nth-of-type(2) > div",
+    "path": "src/ui/svelte/components/SlotTile.svelte",
+    "inset": 8,
+    "props": {
+      "label": "Essence pool",
+      "icon": "fas fa-atom",
+      "tint": "aqua",
+      "state": "met",
+      "pip": "2/2"
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "progress — one track per stage, filled, part-filled, empty",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunProgress.svelte",
+    "note": "The component's root: the Progress kicker naming the track group, and a compact `FillBar` per stage, each a progressbar named by its stage card's name, success, accent at 64 and empty.",
+    "props": {
+      "label": "Progress",
+      "current": 1,
+      "progress": 64,
+      "stages": [
+        {
+          "id": "billet",
+          "name": "Draw the billet",
+          "status": "done"
+        },
+        {
+          "id": "rivets",
+          "name": "Hammer the rivets"
+        },
+        {
+          "id": "quench",
+          "name": "Quench and temper"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "stage nav — a five-stage window over a longer run",
+    "draws": ":scope > nav",
+    "path": "src/ui/svelte/components/StageNav.svelte",
+    "fixture": "StageNavReadings",
+    "props": {
+      "stages": [
+        {
+          "id": "s1",
+          "stepName": "Smelt the ore"
+        },
+        {
+          "id": "s2",
+          "stepName": "Fold the bloom"
+        },
+        {
+          "id": "s3",
+          "stepName": "Draw the billet"
+        },
+        {
+          "id": "s4",
+          "stepName": "Hammer the rivets"
+        },
+        {
+          "id": "s5",
+          "stepName": "Quench and temper"
+        },
+        {
+          "id": "s6",
+          "stepName": "Grind the burrs"
+        },
+        {
+          "id": "s7",
+          "stepName": "Polish the heads"
+        },
+        {
+          "id": "s8",
+          "stepName": "Count the batch"
+        }
+      ],
+      "current": 3,
+      "view": 2
+    },
+    "undrawn": {
+      "Grind the burrs": "a stage outside the five-stage window; the nav draws no numeral for it",
+      "Polish the heads": "a stage outside the five-stage window; the nav draws no numeral for it",
+      "Count the batch": "a stage outside the five-stage window; the nav draws no numeral for it"
+    },
+    "data": {
+      "openKey": "FABRICATE.App.Journal.Stage.Open",
+      "previousKey": "FABRICATE.App.Journal.Stage.Previous",
+      "nextKey": "FABRICATE.App.Journal.Stage.Next",
+      "positionKey": "FABRICATE.App.Journal.Stage.Position",
+      "returnKey": "FABRICATE.App.Journal.Stage.Return"
+    },
+    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. Its numerals and position line ship in `--fab-text-subtle`, under the 4.5:1 floor in six themes, so the drawing inks them `--fab-text-muted`; issue 2353 owns that debt."
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "the worked stage — the only one with controls",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/StageCard.svelte",
+    "partial": "no body",
+    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
+    "props": {
+      "stage": {
+        "name": "Hammer the rivets"
+      },
+      "index": 3,
+      "current": true,
+      "state": "current",
+      "tag": {
+        "label": "Your move",
+        "tone": "positive"
+      },
+      "io": [
+        {
+          "kind": "produced",
+          "label": "Produces",
+          "items": [
+            {
+              "name": "Rough Rivets",
+              "icon": "fas fa-hammer",
+              "quantityText": "×4"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "a stage you are only looking at — dashed, muted, inert",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/StageCard.svelte",
+    "props": {
+      "stage": {
+        "name": "Quench and temper",
+        "summary": "Needs 6 hours once reached"
+      },
+      "index": 4,
+      "state": "future",
+      "facts": [
+        {
+          "id": "time",
+          "icon": "fas fa-clock",
+          "label": "Time it needs",
+          "value": "6 h"
+        },
+        {
+          "id": "check",
+          "icon": "fas fa-dice-d20",
+          "label": "Check",
+          "value": "1d20 + 3 vs DC 14"
+        },
+        {
+          "id": "slot",
+          "icon": "fas fa-table-cells-large",
+          "label": "Open slot",
+          "value": "Quench Oil or Brine"
+        }
+      ],
+      "note": "Not reached yet. Its choices open when the run gets here."
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "a stage you are only looking at — dashed, muted, inert",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/StageCard.svelte",
+    "note": "The past stage, consumed and produced. Its io groups are the four-column truncated `ListRow` grid (issue 1648) the drawing also draws, which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane.",
+    "props": {
+      "stage": {
+        "name": "Draw the billet",
+        "summary": "Done · Day 13 · 22:00",
+        "status": "done"
+      },
+      "index": 0,
+      "state": "past",
+      "io": [
+        {
+          "kind": "consumed",
+          "label": "Consumed",
+          "items": [
+            {
+              "name": "Iron Bar",
+              "icon": "fas fa-hammer",
+              "quantityText": "×2"
+            }
+          ]
+        },
+        {
+          "kind": "produced",
+          "label": "Produced",
+          "items": [
+            {
+              "name": "Drawn Billet",
+              "icon": "fas fa-hammer",
+              "quantityText": "×1"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "before the roll — the scale, commonest first",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "greyfell",
+          "name": "Greyfell Scree",
+          "chance": 100,
+          "qty": 3,
+          "icon": "fas fa-hammer",
+          "tint": "slate"
+        },
+        {
+          "id": "iron",
+          "name": "Iron Nodule",
+          "chance": 70,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "silver",
+          "name": "Silver Seam",
+          "chance": 30,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "bone"
+        },
+        {
+          "id": "skyfall",
+          "name": "Skyfall Shard",
+          "chance": 5,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        }
+      ]
+    },
+    "data": {
+      "chances": {
+        "greyfell": "100%",
+        "iron": "70%",
+        "silver": "30%",
+        "skyfall": "5%"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "thresholdKey": "FABRICATE.App.Journal.Yields.HighRollThreshold",
+      "labelKey": "FABRICATE.App.Journal.Yields.PreviewTitle"
+    },
+    "note": "Wired as `RunDetail.svelte:582-602` wires a d100 run's preview: the heading, each threshold and each quantity are the Journal's own copy, and each chance is the row's string, because `RunDetail` appends a % a fixture may not author."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "after the roll — the same scale, cut once",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "greyfell",
+          "name": "Greyfell Scree",
+          "chance": 100,
+          "qty": 3,
+          "icon": "fas fa-hammer",
+          "tint": "slate"
+        },
+        {
+          "id": "iron",
+          "name": "Iron Nodule",
+          "chance": 70,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "tint": "mist"
+        },
+        {
+          "id": "silver",
+          "name": "Silver Seam",
+          "chance": 30,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "bone"
+        },
+        {
+          "id": "skyfall",
+          "name": "Skyfall Shard",
+          "chance": 5,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "tint": "lavender"
+        }
+      ],
+      "roll": 41
+    },
+    "data": {
+      "chances": {
+        "greyfell": "100%",
+        "iron": "70%",
+        "silver": "30%",
+        "skyfall": "5%"
+      },
+      "readings": {
+        "greyfell": "Effective roll 41 · Needed 1 or higher · Cleared the roll",
+        "iron": "Effective roll 41 · Needed 31 or higher · Cleared the roll",
+        "silver": "Effective roll 41 · Needed 71 or higher · Missed the roll",
+        "skyfall": "Effective roll 41 · Needed 96 or higher · Missed the roll"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "rolledKey": "FABRICATE.App.Journal.History.RolledValue",
+      "cutKey": "FABRICATE.App.Journal.History.Cut",
+      "labelKey": "FABRICATE.App.Journal.History.Scale"
+    },
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records a shared roll: the heading, cut chip and cut note are the Journal's own copy, and each reading and chance is the row's string, because `dropEvidence` (`:33-57`) joins its parts with a separator a fixture may not author."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "legacy history — recorded row rolls, no global cut",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/YieldScale.svelte",
+    "fixture": "YieldScaleReadings",
+    "props": {
+      "entries": [
+        {
+          "id": "ore",
+          "name": "Ore",
+          "chance": 90,
+          "qty": 2,
+          "icon": "fas fa-hammer",
+          "cleared": true
+        },
+        {
+          "id": "gem",
+          "name": "Gem",
+          "chance": 20,
+          "qty": 1,
+          "icon": "fas fa-star",
+          "cleared": true
+        }
+      ],
+      "rollModel": "perRow"
+    },
+    "data": {
+      "chances": {
+        "ore": "90%",
+        "gem": "20%"
+      },
+      "readings": {
+        "ore": "Rolled 12 · Needed 11 or higher · Cleared the roll",
+        "gem": "Rolled 94 · Needed 81 or higher · Cleared the roll"
+      },
+      "quantityKey": "FABRICATE.App.Journal.Quantity",
+      "labelKey": "FABRICATE.App.Journal.History.ScalePerRow"
+    },
+    "note": "Wired as `HistoricalRunDetail.svelte:218-235` records per-row rolls, each reading and chance the row's string as in the shared record above. The drawing inks the chance chip and the reading in the secondary ink, where the shipped neutral chip (3.70 to 5.69:1), and the `--fab-text-subtle` reading and quantity (3.09 to 4.30:1 on the cleared wash), measure under 4.5:1; issue 2368 owns that debt."
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "routed by check — the whole ladder, failure included",
+    "draws": ":scope > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+    "note": "Beside the tiers. The live ladder draws its own kicker and hint above them.",
+    "undrawn": {
+      "Success": "the status glyph’s accessible name; the drawing draws the glyph"
+    },
+    "props": {
+      "label": "What each outcome brings back",
+      "hint": "one roll of 1d20 + 3 lands in a single tier",
+      "successLabel": "Success",
+      "failureLabel": "Failure",
+      "tiers": [
+        {
+          "id": "bountiful",
+          "name": "Bountiful",
+          "band": "20+",
+          "yields": [
+            {
+              "name": "Iron Nodule",
+              "icon": "fas fa-hammer",
+              "quantity": "×4"
+            },
+            {
+              "name": "Silver Seam",
+              "icon": "fas fa-star",
+              "quantity": "×1"
+            },
+            {
+              "name": "You choose one of…",
+              "icon": "fas fa-layer-group",
+              "detail": "Binding Chalk · Rune Bar"
+            }
+          ]
+        },
+        {
+          "id": "fruitful",
+          "name": "Fruitful",
+          "band": "14–19",
+          "yields": [
+            {
+              "name": "Iron Nodule",
+              "icon": "fas fa-hammer",
+              "quantity": "×2"
+            }
+          ]
+        },
+        {
+          "id": "barren",
+          "name": "Barren",
+          "band": "<14",
+          "fail": true,
+          "emptyText": "nothing — the trail goes cold"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<YieldScale> <OutcomeLadder>",
+    "cap": "after a successful roll — the one tier it reached",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+    "undrawn": {
+      "Success": "the status glyph’s accessible name; the drawing draws the glyph",
+      "Failure": "the status glyph’s accessible name; the drawing draws the glyph",
+      "icons/commodities/metal/ingot-plain-steel.webp": "the yield's art path, drawn as its 14px picture rather than as text"
+    },
+    "props": {
+      "reachedId": "fruitful",
+      "reachedLabel": "Your roll",
+      "successLabel": "Success",
+      "failureLabel": "Failure",
+      "tiers": [
+        {
+          "id": "fruitful",
+          "name": "Fruitful",
+          "band": "14–19",
+          "yields": [
+            {
+              "name": "Iron Nodule",
+              "img": "icons/commodities/metal/ingot-plain-steel.webp",
+              "icon": "fas fa-hammer",
+              "quantity": "×2"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<EssencePool>",
+    "cap": "two thresholds, one spend — a bar each, a source list once",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/EssencePool.svelte",
+    "fixture": "EssencePoolReadings",
+    "props": {
+      "label": "Shared essence allocation",
+      "thresholds": [
+        {
+          "essence": "Radiant",
+          "amount": 4,
+          "icon": "fas fa-star",
+          "tint": "butter",
+          "sources": [
+            {
+              "id": "sunmote",
+              "label": "Sunmote",
+              "icon": "fas fa-star",
+              "tint": "butter"
+            },
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            }
+          ]
+        },
+        {
+          "essence": "Shadow",
+          "amount": 3,
+          "icon": "fas fa-droplet",
+          "tint": "mauve",
+          "sources": [
+            {
+              "id": "duskglass",
+              "label": "Duskglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            },
+            {
+              "id": "shade-ink",
+              "label": "Shade Ink",
+              "icon": "fas fa-droplet",
+              "tint": "mauve"
+            }
+          ]
+        }
+      ],
+      "allocation": {
+        "sunmote": 1,
+        "duskglass": 2,
+        "shade-ink": 0
+      }
+    },
+    "data": {
+      "readings": {
+        "sunmote": "+2 Radiant · 3 held · 2 unallocated",
+        "duskglass": "+1 Radiant · +2 Shadow · 2 held · 0 unallocated",
+        "shade-ink": "+3 Shadow · 1 held · 1 unallocated"
+      },
+      "yields": {
+        "sunmote": {
+          "Radiant": 2
+        },
+        "duskglass": {
+          "Radiant": 1,
+          "Shadow": 2
+        },
+        "shade-ink": {
+          "Shadow": 3
+        }
+      },
+      "held": {
+        "sunmote": 3,
+        "duskglass": 2,
+        "shade-ink": 1
+      },
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
+      "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
+      "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
+      "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
+    },
+    "note": "Wired as `StepDetails` wires the open stage's pool, in the Journal's copy: its kicker, each bar named by its essence, the steppers' names and the overshoot. Each carrier's reading is the row's string, because the caller assembles it with punctuation a fixture may not author. The kicker and the overshoot ship in `--fab-text-subtle` (3.54 to 3.98:1 on `--fab-bg-1` in six themes) and the readings likewise (3.34 to 3.78:1 on `--fab-bg-2`); the drawing draws them in `--fab-text-muted`: debt owned by #2368. The Shadow and Shade Ink chips ship and are drawn in `--fab-tag-mauve`, 2.74:1 on `--fab-bg-3` in foundry-native against the 3:1 glyph floor: debt owned by #2368."
+  },
+  {
+    "spec": "<EssencePool>",
+    "cap": "short — the bar carries the entity tint until it is met",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/EssencePool.svelte",
+    "fixture": "EssencePoolReadings",
+    "props": {
+      "label": "Shared essence allocation",
+      "thresholds": [
+        {
+          "essence": "Clarity",
+          "amount": 5,
+          "icon": "fas fa-droplet",
+          "tint": "aqua",
+          "sources": [
+            {
+              "id": "dewglass",
+              "label": "Dewglass",
+              "icon": "fas fa-flask",
+              "tint": "aqua"
+            },
+            {
+              "id": "moonpetal",
+              "label": "Moonpetal",
+              "icon": "fas fa-leaf",
+              "tint": "lavender"
+            }
+          ]
+        }
+      ],
+      "allocation": {
+        "dewglass": 1,
+        "moonpetal": 0
+      }
+    },
+    "data": {
+      "readings": {
+        "dewglass": "+2 Clarity · 4 held · 3 unallocated",
+        "moonpetal": "+3 Clarity · 1 held · 1 unallocated"
+      },
+      "yields": {
+        "dewglass": {
+          "Clarity": 2
+        },
+        "moonpetal": {
+          "Clarity": 3
+        }
+      },
+      "held": {
+        "dewglass": 4,
+        "moonpetal": 1
+      },
+      "meterKey": "FABRICATE.App.Crafting.Pool.MeterValue",
+      "allocateKey": "FABRICATE.App.Journal.Stage.Allocate",
+      "decreaseKey": "FABRICATE.App.Journal.Stage.Decrease",
+      "increaseKey": "FABRICATE.App.Journal.Stage.Increase",
+      "overshootKey": "FABRICATE.App.Journal.Stage.Overshoot"
+    },
+    "note": "Wired as the pool above, short of its one threshold, so no overshoot is stated. `StepDetails` lists only a carrier that gives an essence the stage needs. The kicker and readings carry the debt named above, owned by #2368."
+  }
+]

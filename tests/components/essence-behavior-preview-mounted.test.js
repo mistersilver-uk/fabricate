@@ -30,7 +30,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/Chip.svelte',
     // The REAL player tile the "How players see it" card mounts for both samples. A `.svelte` in
-    // the closure but absent HANGS the suite (# cancelled) rather than failing it.
+    // the closure but absent HANGS the suite (# cancelled) rather than failing it. It is a ListRow
+    // card, and ListRow imports Medallion statically (issue 1778).
+    'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
   ],
@@ -103,6 +106,18 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     assert.ok(
       component.querySelector('.inventory-card-button.is-static'),
       'as does the fake carrying component'
+    );
+    assert.equal(
+      appears.querySelectorAll('div.fabricate-list-row-open.inventory-card-button.is-static').length,
+      2,
+      "both are ListRow's inert form (issue 1778)"
+    );
+    for (const control of appears.querySelectorAll('.inventory-card-button')) {
+      assert.equal(control.tagName, 'DIV', 'a preview card draws no control');
+    }
+    assert.ok(
+      !appears.querySelector('[data-keyboard-focus]'),
+      'and nothing in it declares itself focused to Foundry'
     );
     harness.remount();
   });

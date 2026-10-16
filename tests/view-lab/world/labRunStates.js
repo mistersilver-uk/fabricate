@@ -5,6 +5,7 @@ import {
   resolveGatheringCompositionMode,
 } from '../../../src/systems/gatheringComposition.js';
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
+import { historyEvidenceFields } from '../../../src/systems/runHistoryEvidence.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { LAB_HISTORY_DATA_STATES, historyDataRunSets } from './labHistoryEvidence.js';
@@ -44,7 +45,9 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'ready-single': 'lab-v1-ready-single',
   'legacy-armed': 'lab-v1-legacy-armed',
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
+  'waiting-auto-completes': 'lab-v1-waiting-auto-completes',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
+  'stale-choice': 'lab-v1-stale-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
   'stage-paid': 'lab-v1-stage-paid',
   'awaiting-choice': 'lab-v1-awaiting-choice',
@@ -94,6 +97,10 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
   'claim-retained': 'lab-v1-claim-retained',
+  // Issue 1773: a finished craft owing the player a pick, and the same craft once it was settled.
+  'award-choice': 'lab-v1-award-choice',
+  'award-choice-history': 'lab-v1-award-choice-history',
+  'award-choice-forfeit': 'lab-v1-award-choice-forfeit',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
   ...Object.fromEntries(
@@ -113,6 +120,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'history-d100-all-miss',
       'history-gathering-check-failure',
       'history-just-resolved',
+      'history-just-resolved-rewards',
       'history-redacted',
       'history-missing-material',
       'history-gm-deleted-recipe',
@@ -121,7 +129,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'essence-overshoot',
       'past-routed-stage',
       'future-routed-stage',
-      'kind-menu-open',
+      'kind-toggles',
       'history-settling',
       'history-compact-grid',
       'history-compact-tools',
@@ -567,6 +575,18 @@ function journalCaseFactories(context) {
     'waiting-auto-eligible': () => active(waiting('lab-v1-waiting-auto-eligible')),
     'waiting-open-choice': () =>
       active(unbegun('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
+    // Issue 2366: each group's pick points past its options, so its slot shows the open face.
+    'stale-choice': () => {
+      const run = unbegun('lab-v1-stale-choice', choice(), { completionMode: 'manual' });
+      const [stage] = run.steps;
+      stage.selectionPlan.ingredientOptionOverrides = Object.fromEntries(
+        stage.selectedRequirementSnapshot.ingredientGroups.map((group) => [
+          group.id,
+          { optionIndex: group.options.length },
+        ])
+      );
+      return active(run);
+    },
     'material-shortage': () =>
       active(
         unbegun('lab-v1-material-shortage', shortage(), {
@@ -660,6 +680,9 @@ function journalCaseFactories(context) {
       ),
     wide: () => wideContainers(context, multi()),
     narrow: () => wideContainers(context, multi()),
+    'award-choice': () => finished(awardChoiceCase(context, single(), {})),
+    'award-choice-history': () => finished(awardChoiceCase(context, single(), { settled: true })),
+    'award-choice-forfeit': () => finished(awardChoiceCase(context, single(), { forfeit: true })),
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
     // Persisted history-data witnesses live in their own module; each state seeds one selected
@@ -748,6 +771,7 @@ function prototypeContainers(context, state) {
   }
   if (state === 'filter-paused')
     selected.pauseState = { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR };
+  if (state === 'waiting-auto-completes') selected.completionMode = 'worldTime';
   if (state === 'waiting-auto-eligible') {
     selected.completionMode = 'worldTime';
     const current = selected.steps[selected.currentStepIndex];
@@ -1145,7 +1169,7 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.gatheringRuns, run, false);
     return true;
   }
-  if (state === 'history-just-resolved') {
+  if (state === 'history-just-resolved' || state === 'history-just-resolved-rewards') {
     replacePrototypeFocus(containers.craftingRuns, prototypeCraft(context, 'cord', id), false);
     return true;
   }
@@ -1437,6 +1461,83 @@ function terminalCraftingCase(context, recipe, status, id = null) {
   });
 }
 
+/** Every alternative of the forfeit fixture is unclaimable: retired, unpriced, or known. */
+const FORFEIT_ALTERNATIVES = Object.freeze([
+  { id: 'retired', componentId: 'sm-retired-ingot', quantity: 2 },
+  { id: 'marks', kind: 'currency', unit: 'mark', quantity: 3, label: 'Guild marks' },
+  { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+]);
+
+/**
+ * A finished horseshoe that left the player a pick of up to two (issue 1773): an ingot, a guild
+ * bounty, a taught longsword and the horseshoe recipe Brenna already knows under `reward-craft`,
+ * which the face disables with its reason. `settled` picks the ingot and the bounty; `forfeit`
+ * offers only rewards none of which can be claimed.
+ */
+function awardChoiceCase(context, recipe, { settled = false, forfeit = false }) {
+  const id = forfeit
+    ? 'lab-v1-award-choice-forfeit'
+    : settled
+      ? 'lab-v1-award-choice-history'
+      : 'lab-v1-award-choice';
+  const run = terminalCraftingCase(context, recipe, 'succeeded', id);
+  const [step] = run.steps;
+  const choice = {
+    choiceId: 'sm-r-horseshoe-reward',
+    resultGroupId: 'rg',
+    awardStrategy: 'upTo',
+    count: 2,
+    alternatives: forfeit
+      ? [...FORFEIT_ALTERNATIVES]
+      : [
+          { id: 'ingot', componentId: 'sm-iron-ingot', quantity: 2 },
+          { id: 'bounty', kind: 'currency', unit: 'gp', quantity: 12, label: 'Guild bounty' },
+          { id: 'lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 },
+          { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+        ],
+  };
+  if (!settled) {
+    step.pendingAwardChoices = [choice];
+    return run;
+  }
+  const picks = ['ingot', 'bounty'];
+  step.pendingAwardChoices = [{ ...choice, picks, settledAt: NOW - HOUR / 2, outcome: 'awarded' }];
+  step.createdResults = [
+    ...step.createdResults,
+    {
+      componentId: 'sm-iron-ingot',
+      quantity: 2,
+      name: 'Iron Ingot',
+      resultRowId: 'rg:reward:ingot',
+    },
+  ];
+  Object.assign(
+    step,
+    historyEvidenceFields({
+      currencyCredits: [
+        {
+          resultId: choice.choiceId,
+          alternativeId: 'bounty',
+          unit: 'gp',
+          amount: 12,
+          label: 'Guild bounty',
+          unitName: 'gp',
+        },
+      ],
+    })
+  );
+  step.groupAwards = [
+    {
+      choiceId: choice.choiceId,
+      chooser: 'playerChooses',
+      awardStrategy: 'upTo',
+      count: 2,
+      selections: picks.map((alternativeId) => ({ alternativeId })),
+    },
+  ];
+  return run;
+}
+
 /**
  * Runework's routed count (`runeworkCheckMode=routed-count`, two needed) netting 6, so it routed
  * to Masterwork (+2) and recorded a margin of 2 against that tier's 4, never against the 2.
@@ -1526,16 +1627,31 @@ function automaticCompletedCase(context, recipe, id) {
   });
 }
 
+const authoredGroupResults = (recipe, stepIndex) =>
+  (recipeSteps(recipe)[stepIndex]?.resultGroups ?? []).flatMap((group) => group?.results ?? []);
+
 function authoredResults(recipe, stepIndex) {
-  const authored = recipeSteps(recipe)[stepIndex];
-  return (authored?.resultGroups ?? []).flatMap((group) =>
-    (group?.results ?? []).map((result) => ({
+  return authoredGroupResults(recipe, stepIndex)
+    .filter((result) => (result?.kind ?? 'component') === 'component')
+    .map((result) => ({
       componentId: result.componentId,
       quantity: result.quantity ?? 1,
       name: result.name,
       img: result.img,
-    }))
-  );
+    }));
+}
+
+/** The credits a stage's authored currency results pay, as the reward step records them (1773). */
+function authoredRewards(recipe, stepIndex) {
+  const credits = authoredGroupResults(recipe, stepIndex)
+    .filter((result) => result?.kind === 'currency')
+    .map((result) => ({
+      ...result,
+      resultId: result.id,
+      amount: result.quantity,
+      unitName: result.unit,
+    }));
+  return historyEvidenceFields(credits.length > 0 ? { currencyCredits: credits } : {});
 }
 
 function requireGatheringTask(tasks, mode) {
@@ -1879,6 +1995,7 @@ function completeFixtureRun({ container, run, recipes, state, now }) {
       if (prototypeKey)
         recordPrototypeStage({ actorUuid: run.actorUuid }, prototypeKey, current, stepIndex, true);
       else current.resolutionSnapshot = { kind: 'none', mode: 'simple' };
+      Object.assign(current, authoredRewards(recipe, stepIndex));
       if (recipe?.craftingSystemId === LAB_SYSTEM_IDS.RUNEWORK) {
         current.lastCheckResult = {
           success: true,

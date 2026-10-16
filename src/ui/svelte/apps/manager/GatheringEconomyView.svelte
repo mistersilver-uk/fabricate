@@ -14,7 +14,7 @@
   import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import IconButton from '../../components/IconButton.svelte';
@@ -345,7 +345,7 @@
             options={regenPolicyOptions}
             showTick={false}
             label={text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}
-            triggerData={{ 'data-economy-regen-policy': '' }}
+            triggerProps={{ 'data-economy-regen-policy': '' }}
             onChange={(next) => updateRegen({ policy: next })}
           />
           {#if economy.stamina.regen.policy === 'overTime'}
@@ -354,7 +354,7 @@
               options={regenUnitOptions}
               showTick={false}
               label={text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}
-              triggerData={{ 'data-economy-regen-unit': '' }}
+              triggerProps={{ 'data-economy-regen-unit': '' }}
               onChange={(next) => updateRegen({ unit: next })}
             />
           {/if}
@@ -417,12 +417,12 @@
               <span class="manager-economy-actor-col-label"
                 >{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span
               >
-              <ManagerButton
+              <Button
                 role="primary"
                 class="manager-economy-bulk-save"
                 onclick={saveAll}
                 data-economy-bulk-save
-                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</ManagerButton
+                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</Button
               >
             </li>
             {#each pagedActors as actor (actor.actorId)}
@@ -537,16 +537,16 @@
 
 <style>
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
-     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration controls
+     `.fabricate-field.fabricate-field select { width: 100% }` painted the two regeneration controls
      until they became `<button>`s, and `.fabricate-select-trigger` declares no width at all.
      Without this rule the two cells of a two-column grid rendered at different widths and the unit
      cell re-sized as the GM changed it.
 
      Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`, so
-     the rule names `.manager-field` and reaches both. The `:global()` is anchored at
+     the rule names `.fabricate-field` and reaches both. The `:global()` is anchored at
      `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash rather
      than reaching every trigger in the document. */
-  .manager-economy-regen-grid :global(.manager-field .fabricate-select-trigger) {
+  .manager-economy-regen-grid :global(.fabricate-field .fabricate-select-trigger) {
     width: 100%;
   }
 
@@ -557,30 +557,30 @@
     grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--fab-space-4);
   }
 
   /* Card chrome mirrors the sibling .manager-condition-panel. */
   .manager-economy-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 14px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-overlay-light-035);
   }
 
   .manager-economy-card-head {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .manager-economy-card-title {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     color: var(--fab-text);
     font-size: 0.95rem;
@@ -594,7 +594,7 @@
   }
 
   .manager-economy-card-hint {
-    margin: -2px 0 0;
+    margin: calc(-1 * var(--fab-space-2xs)) 0 0;
     color: var(--fab-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
@@ -603,36 +603,34 @@
   .manager-economy-mode-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .manager-economy-mode-option {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border-radius: 8px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-4);
+    border-radius: 7px;
     border: 1px solid var(--fab-border);
-    background: var(--fab-overlay-light-035);
+    background: var(--fab-surface-soft);
     color: var(--fab-text);
     cursor: pointer;
     font-weight: 600;
   }
 
-  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather than an
-     oversight: this rule asked for a soft accent with the overlay as its fallback, the soft accent
-     was never declared anywhere, and the overlay is what every theme has always painted (issue
-     1399). Tinting it is a visible change and needs `--fab-accent-soft`, which does exist. */
+  /* The chosen mode is the selected face: the active surface behind the accent edge, neutral
+     rather than an accent tint (issue 1399). */
   .manager-economy-mode-option.is-active {
     border-color: var(--fab-accent);
-    background: var(--fab-overlay-light-035);
+    background: var(--fab-surface-active);
     color: var(--fab-text);
   }
 
   .manager-economy-subsection {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
@@ -649,7 +647,7 @@
   .manager-economy-subtitle {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     color: var(--fab-text);
     font-size: 0.85rem;
@@ -659,7 +657,7 @@
   .manager-economy-regen-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* Manual-only regen hides the Per select, so Regeneration spans full width. */
@@ -672,9 +670,9 @@
     width: 100%;
     box-sizing: border-box;
     height: 34px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     color: var(--fab-text);
     background: var(--fab-bg-1);
   }
@@ -685,10 +683,10 @@
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
-    padding: 0 12px 0 0;
+    padding: 0 var(--fab-space-3) 0 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     /* 380px, not 320px: a 30px bare cell became a 36px filled stepper, so six rows plus the sticky
        header no longer fit the old height and the list would scroll before pagination kicked in. */
     max-height: 380px;
@@ -714,10 +712,10 @@
     display: grid;
     grid-template-columns: minmax(140px, 1fr) 106px 106px 64px;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-overlay-light-035);
   }
 
@@ -726,7 +724,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 4px 8px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     border: 0;
     border-radius: 0;
     background: var(--fab-bg-3);
@@ -739,14 +737,14 @@
   .manager-economy-actor-identity {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
   .manager-economy-actor-thumb {
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 7px;
     object-fit: cover;
     flex: 0 0 auto;
   }
@@ -778,21 +776,21 @@
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
      Then chained, because at (0,2,0) this rule did not beat
-     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
+     `.fabricate-button.fabricate-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
      the primitive's classes takes it to (0,5,0), which wins on specificity rather than on where the
      sheet happens to be injected. */
   :global(
-    .fabricate-manager .manager-button.fab-manager-button.is-primary.manager-economy-bulk-save
+    .fabricate-manager .fabricate-button.fab-manager-button.is-primary.manager-economy-bulk-save
   ) {
     width: auto;
     justify-self: center;
-    padding: 3px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     justify-content: center;
     font-size: 0.82rem;
     line-height: 1.1;
   }
 
-  /* `:global`, and CHAINED with `.manager-icon-button`, because the roll button is an
+  /* `:global`, and CHAINED with `.fabricate-icon-button`, because the roll button is an
      `<IconButton>` (issue 1422): the scoped spelling emits `.manager-economy-actor-roll.svelte-<hash>`
      and matches NOTHING.
 
@@ -804,23 +802,23 @@
 
      The chain keeps the specificity identical rather than merely making the rule reach: the dead
      scoped form was (0,2,0) and a bare `:global()` would be (0,1,0). */
-  :global(.manager-icon-button.manager-economy-actor-roll) {
+  :global(.fabricate-icon-button.manager-economy-actor-roll) {
     justify-self: center;
   }
 
   /* Emphasise the dice button on characters that have not been rolled yet. The fill is a NEUTRAL
      overlay for the reason `.manager-economy-mode-option.is-active` records above. */
-  :global(.manager-icon-button.manager-economy-actor-roll.is-roll-needed) {
+  :global(.fabricate-icon-button.manager-economy-actor-roll.is-roll-needed) {
     color: var(--fab-accent);
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
   }
 
   /* Keep the actor-list pagination compact and on a single line. */
-  .manager-economy-subsection :global(.manager-pagination) {
+  .manager-economy-subsection :global(.fabricate-pagination) {
     flex-wrap: nowrap;
-    gap: 8px;
-    padding: 8px 0 0;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) 0 0;
     border-top: 0;
     background: transparent;
   }

@@ -1,6 +1,6 @@
 /**
  * The Journal's prepared check prompt carrying additional dice (issue 2008), composed through the
- * real `promptJournalStageCheck` adapter, prompt and ManagerModal host: the GM-described offer
+ * real `promptJournalStageCheck` adapter, prompt and Modal host: the GM-described offer
  * reaches the control, the player's bought die is the decision the command sends, and a redacted
  * prompt with no reach never blocks or states a shortfall (R3).
  */

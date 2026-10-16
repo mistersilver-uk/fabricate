@@ -16,6 +16,9 @@
   to the active language) and is this panel's DEFAULT, so the locale-aware join is
   what ships. The `formatList` prop stays as an injection seam for tests and for a
   caller that needs a different join.
+
+  `overshoots` is the pool's surplus per essence, from `essenceOvershoots`: one line each,
+  beneath the rows, because no row's quantity states what the craft spends beyond its need.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -28,6 +31,7 @@
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
     plan = null,
+    overshoots = [],
     // Locale-aware list formatter: (string[]) => string. Defaults to the bridge's
     // own, so an omitted prop still joins through the active language. Deliberately
     // NOT guarded with a `typeof … === 'function'` fallback at the call site: such a
@@ -106,6 +110,14 @@
         </li>
       {/each}
     </ul>
+    {#each overshoots as overshoot (overshoot.essenceId)}
+      <p class="consumption-plan-overshoot" data-consumption-overshoot={overshoot.essenceId}>
+        {localize('FABRICATE.App.Crafting.ConsumptionPlan.Overshoot', {
+          essence: overshoot.name,
+          amount: overshoot.amount,
+        })}
+      </p>
+    {/each}
   {/if}
 
   {#if pendingText}
@@ -124,7 +136,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border-strong);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-surface-soft);
   }
 
@@ -146,7 +158,7 @@
   .consumption-plan-rows {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -191,7 +203,7 @@
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-muted);
   }
@@ -200,17 +212,23 @@
     color: var(--fab-danger-text);
   }
 
+  .consumption-plan-overshoot {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
   .consumption-plan-pending {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 11px;
     color: var(--fab-accent);
   }
 
   .consumption-plan-pending i {
-    margin-top: 2px;
+    margin-top: var(--fab-space-2xs);
     font-size: 10px;
   }
 </style>

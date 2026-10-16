@@ -15,7 +15,7 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
   import IconButton from '../../../components/IconButton.svelte';
@@ -108,7 +108,7 @@
   data-recipe-tab="books-scrolls"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.BooksScrolls', 'Books & Scrolls')}
 >
-  <div class="manager-recipe-tab-intro">
+  <div class="manager-recipe-tab-intro" data-tab-heading>
     <h2 class="manager-recipe-tab-title">
       {text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Title', 'Appears in')}
     </h2>
@@ -179,11 +179,11 @@
           'Not in any book or scroll yet.'
         )}
         contextClass="manager-recipe-tab-empty"
-        dataAttr="data-recipe-item-empty"
+        data-recipe-item-empty
       />
     {/if}
 
-    <ManagerButton
+    <Button
       class="manager-recipe-tab-action"
       data-recipe-open-books
       onclick={() => onOpenBooksScrolls()}
@@ -196,7 +196,7 @@
         )}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </ManagerButton>
+    </Button>
   </div>
 </section>
 
@@ -233,7 +233,7 @@
     height: 26px;
     overflow: hidden;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-bg-3);
     font-size: 0.66rem;

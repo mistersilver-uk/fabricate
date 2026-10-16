@@ -124,7 +124,7 @@
   .crafting-steps-hint {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
@@ -143,10 +143,10 @@
   .crafting-step {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -162,7 +162,7 @@
   .crafting-step-label {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     font-size: 12px;
     font-weight: 600;
@@ -199,15 +199,15 @@
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
-    gap: 5px;
-    padding: 2px 7px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2xs) var(--fab-space-chip);
     border: 1px solid var(--fab-border);
     border-radius: 999px;
     background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
     font-size: 10px;
     font-family: var(--fab-font-mono);
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     letter-spacing: normal;
     text-transform: none;

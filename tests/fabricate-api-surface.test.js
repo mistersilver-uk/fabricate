@@ -20,13 +20,22 @@ import { managerExtensions } from '../src/ui/managerExtensions.js';
 import { playerExtensions } from '../src/ui/playerExtensions.js';
 import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { SHIPPED_KINDS } from '../src/ui/publishedComponentProps.js';
+import { publishedComponentSeam } from '../src/ui/publishedComponentSeam.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
+import { NEVER_ARIA } from './helpers/publishedComponentGate.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
 const GOLDEN = JSON.parse(
   readFileSync(resolve(import.meta.dirname, 'fixtures/fabricateBootContract.golden.json'), 'utf8')
 );
 const DOCUMENTED = readFileSync(resolve(import.meta.dirname, '../docs/api/index.md'), 'utf8');
+const SPECIFIED = readFileSync(
+  resolve(import.meta.dirname, '../openspec/specs/ui-extension-points/spec.md'),
+  'utf8'
+);
+const COMPONENTS_TABLE_HEADER = '| Component | Version | Root | Props | Rest |';
 
 const member = (name, length) => ({ set: 'prototypeProperties', name, length });
 const published = (set, ...names) => names.map((name) => ({ set, name }));
@@ -71,7 +80,8 @@ const PUBLIC_MEMBERS = Object.freeze([
     'GatheringRegionStore',
     'GatheringPartyStore',
     'GatheringLocationService',
-    'HOOKS'
+    'HOOKS',
+    'ui'
   ),
   ...published(
     'gatheringKeys',
@@ -151,6 +161,84 @@ function recordingFacade() {
   return { facade, calls };
 }
 
+/**
+ * The docs row a described published component must carry: name, version, root, props and rest.
+ * A prop cell notes its kind unless it is `data`, then `required`.
+ */
+function documentedComponentRow(name, { version, props, rest, root }) {
+  const cells = Object.entries(props).map(([key, spec]) => {
+    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : ''];
+    const noted = notes.filter(Boolean).join(', ');
+    return noted ? `\`${key}\` (${noted})` : `\`${key}\``;
+  });
+  const published = cells.join(', ') || '—';
+  return `| \`${name}\` | ${version} | \`${root}\` | ${published} | ${rest ? 'yes' : 'no'} |`;
+}
+
+/** `api.ui` as a fresh bind publishes it. */
+function publishedUi() {
+  installPublicGame();
+  bindFabricateGlobal(recordingFacade().facade, {});
+  return globalThis.game.fabricate.api.ui;
+}
+
+/** The docs `### <Name>` sections from the components table to the descriptor section, in order. */
+function documentedComponentSections() {
+  const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
+  const end = DOCUMENTED.indexOf('\n### The descriptor\n', start);
+  assert.ok(start !== -1 && end !== -1, 'the table, then the descriptor section');
+  return DOCUMENTED.slice(start, end).split(/^### /mu).slice(1);
+}
+
+/**
+ * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
+ * headings, by name and in the order the spec states them.
+ */
+function specifiedComponentGroups() {
+  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
+    const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
+    const end = SPECIFIED.indexOf('\n### ', start + 1);
+    assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
+    return SPECIFIED.slice(start, end)
+      .split(/^- \*\*/mu)
+      .flatMap((group) => {
+        const name = /^`(\w+)`\.\*\*\n/u.exec(group)?.[1];
+        return name ? [[name, group]] : [];
+      });
+  });
+  return new Map(groups);
+}
+
+/** One token for each family of rest name M13 reserves where an entry's rest lands on a control. */
+const RESERVED_REST_FAMILIES = Object.freeze([
+  '`data-keyboard-focus`',
+  '`data-action`',
+  '`data-cursor`',
+  '`data-tooltip`',
+  '`data-validation-focused`',
+  '`data-essence-sort-direction`',
+]);
+
+/** The kinds whose key opens a line of its entry's spec group: its arguments, or its values. */
+const KINDS_A_GROUP_STATES = new Set(['callback', 'aria']);
+
+/** The names `text` spells between `open` and `close` marks, in order. */
+const spelledBetween = (text, open, close = open) =>
+  [...(text ?? '').matchAll(new RegExp(`${open}([a-z-]+)${close}`, 'gu'))].map(([, name]) => name);
+
+/** The lines of `text` that `key` opens, alone or as "`a` and `b`", past a list marker. */
+function linesOpenedBy(text, key) {
+  const opening = new RegExp('^\\s*(?:- )?(?:`[^`]+` and )?`' + key + '`', 'u');
+  return text.split('\n').filter((line) => opening.test(line));
+}
+
+/** The set of every other backticked token on the lines `key` opens: the values stated for it. */
+function statedValues(text, key) {
+  const tokens = new Set(linesOpenedBy(text, key).flatMap((line) => line.match(/`[^`]+`/gu)));
+  tokens.delete(`\`${key}\``);
+  return tokens;
+}
+
 describe('bindFabricateGlobal publishes the stable namespaces', () => {
   it('re-publishes the SAME extension registries through the init and ready binds', () => {
     installPublicGame();
@@ -163,6 +251,352 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       const key = Object.keys(atInit).find((name) => atInit[name] === registry.publicApi);
       assert.ok(key, 'the registry publicApi is on game.fabricate.api');
       assert.equal(atReady[key], registry.publicApi, 'a replay binds the page-session singleton');
+    }
+    assert.equal(atInit.ui, publishedComponentSeam.publicApi, 'api.ui is the page-session seam');
+    assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
+  });
+
+  it('publishes exactly the pinned components, each described as pinned with its root, and documents them', () => {
+    installPublicGame();
+    bindFabricateGlobal(recordingFacade().facade, {});
+    const { ui } = globalThis.game.fabricate.api;
+    assert.deepEqual(ui.components, [
+      'TierTrack',
+      'Avatar',
+      'Medallion',
+      'FillBar',
+      'Meter',
+      'BandedBar',
+      'StatBox',
+      'InfoStrip',
+      'Kicker',
+      'Chip',
+      'Rail',
+      'InspectorCard',
+      'EmptyState',
+      'Notice',
+      'Button',
+      'StatusToggle',
+    ]);
+    const optional = { kind: 'data', required: false };
+    const required = { kind: 'data', required: true };
+    const requiredText = { kind: 'text', required: true };
+    const slot = { kind: 'slot', required: false };
+    assert.deepEqual(Object.fromEntries(ui.components.map((name) => [name, ui.describe(name)])), {
+      TierTrack: {
+        version: 1,
+        props: {
+          tiers: required,
+          currentIndex: optional,
+          direction: optional,
+          layout: optional,
+          ariaLabel: required,
+          currentLabel: required,
+          reachedLabel: required,
+          aheadLabel: required,
+          hint: optional,
+        },
+        rest: true,
+        root: 'any',
+      },
+      Avatar: {
+        version: 1,
+        props: {
+          art: optional,
+          name: required,
+          alt: optional,
+          size: optional,
+          shape: optional,
+          tint: optional,
+        },
+        rest: false,
+        root: 'any',
+      },
+      Medallion: {
+        version: 1,
+        props: {
+          art: optional,
+          icon: optional,
+          size: required,
+          alt: optional,
+          tint: optional,
+          glyph: optional,
+          variant: optional,
+          tone: optional,
+          ink: optional,
+        },
+        rest: false,
+        root: 'any',
+      },
+      FillBar: {
+        version: 1,
+        props: { value: optional, tone: optional, color: optional, density: optional },
+        rest: true,
+        root: 'any',
+      },
+      Meter: {
+        version: 1,
+        props: {
+          value: optional,
+          max: optional,
+          segments: optional,
+          valueText: optional,
+          label: required,
+        },
+        rest: true,
+        root: 'any',
+      },
+      BandedBar: {
+        version: 1,
+        props: { rows: required, direction: optional, density: optional },
+        rest: true,
+        root: 'any',
+      },
+      StatBox: {
+        version: 1,
+        props: { value: required, label: required, icon: optional, tone: optional },
+        rest: true,
+        root: 'any',
+      },
+      InfoStrip: {
+        version: 1,
+        props: { label: required, facts: required, badge: optional },
+        rest: true,
+        root: 'any',
+      },
+      Kicker: {
+        version: 1,
+        props: { as: optional, tone: optional, children: requiredText },
+        rest: true,
+        root: 'any',
+      },
+      Chip: {
+        version: 1,
+        props: { tone: optional, density: optional, children: requiredText },
+        rest: true,
+        root: 'any',
+      },
+      Rail: {
+        version: 1,
+        props: { label: optional, children: slot },
+        rest: true,
+        root: 'any',
+      },
+      InspectorCard: {
+        version: 1,
+        props: { children: slot },
+        rest: true,
+        root: 'fabricate',
+      },
+      EmptyState: {
+        version: 1,
+        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
+        rest: true,
+        root: 'any',
+      },
+      Notice: {
+        version: 1,
+        props: {
+          tone: optional,
+          title: required,
+          detail: optional,
+          icon: optional,
+          action: optional,
+          onAction: { kind: 'callback', required: false },
+        },
+        rest: true,
+        root: 'any',
+      },
+      Button: {
+        version: 1,
+        props: {
+          role: optional,
+          fullWidth: optional,
+          disabled: optional,
+          children: requiredText,
+          onclick: { kind: 'callback', required: true },
+          'aria-expanded': { kind: 'aria', required: false },
+          'aria-describedby': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'fabricate',
+      },
+      StatusToggle: {
+        version: 1,
+        props: {
+          on: required,
+          ariaLabel: required,
+          onclick: { kind: 'callback', required: true },
+          'aria-labelledby': { kind: 'aria', required: false },
+          'aria-describedby': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'fabricate',
+      },
+    });
+    assert.deepEqual(
+      Object.keys(ui),
+      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
+      'the descriptor a bind publishes, `load` last'
+    );
+    const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
+    assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
+    const end = DOCUMENTED.indexOf('\n\n', start);
+    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
+    assert.deepEqual(
+      rows,
+      ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
+      'one documented row per published component, in publication order, with all five cells'
+    );
+  });
+
+  it('gives each published component its own docs section, each prop opening a sentence', () => {
+    const ui = publishedUi();
+    const sections = documentedComponentSections();
+    assert.deepEqual(
+      sections.map((section) => section.slice(0, section.indexOf('\n'))),
+      ui.components,
+      'one section per published component, in publication order, and no other'
+    );
+    for (const [index, name] of ui.components.entries()) {
+      for (const key of Object.keys(ui.describe(name).props)) {
+        assert.ok(
+          linesOpenedBy(sections[index], key).length > 0,
+          `### ${name} opens a sentence with \`${key}\``
+        );
+      }
+    }
+  });
+
+  it('states the same values for each key in its docs section as in its spec group', () => {
+    const ui = publishedUi();
+    const sections = documentedComponentSections();
+    const groups = specifiedComponentGroups();
+    assert.deepEqual(
+      [...groups.keys()],
+      ui.components.filter((name) => name !== 'TierTrack'),
+      'one group per component but TierTrack, which the design-system capability states'
+    );
+    for (const [name, group] of groups) {
+      const { props } = ui.describe(name);
+      const keys = Object.keys(props);
+      const valuesIn = (text) =>
+        Object.fromEntries(keys.map((key) => [key, statedValues(text, key)]));
+      for (const key of keys) {
+        if (!KINDS_A_GROUP_STATES.has(props[key].kind)) continue;
+        assert.ok(
+          linesOpenedBy(group, key).length > 0,
+          `the ${name} group opens a line with \`${key}\`, where its arguments or values are stated`
+        );
+      }
+      const specified = valuesIn(group);
+      assert.ok(
+        Object.values(specified).some((values) => values.size > 0),
+        `the ${name} group states a value`
+      );
+      assert.deepEqual(
+        valuesIn(sections[ui.components.indexOf(name)]),
+        specified,
+        `### ${name} in docs/api/index.md against its spec group`
+      );
+    }
+  });
+
+  it('states every value the spec names for an interactive component under Ownership and theme', () => {
+    const between = (text, from, to) => {
+      const start = text.indexOf(from);
+      const end = text.indexOf(to, start + 1);
+      assert.ok(start !== -1 && end !== -1, `${from.trim()}, then ${to.trim()}`);
+      return text.slice(start, end);
+    };
+    const specified = between(SPECIFIED, '\n### Interactive components\n', '\n### ');
+    const documented = between(DOCUMENTED, '\n### Ownership and theme\n', '\n## Data Persistence\n');
+    const tokens = [...new Set(specified.match(/`[^`]+`/gu))];
+    assert.ok(tokens.length > 15, 'the spec states its interactive rule in backticked values');
+    // The docs write a root bare, as their components table does, where the spec quotes it.
+    const stated = (token) =>
+      documented.includes(token) || documented.includes(token.replaceAll("'", ''));
+    assert.deepEqual(
+      tokens.filter((token) => !stated(token)),
+      [],
+      'each value the spec names for a control is named in the docs'
+    );
+    assert.ok(
+      !documented.includes('non-interactive'),
+      'the docs no longer say a published component is non-interactive'
+    );
+  });
+
+  it('spells the shipped prop kinds alike in the kinds table, the spec and the docs', () => {
+    const kinds = Object.keys(SHIPPED_KINDS);
+    const shapes = [...SPECIFIED.matchAll(/\{ kind: ('[a-z]+'(?: \| '[a-z]+')+), required/gu)];
+    assert.deepEqual(
+      shapes.map(([, union]) => spelledBetween(union, "'")),
+      [kinds, kinds],
+      'the described shape and the manifest shape, in the spec'
+    );
+    const refusing = /`kind` outside the shipped set, (.+?), with an `Error`/u.exec(SPECIFIED);
+    assert.ok(refusing, 'the spec sentence that refuses a `kind` outside the shipped set');
+    const [, refused] = refusing;
+    assert.deepEqual(spelledBetween(refused, "`'", "'`"), kinds, 'what registration admits');
+    const listing = /^A prop's `kind` is (.+)\.$/mu.exec(DOCUMENTED);
+    assert.ok(listing, 'the docs sentence that opens "A prop’s `kind` is"');
+    const [, sentence] = listing;
+    assert.deepEqual(spelledBetween(sentence, '`'), kinds, 'the docs’ kinds sentence');
+  });
+
+  it('holds the gate’s never-published ARIA names to the line of the spec and of the docs that spells them', () => {
+    const stating = (text) =>
+      text.split('\n').filter((line) => line.endsWith(' are never published as one.'));
+    const lines = stating(SPECIFIED);
+    assert.equal(lines.length, 1, 'one spec line says what is never an aria key');
+    assert.deepEqual(spelledBetween(lines[0], '`'), [...NEVER_ARIA]);
+    assert.deepEqual(stating(DOCUMENTED), lines, 'and the docs spell the same line');
+  });
+
+  it('states the reserved rest names, their refusal and an aria key’s in the spec’s M13 row and the docs’ mounting section', () => {
+    const row = SPECIFIED.split('\n').filter((line) => line.startsWith('| M13 |'));
+    assert.equal(row.length, 1, 'one M13 row');
+    const from = DOCUMENTED.indexOf('\n### Mounting, updating and destroying\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mounting section, then another heading');
+    const stated = [
+      'is reserved on <name>',
+      'must be a string, number or boolean',
+      ...RESERVED_REST_FAMILIES,
+      '`data-tooltip-`',
+    ];
+    for (const [where, prose] of [
+      ['the spec’s M13 row', row[0]],
+      ['### Mounting, updating and destroying', DOCUMENTED.slice(from, to)],
+    ]) {
+      assert.deepEqual(
+        stated.filter((token) => !prose.includes(token)),
+        [],
+        `${where} states each reserved name and the tail that refuses it`
+      );
+    }
+  });
+
+  it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
+    const names = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control').map(
+      (entry) => entry.name
+    );
+    assert.ok(names.length > 0, 'an entry states restOn');
+    const groups = specifiedComponentGroups();
+    const sections = documentedComponentSections();
+    for (const name of names) {
+      const section = sections.find((candidate) => candidate.startsWith(`${name}\n`));
+      for (const [where, prose] of [
+        [`the ${name} group`, groups.get(name) ?? ''],
+        [`### ${name}`, section ?? ''],
+      ]) {
+        assert.deepEqual(
+          RESERVED_REST_FAMILIES.filter((token) => !prose.includes(token)),
+          [],
+          `${where} is where a companion learns the names it reserves`
+        );
+      }
     }
   });
 

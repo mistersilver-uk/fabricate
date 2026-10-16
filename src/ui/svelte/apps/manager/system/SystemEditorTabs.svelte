@@ -6,9 +6,9 @@
 
   A thin caller of the promoted `EditorTabs` primitive (issue 1362): this file owns the tab
   list and this site's DOM contract — the `data-system-tab` hook, the `system-tab-*` /
-  `system-panel-*` id stem whose panels `SystemEditView.svelte` renders, and the strip's own
-  aria-label. It keeps `manager-environment-tabs` alongside `manager-system-tabs` and the
-  `manager-environment-tab-button` / `-badge` classes, so no shipped rule stops matching.
+  `system-panel-*` id stem whose one panel `SystemEditView.svelte` renders, and the strip's own
+  aria-label. It passes `manager-environment-tabs`, `manager-system-tabs` and the
+  `manager-environment-tab-button` / `-badge` classes as the hooks its mounted suite selects on.
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
@@ -39,8 +39,9 @@
   ariaLabelKey="FABRICATE.Admin.Manager.SystemEdit.Tabs.Label"
   ariaLabel="System overview sections"
   idStem="system"
-  hookAttribute="data-system-tab"
+  tabDataAttr="data-system-tab"
   containerClass="manager-environment-tabs manager-system-tabs"
   buttonClass="manager-environment-tab-button"
   badgeClass="manager-environment-tab-badge"
+  activePanelOnly
 />

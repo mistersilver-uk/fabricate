@@ -1,7 +1,7 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { defineStructureContract } from '../helpers/structureContract.js';
@@ -172,4 +172,5 @@ describe('World and Travel navigation', () => {
     // `inspector-card-source-contract.test.js`.
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);
   });
+
 });

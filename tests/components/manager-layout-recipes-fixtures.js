@@ -101,11 +101,11 @@ export function assertOneTrackPerGridChild({
 
 // ── THE "or…" MENU (issue 1373, maintainer round 8) ──────────────────────────────────────
 // The panel a requirement row opens to accept a different KIND of ingredient in its place.
-const orMenuGroupCardPath = resolve(
+const orMenuPath = resolve(
   __dirname,
-  '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte'
+  '../../src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte'
 );
-export const orMenuGroupCardSource = readFileSync(orMenuGroupCardPath, 'utf8');
+export const orMenuSource = readFileSync(orMenuPath, 'utf8');
 
 export const OR_MENU_KINDS = ['component', 'tag', 'essence', 'currency'];
 export const OR_MENU_LABELS = {
@@ -122,13 +122,14 @@ export const OR_MENU_GLYPHS = {
 };
 // ── THE KIND PICKER (issue 1510) ─────────────────────────────────────────────────────────
 /**
- * The requirement row's kind control exactly as `RecipeIngredientOption` renders it: the picker ROOT
+ * The requirement row's kind control exactly as `PickerRow` renders it: the picker ROOT
  * with the trigger nested inside, because the root is where `.fabricate-select` and the caller's
  * `.manager-recipe-option-kind` land while the rung is `.fabricate-select
  * .fabricate-select-trigger-inline`. A trigger-only fixture matches neither, and the row-parity and
  * tint measurements would go fictional green on markup the app no longer emits.
  *
- * @param {string} label The chosen kind's own word, as the trigger shows it.
+ * @param {string} label The chosen kind's own word, as the trigger shows it and an unnamed row
+ *   names it.
  * @returns {string} The picker's markup.
  */
 export function kindPickerFixture(label) {
@@ -136,7 +137,7 @@ export function kindPickerFixture(label) {
     '<div class="fabricate-picker manager-travel-picker fabricate-select manager-recipe-option-kind">' +
     '<button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline"' +
     ' data-recipe-option-kind data-select-size="inline" role="combobox" aria-haspopup="listbox"' +
-    ' aria-expanded="false" aria-label="Requirement kind" title="Requirement kind">' +
+    ` aria-expanded="false" aria-label="Kind of ${label}" title="Kind of ${label}">` +
     `<span class="manager-travel-picker-value fabricate-select-value">${label}</span>` +
     '<i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>'
   );

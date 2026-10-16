@@ -235,7 +235,7 @@
     grid-row: 3;
   }
 
-  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-head :global(.manager-status-toggle) {
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-head :global(.fabricate-toggle) {
     grid-row: 1 / -1;
   }
 

@@ -38,3 +38,15 @@ export function maximisedTotal(formula, Roll = diceEngine()) {
     return null;
   }
 }
+
+/** The rollability floor an amount expression must clear, as validation errors; `Roll` is injected,
+ *  and the gathering data boundary applies the same floor through this one function (issue 1645). */
+export function quantityFormulaErrors(quantityFormula, Roll) {
+  if (!quantityFormula || typeof Roll !== 'function') return [];
+  const maximum = maximisedTotal(quantityFormula, Roll);
+  if (maximum === null) return ['quantity formula cannot be rolled'];
+  if (maximum <= 0 && !hasRollDataPath(quantityFormula)) {
+    return ['quantity formula can never award a positive amount'];
+  }
+  return [];
+}

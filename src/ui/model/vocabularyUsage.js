@@ -1,4 +1,7 @@
-/** Reference counting for the Tags & Categories screen (issue 689). */
+/**
+ * Tag and category counting: the Tags & Categories screen's case-folded reference counts, and the
+ * tag adder's exact component count.
+ */
 
 /** The COUNTING key: a record's stored value trimmed and lower-cased, a blank keying as `''`. */
 function vocabularyKey(value) {
@@ -99,6 +102,23 @@ export function countRecipeTagPlaceholderUsage(recipes) {
   const tagUsage = new Map();
   for (const recipe of recipes || []) countRecipeTagPlaceholders(recipe, tagUsage);
   return Object.fromEntries(tagUsage);
+}
+
+/**
+ * How many components carry each tag, keyed by the tag EXACTLY as stored. This is deliberately not
+ * `vocabularyKey`: a tag requirement matches by exact comparison (`matchTypes.js` › `tagsHandler`),
+ * so two spellings that differ only in case are two tags here, while the Tags & Categories screen
+ * folds them into one row.
+ */
+export function countComponentsByTag(components) {
+  const counts = new Map();
+  for (const component of Array.isArray(components) ? components : []) {
+    const tags = Array.isArray(component?.tags) ? component.tags : [];
+    for (const tag of new Set(tags)) {
+      if (typeof tag === 'string' && tag) increment(counts, tag);
+    }
+  }
+  return Object.fromEntries(counts);
 }
 
 /** Build the usage maps and roll-up totals for all three vocabularies. */

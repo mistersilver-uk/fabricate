@@ -56,13 +56,16 @@ import {
 } from './manager/deleteCascades.js';
 import {
   addItemFromUuid,
+  addItemsFromPack,
   addRecipeItemFromUuid,
+  flushImportRegistrations,
   itemSourcesCollaborators,
   migrateLegacyRecipeItems,
   refreshComponentMetadataForUpdatedItem,
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import { sourceSnapshotCollaborators } from './manager/sourceSnapshotCollaborators.js';
 import { deleteTool, toolSourcesCollaborators, upsertTool } from './manager/toolSources.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
@@ -126,6 +129,7 @@ import {
 } from './normalize/tools.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
+import { assertSalvageAmounts } from './rolledAmountResolver.js';
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -273,6 +277,11 @@ export class CraftingSystemManager {
     return _resolveStoreSeam(this._characterLibrariesStore);
   }
 
+  /** The world component scope store behind its seam, or `null` when none is readable. */
+  _resolveComponentScopeStore() {
+    return _resolveStoreSeam(this._componentScopeStore);
+  }
+
   /** The Valid Id Basis for one system's reference pruning, `null` for each set not known to be
    * complete (`DOMAIN.md` Valid Id Basis). It unions the world library with the legacy copy, the
    * live corpus before the 1.28.0 migration, and is never a `migrationVersion` check. */
@@ -296,7 +305,8 @@ export class CraftingSystemManager {
 
   /** The Valid Id Basis for one system's world-scope pruning (issue 1359) plus the icon-map
    * vocabularies, `null` for each basis not known complete. No caller may default one to
-   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it. */
+   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it.
+   * `createItem` and `updateItem` bypass `_normalizeSystem` and read the same basis here. */
   _scopeBasis(system) {
     return {
       componentIds: _scopeEntityBasis(
@@ -573,16 +583,7 @@ export class CraftingSystemManager {
   /** The snapshot cluster's collaborators (issue 1699), rebuilt per call because suites patch
    * these methods on constructed instances. */
   _sourceSnapshotCollaborators() {
-    return {
-      enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
-      resolveImportedComponentSourceData: (itemUuid, source) =>
-        this._resolveImportedComponentSourceData(itemUuid, source),
-      plainTextDescription: (value) => this._plainTextDescription(value),
-      descriptionTextCandidate: (value, seen) => this._descriptionTextCandidate(value, seen),
-      normalizeComponentDescription: (description) =>
-        this._normalizeComponentDescription(description),
-      extractSourceDescription: (source) => this._extractSourceDescription(source),
-    };
+    return sourceSnapshotCollaborators(this);
   }
 
   async _extractSourceDescription(source = null) {
@@ -1320,8 +1321,6 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    // The Valid Id Basis `_normalizeSystem` uses (issue 1359); this site bypasses it, and a
-    // real-but-empty Set on an unreplicated client cannot be refused downstream. `Set|null`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
@@ -1499,50 +1498,15 @@ export class CraftingSystemManager {
     return replaceItemSource(itemSourcesCollaborators(this), systemId, itemId, itemUuid);
   }
 
-  /** Bulk-import all Item documents from a Foundry compendium pack into a crafting system,
-   * delegating to {@link addItemFromUuid}.
-   * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
-   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
   async addItemsFromPack(systemId, packId) {
-    this._assertGM('bulk import from compendium');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    return addItemsFromPack(itemSourcesCollaborators(this), systemId, packId);
+  }
 
-    const pack = game.packs.get(packId);
-    if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
-
-    const documents = await pack.getDocuments();
-    const items = documents.filter((d) => d.documentName === 'Item');
-
-    // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
-    // intra-pack references are the common case, so per-item priming mostly hits the cache.
-    let added = 0;
-    let updated = 0;
-    let skipped = 0;
-    const sourceFallbacks = [];
-    // Items mutate memory only (`persist: false`) and the batch is flushed by one `save()` below
-    // (issue 1086); `dirty` keeps an all-skipped re-drop from writing.
-    let dirty = false;
-    try {
-      for (const item of items) {
-        const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
-        const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
-        if (result.action === 'added') {
-          added++;
-          dirty = true;
-        } else if (result.action === 'updated') {
-          updated++;
-          dirty = true;
-        } else skipped++;
-        if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
-      }
-    } finally {
-      // In `finally`, so items imported before a throw still persist; named, because every item
-      // went into this one system (issue 1078).
-      if (dirty) await this.save({ put: system, domains: COMPONENT_FACTS });
-    }
-
-    return { added, updated, skipped, total: items.length, sourceFallbacks };
+  /** Write the world-component registrations a batch owner collected through `addItemFromUuid`'s
+   * `registrations` option, in one `fabricate.componentScope` save, after its own save resolved.
+   * @returns {Promise<{registered: number, error: Error|null}>} */
+  async flushWorldComponentRegistrations(registrations) {
+    return flushImportRegistrations(itemSourcesCollaborators(this), registrations);
   }
 
   async refreshComponentMetadataForUpdatedItem(item, changes = {}) {
@@ -1555,12 +1519,12 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.components.findIndex((i) => i.id === itemId); // ratchet-exempt(world-scope): writer
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId }, // ratchet-exempt(world-scope): writer
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
+    if (updates.salvage) assertSalvageAmounts(updatedItem.salvage, system);
     // ratchet-exempt(world-scope): writer
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);

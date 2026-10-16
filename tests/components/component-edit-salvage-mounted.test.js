@@ -7,6 +7,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 
 function flushRender() {
@@ -20,10 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-edit-salvage-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
-  // SPREAD rather than passed by name (issue 1040). `mounted-harness-primitive-allowlist`
-  // resolves a shared list only through a `compiledModules: [ … ]` region, so the bare
-  // identifier made this harness read as compiling NOTHING and every primitive it needs
-  // passed vacuously.
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -107,7 +105,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     // for a validation-disabled switch. Named `toggleTitle` because `title` is already
     // the card heading — a collision the retrofit would otherwise hit.
     const target = await mountCard({ toggleTitle: 'Resolve the issues on the Validation tab.', disabled: true });
-    const button = target.querySelector('button.manager-status-toggle');
+    const button = target.querySelector('button.fabricate-toggle');
     assert.equal(button.getAttribute('title'), 'Resolve the issues on the Validation tab.');
     assert.equal(button.disabled, true);
     assert.equal(
@@ -120,13 +118,13 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('an empty toggleTitle emits NO title attribute', async () => {
     const target = await mountCard();
-    assert.equal(target.querySelector('button.manager-status-toggle').hasAttribute('title'), false);
+    assert.equal(target.querySelector('button.fabricate-toggle').hasAttribute('title'), false);
     cardHarness.remount();
   });
 
-  it('subAttr emits the sub-line hook the Locked card needs', async () => {
+  it('subDataAttr emits the sub-line hook the Locked card needs', async () => {
     // Mirrors `data-recipe-locked-state` on the Overview Locked card.
-    const target = await mountCard({ subAttr: 'data-recipe-locked-state' });
+    const target = await mountCard({ subDataAttr: 'data-recipe-locked-state' });
     assert.ok(
       target.querySelector('.manager-recipe-status-sub[data-recipe-locked-state]'),
       'the hook lands on the sub-line'
@@ -134,7 +132,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     cardHarness.remount();
   });
 
-  it('an unset subAttr adds no stray attribute', async () => {
+  it('an unset subDataAttr adds no stray attribute', async () => {
     const target = await mountCard();
     const sub = target.querySelector('.manager-recipe-status-sub');
     assert.deepEqual(
@@ -184,7 +182,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
   it('the switch it COMPOSES keeps its own root and takes none of this family`s', async () => {
     // The card owns the glyph, the copy and the state class; `StatusToggle` owns the track.
     const target = await mountCard();
-    const button = target.querySelector('button.manager-status-toggle');
+    const button = target.querySelector('button.fabricate-toggle');
     assert.ok(Boolean(button), 'the composed switch must render');
     assert.ok(
       button.classList.contains('fabricate-toggle'),
@@ -205,10 +203,10 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('the switch carries aria-pressed and no role=switch', async () => {
     const on = await mountCard({ on: true });
-    assert.equal(on.querySelector('button.manager-status-toggle').getAttribute('aria-pressed'), 'true');
+    assert.equal(on.querySelector('button.fabricate-toggle').getAttribute('aria-pressed'), 'true');
     cardHarness.remount();
     const off = await mountCard({ on: false });
-    const button = off.querySelector('button.manager-status-toggle');
+    const button = off.querySelector('button.fabricate-toggle');
     assert.equal(button.getAttribute('aria-pressed'), 'false');
     assert.equal(button.getAttribute('role'), null, 'the repo uses no role=switch anywhere');
     cardHarness.remount();
@@ -323,7 +321,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.ok(node.querySelector('.manager-recipe-status-icon[aria-hidden="true"]'));
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-title'));
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-sub'));
-    const button = node.querySelector('button.manager-status-toggle');
+    const button = node.querySelector('button.fabricate-toggle');
     assert.ok(button, 'the switch is a plain button');
     assert.equal(button.getAttribute('role'), null, 'aria-pressed is the house pattern, not role=switch');
     assert.ok(
@@ -391,6 +389,11 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       assert.equal(control.getAttribute('type'), 'button', control.getAttribute('aria-label'));
       assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     }
+    assert.match(
+      row.querySelector('[data-remove-salvage-result]').getAttribute('aria-label'),
+      /SortableList\.Remove.*Scrap Metal/,
+      'the stage remove names its component, as the list names every remove'
+    );
     harness.remount();
   });
 
@@ -452,7 +455,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  // ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ───────────────────────────────────
+  // ── THE READ-ONLY COMPLICATION LIST (issues 1286, 2445) ─────────────────────────────
 
   const COMPLICATION = Object.freeze({
     id: 'cx-1',
@@ -508,32 +511,35 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     });
   }
 
-  const strips = (target) => [...target.querySelectorAll('[data-salvage-stage-complications]')];
+  const strips = (target) => [...target.querySelectorAll('[data-stage-complications]')];
 
-  it('1286: a stage whose yield authors salvage complications grows a strip; one that does not, does not', async () => {
+  it('RED 1286: a stage whose yield authors salvage complications nests a list in its body; one that does not, does not', async () => {
     const target = await harness.mount(complicatedProps());
     const list = target.querySelector('.fabricate-sortable-list');
     const found = strips(target);
-    assert.equal(found.length, 1, 'only the yield that authors one gets a strip');
+    assert.equal(found.length, 1, 'only the yield that authors one gets a list');
     assert.equal(
-      found[0].getAttribute('data-salvage-stage-complications'),
+      found[0].getAttribute('data-stage-complications'),
       'cmp-scrap',
       'and it is bound to the component that owns the complications'
     );
 
-    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, and the shared list is
-    // what draws that shape as of issue 1512 — the band is the row's BODY, the line's own sibling.
+    // The list is NESTED: a `SortableList` of its own in the stage row's BODY, so the outer list
+    // still counts only stages and its footer.
     const row = target.querySelector('[data-salvage-result="res-1"]');
-    // `assert.ok` on the identity, never `assert.equal(node, node)`.
-    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
     assert.ok(
-      [...list.children].every(
-        (child) => child.matches('.manager-salvage-stage-row') || child.matches('.manager-salvage-stage-add')
+      found[0].matches('ul.fabricate-sortable-list'),
+      'the complications are a list of the shared list’s own rows'
+    );
+    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the list is in the row');
+    assert.ok(
+      [...list.querySelectorAll(':scope > li')].every(
+        (child) =>
+          child.matches('.manager-salvage-stage-row') || child.matches('.manager-salvage-stage-add')
       ),
-      'and the list holds nothing but stage rows and its own footer, so no band is a stage itself'
+      'and the outer list holds nothing but stage rows and its own footer'
     );
     const line = row.querySelector('.fabricate-sortable-list-line');
-    assert.ok(Boolean(line), 'the row wraps its own controls in the list`s line');
     assert.ok(
       line.querySelector('[data-salvage-result-edit]') &&
         line.querySelector('[data-salvage-result-difficulty]'),
@@ -541,10 +547,35 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     assert.ok(
       found[0].closest('.fabricate-sortable-list-body').parentElement === row,
-      "and the band sits in the row's own BODY, beside that line rather than inside it"
+      "and the list sits in the row's own BODY, beside that line rather than inside it"
     );
-    // Not a stage: it annotates the one above it.
-    assert.equal(found[0].getAttribute('role'), 'presentation');
+    // A list of its own, announced as one — not a presentational annotation.
+    assert.equal(found[0].getAttribute('role'), 'list');
+    harness.remount();
+  });
+
+  it('RED 1286: the list draws the library row — kicker, display name, severity chip, no tile', async () => {
+    const target = await harness.mount(complicatedProps());
+    const list = strips(target)[0];
+    assert.ok(Boolean(list), 'the list renders');
+    assert.ok(!list.querySelector('.fab-complication-severity'), 'no square severity tile');
+    const row = list.querySelector('[data-stage-complication="cx-1"]');
+    assert.ok(Boolean(row), 'the row renders');
+    assert.deepEqual(
+      [...row.querySelectorAll('.manager-chip')].map((chip) => chip.textContent.trim()),
+      ['Severe'],
+      'severity is the chip alone'
+    );
+    assert.ok(row.querySelector('.fab-complication-row-name').classList.contains('is-display'));
+    const kicker = list.parentElement.querySelector('.fab-kicker');
+    assert.ok(Boolean(kicker), 'the kicker renders');
+    assert.equal(kicker.textContent.trim(), 'Complications');
+    assert.ok(
+      Boolean(
+        kicker.compareDocumentPosition(list) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the kicker comes before the list'
+    );
     harness.remount();
   });
 
@@ -554,7 +585,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const plain = target.querySelector('[data-salvage-result="res-2"]');
     assert.ok(plain, 'the yield that authors no complication still renders its stage');
     assert.equal(
-      plain.querySelectorAll('[data-salvage-stage-complications]').length,
+      plain.querySelectorAll('[data-stage-complications]').length,
       0,
       'and draws no band at all'
     );
@@ -570,43 +601,38 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  it('1286: the strip shows only the complications enabled for SALVAGE', async () => {
+  // GUARD: red when the salvage activity filter is dropped.
+  it('GUARD 1286: the list shows only the complications enabled for SALVAGE', async () => {
     const target = await harness.mount(complicatedProps());
-    const rows = [...strips(target)[0].querySelectorAll('[data-salvage-stage-complication]')];
+    const rows = [...strips(target)[0].querySelectorAll('[data-stage-complication]')];
     assert.deepEqual(
-      rows.map((row) => row.getAttribute('data-salvage-stage-complication')),
+      rows.map((row) => row.getAttribute('data-stage-complication')),
       ['cx-1'],
       'a complication authored for crafting alone says nothing about a salvage stage, and ' +
         'listing it would tell the GM this yield carries a consequence it does not'
     );
-    assert.match(
-      rows[0].textContent,
-      /The spring lets go/,
-      'the row names the complication'
-    );
+    assert.match(rows[0].textContent, /The spring lets go/, 'the row names the complication');
     // The GM body is the generated TRIGGER SENTENCE.
-    assert.match(
-      rows[0].textContent,
-      /When the award is missed/,
-      'and states when it fires'
-    );
+    assert.match(rows[0].textContent, /When the award is missed/, 'and states when it fires');
     assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
     harness.remount();
   });
 
-  it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
-    // The trap this pins: feeding the strip `forecastComplications`.
+  // GUARD: red when the list is fed the player forecast projection.
+  it('GUARD 1286: the list is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
+    // The trap this pins: feeding the list `forecastComplications`.
     const target = await harness.mount(complicatedProps());
-    const row = strips(target)[0].querySelector('[data-salvage-stage-complication="cx-1"]');
-    assert.ok(row, 'the gmOnly complication renders on the GM strip');
+    const row = strips(target)[0].querySelector('[data-stage-complication="cx-1"]');
+    assert.ok(row, 'the gmOnly complication renders on the GM list');
     assert.ok(
-      !row.querySelector('.manager-chip'),
+      [...row.querySelectorAll('.manager-chip')].every((chip) => !/Player/.test(chip.textContent)),
       'and carries no Player pill, because it is not shown to the player'
     );
     harness.remount();
   });
 
-  it('1286: a complication the player is told about carries the Player pill', async () => {
+  // GUARD: red when the Player chip stops rendering for a visible complication.
+  it('GUARD 1286: a complication the player is told about carries the Player pill', async () => {
     const target = await harness.mount(
       complicatedProps({
         componentOptions: [
@@ -618,12 +644,12 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         ],
       })
     );
-    const row = strips(target)[0].querySelector('[data-salvage-stage-complication="cx-1"]');
+    const row = strips(target)[0].querySelector('[data-stage-complication="cx-1"]');
     assert.match(row.textContent, /Player/, 'the pill states the disclosure on a GM screen');
     harness.remount();
   });
 
-  it('1286: the strip is READ-ONLY and deep-links to the component that owns it', async () => {
+  it('RED 1286: the list holds no control — the stage row’s Edit opens the component that owns it', async () => {
     const opened = [];
     const target = await harness.mount(
       complicatedProps({
@@ -632,34 +658,29 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         },
       })
     );
-    const strip = strips(target)[0];
+    const list = strips(target)[0];
+    assert.ok(Boolean(list), 'the list renders');
     assert.ok(
-      !strip.querySelector('input, select, textarea'),
+      !list.querySelector('button, input, select, textarea'),
       'nothing here edits the referenced component — that would be a cross-aggregate write ' +
         'from an editor whose Save button belongs to a different component'
     );
-    const edit = strip.querySelector('[data-salvage-stage-complications-edit]');
-    assert.ok(edit, 'the deep-link is the only route to changing any of this');
-    // Distinguishable from the ROW's own Edit link.
-    assert.match(edit.getAttribute('aria-label'), /complications/i);
-    assert.match(edit.getAttribute('aria-label'), /Scrap Metal/);
+    assert.ok(!target.querySelector('[data-salvage-stage-complications-edit]'), 'no second link');
+    const edit = target
+      .querySelector('[data-salvage-result="res-1"]')
+      .querySelector('[data-salvage-result-edit]');
+    assert.match(edit.getAttribute('title'), /complications/i, 'the row Edit names complications');
     edit.click();
     assert.deepEqual(opened, ['cmp-scrap']);
     harness.remount();
   });
 
-  it('1286: the strip COUNTS and names its owning component, and is progressive-only', async () => {
+  it('RED 1286: the list is NAMED for its count and owning component, and is progressive-only', async () => {
     const target = await harness.mount(complicatedProps());
-    // The COUNT leads, on the prototype's own rule
-    // (`list.length + ' complication' + s + ' on ' + component.name`). On a band the GM has
-    // not opened, the number is the half of that sentence worth reading — the component is
-    // already named by the row above and by this band's own Edit control — and a title that
-    // dropped it made every band look alike however much was hiding in it.
-    assert.match(
-      strips(target)[0].textContent,
-      /1 complication on Scrap Metal/,
-      'the band states how much it is hiding, and whose it is'
-    );
+    // The count-and-owner sentence is the nested list's accessible name, not a drawn eyebrow.
+    const list = strips(target)[0];
+    assert.equal(list.getAttribute('aria-label'), '1 complication on Scrap Metal');
+    assert.doesNotMatch(list.parentElement.textContent, /complication on/, 'and is not drawn');
     harness.remount();
 
     for (const mode of ['simple', 'routed']) {
@@ -667,18 +688,20 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       assert.equal(
         strips(other).length,
         0,
-        `no strip in ${mode} salvage — a complication has no stage to fire from there`
+        `no list in ${mode} salvage — a complication has no stage to fire from there`
       );
       harness.remount();
     }
   });
 
-  it('1286: the strip disables its deep-link while the editor is saving', async () => {
+  it('RED 1286: while saving the list still holds no control, and the row Edit is held', async () => {
     const target = await harness.mount(complicatedProps({ saving: true }));
+    assert.ok(!strips(target)[0].querySelector('button'), 'nothing in the list to hold');
     assert.equal(
-      strips(target)[0].querySelector('[data-salvage-stage-complications-edit]').disabled,
+      target.querySelector('[data-salvage-result="res-1"]').querySelector('[data-salvage-result-edit]')
+        .disabled,
       true,
-      "navigating away mid-save is the same hazard the row's own Edit link guards against"
+      "navigating away mid-save is the hazard the row's own Edit link guards against"
     );
     harness.remount();
   });
@@ -695,40 +718,34 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  it('a yield row picks its component through the searchable popover, showing image AND name', async () => {
-    // The native <select> could show a component's name but never its art.
-    const target = await harness.mount(props());
-    const field = target.querySelector('[data-salvage-result-component]');
-    assert.ok(field, 'the row still exposes its component field');
-    // WHICH APP-DRAWN PICKER, rather than "not a native select" (issue 1510). This editor renders
-    // no native select at all now, so the old `!querySelector('select')` was satisfied by any tree
-    // at all. The two pickers are told apart by what their trigger announces — the searchable
-    // popover a `dialog`, the shared one-of-N `Select` a `listbox` — and only the first can draw a
-    // component's art, which is the whole reason this field is the one it is.
-    assert.ok(
-      !field.querySelector('.fabricate-select-trigger'),
-      'the field is not the shared one-of-N picker, which shows a label and no image'
-    );
-    const trigger = field.querySelector('button.manager-salvage-component-trigger');
-    assert.ok(trigger, 'the field is a popover trigger');
-    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
-    assert.ok(trigger.querySelector('img'), 'the trigger carries the component image');
-    assert.match(trigger.textContent, /Scrap Metal/, 'the trigger carries the component name');
-    harness.remount();
+  it('a yield row names its component through the requirement row, showing image AND name', async () => {
+    // The native <select> could show a component's name but never its art (issue 676). Both
+    // salvage rows are the requirement row now (issue 1516), whose named pill carries both.
+    for (const mode of ['progressive', 'simple']) {
+      const target = await harness.mount(props({ salvageResolutionMode: mode }));
+      const field = target.querySelector('[data-salvage-result-component]');
+      assert.ok(field, `the ${mode} row still exposes its component field`);
+      assert.ok(
+        field.matches('[data-recipe-option] .manager-recipe-option-name-field'),
+        'and it is the requirement row`s name field'
+      );
+      const pill = field.querySelector('[data-recipe-option-chosen]');
+      assert.ok(pill?.querySelector('img'), 'the pill carries the component image');
+      assert.match(pill.textContent, /Scrap Metal/, 'the pill carries the component name');
+      harness.remount();
+    }
   });
 
   it('a yield component with no art falls back to a glyph, never a broken <img>', async () => {
-    // A raw <img src=""> renders a broken-image box. SearchablePopover only emits the
-    // <img> when `triggerImg` is truthy, so the fallback has to be an ICON — the option
-    // list is built with `icon` set for exactly the art-less components.
+    // A raw <img src=""> renders a broken-image box, so the row draws the catalogue's glyph.
     const target = await harness.mount(
       props({
         componentOptions: COMPONENT_OPTIONS.map((option) => ({ ...option, img: '' }))
       })
     );
-    const trigger = target.querySelector('button.manager-salvage-component-trigger');
-    assert.equal(trigger.querySelector('img'), null, 'no <img> is emitted without a src');
-    assert.ok(trigger.querySelector('i.fa-cube'), 'the art-less component reads as a glyph');
+    const pill = target.querySelector(':scope [data-salvage-result-component] [data-recipe-option-chosen]');
+    assert.ok(!pill.querySelector('img'), 'no <img> is emitted without a src');
+    assert.ok(pill.querySelector('i.fa-cube'), 'the art-less component reads as a glyph');
     harness.remount();
   });
 
@@ -751,7 +768,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const hint = target.querySelector('[data-salvage-simple-hint]');
     assert.ok(hint, 'the required visible hint is present (not a tooltip)');
-    assert.match(hint.textContent, /single result group/i);
+    assert.match(hint.textContent, /single result set/i);
     harness.remount();
   });
 
@@ -786,7 +803,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         : 'data-add-salvage-result';
       assert.ok(
         add.classList.contains('fab-manager-button'),
-        `${named} renders through the ManagerButton primitive, got ${add.className}`
+        `${named} renders through the Button primitive, got ${add.className}`
       );
       assert.ok(
         add.classList.contains('is-dashed'),
@@ -845,6 +862,21 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const groups = target.querySelectorAll('[data-salvage-group]');
     assert.equal(groups.length, 2, 'both the success and the reserved failure rows render (data not blanked)');
+    harness.remount();
+  });
+
+  it('the Validation tab’s hero states the worst status the rules reach', async () => {
+    // Salvage on with no stage blocks, so the hero must say so rather than a resting pass.
+    const target = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: [] } } })
+    );
+    target.querySelector('[data-component-edit-tab="validation"]').click();
+    await flushRender();
+    const hero = target.querySelector(
+      ':scope [data-component-edit-validation] [data-editor-validation-summary]'
+    );
+    assert.equal(hero.dataset.editorValidationSummary, 'block');
+    assert.match(hero.textContent, /These rules have gaps/);
     harness.remount();
   });
 });

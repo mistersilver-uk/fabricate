@@ -177,13 +177,13 @@ describe('createPlayerResultOrder', () => {
 
   // The reorder gesture
 
-  it('reorder moves the row optimistically, announces it, and stores IDS', () => {
+  it('reorder moves the row optimistically and stores IDS, leaving the announcement to the list', () => {
     const { order, writes } = setup();
-    order.reorder(2, 0, 'Master moved to position 1 of 3');
+    order.reorder(2, 0);
     flushSync();
 
     assert.deepEqual(ids(order.orderedStages), ['s3', 's1', 's2'], 'before any write resolves');
-    assert.equal(order.announcement, 'Master moved to position 1 of 3');
+    assert.equal(order.announcement, '', 'the list announces its own moves');
     assert.deepEqual(order.orders['recipe:a'], ['s3', 's1', 's2']);
     assert.equal(writes.length, 0, 'and nothing is written yet');
   });
@@ -278,7 +278,7 @@ describe('createPlayerResultOrder', () => {
    */
   it('commits under the key captured when the debounce was ARMED, not the current subject', async () => {
     const { order, writes, source } = setup({ debounceMs: 10_000 });
-    order.reorder(2, 0, 'Master moved to position 1 of 3');
+    order.reorder(2, 0);
     flushSync();
 
     source.swapTo(progressive('b'));
@@ -421,7 +421,7 @@ describe('createPlayerResultOrder', () => {
       rejectWrite: true,
       debounceMs: 10_000,
     });
-    order.reorder(2, 0, 'Master moved to position 1 of 3');
+    order.reorder(2, 0);
     flushSync();
     assert.deepEqual(ids(order.orderedStages), ['s3', 's2', 's1'], 'optimistic: the row moved');
 

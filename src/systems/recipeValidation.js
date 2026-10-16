@@ -219,9 +219,11 @@ export function validateTagPlaceholders(recipe, { system }) {
 /** Validation required to persist a recipe: structural and completeness integrity plus
  * essence, tag-placeholder and resolution-mode checks. Signature uniqueness is excluded — a
  * conflict never blocks persistence, only activation. `deps.roll` reaches `Result.validate` from
- * here, so a rolled amount that can never award anything is refused at the write. */
+ * here, so a rolled amount that can never award anything is refused at the write, except under a
+ * progressive system, whose award drops it. */
 export function validateRecipeForPersistence(recipe, deps, { requireComplete = true } = {}) {
-  const injected = { Roll: deps.roll };
+  const system = deps.system?.(recipe.craftingSystemId);
+  const injected = { Roll: deps.roll, progressive: system?.resolutionMode === 'progressive' };
   const baseValidation = requireComplete
     ? recipe.validate(injected)
     : recipe.validateStructure(injected);

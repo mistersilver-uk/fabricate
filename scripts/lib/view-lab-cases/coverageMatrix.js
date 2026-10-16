@@ -25,7 +25,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -43,7 +43,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -71,7 +71,11 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     // No pattern for `components/ThresholdBandStrip.svelte`: it is a broad signal, so `sourceMatches` never sees it.
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+    // The strip's pure geometry is a util, so it is named here as well (issue 2431).
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
+    ],
   }),
   managerCase({
     id: 'coverage-mode-routed-check-five-bands',
@@ -191,7 +195,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
       // The list collapses (issue 1096), so the tier-step row is not in the document until its trigger is opened.
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       // Anchored on a named trigger's tier-step row: which control is last depends on the mode.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
@@ -218,7 +222,7 @@ export const CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -272,7 +276,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // The bars themselves, not the panel: a panel that abstained would still render.
-    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    expectSelector: '.fabricate-manager [data-banded-bar-track]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
@@ -319,7 +323,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // A bucket that must exist, not merely a bar.
-    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    expectSelector: '.fabricate-manager [data-banded-bar-row="award-0"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
@@ -345,11 +349,19 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
+    // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
+    expectLayout: {
+      controls: [
+        { selector: '[data-simple-band-record]', styles: 'font-size: 11.5px; font-weight: 600' },
+        { selector: '[data-checks-preview-record]', styles: 'font-size: 11.5px; font-weight: 600' },
+      ],
+    },
     kinds: ['manager', 'checks'],
     // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
+      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
     ],
   }),
   managerCase({
@@ -531,7 +543,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-overview' },
     ],
     expectView: 'recipe-edit',
@@ -589,7 +601,7 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
-    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 84px column.
+    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 72px column.
     expectNoHorizontalOverflow: [
       '.fabricate-app-content',
       '.fabricate-app-nav',

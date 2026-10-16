@@ -199,6 +199,14 @@ On the Crafting tab, a group with an essence alternative shows it alongside its 
 Choosing it opens the essence pool beneath the alternatives, where the player picks which items fund it.
 The player can switch back to another alternative at any time.
 
+The essence pool shows one meter for each essence the recipe needs, labelled with how much the selected carriers supply against how much is needed.
+When the selection overshoots, the meter adds a surplus sentence, such as "Earth: 2 more than required".
+Only items that contribute an essence the recipe needs are listed as carriers.
+Each listed carrier has a stepper that stops at the number of units the player owns, shown as "You own N".
+A **Your selection** recap beneath lists every carrier the player has allocated, with a chip for each essence it yields.
+Essences the recipe does not need appear muted in those chips.
+Fractional essence amounts are rounded to 12 significant digits.
+
 A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
 Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.
 
@@ -246,11 +254,23 @@ From there you can:
 
 The colour control is withheld, with a note in its place, whenever one or more of the selected essences already belongs to the world Essence Catalogue.
 Colour is authored once on the world essence, and this system's own copy is not what any screen draws, so the axis is offered only when every selected essence is one the world does not hold.
+To colour world essences in bulk, use the world Essence Catalogue's bulk edit, described below.
 Staging a colour and then adding a world-known essence to the selection clears the staged colour along with the control, so nothing you can no longer see is still applied.
 
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
 
+The world Essence Catalogue has its own bulk edit.
+Tick essences there to open a panel with **Icon** and **Colour** in place of the single-essence inspector.
+Each starts as **Leave unchanged**, and Colour can also be cleared with **No colour**.
+**Apply**, in the dock at the foot of the inspector, writes the staged fields to the world essences one at a time, then clears the selection.
+The colour shows on every manager screen that tints essences, but not on the recipe editor's essence choices or on player screens.
+The icon shows on the world catalogue and entry and on the shared-definition callout and header, but a crafting system's own essence row keeps the icon it has.
+If any essence cannot be updated, a notice names up to three of them and says how many more, and the rest are still applied.
+Names, descriptions, effect sources and macros, enabled state, and adding an essence to a system or removing it stay per essence, and the panel has no bulk delete.
+Delete an essence from its own page.
+
+The **Apply** button sits at the foot of the inspector, and the delete sits directly under it, so both stay in view while you scroll the staged changes.
 **Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.
 An essence in use is never excluded: deleting it removes it from every component that carries it and rewrites every recipe that requires it.
 A component that only inherits the essence from the world Component catalogue is counted in this impact too, so the confirmation states the delete's full reach rather than only the components that author the essence themselves.

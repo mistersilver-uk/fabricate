@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  CHARACTER_MODIFIER_BOUNDS_PATH,
   CHARACTER_MODIFIER_PANEL_PATH,
   CHARACTER_MODIFIER_PANEL_LEAVES,
   CHARACTER_MODIFIER_RAIL_PATH,
@@ -222,9 +221,9 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';
     const rail = markup[CHARACTER_MODIFIER_RAIL_PATH] ?? '';
     const panel = markup[CHARACTER_MODIFIER_PANEL_PATH] ?? '';
-    const rendered = [...panel.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
-      (tag) => tag[0]
-    );
+    const declared = panel.match(/\{#snippet boundsRow\(/g) ?? [];
+    const rendered = panel.match(/\{@render boundsRow\(/g) ?? [];
+    assert.equal(declared.length, 1, 'the shared panel declares the bounds row once');
     assert.equal(rendered.length, 1, 'the shared panel renders the bounds row once, no more');
     const chains = CHARACTER_MODIFIER_PANEL_LEAVES.map((leaf) => {
       const leafSource = markup[leaf.path] ?? '';
@@ -263,11 +262,11 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     // And the component the two of them render really is the one the table entry resolves in,
     // so this cannot pass against some other file with the same tag name.
     assert.ok(
-      Object.hasOwn(markup, CHARACTER_MODIFIER_BOUNDS_PATH),
-      'the shared bounds row is a tracked component in the scanned corpus'
+      Object.hasOwn(markup, CHARACTER_MODIFIER_PANEL_PATH),
+      'the panel holding the bounds row is a tracked component in the scanned corpus'
     );
     assert.equal(
-      stepperTags(markup[CHARACTER_MODIFIER_BOUNDS_PATH]).length,
+      stepperTags(markup[CHARACTER_MODIFIER_PANEL_PATH]).length,
       1,
       'and it holds exactly one Stepper, which is what makes one table entry cover four fields'
     );

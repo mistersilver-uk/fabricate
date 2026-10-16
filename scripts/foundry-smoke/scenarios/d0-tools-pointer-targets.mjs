@@ -171,7 +171,7 @@ async function assertToolLibraryPagination(
   const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
   const slot = browser.locator('[data-tool-browser-pagination]');
-  const footer = slot.locator('.manager-pagination');
+  const footer = slot.locator('.fabricate-pagination');
   // The selection invariant is an identity, NOT A row position.
   if (expectedPage === 1 && !selectedToolId) {
     throw new Error('Tool pagination page-1 checks need the Tool ID the walk selected');
@@ -747,7 +747,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
-  const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
+  const enabledInSystem = editor.locator('[data-tool-enabled] .fabricate-toggle');
   await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
   // The per-system display label is a `ToolInheritCard` like every other overridable fact on this
   // tab (issue 1373): blank is the inheriting state, which renders the world name read-only on a
@@ -846,13 +846,24 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   );
   const repairGroups = editor.locator('[data-tool-repair-requirements] [data-recipe-group]');
   const initialRepairGroupCount = await repairGroups.count();
-  const addRepairGroup = editor.locator(
-    '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]'
+  // The set's Ingredient adder opens the kind menu, which writes nothing; its item mutates once.
+  const repairIngredientAdder = editor.locator(
+    '[data-tool-repair-requirements] [data-recipe-add="ingredient"]'
+  );
+  await assertPointerTarget(
+    page,
+    repairIngredientAdder,
+    '[data-recipe-add="ingredient"]',
+    'Tool repair Ingredient adder'
+  );
+  await repairIngredientAdder.click();
+  const addRepairGroup = page.locator(
+    '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
   );
   await assertPointerTarget(
     page,
     addRepairGroup,
-    '[data-recipe-add="tag-requirement"]',
+    '[data-recipe-add="ingredient-tag"]',
     'Tool repair AND control'
   );
   await withSingleToolStoreMutation(
@@ -886,8 +897,17 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   );
   const firstRepairGroup = repairGroups.first();
   const initialRepairOptionCount = await firstRepairGroup.locator('[data-recipe-option]').count();
-  const addRepairAlternative = firstRepairGroup.locator(
-    '[data-recipe-add="alternative-component"]'
+  // The box's Alternative adder opens the kind menu, which writes nothing; its item mutates once.
+  const repairAlternativeAdder = firstRepairGroup.locator('[data-recipe-add="alternative"]');
+  await assertPointerTarget(
+    page,
+    repairAlternativeAdder,
+    '[data-recipe-add="alternative"]',
+    'Tool repair Alternative adder'
+  );
+  await repairAlternativeAdder.click();
+  const addRepairAlternative = page.locator(
+    '.manager-recipe-or-menu [data-recipe-add="alternative-component"]'
   );
   await assertPointerTarget(
     page,
@@ -937,7 +957,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   await scrollToolEditorPanelToReveal(
     page,
     editor,
-    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative-component"]',
+    '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative"]',
     'Populated repair'
   );
   await captureToolStudioProduct(ctx, 'manager-tool-stress-repair', wideGeometry);
@@ -1387,7 +1407,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   if (!(await checksSave.isEnabled())) {
     throw new Error('Authoring a tier-step trigger left the Checks draft undirtied');
   }
-  await triggerCard.locator('[data-trigger] [data-remove-trigger]').first().click();
+  await triggerCard.locator('[data-trigger] [data-rule-row-remove]').first().click();
   await triggerCard.locator('[data-triggers-empty]').waitFor({ state: 'visible', timeout: 5000 });
   if (await checksSave.isEnabled())
     throw new Error('Tier-step trigger round trip left the Checks draft dirty');

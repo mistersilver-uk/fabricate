@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -16,7 +17,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const selectPath = resolve(repoRoot, 'src/ui/svelte/components/Select.svelte');
 const selectSource = readFileSync(selectPath, 'utf8');
 // The `.fabricate-select*` family lives in the GLOBAL SHEET (issue 1504).
-const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheetSource = readStylesheet();
 
 /** THE SENTINEL THIS SUITE AND EVERY DRIVER STEP USE, stated independently of the component. */
 const UNCHANGED_OPTION_ID = '__unchanged__';
@@ -345,10 +346,10 @@ describe('1504 Select — the select every screen renders', () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies to every recipe here.' });
 
       // THE HOST IS A `<div>` SINCE ISSUE 1510.
-      const field = harness.target.querySelector('div.manager-field');
+      const field = harness.target.querySelector('div.fabricate-field');
       assert.ok(Boolean(field), 'the labelled form is the shared Field column, on a <div> host');
       assert.ok(
-        !harness.target.querySelector('label.manager-field'),
+        !harness.target.querySelector('label.fabricate-field'),
         'and NOT on a <label> host: a label would forward a caption click into the trigger, ' +
           'which cannot close a list dismissed on mousedown'
       );
@@ -505,7 +506,7 @@ describe('1504 Select — the select every screen renders', () => {
 
     it('an error replaces the hint rather than stacking under it', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies here.', error: 'Pick a mode.' });
-      const field = harness.target.querySelector('div.manager-field');
+      const field = harness.target.querySelector('div.fabricate-field');
       assert.equal(
         field.querySelector('.fabricate-select-error').textContent.trim(),
         'Pick a mode.'
@@ -1022,9 +1023,9 @@ describe('1504 Select — the select every screen renders', () => {
       }
     });
 
-    it('forwards triggerData, id, name, invalid and mono onto the control itself', async () => {
+    it('forwards triggerProps, id, name, invalid and mono onto the control itself', async () => {
       await mountSelect({
-        triggerData: { 'data-pagination-size': '' },
+        triggerProps: { 'data-pagination-size': '' },
         id: 'page-size',
         name: 'pageSize',
         invalid: true,
@@ -1063,23 +1064,23 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
-    it('forwards triggerTitle onto the trigger, and drops a title placed in triggerData', async () => {
-      // THE PROP EXISTS BECAUSE `triggerData` CANNOT CARRY A TITLE.
+    it('forwards triggerTitle onto the trigger, and drops a title placed in triggerProps', async () => {
+      // THE PROP EXISTS BECAUSE `triggerProps` CANNOT CARRY A TITLE.
       await mountSelect({
         triggerTitle: 'System actions',
-        triggerData: { title: 'ignored' },
+        triggerProps: { title: 'ignored' },
       });
       assert.equal(
         trigger().getAttribute('title'),
         'System actions',
-        'the prop is the route, and it beats a title placed in triggerData'
+        'the prop is the route, and it beats a title placed in triggerProps'
       );
       harness.remount();
 
-      await mountSelect({ triggerData: { title: 'ignored' } });
+      await mountSelect({ triggerProps: { title: 'ignored' } });
       assert.ok(
         !trigger().getAttribute('title'),
-        'and a title in triggerData alone reaches the trigger not at all — which is why the ' +
+        'and a title in triggerProps alone reaches the trigger not at all — which is why the ' +
           'prop had to exist, rather than being a convenience beside a working route'
       );
       harness.remount();

@@ -13,7 +13,10 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PILL_SELECT_PATH = 'src/ui/svelte/components/ModifierPillSelect.svelte';
@@ -23,6 +26,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-modifier-pill-select-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // `SearchablePopover` portals its panel to the manager host and lays it out against
@@ -41,7 +45,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
     // the shared picker now, so this tree reaches all three; an omission does not fail this
     // suite, it cancels every test in it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Chip.svelte',
@@ -92,7 +96,7 @@ async function mountPills(selectedIds, props = {}) {
   const root = await harness.mount({
     options: OPTIONS,
     selectedIds,
-    testId: 'pill',
+    'data-modifier-pill-select': 'pill',
     noneSelectedLabel: NONE_LABEL,
     onToggle: (id, next) =>
       toggles.push({ id, next, focused: focusDescriptor(globalThis.document.activeElement) }),

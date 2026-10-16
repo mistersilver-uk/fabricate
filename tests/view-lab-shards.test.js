@@ -17,7 +17,9 @@ import {
 import { publishableCases } from '../scripts/lib/viewLabCases.js';
 
 const plain = (count, prefix = 'case') =>
-  Array.from({ length: count }, (_, index) => ({ id: `${prefix}-${String(index).padStart(3, '0')}` }));
+  Array.from({ length: count }, (_, index) => ({
+    id: `${prefix}-${String(index).padStart(3, '0')}`,
+  }));
 
 test('a small selection renders on one runner, and an empty one on none', () => {
   assert.equal(shardCountFor(0), 0);
@@ -44,7 +46,10 @@ test('every case lands in exactly one slice, slices are balanced, and each keeps
   const order = new Map(cases.map(({ id }, index) => [id, index]));
   for (const slice of slices) {
     const positions = slice.map((id) => order.get(id));
-    assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+    assert.deepEqual(
+      positions,
+      [...positions].sort((left, right) => left - right)
+    );
   }
 });
 
@@ -75,7 +80,10 @@ test('every member of a distinct-evidence group renders on the same runner', () 
   const order = new Map(cases.map(({ id }, index) => [id, index]));
   for (const slice of slices) {
     const positions = slice.map((id) => order.get(id));
-    assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+    assert.deepEqual(
+      positions,
+      [...positions].sort((left, right) => left - right)
+    );
   }
 });
 
@@ -83,7 +91,10 @@ test("the real registry's groups stay together when the whole corpus is sharded"
   const cases = publishableCases();
   const slices = sliceSelection(cases, shardCountFor(cases.length));
   const groups = new Set(cases.map((viewCase) => viewCase.distinctEvidenceGroup).filter(Boolean));
-  assert.ok(groups.size > 0, 'the registry declares no distinct-evidence group, so this proves nothing');
+  assert.ok(
+    groups.size > 0,
+    'the registry declares no distinct-evidence group, so this proves nothing'
+  );
   for (const group of groups) {
     const members = cases.filter((viewCase) => viewCase.distinctEvidenceGroup === group);
     const holding = slices.filter((slice) => members.some(({ id }) => slice.includes(id)));
@@ -122,7 +133,10 @@ test('a merge refuses shards that lose, repeat or invent a case, or disagree abo
     () => mergeShardManifests(ids, [manifest(['a', 'b']), manifest(['b', 'c'])]),
     /duplicated \[b\]/
   );
-  assert.throws(() => mergeShardManifests(ids, [manifest(['a', 'b', 'c', 'd'])]), /unselected \[d\]/);
+  assert.throws(
+    () => mergeShardManifests(ids, [manifest(['a', 'b', 'c', 'd'])]),
+    /unselected \[d\]/
+  );
   assert.throws(
     () => mergeShardManifests(ids, [manifest(['a']), manifest(['b', 'c'], [], 'other')]),
     /disagree about head/
@@ -139,7 +153,56 @@ test('an unrendered selection has no shard, and a rendered one numbers its shard
     matrix.map((entry) => entry.shard),
     Array.from({ length: shardCountFor(cases.length) }, (_, index) => index + 1)
   );
-  assert.deepEqual(matrix.flatMap((entry) => entry.ids.split(',')).sort(), cases.map(({ id }) => id));
+  assert.deepEqual(
+    matrix.flatMap((entry) => entry.ids.split(',')).sort(),
+    cases.map(({ id }) => id)
+  );
+});
+
+test('an unrendered selection has no app shard, and library units add one library leg', () => {
+  const cases = plain(40);
+  const targets = 'unit:3.1,row:marks/0';
+  assert.deepEqual(renderMatrix(cases, false, targets), [
+    { shard: 'library', kind: 'library', targets },
+  ]);
+  const matrix = renderMatrix(cases, true, targets);
+  assert.deepEqual(
+    matrix.map((entry) => entry.kind),
+    ['apps', 'apps', 'library'],
+    'app shards come first, each marked, and the library leg last'
+  );
+  assert.deepEqual(renderMatrix(cases, true, ''), renderMatrix(cases, true));
+});
+
+test('the matrix is never empty when the render job runs, and empty when it does not', () => {
+  // `render.if`: (ids != '' && render == 'true') || library != ''.
+  for (const ids of ['', 'case-000']) {
+    for (const render of [false, true]) {
+      for (const library of ['', 'coverage']) {
+        const cases = ids === '' ? [] : plain(1);
+        const runs = (ids !== '' && render) || library !== '';
+        const matrix = renderMatrix(cases, render, library);
+        assert.equal(matrix.length > 0, runs, JSON.stringify({ ids, render, library }));
+        assert.equal(
+          matrix.some((entry) => entry.kind === 'apps'),
+          ids !== '' && render,
+          `no app shard unless the selection renders: ${JSON.stringify({ ids, render, library })}`
+        );
+      }
+    }
+  }
+});
+
+test('the plan command carries the library targets into the matrix', () => {
+  const run = spawnSync(
+    process.execPath,
+    ['scripts/view-lab-shards.mjs', 'plan', '', 'false', 'coverage'],
+    { encoding: 'utf8' }
+  );
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(JSON.parse(run.stdout), [
+    { shard: 'library', kind: 'library', targets: 'coverage' },
+  ]);
 });
 
 /** Write one shard's frames and manifest into `dir`, as its artifact downloads. */
@@ -167,7 +230,9 @@ function runMerge(t, ids, layout) {
 
 const mergedFrameSet = (outputDir) => ({
   files: readdirSync(outputDir).sort((left, right) => left.localeCompare(right)),
-  frames: JSON.parse(readFileSync(join(outputDir, 'manifest.json'), 'utf8')).frames.map(({ id }) => id),
+  frames: JSON.parse(readFileSync(join(outputDir, 'manifest.json'), 'utf8')).frames.map(
+    ({ id }) => id
+  ),
 });
 
 test('the merge reads one folder per shard when several artifacts download', (t) => {

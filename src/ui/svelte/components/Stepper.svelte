@@ -18,7 +18,7 @@
   | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
   | `formatValue` / `parseValue` | functions \| `null` | `null` | Both together opt into the FORMATTED mode below; without them the `type="number"` path and its commit-on-input are unchanged. `parseValue(text)` returns a finite number, `null` for the null endpoint, or anything else for invalid text. |
   | `stops` | `number[]` | `[]` | The formatted mode's ordered stepping values. Empty steps by `step` within `min`/`max`. |
-  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop. Without it a `null` value is unset: blank, with the placeholder. |
+  | `nullLabel` | string | `''` | Names the formatted mode's null endpoint (Otherwise), one step below the lowest stop. Without it a `null` value is unset: blank, with the placeholder. At the endpoint the input carries `data-stepper-endpoint`, reads muted at rest and, horizontal and unfilled, widens to the label's character count, so only a mono Latin label fits exactly. |
 
   Callbacks:
   - `onChange(value)` — the clamped number on every accepted edit, and `null` when an `allowUnset`
@@ -172,8 +172,8 @@
   }
 
   function commitDraft(input) {
-    const text = input.value.trim();
-    emitFormatted(text === formattedDisplay ? undefined : parsedDraft(text), input);
+    const typed = input.value.trim();
+    emitFormatted(typed === formattedDisplay ? undefined : parsedDraft(typed), input);
   }
 
   function keyedValue(key) {
@@ -217,6 +217,8 @@
       role="spinbutton"
       class="fab-stepper-input"
       data-stepper-input
+      data-stepper-endpoint={atEndpoint ? '' : undefined}
+      style:--fab-stepper-endpoint-ch={hasEndpoint ? Array.from(nullLabel).length : undefined}
       value={formattedDisplay}
       {disabled}
       aria-label={ariaLabel || undefined}
@@ -306,7 +308,7 @@
   }
 
   .fab-stepper.is-disabled {
-    opacity: 0.55;
+    opacity: 0.45;
   }
 
   .fab-stepper.is-vertical {
@@ -321,15 +323,15 @@
   .fab-stepper.is-vertical .fab-stepper-adjunct {
     width: 100%;
     height: 26px;
-    border-radius: 6px;
-    font-size: 0.7rem;
+    border-radius: 7px;
+    font-size: 11px;
   }
 
   .fab-stepper.is-vertical .fab-stepper-input {
     width: 100%;
     height: 30px;
     font-size: 1.05rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
@@ -341,7 +343,7 @@
     display: flex;
     box-sizing: border-box;
     width: 100%;
-    height: var(--fab-stepper-fill-height, 36px);
+    height: var(--fab-stepper-fill-height, 38px);
   }
 
   .fab-stepper.is-fill:not(.is-vertical) .fab-stepper-input {
@@ -370,14 +372,34 @@
     border-radius: 6px;
     color: var(--fab-text-subtle);
     background: transparent;
-    font-size: 0.62rem;
+    font-size: 9px;
     line-height: 1;
     cursor: pointer;
   }
 
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) of a 22px button: a 1px padding the negative margin
+     gives back, so the row keeps its 22px and the 2px gap to the input. The background stays on the
+     content box and takes the 7px corner that leaves it the drawn 6px, and the focus ring sits on
+     the 24px edge, which is where the 22px box's ring sat at an offset of 1px. A positioned
+     `::before` would paint the glyph a sub-pixel off. */
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    margin: -1px;
+    padding: 1px;
+    /* ratchet-exempt(design-system): the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box background still draws 6; retires if the adjunct moves to the ::before form or a hit-area token lands */
+    border-radius: 7px;
+    background-clip: content-box;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible {
+    outline-offset: 0;
+  }
+
   .fab-stepper-adjunct:hover:not(:disabled) {
     color: var(--fab-text);
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .fab-stepper-adjunct:disabled {
@@ -395,10 +417,28 @@
     color: var(--fab-text);
     background: transparent;
     font-family: var(--fab-font-mono);
-    font-size: 0.74rem;
+    font-size: 11.5px;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
     text-align: center;
     appearance: textfield;
+  }
+
+  /* The same 24px target for the typeable input, by a 1px border-box inset the negative margin gives
+     back: the row keeps its 22px, the text stays centred and the focus ring stays where it was. */
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input {
+    box-sizing: border-box;
+    height: 24px;
+    margin-block: -1px;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input[data-stepper-endpoint] {
+    /* 4px is the border-box input's two 2px inline paddings, around the label's own width. */
+    width: max(64px, calc(var(--fab-stepper-endpoint-ch) * 1ch + 4px));
+  }
+
+  .fab-stepper-input[data-stepper-endpoint]:not(:focus-visible) {
+    color: var(--fab-text-muted);
   }
 
   .fab-stepper-input::-webkit-outer-spin-button,
@@ -411,6 +451,10 @@
   .fab-stepper-input:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input:focus-visible {
+    outline-offset: 0;
   }
 
   .fab-stepper-adjunct:focus-visible {

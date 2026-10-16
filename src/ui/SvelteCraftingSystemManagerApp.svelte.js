@@ -3,7 +3,7 @@ import CraftingSystemManagerRoot from './svelte/apps/manager/CraftingSystemManag
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { confirmDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
-import { createManagerServices } from './managerServices.js';
+import { COMPONENT_SERVICE_KEYS, createManagerServices } from './managerServices.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import { localize } from './svelte/util/foundryBridge.js';
@@ -12,6 +12,7 @@ import {
   collectPackFolderGroups,
   applyFolderImportDecisions,
   hasRealFolderGroups,
+  warnWorldRegistrationFailure,
 } from './svelte/util/importFolderGroups.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
 import { buildKnowledgeSnapshot, recipeItemCaps } from '../systems/knowledgeSnapshot.js';
@@ -216,6 +217,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           );
         }
         notifySingleSourceFallback(result.sourceFallbacks);
+        warnWorldRegistrationFailure(result, { notify: ui.notifications, localize });
         await this._adminStore.refresh();
         return result.item ?? null;
       } catch (err) {
@@ -230,11 +232,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       playerExtensions,
       services: {
         importSingleManagedItemFromDrop,
-        pickImagePath: this._services.pickImagePath,
-        getSetting: this._services.getSetting,
-        setSetting: this._services.setSetting,
-        getWorldItemOptions: this._services.getWorldItemOptions,
-        resolveToolSource: this._services.resolveToolSource,
+        ...Object.fromEntries(COMPONENT_SERVICE_KEYS.map((key) => [key, this._services[key]])),
         // Folder-aware bulk-import (issue 771): resolve a folder / whole-pack drop into
         // per-folder groups the mapping modal seeds from. Returns null for every drop
         // that should keep today's one-shot behavior (single item, no real folders, an
@@ -292,11 +290,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
           return null;
         },
-        // Commit the mapping modal's per-folder decisions: import each non-skipped
-        // folder's items, then apply that folder's category/tags to the freshly imported
-        // component set via the shared set-apply primitive. The whole run — every folder's
-        // items and every folder's set-apply — costs ONE `craftingSystems` write (issue
-        // 1086), not one per item plus one per folder.
+        // Commit the mapping modal's per-folder decisions: import each non-skipped folder's items,
+        // then apply that folder's category and tags to the imported set through the shared
+        // set-apply primitive. The whole run costs one `craftingSystems` write (issue 1086).
         commitImportFolderMapping: async (systemId, decisions) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           if (!systemId) {
@@ -317,6 +313,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             })
           );
           notifyBulkSourceFallback(summary.sourceFallbacks);
+          warnWorldRegistrationFailure(summary, { notify: ui.notifications, localize });
           await this._adminStore.refresh();
         },
         onDropItem: async (data) => {
@@ -342,6 +339,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               })
             );
             notifyBulkSourceFallback(result.sourceFallbacks);
+            warnWorldRegistrationFailure(result, { notify: ui.notifications, localize });
             await this._adminStore.refresh();
             return;
           }
@@ -373,24 +371,22 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             }
             // One unmapped decision — no category, no tags — is exactly this flat folder
             // import, so it delegates to the shared commit loop rather than carrying a
-            // second copy of it. That is what gives the plain folder drop the single
-            // batched `craftingSystems` write the mapping commit has (issue 1086): this
-            // branch used to save the whole corpus once per imported item.
-            const { added, updated, skipped, sourceFallbacks } = await applyFolderImportDecisions(
-              systemManager,
-              systemId,
-              [{ itemUuids }]
-            );
+            // second copy of it, which gives the plain folder drop the single batched
+            // `craftingSystems` write the mapping commit has (issue 1086).
+            const summary = await applyFolderImportDecisions(systemManager, systemId, [
+              { itemUuids },
+            ]);
             ui.notifications.info(
               localize('FABRICATE.Admin.Items.FolderImportSummary', {
-                added,
-                updated,
-                skipped,
+                added: summary.added,
+                updated: summary.updated,
+                skipped: summary.skipped,
                 total: itemUuids.length,
                 name: folder.name || data.id,
               })
             );
-            notifyBulkSourceFallback(sourceFallbacks);
+            notifyBulkSourceFallback(summary.sourceFallbacks);
+            warnWorldRegistrationFailure(summary, { notify: ui.notifications, localize });
             await this._adminStore.refresh();
             return;
           }

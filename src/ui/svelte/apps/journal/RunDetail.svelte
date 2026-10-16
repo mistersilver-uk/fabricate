@@ -31,13 +31,15 @@
     quantityText,
   } from './runDetailPresentation.js';
   import { reconcileRetainedClaim, retainedClaimPrompt } from './runRecovery.js';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
+  import RunAwardChoice from './RunAwardChoice.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
   import StepDetails from './StepDetails.svelte';
   import TimeRemainingBox from './TimeRemainingBox.svelte';
   import HistoricalRunDetail from './HistoricalRunDetail.svelte';
   import ThisRun from './ThisRun.svelte';
-  import { presentStage } from './historyPresentation.js';
+  import { presentReceiptFacts, presentStage } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
@@ -90,8 +92,6 @@
   // THE BAR READS THE GATE'S DEADLINE, NEVER ELAPSED WALL TIME (issue 1648). `applyResume`
   // re-anchors `availableAt` past every paused second, so `required - remaining` carries any
   // number of pause cycles already and agrees with the remaining-time labels beside it.
-  // `now - initiatedAt` counted the pause as progress and pegged the bar full on a run the
-  // same panel reported as still waiting.
   const elapsed = $derived.by(() => {
     const required = Number(currentGate?.requiredSeconds);
     if (!(Number.isFinite(required) && required > 0)) return status === 'ready' ? 100 : 0;
@@ -134,16 +134,12 @@
     Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
   const availableAt = $derived(Number(summaryGate?.availableAt));
-  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). Before a stage is
-  // started it holds no `timeGate`, so `availableAt` is NaN and this row fell through to
-  // `Summary.None` — the exact string a MATURED wait prints — while the button beside it
-  // offered to start the clock. D-025 governs the FORMAT of a duration shown, not which duration
-  // is shown, so no accepted ruling reaches this branch.
-  //
-  // It reads `run.stageStart`, the projection's STAGE fact. `actions.atStageStart` also requires
-  // that this viewer may act, so keying on it lost the row to a held claim, a non-owner viewer or
-  // a run awaiting recovery (UX2-2). Whether a stage has begun does not depend on a GM being
-  // online.
+  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). An unstarted stage holds
+  // no `timeGate`, so `availableAt` is NaN and this row fell through to `Summary.None`, the string
+  // a MATURED wait prints, beside a button offering to start the clock (D-025 governs a duration's
+  // FORMAT, not which duration is shown). It reads `run.stageStart`, the projection's STAGE fact:
+  // `actions.atStageStart` also requires that this viewer may act, so keying on it lost the row to
+  // a held claim, a non-owner viewer or a run awaiting recovery (UX2-2); it needs no online GM.
   const notStarted = $derived(viewedIsCurrent && run?.stageStart?.required === true);
   const remainingTime = $derived.by(() => {
     const pausedRemaining = viewedIsCurrent
@@ -387,44 +383,40 @@
        floating beside the buttons it talks about. -->
   <section class="journal-detail-state">
     <header class="journal-detail-header">
-      <div class="journal-detail-identity">
-        <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={38} />
-        <div>
-          <h2>{run?.names?.title ?? ''}</h2>
-          <div class="journal-detail-meta">
-            {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
-            {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
-            {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
-            <Chip
+      <PlayerDetailHeader name={run?.names?.title ?? ''} art={run?.img ?? ''} icon="fas fa-hammer">
+        {#snippet meta()}
+          {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
+          {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
+          {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
+        {/snippet}
+        {#snippet chips()}
+          <Chip
+            density="list"
+            tone={statusChipTone(statusView.tone)}
+            icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
+          >
+          {#if attention}<Chip
               density="list"
-              tone={statusChipTone(statusView.tone)}
-              icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
-            >
-            {#if attention}<Chip
-                density="list"
-                tone={statusChipTone(attention.tone)}
-                icon={`fas ${attention.icon}`}
-                data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
-              >{/if}
-            {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
-                >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
-              >{/if}
-          </div>
-        </div>
-      </div>
+              tone={statusChipTone(attention.tone)}
+              icon={`fas ${attention.icon}`}
+              data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+            >{/if}
+          {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
+              >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
+            >{/if}
+        {/snippet}
+      </PlayerDetailHeader>
       {#if showActions}<ActionsPanel {run} {journal} {now} />{/if}
     </header>
 
     {#if stateNotice}
+      <!-- ratchet-exempt(design-system): the spread is `runStateNotice`'s `hooks`, which holds `data-journal-*` names only -->
       <Notice
         tone={stateNotice.tone}
         blocking={stateNotice.blocking}
         title={stateNotice.title}
         detail={stateNotice.detail}
-        dataAttr={stateNotice.dataAttr}
-        dataValue={stateNotice.dataValue}
-        stateDataAttr={stateNotice.stateDataAttr}
-        stateDataValue={stateNotice.stateDataValue}
+        {...stateNotice.hooks}
         action={stateNotice.claim
           ? {
               label: localize('FABRICATE.App.Journal.Recovery.Action'),
@@ -433,6 +425,7 @@
           : null}
       />
     {/if}
+    <RunAwardChoice {run} {journal} />
   </section>
 
   {#if stateNotice?.evidence}
@@ -451,8 +444,8 @@
               quantity={quantityText(item.quantity, localize)}
             />
           {/each}
-          {#each effect.receipt?.currencies ?? [] as spend, index (index)}
-            <JournalFactRow label={spend.unit} value={String(spend.amount ?? '')} />
+          {#each presentReceiptFacts(effect.receipt, localize) as fact, index (index)}
+            <JournalFactRow label={fact.label} value={fact.value} />
           {/each}
         </div>
       {/each}
@@ -468,8 +461,7 @@
         label: localize('FABRICATE.App.Journal.Retry'),
         onClick: (event) => withRollPromptOrigin(event, () => journal?.retryCommandError?.()),
       }}
-      dataAttr="data-journal-command-error"
-      dataValue="true"
+      data-journal-command-error="true"
     />
   {/if}
 
@@ -570,21 +562,21 @@
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
         hint={localize(ladderRuleKey(gatheringYield.ladderRule))}
+        successLabel={localize('FABRICATE.Check.Evidence.Success')}
+        failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}
       {#if yieldPreviewLoading}
         <Notice
           tone="info"
           title={localize('FABRICATE.App.Journal.Yields.LoadingPreview')}
-          dataAttr="data-journal-yield-loading"
-          dataValue="true"
+          data-journal-yield-loading="true"
         />
       {:else if yieldPreviewError}
         <Notice
           tone="warning"
           title={localize('FABRICATE.App.Journal.Yields.PreviewError')}
-          dataAttr="data-journal-yield-error"
-          dataValue="true"
+          data-journal-yield-error="true"
         />
       {/if}
       <YieldScale
@@ -642,6 +634,8 @@
               tiers={previewTiers(craftingYield.tiers, localize)}
               emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
               label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+              successLabel={localize('FABRICATE.Check.Evidence.Success')}
+              failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
               hint={localize(
                 viewedIsCurrent
                   ? 'FABRICATE.App.Journal.Yields.CraftingPreviewHint'
@@ -752,7 +746,7 @@
       </div>{/if}
     <ThisRun {run} {services} />
     {#if run?.actions?.disabledReason !== 'unsupportedLifecycle'}
-      <Callout tone="neutral" text={guidance} dataAttr="data-journal-guidance" />
+      <Callout tone="neutral" text={guidance} data-journal-guidance />
     {/if}
   {/if}
 </article>
@@ -776,27 +770,6 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--fab-space-3);
-  }
-  .journal-detail-identity {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: var(--fab-space-3);
-  }
-  .journal-detail-identity h2 {
-    margin: 0 0 var(--fab-space-1);
-    color: var(--fab-text);
-    font-family: var(--fab-font-serif);
-    font-size: 22px;
-    font-weight: 600;
-  }
-  .journal-detail-meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
-    color: var(--fab-text-subtle);
-    font-size: 11px;
   }
   .journal-detail-stages {
     display: grid;

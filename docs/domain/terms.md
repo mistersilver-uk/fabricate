@@ -103,11 +103,63 @@ Canonical mapping: `Result.chooser`, `Result.selectionFormula`, `Result.selectio
 
 Spec reference: openspec/specs/design-system/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Selection Roll
+
+A roll expression authored only where the ROLL is the **Chooser**, and validated as a rolled amount is: it must roll, and it must be able to total more than 0.
+Each alternative awarded takes one Selection Roll.
+Without repeats an alternative drawn once leaves the ladder for the rest of that award, so `up to N` stops rolling once every alternative is drawn.
+
+Canonical mapping: `Result.selectionFormula`; `drawRolledAwards` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/design-system/spec.md
+
+## Selection Range
+
+The alternatives' ranges form a ladder ordered by where each range starts.
+A gap is legal and never leaves a roll unanswered: a roll selects the alternative whose range starts highest at or below it, and a roll below every range selects the lowest.
+A setting lives only in the cell that reads it, so ranges persist only on the alternatives of a rolled group; the editor keeps them while the GM switches to the player and drops them on save.
+
+Canonical mapping: `Result.alternatives[].selectionRange`; `selectionLadder` and `selectFromLadder` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-entity-editors/spec.md
+
+## Pending Award Choice
+
+A choice group whose chooser is the player that has been awarded but awaits settlement, persisted in `pendingAwardChoices`.
+The player must pick one or more alternatives according to the **Award Strategy** to settle the choice exactly once.
+An unsettled choice blocks later stage execution with the `awardChoicePending` blocker.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Claimable
+
+An alternative in a pending award choice that can be awarded at settle time.
+Claimability is determined at settle time: an alternative is claimable if its component or source item exists, its world credit writer would accept it, or (for knowledge results) its recipe is available, observable, and not already known to the actor.
+
+Canonical mapping: settlement-time evaluation of `CraftingRunStepState.pendingAwardChoices[].alternatives`
+
+Spec reference: openspec/specs/data-models/spec.md
+
+## Forfeited
+
+A pending award choice that settles because no alternative remains claimable.
+A forfeited choice persists in the step's `pendingAwardChoices` with `outcome: "forfeited"` and no selections recorded.
+When a run is cleaned up while owing an unsettled choice, the choice settles forfeited instead of being deleted.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices[].outcome`, `CraftingRunStepState.groupAwards`
+
+Spec reference: openspec/specs/data-models/spec.md
+
 ## Rolled Amount
 
 Presence of `quantityFormula` IS the mode: absent or empty leaves the amount fixed at `quantity`, which stays the AUTHORED amount, is never omitted from disk, and is what a cleared formula returns to.
 The RESOLVED amount is a different value from the authored one and only it may be zero — an **empty award**, which creates no item, is still stated on the chat card with the roll that produced nothing, and writes no award receipt, because there was no Item write to acknowledge.
 Validation is rollability and never parsability: `Roll.validate` passes expressions that cannot evaluate, so the floor is a maximised evaluation of the formula AS AUTHORED, applied by the authoring surface and by the gathering data boundary alike.
+A craft is also refused before anything is consumed when a non-progressive result's formula cannot total finitely against the crafting character's roll data, maximised and minimised (`validateCraft`, `src/systems/rolledAmountResolver.js`).
+A progressive system skips that check, because its award drops every formula.
+A non-progressive salvage is refused the same way before anything is consumed, and saving an enabled salvage with a non-rollable formula is refused (`validateSalvage`, `assertSalvageAmounts`); a progressive salvage skips both.
 Result-only — a requirement amount and a gathering drop row's quantity are always fixed, and a progressive or salvage-progressive award strips the formula and awards 1.
 
 Canonical mapping: `Result.quantityFormula`, `Result.quantity`, `quantityFormulaErrors` (`src/models/Result.js`); `resolveRolledAmount` (`src/systems/rolledAmountResolver.js`); `maximisedTotal` (`src/utils/rollFormulaRollability.js`)
@@ -140,8 +192,12 @@ Spec reference: openspec/specs/recipes-and-steps/spec.md
 A slot IS an `IngredientGroup` — the same record, named for how the player meets it — so "slot" and "ingredient group" are never two different things.
 A slot is **fixed** when its group authors exactly one option, a **choice** when it authors more than one, and an **essence** slot when the option resolved for it is an essence alternative.
 Slot state is `met` / `partial` / `short`, and the rail keeps at most one slot's chooser open at a time.
+An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open with an empty ring; a chosen choice that falls short is `short`; a partly delivered essence is `partial` and paints the slot tile's own partial face, on the warning ground rather than the danger one, in the crafting rail and the Journal alike.
+A short alternative is dimmed but still offered, and its shortfall is stated in words beside it.
+A candidate is **claimed elsewhere** when it is held in full but the stock the stage's other fundable requirements claim leaves its **spare** (held less claimed) below the need; it is the only reason a candidate is disabled, apart from a pending selection command.
+The shared requirement chooser draws every slot as a slot tile, and the crafting rail is its adopter.
 
-Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementRail.svelte`
+Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `SlotRow.svelte`, `RequirementRail.svelte`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
@@ -201,13 +257,13 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 ## Section Inheritance
 
-The `1.30.0` migration writes every membership record fully OVERRIDING, so on a migrated world nothing resolves through the world layer until a GM clears an override — but once cleared it really does resolve: the **Read Union** applies each inheriting section from the **World Defaults** AFTER the in-system re-spread, on the shipped field names, so the answer changes when the world default moves.
+The `1.30.0` migration writes its membership records so that no resolved value moves, while a record written by add-from-catalogue or by a component import (issue 2218) inherits every section from the start — and an inheriting section really does resolve: the **Read Union** applies each inheriting section from the **World Defaults** AFTER the in-system re-spread, on the shipped field names, so the answer changes when the world default moves.
 **THE COMPONENT `tags` CLAUSE BELOW IS THE EXCEPTION AND STAYS INERT**: `tags` is not a section, carries no writer in the union's inherited-section table, and the in-system record emits it unconditionally, so the additive merge is the RESOLVER's contract and the union's trailing in-system re-spread discards it.
 **AND THE MUTE HALF OF THAT CLAUSE HAS NO AUTHORING SURFACE AT ALL as of issue 1371's prototype-parity rebuild**: `mutedTags` is persisted, normalized, read back and displayed, and the `setMutedTags` leg that writes it is published on the component family alone and called from nowhere in `src/` — so a mute reaches the corpus only through the `1.30.0` migration, an import or a hand edit, and a GM can see one and neither make nor clear it.
 `dormant` keeps its meaning HERE, for the retained local override a re-inherited section leaves on disk, which is why the world identity copy the migration writes is called a **World Identity Snapshot** and never a dormant one.
 An overriding switch over an ABSENT section is not an override and still resolves to the WORLD value, because absence is not a partial block and no field inside a stored block ever falls back; the switch is still reported AS AUTHORED rather than repaired.
 Turning a switch OFF SEEDS the local block from the current world value; turning it back ON flips the switch ONLY and **RETAINS the dormant override**, which re-overriding RESTORES rather than re-seeding — nothing is lost, so the copy stays "fall back" and no confirmation is required.
-An `inherit` map that OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
+An `inherit` map that OMITS a section reads as inheriting it, because that is the state a record created by "add to system" or by a component import is in.
 Three fields depart from the plain pattern, each with its own named helper: the component `category` (the world value wins IF AUTHORED, otherwise the local value falls through), the component `tags` (ADDITIVE — world minus muted plus system-only, with no switch at all), and the tool `repairRequirements` (named for the shipped `Tool.repairRequirements` it seeds; a SEED copied once on add, never a live parent).
 **A SYSTEM-SCOPE WRITE OF AN INHERITABLE SECTION IS AN OVERRIDE, NOT A SHADOWED WRITE** (issue 1371 r19, first stated at component `essences`): every system-scope writer flips that pair's switch to `false` BEFORE the values land, on the same flag-before-values order the editors' own inherit controls use, so what a GM stages is what that system resolves — and **A DELETE IS ONE OF THOSE WRITERS** (issue 1371 r21), which is the least obvious of them: deleting an essence from a system strips it from that system's own rows, which an inheriting pair does not resolve, so the strip changed nothing the GM had just been told it would.
 The delete's flip carries an addition the other writers do not need: the row is SEEDED from what the pair RESOLVED before the flip, because an inheriting pair's own row is dormant and EMPTY for anything adopted after the migration, so flipping onto it and stripping would have answered `{}` and taken every other essence with the one deleted.
@@ -390,7 +446,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 The depleted state is read from the shared `environment.nodeRuntime[taskId]` (linked) or the behaviour's `system.node.current` (unlinked, issue 302).
 
-Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
+Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -442,6 +498,7 @@ Spec reference: openspec/specs/data-models/spec.md
 ## Result Group
 
 In routed and alchemy flows, it is the routing target.
+The interface names it a **result set** throughout `lang/en.json`; engine-authored validation messages and the persisted default name `Result Group N` still say result group.
 
 Canonical mapping: Plain object `{ id, name, results[] }`
 
@@ -924,7 +981,7 @@ The prompt's own cap is a UI affordance re-imposed by `evaluateCheckRoll`, never
 The pre-roll prompt itemises resolved contributions as chips beside a formula that omits their terms; a deferred `playerPicks` choice and any entered situational bonus join the posted roll only after submission.
 On a direct runner the formula ends in a neutral `+ (modifier)[Modifiers]` slot for that deferred choice; a versioned Journal prompt shows its prepared formula without the slot or any flavour label and offers the choice beneath it.
 The posted roll, chat flavor and run journal then carry the chosen contribution and labels.
-The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), mounted by `rollPromptHost.js` over the Fabricate window the roll was started from (the one its starting control recorded, else the one holding focus or, when focus is nowhere, the one under the pointer), or otherwise on a themed standalone layer, and unmounted on every exit, including its host window closing.
+The prompt renders in Fabricate's shared modal chrome, the `Modal` component, mounted by `rollPromptHost.js` over the Fabricate window the roll was started from (the one its starting control recorded, else the one holding focus or, when focus is nowhere, the one under the pointer), or otherwise on a themed standalone layer, and unmounted on every exit, including its host window closing.
 For a versioned Journal check, the issuing GM captures the JSON-safe modifier context and permitted choice with the private prepared evaluation before showing the prompt.
 The entitled prompt displays applied entries from that snapshot, or offers the deferred choice; later library or actor-data edits cannot change the prepared contribution.
 The world authority ledger carries only safe token coordination, while the prepared evaluation and cached recipient-specific reply stay in the issuing authority instance and disappear on consume, release or expiry.
@@ -1427,7 +1484,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipe-visibi
 Whether a source is a derivative is decided by a name comparison, trimmed, whitespace-collapsed and case-insensitive.
 The source's stored name (`_source.name`, else `name`) is compared against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
 The source's own `flags.babele.originalName` is never read, because an Item built from a translated entry inherits that entry's flags and would always match it.
-A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative, so components and recipe items sharing an unresolvable entry still merge until it is restored.
+A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative.
+The unresolvable-source rule then keeps Items sharing that entry apart, as set out below.
 The motivating case is the dnd5e spell scroll (issue 2217): dnd5e builds every scroll of one level from that level's template entry, so scrolls registered from freshly built Items shared one **Source UUID** and each overwrote the component the last one registered.
 The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference; the GM hands out copies of the registered Item instead.
 It is told apart from a clone by the absence of `_stats.duplicateSource`, and from a double import (two world copies of one entry that keep its name, which still de-duplicate to one definition) by its name.
@@ -1435,8 +1493,17 @@ Unlike a clone's stripped provenance, a derivative's `_stats.compendiumSource` s
 The gate decides only what a new definition claims.
 Find-existing prefers the definition claiming the source's own uuid, and re-registering such a source neither adds nor releases a compendium-source claim: a registered derivative renamed back to its entry's name stays on its own uuid, and one registered before the gate moves its `originItemUuid` to its own uuid on its next import and keeps the entry's uuid in `aliasItemUuids`.
 For a recipe item and a tool, a durable `roles[systemId]` leaf a derivative inherited from a stamped entry is an inherited marker, passed over and (on a world source) overwritten, when the definition it names claims none of the source's own uuids and does not carry its stored name; a component's find-existing reads no durable leaf.
-The gate never un-merges: a component that absorbed several derivatives before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
-It is a registration and source-replacement rule only: the runtime matchers have no derivative gate, and Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
+The same leaf test applies to a source whose compendium source does not resolve, so its leaf is honoured only when the named definition claims the source's own uuid or carries the source's stored name.
+The **unresolvable-source rule** is separate from the derivative gate: for every kind, find-existing does not match through a compendium source that does not resolve, because the registration records it only as an alias.
+Such a source matches only a definition claiming its own uuid, so Items sharing the entry register separately as components, recipe items and tools, and importing one again finds its definition by its own uuid.
+A source does not resolve when its pack is missing (its module or system is disabled or uninstalled, or held back by a core compatibility gate), its entry was deleted, or the server lookup failed.
+A component records the alias only when no other component of its system, and no World Component other than the one it adopts, claims it, compared without a pack uuid's document-type segment.
+A first import that withholds the alias still reports its `sourceFallbacks` entry.
+The split is permanent once made: restoring the entry does not rejoin the Items, and the recovery is to delete the extra definition, then either restore the entry and import again or, for a component, replace-source the Item onto the original component.
+Replace-source keeps refusing an Item whose unresolvable source another component of its system claims.
+Neither the gate nor the unresolvable-source rule un-merges: a component that absorbed several derivatives, or several Items sharing an unresolvable entry, before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
+The derivative gate is a registration and source-replacement rule only, and the unresolvable-source rule is a registration rule only: the runtime matchers have neither, so an owned copy with no leaf whose only source reference is an unresolvable compendium source resolves to the first definition claiming it.
+Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
 
 Canonical mapping: `isDerivativeOf` / `resolveImportedComponentSourceData` in `src/systems/manager/itemSources.js`; `storedMatchName()` / `normalizeMatchName()` / `getOwnSourceUuids()` / `findRegisteredDefinition()` / `settleCompendiumClaim()` in `src/utils/sourceUuid.js`; `resolveSourceRepairOwner` in `src/systems/SourceIdentityService.js`
 
@@ -1604,7 +1671,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 `offerSituationalBonus` normalizes to `true` unless the stored value is exactly `false` (`normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`), and is carried beside `evaluation` on all eight normalized check sub-objects.
 It survives `checkDraftClone.js`'s clone functions, the Studio's save wiring, schema-6 export/import, and `CraftingSystemManager._copyPassFailCheckFields`'s crossing of the routed-by-ingredients boundary.
-It is a display flag only: the Studio's `CheckPromptOptions.svelte` toggle writes it, and the roll prompt (`RollPrompt.svelte`, `rollPrompt.js`) reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so `ManagerModal`'s initial focus falls through to the Roll button.
+It is a display flag only: the Studio's `CheckPromptOptions.svelte` toggle writes it, and the roll prompt (`RollPrompt.svelte`, `rollPrompt.js`) reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so the shared `Modal`'s initial focus falls through to the Roll button.
 `allowsSituationalModifier` (threaded from each activity's own usability check, read at `checkRoll.js:501`) is the SEPARATE authority gate a decision's typed bonus is checked against, and it is never derived from the offer: a Tool bonus, an eligible named modifier, and a programmatic bonus a Macro or companion module supplies all keep applying while the offer is off.
 A bulk prompt hides its bonus field only when every usable subject's check has the offer off, and a companion call through `rollActorCheck`/`resolveBulkCheckDecision` always offers the field regardless of any system's own offer.
 
@@ -1924,6 +1991,7 @@ The clamp routes to the closest tier, it does not force success — a below-lowe
 It is threaded only by the crafting `_runRoutedCheck` caller through `runFormulaRouted`'s optional `minOutcomeId`, so salvage and gathering routed checks are unaffected; on a blocked craft the tier it blocked is recorded as `data.blockedOutcomeId`.
 **One ranking (issue 975):** tier ORDER is derived in exactly one place, `rankedRoutedOutcomes`, shared by the forced reroute, this minimum gate and the tier-step pass, and the same ranking rule picks the best qualifying tier and the clamp's tier — a fixed range by `start` and a multiply tier by its threshold, both in the check's direction, an additive relative tier by its benefit-signed `dc`, an **Otherwise Tier** lowest, other non-finite ranks dropped, and the FIRST authored tier kept among equal ranks in both directions.
 The gate consumes it only to LOCATE the required tier and still compares `start` VALUES as a meet in the check's direction, so two fixed tiers sharing a `start` compare equal and the craft passes, where an index comparison would strictly fail it.
+After a successful crafting or salvage roll the player sees the reached tier marked **Your roll**, read from the recorded `outcomeId`; a failed roll, or a secret or blind one, marks no tier.
 
 Canonical mapping: `classifyCheckTotal` and its private `matchRoutedOutcome`/`routeCritOutcome`/`rankedRoutedOutcomes`/`applyTierStepTriggers` in `src/systems/checkRouting.js` (re-exported by `src/systems/checkRoll.js`); `relativeOutcomes[]`/`fixedOutcomes[]` from `_normalizeRoutedCraftingCheck`, `normalizeRoutedCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `Recipe.minSuccessOutcomeId`; `resolveRecipeFixedOutcomeTierOptions` in `src/utils/routedOutcomeKeywords.js`
 
@@ -2033,6 +2101,19 @@ An accrual-anchor absent-check must consume the `null`-preserving one: the lax (
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md (## World-Time Anchors and Rewind Policy; Gathering Resource Nodes Requirement 14; Gathering Economy and Stamina Requirement 27), openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md
 
+## Time-of-Day Start Hour
+
+Each time-of-day value names a **period** of the day; `startHour` places it on the world calendar's day, and periods run in day order (ascending start hour), the latest wrapping past the day's end.
+The UI labels it **Starts at**; the manager's time-of-day bar draws the periods and edits start hours through its dividers, and the steppers on the value pills are the authoritative editor.
+**Descriptive, not a gate.** Nothing gates, matches or selects on a start hour: the current time of day stays GM-selected or provider-supplied, so the world-clock line and the current-time dot may legitimately sit in different periods; following the world clock is issue 2434.
+**Not a world-time anchor.** It is a position within one calendar day, not a world-time instant, so a world-time rewind never adjusts it.
+**Defaults are resolved, not stored.** `dawn` 4, `day` 8, `dusk` 17 and `night` 21 apply only where an option of that id has none authored; normalization never writes them back, so untouched worlds and their exports are unchanged.
+**Trap:** `0` is midnight and is authored data; an absence test must not coerce, because `Number(null)` and `Number('')` are `0`.
+
+Canonical mapping: `normalizeTimeOfDayStartHour` and the default resolver in `src/systems/normalize/gatheringConditionOptions.js`, consumed by both the service and manager-store normalizers; `src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js` (rotation, tiling verdict).
+
+Spec reference: openspec/specs/gathering-and-harvesting/spec.md (## Global Gathering Conditions, Requirements 25–27), openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-visual-style/spec.md (#### Threshold band strip)
+
 ## Valid Id Basis
 
 The rule is one line: **a destructive pass runs only when its Valid Id Basis is known-complete**, because a pass that cannot see a live record concludes the thing naming it is stale and deletes durable state that never was.
@@ -2049,6 +2130,7 @@ Every prune site that can receive it must test for it, argument defaults include
 And the basis must be THREADED AS A PARAMETER rather than dug out of a collaborator inside the pass, so the pass stays a function of its arguments and can be handed, and tested with, an unknown one.
 **A SEEDEDNESS PREDICATE MUST BE ASKED ABOUT THE SUB-KEY THE ID SET IS DRAWN FROM** (issue 1359): a store holding several sub-keys under one setting answers an aggregate `isSeeded()` by ORing across them, so an aggregate answer reports seeded on the strength of a SIBLING and hands the basis a real, empty, prunable id set derived from a sub-key that is simply absent.
 That is also why the three world scope settings are three KEYS and not one — on a shared key the predicate cannot be honest per entity type at all, because one entity type's first write persists the others as empty.
+**A COMPONENT IMPORT IS A SEEDING WRITER** (issue 2218): its first registration flips `isSeeded("entities")` for `fabricate.componentScope` on a world the migration never wrote, as the world catalogue's create does and as a crafting-system import never does, so a system whose own component array is EMPTY goes from an unknown basis to a known one, which no longer vouches for a component id in neither half: an essence source there naming such an id keeps its `sourceComponentId` and loses its `sourceItemUuid` on the next normalize.
 **THE LEGACY HALF COUNTS ONLY WHEN IT IS NON-EMPTY:** an empty in-system array is a legacy KEY rather than a legacy corpus, so it vouches for nothing while licensing a full prune, and the answer is UNKNOWN only when the store is unseeded AND that array is empty — deriving it from seededness alone returns UNKNOWN on every unmigrated client for every system and silently disables every prune in the corpus for a release.
 **A VOCABULARY IS A BASIS TOO:** an icon map is pruned only against a known-complete vocabulary and only against ITS OWN (`componentCategoryIcons` against `componentCategories`, `categoryIcons` against `categories`, never the other's), with an unknown one falling back to the map's own keys so shape rules still apply and nothing is dropped.
 **A DEGRADED ARGUMENT IS THIS RULE'S BLIND SPOT:** a defect that keeps the derivation call and corrupts only what it is derived FROM passes any site-counting census, so the change that first reads an id set rather than only its known/unknown state owns behavioural coverage for the prune's OUTCOME.

@@ -26,11 +26,10 @@ import { promptDropEnvironment } from '../canvas/environmentDialog.js';
 import { confirmDialog, localize } from './svelte/util/foundryBridge.js';
 import {
   listSystemOptions,
-  listSystemTools,
-  listSystemComponents,
   listSystemTasks,
   listToolSourceOptions,
   listTaskSourceOptions,
+  resolveInteractableSourceLabel,
 } from './interactableSourceLibrary.js';
 
 /**
@@ -139,24 +138,7 @@ export class InteractablesManagerApp extends SvelteApplicationMixin(
 
   /** Resolve a source's human label (tool / task name) for a behaviour system. */
   _resolveSourceLabel(system) {
-    if (!system) return null;
-    const deps = this._sourceDeps();
-    if (system.interactableType === 'tool') {
-      const tool = listSystemTools(deps, system.systemId).find(
-        (t) => String(t?.id) === String(system.toolId)
-      );
-      if (!tool) return null;
-      const label = String(tool?.label || '').trim();
-      if (label) return label;
-      const component = listSystemComponents(deps, system.systemId).find(
-        (c) => String(c?.id) === String(tool?.componentId)
-      );
-      return component?.name ? String(component.name) : null;
-    }
-    const task = listSystemTasks(deps, system.systemId).find(
-      (t) => String(t?.id) === String(system.taskId)
-    );
-    return task?.name ? String(task.name) : null;
+    return resolveInteractableSourceLabel(this._sourceDeps(), system);
   }
 
   /**

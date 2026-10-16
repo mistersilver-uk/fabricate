@@ -1,9 +1,6 @@
 /** Phase E's first half: the shared app, the inventory and salvage captures, the gathering states and the Crafting tab; it returns the app-shell locator the second half continues against. */
 
-import {
-  assertProgressiveStageListSound,
-  handleRollPromptIfPresent,
-} from '../pageOps/managerViews.mjs';
+import { assertProgressiveStageListSound, answerRollPrompt } from '../pageOps/managerViews.mjs';
 import {
   assertNoScreenshotOverlays,
   assertPointerTarget,
@@ -12,8 +9,20 @@ import {
 } from '../pageOps/pageLifecycle.mjs';
 import { ensureSlotOpen } from '../pageOps/toolStudio.mjs';
 
+/**
+ * The gathering attempts phase E clicks, with whether each opens the interactive roll prompt: an
+ * untimed d100, routed or progressive task does, and a timed d100 gather does not. A Node test pins
+ * every row against the d0 spine fixture and the engine.
+ */
+export const GATHERING_ATTEMPT_PROMPTS = [
+  { taskId: 'smoke-meadow-herbs', resolutionMode: 'd100', prompts: true },
+  { taskId: 'smoke-slow-bloom', resolutionMode: 'd100', prompts: false },
+];
+
 export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
   const { page, results, screenshot } = ctx;
+  const attemptPrompts = (taskId) =>
+    GATHERING_ATTEMPT_PROMPTS.find((entry) => entry.taskId === taskId).prompts;
   const { executionFixtures } = ctx.shared;
   const { RUN_SCREENSHOT_PHASES, RUN_FULL_ONLY_GATHERING_STATES } = ctx.profile;
   // The "Craft Item" and "Gathering" sidebar actions both open one shared window
@@ -380,13 +389,14 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  async function clickReadyGatheringAttempt() {
+  // `prompts` comes from GATHERING_ATTEMPT_PROMPTS: an untimed d100, routed or progressive task
+  // opens the roll prompt, and a timed d100 gather starts without one.
+  async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
       .first()
       .click();
-    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
-    await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
+    if (prompts) await answerRollPrompt(ctx, 'player-gathering-roll-prompt');
     // The attempt keeps a ready button disabled until its listing reload lands, and that reload
     // re-keys the task rows; selecting a row before it settles races a detached element.
     await page.waitForFunction(
@@ -426,7 +436,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-meadow-herbs') });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -444,7 +454,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: attemptPrompts('smoke-slow-bloom') });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
@@ -453,8 +463,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     });
 
     await selectGatheringEnvironment('Moonlit Blind Grove');
+    // The blind gather is the centre header's one primary (issue 1518).
     await appShell
-      .locator('[data-gathering-blind-card]')
+      .locator('[data-gathering-blind-attempt]')
       .first()
       .waitFor({ state: 'visible', timeout: 10_000 });
     await captureCurrentPlayerGathering('player-gathering-blind');
@@ -583,11 +594,10 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         .locator('[data-crafting-craft][data-crafting-craft-disabled="false"]')
         .first();
       if ((await craftButton.count()) > 0) {
-        await craftButton.click().catch(() => {});
-        // A UI craft now opens the interactive roll prompt: capture it, then
-        // click Roll so the run summary resolves and the overlay clears. The prompt can open several
-        // seconds after the click once a full D0 walk has loaded the world.
-        await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt', { timeout: 15_000 });
+        await craftButton.click();
+        // A UI craft of this checked recipe opens the interactive roll prompt: capture it, then
+        // click Roll so the run summary resolves and the overlay clears.
+        await answerRollPrompt(ctx, 'player-crafting-roll-prompt');
         await appShell
           .locator('[data-crafting-run-summary]')
           .first()
@@ -633,7 +643,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .first();
         await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5000 });
-        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always present.
+        // The open choice slot's panel holds its alternative tiles (issue 1518).
         await appShell
           .locator('[data-recipe-section="requirement-rail"]')
           .first()
@@ -642,7 +652,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .locator('[data-requirement-slot][data-slot-kind="choice"]')
           .first();
         await ensureSlotOpen(altSlotTile).catch(() => {});
-        const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
+        const altSection = appShell.locator('[data-requirement-panel]').first();
         await altSection.waitFor({ state: 'visible', timeout: 10_000 });
         // Pointer hit-test (issue 917): the whole 80px slot-tile column is the control, under the
         // rail's wrapping flex row. happy-dom computes no cascade, so only a real frame can prove
@@ -661,18 +671,24 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await screenshot(page, 'player-crafting-essence-alternative');
         await screenshot(page, 'player-crafting-alternatives');
 
-        // Nice-to-have "switched" variant: click the second alternative so the
-        // selection tick moves, evidencing the player choosing the other option.
-        const altOptions = appShell.locator('.crafting-alt-option');
-        if ((await altOptions.count()) > 1) {
-          await altOptions
-            .nth(1)
-            .click({ timeout: 5000 })
-            .catch(() => {});
-          await page.waitForTimeout(250);
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'player-crafting-alternatives-switched');
-        }
+        // The player presses the second alternative tile: a real hit-tested click, then its press.
+        const altTile = appShell
+          .locator('[data-requirement-panel] [data-requirement-alternative].crafting-alt-option')
+          .nth(1);
+        const altButton = altTile.locator('button');
+        await assertPointerTarget(
+          page,
+          altButton,
+          '[data-requirement-alternative] button',
+          'Requirement chooser alternative tile'
+        );
+        await altButton.click({ timeout: 5000 });
+        await altTile
+          .locator('[aria-pressed="true"]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-crafting-alternatives-switched');
         // Restore the unfiltered recipe list for the subsequent stacked frame.
         await recipeSearch.fill('').catch(() => {});
         await page.waitForTimeout(200);
@@ -758,9 +774,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll('#fabricate-app [data-essence-meter]')].map((node) => ({
               essenceId: node.dataset.essenceMeter,
               state: node.dataset.essenceMeterState,
-              ratio: String(
-                node.querySelector('.essence-pool-meter-ratio')?.textContent ?? ''
-              ).trim(),
+              ratio: String(node.querySelector('[data-essence-total]')?.textContent ?? '').trim(),
             }))
           );
         // Container-level wait: the rail's slot row, not a particular tile. An over-specific
@@ -785,9 +799,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Requirement rail states were ${JSON.stringify(railStates)}, expected ${JSON.stringify(expectedRailStates)}`
           );
         }
-        const openChoosers = await appShell
-          .locator('[data-recipe-section="alternatives"], [data-recipe-section="essence-pool"]')
-          .count();
+        const openChoosers = await appShell.locator('[data-requirement-panel]').count();
         if (openChoosers !== 1) {
           throw new Error(
             `Requirement rail had ${openChoosers} choosers open, expected exactly one`
@@ -814,9 +826,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             ).length,
             // Issue 1506: the fallback glyph is the shared art tile's glyph face.
             glyphTiles: rail.querySelectorAll('[data-medallion="glyph"]').length,
-            openChoosers: document.querySelectorAll(
-              '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
-            ).length,
+            openChoosers: document.querySelectorAll('#fabricate-app [data-requirement-panel]')
+              .length,
           };
         });
         if (!tagReport) throw new Error('Tag-requirement rail did not render');
@@ -913,15 +924,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
           );
         }
-        // Issue 917 re-point: the chip's class is `.essence-contribution`
-        // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never existed and
-        // always counted zero.
-        const duskContributions = await appShell
-          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
-          .count();
+        // Issue 1644: the shared pool states a carrier's yield as one reading, `+N <essence>` per
+        // pool it funds, so the dual carrier's row must name two contributions.
+        const duskReading = await appShell
+          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal")')
+          .first()
+          .textContent();
+        const duskContributions = (String(duskReading).match(/\+\d/g) ?? []).length;
         if (duskContributions < 2) {
           throw new Error(
-            `Dual carrier showed ${duskContributions} contribution chips, expected one per essence it funds`
+            `Dual carrier stated ${duskContributions} contributions, expected one per essence it funds`
           );
         }
         await assertNoScreenshotOverlays(page);
@@ -1075,15 +1087,17 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             .waitFor({ state: 'visible', timeout: 10_000 });
         };
 
-        // (1) Flag ON — the default. Settles the chevron box: the buttons render
-        // whether or not anything has moved, so the reset is checkable at rest.
+        // (1) Flag ON — the default. Settles the rocker box: it renders whether or not
+        // anything has moved, so its geometry is checkable at rest.
         await selectRecipeByName('Smoke Mold Brick');
         await assertProgressiveStageListSound(page, 'player-crafting-progressive');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-crafting-progressive');
 
         // (2) Reordered.
-        const moveDown = appShell.locator('[data-progressive-stage-move-down]').first();
+        const moveDown = appShell
+          .locator('[data-progressive-stage] [data-sortable-move="down"]')
+          .first();
         await moveDown.click({ timeout: 5000 });
         await page.waitForTimeout(250);
         const reordered = await assertProgressiveStageListSound(
@@ -1100,36 +1114,49 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           announcement: reordered.region?.text ?? '',
         });
 
-        // (3) Flag OFF (D13): no grips, no move buttons, ordinals + difficulty kept,
-        // and the muted "Order set by the GM" line. Default-true means an explicit
-        // false has to be authored to reach this state at all.
+        // (3) Flag OFF (D13): no grips, no rocker, ordinals + difficulty kept, the muted
+        // "Order set by your GM." line, and the one live region kept mounted and empty.
+        // Default-true means an explicit false has to be authored to reach this state.
         await selectRecipeByName('Smoke Kiln Firing');
-        const fixedReport = await page.evaluate(() => ({
-          rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
-          grips: document.querySelectorAll('.crafting-stage-handle').length,
-          moves: document.querySelectorAll('[data-progressive-stage-move]').length,
-          ordinals: document.querySelectorAll('[data-progressive-stage-ordinal]').length,
-          difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
-          note:
-            document.querySelector('[data-progressive-stage-fixed-note]')?.textContent?.trim() ??
-            '',
-          liveRegions: document.querySelectorAll('[data-progressive-stage-status]').length,
-        }));
+        const fixedReport = await page.evaluate(() => {
+          const regions = [...document.querySelectorAll('[data-sortable-list-status]')].filter(
+            (region) =>
+              region.previousElementSibling?.matches('[data-recipe-section="progressive-stages"]')
+          );
+          return {
+            rows: document.querySelectorAll('[data-progressive-stage-fixed]').length,
+            grips: document.querySelectorAll('[data-progressive-stage] [data-sortable-grip]')
+              .length,
+            moves: document.querySelectorAll('[data-progressive-stage] [data-sortable-move]')
+              .length,
+            ordinals: document.querySelectorAll('[data-progressive-stage] [data-sortable-ordinal]')
+              .length,
+            difficulties: document.querySelectorAll('[data-progressive-stage-difficulty]').length,
+            note:
+              document.querySelector('[data-progressive-stage-fixed-note]')?.textContent?.trim() ??
+              '',
+            liveRegions: regions.length,
+            regionText: regions.map((region) => region.textContent?.trim() ?? '').join(''),
+          };
+        });
         if (fixedReport.rows < 3) throw new Error(`fixed state rendered ${fixedReport.rows} rows`);
         if (fixedReport.grips > 0 || fixedReport.moves > 0) {
           throw new Error(
             `fixed state still offers reorder affordances: ${JSON.stringify(fixedReport)}`
           );
         }
-        if (fixedReport.ordinals < 3 || fixedReport.difficulties < 3) {
+        if (fixedReport.ordinals !== fixedReport.rows || fixedReport.difficulties < 3) {
           throw new Error(
             `fixed state dropped ordinals/difficulty: ${JSON.stringify(fixedReport)}`
           );
         }
         if (fixedReport.note.length === 0)
-          throw new Error('fixed state shows no "order set by the GM" line');
-        if (fixedReport.liveRegions > 0)
-          throw new Error('fixed state renders a live region for an order that cannot change');
+          throw new Error('fixed state shows no "Order set by your GM." line');
+        if (fixedReport.liveRegions !== 1 || fixedReport.regionText.length > 0) {
+          throw new Error(
+            `fixed state needs exactly one empty live region after the list: ${JSON.stringify(fixedReport)}`
+          );
+        }
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-crafting-progressive-fixed');
         results.steps.push({
@@ -1139,7 +1166,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         });
 
         // (4) Narrow: the long component name must ellipse while the difficulty and
-        // "Reached at >=N" chips survive and the chevrons stay on-row.
+        // "Reached at >=N" chips survive and the rocker stays on-row.
         await selectRecipeByName('Smoke Mold Brick');
         const progressiveStackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
@@ -1167,14 +1194,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll(selector)].filter(
               (node) => node.getBoundingClientRect().width > 1
             ).length;
-          const names = [...document.querySelectorAll('.crafting-stage-name')];
+          const names = [
+            ...document.querySelectorAll('[data-progressive-stage] .progressive-stage-name'),
+          ];
           return {
             difficulties: visible('[data-progressive-stage-difficulty]'),
             thresholds: visible('[data-progressive-stage-threshold]'),
             ellipsed: names.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
-            rowOverflow: [...document.querySelectorAll('.crafting-stage-row')].filter(
-              (row) => row.scrollWidth > row.clientWidth + 2
-            ).length,
+            rowOverflow: [
+              ...document.querySelectorAll('.fabricate-sortable-list-row.progressive-stage-row'),
+            ].filter((row) => row.scrollWidth > row.clientWidth + 2).length,
           };
         });
         if (narrowChips.difficulties < 3 || narrowChips.thresholds < 3) {
@@ -1182,7 +1211,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         }
         if (narrowChips.rowOverflow > 0) {
           throw new Error(
-            `narrow layout overflows the row (chevrons pushed off): ${JSON.stringify(narrowChips)}`
+            `narrow layout overflows the row (rocker pushed off): ${JSON.stringify(narrowChips)}`
           );
         }
         await assertNoScreenshotOverlays(page);

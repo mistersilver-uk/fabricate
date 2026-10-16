@@ -93,7 +93,7 @@ test('ignores extra selectors the surface renders beyond the expected set', () =
   const metrics = elementMetrics(
     '.manager-environment-row',
     '.manager-environment-identity',
-    '.manager-inspector-card',
+    '.fabricate-card',
     '.manager-fact'
   );
   assert.doesNotThrow(() =>

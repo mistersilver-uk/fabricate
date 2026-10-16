@@ -438,6 +438,75 @@ test('CraftingRunManager leaves matured v1 gates untouched and lists only author
   );
 });
 
+const byText = (a, b) => a.localeCompare(b);
+
+test('CraftingRunManager lists a matured v1 run for the scan unless exactly one clause skips it', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Skip table crafter');
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const rows = [
+    ['manual completion', (run) => (run.completionMode = 'manual')],
+    ['a pause', (run) => (run.pauseState = { pausedAt: 1000, remainingSeconds: 10 })],
+    ['a status other than waitingTime', (run) => (run.status = 'inProgress')],
+    ['a stage with no time gate', (run) => delete run.steps[0].timeGate],
+    ['an uncommitted journal', (run) => (run.executionJournal = { status: 'planned' })],
+    ['an unsupported contract', (run) => (run.lifecycleVersion = 99)],
+  ];
+  const control = await manager.createRun(
+    actor,
+    singleStepRecipe('skip-control'),
+    [actor],
+    'user-1',
+    {
+      lifecycleVersion: 1,
+      completionMode: 'worldTime',
+    }
+  );
+  await manager.markStepWaitingForTime(actor, control, 0, { minutes: 1 });
+  const skipped = new Map();
+  for (const [label, breakIt] of rows) {
+    const run = await manager.createRun(
+      actor,
+      singleStepRecipe(`skip-${skipped.size}`),
+      [actor],
+      'user-1',
+      {
+        lifecycleVersion: 1,
+        completionMode: 'worldTime',
+      }
+    );
+    await manager.markStepWaitingForTime(actor, run, 0, { minutes: 1 });
+    const container = manager._getContainer(actor);
+    breakIt(container.active[run.id]);
+    await manager._persist(actor, container);
+    skipped.set(run.id, label);
+  }
+  const owing = await manager.createRun(actor, singleStepRecipe('skip-owed'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+    completionMode: 'worldTime',
+  });
+  await manager.markStepWaitingForTime(actor, owing, 0, { minutes: 1 });
+  skipped.set(owing.id, 'an owed award pick');
+
+  const dueIds = (blocks) => manager.listDueVersionedRuns(1060, blocks).map((c) => c.runId);
+  assert.deepEqual(
+    dueIds((run) => run.id === owing.id).sort(byText),
+    [control.id],
+    'only the control'
+  );
+  assert.deepEqual(
+    dueIds(undefined).sort(byText),
+    [control.id, owing.id].sort(byText),
+    'owed pick defaults off'
+  );
+  assert.deepEqual(
+    manager.listDueVersionedRuns(1059, () => false),
+    [],
+    'the gate has not passed'
+  );
+});
+
 test('CraftingRunManager allows a paused v1 run to be cancelled', async () => {
   setupGlobals(1000);
   const actor = new FakeActor('Cancelled paused crafter');

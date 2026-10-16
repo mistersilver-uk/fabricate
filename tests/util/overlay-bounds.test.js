@@ -34,7 +34,7 @@ const BOUNDARIES = [
     value: MANAGER_MAIN_SELECTOR,
     expected: '.manager-main',
     callers: [
-      ['src/ui/svelte/components/ManagerColorPicker.svelte', 'bounds = MANAGER_MAIN_SELECTOR'],
+      ['src/ui/svelte/components/TintPickerButton.svelte', 'bounds = MANAGER_MAIN_SELECTOR'],
       ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte', 'bounds: MANAGER_MAIN_SELECTOR'],
     ],
     // DELIBERATELY NARROWER THAN THE ONE ABOVE, and the narrowness is the content.

@@ -215,6 +215,18 @@ export const JOURNAL_PROTOTYPE_RECIPES = Object.freeze({
     left: 0,
     steps: [stage('Forge and quench the plate', 4, [], ['breastplate', 1])],
   },
+  // CANONICAL EXTENSION, not a prototype account: a no-input, tool-free stage in a workshop with no
+  // check, the one stage the world clock finishes unattended (issue 1644).
+  hide: {
+    name: 'Cure a Salted Hide',
+    mode: 'simple',
+    current: 1,
+    left: 5,
+    steps: [
+      stage('Salt the hide', 0, [fixed('balehound_hide'), fixed('brine')], ['salted_hide', 1]),
+      stage('Hang it to cure', 8, [], ['cured_hide', 1]),
+    ],
+  },
 });
 
 const STOCK = Object.freeze({
@@ -276,6 +288,7 @@ const WORKSHOPS = {
   sigil: 'Hedge Witchery',
   permit: 'Guild Registry',
   draught: 'Philosopher’s Crucible',
+  hide: 'Tanner’s Yard',
 };
 
 /** Case-to-original-data binding; canonical extensions are explicitly labelled. */
@@ -283,6 +296,7 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'ready-single': 'cord',
   'legacy-armed': 'canonical/pre-start-commit-run',
   'waiting-auto-eligible': 'poultice',
+  'waiting-auto-completes': 'hide',
   'waiting-open-choice': 'rivets',
   'stage-not-started': 'rivets',
   'awaiting-choice': 'buckler',
@@ -321,6 +335,8 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'history-d100-all-miss': 'stone/roll-all-miss',
   'history-gathering-check-failure': 'balehound/fail',
   'history-just-resolved': 'cord/execute',
+  // Issue 1773: the same execute, its stage also paying a labelled credit.
+  'history-just-resolved-rewards': 'cord/execute',
   'history-redacted': 'canonical/disclosure',
   'history-missing-material': 'canonical/missing-evidence',
   'history-gm-deleted-recipe': 'canonical/deleted-recipe',
@@ -333,7 +349,7 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'filter-paused': 'tonic',
   'empty-search': 'rivets',
   dismissal: 'h1/dismiss',
-  'kind-menu-open': 'runs/kind-menu',
+  'kind-toggles': 'runs/kind-menu',
   'automatic-completion': 'poultice/automatic',
   'automatic-blocker': 'canonical/automatic-no-spend',
   wide: 'rivets',

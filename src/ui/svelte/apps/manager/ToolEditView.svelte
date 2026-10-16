@@ -1,7 +1,10 @@
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import PageHeader from '../../components/PageHeader.svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import { countComponentsByTag } from '../../../model/vocabularyUsage.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
   import ToolEditorTabs from './tools/ToolEditorTabs.svelte';
@@ -29,6 +32,8 @@
     activeTab = 'breakage',
     focusValidationNonce = 0,
     managedItems = [],
+    // The system's `{ id, tags }` components, which the repair tag adder counts each tag over.
+    componentTagOptions = [],
     itemTags = [],
     essenceOptions = [],
     currencyUnits = [],
@@ -88,6 +93,7 @@
     )
   );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
+  const tagComponentCounts = $derived(countComponentsByTag(componentTagOptions));
   /** THE HEADER'S SUBTITLE IS A STATEMENT OF SCOPE (issue 1373): which half of a Tool this screen
       owns — the rules are this system's, the identity is the world Tool's. */
   const sourceContext = $derived(
@@ -201,58 +207,62 @@
   <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
-  <header class="manager-tool-edit-header" data-tool-editor-header>
-    <nav
-      class="manager-breadcrumbs"
-      aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-    >
-      <button type="button" data-tool-editor-open-systems onclick={onOpenSystems}
-        >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-system onclick={onOpenSystem}>{systemName}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-tools onclick={onOpenTools}
-        >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <span title={displayName}>{displayName}</span>
-    </nav>
-    <div class="manager-tool-edit-header-main">
+  <PageHeader
+    class="manager-tool-edit-header"
+    data-tool-editor-header=""
+    breadcrumbs={[
+      {
+        label: text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems'),
+        onSelect: onOpenSystems,
+        'data-tool-editor-open-systems': '',
+      },
+      { label: systemName, onSelect: onOpenSystem, 'data-tool-editor-open-system': '' },
+      {
+        label: text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules'),
+        onSelect: onOpenTools,
+        'data-tool-editor-open-tools': '',
+      },
+      { label: displayName, title: displayName },
+    ]}
+  >
+    {#snippet identity()}
       <div class="manager-tool-edit-identity">
         <img src={displayImage} alt="" data-tool-editor-image />
         <div class="manager-tool-edit-identity-copy">
-          <h2 title={displayName}>{displayName}</h2>
-          <p data-tool-editor-source-context>{sourceContext}</p>
+          <h2 class="manager-title" title={displayName}>{displayName}</h2>
+          <p class="manager-subtitle" data-tool-editor-source-context>{sourceContext}</p>
         </div>
       </div>
+    {/snippet}
+    {#snippet actions()}
       <div class="manager-header-actions manager-tool-edit-actions">
-        {#if dirty}<Chip tone="warning" density="action" data-tool-editor-status
+        {#if dirty}<Chip tone="warning" density="header" data-tool-editor-status
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096) and go through the
+        <!-- These three are the AUTHORITY for `Button` (issue 1096) and go through the
              primitive so the two screens cannot drift apart again. -->
         <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue 1373):
              the GHOST role, or two adjacent buttons that both leave this screen read as two
              different weights of verb. `Save rules` stays `primary` and green, a standing ruling. -->
         {#if worldRecordExists}
-          <ManagerButton
+          <Button
             role="ghost"
+            size="38"
             data-tool-editor-world-tool={String(tool?.id ?? '')}
             aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
             onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
             disabled={saving}
             ><i class="fas fa-globe" aria-hidden="true"></i><span
               >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
-            ></ManagerButton
+            ></Button
           >
         {/if}
         <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`: what this
              screen saves is one crafting system's RULES for a Tool. -->
-        <ManagerButton
+        <Button
           role="ghost"
+          size="38"
           data-tool-editor-back
           aria-label={text(
             'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
@@ -266,10 +276,11 @@
           disabled={saving}
           ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.BackToToolRules', 'Back to Tool Rules')}</span
-          ></ManagerButton
+          ></Button
         >
-        <ManagerButton
+        <Button
           role="primary"
+          size="38"
           data-tool-editor-save
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
           onclick={onSave}
@@ -282,11 +293,11 @@
               )}
           ><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.SaveRules', 'Save rules')}</span
-          ></ManagerButton
+          ></Button
         >
       </div>
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   <ToolEditorTabs
     {activeTab}
@@ -309,6 +320,21 @@
       data-keyboard-focus="true"
       bind:this={tabPanel}
     >
+      <!-- The page notice position, first in the panel so a failed save shows on every tab. -->
+      {#if saveError && saveError !== 'invalid'}
+        <div class="manager-tool-editor-notices" data-notice-position="page">
+          <Notice
+            blocking
+            tone="danger"
+            data-tool-save-error
+            title={text('FABRICATE.Admin.Manager.Tools.Editor.SaveFailedTitle', 'Save failed')}
+            detail={text(
+              'FABRICATE.Admin.Manager.Tools.Editor.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )}
+          />
+        </div>
+      {/if}
       {#if activeTab === 'requirements'}
         <ToolRequirementsTab
           {tool}
@@ -328,7 +354,6 @@
           {tool}
           {authority}
           {validation}
-          {saveError}
           {focusValidationNonce}
           {worldRecordExists}
           {onEditWorldTool}
@@ -342,6 +367,7 @@
           {worldAuthority}
           componentOptions={managedItems}
           {itemTags}
+          {tagComponentCounts}
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}

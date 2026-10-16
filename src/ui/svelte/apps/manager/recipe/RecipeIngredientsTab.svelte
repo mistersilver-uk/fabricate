@@ -17,8 +17,11 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeIngredientsSection from './RecipeIngredientsSection.svelte';
+  import { countComponentsByTag } from '../../../../model/vocabularyUsage.js';
 
   let {
+    // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
+    modeCallout = undefined,
     recipe = null,
     isMultiStep = false,
     // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
@@ -27,13 +30,15 @@
     // preserved and restored on re-enable.
     collapsed = false,
     currencyUnits = [],
-    // Gates the "Add cost" affordances (and read-only rendering of existing currency
+    // Gates the kind menu's Currency entry (and read-only rendering of existing currency
     // requirements) on the system's currency feature being enabled, not merely on unit
     // presence. Forwarded to every section, or it silently drops to its default.
     currencyEnabled = true,
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // The system's `{ id, tags }` components, which the tag adder counts each tag over.
+    componentTagOptions = [],
     // Whether the system mode allows more than one ingredient set. Forwarded to each
     // section to gate the "Add ingredient set" promotion affordance (issue 643).
     canAddSet = false,
@@ -55,6 +60,7 @@
     Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
   );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+  const tagComponentCounts = $derived(countComponentsByTag(componentTagOptions));
 
   // Per-mode heading + intro OUTSIDE any card (§B5), mirroring the Results tab.
   const heading = $derived(
@@ -96,19 +102,24 @@
   data-recipe-tab="ingredients"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients', 'Ingredients')}
 >
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{heading.title}</h2>
-    <p class="manager-muted">{heading.intro}</p>
+  <div class="fab-stack" data-gap="3" data-tab-heading>
+    <div class="manager-recipe-tab-intro">
+      <h2 class="manager-recipe-tab-title">{heading.title}</h2>
+      <p class="manager-muted">{heading.intro}</p>
+      {#if collapsed}
+        <p class="manager-muted" data-recipe-collapsed-note>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
+            'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
+          )}
+        </p>
+      {/if}
+    </div>
+    {@render modeCallout?.()}
   </div>
 
-  {#if collapsed}
-    <p class="manager-muted" data-recipe-collapsed-note>
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
-        'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
-      )}
-    </p>
-  {:else if isMultiStep}
+  <!-- A collapsed chain authors nothing here; the heading block's note says why. -->
+  {#if isMultiStep && !collapsed}
     {#if steps.length === 0}
       <p class="manager-muted">
         {text(
@@ -126,6 +137,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
             {showSetName}
@@ -134,13 +146,14 @@
         {/snippet}
       </RecipeStepAccordion>
     {/if}
-  {:else}
+  {:else if !collapsed}
     <RecipeIngredientsSection
       {ingredientSets}
       {canAddSet}
       {componentOptions}
       {essenceOptions}
       {itemTags}
+      {tagComponentCounts}
       {currencyUnits}
       {currencyEnabled}
       {showSetName}

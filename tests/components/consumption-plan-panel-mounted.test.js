@@ -7,6 +7,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import { buildConsumptionPlan } from '../../src/ui/svelte/util/requirementSlots.js';
 import { sharedEssenceCraftability } from '../helpers/crafting-fixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -90,6 +91,36 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
         ['Duskcrystal', '×1'],
       ]
     );
+  });
+
+  it('states each overshot essence on its own line beneath the rows, in the shipped wording', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const target = await harness.mount({
+        plan: buildConsumptionPlan(mixedCraftability()),
+        overshoots: [
+          { essenceId: 'radiant', name: 'Radiant', amount: 2 },
+          { essenceId: 'shadow', name: 'Shadow', amount: 1 },
+        ],
+      });
+      const lines = [...target.querySelectorAll('[data-consumption-overshoot]')];
+      assert.deepEqual(
+        lines.map((line) => line.textContent.trim()),
+        ['Radiant: 2 more than required', 'Shadow: 1 more than required']
+      );
+      assert.equal(
+        target.querySelector('.consumption-plan-rows').compareDocumentPosition(lines[0]) & 4,
+        4,
+        'beneath the planned rows'
+      );
+    } finally {
+      restoreI18n();
+    }
+  });
+
+  it('states no overshoot line when the caller reports none', async () => {
+    const target = await harness.mount({ plan: buildConsumptionPlan(mixedCraftability()) });
+    assert.ok(!target.querySelector('[data-consumption-overshoot]'));
   });
 
   // The essence block contributes at most ONE plan entry per item key.

@@ -211,7 +211,7 @@
           value={rule.mode}
           groupName={`${uid}-advantage-mode`}
           ariaLabel={modeTitle}
-          dataAttr="data-check-advantage-mode"
+          data-check-advantage-mode
           optionDataAttr="data-check-advantage-mode-option"
           onChange={(next) => writeAdvantage('mode', next)}
         />

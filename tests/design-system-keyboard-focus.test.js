@@ -194,9 +194,9 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { roleZero } = focusPopulations();
 
     assert.ok(
-      roleZero.length >= 9,
+      roleZero.length >= 7,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 11 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 7 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 
@@ -217,9 +217,10 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { formlessButtons } = focusPopulations();
     const undeclared = undeclaredIn(formlessButtons);
 
+    // A floor on the walk's reach: lower it only by the formless buttons a change deletes.
     assert.ok(
-      formlessButtons.length >= 200,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 261 ` +
+      formlessButtons.length >= 149,
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 149 ` +
         'this tree holds'
     );
     assert.ok(

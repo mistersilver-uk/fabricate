@@ -68,7 +68,7 @@ export function mountCaptionShape({
         label: 'Sort',
         value: startValue || 'newest',
         options,
-        triggerData: { 'data-fixture-select': '' },
+        triggerProps: { 'data-fixture-select': '' },
         onChange: () => {},
       },
     });
@@ -92,7 +92,7 @@ export function mountCaptionShape({
       value: startValue || 'newest',
       options,
       ariaLabelledBy: 'fixture-caption',
-      triggerData: { 'data-fixture-select': '' },
+      triggerProps: { 'data-fixture-select': '' },
       onChange: () => {},
     },
   });

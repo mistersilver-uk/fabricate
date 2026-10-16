@@ -50,6 +50,7 @@ import { chromium } from 'playwright';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
 import { labQueryFor, partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
+import { assertComputedCensus } from './lib/viewLabComputedCensus.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 import {
@@ -136,7 +137,7 @@ async function startLabServer() {
 
 /** The click modifiers Playwright accepts. */
 const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
-const PRESS_KEYS = ['Enter', 'Space'];
+const PRESS_KEYS = ['Enter', 'Space', 'Tab'];
 
 /** The verbs a `modifiers` step may not carry. */
 const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];
@@ -482,6 +483,7 @@ async function renderPage(
     }
 
     await assertViewLabLayout(page, expectLayout, label);
+    await assertComputedCensus(page, appId, label);
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });

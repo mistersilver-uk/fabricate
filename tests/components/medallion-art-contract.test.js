@@ -15,10 +15,24 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 /** EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing. */
 // #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1. #2080: the simulator's number tile and
 // its result-card icon +2. #2006: the count face tile -1, now the shared DiceTiles' own tile.
-const MEDALLION_SITES = 85;
+// #1518: the recipe, inventory and run identity tiles -3, PlayerDetailHeader's one tile +1; the
+// retired RequirementTile's two -2, its slots now the shared SlotTile's one site; the option
+// selector's option tiles -2, now the chooser's alternatives. Issue 1773: the output, outcome-tier
+// and roll-result award pills -3, now the shared AwardPill's one site. Issue 1782: the recipe-item
+// contents tab's linked-recipe row -1, its members now `SetPicker` tokens. Issue 1644: the crafting
+// pool's carrier tile -1, now the shared EssencePool's source tile; the routed salvage result
+// pill -1, now the shared ladder's `ListRow`; the gathering drop row's tile -1, its drops now the
+// shared YieldScale's rows; the held-stack picker's tile -1, its stacks now the shared
+// ChoiceOptionList's one site. Issue 1778: ListRow's mark +3, one literal tag per art rung (22,
+// 26, 30, 38); RunCard's tile -1, now that row's 30px mark; the ingredient routes' product tile -1,
+// now the dense row's 22px mark; the alchemy known-recipe and discipline card tiles -2, now that
+// row's 38px mark. Issue 2321: the inventory inspector's cross-reference tiles -6, now
+// `XrefList`'s rows. Issue 2381: the player progressive stage row's art +2, one per branch (22 inline, 30 stacked), replacing the raw `<img>` tile
+// its retired list drew. The count is every `<Medallion` opening tag in `src/`; a branched pair is two.
+const MEDALLION_SITES = 70;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 66;
+const ART_BEARING_SITES = 53;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
@@ -54,8 +68,8 @@ describe('1506 the medallion art contract — its domain', () => {
     assert.equal(
       TAGS.length,
       MEDALLION_SITES,
-      'the medallion render-site census moved. That is not itself wrong — this change converted ' +
-        'two retired crafting tiles into it — but the count is what keeps the negative clauses ' +
+      'the medallion render-site census moved. That is not itself wrong — a change converts ' +
+        'tiles into it or composes it through a shared row — but the count is what keeps the negative clauses ' +
         'below honest, so it is re-measured deliberately rather than left to drift.'
     );
     assert.equal(

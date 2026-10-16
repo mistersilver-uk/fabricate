@@ -8,7 +8,7 @@
 <script>
   import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize, notifyError } from '../../../util/foundryBridge.js';
-  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import { TOOL_BREAKAGE_TRACK, toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Field from '../../../components/Field.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
@@ -60,6 +60,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     currencyUnits = [],
     // THE `PREVIEW AS` SEAM: `{id, name, img}` per actor and a reader for one actor's prepared
     // roll data, both the SHELL'S, because resolving an Actor is a Foundry read and this is a leaf.
@@ -138,8 +139,6 @@
     return result;
   }
 
-  /**
-   */
   function sectionLabel(section) {
     return scopedSectionLabel(section, text);
   }
@@ -277,15 +276,15 @@
     },
   ]);
 
-  // THE VALIDATION TAB WEARS ITS OWN COUNT, so a GM need not open it to learn whether anything
-  // is wrong. A clean record shows a tick, because a zero reads as a quantity of something.
+  // The Validation tab wears its own count, and a clean record shows a tick rather than a zero.
+  const ALL_VALID = 'FABRICATE.Admin.Manager.Tools.Editor.AllValid';
   const tabBadges = $derived({
     validation:
       validationCounts.blocking > 0
         ? { label: String(validationCounts.blocking), tone: 'danger' }
         : validationCounts.warnings > 0
           ? { label: String(validationCounts.warnings), tone: 'warning' }
-          : { label: '✓', tone: 'success' },
+          : { label: '✓', tone: 'neutral', name: text(ALL_VALID, 'All checks pass') },
   });
 
   /** The inherit count a section states before an edit lands; `null` for a SEEDED section. */
@@ -540,11 +539,33 @@
    */
   const source = $derived(toolSourceSnapshot(entity, worldItems));
 
-  /**
-   */
+  // `worldItems` is the world's Items only, so a compendium address is never reported missing,
+  // as `componentSourceBroken` rules.
   const sourceMissing = $derived(
-    sourceLinked && worldItems.length > 0 && !worldItems.some((item) => item?.uuid === sourceUuid)
+    sourceLinked &&
+      worldItems.length > 0 &&
+      !sourceUuid.trim().startsWith('Compendium.') &&
+      !worldItems.some((item) => item?.uuid === sourceUuid)
   );
+
+  const sourceDropHint = $derived.by(() => {
+    if (sourceMissing) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint',
+        'This Item no longer resolves. Drop another Item here to replace it.'
+      );
+    }
+    if (sourceLinked) {
+      return text(
+        'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
+        'Drop another Item here to replace the linked source.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
+      'Drop an Item from the Items directory or a compendium to link this Tool.'
+    );
+  });
 
   /**
    * THE NAME THIS SCREEN SHOWS, and the ONE place the optional display label is resolved: the
@@ -759,12 +780,12 @@
         ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Entry.Tabs"
         ariaLabel="Tool entry sections"
         idStem="world-tool-entry"
-        hookAttribute="data-world-tool-entry-tab"
+        tabDataAttr="data-world-tool-entry-tab"
         badges={tabBadges}
-        badgeAttribute="data-world-tool-entry-tab-badge"
+        badgeDataAttr="data-world-tool-entry-tab-badge"
         danger
+        activePanelOnly
       />
-
       <div
         class="manager-world-tool-entry-panel"
         data-scoped-entry={PAGE_ID}
@@ -820,18 +841,10 @@
               item={sourceLinked ? source : null}
               state={sourceMissing ? 'missing' : 'linked'}
               title={entryName}
-              hint={sourceLinked
-                ? text(
-                    'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
-                    'Drop another Item here to replace the linked source.'
-                  )
-                : text(
-                    'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
-                    'Drop an Item from the Items directory or a compendium to link this Tool.'
-                  )}
+              hint={sourceDropHint}
               onDrop={onSourceDrop}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
-              unlinkAttr="data-world-tool-entry-source-unlink"
+              unlinkDataAttr="data-world-tool-entry-source-unlink"
               onUnlink={sourceLinked ? onUnlinkSource : null}
             />
             <!-- READ-ONLY, and it is the linked Item's OWN description rather than this record's.
@@ -978,7 +991,7 @@
               groupName="world-tool-breakage-mode"
               columns={2}
               legend={sectionLabel('breakage')}
-              dataGroup="world-tool-breakage-mode"
+              data-radio-card-group="world-tool-breakage-mode"
               optionDataAttr="data-world-tool-entry-breakage-mode"
               onChange={changeBreakageChoice}
             />
@@ -1063,7 +1076,7 @@
                       'Breakage chance'
                     )}
                     resolveColor={toolBreakageChanceColor}
-                    trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                    trackGradient={TOOL_BREAKAGE_TRACK}
                     controlClass="manager-tool-breakage-chance-control"
                     numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                     rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
@@ -1137,7 +1150,7 @@
               groupName="world-tool-onbreak-mode"
               columns={3}
               legend={sectionLabel('onBreak')}
-              dataGroup="world-tool-onbreak-mode"
+              data-radio-card-group="world-tool-onbreak-mode"
               optionDataAttr="data-world-tool-entry-onbreak-mode"
               onChange={(mode) => patchSection('onBreak', { mode })}
             />
@@ -1166,6 +1179,7 @@
                 groups={repairGroups}
                 {componentOptions}
                 {itemTags}
+                {tagComponentCounts}
                 {essenceOptions}
                 {currencyUnits}
                 currencyEnabled={true}
@@ -1272,7 +1286,7 @@
     gap: var(--fab-space-3);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
     min-width: 0;
   }
@@ -1315,69 +1329,12 @@
     min-width: 0;
   }
 
-  /* THE LINKED TILE IS SOLID AND FILLED; DASHED MEANS UNLINKED. The shipped `ItemDropZone` paints
-     ONE box for both faces, so a healthy link wore the design's broken state; `proto:2089` draws
-     the LINKED tile filled and reserves the dashed edge for the UNLINKED prompt. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    > :global(.manager-item-drop-zone.is-linked) {
-    gap: var(--fab-space-3);
-    min-height: 0;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 11px;
-    background: var(--fab-surface-soft);
-  }
-
-  /* THE LINKED ITEM'S NAME IS SET IN THE DISPLAY SERIF (`proto:2091`), where nothing declared a
-     face, a size or a weight on that element at all. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong) {
-    font-family: var(--fab-font-serif);
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
-
-  /* THE UNLINKED FACE KEEPS THE DASH AND GAINS THE DANGER INK. `2px` rather than the design's
-     1.5: a fractional border rounds per device pixel ratio and reads as a hairline at 1x. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    > :global(.manager-item-drop-zone:not(.is-linked)) {
-    border: 2px dashed var(--fab-danger-border);
-    background: transparent;
-  }
-
-  /* A BARE DANGER GLYPH, NOT A FILLED TILE (`proto:2099`): the 44px square is the mount for a
-     linked Item's ART, and with no Item it reads as a picture that failed to load. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-icon) {
-    color: var(--fab-danger-text);
-    background: transparent;
-  }
-
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy strong),
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy small) {
-    color: var(--fab-danger-text);
-  }
-
-  /* THE UNLINK IS A DESTRUCTIVE CONTROL AND IS DRAWN AS ONE (`proto:2093`): `IconButton.is-danger`
-     carries the danger edge and ink but leaves the resting fill neutral. */
-  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone-actions .manager-icon-button) {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    background: var(--fab-danger-soft);
-    font-size: 0.68rem;
-  }
-
   /* THE LINKED ITEM'S OWN DESCRIPTION, in a bordered read-only box: a surface rather than a
      paragraph, because it states another document's text, and the edge says it is read-only. */
   .manager-world-tool-entry-source-description {
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     color: var(--fab-text-muted);
     font-size: 0.68rem;
@@ -1421,7 +1378,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     min-width: 0;
   }
@@ -1471,7 +1428,7 @@
   }
 
   /* AN INVALID FORMULA IS EDGE-MARKED as well as explained; two selectors deep so it beats the
-     shipped `.manager-field input` border. */
+     shipped `.fabricate-field input` border. */
   :global(.manager-world-tool-entry-formula) input[aria-invalid='true'] {
     border-color: var(--fab-danger-border);
   }

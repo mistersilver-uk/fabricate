@@ -2,7 +2,12 @@
  * System scope: the Checks rail, its modifier panels, and the tags and categories route.
  */
 
-import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  COMPONENT_EDITOR_MATCHES,
+  GATHERING_ROUTE_MODEL_PATTERN,
+  GATHERING_TASK_EDITOR_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
@@ -249,8 +254,17 @@ const COUNTING = '.fabricate-manager:has([data-check-product-option="count"].is-
 const ADDITIONAL_DICE = '[data-check-additional-dice-group]';
 const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: true });
 const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
+/** Each macro zone fills its well, so two wells side by side end level (issue 2466). */
+const MACRO_ZONES_FILL = Object.freeze({
+  controls: ['read', 'spend'].map((slot) => ({
+    selector: `[data-check-additional-dice-${slot}-macro]`,
+    styles: 'flex-grow: 1',
+  })),
+});
 const PATH_LINE = (tone, text) =>
   `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
+const PATH_READING = (kind, text) =>
+  `:has([data-check-additional-dice-path-field] [data-expr-input-reading="${kind}"]:text-is("${text}"))`;
 const PREVIEW_NOTE = (kind, text) =>
   `:has([data-checks-preview-additional-dice-note="${kind}"]:text-is("${text}"))`;
 const MOMENTUM_PATH = 'system.resources.momentum.value';
@@ -289,7 +303,7 @@ const overFixed = (dc) => [
 ];
 const triggerPreset = (preset) => [
   { selector: '#checks-section-triggers' },
-  { selector: `[data-add-trigger-preset="${preset}"]` },
+  { selector: `[data-check-trigger-presets] [data-rule-row-preset="${preset}"]` },
 ];
 /** Two fixed ranges, Spoiled 1–20 and Sound 21–30, typed onto Runework's fresh fixed list. */
 const FIXED_RANGES = Object.freeze([
@@ -637,12 +651,59 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-check-formula-average-withheld="die-modifiers"]',
+    // The Formula card's token row at the floor width: a token owns its own centre.
+    expectCenterHit: '.fab-expr-input-token',
     position: { width: 1024, height: 640 },
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
     kinds: ['manager', 'checks', 'responsive'],
+  }),
+  managerCase({
+    id: 'manager-checks-formula-card',
+    label: 'Manager — Checks Formula card, field, tokens and average',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @prof' },
+      // A closing click on the card's title: it takes focus off the field, so the frame is at rest.
+      { selector: '[data-roll-formula-card] .manager-checks-card-title' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager .manager-checks-formula:has([data-check-formula-average="10.5"])',
+    expectCenterHit: '.fab-expr-input-token',
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-character-value-unresolved',
+    label: 'Manager — Checks character value the character lacks, reading and line',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      ...PARITY_NAV,
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.craft.value'),
+      // A closing click on the card's title takes focus off the field, so the frame is at rest.
+      { selector: '[data-check-difficulty-card] .manager-checks-card-title' },
+      // The click can scroll the panel; the field is brought back into view.
+      { selector: '[data-check-attribute-fields]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields]' +
+      ':has([data-expr-input-reading="unresolved"]:text-is("Unresolved"))' +
+      ':has([data-check-target-resolution="unresolved"]:has-text("@skills.craft.value"))',
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+    kinds: ['manager', 'checks'],
   }),
   // The first open-panel frame in the checks studio (issue 1510), and the only way to photograph a
   // converted control's own subject: the list exists only while the panel is open, and an open panel
@@ -772,7 +833,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
       { selector: '[data-recipe-add="routing-option"]' },
     ],
@@ -1061,7 +1122,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
   managerCase({
@@ -1080,8 +1141,10 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      // The pick is a Requirements card (issue 1522).
+      { selector: '[data-gathering-task-tab="requirements"]' },
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -1094,7 +1157,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   managerCase({
@@ -1173,15 +1236,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags'],
@@ -1229,7 +1292,7 @@ export const CASES = Object.freeze([
         // `:not(.is-danger)` is load-bearing: an unreferenced row's delete wears `is-danger` and
         // fires in one click with no confirm, which would mutate the fixture mid-capture.
         selector:
-          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .manager-icon-button:not(.is-danger)',
+          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .fabricate-icon-button:not(.is-danger)',
       },
     ],
     expectView: 'tags',
@@ -1238,15 +1301,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags', 'responsive'],
@@ -1315,7 +1378,8 @@ export const CASES = Object.freeze([
       ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['+2', '0', '-2', '-4']),
       ...parityPreview(3),
     ],
-    expectSelector: '.fabricate-manager [data-check-target-resolution="resolved"]',
+    expectSelector:
+      '.fabricate-manager [data-check-attribute-fields] [data-expr-input-reading="resolved"]:text-is("= 12")',
   }),
   parityCase({
     id: 'manager-checks-parity-under-multiply',
@@ -1356,57 +1420,75 @@ export const CASES = Object.freeze([
     ],
     expectSelector: '.fabricate-manager [data-check-attribute-fields]',
   }),
-  parityCase({
+  managerCase({
+    ...parityCase({
+      label: 'outcome tiers against a multiplied character value',
+      frame: 11,
+      query: { system: 'lab-runework' },
+      steps: [
+        ...parityFormula('1d100'),
+        ...previewAsActor('lab-actor-idrin'),
+        ...PARITY_UNDER,
+        ...parityAttribute('@skills.med.mod + 51'),
+        ...PARITY_MULTIPLY,
+        ...parityType('[data-check-base-adjustment]', 1, '1'),
+        ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
+        ...parityPreview(1),
+        ...parityOutcomes(
+          ['Failure', 'Regular', 'Hard', 'Extreme'],
+          '[data-outcome-adjustment]',
+          [
+            [2, '1'],
+            [3, '1/2'],
+            [4, '1/5'],
+          ],
+          ['failure', 'success', 'success', 'success']
+        ),
+      ],
+      expectSelector: '.fabricate-manager [data-outcome-adjustment][data-stepper-endpoint]',
+    }),
     id: 'manager-checks-parity-outcomes-multiply',
-    label: 'outcome tiers against a multiplied character value',
-    frame: 11,
-    query: { system: 'lab-runework' },
-    steps: [
-      ...parityFormula('1d100'),
-      ...previewAsActor('lab-actor-idrin'),
-      ...PARITY_UNDER,
-      ...parityAttribute('@skills.med.mod + 51'),
-      ...PARITY_MULTIPLY,
-      ...parityType('[data-check-base-adjustment]', 1, '1'),
-      ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
-      ...parityPreview(1),
-      ...parityOutcomes(
-        ['Failure', 'Regular', 'Hard', 'Extreme'],
-        '[data-outcome-adjustment]',
-        [
-          [2, '1'],
-          [3, '1/2'],
-          [4, '1/5'],
-        ],
-        ['failure', 'success', 'success', 'success']
-      ),
-    ],
-    expectSelector: '.fabricate-manager [data-outcome-head]',
+    expectLayout: {
+      containerSelector: '.manager-checks-tier-list',
+      oneLineRows: '.manager-checks-tier-list [data-outcome-row]',
+      unclipped:
+        '.manager-checks-tier-list [data-outcome-adjustment], .manager-checks-tier-list [data-outcome-name]',
+      alignedLeft: '.manager-checks-tier-list .manager-checks-tier-stepper',
+    },
+    expectCenterHit: '[data-outcome-adjustment][data-stepper-endpoint]',
   }),
-  parityCase({
+  managerCase({
+    ...parityCase({
+      label: 'outcome tiers against a fixed target',
+      frame: 12,
+      query: { system: 'lab-runework' },
+      steps: [
+        ...parityFormula('1d20'),
+        ...previewAsActor('lab-actor-idrin'),
+        ...PARITY_UNDER,
+        ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
+        ...parityPreview(1),
+        ...parityOutcomes(
+          ['Botched', 'Flawed', 'Success', 'Fine'],
+          '[data-outcome-dc]',
+          [
+            [1, '-4'],
+            [2, '-1'],
+            [3, '0'],
+            [4, '+3'],
+          ],
+          ['failure', 'failure', 'success', 'success']
+        ),
+      ],
+      expectSelector: '.fabricate-manager [data-outcome-head]',
+    }),
     id: 'manager-checks-parity-outcomes-under-fixed',
-    label: 'outcome tiers against a fixed target',
-    frame: 12,
-    query: { system: 'lab-runework' },
-    steps: [
-      ...parityFormula('1d20'),
-      ...previewAsActor('lab-actor-idrin'),
-      ...PARITY_UNDER,
-      ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
-      ...parityPreview(1),
-      ...parityOutcomes(
-        ['Botched', 'Flawed', 'Success', 'Fine'],
-        '[data-outcome-dc]',
-        [
-          [1, '-4'],
-          [2, '-1'],
-          [3, '0'],
-          [4, '+3'],
-        ],
-        ['failure', 'failure', 'success', 'success']
-      ),
-    ],
-    expectSelector: '.fabricate-manager [data-outcome-head]',
+    expectLayout: {
+      containerSelector: '.manager-checks-tier-list',
+      oneLineRows: '.manager-checks-tier-list [data-outcome-row]',
+      unclipped: '.manager-checks-tier-list [data-outcome-dc]',
+      alignedLeft: '.manager-checks-tier-list .manager-checks-tier-stepper',
+    },
   }),
   underCase({
     id: 'manager-checks-under-fixed-rolled',
@@ -1423,7 +1505,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [...underMultiplySteps('@skills.med.mod + 51'), ...SCROLL_ODDS],
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
   }),
   underCase({
     id: 'manager-checks-under-attribute-rolled',
@@ -1464,7 +1546,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar])' +
+      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track])' +
       ':not(:has([data-checks-simulator-state="needs-preview-actor"]))',
   }),
   underCase({
@@ -1579,7 +1661,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]):has([data-checks-odds-domain])',
+      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]):has([data-checks-odds-domain])',
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
   }),
@@ -1617,7 +1699,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
     // The 1024x640 declared floor, stacked, for the same enumerated row `manager-checks-stacked-floor`
     // proves for sum/over: the odds panel restacks under the same ladder for a roll-under record.
     position: { width: 1024, height: 640 },
@@ -1810,7 +1892,7 @@ export const CASES = Object.freeze([
     frame: 6,
     steps: [...COUNT_IDRIN, ...COUNT_ODDS],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-checks-odds-row="botch"] [data-checks-odds-bar]',
+      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-banded-bar-row="botch"] [data-banded-bar-track]',
   }),
   countCase({
     id: 'manager-checks-count-over-rolled',
@@ -1879,7 +1961,7 @@ export const CASES = Object.freeze([
     nav: 'gathering',
     steps: COUNT_ODDS,
     expectSelector:
-      '.fabricate-manager [data-checks-odds-product="count"] [data-checks-odds-row="botch"]',
+      '.fabricate-manager [data-checks-odds-product="count"] [data-banded-bar-row="botch"]',
   }),
   countCase({
     id: 'manager-checks-count-progressive',
@@ -1888,7 +1970,7 @@ export const CASES = Object.freeze([
     state: 'dice-pool-extended',
     steps: [{ selector: '[data-checks-preview-difficulties]', fill: '1, 1, 2' }, ...COUNT_ROLL],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-row="botch"]):has([data-checks-simulator-band])',
+      '.fabricate-manager:has([data-banded-bar-row="botch"]):has([data-checks-simulator-band])',
   }),
   countCase({
     id: 'manager-checks-count-zero',
@@ -1912,6 +1994,17 @@ export const CASES = Object.freeze([
     steps: COUNT_ROLL,
     expectSelector:
       '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch]:has([data-checks-simulator-margin="botch"]) [data-checks-simulator-total="-3"]',
+  }),
+  // Issue 1782: a one-outcome chart is the single-row meter, drawn in the histogram's band row.
+  countCase({
+    id: 'manager-checks-count-botch-odds',
+    label: 'a botch-only odds chart',
+    frame: '40 semantic',
+    state: 'dice-pool-extended',
+    nav: 'gathering',
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-product="count"] [role="meter"] .fab-banded-bar-band[data-banded-bar-row="botch"]',
   }),
   rolledCase({
     id: 'manager-checks-count-over-rolled-failure',
@@ -2045,7 +2138,9 @@ export const CASES = Object.freeze([
     expectSelector:
       COUNTING +
       ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ':has([data-check-count-row-base] [data-expr-input-reading="resolved"])' +
       ' [data-check-count-actor-line="resolved"]',
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   authoringCase({
     id: 'manager-checks-v3-count-under',
@@ -2195,12 +2290,12 @@ export const CASES = Object.freeze([
     frame: '15',
     steps: [
       { selector: '#checks-section-triggers' },
-      { selector: '[data-add-trigger-preset="botch"]' },
+      { selector: '[data-check-trigger-presets] [data-rule-row-preset="botch"]' },
     ],
     expectSelector:
-      '.fabricate-manager:has([data-add-trigger-preset="low"])' +
-      ':not(:has([data-add-trigger-preset="high"]))' +
-      ' [data-trigger] [data-trigger-summary]:has-text("Net successes")',
+      '.fabricate-manager:has([data-check-trigger-presets] [data-rule-row-preset="low"])' +
+      ':not(:has([data-check-trigger-presets] [data-rule-row-preset="high"]))' +
+      ' [data-trigger] [data-rule-row-title]:has-text("Net successes")',
   }),
   authoringCase({
     id: 'manager-checks-v3-count-convert',
@@ -2293,9 +2388,10 @@ export const CASES = Object.freeze([
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}` +
       ':has([data-check-additional-dice-source-option="path"].is-active)' +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2') +
+      PATH_READING('resolved', '= 2') +
       ':has([data-check-additional-dice-label-field])' +
       ':has([data-check-additional-dice-max])',
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-path-narrow',
@@ -2306,7 +2402,7 @@ export const CASES = Object.freeze([
     expectSelector:
       ':not(:has([data-checks-simulator-readout]))' +
       ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-source-option="path"].is-active)` +
-      PATH_LINE('resolved', 'Idrin Ashfall → 2'),
+      PATH_READING('resolved', '= 2'),
   }),
   // `rdySrc` in the Studio: the path cleared, so nothing can be offered.
   additionalDiceCase({
@@ -2331,6 +2427,7 @@ export const CASES = Object.freeze([
         `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
       ) +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
@@ -2348,6 +2445,7 @@ export const CASES = Object.freeze([
       ) +
       ':has(input[data-checks-preview-additional-dice]:disabled)' +
       ` ${ADDITIONAL_DICE}` +
+      PATH_READING('unresolved', 'Unresolved') +
       PATH_LINE(
         'warning',
         `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so spending it would not lower it. Use a stored value.`
@@ -2364,6 +2462,19 @@ export const CASES = Object.freeze([
       ` ${ADDITIONAL_DICE}:not(:has(${ADDITIONAL_DICE_PATH}))` +
       ':has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))' +
       ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
+  }),
+  // The same two wells near the 220px floor their grid gives them.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-narrow',
+    label: 'paid by macros, the spend macro not yet linked, at 580x720',
+    frame: '07, macros',
+    position: { width: 580, height: 720 },
+    steps: [{ selector: '[data-check-additional-dice-source-option="macro"]' }],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
+    expectNoHorizontalOverflow: '[data-check-additional-dice-macros]',
+    expectLayout: MACRO_ZONES_FILL,
   }),
   // Both macros linked: the Preview never runs the read macro, so the maximum bounds it.
   additionalDiceCase({
@@ -2382,6 +2493,22 @@ export const CASES = Object.freeze([
     // The linked uuid wraps under its Copy button rather than running beneath it.
     expectNoHorizontalOverflow:
       '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-pair-narrow',
+    label: 'paid by a linked read and spend macro, at 580x720',
+    frame: '07, macros',
+    state: 'dice-pool-faults-macro',
+    position: { width: 580, height: 720 },
+    steps: [],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Announce Momentum")',
+    expectNoHorizontalOverflow: [
+      '[data-check-additional-dice-macros]',
+      '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+    ],
+    expectLayout: MACRO_ZONES_FILL,
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-no-actor',

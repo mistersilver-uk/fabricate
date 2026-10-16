@@ -1,9 +1,10 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,13 +17,12 @@ const eventInspectorPath = resolve(
   'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
 );
 const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
+const css = readStylesheet();
 
 describe('GatheringEventsBrowserView source contract', () => {
   // The filter's own body; its forward to the leaf is asserted by DOM in
@@ -36,15 +36,15 @@ describe('GatheringEventsBrowserView source contract', () => {
   it('renders an event library tabpanel with the expected toolbar filters', () => {
     assert.ok(browserSource.includes("class=\"manager-gathering-panel manager-gathering-panel-events\""), 'browser should use the event panel class');
     assert.ok(browserSource.includes('data-gathering-events-browser'), 'browser should expose a data attribute hook for tests');
-    // The search input's markup moved into `components/ManagerSearchField.svelte` (issue
+    // The search input's markup moved into `components/SearchField.svelte` (issue
     // 1039), so the browser is asserted to RENDER the primitive rather than to write the
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
-    assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
+    assert.ok(/<SearchField[\s/>]/.test(browserSource), 'browser should render the shared search field');
     // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(
-      browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
+      browserSource.includes('onChange={(next) => (ui.searchTerm = next)}'),
       'browser should write the search term back to the lifted view-state'
     );
     assert.ok(browserSource.includes("value={statusFilter}"), 'browser should expose a status filter');

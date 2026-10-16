@@ -1,5 +1,5 @@
 /** The Checks Studio's simulator, odds histogram and previewed record, MOUNTED (issue 1097). */
-import { describe, it, before, after, afterEach } from 'node:test';
+import { describe, it, before, after, afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -267,9 +267,9 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
 
   it('rolls through the studio BUTTON PRIMITIVE, not a hand-written class string', async () => {
     // Reported as "the roll button does not match the studio's button". The cause is not a
-    // missing rule: `manager-button is-primary` matches no rule stating a type size, so the
+    // missing rule: `fabricate-button is-primary` matches no rule stating a type size, so the
     // label took Foundry's 14px app base while every converted button in the studio read at
-    // the primitive's 11.52px. `fab-manager-button` is what `ManagerButton` emits and is the
+    // the primitive's 11.52px. `fab-manager-button` is what `Button` emits and is the
     // only class the type-scale rule keys on, so its presence IS the conversion.
     const root = await mountChecks();
     const roll = root.querySelector('[data-checks-simulator-roll]');
@@ -277,7 +277,7 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
     assert.equal(roll.querySelectorAll('button').length, 0, 'and nests none');
     assert.ok(
       roll.classList.contains('fab-manager-button'),
-      'the roll action renders through ManagerButton'
+      'the roll action renders through Button'
     );
     assert.ok(roll.classList.contains('is-primary'), 'in the primary role it always had');
     assert.ok(
@@ -398,10 +398,10 @@ describe('the outcome-preview readout', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 12 · +0', 'margin'],
-      card: ['success', 'Success', 'Counts as a success · result group bound to this tier'],
+      card: ['success', 'Success', 'Counts as a success · result set bound to this tier'],
       note: null,
       rows: [
-        ['result-group', 'Result group produced', 'Success'],
+        ['result-group', 'Result set produced', 'Success'],
         ['ingredients', 'Ingredients consumed', 'as listed'],
       ],
     });
@@ -491,12 +491,11 @@ describe('the evaluation reaches the stack, the editors and the preview (issue 2
   });
 
   it('reads the character value for the Preview-as actor in the routed and simple editors', async () => {
+    const TARGET_READING = '[data-check-attribute-fields] [data-expr-input-reading="resolved"]';
     const routed = await mountChecks({ craftingCheck: { ...ROUTED_CHECK, evaluation: attribute } });
     await choosePreviewActor(routed, 'sera');
-    assert.equal(
-      routed.querySelector('[data-check-target-resolution]')?.textContent.trim(),
-      'Sera Vane → 3'
-    );
+    assert.equal(routed.querySelector(TARGET_READING)?.textContent, '= 3');
+    assert.ok(!routed.querySelector('[data-check-target-resolution]'), 'a resolved value draws no line');
     harness.remount();
     const simple = await mountChecks({
       resolutionMode: 'simple',
@@ -504,10 +503,7 @@ describe('the evaluation reaches the stack, the editors and the preview (issue 2
       craftingCheckSimple: { ...SIMPLE_CHECK, evaluation: attribute },
     });
     await choosePreviewActor(simple, 'sera');
-    assert.equal(
-      simple.querySelector('[data-check-target-resolution]')?.textContent.trim(),
-      'Sera Vane → 3'
-    );
+    assert.equal(simple.querySelector(TARGET_READING)?.textContent, '= 3');
   });
 
   const KIT = {
@@ -677,10 +673,13 @@ describe('the odds histogram', () => {
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    const bars = [...root.querySelectorAll('[data-checks-odds-bar]')];
+    const bars = [...root.querySelectorAll('[data-banded-bar-track]')];
     assert.ok(bars.length > 0, 'there are bars');
     for (const bar of bars) {
       assert.ok(bar.classList.contains('fab-fill-bar'), 'each bar IS the shared primitive');
+      // A histogram's tracks are hidden; its names and percentages are not (issue 1782).
+      assert.equal(bar.getAttribute('aria-hidden'), 'true', 'the track is decorative');
+      assert.ok(!bar.closest('[role="meter"]'), 'several rows are not a meter');
       const fill = bar.querySelector('.fab-fill-bar-fill');
       assert.ok(Boolean(fill), 'with the primitive’s own fill element');
       assert.ok(
@@ -792,8 +791,8 @@ describe('the modifier context reaches the derivations that DESCRIBE the roll', 
     const percents = async (props) => {
       const root = await mountChecks(props);
       await choosePreviewActor(root, 'sera');
-      return [...root.querySelectorAll('[data-checks-odds-percent]')].map(
-        (cell) => `${cell.getAttribute('data-checks-odds-percent')}:${cell.textContent.trim()}`
+      return [...root.querySelectorAll('[data-banded-bar-percent]')].map(
+        (cell) => `${cell.getAttribute('data-banded-bar-percent')}:${cell.textContent.trim()}`
       );
     };
     const without = await percents();
@@ -856,9 +855,9 @@ describe('the progressive PREVIEW SANDBOX', () => {
     // `1d20 + @prof` for Sera is `1d20 + 3`.
     const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
     await choosePreviewActor(root, 'sera');
-    const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
-      row.getAttribute('data-checks-odds-row'),
-      row.querySelector('[data-checks-odds-percent]').textContent.trim(),
+    const rows = [...root.querySelectorAll('[data-banded-bar-row]')].map((row) => [
+      row.getAttribute('data-banded-bar-row'),
+      row.querySelector('[data-banded-bar-percent]').textContent.trim(),
     ]);
     assert.deepEqual(rows, [
       ['award-0', '10%'],
@@ -866,7 +865,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
       ['award-2', '45%'],
     ]);
     assert.equal(
-      root.querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label').textContent
+      root.querySelector('[data-banded-bar-row="award-0"] .fab-banded-bar-name').textContent
         .trim(),
       '0 of 4',
       'an award of nothing is a real outcome and IS listed, out of the authored four'
@@ -952,8 +951,8 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
     assert.equal(odds(root).dataset.checksOddsDirection, 'under');
     assert.deepEqual(
-      [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
-        cell.dataset.checksOddsPercent,
+      [...root.querySelectorAll('[data-banded-bar-percent]')].map((cell) => [
+        cell.dataset.bandedBarPercent,
         cell.textContent.trim(),
       ]),
       [
@@ -978,9 +977,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw · Sera Vane',
       total: '9',
       line: ['target 12 · margin +3', 'margin'],
-      card: ['success', 'Regular', 'The recipe’s result group is produced'],
+      card: ['success', 'Regular', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Regular']],
+      rows: [['result-group', 'Result set produced', 'Regular']],
     });
 
     await choosePreviewActor(root, 'no-actor');
@@ -1080,9 +1079,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw',
       total: '9',
       line: ['target 10 · margin +1', 'margin'],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Success']],
+      rows: [['result-group', 'Result set produced', 'Success']],
     });
     assert.equal(root.querySelector('[data-checks-simulator-target]').dataset.checksSimulatorTarget, '10');
   });
@@ -1108,7 +1107,7 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       'the prototype’s exact heading, never "all 0 faces"'
     );
     // P(d20 <= 10 + d4) = 50 / 80.
-    assert.equal(root.querySelector('[data-checks-odds-percent="success"]').textContent.trim(), '62.5%');
+    assert.equal(root.querySelector('[data-banded-bar-percent="success"]').textContent.trim(), '62.5%');
   });
 
   it('never publishes a result rolled before its inputs changed', async () => {
@@ -1161,7 +1160,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       .map((rule) => rule.style.getPropertyValue(property))
       .filter(Boolean);
   const SUCCESS_ROWS = [
-    ['result-group', 'Result group produced', 'full'],
+    ['result-group', 'Result set produced', 'full'],
     ['ingredients', 'Ingredients consumed', 'as listed'],
   ];
   const withTriggers = (check, triggers) => ({ ...check, checkBreakage: { triggers } });
@@ -1180,7 +1179,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 10', ''],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: null,
       rows: SUCCESS_ROWS,
     });
@@ -1282,7 +1281,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(root);
     assert.deepEqual([readout.line, readout.card, readout.rows], [
       ['vs DC 16 · −4', 'margin'],
-      ['failure', 'Flawed', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Flawed', 'Counts as a failure · result set bound to this tier'],
       [['failure-result', 'Failure result if this gathering task defines one', 'per gathering task']],
     ]);
     harness.remount();
@@ -1362,7 +1361,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [stepTrigger('down', 2)]) })
     );
     assert.deepEqual([down.card, down.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['trigger', 'Trigger fired — the result steps down 2 tiers.'],
     ]);
   });
@@ -1372,7 +1371,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await simple(withTriggers({ ...SIMPLE_CHECK, dc: 15 }, [forceTrigger('success')]))
     );
     assert.deepEqual([rescued.card, rescued.note, rescued.rows], [
-      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['success', 'Success', 'The recipe’s result set is produced'],
       ['forced', 'Trigger fired — automatic success.'],
       SUCCESS_ROWS,
     ]);
@@ -1386,7 +1385,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [forceTrigger('failure')]) })
     );
     assert.deepEqual([forced.card, forced.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['forced', 'Trigger fired — forced to the worst failing tier.'],
     ]);
   });
@@ -1404,8 +1403,8 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(await mountChecks({ craftingCheck: fixed }));
     assert.deepEqual([readout.line, readout.card, readout.rows[0]], [
       ['in the 10–14 band', ''],
-      ['success', 'Mid', 'Counts as a success · result group bound to this tier'],
-      ['result-group', 'Result group produced', 'Mid'],
+      ['success', 'Mid', 'Counts as a success · result set bound to this tier'],
+      ['result-group', 'Result set produced', 'Mid'],
     ]);
   });
 
@@ -1500,9 +1499,9 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
         breakdown: '9 · raw · Sera Vane',
         total: '9',
         line: ['target 12 · margin +3', 'margin'],
-        card: ['success', 'Success', 'The recipe’s result group is produced'],
+        card: ['success', 'Success', 'The recipe’s result set is produced'],
         note: MARGIN_NOTES.under,
-        rows: [['result-group', 'Result group produced', 'Success']],
+        rows: [['result-group', 'Result set produced', 'Success']],
       });
     });
 
@@ -1700,13 +1699,89 @@ describe('the Preview’s additional-dice stepper (issue 2008)', () => {
   });
 });
 
+describe('the character value’s reading under the Preview-as picker (issue 2465)', () => {
+  /** A second player character with a proficiency, so a pick between two changes the number. */
+  const NINE = { id: 'nine', name: 'Nine', type: 'character', getRollData: () => ({ prof: 9 }) };
+  const attribute = {
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'attribute', expression: '@prof', adjustmentKind: 'multiply' },
+  };
+  const fields = (root) => root.querySelector('[data-check-attribute-fields]');
+  const chip = (root) => fields(root).querySelector('[data-expr-input-reading]')?.textContent ?? '';
+  const region = (root) => fields(root).querySelector('[data-expr-input-status]');
+
+  let worldActors;
+  before(() => {
+    worldActors = globalThis.game.actors;
+    const actors = [...WORLD_ACTORS, NINE];
+    globalThis.game.actors = { contents: actors, get: (id) => actors.find((a) => a.id === id) };
+  });
+  after(() => {
+    globalThis.game.actors = worldActors;
+  });
+  // `setImmediate` stays real: every `harness.mount` awaits one.
+  beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+  afterEach(() => mock.timers.reset());
+
+  // Through the route every write hands the field a new resolver, so its identity cannot tell an
+  // edit from a pick: this is the clause that holds the typed edit spoken.
+  it('speaks a typed edit once it settles, and never a pick in the picker', async () => {
+    const echoed = [];
+    /** Run `ms` of timers, then cross a real macrotask so the route's echo has landed. */
+    const advance = async (ms) => {
+      mock.timers.tick(ms);
+      await new Promise((done) => setImmediate(done));
+      const landing = [...echoed];
+      echoed.length = 0;
+      await Promise.all(landing);
+      await settle();
+    };
+    let check = { ...ROUTED_CHECK, evaluation: attribute };
+    const root = await mountChecks({
+      craftingCheck: check,
+      onUpdateCraftingCheck: (next) => {
+        check = typeof next === 'function' ? next(check) : { ...check, ...next };
+        echoed.push(harness.setProps({ craftingCheck: check }));
+      },
+    });
+    await choosePreviewActor(root, 'sera');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 3', ''], 'a pick is not an edit');
+
+    const input = root.querySelector('[data-check-target-expression]');
+    input.value = '@prof + 4';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await advance(499);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', ''], 'silent at 499ms');
+    await advance(1);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', '= 7']);
+
+    await choosePreviewActor(root, 'nine');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 13', ''], 'emptied, not rewritten');
+    await advance(1000);
+    assert.deepEqual([chip(root), region(root).textContent], ['= 13', ''], 'at any later tick too');
+
+    await choosePreviewActor(root, 'bare');
+    assert.deepEqual([chip(root), region(root).textContent], ['Unresolved', '']);
+
+    await choosePreviewActor(root, 'no-actor');
+    assert.equal(chip(root), '', 'no actor is in scope, so no reading is drawn');
+    assert.ok(!region(root), 'and the status region is unmounted');
+
+    await choosePreviewActor(root, 'sera');
+    assert.deepEqual([chip(root), region(root).textContent], ['= 7', ''], 'mounted empty again');
+    await advance(1000);
+    assert.equal(region(root).textContent, '');
+  });
+});
+
 describe('the source contract these hooks are pinned by', () => {
   it('keeps the panels on the shared primitives the spec names', () => {
     const odds = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte'),
       'utf8'
     );
-    assert.match(odds, /FillBar from '\.\.\/\.\.\/\.\.\/components\/FillBar\.svelte'/);
+    assert.match(odds, /BandedBar from '\.\.\/\.\.\/\.\.\/components\/BandedBar\.svelte'/);
     const preview = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte'),
       'utf8'

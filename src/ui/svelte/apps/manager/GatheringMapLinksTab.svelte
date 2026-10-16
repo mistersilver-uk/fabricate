@@ -51,7 +51,7 @@
           'FABRICATE.Admin.Manager.Travel.MapLinks.NoScene',
           'Activate a scene to link its regions.'
         )}
-        dataAttr="data-travel-map-links-empty"
+        data-travel-map-links-empty
       />
     {:else if sceneRegions.length === 0}
       <EmptyState
@@ -61,7 +61,7 @@
           'FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions',
           'The active scene has no regions.'
         )}
-        dataAttr="data-travel-map-links-empty"
+        data-travel-map-links-empty
       />
     {:else}
       <div class="manager-map-link-list" role="list">

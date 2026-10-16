@@ -8,6 +8,9 @@
   repair. Fully-owned components never appear.
 -->
 <script>
+  import IconButton from '../../components/IconButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
@@ -15,6 +18,7 @@
   import StatBox from '../../components/StatBox.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Chip from '../../components/Chip.svelte';
 
   let {
     aggregate = null,
@@ -127,7 +131,7 @@
   function ratioChip(have, need) {
     return {
       mode: 'ratio',
-      tone: 'tone-danger',
+      tone: 'danger',
       label: localize('FABRICATE.App.Crafting.Shopping.Owned', { have, need }),
       title: null,
     };
@@ -149,7 +153,7 @@
     if (ing.issue) {
       return {
         mode: 'currency-unavailable',
-        tone: 'tone-warning',
+        tone: 'warning',
         label: localize('FABRICATE.App.Crafting.Shopping.CurrencyUnavailable'),
         title: ing.issue,
       };
@@ -158,14 +162,14 @@
       const count = ing.costRepeats ?? 1;
       return {
         mode: 'currency-unchecked',
-        tone: 'tone-neutral',
+        tone: 'neutral',
         label: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeats', { count }),
         title: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeatsHint', { count }),
       };
     }
     return {
       mode: 'currency',
-      tone: 'tone-danger',
+      tone: 'danger',
       label: localize('FABRICATE.App.Crafting.Shopping.CurrencyShort'),
       title: null,
     };
@@ -199,9 +203,9 @@
   <header class="crafting-shopping-head">
     <p class="crafting-shopping-title">{localize('FABRICATE.App.Crafting.Shopping.Title')}</p>
     {#if !isEmpty}
-      <button type="button" class="crafting-shopping-clear" onclick={() => onClear?.()}>
+      <Button role="ghost" class="crafting-shopping-clear" onclick={() => onClear?.()}>
         {localize('FABRICATE.App.Crafting.Shopping.Clear')}
-      </button>
+      </Button>
     {/if}
   </header>
 
@@ -210,24 +214,21 @@
       value={plannedRecipes}
       label={localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}
       icon="fas fa-scroll"
-      dataAttr="data-summary"
-      dataValue="recipes"
+      data-summary="recipes"
     />
     <StatBox
       value={missingComponentsCount}
       label={localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}
       icon="fas fa-cubes"
       tone={missingComponentsCount > 0 ? 'danger' : 'default'}
-      dataAttr="data-summary"
-      dataValue="components"
+      data-summary="components"
     />
     <StatBox
       value={unavailableToolsCount}
       label={localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}
       icon="fas fa-screwdriver-wrench"
       tone={unavailableToolsCount > 0 ? 'danger' : 'default'}
-      dataAttr="data-summary"
-      dataValue="tools"
+      data-summary="tools"
     />
   </div>
 
@@ -242,9 +243,9 @@
       this change's path. So `.crafting-shopping-empty` survives as a caller-owned WRAPPER
       declaring the fill and the centring and nothing else.
 
-      The hook stays ON THE WRAPPER, which is the element it has always sat on, so it keeps
-      rendering `data-crafting-shopping-empty=""` rather than the `="true"` `EmptyState` coerces
-      a bare hook to (`EmptyState.svelte:84`, `dataValue || true`).
+      The hook stays on the wrapper, which is the element it has always sat on, so it keeps
+      rendering `data-crafting-shopping-empty=""` rather than the `="true"` a bare hook on the
+      `<EmptyState>` tag renders.
     -->
     <div class="crafting-shopping-empty" data-crafting-shopping-empty>
       <EmptyState
@@ -254,7 +255,7 @@
     </div>
   {:else}
     <div class="crafting-shopping-scroll">
-      <div class="crafting-shopping-card">
+      <InspectorCard class="crafting-shopping-card">
         <Kicker as="p">
           {localize('FABRICATE.App.Crafting.Shopping.RecipesTitle')}
         </Kicker>
@@ -283,26 +284,25 @@
                 title={entry.name}
                 onclick={() => onIncrement?.(entry.recipeId)}
               >
-                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={26} />
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
-              <button
-                type="button"
-                class="crafting-shopping-remove"
+              <IconButton
+                class="crafting-shopping-remove is-ghost"
+                ariaLabel={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 title={localize('FABRICATE.App.Crafting.Shopping.Remove')}
-                aria-label={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 onclick={() => onEntryRemove(entry.recipeId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>
-      </div>
+      </InspectorCard>
 
       {#if acquireComponents.length > 0}
-        <div class="crafting-shopping-card" data-shopping-acquire-components>
+        <InspectorCard class="crafting-shopping-card" data-shopping-acquire-components="">
           <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireComponents')}
           </Kicker>
@@ -310,33 +310,33 @@
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={28} glyph={12} />
+                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={26} glyph={11} />
                 {:else}
-                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
+                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={26} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
-                <span
-                  class={`crafting-shopping-chip ${row.chip.tone}`}
+                <Chip
+                  density="list"
+                  emphasis="solid"
+                  tone={row.chip.tone}
                   data-shopping-chip={row.chip.mode}
-                  title={row.chip.title}
+                  title={row.chip.title}>{row.chip.label}</Chip
                 >
-                  {row.chip.label}
-                </span>
               </li>
             {/each}
           </ul>
-        </div>
+        </InspectorCard>
       {/if}
 
       {#if acquireTools.length > 0}
-        <div class="crafting-shopping-card" data-shopping-acquire-tools>
+        <InspectorCard class="crafting-shopping-card" data-shopping-acquire-tools="">
           <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireTools')}
           </Kicker>
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
-                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={26} />
                 <span class="crafting-shopping-acquire-name" title={tool.name}>{tool.name}</span>
                 <span
                   class={`crafting-shopping-chip ${tool.needsRepair ? 'tone-warning' : 'tone-danger'}`}
@@ -353,7 +353,7 @@
               </li>
             {/each}
           </ul>
-        </div>
+        </InspectorCard>
       {/if}
     </div>
   {/if}
@@ -375,31 +375,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .crafting-shopping-title {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-  }
-
-  .crafting-shopping-clear {
-    box-sizing: border-box;
-    height: auto;
-    min-height: 28px;
-    padding: 2px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .crafting-shopping-clear:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
   }
 
   /* The grid the three always-visible summary cards sit in. Each card is a `<StatBox>`
@@ -429,17 +411,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
-    padding-right: 2px;
-  }
-
-  .crafting-shopping-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
+    padding-right: var(--fab-space-2xs);
   }
 
   .crafting-shopping-queue,
@@ -449,7 +421,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   /* The row's own padding moved INSIDE the activation button, so the whole padded area
@@ -459,10 +431,10 @@
   .crafting-shopping-entry {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 0 6px 0 0;
+    gap: var(--fab-space-2);
+    padding: 0 var(--fab-space-chip) 0 0;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
   }
 
@@ -500,7 +472,7 @@
        wins regardless of specificity. `.crafting-shopping-entry-qty` declares no
        `font-size`, so unreset the quantity would jump to 14px while the 13px name held,
        shifting the row baseline.
-     - `height: auto` + `min-height` — the row needs ~36px (a 28px thumb plus padding)
+     - `height: auto` + `min-height` — the row needs ~34px (a 26px thumb plus padding)
        against Foundry's ~32px `--button-size` floor, which would otherwise clip it.
   */
   .crafting-shopping-entry-main {
@@ -511,18 +483,18 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
+    gap: var(--fab-space-2);
     height: auto;
-    min-height: 36px;
+    min-height: 34px;
     margin: 0;
-    padding: 4px 6px;
+    padding: var(--fab-space-1) var(--fab-space-chip);
     border: 0;
     background: transparent;
     color: inherit;
     text-align: left;
     font-family: inherit;
     font-size: inherit;
-    font-weight: inherit;
+    font-weight: 400;
     line-height: inherit;
     cursor: pointer;
   }
@@ -533,8 +505,7 @@
      this is (0,3,0) and beats that module rule at (0,2,1) — which is held at
      single-class specificity for exactly this purpose, and stayed there when issue 1501
      collapsed the `.fabricate-app` pair onto the module root, so this argument survives
-     the rename unchanged. `.crafting-shopping-remove:focus-visible` below is the same
-     pattern. The module rule's `:focus` half already covers the mouse case, so
+     the rename unchanged. The module rule's `:focus` half already covers the mouse case, so
      `:focus-visible` alone is enough. */
   .crafting-shopping-entry-main:focus-visible {
     outline: none;
@@ -556,40 +527,13 @@
     color: var(--fab-text-muted);
   }
 
-  .crafting-shopping-remove {
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    min-height: 26px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--fab-text-muted);
-    cursor: pointer;
-  }
-
-  .crafting-shopping-remove:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .crafting-shopping-remove:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
-  }
-
   .crafting-shopping-acquire-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 6px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) var(--fab-space-chip);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface);
   }
 
@@ -606,8 +550,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 8px;
+    gap: var(--fab-space-1);
+    padding: 1px var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
@@ -629,14 +573,5 @@
     color: var(--fab-warning-text);
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
-  }
-
-  /* The row states a fact and no verdict (issue 1493): a currency cost whose affordability
-     was only ever checked for a single craft. Neither red nor amber would be honest, so it
-     borrows the surrounding chrome rather than any status hue. */
-  .crafting-shopping-chip.tone-neutral {
-    color: var(--fab-text-muted);
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
   }
 </style>

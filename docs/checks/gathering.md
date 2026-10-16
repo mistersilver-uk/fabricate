@@ -32,7 +32,7 @@ See [Additional dice]({% link checks/crafting.md %}#additional-dice).
 ## What the check decides
 
 A **routed** gathering task is resolved by this check.
-The check rolls, produces a named outcome, and that outcome name is matched to one of the task's result groups by name.
+The check rolls, produces a named outcome, and that outcome name is matched to one of the task's result sets by name.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 See [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection).
 

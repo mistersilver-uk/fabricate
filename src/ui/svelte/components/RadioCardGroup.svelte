@@ -1,6 +1,10 @@
 <!--
-  A fieldset of radio CARDS for a closed mode set: one card per option, with an optional inline
-  second datum and a sentence line beneath the name. Nine callers, all closed mode sets.
+  A fieldset of radio CARDS for one choice among a few options: one card per option, with an
+  optional inline second datum, a sentence line beneath the name, and an optional `optionBody`.
+
+  Rest spread:
+  - `{...rest}` lands on the `<Field>` fieldset root, written after `class`, and carries the
+    group's hooks, `data-radio-card-group` among them; `class` is appended to the root's own.
 
   Invariants:
   - A RECORDED DEVIATION FROM THE PROTOTYPE, WHICH IS NOT GOING TO BE CORRECTED. MAINTAINER RULING:
@@ -27,7 +31,7 @@
 -->
 <script>
   import Field from './Field.svelte';
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     cardId = undefined,
@@ -41,19 +45,15 @@
     groupName = '',
     columns = 2,
     disabled = false,
-    dataGroup = '',
-    dataAttr = '',
     optionDataAttr = '',
     configCards = true,
     optionBody = null,
     onChange = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
 
-  function text(key, fallback) {
-    if (!key) return fallback;
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   function choose(option, event) {
     if (disabled || option.disabled) return;
@@ -64,16 +64,15 @@
 <Field
   as="fieldset"
   id={cardId}
-  class={`fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}`}
+  class={`fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}${extraClasses}`}
   {disabled}
-  data-radio-card-group={dataGroup || undefined}
-  {...{ [dataAttr]: dataAttr ? true : undefined }}
+  {...rest}
 >
-  <legend class="manager-resolution-mode-legend">{text(legendKey, legend)}</legend>
+  <legend class="manager-resolution-mode-legend">{localizeOr(legendKey, legend)}</legend>
   {#if hintKey || hint}
     <p class="manager-resolution-mode-note" role="note">
       <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{text(hintKey, hint)}</span>
+      <span>{localizeOr(hintKey, hint)}</span>
     </p>
   {/if}
   <div class="manager-resolution-mode-options" style={`--manager-radio-card-columns: ${columns}`}>
@@ -100,19 +99,19 @@
         {/if}
         <div class="manager-resolution-option-body">
           <span class="manager-resolution-option-name" data-tool-choice-title>
-            {text(option.labelKey, option.label || option.fallback)}
+            {localizeOr(option.labelKey, option.label || option.fallback)}
             {#if option.meta}<code class="manager-resolution-option-meta" data-radio-card-meta
                 >{option.meta}</code
               >{/if}
             {#if option.disabled && (option.badgeKey || option.badgeFallback)}
               <span class="manager-resolution-option-badge"
-                >{text(option.badgeKey, option.badgeFallback)}</span
+                >{localizeOr(option.badgeKey, option.badgeFallback)}</span
               >
             {/if}
           </span>
           {#if option.description || option.descFallback}
             <span class="manager-resolution-option-desc" data-tool-choice-description
-              >{text(option.descKey, option.description || option.descFallback)}</span
+              >{localizeOr(option.descKey, option.description || option.descFallback)}</span
             >
           {/if}
           {#if optionBody}{@render optionBody(option)}{/if}
@@ -129,6 +128,6 @@
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 </style>

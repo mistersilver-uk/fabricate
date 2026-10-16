@@ -62,7 +62,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--fab-space-1);
     min-width: 0;
     max-width: 96px;
     text-align: center;

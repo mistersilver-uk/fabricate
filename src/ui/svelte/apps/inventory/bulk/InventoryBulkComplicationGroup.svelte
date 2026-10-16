@@ -55,7 +55,6 @@
   `eyebrow` prop, so it sits above the name inside the row's copy column. A separate
   ordinal tile beside the severity tile would put three leading boxes in a 300px
   column, which is the failure the stage row's `stacked` treatment exists to prevent.
-  One metadata slot, not two.
 
   ## What this card deliberately does NOT grow
 
@@ -144,7 +143,7 @@
        is the shell's shared leaf, so the name reads exactly like the queue row's own name
        directly below the block. -->
   <div class="bulk-complication-head">
-    <Medallion {...resolveCraftingArt(img)} alt="" size={24} />
+    <Medallion {...resolveCraftingArt(img)} alt="" size={22} />
     <span class="bulk-complication-head-text">
       <span class="inventory-detail-row-name">{name}</span>
       {#if orderNoteKey}
@@ -180,8 +179,7 @@
           statusLabel={localize('FABRICATE.App.Complications.Forecast')}
           statusTone="neutral"
           bodyClamp={3}
-          dataAttr="data-inventory-bulk-complication"
-          dataValue={row.id}
+          data-inventory-bulk-complication={row.id || true}
         />
       </li>
     {/each}
@@ -227,7 +225,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   /* WRAPS rather than clipping. It is a whole sentence in a 300px column, and one

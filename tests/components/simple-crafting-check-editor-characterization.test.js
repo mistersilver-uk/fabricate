@@ -68,18 +68,20 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     // The Difficulty card's count callouts (issue 2006). Manifest only.
     'src/ui/svelte/components/Callout.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
+    // The range bar's marker (issue 2431). Manifest only.
+    'src/ui/svelte/components/RangeBarMarker.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     // The counting pool and the shared character-value field (issue 2006). Manifest only.
     'src/ui/svelte/components/Select.svelte',
@@ -104,6 +106,8 @@ const harness = createMountedComponentHarness({
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
     'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/components/RuleSentence.svelte',
+    'src/ui/svelte/components/RuleRow.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     // THE SHARED ONE-OF-N PICKER and its compiled graph (issue 1510), rendered by this editor's
     // Preview-against control and by the trigger editor's five. Manifest only.

@@ -34,9 +34,9 @@ Changing salvage resolution mode is non-destructive for recipes and runs (it del
 A switch into `simple` that drops a component's surplus success groups SHALL emit a `ui.notifications.warn` naming the affected component(s).
 The confirmation/warn copy is salvage-accurate — it discloses the group deletion and is not the recipe-deletion warning.
 
-In `simple` salvage mode the component salvage editor is capped at one success result group: the Add group affordance is removed and a required visible hint ("Simple mode uses a single result group") is shown, matching the recipe editor's `data-recipe-result-simple` single-group treatment.
+In `simple` salvage mode the component salvage editor is capped at one success result group: the Add result set affordance is removed and a required visible hint ("Simple mode uses a single result set") is shown, matching the recipe editor's `data-recipe-result-simple` single-group treatment.
 The cap counts success groups (`role !== 'failure'`) and does not filter, blank, or destroy a legacy reserved failure group's stored data.
-Routed keeps its multi-group list and Add group; progressive is unchanged.
+Routed keeps its multi-group list and Add result set; progressive is unchanged.
 
 ### Feature Toggles
 
@@ -94,6 +94,7 @@ Every readiness issue has a title, and the title map is proven exhaustive agains
 A section's notices sort blocking issues first, then warnings, as the Validation route orders its rows; with every notice amber, the order is the pane's only priority cue.
 A notice's Review action focuses the control the issue names, and otherwise focuses the section, as a Validation row's View does.
 No readiness issue renders as a `Callout`; the mode description on The roll stays a `Callout`, because it documents the mode rather than reporting this check's state.
+That mode callout (`CheckModeCallout`) sits in the section's heading block, after the pane heading and below the section's notices.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
@@ -109,6 +110,7 @@ Alchemy `checkMode: "none"` is the opposite case and is OFF, not inert: it is wh
 
 The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE ONLY, never a pinned column that clips.
 On an activity route it carries, in order: the documentation/quickstart pair, the activation control, a "Preview as" panel, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
+The activation control is the design system's declared exception to the read-only rail, and the preview controls write nothing an engine reads.
 Where the resolution mode denies the GM the choice, the activation control renders a LOCKED READING of the switch — the same track and knob, a padlock and the hint — not the hint alone: removing the control removed the state with it, and "this mode requires the check" does not say which way the switch is set.
 The locked reading is always ON, because every mode that hides the switch rolls its check.
 
@@ -165,7 +167,7 @@ A summed roll-over against a fixed DC:
 Every other evaluation:
 
 - states the benefit-positive margin note whenever the line shows a margin, unless a trigger-forced outcome takes the note slot
-- lists one row, "Result group produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
+- lists one row, "Result set produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
 
 A progressive check spends its rolled value down the sandbox order through `resolveProgressiveAward` and reads "{awarded} of {of} awarded".
 
@@ -232,17 +234,19 @@ And it is ABSENCE-PRESERVING and ORDER-PRESERVING: an absent list means no exper
 The field itself keeps the GM's raw text while they type rather than echoing the stored numbers back, so a separator or a half-typed word is never rewritten under the cursor.
 
 An empty sandbox renders its own stated sentence NAMING THE FIELD that fills it, and that sentence is not one of the enumerability refusal codes: those all say the formula cannot be charted, and this one says the opposite — the formula is fine and the experiment has not been typed yet.
-Bars render through `FillBar`, flat.
+Bars render through `BandedBar`, flat: several outcomes as its histogram, and a one-outcome chart as its single-row meter drawn in the same band row, so it reads like the charts beside it.
 
 The View Lab's `Roll` double carries a `parse` static whose term shape is derived from RECORDED real-Foundry output, because the lab's `Roll` otherwise exposes only `replaceFormulaData` and `validate` and every render of the histogram panel would throw — and one bad case fails the capture job whole, publishing nothing.
 A capture job that fails whole now surfaces as a FAILED evidence gate rather than as silent stale evidence: the gate reds instead of passing on the previous head's frames, so the bad case is visible as the failure it is.
 The panel additionally guards a missing or throwing `Roll.parse` as a not-enumerable result rather than a throw.
 
-An `avg N` annotation on the formula field renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, its value set in the mono face and the annotation referenced by the formula input's `aria-describedby`.
+An `avg N` annotation beneath the formula field and its token row renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, its value set in the mono face and the annotation referenced by the formula input's `aria-describedby`.
 When a die or pool carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes, in visually hidden text that needs no hover, a localized explanation that the average is withheld because the die modifier transforms the total.
 Malformed or irreducible input omits the annotation.
 A counting check's Formula card carries no `avg`: its reading is `expected successes {n}`, the same expected net the odds panel renders on `data-checks-odds-expected`, from the one preview computation, to two decimals, and hidden whenever the count odds abstain rather than shown as zero.
 A summing check's `avg` and `avg —` are unchanged.
+The formula field is the shared expression field in a field shell, with no glyph and no reading inside its box.
+Its token row sits directly beneath it, ahead of the annotation and the composed-roll inset, offers the active world's suggested terms, never a roll-data path that world's presets do not define, and inserts a pressed term at the caret, or at the end when the whole formula is selected or the caret or an edge of the selection stands inside a term.
 Magnitude expressions remain deliberately LOOSER than the histogram's predicate — the annotation answers for multi-group and magnitude-modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
@@ -330,8 +334,15 @@ Its rule sentence reads `The dice are compared raw. Every modifier that applies 
 
 Every summed check that grades against a target offers the target source as a `RadioCardGroup`, `What the roll is measured against`: `Fixed difficulty` (`The same number for every character, set here and per recipe tier.`) or `Character value` (`Read from the crafting character. Difficulty adjusts it rather than replacing it.`).
 The Difficulty card's lead names the direction: fixed roll-under "The number the roll must stay {cmp}, and where that number comes from.", character value "The character value the roll must reach, and how difficulty adjusts it." or "…must stay {cmp}, and how difficulty adjusts it."
-A character value is a plain `RollDataExpressionInput` (no sigil affix) whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form; with no Preview-as actor it reads "Choose a character in Preview as to see what this resolves to.", resolved `{actor} → {value}`, and unresolved `{actor} has no value at {path}. The check cannot resolve for them.`
-Its static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
+A character value is a `RollDataExpressionInput` that shows and writes the stored text unchanged, whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form.
+With a Preview-as actor chosen it passes the field a resolver over that actor's roll data, and the field draws the reading: `= {value}` where the expression reduces to a number, and `Unresolved` where it does not.
+The field draws only that reading; the line beneath it is the Studio's own and states what the reading cannot.
+With no Preview-as actor and an expression that is otherwise readable, the line reads "Choose a character in Preview as to see what this resolves to." and no reading is drawn.
+For a path the actor lacks it reads `{actor} has no value at {path}. The check cannot resolve for them.`, and for a formula that rolls dice or cannot be read it is the runtime's own refusal sentence.
+A resolved value draws no line, so the actor is named by the Preview-as picker and not beside the value.
+The reading describes the field, and is spoken once typing settles, never because the Preview-as actor changed.
+A stored document path, as the additional-dice path source is, is not an expression: it is read from the actor's stored data and not its roll data, and with an actor chosen the field's reading for a path that is set is the stored number where one is stored and no active effect overrides it, and `Unresolved` otherwise.
+The Difficulty card's static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
 The Comparison reads `At or under` / `Strictly under` under a roll-under check.
 Numeric and fractional values edit through the formatted `Stepper` (`ui-visual-style/spec.md` § Numeric entry), so a multiplier reads `×½` and stays directly typeable, including an off-list `×0.7`.
 
@@ -417,7 +428,7 @@ It is off by default, and while off no nested field renders, validates or is rea
 While on, it shows:
 
 - "Paid for by", a `SegmentedControl` of `Value on the crafting character` / `Read and spend macros`;
-- for the path source, "Path on the crafting character", a plain stored-path input with the placeholder `system.resources.momentum.value` and a line read from the Preview-as actor's stored data, never prepared data: resolved `{actor} → {value}`, no actor `Choose a character in Preview as to see what this resolves to.`, blank (danger) `No source set. Players cannot be offered additional dice until one is.`, no number at the path (warning) `{actor} has no stored number at {path}, so they could not buy additional dice.`, and overridden by an active effect (warning) `An active effect changes {actor}'s {path}, so spending it would not lower it. Use a stored value.`;
+- for the path source, "Path on the crafting character", a plain stored-path input with the placeholder `system.resources.momentum.value` and a reading and a line read from the Preview-as actor's stored data, never prepared data: resolved, the field's reading `= {value}` and no line, no actor `Choose a character in Preview as to see what this resolves to.`, blank (danger) `No source set. Players cannot be offered additional dice until one is.`, no number at the path (warning) `{actor} has no stored number at {path}, so they could not buy additional dice.`, and overridden by an active effect (warning) `An active effect changes {actor}'s {path}, so spending it would not lower it. Use a stored value.`, the last two standing under the field's `Unresolved` reading;
 - for the macro source, two `ItemDropZone` macro wells, `Read macro` (`Returns what the character can spend`) and `Spend macro` (`Deducts what was spent`), side by side until either would fall under 220px, where a dropped macro that is not a script macro is refused with a notice;
 - "Resource name", a plain text field hinting `What players see this resource called. Leave it blank to show the amount alone.`, for both sources;
 - "Most additional dice per roll", a `Stepper` from 1 to 20, default 1.
@@ -471,7 +482,7 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
   This is a control that routed **gathering** checks and **fixed**-type routed checks have never had: the retired toggle was relative crafting/salvage only, so those screens gain an effect they previously could not author at all.
 - The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a shared stepper clamped at a minimum of 1 for `up`/`down`, the shared `Select` at its `inline` rung for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
   The stepper and the `Select` trigger both FILL the pinned slot rather than sizing to their own content, and that direction is the requirement: the 160px pin and the no-movement guarantee are unchanged, so each primitive is made to fill the existing slot rather than the slot being re-measured to the primitive.
-  The guarantee that holds across a mode swap is POSITION and WIDTH, not height: each mode renders its box at the same 160px width in the same place, so nothing under the GM's pointer moves horizontally and no row rewraps, but the three rendered boxes are NOT the same height — the stepper's filled height is 36px, the inert placeholder's disabled input is 32px (the studio's own field height), and the `target` select's `inline` rung is 30px — and the row's `align-items: flex-end` keeps their bottom edges level rather than their tops.
+  The guarantee that holds across a mode swap is POSITION and WIDTH, not height: each mode renders its box at the same 160px width in the same place, so nothing under the GM's pointer moves horizontally and no row rewraps, but the three rendered boxes are NOT the same height — the stepper fills at its 38px default and the inert placeholder's disabled input takes the manager field's 38px, while the `target` select's `inline` rung is 30px — and the row's `align-items: flex-end` keeps their bottom edges level rather than their tops.
   It is deliberately not a claim about the operand's whole appearance — the stepper keeps its own 7px radius (the library specimen's, since maintainer ruling 2026-09-28) and soft surface fill, the `Select` trigger takes the `inline` rung's 7px radius on `--fab-bg-2`, and the inert placeholder keeps the manager's field background, because a layout-context rule may take a SIZE from its slot but must not restyle the primitive's border, radius or fill (see line 88).
   An operand sized to its own content would break the size half outright: it stands as a narrower island beside the modes that fill the slot, and a trigger that hugs its VALUE re-measures every time the GM chooses a longer tier name, which is the movement the pin exists to prevent.
   Every rendered `SegmentedControl` takes a radio `name` unique per CONTROL, not per trigger: a trigger card renders two of them, and a shared group name would make choosing a tier-step mode uncheck the outcome radio.
@@ -649,10 +660,9 @@ the Validation tab renders a full-width `role="note"` callout explaining that pl
 ### System-Blocker Banner
 
 When the selected system's report has `blocksSystem === true`,
-the System Overview page's Settings tab SHALL render a full-width `role="note"` callout
-(reusing the `manager-environment-comp-callout` treatment) above the identity card.
-The banner is GM-only, explains that the system is blocked from player visibility, and links to the Validation tab.
-Activating the banner link switches the page to the Validation tab in place.
+the System Overview page's Settings tab SHALL render a non-blocking warning `Notice` in the notice stacking region above the identity card.
+The notice is GM-only, explains that the system is blocked from player visibility, and its action links to the Validation tab.
+Activating that action switches the page to the Validation tab in place.
 It is not shown when `blocksSystem` is false.
 
 ## Item Sheets
@@ -671,6 +681,8 @@ Capabilities:
   drops are accepted from both the world Items directory and a compendium directory, and expand to
   every contained Item including nested subfolders; a compendium folder's items are resolved from
   the pack index entries.
+- On the Component Rules route, the list region beneath the toolbar, including its empty state, accepts every drop the import zone accepts and hands it to the same import flow.
+  The toolbar and pager do not accept a drop, and the list region shows the drop-active state while a drag is over it.
 - Folder-aware categorization on bulk import: a folder drop, an in-pack-folder drop, or a
   whole-compendium drop that contains at least one item-bearing folder opens a mapping step before
   the import commits.
@@ -703,6 +715,8 @@ Component import warnings:
 
 - When a single component import or replace-source operation falls back because the dropped Item's recorded canonical source UUID no longer resolves, the GM manager UI warns that the original source link is broken and that Fabricate used the live dropped Item UUID instead, naming the affected item and UUIDs.
 - When a folder or compendium pack import falls back for one or more Items, the GM manager UI emits one summary warning with the number of affected Items, rather than one warning per Item.
+- When an import's World Component registration could not be written, the single-item drop, the pack drop, the folder drop, the mapping commit and the Compendium Directory action each emit one warning per import run, saying that the items were imported, that the world Component catalogue could not be updated, and that importing them again adds them to it (`data-models/spec.md` `## Component` requirement 12c).
+- When a pack drop, a folder drop or a folder-mapping commit fails with an error, the GM manager UI emits one warning that the import could not finish, in addition to any catalogue-registration warning, and logs the error to the console, so such a drop never fails without a notice.
 
 ## Essences Tab
 
@@ -747,7 +761,7 @@ Capabilities:
   The card is itself the drop target, so no second drop prompt renders beneath it — a card and a zone side by side state the same affordance twice.
   A sub-line states what the GM can do with the card; it never restates the card's own title or the raw uuid, which is what a copy-uuid action is for.
   The essence source's UNLINKED state keeps the drop-or-pick control, because an essence source is an in-system managed component and the pick half is the only route to that list.
-  The presentation toggle renders through the shared segmented control's icon-only variant, because a list glyph and a grid glyph ARE the two layouts, while the status filter beside it keeps its words.
+  The presentation toggle renders through `ViewToggle`, the shared segmented control's icon-only form over the closed list and grid pair (issue 2412), because a list glyph and a grid glyph ARE the two layouts.
 - A browser row that leads with the 40px medallion states selection as the accent ring alone and drops the inset left bar, which would otherwise bite into the medallion; the essence row is one of them, and on its grid card a left bar is not even the correct axis.
 - A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
   A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
@@ -913,7 +927,7 @@ Each row shows the recipe's image medallion (the recipe's own image, resolved th
 
 The row's on/off toggle carries **no On/Off text**.
 The track colour is the state, its `aria-label` names the state for assistive tech, and the `Disabled` pill states it in words — a third copy on every row only crowds the description out.
-The label is retained on every other `manager-status-toggle` in the manager, where the switch has no pill beside it.
+The label is retained on every other `fabricate-toggle` in the manager, where the switch has no pill beside it.
 
 The row's `Edit` pencil is a **borderless ghost icon** that takes a background on hover.
 Delete and Duplicate are preserved capabilities, but they are inspector-only rather than row actions: three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
@@ -1009,7 +1023,7 @@ The **lock toggle** gives `recipe.locked` a real write path from the row.
 Unlike enable, locking is **never gated**, in either direction: a GM locks a recipe precisely while it is unfinished, so refusing the write on incompleteness would make the control useless exactly when it is wanted.
 
 The **inspector** is one column on the panel background, not a stack of bordered cards.
-Section headings are uppercase micro-labels sitting directly on the panel — `Selected recipe`, `Requires`, `Produces` — not `<h3>` titles inside nested `manager-inspector-card` boxes, and there is no invented "Recipe details" heading over the stat grid.
+Section headings are uppercase micro-labels sitting directly on the panel — `Selected recipe`, `Requires`, `Produces` — not `<h3>` titles inside nested `fabricate-card` boxes, and there is no invented "Recipe details" heading over the stat grid.
 Only the things that are objects keep a box: the 2×2 stat grid (Ingredients / Results / Steps / Crafting check) and the Requires / Produces flow rows.
 
 The hero chip row carries exactly two chips on one line: the category and a status pill (a dot plus `On`/`Off`, naming the state exactly as the row's switch does).
@@ -1058,14 +1072,14 @@ Actions:
 In Manager, the recipes browser header offers a single primary `Create recipe` action (no crafting-system import/export on the recipes header); creating a recipe follows a create-then-edit model — `store.createRecipe` persists a new identity-only _incomplete shell_ in the selected system via `RecipeManager.createRecipe({ craftingSystemId }, { allowIncomplete: true })` (it saves because persistence gates on structural validity only, not completeness) and the manager immediately opens the recipe-edit view on it.
 The new shell carries the default recipe name and image until edited, and the browse row surfaces a derived authoring-state pill — `Incomplete` while the shell is on, `Can't enable` while it is off — until the activation check would accept it (see the row authoring-state pills above; missing ingredient sets and result groups are the commonest, not the only, reason it would not).
 The recipe browse row `Edit` action opens that same dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state.
-The recipe-edit view is the **five-tab editor** specified in `ui-entity-editors/spec.md` `## Recipe Editor` — Overview, Ingredients, Results, Tools and Validation — over a controlled local draft in the central `manager-main`, with the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) carrying that editor's context rail.
+The recipe-edit view is the **five-tab editor** specified in `ui-entity-editors/spec.md` `## Recipe Editor` — Overview, Ingredients, Results, Tools and Validation — over a controlled local draft in the central `manager-main`, and the editor has no right rail.
 Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no _Catalyst_ concept in the editor (Tools replaced it).
 Identity edits track a dirty state surfaced by a header dirty chip, persist via `store.updateRecipe` → `RecipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true })` (so an identity-only save is not blocked by the shell's still-empty ingredients/results), and a dirty draft prompts a discard confirmation on route exit.
 The recipe-edit header follows the standard editor convention shared with the gathering-task, gathering-event, and environment editors: an `Unsaved` chip (when dirty), `Back to recipes`, `Delete recipe` (danger, enabled whenever a recipe is selected), and `Save`.
-The context rail is **always present** on `recipe-edit`, and what its top section carries is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `ui-entity-editors/spec.md` `### Context rail`): the read-only access roster in `restricted`, the read-only Books & Scrolls "Appears in" summary in `item` / `knowledge`, and no top section at all in `global`.
+Which of these tabs the editor offers is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `ui-entity-editors/spec.md` `### No right rail`): the Access tab's roster in `restricted`, the Books & Scrolls tab in `item` / `knowledge`, and neither in `global`.
 It is **not** gated on the superseded `knowledge.mode`.
 The layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor.
-The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `ui-entity-editors/spec.md` `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access tab.
+The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `ui-entity-editors/spec.md` `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access screen.
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
@@ -1172,7 +1186,7 @@ When there are no options (no candidate recipes / no `characterPrerequisites` li
 
 The recipe-item editor's right rail's **"How players see it"** section renders the ACTUAL player book detail component (`InventoryDetail`) fed a synthetic row built by the pure, import-free `buildRecipeItemPreviewRow` helper (issue 544) — rather than a bespoke re-implementation — so the preview can never drift from what players see (mirroring the shared-`recipeItemAccessBadge` no-drift precedent).
 The synthetic row mirrors the exact shape `InventoryListingBuilder._buildRecipeItemRows` emits (mode → `learnable`/`craftable`, applicability-suppressed caps, `requirements` kept only when learnable + Limited learning, `blocked`/`reason` folded onto each recipe), so the embedded detail renders the real access badge, description, "Needs: &lt;name&gt;" requirement chips (with met/unmet state), and per-recipe Learn/Craft affordances.
-Because the GM preview has no actor, the **"Effective rules"** list's "Needs: &lt;name&gt;" rows (one per requirement, only when Limited learning is on; the character-prerequisite row's sub is the `@path op value` preview) each carry a GM-only **"Satisfied?"** toggle (`manager-status-toggle`, defaulting to satisfied so the preview opens unlocked).
+Because the GM preview has no actor, the **"Effective rules"** list's "Needs: &lt;name&gt;" rows (one per requirement, only when Limited learning is on; the character-prerequisite row's sub is the `@path op value` preview) each carry a GM-only **"Satisfied?"** toggle (`fabricate-toggle`, defaulting to satisfied so the preview opens unlocked).
 Flipping a requirement's toggle drives that requirement's synthetic `met` state, which flows to the embedded `InventoryDetail` live — its requirement chip flips met/unmet and its Learn buttons enable/disable — letting the GM preview exactly what a player in any qualification state would see.
 The toggle is an authoring experiment control only; it is never persisted.
 In the player app, the **book detail** renders the "Needs: &lt;name&gt;" chip row full-width below the header from the row's `requirements` array (surfaced by `InventoryListingBuilder`), reflecting the acting actor's met/unmet state per requirement (success ramp + check glyph when met, danger ramp + lock glyph when unmet); a blocked recipe's Learn button is disabled (the enumeration is not repeated per recipe).
@@ -1367,7 +1381,17 @@ Current GM editor behavior:
   When the toggle is on but the world has no realms yet, the control shows a muted empty line pointing the GM to create realms under World > Travel first, and says they are shared by every crafting system.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, event selection, limits, and event outcome through `gatheringConfig.systems[systemId].rules`.
-- The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
+- The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion; each time-of-day pill and the time-of-day add form also carry a start-hour `Stepper`.
+- The Times of day panel draws the time-of-day bar: the shared range bar over one calendar day, starting at the first-listed period's start hour, with each period's name and hours inside the track and the periods in day order; the value pills keep their authored order.
+  The Times of day panel spans the settings grid's full width, so the time-of-day bar has room for its periods; the Weather panel follows on its own row.
+  Dragging or keying a divider sets the start hour of the period that begins there, and a drag released at that period's stored start hour writes nothing; the first-listed period's start, at the bar's two ends, is set by its stepper only.
+  When the world calendar reports the time, a fixed line marks the world clock.
+  A draggable dot is the current time of day: it rests at its period's centre, moves between periods, edits the same value as the current-time selector, and may sit in a different period from the clock.
+  Each "+" on the rail beneath a period wide enough for two steps, unless its button would overlap its neighbour's at the panel's width (ui-visual-style § Threshold band strip), fills the add form's start hour with that period's midpoint, rounded down to a whole hour, and moves focus to its name field; nothing is created until the form is submitted.
+  When the start hours do not tile the day (gathering-and-harvesting § Global Gathering Conditions requirement 26), the bar is replaced by a note naming the values to fix, and the start-hour steppers remain the only editor.
+  The weather panel draws no bar.
+- A plain add's start hour is seeded with the midpoint of the longest period (ties go to the first in day order, rounded down), so the day keeps tiling, and it resets to that default after each submit.
+  With no tiling, it is left empty.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day.
   Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
@@ -1378,10 +1402,24 @@ Current GM editor behavior:
   Removing an included manual task or event clears `enabled*Ids`, ignores stale `disabled*Ids` and `forced*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
 - Manual Available to add rows present Add for matching AND for enabled non-matching records — manual composition has no match filter, so it has no force add — and a disabled library note for library-disabled records.
 - When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/event options before composing environments.
+- The environment editor's record and summary panes are read-only: they show the selected record's hero, node count and matching evidence, and the environment's summary, linked scene and counts, and host no editing input or drop target.
 - Gathering Task and event row overrides stay inside expandable rows so the default environment workspace remains scannable.
+  Every composition row opens them in place through its own disclosure, whatever its section — Included, Available to add, Excluded or Non-matching — so an override on an excluded record stays editable and clearable; opening a row also selects it, and selecting another row closes the open one.
+  The overrides are the task's node count (a `Stepper` from 0 to its capacity, read-only for a non-regenerating pool), the drop-rate adjustment switch, and the drop-rate adjustments.
   Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
+- The scene link is authored on the Overview tab's Linked scene card: a Scene drop links or replaces it, a visible Unlink clears it, and a link whose scene no longer resolves reads as missing.
+- Gathering Task authoring is a tabbed editor — Overview (identity, task resolution mode, nodes), Requirements (availability, stamina, check modifiers, check override, required tools), Results, and Validation, which renders the shared surface over the task's readiness rows at full width; the blocking rows are the errors that disable Save.
+  Its d100 Results tab alone keeps the selected-drop rail.
+  Validation groups its rows in tab order: the name under Overview, read from the validation's own name errors and focusing the name input, and the drop-rule and result-set errors under Results, landing on its panel; Requirements runs no check and draws no group.
+  Its warnings are a routed task under a check with no outcome tiers, and a d100 task with one component on more than one drop row under a reward rule that may award only one.
+  The Validation tab carries a `danger` mark counting the blocking rows and a `warning` mark counting the warnings, so an issue is visible from every tab.
+  On Results, the blocking notice counts the Results rows that block Save and offers an action to Validation, and each warning notice is the Validation tab's own warning row, in the same words.
+  The editor's tab bar is fixed, as the recipe and environment editors' are: the tab bar and the page notice position sit above the tab panel, and the tab panel is the scroller.
+  At the manager's stacking width, a d100 task's Results tab stacks its drop rail beneath the editor without moving the nav, so a tab switch never moves the tab bar.
+  A legacy Progressive task's Results tab renders `EmptyState`, saying its results are not authored here and pointing to Overview's resolution card.
+  Each list's search, page, page size and tag picks survive a tab switch, and an open availability menu closes with its tab.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.

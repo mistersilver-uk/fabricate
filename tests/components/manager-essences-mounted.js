@@ -4,6 +4,7 @@ import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
@@ -213,9 +214,9 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil.
+    // The FIRST `.fabricate-icon-button` in the row must remain the Edit pencil.
     assert.equal(
-      earthRow.querySelector('.manager-icon-button').getAttribute('data-essence-edit'),
+      earthRow.querySelector('.fabricate-icon-button').getAttribute('data-essence-edit'),
       'earth',
       'the first icon button in a row is still the Edit pencil'
     );
@@ -291,6 +292,30 @@ export function registerEssencesCases() {
     assert.ok(
       target.querySelector('[data-essence-section="usage"]'),
       'essence inspector should expose a Usage section'
+    );
+    // Its labelled rail sections are groups named by their kickers, and the rest are unnamed
+    // sections, never regions (issue 1782).
+    const named = (section) =>
+      section.getAttribute('role') === 'group'
+        ? document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent
+        : null;
+    assert.deepEqual(
+      ['stats', 'actions', 'source', 'usage'].map((id) =>
+        named(target.querySelector(`.fab-rail[data-essence-section="${id}"]`))
+      ),
+      [null, null, 'Source', 'Usage']
+    );
+    // The hero is the rail's own unlabelled section, and the on-craft section is named by the
+    // system it describes (issue 1782).
+    assert.equal(
+      named(target.querySelector('.fab-rail[data-essence-browser-inspector]')),
+      null,
+      'the hero stays an unnamed section'
+    );
+    assert.equal(
+      named(target.querySelector('.fab-rail[data-essence-section="oncraft"]')),
+      'On craft in Alchemy',
+      'the on-craft section is a group named for its system'
     );
     assert.ok(
       target.querySelector(
@@ -397,22 +422,17 @@ export function registerEssencesCases() {
     const unlinkSourceAction = inspectorSourceActions.querySelector(
       '[data-essence-action="unlink-source"]'
     );
-    // The AMBER survives the extraction (issue 1036, maintainer round 2). Both source
-    // actions now render through `InspectorActionButton`, the shared right-inspector button,
-    // and the modifier moved with them: `.manager-button.is-warning-action` was the global
-    // sheet's, `is-warning` is the primitive's own tone. Unlinking breaks a reference and
-    // destroys nothing, so it must not land in the danger family on the way across.
-    assert.ok(
-      unlinkSourceAction.classList.contains('fab-inspector-action'),
-      'unlink source should render through the shared right-inspector button'
-    );
-    assert.ok(
-      unlinkSourceAction.classList.contains('is-warning'),
-      'and keep the amber warning tone rather than becoming destructive'
-    );
-    assert.ok(
-      copySourceAction.classList.contains('fab-inspector-action'),
-      'as should its copy-uuid partner'
+    // Every verb on the rail is a full-width `Button` in the role its verb names (issue 1521).
+    // Unlinking breaks a reference the GM can re-make and destroys nothing, so it is the caution
+    // verb, `is-warning-action`, and never `is-danger`.
+    assertInspectorVerbs(
+      target.querySelector('[data-essence-browser-inspector]').closest('.manager-inspector'),
+      [
+        ['[data-essence-action="edit"]', 'primary'],
+        ['[data-essence-action="delete"]', 'danger'],
+        ['[data-essence-action="copy-source"]', 'ghost'],
+        ['[data-essence-action="unlink-source"]', 'warning'],
+      ]
     );
     unlinkSourceAction.click();
     await tick();
@@ -548,7 +568,7 @@ export function registerEssencesCases() {
     );
     // The Tool Studio's grouped icon pair.
     const linkedActions = linkedSource.querySelectorAll(
-      '.manager-item-drop-zone-actions .manager-icon-button'
+      '.manager-item-drop-zone-actions .fabricate-icon-button'
     );
     assert.equal(linkedActions.length, 1, 'a source with no uuid offers unlink alone');
     assert.ok(
@@ -596,7 +616,7 @@ export function registerEssencesCases() {
     // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
     // reference's Essence Rules header carries nothing on the right at all.
     assert.ok(
-      !target.querySelector('.manager-header-actions .manager-button'),
+      !target.querySelector('.manager-header-actions .fabricate-button'),
       'the Essence Rules header carries no action'
     );
     navButton('Component Rules').click();
@@ -909,14 +929,16 @@ export function registerEssencesCases() {
     failedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
-    assert.ok(target.textContent.includes('Save failed.'));
+    // The name is editable here and the store refuses a duplicate, so the notice says so.
+    assert.ok(target.textContent.includes('Save failed'));
+    assert.ok(target.textContent.includes('may already have this name'));
 
     unmount(mounted);
     target.remove();
@@ -944,14 +966,14 @@ export function registerEssencesCases() {
     rejectedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Storm');
-    assert.ok(target.textContent.includes('Save failed.'));
+    assert.ok(target.textContent.includes('Save failed'));
 
     unmount(mounted);
     target.remove();

@@ -15,6 +15,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -28,8 +29,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/components/stepperLabels.js',
-    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
-    // preset bundle it reads.
+    // The expression tokens' derivation (issue 1096) and the per-Foundry-system preset bundle
+    // it reads.
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     // The unified modifier library's bounds pair and roll classification (issue 1117).
@@ -42,7 +43,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
-    // `RollDataExpressionInput` reads the shared `@`-sigil helpers from the copy module.
+    // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
   ],
@@ -51,12 +52,12 @@ const harness = createMountedComponentHarness({
     // than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte',
@@ -138,13 +139,9 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     assert.ok(row.querySelector('.manager-modifier-body'), 'the editor body opens');
     const trigger = row.querySelector('.essence-icon-picker-trigger');
     assert.ok(trigger, 'the modifier editor renders an IconPicker trigger, not a bare text input');
-    // The expression field is `RollDataExpressionInput` with `sigil={false}` (maintainer
-    // ruling, issue 1096): a PLAIN input over the stored value. The `@` cap was written when an
-    // expression was always a roll-data path, and dice retired that premise — a cap that
-    // prepends `@` to whatever is typed turns `1d4` into `@1d4`, and the adaptive cap that
-    // shipped restructures the field as the GM types. Both halves are asserted, because
-    // "shows the value" and "draws no cap" are different claims and dropping either would
-    // leave half the ruling unguarded.
+    // The expression field is `RollDataExpressionInput`, a plain input over the stored value
+    // (maintainer ruling, issue 1096). Both halves are asserted, because "shows the value" and
+    // "draws no cap" are different claims.
     const expressionInput = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(expressionInput, 'the editor exposes the expression field');
     assert.equal(
@@ -417,6 +414,9 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     },
   ]);
 
+  /** A token the expression field draws in its row. */
+  const TOKEN = '.fab-expr-input-token';
+
   async function openEditor(props = {}) {
     const root = await harness.mount({ library: BOUNDED, ...props });
     const row = root.querySelector('[data-world-modifier="mod-flat"]');
@@ -425,7 +425,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     return { root, row };
   }
 
-  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`.
+  // DEFECT 1. `Delete modifier` and `Done` shipped a bare hand-written button class.
   it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
     const { row } = await openEditor();
 
@@ -440,13 +440,13 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'Done is the quiet verb, as Back is in the Tool Studio'
     );
 
-    // Both go through `ManagerButton`, which is what stops the pair drifting apart again.
+    // Both go through `Button`, which is what stops the pair drifting apart again.
     for (const [name, button] of [
       ['Delete modifier', del],
       ['Done', done],
     ]) {
       assert.ok(
-        button.classList.contains('manager-button') &&
+        button.classList.contains('fabricate-button') &&
           button.classList.contains('fab-manager-button'),
         `${name} renders through the shared primitive, not a hand-written class string`
       );
@@ -460,7 +460,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     // header-actions class, and this change converted only this one.
     const actions = [
       ...root.querySelectorAll(
-        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .manager-button'
+        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .fabricate-button'
       ),
     ];
 
@@ -566,32 +566,57 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     assert.ok(note, 'the error surface is not a casualty of the relayout');
   });
 
-  // DEFECT 3. Roll-data suggestion chips under the expression, which APPEND.
-  it('offers roll-data suggestion chips under the expression, derived from the active world', async () => {
+  // DEFECT 3. The expression field's tokens, derived from the active world, which append.
+  it('offers roll-data tokens under the expression, derived from the active world', async () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
 
-    const chips = [...row.querySelectorAll('[data-world-modifier-suggestion]')];
-    assert.ok(chips.length > 0, 'the expression carries a suggestion row');
+    const chips = [...row.querySelectorAll(TOKEN)];
+    assert.ok(chips.length > 0, 'the expression carries a row of tokens');
     const terms = chips.map((chip) => chip.textContent.trim());
     assert.ok(terms.includes('@abilities.wis.mod'), 'a dnd5e world is offered dnd5e roll data');
     assert.ok(terms.includes('1d4'), 'and the system-agnostic terms beside it');
 
-    const suggestions = row.querySelector('[data-world-modifier-suggestions="mod-flat"]');
+    const suggestions = row.querySelector('.fab-expr-input-tokens');
     const expression = row.querySelector('[data-world-modifier-field="expression"]');
     assert.ok(
       Boolean(
         expression.compareDocumentPosition(suggestions) &
         globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
       ),
-      'the chips sit UNDER the field they fill in'
+      'the tokens sit under the field they fill in'
+    );
+    assert.equal(
+      suggestions.getAttribute('aria-label'),
+      'Add a term to this expression',
+      'and the tokens are a group the caller names'
+    );
+  });
+
+  it('names the expression field by its caption alone, and describes it by the hint', async () => {
+    const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
+    const expression = row.querySelector('[data-world-modifier-field="expression"]');
+    const host = expression.closest('.fabricate-field');
+    assert.equal(host.tagName, 'DIV', 'a `<label>` host would name the field by every token');
+
+    const referenced = (attribute) =>
+      globalThis.window.document.querySelector(`#${expression.getAttribute(attribute)}`);
+    assert.equal(referenced('aria-labelledby').textContent.trim(), 'Expression');
+    const hint = row.querySelector('[data-world-modifier-expression-hint]');
+    assert.ok(referenced('aria-describedby') === hint, 'the hint describes the field');
+
+    const tokens = row.querySelector('.fab-expr-input-row');
+    assert.ok(host.contains(tokens) && host.contains(hint), 'the row and the hint share the shell');
+    assert.ok(
+      Boolean(
+        tokens.compareDocumentPosition(hint) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the row sits between the field and its hint'
     );
   });
 
   it('offers the pf2e paths in a pf2e world, so the row is not one hard-coded list', async () => {
     const { row } = await openEditor({ foundrySystemId: 'pf2e' });
-    const terms = [...row.querySelectorAll('[data-world-modifier-suggestion]')].map((chip) =>
-      chip.textContent.trim()
-    );
+    const terms = [...row.querySelectorAll(TOKEN)].map((chip) => chip.textContent.trim());
     assert.ok(
       terms.includes('@actor.system.abilities.wis.mod'),
       'the pf2e wisdom path, which is a different string from the dnd5e one'
@@ -608,10 +633,8 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       },
     });
 
-    const die = [...row.querySelectorAll('[data-world-modifier-suggestion]')].find(
-      (chip) => chip.textContent.trim() === '1d4'
-    );
-    assert.ok(die, 'the 1d4 chip is present');
+    const die = [...row.querySelectorAll(TOKEN)].find((chip) => chip.textContent.trim() === '1d4');
+    assert.ok(die, 'the 1d4 token is present');
     die.dispatchEvent(clickEvent());
     await flushRender();
 
@@ -658,7 +681,9 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
     const expression = row.querySelector('[data-world-modifier-field="expression"]');
 
-    const chip = row.querySelector('[data-world-modifier-suggestion]');
+    const chip = row.querySelector(TOKEN);
+    // Focus first, as a real press leaves it: a dispatched click moves no focus of its own.
+    chip.focus();
     chip.dispatchEvent(clickEvent());
     await flushRender();
 

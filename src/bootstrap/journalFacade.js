@@ -10,7 +10,11 @@ import {
   resolveToolDisplayName,
 } from '../models/toolDisplay.js';
 import { affordsCurrencySpends, buildCurrencyAffordProbe } from '../systems/currencyAffordance.js';
-import { daysPerYearFromCalendar } from '../systems/foundryCalendar.js';
+import {
+  daysPerYearFromCalendar,
+  hoursPerDayFromCalendar,
+  minutesPerHourFromCalendar,
+} from '../systems/foundryCalendar.js';
 import { authorityUnavailableRefusal } from '../systems/journalRunCommands.js';
 import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 import { withStationPresence } from '../systems/stationPresence.js';
@@ -144,7 +148,10 @@ export const journalFacade = {
     );
   },
 
-  /** Calendar components plus `daysPerYear` where derivable, for the pure `worldTimeLabel`. */
+  /**
+   * Calendar components plus `daysPerYear` where derivable, for the pure `worldTimeLabel`, and the
+   * calendar's `hoursPerDay` and `minutesPerHour` for the time-of-day bar.
+   */
   getWorldTimeComponents(worldTime = this.getWorldTime()) {
     const calendar = game.time?.calendar ?? null;
     if (typeof calendar?.timeToComponents !== 'function') return null;
@@ -153,6 +160,8 @@ export const journalFacade = {
       if (!components || typeof components !== 'object') return null;
       const daysPerYear = daysPerYearFromCalendar(calendar);
       if (daysPerYear !== null) components.daysPerYear = daysPerYear;
+      components.hoursPerDay = hoursPerDayFromCalendar(calendar);
+      components.minutesPerHour = minutesPerHourFromCalendar(calendar);
       return components;
     } catch {
       return null;
@@ -160,7 +169,73 @@ export const journalFacade = {
   },
 
   _getRunJournalBuilder() {
-    this._runJournalBuilder ??= createRunJournalBuilder(this, this.recipeManager);
+    if (!this._runJournalBuilder) {
+      this._runJournalBuilder = new RunJournalBuilder({
+        craftingRunManager: this.craftingRunManager,
+        salvageRunManager: this.salvageRunManager,
+        gatheringRunSource: this.gatheringRunManager,
+        recipeManager: this.recipeManager,
+        resolutionModeService: this.resolutionModeService,
+        recipeVisibility: this.recipeVisibilityService,
+        getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
+        getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
+        getGatheringTask: (environmentId, taskId) =>
+          this._resolveJournalGatheringTask(environmentId, taskId),
+        // Consulted only for a GM viewer; a player sees the generic blind label (issue 901).
+        getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
+        // History names a blind task only once the reveal policy disclosed it, never because the
+        // viewer owns the actor (D-027); the engine makes the chat card's identical decision.
+        isGatheringIdentityHidden: (args) =>
+          getGatheringEngine()?.isHistoricalBlindIdentityHidden?.(args) === true,
+        getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
+        getComponent: (systemId, componentId) =>
+          this._resolveJournalComponent(systemId, componentId),
+        getViewer: () => game.user,
+        localize: (key, data) => localizeGathering(key, data),
+        nowWorldTime: () => this.getWorldTime(),
+        // Unread here, but the snapshot must match every other pass's (issue 1228).
+        resolveComponentForItem: findMatchingComponent,
+        getComponentSourceActors: ({ actor, run }) => {
+          const uuids = Array.isArray(run?.componentSourceActorUuids)
+            ? run.componentSourceActorUuids
+            : [];
+          const sources = uuids
+            .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
+            .filter(Boolean);
+          if (sources.length > 0) return sources;
+          return actor ? [actor] : [];
+        },
+        resolveItemEssences: ({ item, recipe }) => {
+          const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
+          return resolveItemEssences(
+            item,
+            resolvedComponentsFor(system),
+            recipe?.craftingSystemId,
+            findMatchingComponent
+          );
+        },
+        affordCurrency: ({ actor, recipe, match }) =>
+          buildCurrencyAffordProbe(
+            actor,
+            recipe,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          )(match),
+        // The aggregate: two currency ingredients affordable alone but not together (issue 1648).
+        affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
+          affordsCurrencySpends(
+            actor,
+            recipe,
+            currencySpends,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          ),
+        getDismissedRunKeys: ({ actorUuid, viewerId }) =>
+          this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
+        getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
+        // The settle's own claimability, so a tile is disabled exactly when a pick would refuse.
+        getAwardChoiceClaimability: ({ run, actor }) =>
+          this.craftingEngine?.awardChoiceClaimability?.(run, actor) ?? (() => null),
+      });
+    }
     return this._runJournalBuilder;
   },
 

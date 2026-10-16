@@ -143,8 +143,13 @@ export function normalizeToolIds(toolIds) {
   return out;
 }
 
+/** A salvage result is a component: another kind or a choice group is refused here, at the
+ *  chokepoint every writer passes, rather than read back as a component (issue 1773). */
 export function normalizeSalvageResult(result) {
   if (!result || typeof result !== 'object') return null;
+  if ((result.kind ?? 'component') !== 'component' || Object.hasOwn(result, 'alternatives')) {
+    return null;
+  }
   const compId = result.componentId || result.systemItemId;
   const quantityFormula = normalizeQuantityFormula(result.quantityFormula);
   return {

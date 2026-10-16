@@ -151,6 +151,11 @@
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
   const showRunSummary = $derived(Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id);
+  // A reward the outcome left to pick, until this client settles it in the Journal (issue 1773).
+  const awardPending = $derived(
+    rollResult?.awardChoicePending === true &&
+      services?.journal?.awardChoiceSettled?.(rollResult.runId) !== true
+  );
 
   // Shopping-list entries enriched with display name/img from the listing.
   const shoppingEntries = $derived(
@@ -308,10 +313,12 @@
           <RunSummaryPanel
             recipe={selectedRecipe}
             {rollResult}
+            {awardPending}
             canCraft={craftability?.canCraft === true}
             busy={craftInFlight}
             onCraftNext={onCraft}
             onDismiss={onDismissRun}
+            onOpenRun={(runId) => services?.navigateToJournalRun?.(runId)}
           />
         {:else}
           <ShoppingList
@@ -339,23 +346,49 @@
     min-height: 0;
   }
 
+  /* No padding and no gap of its own: the left column carries the view's padding and the other two
+     are square pane sections flush to the content area's edges, so the recipe pager can run to the
+     centre pane's rule as the browse column's footer (design-system, player screens). */
   .crafting-view-grid {
     display: grid;
     /* The centre column carries the denser minimum so it scales down with the side
        columns instead of collapsing first; below the breakpoint the three columns
        reflow into a single vertical stack. */
     grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr);
-    gap: var(--fab-space-4);
     height: 100%;
     min-height: 0;
-    padding: var(--fab-space-4);
     box-sizing: border-box;
     background: var(--fab-surface);
     color: var(--fab-text);
   }
 
+  .crafting-view-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .crafting-view-column-left {
+    padding: var(--fab-space-4);
+  }
+
+  /* The recipe pager bleeds through the column's padding to the nav rail, the window's bottom edge
+     and the centre pane's rule; with no bar rendered, the padding stands. */
+  .crafting-view-column-left :global(.crafting-browser-pagination:has(> .fabricate-pagination)) {
+    margin: 0 calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
+  }
+
+  .crafting-view-column-center,
+  .crafting-view-column-right {
+    border-left: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+    overflow: hidden;
+  }
+
   /* At the supported 1024px window floor this container's content box is roughly
-     938px wide, so the shared 960px boundary is deliberately reachable. */
+     938px wide, so the shared 960px boundary is deliberately reachable. Stacked, each
+     pane runs the window's width with its rule turned to the top. */
   @container fabricate-crafting (max-width: 960px) {
     .crafting-view-grid {
       grid-template-columns: 1fr;
@@ -368,20 +401,11 @@
     .crafting-view-column {
       min-height: 220px;
     }
-  }
 
-  .crafting-view-column {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .crafting-view-column-center,
-  .crafting-view-column-right {
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    overflow: hidden;
+    .crafting-view-column-center,
+    .crafting-view-column-right {
+      border-top: 1px solid var(--fab-border);
+      border-left: 0;
+    }
   }
 </style>

@@ -50,16 +50,30 @@ export function normalizeGatheringResultGroups(
   });
 }
 
-/** The rollability floor a gathering result's amount must clear, as task-configuration errors. The
- *  data boundary applies the SAME floor the authoring surface does, because a row that entered by
- *  import or seed had no editor to refuse it (issue 1645). */
+/** A gathering task awards components alone: another kind or a choice group is refused at the data
+ *  boundary, whatever the payload carries (issue 1773). */
+function gatheringResultShapeErrors(result) {
+  const errors = [];
+  if ((result?.kind ?? 'component') !== 'component') {
+    errors.push('Gathering result must award a component');
+  }
+  if (result && Object.hasOwn(result, 'alternatives')) {
+    errors.push('Gathering result cannot be a choice group');
+  }
+  return errors;
+}
+
+/** The rollability floor a gathering result's amount must clear, and its shape, as task-configuration
+ *  errors. The data boundary applies the SAME floor the authoring surface does, because a row that
+ *  entered by import or seed had no editor to refuse it (issues 1645, 1773). */
 export function gatheringResultAmountErrors(resultGroups, Roll = diceEngine()) {
   const groups = Array.isArray(resultGroups) ? resultGroups : [];
   return groups.flatMap((group) =>
-    (Array.isArray(group?.results) ? group.results : []).flatMap((result) =>
-      quantityFormulaErrors(normalizeQuantityFormula(result?.quantityFormula), Roll).map(
+    (Array.isArray(group?.results) ? group.results : []).flatMap((result) => [
+      ...gatheringResultShapeErrors(result),
+      ...quantityFormulaErrors(normalizeQuantityFormula(result?.quantityFormula), Roll).map(
         (error) => `Gathering result ${error}`
-      )
-    )
+      ),
+    ])
   );
 }

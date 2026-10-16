@@ -75,7 +75,8 @@ The player crafting read is TWO phases, because browsing and inspecting have dif
 and the browse half is the one that scales with the corpus.
 
 - **The listing seam returns cheap summary rows.**
-  `listCraftingForActor` answers `{ summaries, total, counts }`, where each summary is the
+  `listCraftingForActor({ rememberedActorId, componentSourceActorIds, presentTools })` answers
+  `{ summaries, total, counts }`, where each summary is the
   canonical recipe summary (`data-models/spec.md` § Summary Projections) for the viewer's
   audience.
   Search, the favourite / craftable / system / category filters, the A–Z sort and pagination
@@ -84,6 +85,8 @@ and the browse half is the one that scales with the corpus.
   A row's material verdict is the indexed availability projection over one per-pass inventory
   snapshot, and it is an UPPER BOUND: a positive answer means "looks makeable", never "you
   can make this".
+  A row whose required Tools are not available is never available, so the craftable filter
+  never keeps it (`data-models/spec.md` § Browse-status precedence).
   This MUST be asserted by an operation count rather than by review, and the count MUST be
   shown to be non-vacuous.
 - **The detail seam hydrates ONE recipe.**
@@ -132,6 +135,9 @@ and the browse half is the one that scales with the corpus.
   Either way a target refusal answers before the roll prompt opens and posts no chat card and no roll message, and the Crafting tab notifies the refusal sentence.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
+- An outcome that left a reward for the player to pick (`awardChoicePending` on the result,
+  issue 1773) names it in the run summary until it is settled from this client, and offers to
+  open that run in the Journal, where the pick is made; the crafting tab never hosts the pick.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
   bridge refreshes calendar-aware durations and re-fetches the listing quietly when
   the GM advances the clock.
@@ -231,7 +237,7 @@ When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rol
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
 - **One modal, one header.**
-The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
+The prompt renders in Fabricate's shared modal chrome, the `Modal` component, never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
 It mounts over the Fabricate window the player started the roll from, unless that window is minimized, whatever the input device: the control that starts a roll records its own window for as long as the roll it started runs.
 Only when no control recorded one does it fall back to the window holding focus or, when focus is nowhere, the window under the pointer.
 Any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.
@@ -396,6 +402,13 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   The card reads the roll the award recorded and never re-rolls it.
   The evaluated rolls are carried in the message's `rolls`, which is what sounds the dice and animates Dice So Nice; the custom card content survives that, and neither card is ever whispered, so carrying them hides it from nobody.
   The gathering card states no roll — it has its own builder and its own row shape — and the run journal is where a gathered amount's roll is read.
+- **A card lists the currency credits and knowledge grants its craft awarded** (issue 1773), as rows of the results section after the created Items, each drawing its kind's glyph in place of an image.
+  A credit reads its label, when authored, beside its amount and unit, states a rolled amount's roll in the same `{formula} = {total}` treatment, and carries its reason; an empty credit is stated rather than omitted.
+  A grant names the recipe it taught and says whether it was learned or already known.
+  A rolled credit's evaluated roll rides the message's `rolls` after the rolled Item amounts.
+- **A card states a reward still to pick** (issue 1773): a result group whose chooser is the player awards nothing at the stage, so its card adds one row, "A reward is waiting to be chosen in the Journal", and the group's count roll rides the message's `rolls` after the credit rolls.
+  The selection roll appears only on the card of a group whose chooser is a roll.
+  The settle posts its own card, listing what was claimed, when `features.chatOutput` is on.
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
   Each active die is one tile in roll order with its marks combined (qualified, cancelled and exploded, each by its Font Awesome glyph), and each explosion roll is its own tile straight after the die that produced it.
@@ -548,6 +561,7 @@ macro that was skipped or threw — none of which may ever reach a player surfac
 ### Top-Level Tabs
 
 The player app is a single shared window with a full-height left navigation rail.
+The rail's geometry — a 72px column of labelled 44px icon wells, with the Journal's active-run count as a pip on its well's outer corner — is `design-system/spec.md`'s, under _Naming, announcement and hit targets are component obligations_.
 
 - The player app carries five **Core** tabs, in this order: Crafting (always present), Alchemy (conditional — shown when at least one crafting system uses the alchemy resolution mode, `resolutionMode === "alchemy"`), Gathering, Journal, Inventory.
 - Alchemy is the only conditional Core entry.
@@ -667,19 +681,23 @@ The player app is a single shared window with a full-height left navigation rail
   A single-step recipe outside `simple` keeps resolving `defaultSet`, which is the one case where the player's chosen route rather than the step decides the row.
   That first authored set is a REPRESENTATIVE headline only: a product step routing several sets to different groups shows the first set's group in the one PRODUCES row, while the per-set product grid beneath it stays exact (issue 1907).
   The `routedByIngredients` detail body follows the same rule: on a recipe with more than one execution step it renders the projected product-step `result` instead of the selected set's products, and swaps its routing hint for one saying the chosen option decides what THIS STEP consumes while PRODUCES is the recipe's final product (issue 1907).
+- Every PRODUCT row of a `knowledge` result (issue 1773) — the expected output, the per-set products, the step products and the outcome tiers — names its taught recipe only when the viewer is a GM, or `evaluateRecipeAccess` finds that recipe visible to the viewer and not a teaser, and it is not disabled.
+  Otherwise the row reads `FABRICATE.App.Crafting.Io.UnknownRecipe`, because `recipe-visibility` § Information Disclosure lets no non-revealed name reach a client field.
+  The rule is single-sourced (`taughtNameReader`), and a product read handed no reader redacts.
+  The post-craft chat card still names the recipe it taught, because by then the crafter has learned it.
 - The crafting-check descriptor is not surfaced (the projection yields `null`) when the mode's check is optional, has no authored roll formula, and checks are not enabled (`craftingCheck.enabled !== true` and `features.craftingChecks !== true`).
   A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
 
 ##### Progressive Stage List
 
-This section governs **every ordered-stage surface**, not crafting alone: the progressive recipe body and the progressive **salvage** body in the Inventory tab's salvage panel (§Player Salvage Surface) render the same component under the same invariants.
+This section governs **every ordered-stage surface**, not crafting alone: the progressive recipe body and the progressive **salvage** body in the Inventory tab's salvage panel (§Player Salvage Surface) render the same shared ordered list (`SortableList`) with the same row content (`ProgressiveStageRow`) under the same invariants.
 Where a requirement says "recipe", read it as "the progressive subject" — a recipe or a salvageable component.
 The salvage deltas are stated at the end of this section; everything else applies identically to both.
 
 - A progressive recipe's detail body renders an **ordered stage list**, replacing the generic input/output table: a progressive output is not a flat set, because one roll is spent down the list and the order decides what the player receives.
 - The stage list is built from the **authored** result group and deliberately bypasses the award loop.
   Browsing has no roll, so routing it through the award loop yields a zero budget, awards nothing, and renders an empty output list.
-- Each row carries: its **ordinal** (the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
+- Each row carries: its **ordinal** (the list's numbered badge: the row's position, not the stage's identity), the component **name** and **image**, a **read-only difficulty**, and the **cumulative threshold** at which the stage is reached.
 - The cumulative threshold is the player's decision input: per-stage difficulty alone forces the player to do the arithmetic and redo it after every move.
 - The threshold is **derived from the award mode**, not a running sum of difficulties.
   A running sum is correct only for `equal`; `exceed` gates on a strict comparison and sits one above each cumulative sum, and `partial` awards a tail result whenever any budget remains, making its final stage reachable _below_ its cumulative sum.
@@ -687,9 +705,9 @@ The salvage deltas are stated at the end of this section; everything else applie
   Such a stage must not advance the cumulative total for later stages.
 - The displayed threshold and the awarded result MUST agree with the award loop for every award mode and every budget.
 - Stages are shown in the **player's** order (see `resolution-modes` §Player Reorder), reconciled against the authored list.
-- When the permission is true the rows are reorderable by **drag** and by **keyboard**: per-row Move up / Move down buttons, disabled at the ends, whose accessible name names the stage they move, with the new position announced through an `aria-live="polite"` region.
-  Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
-- The announcement names the stage that MOVED, read before the move is applied, and is a single localized string carrying name, position and total (never assembled from fragments).
+- When the permission is true the rows are reorderable by the **grip** (pointer drag, and up/down arrow keys while focused) and by the per-row **rocker**, disabled at the ends, whose accessible names name the stage, with the new position announced through the list's `aria-live="polite"` region.
+  Drag is mouse-only; the rocker is the touch path and meets the 24 by 24 hit-area floor (`design-system` §pointer targets).
+- The announcement names the stage that MOVED, read before the move is applied, and is the shared reorder sentence ("Moved {name} to position {position} of {total}.") — a single localized string carrying name, position and total, never assembled from fragments.
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
 - The key a debounced reorder write commits the **Player Result Order** under is captured when the reorder is **scheduled**, never re-derived when the write flushes.
   A subject change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** recipe or participation, silently — the player reorders one subject's stages and another subject's preference moves.
@@ -700,41 +718,39 @@ The salvage deltas are stated at the end of this section; everything else applie
   The write stays pending rather than committing when the reload seeds it, so the flush-before-salvage rule below still sees it and a rejection can still abort the run.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
   A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
-- When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
-  No live region is rendered in this state, because nothing can change.
+  A reset to the GM's order is announced through the same region.
+- When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip and the rocker** (the grip is the affordance signal), attach **no** drag handlers, and show one muted caller-rendered line explaining why.
+  Nothing is announced in this state: the list's live region stays mounted and emits nothing of its own.
   Identical rows minus working affordances are not acceptable: a player must not be able to grab a row and have nothing happen.
 - A Discovery-Mode teaser MUST NOT surface any stage data (see §Browse Status): the stage list is redacted exactly as `result` and `outcomeTiers` are.
 
 **Optional per-caller extensions.**
-The extension set is exactly four, all **opt-in and default-off**: an optional per-stage **state chip**, an optional **fixed-state note** overriding the explanation shown when reordering is unavailable, an optional **stacked row layout**, and an optional per-stage **complication strip**.
-**All four ship.**
-The strip's opt-in is a **tense token** — `off` by default, else `forecast` or `resolved` — and never a caller-supplied snippet, and that spelling is normative rather than incidental: a snippet is defined in the CALLER, so two bodies passing "the same" strip would be two copies of its markup, which is exactly the duplication this shared section exists to prevent.
+The extension set is exactly four, all opt-in: a per-stage **state chip** (`ProgressiveStageRow`'s `stateChip` snippet), a **fixed-state note** (caller-rendered after the list), a **stacked layout** (`ProgressiveStageRow`'s `layout`, default `inline`), and a per-stage **complication strip** (`ProgressiveStageBand`).
+The strip's opt-in is that the caller mounts `ProgressiveStageBand` as the list's `body`, passing a `tense` token (`forecast` or `resolved`); the caller mounts the one shared component and never supplies its own markup.
 A token is sufficient because nothing about the strip varies per caller except the tense, and the tense is the one thing the row data cannot say for itself: an un-fired complication looks identical before a roll and after one that spared it.
 (The per-stage **quantity** opt-in was deleted, not defaulted off: no stage renders a quantity on either surface, consistent with the "result entries carry no quantity" rule.)
-A caller that passes none MUST get the crafting rendering unchanged; the presence of the DATA is never the switch, only the caller's opt-in.
-This exists so a second consumer can add rendering without re-skinning the first.
-The fixed-state note is overridable because `canReorder: false` has **two** causes the component cannot distinguish: the GM pinned the order (the permission is off), or the player's order has already been **spent** by a resolved roll.
-Defaulting to the GM reason keeps the crafting rendering unchanged, since there it is the only cause; a caller with a second cause MUST supply the note, or the surface asserts something untrue about the roll that just happened.
-The GM reason takes precedence where both apply — it stays true whether or not a roll has since been spent.
+A stage that carries no visible complications renders no body, and its row is the plain row.
+The fixed-state note is caller-owned because `canReorder: false` has two causes the list cannot distinguish: the GM pinned the order, or a resolved roll has spent it.
+Each caller renders the note matching its own cause, and the GM reason takes precedence where both apply.
 The set is enumerated deliberately: a future extension is added to this list, so "not listed" means "not supported", not "not yet noticed".
 
 The **stacked row layout** exists because the default inline row lays every part on one line and lets only the name flex, so the name absorbs every other part's width.
 In a narrow column (the player inspector's 300px) that measures a **zero-width name** and overflows the trailing controls out of the panel — the row does not degrade gracefully, it fails.
-Stacked, the reorder controls **lead** the row and the stage's identity is a flexible **column** (the name in one wrapping text flow, its number beneath), so the name wraps instead of being crushed.
+Stacked, the grip leads the row, the rocker trails it, and the stage's identity is a flexible **column** (the name in one wrapping text flow, then the numbers, then the state chip).
 Every progressive surface, stacked rows included, shows **both** the component's progressive DC ("DC N") and the cumulative threshold ("Reach ≥N"), per the issue #675 ruling and matching `resolution-modes` §Progressive Mode Semantics.
 The "DC N" value is `component.difficulty`, which the GM authors via the stepper titled "This component's Progressive DC"; the **check-level** DC remains nonexistent (the projection resolves it to null, and a component's `dcOverride` does not shift these thresholds).
 
 **The per-stage complication strip.**
 
-`ProgressiveStageList.svelte` takes it as `complications`, the tense token named above, and BOTH shipped bodies pass it: the crafting body passes `forecast` always, and the salvage body passes `resolved` once its run has resolved and `forecast` before that.
+`ProgressiveStageBand.svelte` takes it as `tense`, the token named above, and BOTH shipped bodies mount it: the crafting body passes `forecast` always, and the salvage body passes `resolved` once its run has resolved and `forecast` before that.
 Crafting can pass nothing else, because the fired record lives on the salvage run record and the immediate crafting path writes none.
 It is stated here, in the same section that owns the extension contract, because the projection the strip reads (`forecastComplications`) is shared with the GM authoring surface that fills it, and a strip specified anywhere else would be specified away from the enumeration rule it has to obey.
 
-The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a surface that passes nothing renders exactly as it did before the strip existed, and both bodies pass it so neither gets a private copy of the treatment.
+The strip renders a component's complications inside its own stage row, and it is a DEFAULT-OFF extension of this shared section rather than a second body: a stage with no visible complications renders no body, and both bodies pass it so neither gets a private copy of the treatment.
 
 **The data is published on the stage row, and the strip MUST NOT re-derive any of it.**
 Both progressive read-models attach the player projection to the stage rows they already publish — `InventoryListingBuilder._buildSalvage` for salvage and `CraftingListingBuilder._buildProgressiveStages` for crafting — through the one shared `attachStageComplications` helper, so the audience filter, the activity gate and the could-never-fire exclusion are all decided builder-side against the same records the engine fires from.
-A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed; the presence of the DATA is still never the switch, only the caller's opt-in.
+A component that authors no player-visible complication for that activity leaves the stage row carrying no such key at all, and the row is byte-identical to the one published before this feature existed, and such a stage's row renders no body.
 The projection is attached TO the row rather than published beside it because the player's reorder is applied downstream of the builder, and a parallel list keyed by result id would desynchronise at exactly that point.
 Marking the fired tense onto an already-attached list is the paired `markFiredStageComplications`, which only ever MARKS what the forecast already published and can therefore never surface a record the forecast withheld.
 
@@ -749,26 +765,24 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A stage with several applicable complications renders the FIRST in fire order plus a "+N more" affordance.
   The inspector column is 300px wide — the documented reason the stacked layout exists — and an unbounded list turns one row into several prose paragraphs.
 - A stage that is both awarded AND fired renders its success state chip **and** the fired band together, the band reading as a consequence of the award rather than a contradiction of it.
-- The strip is a full-bleed band INSIDE the row, so the row becomes a column with today's line wrapped.
-  **That row-structure flip is gated on the strip rendering CONTENT for that stage, not on the extension being passed.**
-  Both bodies pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
-- The band is explicitly NOT draggable.
-  Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
-- The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (`ui-entity-editors/spec.md` §Component Studio requirement 16).
+- The strip is a full-bleed band in the row's body, beneath its line.
+  A stage whose strip has no content draws no body box (`has-band` gates it), so a row without complications is the plain row.
+  The gate is the strip's CONTENT for that stage, not the caller's mounting of it: both bodies mount it, so a presence gate would re-skin every progressive stage row in every world.
+- The strip's placement and form are deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": on the player side it is a tensed band in the stage row's body that summarises the first entry plus "+N more", while on the GM side both studios list every entry read-only as a nested `SortableList` in the stage row's body (`ui-entity-editors/spec.md` §Component Studio requirement 16; `design-system/spec.md` "An ordered row opens in place to its editing body").
 - **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
-  Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
+  Severity is one vocabulary across every complication call site, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
   The band's own fill and top rule change with the tense; the tile does not.
 - **The badge's copy is tensed, and a resolved stage does not still forecast.**
   Before a resolution the badge reads in the future tense ("this can go wrong"); after one, a complication that did NOT fire reads a past-tense negative.
   A row that still says "this can go wrong" beneath a spent roll asserts something that is no longer true, and the player has no way to tell it from a row that is genuinely still pending.
   The design prototype does say it — its `fired` flag is derived from a stage being short, so a recovered stage keeps its forecast copy — and this rule deliberately overrides it.
 - **The player row renders the authored DESCRIPTION, and it WRAPS.**
-  The GM strips clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
+  The GM read-only complication lists clip their generated trigger sentence to one line so the row height cannot move under a long authored condition, and that is right for a GM reading a list of things they wrote.
   It is wrong here: the description is the whole of what this surface discloses, and an ellipsis at roughly sixty characters in a 300px column removes the disclosure the strip exists to make.
   It wraps, clamped to a bounded number of lines so the row height stays predictable, with the full string still reachable.
-- **The band is not a drag source and carries no destructive or navigational control.**
-  Pre-roll the salvage list is reorderable and the row IS a drag source, so a mousedown inside the prose would start a drag rather than a text selection.
-  It also carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
+- **The band lies outside the drag source and carries no destructive or navigational control.**
+  Only the grip starts a drag, so a mousedown-drag inside the prose selects text.
+  It carries no per-complication link: a complication belongs to the component the row already names, and a player has nowhere to be sent.
 - **The progressive CRAFTING surface is forecast-only.** The fired record is defined on the salvage run record, and crafting has no run record on the immediate path; inventing a second carrier for it is out of scope here.
 
 **Progressive salvage deltas.**
@@ -894,6 +908,15 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   1907).
 - A failure tier (`success === false`) never routes and awards nothing (empty
   `awardedResults`).
+- A collapsed tier carries `ids`, every merged tier's id in first-appearance order, beside
+  `id`, the first of them.
+- The detail draws the tiers through the shared `OutcomeLadder`: each award a wrapping chip at least 24px tall, led by its 14px picture, else its 9px glyph (an item's `×qty`, a reward's own amount, a choice group's members as its detail, wrapping at whitespace), no band, and `No award` for a tier that awards nothing.
+- After a successful roll, the one row whose `ids` contain the craft result's recorded outcome
+  id (`checkResult.data.outcomeId`) carries "Your roll"; a failing outcome marks no row.
+- A successful versioned stage records that id on its craft result, in the run record's
+  `lastCheckResult.data` shape; a failed stage records none.
+  The journal-run reply hands it on only beside a shown roll's evidence, so a secret or blind
+  roll, or an initiator the evidence entitlement refuses, receives no tier.
 
 #### Recipe List
 
@@ -921,6 +944,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 
 #### Recipe Detail
 
+- The detail leads with its identity header: the recipe's 38px tile, its name in the serif face, and Craft as the pane's one primary.
+  Craft is absent, not disabled, while the live craftability says the craft cannot run, and the header then states what is missing; a craft in flight keeps it, disabled.
 - The detail body is keyed on the recipe's `modeToken` (simple,
   routedByIngredients, routedByCheck, progressive), so each resolution mode renders
   its own body (ingredient sets, routed-by-check outcome-tier table, progressive
@@ -933,8 +958,11 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   compact duration in a non-shrinking clock chip at the end of the label row.
   Instant recipes and steps, time-feature-disabled systems, and Discovery-Mode
   teasers show no duration value.
-- Show an ingredient-set selector when the recipe has more than one set; the
-  detail reflects the chosen set's per-set craftability.
+- When a recipe or stage has more than one ingredient set, the player chooses among them as an ingredient-route comparison.
+  - The comparison is a RadioCardGroup in which each set is a route, labelled by its name, or by its ordinal when unnamed.
+  - Each route states its status: its craftability, meaning craftable, a shortage of N entries, or a blocking tool.
+  - Each route shows its products as dense ListRows, including routes not chosen.
+  - The detail reflects the chosen set.
 - Show the `check` descriptor (DC / skill / roll formula) when present, marking it
   optional or mandatory per mode and unusable when no roll formula is authored.
 - Show the outcome-tier table for `routedByCheck` recipes, with each tier's
@@ -965,6 +993,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   A choice slot's caption states its alternative count whichever kind of option is chosen.
 - An essence alternative reports the essence the held stacks carry against its authored amount, and reads satisfied exactly when the resolver would consider that alternative fundable.
   Fundable is not funded: the slot's own ratio still reports what the pool allocation delivers.
+- A tag option matching several held stacks opens its held-stack picker in the slot's panel: the shared `ChoiceOptionList` radiogroup, one candidate per stack, each reading held against the slot's need.
+  A stack held short of the need has its chip and name dimmed, with its reading at full opacity, and is still offered and described by that reading; the picker reads held stock only, so no stack is disabled; contention surfaces in the slot's verdict.
 - Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
   The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
   Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.
@@ -978,7 +1008,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - "Pick for me" fills the set's unmade choices and suggests an essence allocation.
   It ranks a group's alternatives by whether they are satisfied, then by coverage (what is held over what is needed), then by authored order, so an essence amount is never compared against an item count.
   When it switches a group onto an essence alternative, it suggests the allocation for the new selection rather than keeping the previous one.
-  It lives in the rail header, scoped to the rail, rather than in the app footer: the rail renders inside step and routed bodies while Craft sits in a fixed footer outside the scrolling body.
+  It lives in the rail header, scoped to the rail: the rail renders inside step and routed bodies while Craft is the recipe's identity-header primary outside the scrolling body.
   On an infeasible inventory it returns the best partial suggestion and an honest shortfall rather than throwing or looping.
 - Every rail control is keyboard-operable and named for assistive technology, and bar transitions honour `prefers-reduced-motion`.
 
@@ -987,8 +1017,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A set's essence requirements are funded from one shared, player-editable **essence pool**, scoped to a single ingredient set on a single step, because that is the granularity at which the engine consumes.
 - Each carrier row offers a keyboard-operable stepper allocating units of one held item to the pool, and the allocation the player sees is exactly what the craft consumes.
 - A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
-- A requirement's ratio reports `delivered / need` as essence amounts, so a satisfied requirement reads exactly `need / need` rather than the whole matching inventory.
-  Unit-granular overshoot is visible in the per-carrier allocation, never in a requirement's ratio.
+  The pool composes the shared `EssencePool` with `capAtHeld`, so that cap holds after every requirement is met: the player may over-fund deliberately, up to the units owned.
+- A requirement's ratio reports what the allocation contributes over its `need`, as essence amounts, never the whole matching inventory; the bar stops at the need while the ratio states an over-funded pool as it is, `4 / 2`, as the library specimen does.
+  The surplus is stated in words beneath the source list, one sentence per essence ("{essence}: {amount} more than required", the journal stage's own wording), and the consumption-plan panel states the same line.
 - The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
   That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
 - Legacy set-level essence requirements (`IngredientSet.essences`) are threshold-only and never consumed, so they cannot enter the pool.
@@ -1023,13 +1054,14 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   of a progressive run, time-gated), plus a keyboard- and pointer-accessible Back
   affordance that returns the rail to the Shopping List without losing the recorded
   outcome.
+- The Run Summary's craft action — "Craft another", or "Craft next step" on a progressive run — is a ghost button, so the recipe's identity header keeps the pane's one primary.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
 - The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.
   It withholds them only for a blind or secret roll, so a private or self roll still shows its roller the evidence.
   A counting check's sentence rows — `Count` (`{q} qualified − {c} cancelled = {n} net`) and a zero pool's `Pool` and `Result` — set in the body face as prose and wrap by word, while its figure rows keep the keyed row's mono (issue 2134); the salvage summary renders the same rows.
   Its tiles and their legend sit on the same neutral ground as its rows rather than on the box's tint, and the legend keys each mark by the very glyph the tile draws, beside the word that names it.
-  A box whose check states evidence also states the outcome: "The result group is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
+  A box whose check states evidence also states the outcome: "The result set is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
   The salvage summary never states that sentence.
 - The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity
   home for monitoring and advancing these runs; a direct cross-link from the Run
@@ -1038,13 +1070,14 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 ### Alchemy Tab
 
 The player Alchemy tab is an IMPLEMENTED route (it replaced the earlier `{:else}` "Coming soon" placeholder in `FabricateAppRoot.svelte`).
-Its content mounts inside `.fabricate-app-content` — the shell's 84px nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
+Its content mounts inside `.fabricate-app-content` — the shell's nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views' column structure.
 The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; its named container stacks at the shared `@container fabricate-alchemy (max-width: 960px)` breakpoint with the **workbench leading** the stacked order.
 It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
 
 The additional component-sources bar (`ComponentSourcesBar`) renders in the shared top bar on the alchemy tab (`ActorSelectTopBar` `showSourcesBar` includes `activeTab === "alchemy"`), so a player can pull components from other actors; the discipline block (system name + Switch) sits ABOVE the "Known recipes" heading, stacked (name on its own line, Switch below).
 
-The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
+The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading.
+Brew is the Workbench's one primary, a full-width green button, and it carries no ready pulse: its enabled state is what says the bench is ready.
 
 #### Alchemy System Selector
 
@@ -1120,6 +1153,8 @@ It shares the selected character and the component-source actors with the Crafti
 
 - **Layout.**
   Two responsive columns — filters + item grid on the left, an item inspector on the right — reflowing to **stacked** below the container breakpoint.
+  When stacked, the browse and detail panes split the window's content height, weighted toward the browse pane, and each scrolls on its own, so the grid's pagination bar stays the browse pane's footer and the bulk footer stays pinned at the detail pane's foot.
+  Where the window is too short for both panes' floors, the content scrolls as a whole and each footer remains at its own pane's foot.
   The window is resizable, so a fixed column count is not the contract: the grid is responsive and its column count is an expression of the available width.
 - **Filter chips.**
   A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
@@ -1181,10 +1216,12 @@ Brokenness is about **usability, not salvageability**, and MUST NOT gate the sal
   Display name and image are the **primary** (default-selected) participation's component name/image, biased to a **salvageable** participation first so clicking the union recycle badge never opens a primary with no Salvage tab.
   With exactly one participation the selector is **absent** and the surface is byte-identical to a single-system card — no selector node, no chrome, no layout shift.
 - **Inspector Info order.**
-  Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
+  Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / gathering kinds) → Produced by (gated `!isEssence`).
   Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
   For a **tool-only** card the type chip reads **Tool**, and **Used by** and **Produced by** are OMITTED rather than rendered empty: a tool is neither consumed nor produced in that role, and "Not used by any known recipe" beneath a hammer several recipes require reads as a defect rather than as an empty state.
   A **Required for** entry is indexed against BOTH the Tool's own id and, when present, its linked component id, so the disclosure survives `componentId: null` on an item-sourced Tool (issue 1119).
+  Sources, Contributing, Used by, Required for and Produced by each render through the design-system `XrefList`: dense 22px rows of one line, the role or kind as the row's trailing detail, and Sources and Contributing their `×N` quantity.
+  An entry's kind is one of the closed set recipe, salvage and gathering; a recipe entry opens that recipe, and a salvage or gathering entry is not a control.
 - **Used-by reverse index composition.**
   The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
   Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
@@ -1210,13 +1247,14 @@ The player's route to salvage.
   "No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
 - A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
 - **Simple multi-group misconfigured state.** A stored-but-not-yet-re-normalized `simple`-mode component with more than one success result group is misconfigured (the engine only ever awards the first group).
-  The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result group; Simple mode uses a single group — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
+  The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result set; Simple mode uses a single set — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
   The GM-facing inventory renders this cue; the non-GM visibility gate retains the hard-hide for a still-invalid stored config (justified: the config self-heals on the next system normalize, and the GM gets the cue in two surfaces — the manager overview critical and this body).
   Both surfaces show the working salvage panel once the config re-normalizes to a single success group.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
   A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
   A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
   "Verbatim" names the numbers, not the glyphs: the panel renders the range through the same `netRange` formatter the Journal's counting band uses (issue 2152), so a fixed tier whose end is negative separates its bounds with a spaced en dash and the true minus sign (`−2 – −1`), never a raw template interpolation (`-2–-1`), and a single-value segment states its one number (`5`, never `5–5`).
+- The action is the item header's one primary while the Salvage tab is open and no result ribbon stands; a note at the foot of the tab states what pressing it costs.
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
   The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
@@ -1237,7 +1275,7 @@ The player's route to salvage.
   Disclosure is independent of resolution mode **and** of the misconfigured state: a prerequisite is worth disclosing in every state.
   A present-but-broken tool reads unavailable; the panel renders availability only, with no distinct repair cue.
 - **Tool-blocked action.** The pre-roll action is **disabled when any required tool is unavailable**, so the one-shot roll is never spent on an attempt the engine will reject for a missing tool.
-  In that state the footer note **supersedes** the one-shot cost note and instead explains why the button is off; the disabled action may reference the note via `aria-describedby`.
+  In that state the note explaining why the action is off sits directly beneath the tab strip, nearest the header action, which references it by `aria-describedby`, and it replaces the one-shot cost note the footer otherwise carries.
   The engine's `_validateTools` remains the server-side authority — this disable is a UX affordance mirroring crafting's `canCraft`.
 - **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion or an unavailable required tool (`disabled = busy || misconfigured || waiting || depleted || !toolsAvailable`).
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
@@ -1248,11 +1286,11 @@ The player's route to salvage.
   A fixed-range or progressive salvage states no target.
   Its post-roll summary states the chat card's `Target`, `Pre-rolled` and `Margin` rows (or `Needed` and `Margin` for a fixed DC read roll-high), withheld only for a blind or secret roll, and keeps the space before `with a roll of`.
 - **A counting salvage.** Its simple body reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}` for the salvaging character in place of a DC, and its banner says the count must reach the successes needed.
-  Its relative-routed body states each tier's band in net successes from those successes needed, through the Journal's own band presenter and the shared `Chip` (`density="list"`, mono, `danger` for a failing tier) that `OutcomeLadder` uses, with the Journal's `Botch` row while cancelling is on (see `ui-journal-app` _Journal App_), in place of a `Reached at` threshold; a band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
+  Its relative-routed body states each tier's band in net successes from those successes needed, through the Journal's own band presenter and the bare mono band of the shared `OutcomeLadder` the body composes, in `--fab-text-secondary` and `--fab-danger-text` for a failing tier, with the Journal's `Botch` row while cancelling is on (see `ui-journal-app` _Journal App_), in place of a `Reached at` threshold; a band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
   A successful roll whose net falls below the Botch row's floor marks that row "Your roll" in place of the least demanding tier it routed to; a failed salvage marks no row, as for any failing tier.
-  Every routed tier's figure, a fixed range, a count band or a `Reached at` threshold, renders through that same `Chip`.
+  Every routed tier's figure, a fixed range, a count band or a `Reached at` threshold, renders as that ladder's bare band, and each recovered result as its yield chip.
   Its post-roll summary states the die tiles and count rows the crafting result box states, withheld only for a blind or secret roll (the result box rule, which also shows a private or self roll to its roller), and a pool reduced to zero shows no tile and no roll total.
-- **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
+- **Post-roll reconciliation.** The routed body marks the matched tier with the ladder's "Your roll" pill (`reachedId`) from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure.**
   The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
   The projection it reads is attached per stage to `salvage.stages[]` and filtered against salvage's OWN progressive check block, so the ids the forecast filters on are the ids the firing will match against.
@@ -1262,7 +1300,7 @@ The player's route to salvage.
   A `gmOnly` complication appears in NO player surface, in no engine return this panel reads and in no salvage run record, **including when a GM is the acting user** — the projection is keyed on the AUDIENCE, never on the acting user's role (`data-models/spec.md` § Component requirement 23).
   A complication whose condition roll did not pass, on a stage that fell short, renders as NOT fired; a runless progressive salvage renders every strip in the not-fired treatment.
   Each occurrence is marked on its own: a component staged twice whose complication fired on both entries renders BOTH strips fired, and one that fired on neither renders neither, because the resolution produces one fired record per firing and the marks follow the records one for one.
-  A component whose only complication is `gmOnly` therefore renders in both GM read-only strips and in neither player surface.
+  A component whose only complication is `gmOnly` therefore renders in both GM read-only complication lists and in neither player surface.
 - **Bulk selection unit.**
   The bulk gesture's unit is the **acting participation**, one unit per row, with no per-row quantity control; a run may span crafting systems and source actors (see §Bulk Salvage Execution).
   Brokenness does **not** block a row from a bulk queue — brokenness is about usability, not salvageability (see §Inventory Tab), and the prototype's "repair before salvaging" would block something Fabricate permits while naming a remedy Fabricate has no action for.
@@ -1296,7 +1334,7 @@ The player's route to salvage.
   The GM's state states authorship and nothing more — it is neither an error nor a refusal being announced.
   All three MUST come from the projection rather than be inferred in the panel from the reorder permission and the player-order flag together, which would be the block re-deriving the projection it exists to render.
   A row with no ordered stage list at all (a `simple` or `routed` row) has **no** provenance — no order exists for anyone to own — and publishes no forecast either, so no card renders that case.
-  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the six-call-site scaffold exists so the second one costs props rather than a component.
+  The block renders the **same shared complication row** as the per-stage strip, in the same player variant: they are one meaning on two screens, and the shared scaffold exists so the second one costs props rather than a component.
   It renders **no excluded-results note**, on the § Progressive Salvage Deltas rule that no player progressive surface builds any part of the exclusion vocabulary.
 - **Bulk yield preview.**
   The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.

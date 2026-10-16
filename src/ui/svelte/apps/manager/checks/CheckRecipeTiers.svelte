@@ -17,7 +17,7 @@
 <script>
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import SortableList from '../../../components/SortableList.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -280,10 +280,10 @@
 </div>
 
 {#snippet addTierButton()}
-  <ManagerButton role="dashed" data-add-tier onclick={addTier}>
+  <Button role="dashed" data-add-tier onclick={addTier}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add difficulty tier')}</span>
-  </ManagerButton>
+  </Button>
 {/snippet}
 
 <style>

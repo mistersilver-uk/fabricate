@@ -12,7 +12,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -22,11 +22,14 @@ const harness = createMountedComponentHarness({
   runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // RecipeItemEditor/ToolEditView/EssenceEditView resolve.
@@ -66,6 +69,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     // The actor portrait (issue 1514).
     'src/ui/svelte/components/Avatar.svelte',
+    // The identity row `InventoryDetailHeader` composes (issue 1518).
+    'src/ui/svelte/apps/PlayerDetailHeader.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
@@ -80,7 +85,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     // The preview NEVER renders the salvage tree (a book is never salvageable).
-    'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+    'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -90,27 +97,39 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    // The shared ladder the routed body draws, and the row each recovered result is (issue 1644).
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte',
     // The multi-system participation selector InventoryComponentDetail imports (issue 766).
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    // The inspector's cross-reference lists (issue 2321).
+    'src/ui/svelte/components/XrefList.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
+    // The book's recipe search (issue 1518).
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The promoted tab-strip primitive (issue 1362), a dependency of the tab strip below.
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
-    // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
+    // The Contents tab's membership is a `SetPicker` over the searchable popover (issue 1782).
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
+    // The Limits tab's two typeaheads (issue 1782).
+    'src/ui/svelte/components/Typeahead.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
-    // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
+    // either HANGS this suite (# cancelled) rather than failing it. `Button` is already
     // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+    // The preview rail's two sections (issue 1782).
+    'src/ui/svelte/components/Rail.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
@@ -171,6 +190,20 @@ describe('RecipeItemEditor (mounted)', () => {
       'the player access badge renders'
     );
     assert.ok(root.querySelector('[data-recipe-item-rules]'), 'effective rules render');
+    // Each is a rail section named by its kicker (issue 1782).
+    const rail = root.querySelector('[data-recipe-item-rail]');
+    const sections = [...rail.querySelectorAll(':scope > .fab-rail')];
+    assert.deepEqual(
+      sections.map((section) =>
+        document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent
+      ),
+      ['How players see it', 'Effective rules']
+    );
+    assert.ok(sections[0].contains(preview), 'the preview sits in the first section');
+    assert.ok(
+      sections[1].contains(root.querySelector('[data-recipe-item-rules]')),
+      'and the rules in the second'
+    );
   });
 
   // AC13 (issue 675). The preview renders the REAL player component.
@@ -224,7 +257,7 @@ describe('RecipeItemEditor (mounted)', () => {
     assert.deepEqual(calls, ['contents']);
   });
 
-  it('derives the contents count badge and a passing validation badge', async () => {
+  it('derives the contents count and a neutral, named passing validation badge', async () => {
     const root = await harness.mount({
       recipeItem: draft(),
       linkedItem: LINKED_ITEM,
@@ -233,12 +266,13 @@ describe('RecipeItemEditor (mounted)', () => {
       visibilityMode: 'item',
     });
     assert.equal(
-      root.querySelector('[data-recipe-item-tab-badge="contents"]').textContent.trim(),
+      root.querySelector('[data-recipe-item-tab-count="contents"]').textContent.trim(),
       '2'
     );
     const validation = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.equal(validation.textContent.trim(), '✓');
-    assert.ok(validation.classList.contains('is-active'));
+    assert.ok(validation.classList.contains('is-neutral'), 'a pass asks for no attention');
+    assert.equal(validation.getAttribute('aria-label'), 'All clear');
   });
 
   it('turns the validation badge danger when the linked item is missing', async () => {
@@ -253,6 +287,12 @@ describe('RecipeItemEditor (mounted)', () => {
     // itemLinked + recipeLinked both fail = 2 critical.
     assert.equal(validation.textContent.trim(), '2');
     assert.ok(validation.classList.contains('is-danger'));
+    assert.ok(
+      !root
+        .querySelector('[data-recipe-item-tab-button="contents"]')
+        .querySelector('.manager-editor-tab-count'),
+      'no linked recipe draws no Contents count'
+    );
   });
 
   it('recomputes the embedded item-mode preview and effective rules from caps', async () => {
@@ -624,8 +664,10 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     );
   });
 
-  it('changes route and focuses the destination PANEL for a route-only row', async () => {
-    // `recipeLinked` names the CONTENTS tab and no control.
+  it('routes to Contents and focuses the link-recipe trigger, which never disables', async () => {
+    // The trigger opens a staged `SetPicker` over every recipe of the system (issue 1782), so a
+    // book linking nothing still has a control to land on; the panel fallback this row used to
+    // take is held by the recipe editor's own route-only row (`recipe-edit-mounted`).
     const root = await openValidation({
       recipeItem: draft(),
       linkedItem: LINKED_ITEM,
@@ -635,15 +677,10 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     await activateIssueView(root, 'recipeLinked');
 
     assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="contents"]')), 'the route changed');
-    const panel = root.querySelector('.manager-recipe-item-editor-panel');
-    assert.ok(Boolean(panel), 'the editor renders its tab panel');
-    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
-    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
-    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
-    assert.ok(
-      !root.querySelector('[data-validation-focused]'),
-      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
-        'addressed none — the panel is where focus went, not what the row was about'
-    );
+    const trigger = root.querySelector('[data-validation-target="recipe-item-link-recipe"]');
+    assert.ok(Boolean(trigger), 'the Contents tab carries the addressed trigger');
+    assertIs(document.activeElement, trigger, 'and it holds focus, not `<body>`');
+    assert.equal(trigger.tagName, 'BUTTON', 'a native button, focusable without a tabindex');
+    assert.equal(trigger.getAttribute('data-validation-focused'), '', 'and it is marked');
   });
 });

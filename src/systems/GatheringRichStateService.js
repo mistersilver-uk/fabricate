@@ -7,7 +7,6 @@ import {
   normalizeTagList,
 } from '../utils/scalars.js';
 
-import { chatModeOption } from './bulkChatVisibility.js';
 import { resolveModifierLibrary } from './characterLibraries.js';
 import {
   conditionSettingsToCurrent,
@@ -32,6 +31,11 @@ import {
   normalizeNullableAdjustment,
   normalizeNullableSuccesses,
 } from './normalize/checkEvaluation.js';
+import {
+  normalizeConditionIcon,
+  normalizeConditionOptions,
+  seedConditionOptions,
+} from './normalize/gatheringConditionOptions.js';
 import { resolvedToolsFor } from './scopedEntityReads.js';
 
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
@@ -77,27 +81,6 @@ const DEFAULT_BIOME_METADATA = Object.freeze({
   urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
   ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
   wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' }),
-});
-const DEFAULT_CONDITION_ICONS = Object.freeze({
-  weather: Object.freeze({
-    clear: 'fas fa-sun',
-    cloudy: 'fas fa-cloud',
-    rain: 'fas fa-cloud-rain',
-    storm: 'fas fa-bolt',
-    snow: 'fas fa-snowflake',
-    fog: 'fas fa-smog',
-    wind: 'fas fa-wind',
-  }),
-  timeOfDay: Object.freeze({
-    dawn: 'fas fa-cloud-sun',
-    day: 'fas fa-sun',
-    dusk: 'fas fa-cloud-moon',
-    night: 'fas fa-moon',
-  }),
-});
-const FALLBACK_CONDITION_ICONS = Object.freeze({
-  weather: 'fas fa-cloud-sun',
-  timeOfDay: 'fas fa-clock',
 });
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
@@ -416,14 +399,10 @@ export class GatheringRichStateService {
     system = null,
     gatheringModifier = 0,
     eventModifier = 0,
-    // Opt-in Dice So Nice: `animate` pre-rolls one `Nd100` Roll and draws each row/event face
-    // from it (falling back to `this.rollD100()`); `extraModifier` is a flat bonus on every throw;
-    // `rollMode`/`speaker`/`flavor` decorate the post. Off, throws are silent.
-    animate = false,
+    // A prompted attempt's GM-rolled face, used when an item row reads it, else `rollD100()`;
+    // `extraModifier` is its flat bonus on every throw.
+    attemptRoll = null,
     extraModifier = 0,
-    rollMode,
-    speaker,
-    flavor,
   } = {}) {
     const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
@@ -466,12 +445,12 @@ export class GatheringRichStateService {
       };
     }
 
-    const itemRoll = await this._rollD100ItemRows({
+    const itemRoll = this._rollD100ItemRows({
       rowContributions,
       rules,
       environment,
       modifier: taskModifier + flatBonus,
-      animate,
+      presetRoll: attemptRoll,
     });
 
     const eventResolution = this._resolvePreparedEnvironmentalEvents({
@@ -482,20 +461,6 @@ export class GatheringRichStateService {
       eventModifier,
       extraModifier: flatBonus,
     });
-
-    // Post the attempt's d100 so Dice So Nice animates it and the shown number is the one tested;
-    // animate-only, and a chat failure is logged, never thrown.
-    if (itemRoll.attemptRollMessage) {
-      try {
-        // `rollMode` is deprecated on V14; the shim picks key and vocabulary together.
-        await itemRoll.attemptRollMessage.toMessage(
-          { speaker, flavor },
-          { ...chatModeOption(rollMode), create: true }
-        );
-      } catch (error) {
-        console.error('Fabricate | Failed to post d100 roll to chat:', error);
-      }
-    }
 
     return {
       status: eventResolution.status === 'failed' ? 'failed' : 'succeeded',
@@ -551,25 +516,11 @@ export class GatheringRichStateService {
     return { rowSnapshots, rowContributions, diagnostics };
   }
 
-  async _rollD100ItemRows({ rowContributions, rules, environment, modifier, animate }) {
+  _rollD100ItemRows({ rowContributions, rules, environment, modifier, presetRoll = null }) {
     // All item rows share one attempt roll. Environmental events are resolved separately,
     // with one independent throw per event, so hazards never correlate with the item haul.
-    const rollsAttemptCheck = rowContributions.length > 0;
-    let attemptRoll = null;
-    let attemptRollMessage = null;
-    if (rollsAttemptCheck && animate && typeof globalThis.Roll === 'function') {
-      try {
-        const rolled = await new globalThis.Roll('1d100').evaluate({ allowInteractive: false });
-        const face = Number(rolled?.dice?.[0]?.results?.[0]?.result);
-        if (Number.isFinite(face)) {
-          attemptRoll = face;
-          attemptRollMessage = rolled;
-        }
-      } catch (error) {
-        console.error('Fabricate | Failed to roll the d100 gathering check:', error);
-      }
-    }
-    if (rollsAttemptCheck && attemptRoll === null) attemptRoll = this.rollD100();
+    const preset = Number.isInteger(presetRoll) ? presetRoll : null;
+    const attemptRoll = rowContributions.length > 0 ? (preset ?? this.rollD100()) : null;
 
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
@@ -592,7 +543,6 @@ export class GatheringRichStateService {
       roll: attemptRoll,
       itemRows,
       selectedItems: selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit),
-      attemptRollMessage,
     };
   }
 
@@ -732,9 +682,9 @@ export class GatheringRichStateService {
 
   /**
    * A no-dice preview of each drop row's chance for the "What you might find" inspector, using
-   * `resolveD100Attempt`'s per-row math without rolling: base and adjusted chance plus a weather,
-   * time-of-day, biome and per-ability breakdown. Unresolvable character modifiers are omitted,
-   * with no diagnostics shown to players.
+   * `resolveD100Attempt`'s per-row math without rolling: base and adjusted chance, the roll's own
+   * `threshold` for that chance, and a weather, time-of-day, biome and per-ability breakdown.
+   * Unresolvable character modifiers are omitted, with no diagnostics shown to players.
    *
    * @returns {Promise<{drops: object[], awardMode: string, awardLimit: number, eventPolicy: string}>}
    */
@@ -810,18 +760,10 @@ export class GatheringRichStateService {
         ...conditionEntries,
         ...characterEntries,
       ]);
-      const weather = conditionKindDisplay(
-        row.conditionModifiers,
-        'weather',
-        conditions,
-        dropModifierMode
-      );
-      const timeOfDay = conditionKindDisplay(
-        row.conditionModifiers,
-        'timeOfDay',
-        conditions,
-        dropModifierMode
-      );
+      const kindDisplay = (kind) =>
+        conditionKindDisplay(row.conditionModifiers, kind, conditions, dropModifierMode);
+      const weather = kindDisplay('weather');
+      const timeOfDay = kindDisplay('timeOfDay');
       const biome = biomeKindDisplay(
         row.conditionModifiers?.biome,
         biomes,
@@ -836,6 +778,7 @@ export class GatheringRichStateService {
         quantity: row.quantity,
         baseChance: base / 100,
         finalChance: finalRate / 100,
+        threshold: dropThreshold(finalRate),
         modifiers: {
           weather: {
             conditionId: normalizeConditionId(conditions?.weather),
@@ -2157,6 +2100,11 @@ function matchingConditionModifierEntries(
   return entries;
 }
 
+/** The least effective d100 roll a row with this final chance drops on; the preview states it too. */
+function dropThreshold(finalDropRate) {
+  return 101 - finalDropRate;
+}
+
 function rollDropRow({
   row,
   index,
@@ -2197,7 +2145,7 @@ function rollDropRow({
   const allEntries = [...conditionEntries, ...charList];
   const { finalRate } = applyDropModifierContributions(Number(row.dropRate), allEntries);
   const finalDropRate = finalRate;
-  const threshold = 101 - finalDropRate;
+  const threshold = dropThreshold(finalDropRate);
   return {
     ...cloneJson(row),
     rank: index,
@@ -2513,74 +2461,6 @@ function normalizeVocabularyOptions(kind, value) {
 function normalizeConditionIdList(value) {
   const values = Array.isArray(value) ? value : value ? [value] : [];
   return [...new Set(values.map(normalizeConditionId).filter(Boolean))];
-}
-
-function normalizeConditionIcon(icon, fallback) {
-  const tokens = String(icon || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const prefix =
-    tokens.find((token) =>
-      /^(?:fa[bsrltd]?|fa-solid|fa-regular|fa-light|fa-thin|fa-duotone|fa-brands)$/.test(token)
-    ) || 'fas';
-  const iconToken = tokens.findLast(
-    (token) =>
-      token.startsWith('fa-') &&
-      !['fa', 'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands'].includes(
-        token
-      )
-  );
-  return iconToken ? `${prefix} ${iconToken}` : fallback;
-}
-
-function conditionLabelFromId(id) {
-  return String(id || '')
-    .split('-')
-    .filter(Boolean)
-    .map((token) =>
-      token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`
-    )
-    .join(' ');
-}
-
-function defaultConditionIcon(kind, id) {
-  return DEFAULT_CONDITION_ICONS[kind]?.[id] || FALLBACK_CONDITION_ICONS[kind] || 'fas fa-tag';
-}
-
-function normalizeConditionOption(kind, value) {
-  const isRecord = value && typeof value === 'object';
-  const id = normalizeConditionId(isRecord ? (value.id ?? value.value ?? value.label) : value);
-  if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
-  const fallbackIcon = defaultConditionIcon(kind, id);
-  return {
-    id,
-    label: isRecord
-      ? rawLabel || conditionLabelFromId(id)
-      : /[A-Z]/.test(rawLabel)
-        ? rawLabel
-        : conditionLabelFromId(id),
-    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon),
-  };
-}
-
-function normalizeConditionOptions(kind, value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  const options = [];
-  const seen = new Set();
-  for (const raw of values) {
-    const option = normalizeConditionOption(kind, raw);
-    if (!option || seen.has(option.id)) continue;
-    seen.add(option.id);
-    options.push(option);
-  }
-  return options;
-}
-
-function seedConditionOptions(kind, raw, defaults) {
-  const values = normalizeConditionOptions(kind, raw);
-  return values.length > 0 ? values : normalizeConditionOptions(kind, defaults);
 }
 
 function clampDropRate(value) {

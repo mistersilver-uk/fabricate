@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  FORMULA — what is rolled, and what a roll actually resolves to: the INPUT with its `avg N`
-  reading, the `WHAT ACTUALLY GETS ROLLED` inset, and the suggestion chips. The DC and comparison
-  are the `Difficulty` card's.
+  FORMULA — what is rolled, and what a roll actually resolves to: the expression field with its row
+  of tokens, the `avg N` reading beneath them, and the `WHAT ACTUALLY GETS ROLLED` inset. The DC and
+  comparison are the `Difficulty` card's.
 
   The inset is why a bare input was not enough: check modifiers are added to the roll
   AUTOMATICALLY and never appear in the formula text, so the field a GM types into is not the
@@ -29,16 +29,13 @@
   } from '../../../../../utils/rollExpressionAverage.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import Chip from '../../../components/Chip.svelte';
+  import Field from '../../../components/Field.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
   import CheckCountPoolFields from './CheckCountPoolFields.svelte';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
-  import {
-    countComparisonPhrase,
-    formulaTokenIcon,
-    interpolate,
-    underComparisonPhrase,
-  } from './checksCopy.js';
+  import { countComparisonPhrase, interpolate, underComparisonPhrase } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -142,14 +139,16 @@
     getModifierExpressionSuggestions(foundrySystemId).map((suggestion) => suggestion.expression)
   );
 
-  function appendToken(token) {
-    const current = String(rollFormula || '').trim();
-    onChange({ rollFormula: current ? `${current} + ${token}` : token });
-  }
-
   const formulaLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaLabel', 'Formula')
   );
+  const formulaTokensLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTokensLabel', 'Add a term to this formula')
+  );
+
+  // The Validation route's address for the field, held here because the stamp rides a component
+  // tag: `tests/components/checks-validation-tab.test.js` reads it as focus proved elsewhere.
+  const FORMULA_VALIDATION_TARGET = 'checks-roll-formula';
 
   // Every `@`-path taken as ZERO. `reduceRollExpression` needs the substitution already done
   // and REFUSES what it cannot fully consume, so a stray token reduces to NaN and the reading
@@ -247,7 +246,7 @@
         value={normalizedEvaluation.product}
         groupName="check-evaluation-product"
         ariaLabel={productLabel}
-        dataAttr="data-check-product"
+        data-check-product
         optionDataAttr="data-check-product-option"
         onChange={setProduct}
       />
@@ -261,7 +260,7 @@
         value={direction}
         groupName="check-evaluation-direction"
         ariaLabel={directionLabel}
-        dataAttr="data-check-direction"
+        data-check-direction
         optionDataAttr="data-check-direction-option"
         onChange={setDirection}
       />
@@ -295,21 +294,20 @@
   {/if}
 
   {#if !counting}
-    <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
-         visible label. -->
-    <div class="manager-checks-formula-input">
-      <i class="fas fa-dice" aria-hidden="true"></i>
-      <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
-             THIS field, the roll section's first control in every editor, so it is addressed as
-             `checks-roll-formula`. An `<input>` is natively focusable, so no `tabindex`. -->
-      <input
-        data-check-roll-formula
-        data-validation-target="checks-roll-formula"
+    <!-- The card title is `Formula`, so the field takes an `aria-label` rather than a second
+         visible label. All three roll issues are about this field, the roll section's first
+         control in every editor, so the Validation route addresses it as `checks-roll-formula`. -->
+    <Field as="div">
+      <RollDataExpressionInput
+        data-check-roll-formula=""
+        data-validation-target={FORMULA_VALIDATION_TARGET}
         aria-label={formulaLabel}
         aria-describedby={average ? averageId : undefined}
         value={rollFormula || ''}
         {placeholder}
-        oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
+        tokens={quickTokens}
+        tokensLabel={formulaTokensLabel}
+        onChange={(next) => onChange({ rollFormula: next })}
       />
       {#if average?.quantity === 'magnitude'}
         <span
@@ -336,7 +334,7 @@
           <span class="visually-hidden">{transformedReason}</span>
         </span>
       {/if}
-    </div>
+    </Field>
 
     <div class="manager-checks-formula-resolved" data-check-formula-resolved>
       <i class="fas fa-equals" aria-hidden="true"></i>
@@ -392,30 +390,6 @@
         </p>
       </div>
     </div>
-
-    <!-- Real `<button>`s: this row is five controls a GM operates, and a span with an `onclick`
-         reaches neither the keyboard nor a screen reader. -->
-    <span class="manager-checks-formula-tokens" data-check-formula-tokens>
-      {#each quickTokens as token (token)}
-        <button
-          type="button"
-          class="manager-checks-formula-token"
-          data-check-formula-token={token}
-          onclick={() => appendToken(token)}
-        >
-          <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          {#if formulaTokenIcon(token)}
-            <i
-              class={`${formulaTokenIcon(token)} is-kind`}
-              aria-hidden="true"
-              data-check-formula-token-kind
-            ></i>
-          {/if}
-          <span>{token}</span>
-        </button>
-      {/each}
-    </span>
   {/if}
 
   <CheckPromptOptions

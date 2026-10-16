@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Alchemy rows — live keyboard proof</title>
+    <!--
+      Served by `tests/components/alchemy-known-recipe-layout.test.js` from a Vite dev server, so
+      `mount.js` mounts the real columns and chooser and a real key reaches their rows (issue 1778).
+    -->
+    <link rel="stylesheet" href="/@alchemy-rows-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/alchemy-rows/mount.js"></script>
+  </body>
+</html>

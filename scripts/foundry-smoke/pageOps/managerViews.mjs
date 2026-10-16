@@ -21,25 +21,19 @@ import {
 import { chooseSelectOption } from './selectControl.mjs';
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (Fabricate's
- * shared modal, `.manager-modal[data-roll-prompt]`). A caller that knows the prompt opens passes a
- * longer `timeout`; the default keeps a prompt-less path cheap.
+ * Answer the roll prompt an action is known to open: capture it, then click Roll. Whether a prompt
+ * opens is the caller's to state, never inferred from a short wait, because under load a prompt
+ * can mount long after any guess and leave its action blocked. `timeout` is only a hang guard.
  */
-export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
+export async function answerRollPrompt(ctx, label, { timeout = 60_000 } = {}) {
   const { page, screenshot } = ctx;
   const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
-  try {
-    await dialog.waitFor({ state: 'visible', timeout });
-  } catch {
-    return false;
-  }
+  await dialog.waitFor({ state: 'visible', timeout });
   await screenshot(page, label);
   // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
   // Select's "Public roll" trigger first and opened it instead, leaving the prompt standing.
-  const rollBtn = dialog.locator('button[type="submit"]').first();
-  await rollBtn.click().catch(() => {});
-  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-  return true;
+  await dialog.locator('button[type="submit"]').first().click();
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 });
 }
 
 /**
@@ -460,7 +454,7 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
     // Return to the browser: the category filter chip and the collapsed group both survive.
     await page
       .locator(
-        '.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")'
+        '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Back to recipes")'
       )
       .first()
       .click();
@@ -545,7 +539,7 @@ export async function assertManagerLayoutStable(page, label) {
         '.manager-knowledge-learned-row',
         '[data-manager-tool-id]',
         '[data-tool-edit-view]',
-        '.manager-inspector-card',
+        '.fabricate-card',
         '.manager-system-edit-form',
         '.manager-edit-card',
         '.manager-toggle-row',
@@ -664,12 +658,13 @@ export async function assertRecipeRowsHittable(page, label) {
 
 /**
  * Assert the player's progressive stage list is sound — the checks no unit test can make (issue
- * 651).
+ * 651), read off `SortableList`'s rocker and the one live region following the list (issue 2381).
+ * `expectRocker` requires an up and a down control on every row; a fixed list passes false.
  */
 export async function assertProgressiveStageListSound(
   page,
   label,
-  { expectAnnouncement = false } = {}
+  { expectAnnouncement = false, expectRocker = true } = {}
 ) {
   const report = await withDeadline(
     page.evaluate(() => {
@@ -684,38 +679,43 @@ export async function assertProgressiveStageListSound(
         (node) => Number(node.dataset.progressiveStageThreshold)
       );
 
-      const chevrons = [...document.querySelectorAll('[data-progressive-stage-move] button')].map(
-        (button) => {
-          const box = button.getBoundingClientRect();
-          const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
-          return {
-            height: box.height,
-            width: box.width,
-            glyphContained: glyph ? contains(box, glyph) : false,
-            hasGlyph: Boolean(glyph),
-          };
-        }
-      );
+      // Each rocker control's hit area: its own box, joined with a `::before` that extends it.
+      const rocker = [
+        ...document.querySelectorAll('[data-progressive-stage] [data-sortable-move]'),
+      ].map((button) => {
+        const box = button.getBoundingClientRect();
+        const pseudo = getComputedStyle(button, '::before');
+        const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
+        return {
+          width: Math.max(box.width, Number.parseFloat(pseudo.width) || 0),
+          height: Math.max(box.height, Number.parseFloat(pseudo.height) || 0),
+          glyphContained: glyph ? contains(box, glyph) : false,
+          hasGlyph: Boolean(glyph),
+        };
+      });
 
-      // Per row: the horizontal gap between the up and down buttons.
-      const chevronGaps = [...document.querySelectorAll('[data-progressive-stage-move]')]
-        .map((group) => {
-          const buttons = [...group.querySelectorAll('button')];
-          if (buttons.length < 2) return null;
-          const a = buttons[0].getBoundingClientRect();
-          const b = buttons[1].getBoundingClientRect();
-          return Math.round(b.left - a.right);
+      // Per row: the down control sits directly below the up control, on its left edge.
+      const pairs = rows
+        .map((row) => {
+          const up = row.querySelector('[data-sortable-move="up"]');
+          const down = row.querySelector('[data-sortable-move="down"]');
+          if (!up || !down) return null;
+          const a = up.getBoundingClientRect();
+          const b = down.getBoundingClientRect();
+          return { gap: b.top - a.bottom, drift: Math.abs(a.left - b.left) };
         })
-        .filter((gap) => gap !== null);
+        .filter(Boolean);
 
-      const region = document.querySelector('[data-progressive-stage-status]');
+      const region = document.querySelector(
+        '[data-recipe-section="progressive-stages"] + [data-sortable-list-status]'
+      );
       const regionBox = region?.getBoundingClientRect() ?? null;
 
       return {
         rowCount: rows.length,
         thresholds,
-        chevrons,
-        chevronGaps,
+        rocker,
+        pairs,
         region: region
           ? {
               text: region.textContent?.trim() ?? '',
@@ -733,17 +733,25 @@ export async function assertProgressiveStageListSound(
     throw new Error(`${label}: expected >= 3 progressive stages, saw ${report.rowCount}`);
   }
 
-  const cropped = report.chevrons.filter((c) => !c.hasGlyph || !c.glyphContained || c.height < 30);
-  if (cropped.length > 0) {
+  if (expectRocker && report.rocker.length !== 2 * report.rowCount) {
     throw new Error(
-      `${label}: chevron buttons cropped or under-sized (Foundry .app button reset leaked): ${JSON.stringify(cropped.slice(0, 4))}`
+      `${label}: expected an up and a down control on each of ${report.rowCount} rows, saw ${report.rocker.length}`
     );
   }
 
-  const spaced = report.chevronGaps.filter((gap) => gap > 8);
-  if (spaced.length > 0) {
+  const cropped = report.rocker.filter(
+    (c) => !c.hasGlyph || !c.glyphContained || c.width < 24 || c.height < 24
+  );
+  if (cropped.length > 0) {
     throw new Error(
-      `${label}: chevrons not adjacent — a leaked .app button margin: gaps ${JSON.stringify(spaced)}`
+      `${label}: rocker controls cropped or under the 24x24 hit area: ${JSON.stringify(cropped.slice(0, 4))}`
+    );
+  }
+
+  const unstacked = report.pairs.filter(({ gap, drift }) => gap < 0 || gap > 4 || drift > 1);
+  if (unstacked.length > 0) {
+    throw new Error(
+      `${label}: rocker not a stacked pair (down 0-4px below up, same left edge): ${JSON.stringify(unstacked)}`
     );
   }
 

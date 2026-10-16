@@ -143,13 +143,13 @@ test('interactableSourceLibrary.resolveToolName follows the same precedence', ()
 });
 
 test('every non-UI tool-display surface delegates rather than re-deriving', async () => {
-  // The surfaces that cannot be instantiated cheaply here (the two engines, the Run Journal
-  // projection in `src/bootstrap/journalFacade.js`, and the Svelte browser body) are pinned
-  // structurally instead: each must IMPORT the chokepoint.
+  // The surfaces that cannot be instantiated cheaply here (the gathering engine, the crafting
+  // and salvage chat rows, the Run Journal projection in `src/bootstrap/journalFacade.js`, and the
+  // Svelte browser body) are pinned structurally instead: each must IMPORT the chokepoint.
   const { readFileSync } = await import('node:fs');
   const surfaces = [
     'src/systems/GatheringEngine.js',
-    'src/systems/CraftingEngine.js',
+    'src/systems/craftChatEntries.js',
     'src/bootstrap/journalFacade.js',
     'src/ui/interactableSourceLibrary.js',
     'src/ui/svelte/apps/InteractableBrowserRoot.svelte',

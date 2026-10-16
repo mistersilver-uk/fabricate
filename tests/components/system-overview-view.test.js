@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHECK_TO_ISSUES } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -18,10 +19,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // THE manager's labelled push-button (issue 1118). Named AHEAD of the conversion that
     // puts it in this tree: `SystemOverviewView`'s deep-link control is one of the sweep's
-    // forgotten-role repairs, and the moment it becomes a `<ManagerButton>` an omission here
+    // forgotten-role repairs, and the moment it becomes a `<Button>` an omission here
     // costs a HUNG suite reported as `# cancelled`, not a failing one. Compiling a module the
     // tree does not yet render is free; discovering the omission from a cancelled count is not.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
@@ -136,6 +137,32 @@ describe('SystemOverviewView (mounted)', () => {
     harness.remount();
   });
 
+  // Every issue the recipe editor's checks own can reach this list, so each has its own words
+  // rather than the raw id or the headless fallback (issue 1773).
+  it('labels every recipe readiness issue a check owns', async () => {
+    const codes = Object.values(CHECK_TO_ISSUES).flat();
+    const target = await harness.mount({
+      report: {
+        issues: codes.map((code) => ({
+          kind: 'recipe',
+          entityId: 'r1',
+          entityName: 'Iron Ingot',
+          severity: 'critical',
+          code,
+          message: 'UNLABELLED',
+          nav: { view: 'recipe-edit', tab: 'results' }
+        })),
+        counts: { critical: codes.length, warning: 0, info: 0, blockers: 0 }
+      }
+    });
+    const unlabelled = codes.filter((code) => {
+      const row = target.querySelector(`[data-overview-issue="${code}"]`);
+      return !row || /UNLABELLED/.test(row.textContent) || row.textContent.includes(code);
+    });
+    assert.deepEqual(unlabelled, []);
+    harness.remount();
+  });
+
   // ── The deep link is a `ghost`, and the sweep found it painted as a neutral (issue 1118) ──
   it('paints every issue row deep link as the ghost role', async () => {
     const target = await harness.mount({ report: populatedReport, onSelectIssue: () => {} });
@@ -147,7 +174,7 @@ describe('SystemOverviewView (mounted)', () => {
       const kind = link.getAttribute('data-overview-link');
       assert.ok(
         link.classList.contains('fab-manager-button'),
-        `the ${kind} deep link renders through the ManagerButton primitive, got ${link.className}`
+        `the ${kind} deep link renders through the Button primitive, got ${link.className}`
       );
       assert.ok(
         link.classList.contains('is-ghost'),

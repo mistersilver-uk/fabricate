@@ -70,6 +70,10 @@ export function resolveSmokeProfileFlags(argv = process.argv.slice(2), env = pro
     SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
   // R2 (#750): captureManagerThemes + captureAlchemyThemes produce 14 `*-theme-<id>` frames that
   // nothing asserts and that `ui-pr-screenshot-evidence.mjs`'s VIEW_RECIPES deliberately skips.
+  // The `rc` walk never views a scene, but Foundry's canvas ticker still renders every frame; under
+  // software GL on a 2-vCPU runner that saturates the GPU process and the GM page stops producing
+  // frames, stalling every Playwright click (issue 2192). Every other profile walks a scene.
+  const GM_CANVAS_DISABLED = SMOKE_PROFILE === 'rc';
   const CAPTURE_THEME_SWEEPS =
     ['1', 'true', 'yes'].includes(String(env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase()) ||
     argv.includes('--themes');
@@ -82,5 +86,6 @@ export function resolveSmokeProfileFlags(argv = process.argv.slice(2), env = pro
     SCREENSHOT_TARGET_LABELS,
     SCREENSHOT_SCOPING_ACTIVE,
     CAPTURE_THEME_SWEEPS,
+    GM_CANVAS_DISABLED,
   };
 }

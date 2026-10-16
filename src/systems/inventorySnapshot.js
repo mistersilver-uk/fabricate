@@ -14,6 +14,7 @@
  */
 
 import { getFabricateFlag } from '../config/flags.js';
+import { essencesOfItem } from '../utils/itemEssences.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
@@ -144,19 +145,16 @@ export function buildInventorySnapshot({
           quantityByTag.set(tag, (quantityByTag.get(tag) ?? 0) + quantity);
         }
 
+        // The engine's own rule (`resolveItemEssences`), so a flag-only carrier counts too.
+        for (const [essenceId, per] of Object.entries(essencesOfItem(item, () => component))) {
+          essenceTotals.set(essenceId, (essenceTotals.get(essenceId) ?? 0) + per * quantity);
+        }
+
         const componentId = component?.id;
         if (componentId == null) continue;
         const key = String(componentId);
         quantityByComponentId.set(key, (quantityByComponentId.get(key) ?? 0) + quantity);
         stacksByComponentId.set(key, (stacksByComponentId.get(key) ?? 0) + 1);
-
-        const essences = component.essences;
-        if (!essences || typeof essences !== 'object') continue;
-        for (const [essenceId, per] of Object.entries(essences)) {
-          const amount = Number(per) || 0;
-          if (amount <= 0) continue;
-          essenceTotals.set(essenceId, (essenceTotals.get(essenceId) ?? 0) + amount * quantity);
-        }
       }
 
       const tallies = {
@@ -186,15 +184,23 @@ function groupsOf(set) {
 
 /**
  * Whether one option is plausibly covered, always an upper bound: component by exact quantity,
- * `any` tags by the sum, `all` tags by the minimum; currency and anything else are plausible,
- * since currency is read live at craft time.
+ * `any` tags by the sum, `all` tags by the minimum, an essence option by the held essence total
+ * against its `amount`; currency and anything else are plausible, since currency is read live at
+ * craft time.
  */
 function optionIsPlausible(option, tallies) {
-  const required = Number(option?.quantity) || 0;
-  if (required <= 0) return true;
-
   const match = option?.match;
   const type = match?.type;
+
+  if (type === 'essence') {
+    const essenceId = String(match?.essenceId ?? '').trim();
+    const need = Number(match?.amount) || 0;
+    if (!essenceId || need <= 0) return true;
+    return (tallies.essenceTotals.get(essenceId) ?? 0) >= need;
+  }
+
+  const required = Number(option?.quantity) || 0;
+  if (required <= 0) return true;
 
   if (type === 'component' || (type == null && option?.componentId != null)) {
     const componentId = match?.componentId ?? option?.componentId;

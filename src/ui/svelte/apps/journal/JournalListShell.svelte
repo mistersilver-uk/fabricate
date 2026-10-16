@@ -78,7 +78,7 @@
          toggling a portaled panel now, and a `<label>` forwards a caption click into it: with the
          list open, the caption's own mousedown dismisses the panel and the forwarded click
          re-opens it, so the caption could never close the list. The hook keeps its dynamic value
-         and rides onto the trigger through `triggerData`, which is what keeps two instances on
+         and rides onto the trigger through `triggerProps`, which is what keeps two instances on
          one screen distinguishable. -->
     <span class="journal-sort">
       <!-- THE CAPTION IS CONDITIONAL FOR THE SAME REASON THE NAMING PROP IS. `sortLabel` defaults
@@ -96,7 +96,7 @@
         ariaLabelledBy={captionedByLabel ? sortCaptionId : ''}
         ariaLabel={captionedByLabel ? '' : localize('FABRICATE.App.Journal.Sort.Fallback')}
         minWidth={SORT_PANEL_MIN_WIDTH}
-        triggerData={{ 'data-journal-sort': kind }}
+        triggerProps={{ 'data-journal-sort': kind }}
         onChange={(next) => onSortChange?.(next)}
       />
     </span>
@@ -110,8 +110,8 @@
         stands in for. The wrapper fills the allocated body and opts the panel into `fill`,
         so the dashed empty box reaches the same footer regardless of the previous count.
 
-        The hook value is DYNAMIC (`kind` is `active` or `history`) and `EmptyState` renders
-        `dataValue || true`, so it is forwarded as written rather than left bare.
+        The hook value is dynamic (`kind` is `active` or `history`), so it is passed as written
+        rather than left bare.
       -->
       <div class="journal-list-empty">
         <EmptyState
@@ -119,8 +119,7 @@
           fill
           icon={`fas ${emptyIcon}`}
           hint={emptyText}
-          dataAttr="data-journal-empty"
-          dataValue={kind}
+          data-journal-empty={kind || true}
         />
       </div>
     {:else}
@@ -177,7 +176,7 @@
   }
 
   .journal-list-count {
-    margin-left: 6px;
+    margin-left: var(--fab-space-chip);
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-text-muted);
@@ -186,7 +185,7 @@
   .journal-sort {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     color: var(--fab-text-muted);
   }

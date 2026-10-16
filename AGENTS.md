@@ -85,6 +85,7 @@ The model pins, the keyed inputs, row intersection, the `HIGH_RISK_PATHS` list, 
 - `npm run lint:md` (markdownlint, config in `.markdownlint-cli2.jsonc`) gates every authored Markdown file and enforces **one sentence per line** — run it before finalising any change that touches Markdown.
 Run `npm run lint:md:fix` to auto-split prose, re-running until the count stops dropping (a long paragraph splits one boundary per pass), and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines.
 - UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
+  A Primitive Lab file (`tests/view-lab/primitives.html`, or anything under `tests/view-lab/primitives/`) is not a render file whatever its extension, because no application window draws it; a local `npm run lab:check` verifies it.
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
 - The prerequisites and the rest of each gate, with the release utilities, are in `CONTRIBUTING.md`: [Toolchain prerequisites](CONTRIBUTING.md#toolchain-prerequisites), [Linting & formatting](CONTRIBUTING.md#linting--formatting), [The View Lab](CONTRIBUTING.md#the-view-lab-foundry-free-window-captures), [Foundry integration (smoke) tests](CONTRIBUTING.md#foundry-integration-smoke-tests), [UI PR screenshot evidence](CONTRIBUTING.md#ui-pr-screenshot-evidence) and [Release Workflow](CONTRIBUTING.md#release-workflow).
 
@@ -98,6 +99,7 @@ Do not add or reintroduce Handlebars templates.
 Unlike `src/ui/model/`, these may have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
 Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
 - `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field; in dev also through the `src/main.js` import), so it shares the page with every other module and system sheet.
+It is the module sheet's entry and holds only `@import` rules for the sibling `styles/fabricate-*.css` partials, in cascade order, which `scripts/lib/stylesheetSource.js` reads as one file, so every rule about this file binds each partial it imports.
 Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
 A bare generic selector like `.badge` or `.btn-icon` will bleed into other sheets (it previously broke the D&D 5e Armor Class badge). `tests/styles-namespacing.test.js` enforces this under `npm test` and fails on any unscoped selector.
 Note this is independent of the Svelte `<style>` blocks in `src/ui/svelte/`, which compile to hashed, component-scoped classes and do not bleed.
@@ -145,6 +147,11 @@ The helper-duplicate gates are fixed rules with no exception, and the last two s
 Moved to [`.agents/docs/foundry-and-architecture.md`](.agents/docs/foundry-and-architecture.md) (issue #1661).
 Read it before writing code that calls a Foundry API, hooks into its lifecycle, or touches the manager shell, the gathering data model or the design system.
 It carries rules, not background: the imperatives moved with the evidence rather than being summarised here.
+
+- A new named member of the design-system library adds a catalogue row under `tests/view-lab/primitives/catalogue/`, or an `AWAITING_SPECIMEN` line with its reason in `tests/design-system-lab-coverage.test.js`.
+The coverage gate enforces this, and `AWAITING_SPECIMEN` only shrinks.
+- `npm run lab` opens the Primitive Lab, and `npm run lab:check` mounts every catalogued row and fails on any console, page or request error.
+A specimen sits in a `plinth`, never a `stage`, because `stage` is the workflow's keyed dimension.
 
 ## Markdown & Prose Conventions
 

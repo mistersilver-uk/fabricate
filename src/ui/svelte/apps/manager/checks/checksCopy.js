@@ -116,7 +116,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   unnamedOutcome: [
     'IssueUnnamedOutcome',
-    'An unnamed tier cannot be routed to a result group. Name every tier.',
+    'An unnamed tier cannot be routed to a result set. Name every tier.',
   ],
   noSuccessOutcome: [
     'IssueNoSuccessOutcome',
@@ -570,11 +570,11 @@ export function countOutcomeCopy(required, record, text) {
     required === 1
       ? text(
           'FABRICATE.Admin.Manager.Checks.Count.Outcomes.SuccessOne',
-          "Reaches 1 success — the {record}'s result group is produced in full."
+          "Reaches 1 success — the {record}'s result set is produced in full."
         )
       : text(
           'FABRICATE.Admin.Manager.Checks.Count.Outcomes.Success',
-          "Reaches {required} successes — the {record}'s result group is produced in full."
+          "Reaches {required} successes — the {record}'s result set is produced in full."
         );
   const failure =
     required === 1
@@ -648,7 +648,7 @@ export function checkTypeOptions(text, { record, records }) {
       description: interpolate(
         text(
           'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
-          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result groups to these tiers.'
+          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result sets to these tiers.'
         ),
         words
       ),
@@ -677,20 +677,4 @@ export function outcomeThresholdLabels(type, column, text) {
     return [text('FABRICATE.Admin.Manager.Checks.Count.Bands.ExtraSuccesses', 'Extra successes')];
   }
   return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
-}
-
-/** The prototype's reference-kind glyphs, each a Font Awesome Free name, first match wins. */
-const FORMULA_TOKEN_KINDS = Object.freeze([
-  [/^\d*d\d+/i, 'fas fa-dice-d20'],
-  [/^@prof\b/, 'fas fa-medal'],
-  [/^@abilities\./, 'fas fa-hand'],
-  [/^@ingredients\b/, 'fas fa-flask'],
-  [/^@(?:details\.)?level\b/, 'fas fa-arrow-up-9-1'],
-]);
-
-/** A quick formula token's kind glyph (a die, proficiency, an ability…), or `''` for a kind the
- *  prototype draws none for. */
-export function formulaTokenIcon(token) {
-  const source = String(token ?? '').trim();
-  return FORMULA_TOKEN_KINDS.find(([pattern]) => pattern.test(source))?.[1] ?? '';
 }

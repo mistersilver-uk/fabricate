@@ -9,7 +9,10 @@
   | `value` | 0–100 | `0` | Out-of-range and non-finite input is clamped, so a caller handing it a raw ratio cannot paint a 4000%-wide fill. |
   | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'` | `'success'` | An unknown tone falls back to `neutral` rather than rendering an unpainted fill. |
   | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
-  | `size` / `dataAttr` / `dataValue` | `'sm'` \| `'md'` / strings | `'md'` / `''` | A 6px or 8px track height, and an optional test/screenshot hook. |
+  | `density` / `class` | `'compact'` \| `'default'` / class string | `'default'` / `''` | A 6px or 8px track height, and an extra class appended to the primitive's own. |
+
+  Rest spread:
+  - `{...rest}` lands on the track root, written after `class`, and carries a caller's `data-*` hook.
 
   Invariants:
   - NO GRADIENT. `ui-visual-style/spec.md`'s semantic-slider geometry is deliberately NOT claimed:
@@ -22,9 +25,9 @@
     value = 0,
     tone = 'success',
     color = '',
-    size = 'md',
-    dataAttr = '',
-    dataValue = '',
+    density = 'default',
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   const TONES = ['success', 'warning', 'danger', 'info', 'accent', 'neutral'];
@@ -35,14 +38,13 @@
     return Math.min(100, Math.max(0, numeric));
   });
   const resolvedTone = $derived(TONES.includes(tone) ? tone : 'neutral');
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <span
-  class="fab-fill-bar"
-  class:is-sm={size === 'sm'}
+  class={['fab-fill-bar', extraClass]}
+  class:is-sm={density === 'compact'}
   data-fill-bar-tone={resolvedTone}
-  {...hookAttributes}
+  {...rest}
 >
   <span
     class={`fab-fill-bar-fill is-${resolvedTone}`}

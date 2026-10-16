@@ -9,6 +9,21 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+const BIOME_COLOUR_OPEN = [
+  'Gathering',
+  { selector: '#manager-gathering-nav-settings' },
+  { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
+];
+const BIOME_COLOUR_SOURCES = [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/];
+const biomeSwatch = (token) =>
+  `[data-manager-color-picker-popover] [data-manager-color-token="${token}"]`;
+const biomeSwatchPressed = (token, value) => ({
+  selector: biomeSwatch(token),
+  name: 'aria-pressed',
+  value,
+});
+const BIOME_COLOUR_CURSOR = [...BIOME_COLOUR_OPEN, { selector: biomeSwatch('sage'), press: 'Tab' }];
+
 export const CASES = Object.freeze([
   managerCase({
     // World > Travel is ungated (issue 1282).
@@ -23,8 +38,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -45,11 +61,23 @@ export const CASES = Object.freeze([
     expectSelector:
       '.manager-nav:has(.manager-nav-group #manager-gathering-submenu)' +
       ':has(.manager-world-travel-group #manager-travel-submenu)',
+    // Each open group is one box (issue 2257 E3).
+    expectLayout: {
+      controls: [
+        '.manager-nav-group:has(#manager-gathering-submenu)',
+        '.manager-world-travel-group',
+      ].map((selector) => ({
+        selector,
+        styles:
+          'border-radius: 9px; padding: var(--fab-space-2xs); background-color: var(--fab-surface-soft); box-shadow: inset 0 0 0 1px var(--fab-border)',
+      })),
+    },
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -68,8 +96,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       // Issue 1707 moved this column's markup out of the root; `world/` has no directory regex,
       // so each travel case claims the leaf by name or it stops being photographed.
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
@@ -103,7 +132,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
     ],
   }),
   managerCase({
@@ -121,8 +151,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -146,8 +177,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -172,8 +204,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -195,8 +228,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -219,8 +253,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringMapLinksTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -243,8 +278,9 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
@@ -268,6 +304,8 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
       // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the
       // root: this is the case that has to fire when its ten selects change.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
@@ -275,6 +313,167 @@ export const CASES = Object.freeze([
       // ruling this frame now asks for one when the chain changes, since it is the only case that
       // photographs the settings arm at all.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+    ],
+  }),
+  // The time-of-day bar (issue 2431): the four default periods, the world clock at 14:34 and the
+  // current-time dot, from the `timeOfDayBar` lab flag.
+  managerCase({
+    id: 'manager-gathering-time-of-day-bar',
+    label: 'Manager — Gathering settings time-of-day bar',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: '1' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+    ],
+    expectView: 'environments',
+    // The clock line proves the view hands the panel its services; the dot rests on Day.
+    expectSelector:
+      '.fabricate-manager [data-time-of-day-bar]:has([data-band-strip-marker-line="clock"]) [data-band-strip-marker="current"]',
+    expectAttributes: [
+      {
+        selector: '[data-time-of-day-bar] [data-band-strip-marker="current"]',
+        name: 'aria-valuetext',
+        value: 'Day',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
+      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|worldTimeLabel)\.js$/,
+    ],
+  }),
+  // A rail "+" activated: Dusk's midpoint seeds the add form's Starts at, and its name takes focus.
+  managerCase({
+    id: 'manager-gathering-time-of-day-rail-seeded',
+    label: 'Manager — Gathering settings time-of-day rail seeds the add form',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: '1' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+      { selector: '[data-time-of-day-bar] [data-band-strip-add="dusk"]' },
+    ],
+    expectView: 'environments',
+    expectSelector: '.fabricate-manager .manager-time-of-day-add input[placeholder]:focus',
+    expectAttributes: [
+      {
+        selector: '.manager-time-of-day-add [role="spinbutton"]',
+        name: 'aria-valuenow',
+        value: '19',
+      },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
+    ],
+  }),
+  // Non-tiling hours: Night starts at Day's hour, so the note names both.
+  managerCase({
+    id: 'manager-gathering-time-of-day-fallback',
+    label: 'Manager — Gathering settings time-of-day fallback note',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', timeOfDayBar: 'fallback' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-condition-panel="timeOfDay"] .manager-condition-current',
+        scroll: true,
+      },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager [data-gathering-condition-panel="timeOfDay"] [data-time-of-day-fallback]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
+    ],
+  }),
+  // The New-biome colour palette open (issue 2257): the shared palette as a popover, its default
+  // cell pressed.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover',
+    label: 'Manager — Gathering settings New-biome colour palette open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: BIOME_COLOUR_OPEN,
+    expectView: 'environments',
+    expectSelector: '.fabricate-manager [data-manager-color-picker-popover] [role="group"]',
+    expectAttributes: [biomeSwatchPressed('sage', 'true')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // The swatch's keyboard cursor (issue 2416): Tab from the pressed Sage lands it on Mist.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover-cursor',
+    label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on Mist',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: BIOME_COLOUR_CURSOR,
+    themeVariants: ['hearth-herb'],
+    expectView: 'environments',
+    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
+    expectAttributes: [biomeSwatchPressed('sage', 'true'), biomeSwatchPressed('mist', 'false')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // The cursor and the selected ring on one cell: Space presses Mist under the cursor.
+  managerCase({
+    id: 'manager-gathering-biome-colour-popover-cursor-selected',
+    label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on pressed Mist',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [...BIOME_COLOUR_CURSOR, { selector: biomeSwatch('mist'), press: 'Space' }],
+    themeVariants: ['hearth-herb'],
+    expectView: 'environments',
+    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
+    expectAttributes: [biomeSwatchPressed('mist', 'true'), biomeSwatchPressed('sage', 'false')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // A Gathering Rules select open (issue 1777): the rewards rule, the card's first row, so the
+  // ticked list drops below its trigger inside the inspector rail.
+  managerCase({
+    id: 'manager-gathering-rules-select-open',
+    label: 'Manager — Gathering rules rewards list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '#manager-gathering-rule-rewards' },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="limitedDrops"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   // The conditions card's current-value list (issue 1510), pinned at a 1024 window: the settings
@@ -369,7 +568,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -393,7 +592,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -418,17 +617,27 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
       {
         selector:
-          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="More actions"]',
+          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="More actions"]',
       },
     ],
     expectView: 'environment-edit',
     // The open menu's Force add itself, not the section that holds it.
     expectSelector: '.fabricate-manager .fabricate-action-menu-panel [data-action="force-include"]',
+    // The panel at 11 and its items at 7, concentric with its 4px padding (issue 2257).
+    expectLayout: {
+      controls: [
+        { selector: '.fabricate-action-menu-panel', styles: 'border-radius: 11px' },
+        {
+          selector: '.fabricate-action-menu-panel [data-action="force-include"]',
+          styles: 'border-radius: 7px',
+        },
+      ],
+    },
     kinds: ['manager', 'environments'],
     sourceMatches: [
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
@@ -449,7 +658,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-validation' },
     ],

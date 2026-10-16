@@ -423,6 +423,27 @@ function createDropSelection(editingTask) {
   };
 }
 
+/** The task editor's tab, back on Overview whenever the route or the edited task changes. */
+function createTaskTab(view, editingTask) {
+  let gatheringTaskTab = $state('overview');
+  let shownFor = '';
+
+  return {
+    get gatheringTaskTab() {
+      return gatheringTaskTab;
+    },
+    set gatheringTaskTab(tab) {
+      gatheringTaskTab = tab;
+    },
+    resetTaskTab() {
+      const key = `${view()}\u{0}${editingTask()?.id ?? ''}`;
+      if (key === shownFor) return;
+      shownFor = key;
+      gatheringTaskTab = 'overview';
+    },
+  };
+}
+
 /** The environment the browser and editor show, and the party realm-override gate. */
 function createEnvironments(
   { viewState, view, selectedSystem, canShowEnvironments, text },
@@ -581,8 +602,13 @@ export function createGatheringRouteModel(inputs = {}) {
     validate: (draft) => validateGatheringEventDraft(draft, text),
   });
   const drops = createDropSelection(() => tasks.editing);
+  const taskTab = createTaskTab(inputs.view, () => tasks.editing);
   const environments = createEnvironments(inputs, library);
   const gatheringTaskResolutionMode = $derived(tasks.editing?.resolutionMode || 'd100');
+  // Direct and Check own all their result authoring, so the drop inspector has nothing to show.
+  const gatheringTaskResultGroupMode = $derived(
+    ['straight', 'routed'].includes(gatheringTaskResolutionMode)
+  );
   const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
     routedTierOptionsForPolicy(
       selectedSystem()?.gatheringCraftingCheck?.routed,
@@ -597,11 +623,15 @@ export function createGatheringRouteModel(inputs = {}) {
     exposeFields(tasks, TASK_FIELDS),
     exposeFields(events, EVENT_FIELDS),
     drops,
+    taskTab,
     environments,
     createPresenters(inputs, { library, environments }),
     {
       get gatheringTaskResolutionMode() {
         return gatheringTaskResolutionMode;
+      },
+      get gatheringTaskResultGroupMode() {
+        return gatheringTaskResultGroupMode;
       },
       get gatheringTaskRoutedOutcomeTiers() {
         return gatheringTaskRoutedOutcomeTiers;

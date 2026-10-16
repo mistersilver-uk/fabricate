@@ -27,8 +27,7 @@
         'FABRICATE.Admin.Manager.Scoped.Placeholder.Body',
         'The authoring surface for this screen is not built yet. The route, its rail entry and its shared patterns are in place; the catalogue and its editors arrive next.'
       )}
-      dataAttr="data-scoped-placeholder"
-      dataValue={pageId}
+      data-scoped-placeholder={pageId || true}
     />
   </section>
 </main>

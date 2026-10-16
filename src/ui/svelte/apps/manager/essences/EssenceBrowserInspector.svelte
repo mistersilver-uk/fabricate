@@ -13,10 +13,11 @@
 <script>
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import IconFactRow from '../IconFactRow.svelte';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Rail from '../../../components/Rail.svelte';
   import SystemRulesRoster from '../scoped/SystemRulesRoster.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
@@ -122,6 +123,13 @@
       format
     )
   );
+  const onCraftLabel = $derived(
+    systemName
+      ? format('FABRICATE.Admin.Manager.Essence.OnCraftIn', 'On craft in {system}', {
+          system: systemName,
+        })
+      : text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')
+  );
 
   function truncate(value) {
     if (typeof value !== 'string') return '';
@@ -135,14 +143,14 @@
   }
 </script>
 
-<section class="manager-essence-inspector-section" data-essence-browser-inspector>
-  <div class="manager-inspector-title-row is-hero-large">
+<Rail data-essence-browser-inspector="">
+  <div class="manager-inspector-title-row is-hero-large is-art">
     <!-- The tile carries the essence's own colour here too, so the inspector and the row
          cannot disagree about what colour an essence is. -->
     <Medallion
       icon={essence.icon || 'fas fa-mortar-pestle'}
       tint={essence.colorToken || ''}
-      size={52}
+      size={38}
     />
     <div class="manager-inspector-copy">
       <p class="manager-kicker">
@@ -168,7 +176,7 @@
     {description ||
       text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
   </p>
-</section>
+</Rail>
 
 <!--
   WHICH LAYER THE GM IS LOOKING AT, AND THE WAY OUT TO THE OTHER ONE. This describes ONE system's
@@ -205,7 +213,7 @@
 
 <!-- Two stats, two questions: components CARRY the essence and recipes REQUIRE it, and neither
      number is derivable from the other. -->
-<section class="manager-essence-inspector-section" data-essence-section="stats">
+<Rail data-essence-section="stats">
   <!-- The SHIPPED two-stat grid, joined into the sibling selector lists in
        `styles/fabricate.css` rather than re-authored: a hand-rolled copy had already drifted on
        radius, background, value size and both halves of the typographic contract. -->
@@ -223,19 +231,10 @@
       >
     </div>
   </div>
-</section>
+</Rail>
 
 {#if onCraftCards.length > 0}
-  <section class="manager-essence-inspector-section" data-essence-section="oncraft">
-    <p class="manager-kicker">
-      {#if systemName}
-        {format('FABRICATE.Admin.Manager.Essence.OnCraftIn', 'On craft in {system}', {
-          system: systemName,
-        })}
-      {:else}
-        {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
-      {/if}
-    </p>
+  <Rail label={onCraftLabel} data-essence-section="oncraft">
     <ul class="manager-essence-oncraft-cards">
       {#each onCraftCards as card (card.id)}
         <li data-essence-oncraft-card={card.id} data-essence-oncraft-suppressed={card.suppressed}>
@@ -243,7 +242,7 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </Rail>
 {/if}
 
 <!--
@@ -252,7 +251,7 @@
   `systemRows` over an unreadable corpus reports the essence as held by no system at all.
 -->
 {#if systemRows.length > 0}
-  <section class="manager-essence-inspector-section" data-essence-section="systems">
+  <Rail data-essence-section="systems">
     <SystemRulesRoster
       rows={systemRows}
       {memberCount}
@@ -265,15 +264,13 @@
       {onOpenSystemRules}
       resetKey={essence.id}
     />
-  </section>
+  </Rail>
 {/if}
 
 <!-- THE ACTIONS SIT ABOVE `Source` AND `Usage`: ordered after two detail cards the primary fell
      past the fold, so the rail's one loud control was invisible in every captured frame. -->
-<section class="manager-essence-inspector-section" data-essence-section="actions">
-  <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
-       button for every right inspector. The primary was `.manager-button.is-primary`, the SUCCESS
-       family, so `Edit essence` painted green where the design's primary is the accent. -->
+<Rail data-essence-section="actions">
+  <!-- Every verb on the rail is a full-width `Button` in the role its verb names. -->
   <!--
     NO DUPLICATE. `store.duplicateEssence` minted a SYSTEM-owned essence with its own name, icon and
     colour from a rail whose banner two cards above says those come from the Essence Catalogue and
@@ -282,26 +279,25 @@
     into another system's rules for the SAME essence, already shipped one click away.
   -->
   <div class="manager-essence-inspector-actions">
-    <InspectorActionButton
-      tone="primary"
-      icon="fas fa-pen"
-      label={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
-      data-essence-action="edit"
-      onClick={() => onEdit(essence.id)}
-    />
+    <Button role="primary" fullWidth data-essence-action="edit" onclick={() => onEdit(essence.id)}>
+      <i class="fas fa-pen" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}</span>
+    </Button>
     <!-- The SINGLE delete keeps the `confirmDialog` the store owns; the two-step ARM is the BULK
          panel's alone. It is WARNED, not BLOCKED: never disabled by component usage, with the
          cascade's counts stated in the dialog and previewed below. -->
-    <InspectorActionButton
-      tone="danger"
-      icon="fas fa-trash"
-      label={text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}
-      ariaLabel={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
+    <Button
+      role="danger"
+      fullWidth
+      aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
         name: essence.name,
       })}
       data-essence-action="delete"
-      onClick={() => onDelete(essence.id)}
-    />
+      onclick={() => onDelete(essence.id)}
+    >
+      <i class="fas fa-trash" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}</span>
+    </Button>
   </div>
   {#if essence.componentUsageCount > 0}
     <p class="manager-muted manager-essence-delete-note" data-essence-delete-impact>
@@ -325,11 +321,13 @@
       )}
     </p>
   {/if}
-</section>
+</Rail>
 
 {#if showSourceUi}
-  <section class="manager-essence-inspector-section" data-essence-section="source">
-    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</p>
+  <Rail
+    label={text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
+    data-essence-section="source"
+  >
     {#if essence.associatedItem}
       <div class="manager-essence-source-summary manager-essence-inspector-source-summary">
         <img
@@ -341,13 +339,13 @@
           <strong>{essence.associatedItem.name || essence.sourceName}</strong>
         </div>
       </div>
-      <!-- The SAME primitive as the three verbs above, paired in a two-column grid: a rail sizing
-           its source actions differently from its entity actions is the drift the extraction
-           removes. `warning` carries the amber `Unlink Source` wore — it breaks a reference. -->
+      <!-- The same primitive as the verbs above, paired in a two-column grid. Copy changes no
+           record, so it is `ghost`; Unlink breaks a reference the GM can re-make exactly and
+           destroys nothing, so it is the caution verb, `warning`, never `danger`. -->
       <div class="manager-essence-inspector-source-actions">
-        <InspectorActionButton
-          icon="fas fa-copy"
-          label={text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}
+        <Button
+          role="ghost"
+          fullWidth
           title={sourceUuid ||
             text(
               'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
@@ -355,15 +353,20 @@
             )}
           disabled={!sourceUuid}
           data-essence-action="copy-source"
-          onClick={() => onCopySource()}
-        />
-        <InspectorActionButton
-          tone="warning"
-          icon="fas fa-unlink"
-          label={text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}
+          onclick={() => onCopySource()}
+        >
+          <i class="fas fa-copy" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}</span>
+        </Button>
+        <Button
+          role="warning"
+          fullWidth
           data-essence-action="unlink-source"
-          onClick={() => onUnlinkSource()}
-        />
+          onclick={() => onUnlinkSource()}
+        >
+          <i class="fas fa-unlink" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}</span>
+        </Button>
       </div>
     {:else}
       <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
@@ -376,11 +379,10 @@
         />
       </div>
     {/if}
-  </section>
+  </Rail>
 {/if}
 
-<section class="manager-essence-inspector-section" data-essence-section="usage">
-  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</p>
+<Rail label={text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')} data-essence-section="usage">
   <div class="fab-stack" data-gap="2">
     <div class="manager-requirement-row">
       <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
@@ -410,7 +412,7 @@
       {/each}
     </div>
   {/if}
-</section>
+</Rail>
 
 <style>
   /* No stat-grid block here: the classes joined the sibling selector lists in
@@ -421,27 +423,27 @@
 
      `:global()` AND CHAINED, for the reason `ItemPageInspector` states: the class rides a `class`
      prop onto an element THIS component does not write, so it carries no `svelte-<hash>`, and
-     `.manager-inspector-card` is chained so the selector stays at (0,2,0). */
-  :global(.manager-inspector-card.manager-essence-shared) {
+     `.fabricate-card` is chained so the selector stays at (0,2,0). */
+  :global(.fabricate-card.manager-essence-shared) {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
 
   /* Colour only: `.manager-link-button` owns the shape and paints muted, and this link takes the
-     accent because it LEAVES the screen. Compounded through `.manager-inspector-card` so the rule
+     accent because it LEAVES the screen. Compounded through `.fabricate-card` so the rule
      is (0,3,0) and beats the global outright rather than tying and being decided by injection order.
      WHOLLY `:global()`, not a global ancestor with a scoped descendant — the form that looks right
      and quietly changes the cascade — because the ANCESTOR is what stopped matching. */
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link) {
     color: var(--fab-accent);
     font-weight: 600;
   }
 
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link:hover) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link:hover) {
     color: var(--fab-text);
   }
 
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link i) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link i) {
     font-size: 0.6rem;
   }
 
@@ -468,18 +470,6 @@
      only reinforces them. */
   .manager-essence-oncraft-cards li[data-essence-oncraft-suppressed='true'] {
     opacity: 0.72;
-  }
-
-  /* A BARE COLUMN, NOT A STACK OF BOXES. Every section wore `.manager-inspector-card` and four of
-     them CONTAIN cards, so one border became three nested ones. The rail is a column on the pane's
-     own surface with a micro-label per section, and only the things that ARE objects keep a box, as
-     `RecipeBrowserInspector` already does. THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it
-     IS an object, and is therefore the ONE site here calling `<InspectorCard>`. */
-  .manager-essence-inspector-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
   }
 
   .manager-essence-inspector-actions {

@@ -54,7 +54,10 @@ export function fileWith(edits) {
  * @param {{baseRef?: string, mergedAt?: string|null}} [overrides] What to vary.
  * @returns {string} The JSON body.
  */
-export function associationPayload({ baseRef = 'release', mergedAt = '2026-09-01T07:48:19Z' } = {}) {
+export function associationPayload({
+  baseRef = 'release',
+  mergedAt = '2026-09-01T07:48:19Z',
+} = {}) {
   return JSON.stringify([
     {
       number: 1421,
@@ -127,19 +130,18 @@ export function createGateHarness(t) {
    * resolved through `PATH`.
    */
   const runScript = (script, environment = {}) => {
-    const result = run(
-      'bash',
-      ['-c', 'export PATH="$PWD/.stub:$PATH"; exec bash "$1"', 'forward-port', script],
-      {
-        env: {
-          ...process.env,
-          GITHUB_REPOSITORY: REPOSITORY,
-          GH_TOKEN: 'stub-installation-token',
-          OVERRIDE_HINT,
-          ...environment,
-        },
-      }
-    );
+    // Prepended here rather than by a wrapping shell, which costs a second bash startup per run.
+    const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+    const result = run('bash', [script], {
+      env: {
+        ...process.env,
+        [pathKey]: [stubDirectory, process.env[pathKey]].filter(Boolean).join(path.delimiter),
+        GITHUB_REPOSITORY: REPOSITORY,
+        GH_TOKEN: 'stub-installation-token',
+        OVERRIDE_HINT,
+        ...environment,
+      },
+    });
     assert.ok(
       !result.error,
       `${script} could not be launched (${result.error?.message}). These tests execute the real ` +

@@ -22,20 +22,31 @@ The **Component Rules** screen, inside a crafting system, holds what that compon
 That is its category, its tags, its essences, its salvage setup and its progressive difficulty.
 Two more pages sit beneath this one: [Complications]({% link components/complications.md %}), the consequences a component can fire when a progressive result produces it, and [Salvage]({% link components/salvage.md %}), what it yields when it is broken back down.
 
+{: .note }
+> While Fabricate's **Experimental Features** setting is on and Fabricate Premium is not installed, the header of both screens below can show a dismissable Fabricate Premium advert for crafting icons.
+> Closing it hides it in your Manager window at once.
+> Fabricate also tries to save that dismissal for the whole world, which hides it for every GM the next time they open the Manager.
+> If that save does not go through, for example because your account cannot change world settings, the advert returns the next time you open the Manager.
+> There is no control to bring it back once the world-wide dismissal is saved.
+> The advert does not appear while Fabricate Premium is installed.
+
 ## The world Component catalogue
 
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.
 No crafting system needs to be selected.
 
-A search field, a source filter, and an essence filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
+A search field, a source filter, an essence filter, and a category filter share one row of the toolbar, and a **Membership** filter, a **Sort by** control, and an ascending/descending toggle share the row beneath.
 The source filter offers **Any source**, **World items**, **Compendium**, and **Broken link**.
 The essence filter offers **All essences**, **Carries any essence**, and **No essences**, then one option per essence in the world Essence catalogue, and it is left off the toolbar entirely on a world with no essences yet.
+The category filter offers **All categories** and **No world category**, then one option per category in the world's category vocabulary in its order, then any other category a component already carries.
+It is left off the toolbar entirely on a world with no categories yet.
 **Sort by** offers **Name**, **System count**, and **Source type**.
 The list column runs edge to edge across the middle of the screen, so the toolbar, the rows, and the pager at the foot share the same left and right edges with nothing wasted around them.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
 The list itself opens with a drop zone for dragging in items, spanning the full width of the row, so it scrolls with the rows rather than sitting fixed above the toolbar.
 It is the one way to create a component from this screen.
+It is not the only way a world component comes to exist, because importing items into a crafting system creates them too.
 
 Each row starts with a checkbox, then the component's icon and name.
 A pill beside the name states what kind of source it has, **Foundry item**, **Compendium**, or **No source item**, and a second **Broken link** pill appears when a linked world item's address no longer resolves to anything.
@@ -48,6 +59,7 @@ A pencil control at the row's trailing edge, titled **Open catalogue entry**, op
 **Broken link** shows only the components carrying the **Broken link** pill.
 A compendium link is never reported broken here, because the catalogue checks addresses against the world's own Items directory alone.
 **Carries any essence** and **No essences** narrow the list by whether a component carries the chips described above at all, and choosing a named essence narrows it to components carrying that one.
+**No world category** shows components with no world category, and choosing a named category shows only components in that category.
 **System count** sorts by how many crafting systems have rules for the component.
 **Source type** groups compendium-linked components first, then world items, then components with no source item, or the reverse when you flip the toggle, with each group kept in name order either way.
 
@@ -76,9 +88,10 @@ Drag an item from the Items sidebar or a compendium browser onto the drop zone a
 - An item that belongs to an actor, such as one on a character sheet or an unlinked token, cannot be dropped here.
 Drop the item from the Items directory or a compendium instead.
 
-This drop zone creates the shared world record.
+This drop zone creates the shared world record on its own.
 It does not add the component to any crafting system.
 Add it to a system from the entry's per-system rows, or from a crafting system's own Component Rules screen, described below.
+Importing an item into a crafting system also registers a world component, and the system holds it at the same time, as described under [Imports also register world components](#imports-also-register-world-components).
 
 ### What the catalogue actually shares
 
@@ -165,6 +178,7 @@ If you leave with unsaved changes, Fabricate asks whether to save, discard, or k
 Drop an item onto this card's drop zone to link or replace it, or choose **Unlink** to remove the link.
 It is the only drop zone on the entry, and the identity card above it carries none.
 Replacing the link takes a fresh name, image, and description snapshot from the new item.
+Replacing the source takes effect in every crafting system at once.
 **Copy** copies the linked item's identifying address.
 
 **Aliases** lets you add other item addresses this component should also be recognised as.
@@ -234,6 +248,7 @@ If no crafting system has rules for this component, confirming removes it for go
 If one or more crafting systems have rules for it, the card explains that first, and the confirm control itself reads **Cannot delete** instead of letting you proceed.
 Remove the component from each of those systems first, using the systems card above.
 Because the world-scope upgrade gives every pre-existing component a full set of system rules, this refusal is the normal state for most components on an upgraded world, not an edge case.
+It is also the normal state for a component you imported, because the system you imported it into holds it.
 
 ### Validation
 
@@ -274,7 +289,7 @@ It tells you when the world catalogue has no components at all, when this system
 
 The list opens with its first component already selected, and a component you reached by a link from its world entry, or had selected before, is kept instead.
 Changing the sort, a filter, or the cohort never moves the selection, and a dimmed ghost row from the world catalogue is never selected for you.
-Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue and shared with however many other systems also have rules for it, with an **Edit shared identity** link to that component's world entry.
+Selecting a component that has a world component shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue, and naming how many other systems also have rules for it when there is at least one, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
 
 ## Adding Components
@@ -283,17 +298,21 @@ You can add items one at a time or import an entire compendium pack at once.
 
 ### Single-item drop
 
-Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list.
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the Component Rules page.
 
 1. Open the Items sidebar or the compendium browser
-2. Drag the item onto the components list's drop zone
+2. Drag the item onto the drop zone at the top of the page, or anywhere on the components list below it
 3. The item appears in the list of components
+
+The list accepts a drop wherever you release it, including the empty "No components yet" area.
+The toolbar above the list and the page controls below it do not take drops.
 
 If the item is already registered in the system, whether by the item you dropped or by a copy of the same compendium entry that still carries the entry's name, the drop reuses the existing component instead of creating a duplicate.
 Re-importing an item whose own UUID a component already claims never changes which compendium entry that component claims.
 If the stored name, image, or linked item is out of date, Fabricate updates the component in place and remembers the previous link so items already in characters' inventories still match.
 
 If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
+Fabricate remembers the broken link only when no other component claims it, and warns you either way.
 The exception is importing again an item that is already registered: Fabricate adds no fallback and shows no warning for it.
 
 {: .note }
@@ -310,7 +329,11 @@ The exception is importing again an item that is already registered: Fabricate a
 > Hand out copies from the item you registered.
 > A component that already absorbed several items before this was fixed stays merged.
 > Delete that component and import the items again, as described in [Every item I import updates the same component]({% link help/troubleshooting.md %}#every-item-i-import-updates-the-same-component).
-> Components and recipe items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored; tools do not.
+> Items that share a compendium entry which can no longer be found, because the pack is missing or disabled or the entry was deleted, are registered separately.
+> This holds for components, recipe items, and tools alike, and the first import of each item still warns about the broken link.
+> The split is permanent once made, and restoring the entry later does not rejoin the items.
+> To remove an unwanted split, delete the extra component, recipe item, or tool, then restore the entry and import the item again.
+> For a component, once the extra one is deleted, you can instead use **Replace Source** on the original component to link it to the item.
 > A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
@@ -358,6 +381,54 @@ Fabricate expands the folder, applies the same de-duplication as single-item dro
 If any imported item has a broken original source link, Fabricate warns once with the affected count.
 Items that are already registered add no fallback and are not counted.
 If the folder contains no Item documents, a notification says so and nothing is written.
+
+### Imports also register world components
+
+Every import above also registers the component as a world component in the world Component catalogue, and the system you imported into holds it.
+That covers a single drop, a pack drop, a folder drop and its category mapping step, and the Compendium Directory action.
+Before, an imported component had no catalogue entry, so it could not be added to another system from the catalogue.
+
+- If the item is not linked to any world component, Fabricate creates one carrying the component's name, image, and description.
+  A newly registered component carries no world category and no world essence values, so the system resolves its own values until a world category or world essence values are authored.
+  A category you chose for a folder in the mapping step is an ordinary value of this system.
+  A world category authored later replaces it in this system unless the system overrides it.
+- If the item is already linked to a world component, because you dropped it on the catalogue or another system imported it, this system adopts that one instead of creating a second.
+  The new component follows any world category and world essence values that world component already carries, like any component added from the catalogue.
+  A category you chose for a folder in the mapping step is kept as this system's own against a world category the adopted world component already carries.
+- An item that belongs to an actor is imported as before and does not become a world component.
+
+A component held by one system is labelled as authored in the world catalogue, and no longer reads as shared with other systems.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+The rules editor says "Name, image and description are authored in the world catalogue. Everything below belongs to {system} alone."
+
+If the world catalogue cannot be updated, the import still succeeds and one warning says so.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+The warning reads "The items were imported, but the world Component catalogue could not be updated. Import them again to add them to it."
+
+### Importing again and its limit
+
+Importing again an item whose component has no world component gives it one.
+That is how components imported before this change are repaired.
+Drop the items again, or import the folder or pack again.
+Nothing else about those components changes, and they keep every value they had.
+
+There is one limit.
+If the world component for that item has a different id from this system's component, this system's component is left without one.
+This is typically because another system imported the item first.
+Linking it would mean renumbering a component that recipes already reference, and an import never does that.
+
+To recover, work in this order.
+
+1. Check what uses the other system's component for that item, because removing it rewrites the recipes that name it.
+2. Remove that component from every crafting system that holds it.
+   The **Systems using this component** card on its catalogue entry and the bulk remove both do this.
+   Removing it from a system does not delete its catalogue entry.
+3. Delete the world component's entry in the catalogue.
+   This only becomes possible once no system holds it.
+4. Import the item again.
+
+In a world where several systems hold the same item, import it again first in the systems that already hold it.
+Importing it into a new system first gives that system a world component that the older components cannot adopt.
 
 {: .note }
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
@@ -417,6 +488,9 @@ When none of them does, the label reads **Remove from Mythwright Forge…** with
 
 ### Bringing in world components this system has not adopted
 
+Components you import into this system are already in the world Component catalogue, so they show up here for every other system to adopt.
+A component imported before that was added may be missing from the catalogue, and importing its item again adds it, as described under [Importing again and its limit](#importing-again-and-its-limit).
+
 A two-way filter above the list controls which components you see:
 
 - **In this system** shows components this system already has rules for.
@@ -440,8 +514,12 @@ Two tabs sit below it, **Component rules** and **Validation**.
 If you leave with unsaved changes, Fabricate asks you to confirm first.
 
 The page starts with one identity callout carrying the component's icon and name.
-When the component has a world record, the callout also carries a **World catalogue** pill, a note stating how many systems share this identity, and an **Edit shared identity** link to the component's world entry.
-A component with no world record carries a note saying its name, image, and description are this system's own instead.
+When the component has a world component, the callout also carries a **World catalogue** pill, a note, and an **Edit shared identity** link to the component's world entry.
+The note says the name, image, and description are authored in the world catalogue, and counts the other systems that share them when there is at least one.
+A component held by this system alone says so without any count, so it never reads as shared with zero other systems.
+A component with no world component carries a note saying its name, image, and description are this system's own instead.
+Items you import into a system are registered as world components automatically, as described under [Imports also register world components](#imports-also-register-world-components).
+A component imported before that was added may still have none, and [importing it again](#importing-again-and-its-limit) gives it one.
 Name, image, and description are never typed on this screen.
 They come from wherever they are actually authored, the linked item or the world entry.
 

@@ -18,6 +18,7 @@ import { chromium } from 'playwright';
 
 import { runSmokeCleanup } from './foundry-smoke/cleanup.mjs';
 import { createSmokeContext } from './foundry-smoke/context.mjs';
+import { disableCanvasBeforeLoad } from './foundry-smoke/pageOps/joinedClient.mjs';
 import {
   attachConsoleCapture,
   suppressFoundryTours,
@@ -134,6 +135,7 @@ async function main() {
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
   });
+  if (profile.GM_CANVAS_DISABLED) await context.addInitScript(disableCanvasBeforeLoad);
   await suppressFoundryTours(context);
   const page = await context.newPage();
 

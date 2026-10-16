@@ -23,10 +23,10 @@
   `evaluateMacroDrop`; the WARNING is this surface's.
 -->
 <script>
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
-  import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -188,16 +188,16 @@
 
 <div class="manager-essence-tab-stack" data-essence-tab-panel={scoped ? 'rules' : 'oncraft'}>
   {#if !scoped}
-    <!-- THE CREATE DRAFT'S PRIMER, dropped on the rules screen where each card explains itself
-         and the shared-definition callout says which layer is which. -->
-    <ExplainerCard
+    <!-- The create draft's primer; the rules screen's cards and shared definition explain themselves. -->
+    <Callout
       icon="fas fa-circle-question"
       title={text(
         'FABRICATE.Admin.Manager.Essence.OnCraft.ExplainerTitle',
         'What an essence carries'
       )}
       items={explainerItems}
-      dataAttr="data-essence-on-craft-explainer"
+      data-essence-on-craft-explainer
+      data-tab-heading
     />
   {/if}
 
@@ -214,7 +214,7 @@
         'FABRICATE.Admin.Manager.Essence.OnCraft.BothOffHint',
         'Turn on Effect transfer or Property macros in this system’s crafting settings to give essences behaviour.'
       )}
-      dataAttr="data-essence-on-craft-empty"
+      data-essence-on-craft-empty
     />
   {/if}
 
@@ -311,7 +311,7 @@
             onDrop={onSourceDrop}
             onCopy={onCopySourceUuid && sourceUuid ? () => onCopySourceUuid(sourceUuid) : null}
             onUnlink={() => onSourceClear()}
-            unlinkAttr="data-scoped-source-unlink"
+            unlinkDataAttr="data-scoped-source-unlink"
           />
         {:else}
           <!-- UNLINKED only. The PICK half is why `EssenceSourceSelector` survives: an essence
@@ -431,7 +431,7 @@
           unlinkLabel={text('FABRICATE.Admin.Manager.Essence.Macro.Unlink', 'Unlink macro')}
           onDrop={onMacroDrop}
           onUnlink={macroUuid ? onMacroUnlink : null}
-          unlinkAttr="data-scoped-macro-unlink"
+          unlinkDataAttr="data-scoped-macro-unlink"
         />
       {/if}
       {#if macroWarning}
@@ -459,7 +459,7 @@
     column-gap: var(--fab-space-3);
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -468,7 +468,7 @@
     grid-column: 1;
   }
 
-  .manager-essence-inherit-slot :global(.manager-status-toggle) {
+  .manager-essence-inherit-slot :global(.fabricate-toggle) {
     grid-column: 2;
     grid-row: 1 / -1;
   }
@@ -482,7 +482,7 @@
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -493,7 +493,7 @@
     flex: none;
     width: 34px;
     height: 34px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-secondary);
   }

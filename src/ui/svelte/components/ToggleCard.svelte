@@ -11,7 +11,7 @@
   | `title` / `sub` / `toggleLabel` | pre-localized strings | `''` | The heading, its second line, and the switch's accessible name, which falls back to the visible title. |
   | `on` / `disabled` | booleans | `false` | The switch's state and whether it is operable. |
   | `toggleTitle` | pre-localized string | `''` | A tooltip for the SWITCH rather than the card, and often the only explanation of why the switch is disabled. Emitted as `\|\| undefined`, because an empty string renders a present-but-blank tooltip. |
-  | `section` / `field` / `subAttr` / `toggleAttr` | attribute names | `''` | Hooks on the card, the switch's field name, the sub-line and the switch. Each is absent when unset, and each is rendered with an empty-string value per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
+  | `section` / `field` / `subDataAttr` / `toggleDataAttr` | attribute names | `''` | Hooks on the card, the switch's field name, the sub-line and the switch. Each is absent when unset, and each is rendered with an empty-string value per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
   | `onToggle()` | function | no-op | The caller owns `on`. |
 
   Invariants:
@@ -38,8 +38,8 @@
     toggleTitle = '',
     section = '',
     field = '',
-    subAttr = '',
-    toggleAttr = '',
+    subDataAttr = '',
+    toggleDataAttr = '',
     onToggle = () => {},
   } = $props();
 </script>
@@ -53,7 +53,10 @@
   {/if}
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
-    <p class="manager-recipe-status-sub manager-muted" {...subAttr ? { [subAttr]: '' } : {}}>
+    <p
+      class="manager-recipe-status-sub manager-muted"
+      {...subDataAttr ? { [subDataAttr]: '' } : {}}
+    >
       {sub}
     </p>
   </div>
@@ -63,7 +66,7 @@
     ariaLabel={toggleLabel || title}
     data-recipe-field={field || undefined}
     title={toggleTitle || undefined}
-    {...toggleAttr ? { [toggleAttr]: '' } : {}}
+    {...toggleDataAttr ? { [toggleDataAttr]: '' } : {}}
     onclick={() => onToggle(!on)}
   />
 </div>

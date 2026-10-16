@@ -6,8 +6,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildManagerWorld, installWorld } from '../fixtures/managerServicesCorpus.js';
+import { CompendiumImporter } from '../../src/systems/CompendiumImporter.js';
 import { createManagerServices } from '../../src/ui/managerServices.js';
+import { buildManagerWorld, installWorld } from '../fixtures/managerServicesCorpus.js';
 
 const KNOWLEDGE_IO = Object.freeze({
   knowledgeSnapshot: () => null,
@@ -93,6 +94,31 @@ describe('the system import service', () => {
     });
   });
 
+  it("builds its importer to spare the recipes the world's active runs hold", async () => {
+    await withWorld({}, async () => {
+      const worldActor = { id: 'world-actor' };
+      globalThis.game.actors = [worldActor];
+      globalThis.game.fabricate.getCraftingRunManager = () => ({
+        getActiveRuns: (actor) => (actor === worldActor ? [{ recipeId: 'held-recipe' }] : []),
+      });
+      const { importFromPackData } = CompendiumImporter.prototype;
+      const held = [];
+      CompendiumImporter.prototype.importFromPackData = async function capture() {
+        held.push(...this._activeRunRecipeIds());
+        return null;
+      };
+      try {
+        await createManagerServices({
+          ...KNOWLEDGE_IO,
+          adminStore: () => ({ refresh: async () => {} }),
+        }).renderSystemImportDialog();
+      } finally {
+        CompendiumImporter.prototype.importFromPackData = importFromPackData;
+      }
+      assert.deepEqual(held, ['held-recipe']);
+    });
+  });
+
   it('refreshes and returns null when the system already exists', async () => {
     await withWorld({}, async (world) => {
       const services = createManagerServices({
@@ -106,14 +132,71 @@ describe('the system import service', () => {
       );
     });
   });
+});
 
-  it('throws out of the service when the admin store is null', async () => {
-    await withWorld({}, async () => {
-      const services = createManagerServices({ ...KNOWLEDGE_IO, adminStore: () => null });
-      await assert.rejects(
-        () => services.renderSystemImportDialog(),
-        'the refresh is unguarded on purpose; an optional call would swallow a broken store'
+/**
+ * A GM can close the manager while an import runs, and closing nulls the shell's store. The
+ * import has still landed, so its completion must neither throw nor be reported as a failure.
+ */
+describe('an import whose manager closes while it runs', () => {
+  /** An io whose store closes when `close` is called, or when the import reads its file. */
+  function closingManager() {
+    const refreshes = [];
+    let store = {
+      refresh: async () => {
+        refreshes.push('refresh');
+      },
+    };
+    const close = () => (store = null);
+    const file = { text: async () => (close(), IMPORT_FILE.text()) };
+    return { io: { ...KNOWLEDGE_IO, adminStore: () => store }, file, close, refreshes };
+  }
+
+  const failed = (world) =>
+    world.journal.some(
+      ([channel, message]) => channel === 'notify.error' && /failed/i.test(String(message))
+    );
+
+  it('still announces the import, refreshes nothing, and opens no report', async () => {
+    const closing = closingManager();
+    await withWorld({ importFile: closing.file }, async (world) => {
+      admitTheImport(world);
+      assert.equal(await createManagerServices(closing.io).renderSystemImportDialog(), null);
+      assert.ok(
+        world.journal.some(
+          ([channel, message]) =>
+            channel === 'notify.info' && String(message).startsWith('Imported')
+        ),
+        'the success toast is the GM record of an import whose window has gone'
       );
+      assert.deepStrictEqual(closing.refreshes, [], 'a closed manager has no store to refresh');
+      assert.ok(!failed(world), 'a landed import is never reported as failed');
+    });
+  });
+
+  it('still skips an existing system quietly', async () => {
+    const closing = closingManager();
+    await withWorld({ importFile: closing.file }, async (world) => {
+      assert.equal(await createManagerServices(closing.io).renderSystemImportDialog(), null);
+      assert.deepStrictEqual(closing.refreshes, []);
+      assert.ok(!failed(world), 'the skip is not a failure either');
+    });
+  });
+
+  it('never reports a landed recipe import as failed', async () => {
+    const closing = closingManager();
+    await withWorld({}, async (world) => {
+      const importRecipes = world.handles.recipeManager.importRecipes;
+      world.handles.recipeManager.importRecipes = async (...args) => {
+        closing.close();
+        return importRecipes(...args);
+      };
+      await createManagerServices(closing.io).renderImportDialog('sys-1');
+      assert.ok(
+        world.journal.some(([channel]) => channel === 'recipeManager.importRecipes'),
+        'the recipes were imported'
+      );
+      assert.ok(!failed(world), 'so no "Import failed" toast follows them');
     });
   });
 });

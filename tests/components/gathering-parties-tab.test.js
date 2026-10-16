@@ -11,7 +11,10 @@ import {
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -26,6 +29,8 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/apps/manager/recordPickerOptions.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
@@ -46,10 +51,11 @@ const harness = createMountedComponentHarness({
     // Issue 1515: the pane's search is the shared field and its refusal banner the shared
     // notice. A component the tree renders and this list omits HANGS the suite (reported as
     // `# cancelled`) rather than failing it.
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
-    'src/ui/svelte/apps/manager/PartyNameField.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
     'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
     'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
@@ -91,7 +97,7 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
-// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now.
+// The hook on the INPUT (issue 1515). The field is `SearchField` now.
 function typeSearch(root, value) {
   const input = root.querySelector('[data-manager-party-search]');
   input.value = value;
@@ -176,7 +182,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   it('renders the shared filtered panel and NO card list when nothing matches', async () => {
     const root = await mountTab({ parties: makeParties(3) });
     // The negative control for the pager assertion below.
-    assert.ok(Boolean(root.querySelector('.manager-pagination')), 'the matched pane pages');
+    assert.ok(Boolean(root.querySelector('.fabricate-pagination')), 'the matched pane pages');
 
     typeSearch(root, 'zzz');
     assert.ok(Boolean(root.querySelector('[data-travel-parties-no-match]')), 'filtered panel');
@@ -185,7 +191,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     // `tpl:2545` is `pager: { show: matched.length > 0 }`. Outside the matched branch the
     // pager drew "Showing 0-0 of 0 / Page 1 of 1" under the no-match panel — and the
     // zero-parties state above already draws no pager, so it was inconsistent with itself.
-    assert.ok(!root.querySelector('.manager-pagination'), 'nothing matched, so nothing to page');
+    assert.ok(!root.querySelector('.fabricate-pagination'), 'nothing matched, so nothing to page');
   });
 
   it('returns to page 1 on a search keystroke', async () => {
@@ -304,7 +310,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     const root = await mountTab({ parties: makeParties(5) });
     const scroller = root.querySelector('.manager-travel-parties-content');
     const footer = root.querySelector('[data-manager-party-pagination]');
-    const pager = footer.querySelector('.manager-pagination');
+    const pager = footer.querySelector('.fabricate-pagination');
 
     assert.equal(footer.parentElement, root.querySelector('.manager-travel-parties'));
     assert.ok(!scroller.contains(footer), 'the footer cannot scroll over cards');

@@ -47,10 +47,18 @@ function flattenLabelledDirectives(text) {
     );
 }
 
-/** Whether a directive in the text is visibly broken to a reader. */
+// Unresolved content-link directives are repairable; embeds are deliberately NOT expanded by
+// Foundry's plain-text enrichment pass (embeds: false) and cannot be repaired by re-importing.
+const UNRESOLVED_DIRECTIVE = /([@&])([A-Za-z]{1,32})\[[^\]]{0,2048}\](?!\{[^}]{1,2048}\})/g;
+
+/** Whether a directive in the text is visibly broken AND eligible for the repair cue. */
 export function hasUnresolvedDirectives(text) {
   if (typeof text !== 'string' || text.length === 0) return false;
-  return /[@&][A-Za-z]{1,32}\[[^\]]{0,2048}\](?!\{[^}]{1,2048}\})/.test(text);
+  for (const match of text.matchAll(UNRESOLVED_DIRECTIVE)) {
+    if (match[1] === '@' && match[2].toLowerCase() === 'embed') continue;
+    return true;
+  }
+  return false;
 }
 
 /** The best textual candidate from `{ value, enriched, html }` objects, arrays or primitives. */

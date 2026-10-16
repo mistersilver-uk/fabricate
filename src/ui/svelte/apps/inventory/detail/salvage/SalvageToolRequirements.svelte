@@ -43,7 +43,7 @@
         data-inventory-salvage-tool={tool.componentId ?? tool.name ?? ''}
         data-io-satisfied={tool.available ? 'true' : 'false'}
       >
-        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={24} />
+        <Medallion {...resolveCraftingArt(tool.img ?? '')} alt="" size={22} />
         <span class="salvage-tools-name">{tool.name}</span>
         {#if tool.available}
           <Chip tone="positive" icon="fas fa-screwdriver-wrench"
@@ -63,7 +63,7 @@
   .salvage-tools {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* HAND-ROLLED, AND REFUSED (issue 1514), where its three sibling bodies' eyebrows converted.
@@ -73,14 +73,13 @@
          `p` fallback (`Kicker.svelte:93-99`) — so converting would drop this section heading out
          of the document outline without a word;
        - the element carries `id="salvage-tools-title"` and the `<section>` above names it in
-         `aria-labelledby`. `Kicker` forwards no `id` and no rest spread, only a `dataAttr` hook,
-         so the section would lose its accessible name outright.
+         `aria-labelledby`, and `Kicker`'s rest spread exists for a hook, not for an `id`.
 
      An `h4` host and an `id` passthrough are what would close it. Both belong on the primitive. */
   .salvage-tools-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 10px;
     font-weight: 700;
@@ -94,7 +93,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
   }

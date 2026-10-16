@@ -19,7 +19,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
 
   let {
     text = () => '',
@@ -55,17 +55,19 @@
 </script>
 
 {#if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-  <ManagerButton
+  <Button
     role="primary"
+    size="38"
     onclick={createGatheringTaskForSystem}
     disabled={!canShowEnvironments}
   >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-  <ManagerButton
+  <Button
     role="primary"
+    size="38"
     onclick={createGatheringEventForSystem}
     disabled={!canShowEnvironments}
   >
@@ -73,51 +75,54 @@
     <span
       >{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span
     >
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environments'}
-  <ManagerButton role="primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
+  <Button role="primary" size="38" onclick={createEnvironment} disabled={!canShowEnvironments}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environment-edit'}
   {#if environmentDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton
+  <Button
     role="ghost"
+    size="38"
     data-environment-edit-back
     onclick={backToEnvironmentsBrowse}
     disabled={environmentSaving}
   >
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
+    size="38"
     data-action="delete-environment"
     onclick={deleteEnvironmentDraft}
     disabled={environmentDraftIsNew || environmentSaving}
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
+    size="38"
     onclick={saveEnvironmentEdit}
     disabled={!environmentDraftDirty || environmentSaving}
   >
     <i class={environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'gathering-task-edit'}
   {#if gatheringTaskDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton role="ghost" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
+  <Button role="ghost" size="38" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -125,9 +130,10 @@
         'Back to task library'
       )}</span
     >
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
+    size="38"
     data-gathering-task-delete
     onclick={deleteGatheringTaskDraft}
     disabled={!selectedGatheringTaskId || gatheringTaskSaving}
@@ -135,9 +141,10 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Delete', 'Delete gathering task')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
+    size="38"
     onclick={saveGatheringTaskDraft}
     disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
     title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
@@ -145,7 +152,7 @@
     <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
     ></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-  </ManagerButton>
+  </Button>
   <!-- The same failed-save alert the recipe item editor draws, in the same place (issue 919). -->
   {#if gatheringTaskSaveError}
     <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
@@ -154,11 +161,11 @@
   {/if}
 {:else if currentView === 'gathering-event-edit'}
   {#if gatheringEventDraftDirty}
-    <Chip tone="warning" density="action"
+    <Chip tone="warning" density="header"
       >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton role="ghost" data-gathering-event-back onclick={backToGatheringEventLibrary}>
+  <Button role="ghost" size="38" data-gathering-event-back onclick={backToGatheringEventLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -166,18 +173,20 @@
         'Back to event library'
       )}</span
     >
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
+    size="38"
     onclick={deleteGatheringEventDraft}
     disabled={!selectedGatheringEventId || gatheringEventSaving}
     title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
+    size="38"
     onclick={saveGatheringEventDraft}
     disabled={!gatheringEventDraftDirty || !gatheringEventValidation.valid || gatheringEventSaving}
     title={gatheringEventValidation.valid ? '' : gatheringEventValidation.errors.join('\n')}
@@ -185,7 +194,7 @@
     <i class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
     ></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-  </ManagerButton>
+  </Button>
   <!-- The same failed-save alert the recipe item editor draws, in the same place (issue 919). -->
   {#if gatheringEventSaveError}
     <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>

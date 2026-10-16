@@ -414,7 +414,7 @@ describe('the simulator readout reads the executed target', () => {
       [14, 5, 'target 14 · margin +5']
     );
     assert.equal(readout.direction, 'under');
-    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
+    assert.equal(readout.card.detail, 'The recipe’s result set is produced');
   });
 
   it('shows no target or margin for an Otherwise result, never a target of 0', () => {

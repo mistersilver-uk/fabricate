@@ -95,7 +95,7 @@ export default {
       await setManagerWindowSize(page, { width: 1280, height: 820 });
       const essenceRow = page.locator('.fabricate-manager .manager-essence-row');
       if ((await essenceRow.count()) > 0) {
-        const editButton = essenceRow.first().locator('.manager-icon-button[title*="Edit" i]');
+        const editButton = essenceRow.first().locator('.fabricate-icon-button[title*="Edit" i]');
         if ((await editButton.count()) > 0) {
           await editButton.first().click();
           await page
@@ -108,7 +108,7 @@ export default {
           await screenshot(page, 'manager-essence-edit-first-state');
           await page
             .locator(
-              '.fabricate-manager .manager-button:has-text("Cancel"), .fabricate-manager .manager-button:has-text("Back")'
+              '.fabricate-manager .fabricate-button:has-text("Cancel"), .fabricate-manager .fabricate-button:has-text("Back")'
             )
             .first()
             .click({ trial: false })

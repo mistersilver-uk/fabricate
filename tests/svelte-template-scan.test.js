@@ -67,11 +67,11 @@ test('the walk descends into every block form, not a hand-listed set of child ke
 
 test('a Component tag is visited, because a rest spread makes it the rendered element', () => {
   // The issue 1039 defect, as a property.
-  const seen = visited('<ManagerToolbar tabindex="-1" data-keyboard-focus="true" />');
+  const seen = visited('<FilterBar tabindex="-1" data-keyboard-focus="true" />');
 
   assert.deepEqual(
     seen.map((element) => `${element.type} ${element.name}`),
-    ['Component ManagerToolbar'],
+    ['Component FilterBar'],
     'a component tag was not visited, so any attribute it forwards through a rest spread is ' +
       'invisible to every gate built on this walk'
   );

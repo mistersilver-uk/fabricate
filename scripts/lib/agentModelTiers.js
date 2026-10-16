@@ -8,9 +8,13 @@ export const TIER_ORDER = ['small', 'medium', 'large'];
 
 /** Provider pins per model tier — the single source of truth every binding is gated against. */
 export const TIER_MODELS = {
-  small: { claude: 'haiku', codexModel: 'gpt-5.6-luna', codexReasoningEffort: 'low' },
-  medium: { claude: 'sonnet', codexModel: 'gpt-5.6-terra', codexReasoningEffort: 'medium' },
-  large: { claude: 'opus', codexModel: 'gpt-5.6-sol', codexReasoningEffort: 'high' },
+  small: { claude: 'claude-haiku-5-5', codexModel: 'gpt-5.6-luna', codexReasoningEffort: 'low' },
+  medium: {
+    claude: 'claude-sonnet-5-5',
+    codexModel: 'gpt-5.6-terra',
+    codexReasoningEffort: 'medium',
+  },
+  large: { claude: 'claude-opus-5-5', codexModel: 'gpt-5.6-sol', codexReasoningEffort: 'high' },
 };
 
 /**

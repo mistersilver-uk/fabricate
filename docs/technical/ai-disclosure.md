@@ -16,7 +16,8 @@ It is here because that deserves a straight answer on its own page, rather than 
 > **The short version.**
 > AI helps *write* Fabricate.
 > No AI runs *inside* Fabricate.
-> Nothing about your world, your players or your game is ever sent anywhere by this module, or seen by an AI agent.
+> Nothing about your world, your players or your game is ever sent anywhere by this module.
+> The agents work on Fabricate's code, never on your world.
 
 ---
 
@@ -31,15 +32,18 @@ There is no such feature to turn on or off, because there is no such feature.
 
 **No network calls of its own:**
 The module makes no HTTP requests.
-The only network traffic it causes is Foundry's own socket, which carries messages between the GM and the players already sitting in your world, and a documentation link that opens in your browser at the moment you click it.
+The only network traffic it causes is Foundry's own socket, which carries messages between the GM and the players already sitting in your world.
+The only other thing it can do is open a link in your browser at the moment you click it.
+Those links are to this documentation site and, in the GM's Crafting System Manager, a dismissable advert for premium crafting icons that links to my Patreon page.
 
 **No telemetry, no analytics, no phone-home:**
 Nothing about your systems, recipes, actors, players or usage is counted, reported or uploaded.
 No usage data leaves your server, because nothing in the module is capable of sending it.
 
-**No third-party runtime dependencies:**
-Fabricate ships with zero runtime libraries.
-Everything it executes in your game is code from this repository, built from a tagged commit.
+**No separately installed runtime libraries:**
+Fabricate loads nothing from the internet and needs no other module to run.
+The one third-party piece that ships is the Svelte user-interface runtime, which is compiled into Fabricate's own bundle at build time from a version locked in this repository.
+Everything else it executes in your game is code from this repository, built from a tagged commit.
 
 ---
 
@@ -69,18 +73,18 @@ Those are my actions, taken deliberately, and I am accountable for them.
 ## What every change has to pass
 
 Whether a line was typed by me or drafted by an agent, it faces exactly the same gates.
-They run automatically on every change, and a red one blocks it.
+They run automatically, and a red one blocks the change or the release.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Gate                    | What it does                                                                                                                                                                                              |
 |:------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Automated tests         | Over 14,000 automated tests run on every change (14,432 at the time of writing). A single failure stops the change.                                                                                       |
-| End-to-end Foundry test | A real Foundry server is started in a container, a real world is loaded, and Fabricate is driven through it in a real browser, on both Foundry 13 and 14. Any runtime error in the console fails the run. |
+| Automated tests         | Over 20,000 automated tests run on every change. A single failure stops the change.                                                                                                                       |
+| End-to-end Foundry test | A real Foundry server is started in a container, a real world is loaded, and Fabricate is driven through it in a real browser. Any runtime error in the console fails the run. It runs on Foundry 14 before every beta release, and the same test can be run on Foundry 13 on demand. |
 | Static analysis         | Continuous code-quality and security analysis, on top of linting and formatting checks for JavaScript, Svelte, CSS and the documentation itself.                                                          |
-| Interface evidence      | A change to the interface has to carry captured frames of the affected screens, so a visual regression is seen before it is merged rather than after.                                                     |
+| Interface evidence      | A pull request that changes the interface has to carry captured frames of the affected screens, so a visual regression is seen before it is merged rather than after. Only a maintainer can waive this, for a change that has no visible screen to capture. |
 | Staged release          | Nothing goes straight to the public release. A version is exercised in a private beta, promoted to a closed early-access channel, and only then promoted to the public release channel.                   |
-| Reversible migrations   | Anything that changes stored data is written to fail safely rather than corrupt a world, and is covered by its own tests.                                                                                 |
+| Fail-safe migrations    | Anything that changes stored data takes a checkpoint first. If it cannot finish, the checkpoint is restored and nothing is written, so a failed migration cannot corrupt a world. Each is covered by its own tests. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -103,7 +107,8 @@ The interface they show is the interface you see in your game world, rendered fr
 What it is showing is fixture data rather than anyone's real campaign.
 Each frame records the Foundry build whose chrome it was drawn over and a digest of the render it was encoded from.
 A frame is published only when the run that captured it actually produced it.
-Frames are always current and accurate, never stale.
+Frames are regenerated when I run the generation step, not on every change, so a frame can lag behind the interface until the next run.
+If you spot one that no longer matches what you see in your game, [tell me](https://github.com/mistersilver-uk/fabricate/issues).
 
 The Fabricate logo is my own work.
 I drew it in Adobe Illustrator in 2023, for the first version of the module.
@@ -114,7 +119,7 @@ If you want to take a look, that module is now archived as [fabricate-legacy](ht
 ## Why I work this way
 
 I use these tools professionally, day in and day out, to deliver mission-critical platform infrastructure for a global finance company.
-I am a Senior Staff Software Engineer with 20+ years of experience in software development, primarily in Javascript, Java/Kotlin, and Golang.
+I am a Senior Staff Software Engineer with 20+ years of experience in software development, primarily in JavaScript, Java/Kotlin, and Golang.
 
 I know how to write a harness for agents, prompt them effectively, automate guardrails around them, review their output, and feed corrections back so they keep improving.
 I have applied that same discipline to Fabricate.
@@ -132,8 +137,8 @@ The agents let the time I do have go into Fabricate itself, on top of guardrails
 ## Accountability
 
 Whether a particular line of code was typed by me or drafted by an agent is not what keeps your data safe.
-What keeps it safe is everything every change has to pass before it can reach you: the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the reversible migrations that refuse to corrupt your data.
-On top that, I review what ships and I am accountable for it.
+What keeps it safe is everything every change has to pass before it can reach you: the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the migrations that restore a checkpoint rather than corrupt your data.
+On top of that, I review what ships and I am accountable for it.
 
 AI makes the work faster.
 The engineering rigour and human governance I bring to the project are what protect your game.
@@ -149,3 +154,5 @@ I understand, even if I don't agree.
 What I can offer is that nothing here is hidden.
 The [source](https://github.com/mistersilver-uk/fabricate) is public and so is every change that made it, along with the review it went through.
 You can read the code before you install it, pin a version and stay on it, and raise anything that concerns you as an [issue](https://github.com/mistersilver-uk/fabricate/issues).
+Issues are public, and the AI agents I work with may read them.
+Please do not paste anything into one that you would not post publicly.

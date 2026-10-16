@@ -1,10 +1,19 @@
 /** CHARACTERIZATION suite for `Chip` (issue 1036). */
 
-import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import {
+  compiledPaint,
+  injectedCss,
+  themeTokens,
+  tokenOf,
+  translucentIn,
+  withoutComments,
+} from '../helpers/chipPaint.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -19,16 +28,6 @@ const harness = createMountedComponentHarness({
   compiledModules: ['src/ui/svelte/components/Chip.svelte'],
   componentPath: 'src/ui/svelte/components/Chip.svelte',
 });
-
-/**
- * `chipSource`, or a slice of it, with its block and line comments removed.
- *
- * @param {string} text
- * @returns {string}
- */
-function withoutComments(text) {
-  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
-}
 
 /**
  * The values one closed vocabulary `Set` declares.
@@ -555,17 +554,6 @@ describe('1506 Chip — the bare emphasis', () => {
   });
 
   /**
-   * The stylesheet the mount INJECTED, comments stripped.
-   *
-   * @returns {string}
-   */
-  function injectedCss() {
-    return withoutComments(
-      [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
-    );
-  }
-
-  /**
    * The computed `font-size`, in px, of the glyph a chip rendered from its `icon` prop.
    *
    * @param {Element} target the mounted container
@@ -632,14 +620,14 @@ describe('1506 Chip — the bare emphasis', () => {
 
 /** THE CLOSED VOCABULARIES ARE PINNED BY EXACT COUNT (issue 1506). */
 describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
-  it('routes exactly FIVE densities through a `density === …` branch, and `default` is their absence', () => {
+  it('routes exactly SIX densities through a `density === …` branch, and `default` is their absence', () => {
     const branches = densityBranches();
 
     assert.equal(
       branches.length,
-      5,
-      'the chip routes a different number of densities than the five it ships. This is an EXACT ' +
-        'count rather than a ceiling: a SIXTH branch reds here, and so does a `DENSITIES.has(…)` ' +
+      6,
+      'the chip routes a different number of densities than the six it ships. This is an EXACT ' +
+        'count rather than a ceiling: a SEVENTH branch reds here, and so does a `DENSITIES.has(…)` ' +
         'set refactor that drops the count to zero. A conversion routes to an EXISTING rung; ' +
         'minting one to make a conversion pixel-neutral re-creates, on the primitive, the ' +
         `per-surface geometry this component was extracted to retire. Found: ${branches}`
@@ -648,29 +636,133 @@ describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
     // The names as well as the count.
     assert.deepEqual(
       branches,
-      ['row', 'list', 'action', 'tag-run', 'inspector'],
-      'the five shipped densities are these five, in this order, and `default` is their absence'
+      ['row', 'list', 'action', 'tag-run', 'inspector', 'header'],
+      'the six shipped densities are these six, in this order, and `default` is their absence; ' +
+        '`header` is the page header’s 38px rung beside its actions (issue 2257 D10)'
     );
   });
 
-  it('declares exactly THREE emphases, and they are the three the specimen publishes', () => {
+  it('declares exactly four emphases, and they are the four the specimen publishes', () => {
     const emphases = declaredSetLiteral('EMPHASES');
 
     assert.equal(
       emphases.length,
-      3,
-      'the chip declares a different number of emphases than the three it ships. An EXACT count ' +
-        'rather than a ceiling, for the density clause\'s reason: a FOURTH value reds here, and ' +
-        'so does an `EMPHASES.has(…)` refactor that drops the count below three. A face a pixel ' +
-        `from a shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
+      4,
+      'the chip declares a different number of emphases than the four it ships. An exact count ' +
+        "rather than a ceiling, for the density clause's reason: a fifth value reds here, and " +
+        'so does an `EMPHASES.has(…)` refactor that drops the count. A face a pixel from a ' +
+        `shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
     );
 
     assert.deepEqual(
       emphases,
-      ['outlined', 'lit', 'bare'],
-      'the three shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
-        'the ink) and `bare` (no edge at all), in this order'
+      ['outlined', 'lit', 'bare', 'solid'],
+      'the four shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
+        'the ink), `bare` (no edge at all) and `solid` (an opaque ground), in this order'
     );
+  });
+});
+
+/** The solid emphasis (issue 1518): an opaque ground for a chip read over artwork. */
+describe('1518 Chip — the solid emphasis', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  const THEMES = themeTokens(readStylesheet());
+
+  async function paintOf(props) {
+    const paint = compiledPaint(chipNode(await harness.mount(props)));
+    harness.remount();
+    return paint;
+  }
+
+  it('emits is-solid only when asked, and composes with the tone and the scale', async () => {
+    const shipped = await harness.mount({ tone: 'positive' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-positive'],
+      'a chip that does not ask for the solid face is exactly what shipped'
+    );
+    harness.remount();
+
+    const solid = await harness.mount({ tone: 'positive', emphasis: 'solid', density: 'list' });
+    assert.deepEqual(
+      [...chipNode(solid).classList]
+        .filter((name) => name.startsWith('is-'))
+        .toSorted((a, b) => a.localeCompare(b)),
+      ['is-list', 'is-positive', 'is-solid'],
+      'the have chip draws as tone + emphasis + scale, three axes and three classes'
+    );
+  });
+
+  it('leaves the paint of a chip that did not ask for it untouched', async () => {
+    assert.equal(
+      (await paintOf({ tone: 'positive' })).get('background'),
+      'var(--fab-success-soft)',
+      'the soft wash is still the default face of a toned chip'
+    );
+    assert.equal(
+      (await paintOf({})).get('background'),
+      'var(--fab-overlay-light-06)',
+      'and the toneless chip keeps its base fill'
+    );
+  });
+
+  it('paints an opaque ground under every tone, in every theme', async () => {
+    assert.ok(THEMES.size > 1, `the theme blocks were read (${[...THEMES.keys()]})`);
+    for (const [tone] of [['', ''], ...TONE_MATRIX]) {
+      const ground = tokenOf((await paintOf({ tone, emphasis: 'solid' })).get('background'));
+      assert.ok(
+        Boolean(ground),
+        `tone "${tone}" with the solid emphasis must take its ground from one theme token`
+      );
+      assert.deepEqual(
+        translucentIn(THEMES, ground),
+        [],
+        `tone "${tone}" stands on ${ground}, which is not opaque in every theme. A rule written ` +
+          'above a tone rule loses the fill to it, and a soft token is a wash, not a ground.'
+      );
+    }
+  });
+
+  it('fills a coloured tone with its own colour and inks it with the on-colour', async () => {
+    const pairs = [
+      ['positive', '--fab-success', '--fab-on-success'],
+      ['active', '--fab-success', '--fab-on-success'],
+      ['info', '--fab-info', '--fab-on-info'],
+      ['danger', '--fab-danger', '--fab-on-danger'],
+      ['negative', '--fab-danger', '--fab-on-danger'],
+      ['accent', '--fab-accent', '--fab-on-accent'],
+      // No theme declares an on-warning ink; the page ground is what the sheet already uses.
+      ['warning', '--fab-warning', '--fab-bg-0'],
+      ['disabled', '--fab-warning', '--fab-bg-0'],
+    ];
+    for (const [tone, ground, ink] of pairs) {
+      const paint = await paintOf({ tone, emphasis: 'solid' });
+      assert.equal(tokenOf(paint.get('background')), ground, `${tone} stands on ${ground}`);
+      assert.equal(tokenOf(paint.get('color')), ink, `${tone} is inked with ${ink}`);
+    }
+  });
+
+  // At the chip's 9px every recessive rung falls below 4.5:1 on the raised ground in some shipped
+  // theme, so a chip with no fill of its own takes the full ink, the one rung that clears it in all
+  // seven (`chip-status-tone-parity.test.js` measures it).
+  it('gives a recessive chip the raised ground and the full ink, and leaves its edge', async () => {
+    for (const tone of ['', 'neutral', 'muted', 'secondary', 'subtle', 'tag']) {
+      const solid = await paintOf({ tone, emphasis: 'solid' });
+      assert.equal(tokenOf(solid.get('background')), '--fab-bg-3', `${tone} stands on bg-3`);
+      assert.equal(
+        tokenOf(solid.get('color')),
+        '--fab-text',
+        `"${tone}" is inked --fab-text, never a weaker rung of the ladder`
+      );
+    }
+    const plain = await paintOf({ tone: 'neutral' });
+    const solid = await paintOf({ tone: 'neutral', emphasis: 'solid' });
+    assert.equal(solid.get('border-color'), plain.get('border-color'), 'the tone keeps its edge');
   });
 });
 
@@ -692,9 +784,9 @@ describe('1506 Chip — the icon-only chip', () => {
   after(() => harness.teardown());
 
   /**
-   * The six published sides, as `[selector suffix, side, where the figure comes from]`. Five are
+   * The seven published sides, as `[selector suffix, side, where the figure comes from]`. Six are
    * read from the density they belong to; `list` states `min-height: 0` and has none to read,
-   * which is why the six are published rather than computed.
+   * which is why the seven are published rather than computed.
    */
   const ICON_ONLY_SIDES = [
     ['is-icon-only', 20, "the base rule's own min-height"],
@@ -705,6 +797,7 @@ describe('1506 Chip — the icon-only chip', () => {
       'the independent 15px icon square, distinct from the labelled 18.4px bordered list chip',
     ],
     ['is-icon-only.is-action', 34, "`is-action`'s min-height, which is the button's own figure"],
+    ['is-icon-only.is-header', 38, "`is-header`'s min-height, the page header button's 38 rung"],
     ['is-icon-only.is-tag-run', 25, "the height `is-tag-run`'s note computes: 6 + 6 + 11 + 2"],
     [
       'is-icon-only.is-inspector',
@@ -736,7 +829,7 @@ describe('1506 Chip — the icon-only chip', () => {
     );
   });
 
-  it('publishes a square SIDE for every density, six of them, with equal insets', () => {
+  it('publishes a square SIDE for every density, seven of them, with equal insets', () => {
     for (const [selector, side, provenance] of ICON_ONLY_SIDES) {
       const rule = ruleFor(selector);
       for (const property of ['width', 'height', 'min-height']) {

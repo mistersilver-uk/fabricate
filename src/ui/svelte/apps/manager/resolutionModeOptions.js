@@ -12,7 +12,7 @@ export const resolutionModeOptions = [
     labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
     fallback: 'Simple',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimpleDesc',
-    descFallback: 'One ingredient set and one result group, with an optional pass/fail check.',
+    descFallback: 'One ingredient set and one result set, with an optional pass/fail check.',
   },
   {
     value: 'routedByIngredients',
@@ -21,7 +21,7 @@ export const resolutionModeOptions = [
     fallback: 'Routed by ingredients',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredientsDesc',
     descFallback:
-      'Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.',
+      'Multiple ingredient sets and result sets; the chosen ingredient set selects which result set is produced. The crafting check is optional.',
   },
   {
     value: 'routedByCheck',
@@ -30,7 +30,7 @@ export const resolutionModeOptions = [
     fallback: 'Routed by check',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheckDesc',
     descFallback:
-      'Multiple ingredient sets and result groups; the crafting check outcome selects which result group is produced. Requires a crafting check.',
+      'Multiple ingredient sets and result sets; the crafting check outcome selects which result set is produced. Requires a crafting check.',
   },
   {
     value: 'progressive',
@@ -39,7 +39,7 @@ export const resolutionModeOptions = [
     fallback: 'Progressive',
     descKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressiveDesc',
     descFallback:
-      'One ingredient set and one ordered result group; a numeric check awards every result whose difficulty threshold is met.',
+      'One ingredient set and one ordered result set. A numeric check awards every result whose difficulty threshold is met.',
   },
   {
     value: 'alchemy',
@@ -63,7 +63,7 @@ export const salvageResolutionModeOptions = [
     labelKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimple',
     fallback: 'Simple',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionSimpleDesc',
-    descFallback: 'One result group, with an optional pass/fail salvage check.',
+    descFallback: 'One result set, with an optional pass/fail salvage check.',
   },
   {
     value: 'progressive',
@@ -72,7 +72,7 @@ export const salvageResolutionModeOptions = [
     fallback: 'Progressive',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionProgressiveDesc',
     descFallback:
-      'One ordered result group; a numeric salvage check awards every result whose difficulty threshold is met.',
+      'One ordered result set; a numeric salvage check awards every result whose difficulty threshold is met.',
   },
   {
     value: 'routed',
@@ -81,6 +81,6 @@ export const salvageResolutionModeOptions = [
     fallback: 'Routed by check',
     descKey: 'FABRICATE.Admin.SystemSettings.SalvageResolutionRoutedDesc',
     descFallback:
-      'Multiple result groups; the salvage check outcome selects which result group is returned.',
+      'Multiple result sets; the salvage check outcome selects which result set is returned.',
   },
 ];

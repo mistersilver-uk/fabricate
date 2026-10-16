@@ -1,7 +1,7 @@
 /**
  * Source contract: the manager's button contract is written in ONE place (issue 1118).
- * `class="manager-button"` was a CSS CONVENTION for as long as this app has had a manager, and a
- * convention is exactly as reliable as everyone's memory of it.
+ * A hand-written button class string was a CSS CONVENTION for as long as this app has had a
+ * manager, and a convention is exactly as reliable as everyone's memory of it.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -15,30 +15,23 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(repoRoot, 'src');
 const TESTS = join(repoRoot, 'tests');
 
-const CONTRACT_CLASS = 'manager-button';
-const PRIMITIVE_CLASS = 'fab-manager-button';
+/** The family root, and since issue 1507 the one class a hand-written button would have to spell. */
 const ROOT_CLASS = 'fabricate-button';
+const PRIMITIVE_CLASS = 'fab-manager-button';
 const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
-const PRIMITIVE_FILE = 'src/ui/svelte/components/ManagerButton.svelte';
+const PRIMITIVE_FILE = 'src/ui/svelte/components/Button.svelte';
 
 /**
- * The two `.svelte` files under `src/` that may still write the literal, each for its own reason.
+ * The one `.svelte` file under `src/` that may still write the literal, with its reason. The
+ * primitive itself composes its classes in `<script>` and writes no literal at all.
  * Repo-relative POSIX paths, so a Windows checkout compares the same strings (issue 1502).
  */
 const LITERAL_EXCEPTIONS = Object.freeze({
-  [PRIMITIVE_FILE]: Object.freeze({
-    evidence: 'prose',
-    why:
-      'the primitive itself, which names the convention it replaced in its docblock prose and ' +
-      'emits its own classes through a `.join(" ")` rather than writing them in markup — so ' +
-      'its evidence is PROSE, and a token-aware probe would read it as having stopped',
-  }),
   'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze({
-    evidence: 'markup',
     why:
       'a consumer of the same CSS contract, not of the primitive: its danger role is an ' +
       'invariant of its arm/confirm machine rather than a caller choice — so its evidence is ' +
-      'MARKUP, read in token form because it now writes the family root ahead of the literal',
+      'MARKUP, read in token form',
   }),
 });
 
@@ -78,18 +71,18 @@ function classAttributesIn(source) {
   );
 }
 
-test('no .svelte under src writes the manager-button class literal', () => {
+test('no .svelte under src writes the fabricate-button class literal', () => {
   const svelte = filesUnder(SRC).filter((path) => path.endsWith('.svelte'));
 
   // NON-VACUITY, in the precedent's own style and for the precedent's own reason: an absence check
   // over an empty corpus passes forever and reports itself satisfied.
   const callSiteFiles = svelte.filter((path) =>
-    readFileSync(join(repoRoot, path), 'utf8').includes('<ManagerButton')
+    /<Button[\s/>]/.test(readFileSync(join(repoRoot, path), 'utf8'))
   );
   assert.ok(
     callSiteFiles.length >= 41,
     `expected the manager's button call sites to still be here, found ${callSiteFiles.length} ` +
-      `files rendering <ManagerButton across ${svelte.length} components under src/`
+      `files rendering <Button across ${svelte.length} components under src/`
   );
 
   // TOKEN-AWARE, not a prefix probe (issue 1502).
@@ -97,14 +90,14 @@ test('no .svelte under src writes the manager-button class literal', () => {
     .filter((path) => !(path in LITERAL_EXCEPTIONS))
     .filter((path) =>
       classAttributesIn(readFileSync(join(repoRoot, path), 'utf8')).some((attribute) =>
-        attribute.split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
+        attribute.split(/\s+/).filter(Boolean).includes(ROOT_CLASS)
       )
     );
 
   assert.deepEqual(
     offenders,
     [],
-    'a manager button is a `<ManagerButton role="…">`, never a remembered class string. The ' +
+    'a manager button is a `<Button role="…">`, never a remembered class string. The ' +
       'role vocabulary is closed and a per-site visual tweak travels as a pass-through on the ' +
       '`class` prop — see `openspec/specs/ui-visual-style/spec.md` `### Shared product UI primitives`:\n  ' +
       offenders.join('\n  ')
@@ -113,16 +106,13 @@ test('no .svelte under src writes the manager-button class literal', () => {
   // The exceptions are asserted to still EARN their exemption.
   for (const [path, exception] of Object.entries(LITERAL_EXCEPTIONS)) {
     const source = readFileSync(join(repoRoot, path), 'utf8');
-    const earns =
-      exception.evidence === 'prose'
-        ? source.includes(`class="${CONTRACT_CLASS}`)
-        : classAttributesIn(source).some((attribute) =>
-            attribute.split(/\s+/).filter(Boolean).includes(CONTRACT_CLASS)
-          );
+    const earns = classAttributesIn(source).some((attribute) =>
+      attribute.split(/\s+/).filter(Boolean).includes(ROOT_CLASS)
+    );
     assert.ok(
       earns,
-      `${path} is exempted (${exception.why}) but no longer writes the literal as ` +
-        `${exception.evidence}, so drop the exception or restate its evidence`
+      `${path} is exempted (${exception.why}) but no longer writes the literal in its markup, ` +
+        'so drop the exception or restate its evidence'
     );
   }
 });
@@ -150,17 +140,15 @@ test('the primitive emits the family root and the keyboard-focus attribute', () 
   assert.equal(
     literals[0],
     ROOT_CLASS,
-    `\`${ROOT_CLASS}\` is the family ROOT and leads the array, ahead of \`${CONTRACT_CLASS}\` ` +
-      `and \`${PRIMITIVE_CLASS}\`, so the rendered attribute reads root-first like every ` +
-      'hand-written carrier of the same contract.'
+    `\`${ROOT_CLASS}\` is the family ROOT and leads the array, ahead of \`${PRIMITIVE_CLASS}\`, ` +
+      'so the rendered attribute reads root-first like every hand-written carrier of the same ' +
+      'contract.'
   );
-  for (const expected of [CONTRACT_CLASS, PRIMITIVE_CLASS]) {
-    assert.ok(
-      literals.includes(expected),
-      `${PRIMITIVE_FILE} stopped emitting \`${expected}\`, which every rule in the family ` +
-        'still names beside the root.'
-    );
-  }
+  assert.ok(
+    literals.includes(PRIMITIVE_CLASS),
+    `${PRIMITIVE_FILE} stopped emitting \`${PRIMITIVE_CLASS}\`, which every primitive rule in the ` +
+      'family names beside the root.'
+  );
 
   assert.ok(
     source.includes(KEYBOARD_FOCUS_ATTRIBUTE),
@@ -204,7 +192,7 @@ test('no test fixture models a manager button the product no longer renders', ()
   for (const path of suites) {
     for (const attribute of classAttributesIn(readFileSync(join(repoRoot, path), 'utf8'))) {
       const tokens = attribute.split(/\s+/).filter(Boolean);
-      if (!tokens.includes(CONTRACT_CLASS)) continue;
+      if (!tokens.includes(ROOT_CLASS)) continue;
       attributesScanned += 1;
       if (tokens.includes(PRIMITIVE_CLASS)) continue;
       const key = `${path} ${attribute}`;
@@ -215,7 +203,7 @@ test('no test fixture models a manager button the product no longer renders', ()
   // Non-vacuity: the scan must be reaching real fixture markup.
   assert.ok(
     attributesScanned > 20,
-    `only ${attributesScanned} manager-button class attributes found under tests/`
+    `only ${attributesScanned} fabricate-button class attributes found under tests/`
   );
 
   const expected = new Map(
@@ -229,11 +217,11 @@ test('no test fixture models a manager button the product no longer renders', ()
   assert.deepEqual(
     describe(found),
     describe(expected),
-    'a fixture writing a bare `manager-button` is measuring markup the product may have ' +
-      'stopped emitting — the component stopped, the fixture did not, and the suite stayed ' +
-      'green. Add the primitive class to the fixture, or allowlist it HERE with the reason it ' +
-      'is deliberately pre-conversion (a population-B `triggerClass` trigger, an ' +
-      '`ArmedDangerButton`, or one half of a converted/unconverted probe pair).'
+    'a fixture writing `fabricate-button` without `fab-manager-button` is measuring markup ' +
+      'the product may have stopped emitting — the component stopped, the fixture did not, and ' +
+      'the suite stayed green. Add the primitive class to the fixture, or allowlist it HERE ' +
+      'with the reason it is deliberately pre-conversion (a population-B `triggerClass` ' +
+      'trigger, an `ArmedDangerButton`, or one half of a converted/unconverted probe pair).'
   );
 
   for (const entry of FIXTURE_ALLOWLIST) {

@@ -1,4 +1,7 @@
-/** LOCALIZE WITH A LITERAL-STRING FALLBACK, so a missing key never renders as a key. */
+/**
+ * LOCALIZE WITH A LITERAL-STRING FALLBACK: a missing key yields exactly `fallback`, which
+ * `localizeOr` sets to the key itself when a caller gives none.
+ */
 export function localizeWith(localize, key, data, fallback) {
   try {
     const value = typeof localize === 'function' ? localize(key, data) : null;

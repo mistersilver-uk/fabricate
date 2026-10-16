@@ -1,0 +1,279 @@
+/* === THE APP'S ONE SELECT (issue 1504) === `components/Select.svelte` composes `SearchablePopover` with the query field suppressed, so every element these rules paint is one THAT primitive renders and every class they hang from is one `Select` hands it through a `*Class` prop. */
+
+/* THE FOUNDRY HOST RESET IS THE FIRST DECLARATIONS, and each answers a core rule rather than a preference. */
+.fabricate-select-trigger {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  height: auto;
+  padding: 0 var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  color: var(--fab-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* THE THREE RUNGS, AND WHY EACH IS TWO COMPOUNDS. Each names a height, a corner, a type size, a weight AND a fill, because the fill is its own axis: the specimen puts the form control on surface-soft "in cards" and the inline one on bg-2 "inside bg-1 rows", and the toolbar rung is the scoped-catalogue control line's own 34px band on bg-1. */
+.fabricate-select .fabricate-select-trigger-form {
+  min-height: 38px;
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.fabricate-select .fabricate-select-trigger-inline {
+  min-height: 30px;
+  border-radius: 7px;
+  background: var(--fab-bg-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* 11.5px at the weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8), as literals: `--fab-manager-recipe-control-font` is declared only inside `.fabricate-manager`, so a player surface reading it would fall back to inheritance. */
+.fabricate-select .fabricate-select-trigger-toolbar {
+  min-height: 34px;
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* THE FOCUS TREATMENT, and why it is written at three compounds. `.fabricate button:focus` and `.fabricate button:focus-visible` reach this button at (0,2,1) — the first strips Foundry's orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus state is "border to accent-border, no glow" (issue 1511). */
+.fabricate-select .fabricate-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-select-trigger[aria-invalid='true'] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+/* `aria-disabled` is the READONLY shape — the button keeps its tab stop and refuses to open — and `:disabled` is the whole control off. */
+.fabricate-select-trigger[aria-disabled='true'] {
+  color: var(--fab-text-muted);
+  cursor: default;
+}
+
+.fabricate-select-trigger:disabled {
+  color: var(--fab-text-disabled);
+  cursor: default;
+}
+
+/* The value takes the row's slack, which is what pushes the chevron to the trailing edge without a margin of its own — and what makes the label ellipsise instead of widening the trigger past its column. */
+.fabricate-select-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-select-value-placeholder {
+  color: var(--fab-text-subtle);
+}
+
+/* Tabular figures are part of the mono contract, not an extra: a value change must not shift the width of the control beside it. */
+.fabricate-select-value-mono {
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The leading glyph and the chevron are both quiet, as the specimen draws them, and at its 12px (`.k-field .i`) on every rung rather than at the rung's type (ruling 2026-09-28). */
+.fabricate-select-trigger > i {
+  flex: none;
+  color: var(--fab-text-subtle);
+  font-size: 12px;
+}
+
+.fabricate-select-trigger > i:last-child {
+  margin-inline-start: auto;
+}
+
+/* THE PANEL. The specimen corners the option list at 11px, as `.fabricate-picker-popover.manager-travel-popover` does, which also floors it at 240px. */
+.fabricate-picker-popover.fabricate-select-popover {
+  border-radius: 11px;
+}
+
+/* THE BAND IS RESTATED HERE AS THE UNMEASURED FALLBACK, AND ONLY AS THAT (issue 1520). */
+.fabricate-picker-popover.fabricate-select-popover-form {
+  min-width: 240px;
+  max-width: 340px;
+}
+
+.fabricate-picker-popover.fabricate-select-popover-inline {
+  min-width: 96px;
+  max-width: 240px;
+}
+
+.fabricate-picker-popover.fabricate-select-popover-toolbar {
+  min-width: 160px;
+  max-width: 320px;
+}
+
+/* THE ROW. `align-items: flex-start` rather than the shared row's `center`, and that is the whole geometry of a ticked-and-hinted row: with a hint the row is two lines, and a centred tick would float between them instead of sitting on the line it marks. */
+.fabricate-select-popover .fabricate-select-option {
+  align-items: flex-start;
+}
+
+/* The selected row keeps a FILL as well as the tick, because the tick is an 11px glyph in a scanned column and the fill is what the eye finds first. */
+.fabricate-select-popover .fabricate-select-option[aria-selected='true'] {
+  background: var(--fab-surface-active);
+}
+
+/* Opacity alone is not a reason, which is why `disabledReason` renders beside this. */
+.fabricate-select-option[aria-disabled='true'] {
+  color: var(--fab-text-disabled);
+  cursor: default;
+}
+
+/* THE GROUP HEADING'S INSET. A heading aligns with the option LABELS, not with the tick column. */
+.fabricate-select-popover [data-popover-group] > p {
+  margin: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2) var(--fab-space-2xs);
+}
+
+.fabricate-select-popover-ticked [data-popover-group] > p {
+  /* ratchet-exempt(design-system): an alignment, not a step: the option's 8px inset, its 12px tick and the tick's 8px gap */
+  padding-inline-start: calc(var(--fab-space-2) * 2 + var(--fab-space-3));
+}
+
+/* THE ROW'S CONTENT, which is the only markup `Select` writes itself — and therefore the only part of this family that satisfies the area-scope gate's `emitted` precondition from the component's own `class="…"` attributes. */
+.fabricate-select-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 1.4em;
+  color: var(--fab-accent);
+  font-size: 11px;
+  opacity: 0;
+}
+
+.fabricate-select-option[aria-selected='true'] .fabricate-select-tick {
+  opacity: 1;
+}
+
+.fabricate-select-lines {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-select-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A label ABOVE a description is the louder of the two, which is the specimen's own grouped row: 600 over a hint rather than 500 beside nothing. */
+.fabricate-select-lines .fabricate-select-label {
+  font-weight: 600;
+}
+
+.fabricate-select-hint {
+  min-width: 0;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+/* The badge and the reason both sit at the row's trailing edge, which is where the specimen draws them — the badge on an available row, the reason on a gated one. */
+.fabricate-select-badge,
+.fabricate-select-reason {
+  flex: none;
+  align-self: center;
+  margin-inline-start: auto;
+}
+
+/* THE LABELLED FORM. `.fabricate-field` and its `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
+.fabricate-select-note {
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.fabricate-select-error {
+  color: var(--fab-danger-text);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* The standalone roll-prompt host (`overlayHost.js`): a companion or macro prompt opened while no Fabricate window is open. A zero-size fixed layer, so it lifts the modal it hosts above Foundry's windows without blocking the page around it. */
+.fabricate.fabricate-standalone-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: calc(var(--z-index-tooltip, 9999) - 1);
+  color: var(--fab-text);
+  color-scheme: dark;
+}
+
+/* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed: (1) description, (2) I/O + steps readout, (3) check pill — and NEVER the lock, enable or edit controls (issue 1010). */
+@container fabricate-recipes (max-width: 714px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-description {
+    display: none;
+  }
+}
+
+@container fabricate-recipes (max-width: 634px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-io,
+  .fabricate-manager .manager-recipe-head-cell.is-io {
+    display: none;
+  }
+
+  /* Drop the I/O column from the shared template so the cluster reflows tight rather than reserving an empty grid track. */
+  .fabricate-manager .manager-recipes-table {
+    --fab-manager-recipe-cluster-cols: var(--fab-manager-recipe-col-check) var(--fab-manager-recipe-col-lock)
+      var(--fab-manager-recipe-col-status) var(--fab-manager-recipe-col-edit) var(--fab-manager-recipe-col-select);
+  }
+
+  /* Re-place the header labels onto the tracks this rung left (issue 1010): the template is rewritten here but the placements are authored outside every container query, so without these CHECK sits over the lock, STATUS over status + edit, and EDIT lands on the appended SELECT column. */
+  .fabricate-manager .manager-recipe-head-cell.is-check {
+    grid-column: 1;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-status {
+    grid-column: 2 / span 2;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-edit {
+    grid-column: 4;
+  }
+}
+
+@container fabricate-recipes (max-width: 554px) {
+  .fabricate-manager .manager-recipe-row .manager-recipe-check,
+  .fabricate-manager .manager-recipe-head-cell.is-check {
+    display: none;
+  }
+
+  .fabricate-manager .manager-recipes-table {
+    --fab-manager-recipe-cluster-cols: var(--fab-manager-recipe-col-lock) var(--fab-manager-recipe-col-status)
+      var(--fab-manager-recipe-col-edit) var(--fab-manager-recipe-col-select);
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-status {
+    grid-column: 1 / span 2;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-edit {
+    grid-column: 3;
+  }
+}
+

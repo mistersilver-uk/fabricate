@@ -52,6 +52,24 @@ test('counts components and recipe-item definitions carrying raw directives, exc
   );
 });
 
+test('ignores nine shared dnd5e spell-scroll embeds but still detects a broken item link', () => {
+  const embed = '@Embed[Compendium.dnd5e.equipment24.Item.dmgSpellScroll00 inline]';
+  const system = {
+    id: 'scrolls',
+    components: Array.from({ length: 9 }, (_, i) => ({
+      id: `scroll-${i + 1}`,
+      description: `Spell scroll: ${embed}`,
+    })),
+  };
+  assert.equal(countUnresolvedDirectiveDescriptions([system]), 0);
+  const infos = installWorld({ systems: [system] });
+  assert.equal(notifyUnresolvedItemDescriptions(), 0);
+  assert.equal(infos.length, 0, 'a non-repairable embed never causes the startup cue');
+
+  system.components[0].description += ' @UUID[Item.missing]';
+  assert.equal(countUnresolvedDirectiveDescriptions([system]), 1);
+});
+
 test('does NOT count a fully LABELLED description — it already reads cleanly', () => {
   // The notice must not claim a defect the GM can disprove by looking.
   const labelledOnly = [

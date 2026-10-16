@@ -317,6 +317,8 @@ Useful flags: `--json`, `--include <moduleId>`, `--bucket <name>`, `--channel <n
 - `node scripts/rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
 It reads both committed release configs to derive which repository secrets each tester group's segment is written to, so no Patreon tier name is hard-coded here.
 It is **dry-run by default** and writes nothing until `--apply`; `--group <name>` narrows to one group, and refuses when that group's secret also serves groups you did not name.
+Each new segment is `<label>-<32 hex characters>`, where the label defaults to the current UTC month and year (`oct2026`) so a feed's month is readable from its URL; `--label <text>` overrides it, for example when rotating at the end of one month for the next.
+The label is part of the secret value, so a rotation sets it with no committed config edit, and it adds no entropy: all of the unguessability is in the hex.
 Useful flags: `--group <name>`, `--config <path>`, and `--premium-config <path>` when the premium sibling is not checked out beside this repository.
 `--no-premium` inspects this repository alone and is **refused together with `--apply`**, because rotating one repository leaves the other on the old segment and splits one cohort across two prefixes.
 Rotation is a cohort migration, never hygiene: it deletes nothing and republishes nothing, so every superseded prefix keeps serving its last manifest and the cohort on it silently stops receiving updates rather than failing.
@@ -400,6 +402,13 @@ No Jest, Vitest, or Playwright.
 
 - Component-scoped `<style>` blocks handle per-component styles.
 - `styles/fabricate.css` contains shared/global rules (layout, admin panel, design tokens).
+- That file is the module sheet's entry: it holds only `@import` rules for the `styles/fabricate-*.css` partials, in cascade order, and a rule is written in the partial that holds its cascade position, which the comment above each import names.
+`tests/stylesheet-logical-file.test.js` holds the entry to imports and each partial to 4,000 lines.
+Each import is preceded by a comment naming the surfaces and shared families its partial holds, including a family kept there only to preserve its cascade position.
+A rule that extends an existing family is written beside that family's rules, in the partial that already holds them.
+A new family is written at the end of the partial whose entry comment names its surface, the later partial when two name it, and that comment gains the family when it is shared or belongs to another surface.
+A partial that would pass 4,000 lines is first split in two, in a pull request of its own, at a top-level boundary between two families, with the new partial imported immediately after the old one and each import's comment naming what its partial now holds.
+That pull request leaves the joined text of the module sheet byte-identical, so no rule moves.
 - Foundry core CSS classes (`flexrow`, `flexcol`) are used where appropriate.
 
 ### Foundry vs Fabricate CSS overrides
@@ -548,7 +557,7 @@ Prettier additionally formats every `*.svelte` file under `src/` — `prettier-p
 That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
 The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
 That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
-A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
+A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
 Svelte COMPILER warnings are gated too, as of issue 924: `onwarn` in `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings` runs the graph-independent sweep in `scripts/check-svelte-warnings.mjs` as its own step of the `lint` CI job.
 The sweep is the authoritative half — a Vite build compiles only the entry graph, so it is blind to a component nothing imports — and both read their compiler options from `svelte.config.js`, so a disagreement between them means graph reachability and never drift in `compilerOptions`.
 That qualifier is load-bearing: `emitCss` is a `vite-plugin-svelte` option rather than a compiler one, and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` sees it, so the build would go quiet on a class the sweep still reports.
@@ -599,6 +608,7 @@ That is the steady-state rule, and it sits on top of the one-time reflow of the 
 ### CSS linting (Stylelint)
 
 `npm run lint:css` gates `styles/**/*.{css,scss}` (today: the global `styles/fabricate.css`).
+Since issue #1711 that is the module sheet's entry and each `styles/fabricate-*.css` partial, linted one file at a time, so the two checks that compare across partials, a repeated selector and a repeated `@keyframes` name, run over the joined text in `tests/stylesheet-source.test.js`.
 The config extends `stylelint-config-standard` and is tuned to enforce the dimensions a linter can actually check — each is mapped to its rule(s) in the header comment of `stylelint.config.js`:
 
 - **Quality** — invalid/unknown syntax, modern value notation, malformed selectors.
@@ -651,7 +661,7 @@ It is pinned explicitly rather than left to ESLint's default because it is load-
 A directive that slips off its violation resurfaces the violation as an unsuppressed error; one that lands suppressing nothing is caught by this option.
 Both failure shapes fail the gate, which is what makes a mechanical reformat of a component safe.
 Where a suppression must sit on a particular line, fence the element with `<!-- prettier-ignore -->` — it has to be the LAST comment before the element to take effect.
-The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
+The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
 The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
 
 ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
@@ -703,6 +713,7 @@ Fix the code, or, when the regression is legitimate, record why at the site with
 `lang-orphan` alone takes no marker, because `lang/en.json` cannot carry a comment, so an orphaned key is wired up or deleted.
 The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
 A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
+A new `ratchet-exempt(design-system)` marker must also be added to `tests/components/design-system-exempt-allowlist.test.js` with its reason and the file's marker count, or that test fails.
 A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.
 
 A stale `origin/main` can give a false positive: run `git fetch origin main`.
@@ -713,6 +724,9 @@ Locally, with no `origin/main` and no `RATCHET_BASE`, the ratchets skip and name
 
 The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no Docker, and no world.
 It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
+
+Every frame also passes a computed census (`scripts/lib/viewLabComputedCensus.js`) before its screenshot: a painted control or art tile at a ladder height must draw its band's corner, and no mono text may compute above weight 500.
+A census failure names the offending box, so put it on its band's height and corner, or add a ruled kind for it with an allowlisted `ratchet-exempt(design-system)` site marker.
 
 ```sh
 npm run viewlab:chrome:harvest              # one-off; see below
@@ -751,17 +765,23 @@ It deliberately does not re-photograph every state of every screen: a state is e
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
 Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
 Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
-Five inputs narrow below coverage.
-A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
+These inputs narrow below coverage.
+A patch to a case file in `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
+A patch to `scripts/lib/view-lab-cases/broadSignals.js` selects only what the override entries it touches name, plus the representative set, when it is confined to `BROAD_SIGNAL_CASE_OVERRIDES`; an edit anywhere else in that file keeps the coverage default.
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.
 A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, selects every player-window case, as it did before run-state attribution.
-The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+The patch-narrowed inputs — the case registry, the broad-signal override table, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
+The Primitive Lab's page and directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`) are not inputs of the app capture, because a local `npm run lab:check` verifies them, so a change there alone selects no frame.
+Nor are they render files, because no application window draws them: a change there alone does not arm the evidence gate, its `.svelte` and `.css` files included.
+A Primitive Lab change does select the design-library units it touches, which is the exception to the app capture selecting no frame for it.
+CI publishes those units under a `### Library` heading in the managed screenshot block, each as the library drawing beside the live Primitive Lab render.
+A change to the lab's own machinery selects one unit per catalogue section.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
 true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
@@ -844,6 +864,8 @@ Do not commit PR-scoped screenshots under docs or other asset directories.
 
 The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
 A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
+A Primitive Lab file (`tests/view-lab/primitives.html`, or anything under `tests/view-lab/primitives/`) is not a render file whatever its extension; a local `npm run lab:check` verifies it, and a PR that changes one beside a real render file is still armed by that file.
+Library frames are supplementary and not gated: the `check-screenshots` job neither requires them nor reads them as evidence.
 
 ### Prerequisites
 

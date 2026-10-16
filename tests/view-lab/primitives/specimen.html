@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabricate Primitive Lab — specimen</title>
+    <!-- Foundry serves the game view from the web root, so module-relative asset paths resolve against `/`. -->
+    <base href="/" />
+    <!--
+      One specimen per document, carrying the production cascade in the game view's order:
+      foundry2.css (layered internally), then cascade.css (Font Awesome and fabricate.css in their
+      layers); Svelte injects component styles unlayered, as in production.
+    -->
+    <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
+    <link rel="stylesheet" href="/@view-lab/cascade.css" />
+    <link rel="stylesheet" href="/@view-lab/primitives/specimenFrame.css" />
+  </head>
+  <body>
+    <script type="module" src="/tests/view-lab/primitives/specimenMount.js"></script>
+  </body>
+</html>

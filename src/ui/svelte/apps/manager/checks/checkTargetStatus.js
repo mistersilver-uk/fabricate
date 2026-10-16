@@ -50,9 +50,16 @@ export function targetRefusalSentence(refusal, text) {
   });
 }
 
+/** The number a character-value `expression` reduces to over `rollData`, else null. */
+export function resolveCharacterValue(expression, rollData = {}) {
+  const read = resolveDeterministicExpression(expression, rollData, { pathMode: 'foundry' });
+  return read.ok ? read.value : null;
+}
+
 /**
  * The character-value status line for the Preview-as `character` (`{ name, rollData }`):
- * `{ tone, text }`, or null while no expression is written.
+ * `{ tone, text }`, or null while no expression is written or the expression resolves for a chosen
+ * character. It states what the field's reading cannot.
  */
 export function targetValueStatus(expression, character, text) {
   const source = String(expression ?? '').trim();
@@ -68,15 +75,7 @@ export function targetValueStatus(expression, character, text) {
       ),
     };
   }
-  if (read.ok) {
-    return {
-      tone: 'resolved',
-      text: interpolate(
-        text('FABRICATE.Admin.Manager.Checks.Evaluation.ValueResolved', '{actor} → {value}'),
-        { actor: character.name, value: read.value }
-      ),
-    };
-  }
+  if (read.ok) return null;
   if (read.reason !== 'unresolved-path') {
     return { tone: 'unresolved', text: targetRefusalSentence(read.reason, text) };
   }

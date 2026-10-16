@@ -11,6 +11,7 @@ import {
   checkGate,
   gateOver,
   styleCorpusOf,
+  workingTree,
 } from './helpers/designSystemRatchet.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import {
@@ -77,8 +78,8 @@ const THEME_ROOT_COMPOUND =
   /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
 
 /**
- * The prefix that DECLARES an intent to be area-scoped. It is no longer what the gate scans (issue
- * 1497).
+ * The prefix every area-scoped property carries. The gate still measures the set from declaration
+ * sites (issue 1497), and holds the prefix to that set both ways.
  */
 const AREA_SCOPED_PREFIX = '--fab-manager-';
 
@@ -97,7 +98,7 @@ const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w
  * The three shapes that USE one named property, for the channels that are not CSS. THE NAME IS
  * ESCAPED AND BOUNDED, for the reason `AREA_COMPOUND` above is.
  *
- * @param {string} name A whole custom-property name, e.g. `--fab-recipe-col-io`.
+ * @param {string} name A whole custom-property name, e.g. `--fab-manager-recipe-col-io`.
  */
 function areaUseShapes(name) {
   const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
@@ -107,6 +108,13 @@ function areaUseShapes(name) {
     { label: 'declaration', pattern: new RegExp(String.raw`${escaped}\s*:`, 'u') },
     { label: 'CSSOM name', pattern: new RegExp(`['"]${escaped}${ends}`, 'u') },
   ];
+}
+
+/** The labels of the use shapes of the property `name` that `text` matches. */
+function areaUsesIn(name, text) {
+  return areaUseShapes(name)
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ label }) => label);
 }
 
 /**
@@ -339,26 +347,44 @@ function nonStyleRegion(file, source) {
     .join('\n');
 }
 
-test('the area-scoped set is measured, and the prefix still means what it says', () => {
+/**
+ * Where the prefix and the measured set disagree: an area-scoped name without the prefix, and a
+ * prefixed name with a declaration outside the area (spec: a `:root` declaration un-scopes it).
+ */
+function prefixDisagreements({ names, sites }) {
+  const prefixed = [...sites.keys()].filter((name) => name.startsWith(AREA_SCOPED_PREFIX));
+  return {
+    prefixed,
+    unprefixed: names.filter((name) => !name.startsWith(AREA_SCOPED_PREFIX)),
+    escaped: prefixed.filter((name) => !names.includes(name)),
+  };
+}
+
+test('the area-scoped set is measured, and the prefix is exactly that set', () => {
   const { names, sites } = areaScopedProperties();
 
   assert.ok(
     sites.size > 100,
     `only ${sites.size} distinct \`${TOKEN_PREFIX}\` properties are declared anywhere, against the ` +
-      '~141 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
+      '~135 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
   );
   assert.ok(
     names.length >= 10,
-    `only ${names.length} properties measured as area-scoped, against the 17 this tree holds. A ` +
+    `only ${names.length} properties measured as area-scoped, against the 16 this tree holds. A ` +
       'set that has collapsed makes every clause below an absence check over nothing.'
   );
 
-  // THE PREFIX IS NOW A CLAIM THE MEASUREMENT HAS TO AGREE WITH.
-  const prefixed = [...sites.keys()].filter((name) => name.startsWith(AREA_SCOPED_PREFIX));
-  const escaped = prefixed.filter((name) => !names.includes(name));
+  const { prefixed, unprefixed, escaped } = prefixDisagreements({ names, sites });
   assert.ok(
     prefixed.length > 0,
     'no property carries the area prefix, so this control has no domain'
+  );
+  assert.deepEqual(
+    unprefixed,
+    [],
+    `every property declared only under \`${AREA_SELECTOR}\` is area-scoped, and an area-scoped ` +
+      `property carries \`${AREA_SCOPED_PREFIX}\`, so a reader can tell from the name alone that ` +
+      'it is undefined outside the manager. Give it the prefix.'
   );
   assert.deepEqual(
     escaped.map(
@@ -377,6 +403,27 @@ test('the area-scoped set is measured, and the prefix still means what it says',
   );
 });
 
+test('an unprefixed in-area property fails, and a :root declaration takes a name out of the area', () => {
+  const judged = (css) => {
+    const rules = rulesIn(css).map((rule) => ({ ...rule, file: 'styles/probe.css' }));
+    const { unprefixed, escaped } = prefixDisagreements(areaScopedOf(rules));
+    return { unprefixed, escaped };
+  };
+  const inArea = (property) => `.fabricate-manager .probe { ${property}: 4px; }`;
+  const atRoot = (property) => `:root { ${property}: 2px; }`;
+
+  assert.deepEqual(judged(inArea('--fab-manager-gap')), { unprefixed: [], escaped: [] });
+  assert.deepEqual(judged(inArea('--fab-gap')), { unprefixed: ['--fab-gap'], escaped: [] });
+  assert.deepEqual(judged(`${atRoot('--fab-gap')}\n${inArea('--fab-gap')}`), {
+    unprefixed: [],
+    escaped: [],
+  });
+  assert.deepEqual(judged(`${atRoot('--fab-manager-gap')}\n${inArea('--fab-manager-gap')}`), {
+    unprefixed: [],
+    escaped: ['--fab-manager-gap'],
+  });
+});
+
 test('an area-scoped property is declared and read only inside its area', () => {
   const allRules = shippedStyleRules();
   assertBothCorporaReached(allRules);
@@ -391,11 +438,13 @@ test('an area-scoped property is declared and read only inside its area', () => 
   );
 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
-  // rather than against a directory.
+  // rather than against a directory. Measured at issue 1782's search field: 29 rules, after the
+  // data table retired the drop grid's two properties and the search shell retired the two
+  // toolbar search rules that read `--fab-manager-recipe-control-font`.
   assert.ok(
-    rules.length >= 30,
+    rules.length >= 25,
     `only ${rules.length} sheet rules mention one of the ${names.length} area-scoped properties, ` +
-      'against the ~90 this sheet holds. With none, the assertion below is vacuous.'
+      'against the 29 this sheet holds. With none, the assertion below is vacuous.'
   );
 
   // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in
@@ -440,6 +489,9 @@ test('an area-scoped property is declared and read only inside its area', () => 
   );
 });
 
+/** A name without its prefix, so a site nets only against the same property under a new prefix. */
+const stem = (name) => name.replace(/^--fab-(?:manager-)?/u, '');
+
 /** Every line of a Svelte scoped block naming an area-scoped property, over one side's corpus. */
 function areaScopedStyleReads(corpus) {
   const { names } = areaScopedOf(corpus.rules);
@@ -450,7 +502,7 @@ function areaScopedStyleReads(corpus) {
       if (!text.includes(TOKEN_PREFIX)) continue;
       for (const name of names) {
         if (text.includes(name))
-          found.push({ file, line: index + 1, id: `area-scoped read ${name}` });
+          found.push({ file, line: index + 1, id: `area-scoped read ${name}`, value: stem(name) });
       }
     }
   }
@@ -468,6 +520,15 @@ test('no Svelte scoped style reaches an area-scoped property', (t) => {
   // that render it under `.fabricate-app`.
   const files = Object.keys(collectStyleCorpus({ roots: ['src'], extensions: ['.svelte'] }));
   assertFloor('area-scoped properties reached from a Svelte scoped style', files.length, 100);
+  // Absolute as well: the base-relative gate nets a rename, so a revert to a base read is green.
+  const tree = workingTree(STYLE_CORPUS);
+  assert.deepEqual(
+    areaScopedStyleReads(styleCorpusOf(tree.readFile, tree.listFiles())).map(
+      (site) => `${site.file}:${site.line} ${site.id}`
+    ),
+    [],
+    'a Svelte scoped style reads an area-scoped property; write the value or a foundation token'
+  );
   checkGate(
     t,
     AREA_STYLE_READ_GATE,
@@ -481,37 +542,32 @@ test('no Svelte scoped style reaches an area-scoped property', (t) => {
 test('a use shape matches the whole property name and not a longer one starting with it', () => {
   // BOTH POLARITIES OVER A SYNTHETIC PAIR, because no such pair exists in the corpus today — which
   // is exactly the condition under which an unbounded pattern reads as correct.
-  const shapes = (name, text) =>
-    areaUseShapes(name)
-      .filter(({ pattern }) => pattern.test(text))
-      .map(({ label }) => label);
-
   const shorter = '--fab-recipe-col';
   const longer = `${shorter}-io`;
 
   assert.deepEqual(
-    shapes(shorter, `  color: var(${longer});`),
+    areaUsesIn(shorter, `  color: var(${longer});`),
     [],
     `\`var(${longer})\` is a use of ${longer} and of nothing else. A pattern with no trailing ` +
       'boundary reports it against every name that is a prefix of it.'
   );
   assert.deepEqual(
-    shapes(shorter, `  el.style.setProperty('${longer}', value);`),
+    areaUsesIn(shorter, `  el.style.setProperty('${longer}', value);`),
     [],
     'the CSSOM shape is anchored by a quote at one end only, so it needs the boundary at the other'
   );
   assert.deepEqual(
-    shapes(shorter, `  ${longer}: 4px;`),
+    areaUsesIn(shorter, `  ${longer}: 4px;`),
     [],
     'the declaration shape is bounded by its own colon, which the longer name never reaches'
   );
 
   // The positives, so the boundary is narrowing the gate rather than emptying it.
-  assert.deepEqual(shapes(longer, `  color: var(${longer});`), ['read']);
-  assert.deepEqual(shapes(longer, `  ${longer}: 4px;`), ['declaration']);
-  assert.deepEqual(shapes(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
+  assert.deepEqual(areaUsesIn(longer, `  color: var(${longer});`), ['read']);
+  assert.deepEqual(areaUsesIn(longer, `  ${longer}: 4px;`), ['declaration']);
+  assert.deepEqual(areaUsesIn(longer, `  getPropertyValue('${longer}')`), ['CSSOM name']);
   assert.deepEqual(
-    shapes(shorter, `  color: var(${shorter});`),
+    areaUsesIn(shorter, `  color: var(${shorter});`),
     ['read'],
     'the shorter name must still match its OWN use'
   );
@@ -531,8 +587,13 @@ function areaScopedStringUses(readFile, files) {
       if (!text.includes(TOKEN_PREFIX)) continue;
       for (const name of names) {
         if (!text.includes(name)) continue;
-        if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) {
-          found.push({ file, line: index + 1, id: `area-scoped property in a string ${name}` });
+        if (areaUsesIn(name, text).length > 0) {
+          found.push({
+            file,
+            line: index + 1,
+            id: `area-scoped property in a string ${name}`,
+            value: stem(name),
+          });
         }
       }
     }
@@ -620,6 +681,47 @@ test('the area-scoped gates fail a new or grown use against base, measuring the 
           "// ratchet-exempt(design-system): a probe\nexport const a = 'var(--fab-manager-gap)';\n",
       },
       failures: [],
+    },
+    {
+      head: { 'src/a.js': 'export const a = `--fab-manager-gap: 4px`;\n' },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-gap is new (1)'],
+    },
+    {
+      head: { 'src/a.js': "el.style.setProperty('--fab-manager-gap', v);\n" },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-gap is new (1)'],
+    },
+    {
+      head: { 'src/a.js': '// Spaced by `--fab-manager-gap` in the sheet.\nexport const a = 1;\n' },
+      failures: [],
+    },
+  ]);
+
+  // A prefix rename nets against the use it replaces within its file; a copy, or a swap to another
+  // prefixed property, does not.
+  const unprefix = (text) => text.replaceAll('--fab-manager-gap', '--fab-gap');
+  const before = { ...base, [SHEET]: unprefix(base[SHEET]), [PROBE]: unprefix(base[PROBE]) };
+  const swapped = sheet('.fabricate-manager { --fab-manager-pad: 2px; }');
+  assertGateCases(t, AREA_STYLE_READ_GATE, before, [
+    { head: { [SHEET]: base[SHEET], [PROBE]: base[PROBE] }, failures: [] },
+    {
+      head: {
+        [SHEET]: base[SHEET],
+        [PROBE]: probe('  .probe { margin: var(--fab-manager-gap); }'),
+      },
+      failures: [`${read('--fab-manager-gap')} is new (2)`],
+    },
+    {
+      head: { [SHEET]: swapped, [PROBE]: probe().replace('gap)', 'pad)') },
+      failures: [`${read('--fab-manager-pad')} is new (1)`],
+    },
+  ]);
+  const spelled = (name) => `export const a = 'var(${name})';\n`;
+  const spelledBefore = { ...before, 'src/a.js': spelled('--fab-gap') };
+  assertGateCases(t, AREA_STRING_GATE, spelledBefore, [
+    { head: { [SHEET]: base[SHEET], 'src/a.js': spelled('--fab-manager-gap') }, failures: [] },
+    {
+      head: { [SHEET]: swapped, 'src/a.js': spelled('--fab-manager-pad') },
+      failures: ['src/a.js: area-scoped property in a string --fab-manager-pad is new (1)'],
     },
   ]);
 });

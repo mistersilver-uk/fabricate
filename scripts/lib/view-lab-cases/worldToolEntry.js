@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   REQUIREMENT_SUGGESTION,
   TYPEAHEAD_COMBOBOX_SOURCE,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
@@ -45,6 +46,7 @@ export const CASES = Object.freeze([
       // The buffered-save seam (issue 1373), claimed by the second screen that renders it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -485,7 +487,12 @@ export const CASES = Object.freeze([
       },
       {
         container: '[data-scoped-page="world-tool-entry"]',
-        target: '[data-tool-repair-requirements] [data-recipe-add="component"]',
+        target: '[data-tool-repair-requirements] [data-recipe-add="ingredient"]',
+      },
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-group].has-alternatives',
+        target:
+          '[data-tool-repair-requirements] [data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
       },
       {
         container: '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag',
@@ -498,7 +505,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
       // The row itself, because this is the only frame photographing a tag requirement inside a Tool inspector.
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/ChoiceGroup\.svelte$/,
     ],
   }),
   managerCase({
@@ -534,7 +543,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
     ],
   }),
   managerCase({
@@ -550,16 +559,24 @@ export const CASES = Object.freeze([
       },
       { selector: '[data-world-tool-entry-tab="breakage"]' },
       { selector: '[data-tool-repair-requirements]', scroll: true },
-      { selector: '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]' },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add="ingredient"]' },
+      { selector: '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]' },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add="ingredient"]', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',
-    // The arm, in A row that holds no chips.
     expectContained: [
+      // The arm, in A row that holds no chips.
       {
         container:
           '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag:last-of-type',
         target: '[data-tool-repair-requirements] [data-recipe-option-tags]:last-of-type',
+      },
+      // And the set's one adder over the kind menu, the only child of its foot.
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-set]',
+        target:
+          '[data-tool-repair-requirements] .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -567,8 +584,9 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
     ],
   }),
   managerCase({
@@ -603,7 +621,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -634,7 +652,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       TYPEAHEAD_COMBOBOX_SOURCE,
       ...ANCHORED_POPOVER_SOURCES,
     ],

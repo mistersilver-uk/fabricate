@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The player-preview shell shared by the scoped-entity editors (issue 1362, epic 1357): five
-  regions in a fixed ORDER — kicker, identity block, live note, effective-rules list, explainer.
+  The player-preview shell shared by the scoped-entity editors (issue 1362, epic 1357): four
+  regions in a fixed ORDER — kicker, identity block, live note, effective-rules list.
   What each holds is the caller's; this component resolves no value. `EssenceBehaviorPreview` is
   DEFERRED, because folding its different shape in would make this a union of two layouts.
   THE CLASS STEM IS A PROP, so a converted site keeps its rules; both stems live in
@@ -11,7 +11,6 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import ExplainerCard from '../ExplainerCard.svelte';
   import IconFactRow from '../IconFactRow.svelte';
 
   let {
@@ -41,7 +40,6 @@
     // A leading line under the head block, above the first fact group. Empty renders nothing.
     scopeNote = '',
     scopeNoteHook = '',
-    explainer = null,
     children,
   } = $props();
 
@@ -146,14 +144,5 @@
       {/if}
     </div>
   {/each}
-  {#if explainer}
-    <ExplainerCard
-      icon={explainer.icon}
-      title={explainer.title}
-      items={explainer.items}
-      links={explainer.links}
-      dataAttr={explainer.dataAttr}
-    />
-  {/if}
   {@render children?.()}
 </aside>

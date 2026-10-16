@@ -170,7 +170,7 @@
     padding: var(--fab-space-3);
     background: var(--fab-info-soft);
     border: 1px solid var(--fab-info-border);
-    border-radius: 10px;
+    border-radius: 9px;
   }
 
   .manager-crafting-effect-info > i {

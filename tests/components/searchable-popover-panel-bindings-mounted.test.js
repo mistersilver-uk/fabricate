@@ -54,10 +54,10 @@ async function openPanel(props = {}) {
   await harness.mount({
     options: ICONS,
     triggerLabel: 'Icon',
-    dialogAriaLabel: 'Choose an icon',
+    panelLabel: 'Choose an icon',
     popoverTitle: 'Icons',
     searchPlaceholder: 'Search icons...',
-    onChoose: () => {},
+    onSelect: () => {},
     ...props,
   });
   trigger().click();

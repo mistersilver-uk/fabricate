@@ -234,7 +234,7 @@
               options={resolutionModeOptions}
               selectedValue={systemResolutionModeValue}
               groupName="manager-crafting-resolution-mode"
-              dataAttr="data-crafting-resolution-mode"
+              data-crafting-resolution-mode
               optionDataAttr="data-crafting-resolution-mode-option"
               configCards={true}
               onChange={handleResolutionModeChange}
@@ -259,7 +259,7 @@
               options={visibilityModeOptions}
               selectedValue={visibilityMode}
               groupName="manager-crafting-visibility-mode"
-              dataAttr="data-crafting-visibility-mode"
+              data-crafting-visibility-mode
               optionDataAttr="data-crafting-visibility-mode-option"
               configCards={true}
               onChange={(mode) => onSetVisibilityMode(mode)}
@@ -292,7 +292,7 @@
                 options={salvageResolutionModeOptions}
                 selectedValue={systemSalvageResolutionModeValue}
                 groupName="manager-crafting-salvage-resolution-mode"
-                dataAttr="data-crafting-salvage-resolution-mode"
+                data-crafting-salvage-resolution-mode
                 optionDataAttr="data-crafting-salvage-resolution-mode-option"
                 configCards={true}
                 onChange={handleSalvageResolutionModeChange}

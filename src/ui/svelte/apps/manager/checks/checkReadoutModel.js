@@ -51,17 +51,17 @@ const COPY = Object.freeze({
   botch: ['FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch'],
   produced: [
     'FABRICATE.Admin.Manager.Checks.Simulator.Produced',
-    'The {record}’s result group is produced',
+    'The {record}’s result set is produced',
   ],
   nothing: ['FABRICATE.Admin.Manager.Checks.Simulator.NothingProduced', 'Nothing is produced'],
   netBelowZero: ['FABRICATE.Admin.Manager.Checks.Simulator.NetBelowZero', 'Net below zero'],
   countsSuccess: [
     'FABRICATE.Admin.Manager.Checks.Simulator.CountsSuccess',
-    'Counts as a success · result group bound to this tier',
+    'Counts as a success · result set bound to this tier',
   ],
   countsFailure: [
     'FABRICATE.Admin.Manager.Checks.Simulator.CountsFailure',
-    'Counts as a failure · result group bound to this tier',
+    'Counts as a failure · result set bound to this tier',
   ],
   noTiers: ['FABRICATE.Admin.Manager.Checks.Simulator.NoTiers', 'No tiers configured'],
   noTiersDetail: [
@@ -194,7 +194,7 @@ const FORCED_UNCAUGHT = Object.freeze([
 ]);
 
 const ROWS = Object.freeze({
-  produced: ['FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result group produced'],
+  produced: ['FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result set produced'],
   full: ['FABRICATE.Admin.Manager.Checks.Simulator.FactFull', 'full'],
   ingredients: ['FABRICATE.Admin.Manager.Checks.Simulator.FactIngredients', 'Ingredients consumed'],
   returned: [

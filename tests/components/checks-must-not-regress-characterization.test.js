@@ -37,7 +37,7 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
@@ -111,12 +111,14 @@ function mountChecks(props, section = '') {
  * @returns {HTMLElement} The trigger's card.
  */
 function openTrigger(target, id) {
-  const disclosure = target.querySelector(`[data-trigger-disclosure="${id}"]`);
+  const disclosure = target.querySelector(
+    `:scope [data-trigger="${id}"] [data-rule-row-disclosure]`
+  );
   assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
   disclosure.click();
   flushSync();
   assert.ok(
-    Boolean(target.querySelector(`[data-trigger-body="${id}"]`)),
+    Boolean(target.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-body]`)),
     `the head of trigger ${id} opens its body`
   );
   return target.querySelector(`[data-trigger="${id}"]`);

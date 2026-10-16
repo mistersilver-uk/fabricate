@@ -1,20 +1,22 @@
 /** The recipe browser's BULK EDIT panel (issue 1010). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import {
-  createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES
-} from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/ui/model/recipeBulkEditModel.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   openSelectPanel,
   selectOptionLabels,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -24,6 +26,7 @@ const panel = createMountedComponentHarness({
   rawModules: [
     // The book axis is a `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',
@@ -49,6 +52,7 @@ const panel = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     // The shared set-delete card and the armed control inside it (issue 1132). Both are
@@ -981,7 +985,7 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
  * three sentences the impact prop turns into, and which ids the confirm hands back.
  */
 const deleteCard = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
-const deleteButton = (root) => deleteCard(root).querySelector('.manager-button.is-danger');
+const deleteButton = (root) => deleteCard(root).querySelector('.fabricate-button.is-danger');
 const impactRow = (root, key) => root.querySelector(`[data-recipe-bulk-impact-row="${key}"]`);
 
 const FULL_IMPACT = {
@@ -994,7 +998,7 @@ const FULL_IMPACT = {
 };
 
 describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
-  it('renders the card under the shell, with this studio\'s hook names', async () => {
+  it("renders the card in the shell's dock, with this studio's hook names", async () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.ok(Boolean(deleteCard(root)), 'the panel renders no delete card at all');
@@ -1003,14 +1007,14 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
       'the impact list keeps the `data-recipe-bulk-*` convention every other hook in this panel uses'
     );
     assert.ok(Boolean(root.querySelector('[data-recipe-bulk-delete-announce]')));
-    // The card is a SIBLING of the shell, not a child of it.
-    const panelEl = root.querySelector('[data-recipe-bulk-panel]');
-    assert.ok(Boolean(panelEl), 'the shell is absent, so "sibling" would be unfalsifiable');
-    assert.equal(
-      panelEl.contains(deleteCard(root)),
-      false,
-      'the delete card is INSIDE the shell, where it reads as a second Apply'
+    // The card rides the dock under Apply (maintainer ruling 2026-10-14), so both sit at the foot.
+    const dock = root.querySelector(':scope [data-recipe-bulk-panel] .fab-bulk-edit-dock');
+    assert.ok(Boolean(dock), 'the shell renders no dock, so "in the dock" would be unfalsifiable');
+    const [first, second] = dock.querySelectorAll(
+      '[data-recipe-bulk-apply], [data-recipe-bulk-delete-card]'
     );
+    assert.ok(Boolean(first?.matches('[data-recipe-bulk-apply]')), 'Apply leads the dock');
+    assert.ok(second === deleteCard(root), 'and the delete card follows it inside the dock');
   });
 
   it('turns the impact prop into three sentences, keyed for the suites that query them', async () => {

@@ -4,6 +4,8 @@
  * rebuilt per call, so a patch to the manager member is still observed. Nothing here reads a Foundry global.
  */
 
+import { expandDescriptionEmbeds } from './descriptionEmbeds.js';
+
 /** The ordered description fields a Foundry Item may carry, most specific first. Shared by
  * {@link extractSourceDescription} and the repair pass's priming sweep, which needs the RAW
  * text only. */
@@ -12,6 +14,7 @@ function sourceDescriptionCandidates(source = null) {
   return [
     source?.system?.description?.value,
     source?.system?.description,
+    source?.text?.content,
     source?.description?.value,
     source?.description,
   ];
@@ -38,7 +41,13 @@ export async function extractSourceDescription(io, source = null) {
   for (const candidate of candidates) {
     const raw = io.descriptionTextCandidate(candidate);
     if (!raw) continue;
-    const enriched = await io.enrichToHtml(raw, { relativeTo: source });
+    const expanded = await expandDescriptionEmbeds(raw, source, {
+      resolveEmbedUuid: io.resolveEmbedUuid,
+      rawSourceDescription: (document) => rawSourceDescription(io, document),
+      enrichToHtml: io.enrichToHtml,
+      plainTextDescription: io.plainTextDescription,
+    });
+    const enriched = await io.enrichToHtml(expanded, { relativeTo: source });
     const plainText = io.plainTextDescription(enriched);
     if (plainText) return plainText;
   }

@@ -6,10 +6,6 @@
 /** The page sizes the book inspector offers; the first is also the search threshold. */
 export const RECIPE_PAGE_SIZES = Object.freeze([6, 9, 12]);
 
-/** `<Select>` rows for {@link RECIPE_PAGE_SIZES}, whose values stay numbers. */
-export const recipePageSizeOptions = () =>
-  RECIPE_PAGE_SIZES.map((size) => ({ value: size, label: String(size) }));
-
 const contains = (value, query) =>
   String(value ?? '')
     .toLowerCase()

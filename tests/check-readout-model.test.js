@@ -104,7 +104,7 @@ describe('the target line', () => {
       outcome: 'High',
     });
     assert.equal(inBand.targetLine, 'in the 10–14 band');
-    assert.equal(inBand.card.detail, 'Counts as a success · result group bound to this tier');
+    assert.equal(inBand.card.detail, 'Counts as a success · result set bound to this tier');
     const stepped = readout(routedPlan, {
       ...result(true, {
         total: 11,
@@ -280,7 +280,7 @@ describe('the result card', () => {
       tone: 'success',
       icon: 'fas fa-circle-check',
       title: 'Success',
-      detail: 'The component’s result group is produced',
+      detail: 'The component’s result set is produced',
     });
     const failure = readout(plan(OVER), result(false, { total: 5, diceGroups: d20(2) }));
     assert.deepEqual(failure.card, {
@@ -406,7 +406,7 @@ describe('what happens', () => {
     );
     const success = readout(plan(OVER), result(true, { total: 15, diceGroups: d20(12) }));
     assert.deepEqual(success.rows.map((row) => [row.label, row.meta]), [
-      ['Result group produced', 'full'],
+      ['Result set produced', 'full'],
       ['Ingredients consumed', 'as listed'],
     ]);
   });

@@ -22,6 +22,7 @@ import {
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory.
 import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 // Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s.
 import {
@@ -758,6 +759,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         target.querySelector('[data-scoped-component-open-entry]').textContent.trim(),
         'Open catalogue entry'
       );
+      assertInspectorVerbs(target.querySelector('[data-scoped-list-inspector]'), [
+        ['[data-scoped-component-open-entry]', 'primary'],
+      ]);
       assert.equal(
         target.querySelector('[data-scoped-list-inspector-kicker]').textContent.trim(),
         'Catalogue entry'
@@ -1219,7 +1223,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     /** The danger leg's control, whatever primitive draws it. */
     function dangerControl(target) {
       return target.querySelector(
-        '[data-world-component-bulk-danger] .manager-button, ' +
+        '[data-world-component-bulk-danger] .fabricate-button, ' +
           '[data-world-component-bulk-danger] button'
       );
     }
@@ -2395,25 +2399,15 @@ describe('world Component Catalogue (issue 1371)', () => {
     }
 
     it('takes the 38px rung on the LEAD row’s two controls and nowhere else', async () => {
-      // `proto:577`-`578` draws the search field and the source select at 38.
+      // `proto:577`-`578` draws the search field and the source select at 38: the default search
+      // shell, and `Select`'s `form` rung beside it (issue 1782).
       const target = await mounted();
-      const field = target.querySelector('[data-scoped-list-search]').closest('.manager-search');
+      const field = target.querySelector('[data-scoped-list-search]').closest('.fabricate-search');
       assert.ok(Boolean(field), 'the search field is the shared primitive');
-      assert.ok(
-        field.classList.contains('is-size-38'),
-        'and it carries the rung `ManagerSearchField` emits for size="38"'
-      );
+      assert.ok(!field.classList.contains('is-compact'), 'at its default 38px shell');
 
-      // ISSUE 1504 MOVED THE TOKEN OFF THE ELEMENT AND ONTO THE SELECT ROOT. These controls are
-      // shared `<Select>`s now: the hook rides the trigger through `triggerData` and the caller's
-      // `class` lands on the picker root the trigger sits in, which is where the sheet's rung
-      // rule reaches it from.
-      const rootOf = (control) => control.closest('.fabricate-select');
       const source = target.querySelector('[data-scoped-list-filter="source-type"]');
-      assert.ok(
-        rootOf(source).classList.contains('is-size-38'),
-        'the lead row’s select carries the same rung'
-      );
+      assert.equal(source.getAttribute('data-select-size'), 'form', 'the lead row’s select is 38');
 
       for (const [what, selector] of [
         ['membership', '[data-scoped-list-filter="membership"]'],
@@ -2421,8 +2415,9 @@ describe('world Component Catalogue (issue 1371)', () => {
       ]) {
         const control = target.querySelector(selector);
         assert.ok(Boolean(control), `NON-VACUITY: the ${what} control is rendered`);
-        assert.ok(
-          !rootOf(control).classList.contains('is-size-38'),
+        assert.equal(
+          control.getAttribute('data-select-size'),
+          'toolbar',
           `and the filter row’s ${what} control keeps the ladder’s 34, because 32 is retired`
         );
       }
@@ -2453,9 +2448,10 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
-    it('turns the inspector roster into a recess with its search field lifted out of it', async () => {
-      // Reviewer finding 7. Both were restyled IN PLACE for all three catalogues before the props
-      // existed; this screen is the one whose reference draws them.
+    it('turns the inspector roster into a recess around the shared search field', async () => {
+      // Reviewer finding 7. The recess was restyled IN PLACE for all three catalogues before the
+      // prop existed; this screen is the one whose reference draws it. The field's separate well
+      // went with issue 1782: the search draws its own box at every site.
       const target = await mounted();
       target.querySelector('[data-scoped-list-inspect="ingot"]').click();
       await drain();
@@ -2464,9 +2460,10 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(card.classList.contains('is-recessed'), 'and the card takes the recess');
       const search = target.querySelector('.manager-scoped-roster-search');
       assert.ok(Boolean(search), 'the roster still draws its search field');
+      assert.ok(search.classList.contains('fabricate-search'), 'and it is the shared field’s own box');
       assert.ok(
-        search.classList.contains('manager-scoped-roster-search-well'),
-        'and the field is lifted into its own well rather than sitting flush in the recess'
+        !search.classList.contains('manager-scoped-roster-search-well'),
+        'with no second well class over it'
       );
     });
 
@@ -2542,23 +2539,6 @@ describe('world Component Catalogue (issue 1371)', () => {
       search.value = value;
       search.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
     }
-
-    it('turns the flush list column ON, so the toolbar, rows and pager run edge to edge (M21)', async () => {
-      // The page-level half of M21; the shell-level default-OFF half sits with the shell mounts
-      // below. Mounted on THIS harness, not the shell's: the two harnesses own different
-      // documents and a page mounted inside the shell block lands on a foreign DOM.
-      const target = await harness.mount({
-        scope: scopeFor(),
-        systems: COMPONENT_SYSTEMS,
-        actions: {},
-      });
-      const column = target.querySelector('.manager-scoped-list-column');
-      assert.ok(Boolean(column), 'NON-VACUITY: the page renders the frame`s list column');
-      assert.ok(
-        column.classList.contains('is-flush'),
-        'the page hands the shell `flushColumn`; the rendered suite measures what that yields'
-      );
-    });
 
     it('inspects the FIRST row in the shown order the moment it opens, with nothing else chosen', async () => {
       const target = await mountOpen();
@@ -2677,6 +2657,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       tmpPrefix: 'fabricate-world-component-catalogue-shell-',
       componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
       compiledExtras: [
+        'src/ui/svelte/apps/manager/IconFactRow.svelte',
         'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
         'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
         'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
@@ -2743,16 +2724,6 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.deepEqual(selected, [], 'the owner never hears a selection there is no row for');
     });
 
-    it('leaves the list column carrying the pane inset with `flushColumn` unset, exactly as the other catalogues do (M21)', async () => {
-      const target = await shellHarness.mount(shellProps());
-      const column = target.querySelector('.manager-scoped-list-column');
-      assert.ok(Boolean(column), 'NON-VACUITY: the frame renders its list column');
-      assert.ok(
-        !column.classList.contains('is-flush'),
-        'the default is OFF: the essence and tool catalogues keep the inset they always had'
-      );
-    });
-
     it('leaves the inspector column`s inset alone with `flushBulkDock` unset (M24)', async () => {
       const target = await shellHarness.mount(shellProps({ selectedId: 'coal' }));
       const scroller = target.querySelector('.manager-scoped-list-inspector-scroll');
@@ -2774,6 +2745,69 @@ describe('world Component Catalogue (issue 1371)', () => {
         0,
         'the default is OFF: no row is inspected on open'
       );
+    });
+  });
+
+  describe('the toolbar filters by category (#2440)', () => {
+    const rowIds = (target) =>
+      [...target.querySelectorAll('[data-scoped-list-row]')]
+        .map((row) => row.getAttribute('data-scoped-list-row'))
+        .sort((left, right) => left.localeCompare(right));
+
+    async function choose(target, value) {
+      chooseSelectOption(target, '[data-scoped-list-filter="category"]', value);
+      await drain();
+    }
+
+    it('offers the vocabulary after All and No world category, and narrows the rows', async () => {
+      const target = await harness.mount({
+        scope: scopeFor(),
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
+        'All categories',
+        'No world category',
+        'Raw',
+        'Refined',
+      ]);
+      assert.deepEqual(rowIds(target), ['coal', 'ingot', 'orphan', 'resin']);
+      await choose(target, 'Raw');
+      assert.deepEqual(rowIds(target), ['coal']);
+      await choose(target, '__none');
+      assert.deepEqual(rowIds(target), ['orphan', 'resin'], 'only uncategorised rows');
+    });
+
+    it('offers a stray category and narrows the rows by it', async () => {
+      const target = await harness.mount({
+        scope: scopeFor({
+          defaults: [
+            { id: 'ingot', category: 'Refined' },
+            { id: 'coal', category: 'Raw', tags: ['fuel', 'bulk'] },
+            { id: 'resin', category: '  Stray  ' },
+          ],
+        }),
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.deepEqual(selectOptionLabels(target, '[data-scoped-list-filter="category"]'), [
+        'All categories',
+        'No world category',
+        'Raw',
+        'Refined',
+        'Stray',
+      ]);
+      await choose(target, 'Stray');
+      assert.deepEqual(rowIds(target), ['resin']);
+    });
+
+    it('is withheld when the world has no category', async () => {
+      const target = await harness.mount({
+        scope: { ...scopeFor({}, { categories: [], tags: [] }), entries: [] },
+        actions: {},
+        worldItems: WORLD_ITEMS,
+      });
+      assert.ok(!target.querySelector('[data-scoped-list-filter="category"]'));
     });
   });
 
@@ -2869,8 +2903,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         'essence',
         'the essence select is the source select’s next sibling — where the rules list puts its'
       );
-      assert.ok(
-        essence.classList.contains('is-size-38'),
+      assert.equal(
+        essence.querySelector('[data-scoped-list-filter]').getAttribute('data-select-size'),
+        'form',
         'and it takes the lead row’s rung, exactly as the source select beside it does'
       );
       assert.ok(

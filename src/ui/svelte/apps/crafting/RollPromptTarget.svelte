@@ -47,7 +47,7 @@
 {/if}
 {#if notice}
   <div class="target-notice">
-    <Notice tone="warning" title={notice} dataAttr="data-roll-prompt-zero-pool" />
+    <Notice tone="warning" title={notice} data-roll-prompt-zero-pool="" />
   </div>
 {/if}
 

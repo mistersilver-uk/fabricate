@@ -1,7 +1,8 @@
 /**
  * The `CraftingSystemManager` surface, frozen at `b904771fd` before issue 1923 moved any cluster:
  * every public method's name, arity, `async`-ness and parameter shape, and a subset of the private
- * members reached from outside the class. Recorded literally, never derived at run time.
+ * members reached from outside the class, plus the two members issue 2218 added. Recorded
+ * literally, never derived at run time.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -49,6 +50,7 @@ const PUBLIC_SURFACE = Object.freeze({
   addItemFromUuid: [2, true, 'iid'],
   replaceItemSource: [3, true, 'iii'],
   addItemsFromPack: [2, true, 'ii'],
+  flushWorldComponentRegistrations: [1, true, 'i'],
   refreshComponentMetadataForUpdatedItem: [1, true, 'id'],
   updateItem: [2, true, 'iid'],
   applyBulkEditToComponents: [2, true, 'iidd'],
@@ -70,6 +72,7 @@ const PARAM_CODES = Object.freeze({
 
 const PRIVATE_SUBSET = Object.freeze([
   '_characterLibraryBasis',
+  '_resolveComponentScopeStore',
   '_scopeBasis',
   '_assertGM',
   '_componentRoleFlagKey',
@@ -218,9 +221,9 @@ function mutatedClass(mutate) {
 const replacement = (name, holder) => Object.getOwnPropertyDescriptor(holder.prototype, name);
 
 describe('the CraftingSystemManager surface', () => {
-  it('pins 48 public and 92 private names', () => {
-    assert.equal(Object.keys(PUBLIC_SURFACE).length, 48);
-    assert.equal(new Set(PRIVATE_SUBSET).size, 92);
+  it('pins 49 public and 93 private names', () => {
+    assert.equal(Object.keys(PUBLIC_SURFACE).length, 49);
+    assert.equal(new Set(PRIVATE_SUBSET).size, 93);
   });
 
   it('matches the frozen surface exactly', () => {

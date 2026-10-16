@@ -108,7 +108,7 @@ test('simple mode — 2 ingredient sets → invalid with error mentioning "ingre
   );
 });
 
-test('simple mode — 2 result groups → invalid with error mentioning "result group"', () => {
+test('simple mode — 2 result groups → invalid with error mentioning "result set"', () => {
   const system = buildSystem({ resolutionMode: 'simple' });
   const service = buildService(system);
   const step = buildStep({
@@ -123,8 +123,8 @@ test('simple mode — 2 result groups → invalid with error mentioning "result 
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /result group/i.test(e)),
-    `expected an error mentioning "result group", got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /result set/i.test(e)),
+    `expected an error mentioning "result set", got: ${JSON.stringify(result.errors)}`
   );
 });
 
@@ -179,8 +179,8 @@ test('routedByIngredients — resultGroupId references non-existent group → in
   // The reference-integrity failure is surfaced id-free (issue 595): it names the set by position
   // and never echoes the missing group id or the internal `resultGroupId` field name.
   assert.ok(
-    result.errors.some((e) => /result group/i.test(e)),
-    `expected error about a missing result group, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /result set/i.test(e)),
+    `expected error about a missing result set, got: ${JSON.stringify(result.errors)}`
   );
   assert.ok(
     !result.errors.some((e) => e.includes('rg-does-not-exist')),
@@ -524,8 +524,8 @@ test('progressive mode — exactly 1 result group required; multiple → invalid
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /result group/i.test(e)),
-    `expected error about too many result groups, got: ${JSON.stringify(result.errors)}`
+    result.errors.some((e) => /result set/i.test(e)),
+    `expected error about too many result sets, got: ${JSON.stringify(result.errors)}`
   );
 });
 

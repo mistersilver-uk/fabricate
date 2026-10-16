@@ -522,9 +522,9 @@ export function componentEssenceNote({ worldEssences, inheriting, systemName }, 
 }
 
 /**
- * The catalogue attribution banner's sentence. TWO sentences: the rules LIST states where identity
- * comes from and the EDITOR adds what belongs to the system it edits. It claims identity is
- * AUTHORED there, not that the displayed name comes from there. The `entry` surface counts MEMBERS
+ * The catalogue attribution sentence. The rules list states where identity is authored and the
+ * editor adds what belongs to its system; neither claims the displayed name comes from there, and
+ * a component no other system holds states no sharing. The `entry` surface counts members
  * directly, since "other" has no referent on the world entry.
  */
 export function componentAttributionNote({ surface, memberCount, systemName = '' }, phrase) {
@@ -546,27 +546,27 @@ export function componentAttributionNote({ surface, memberCount, systemName = ''
       { count: members }
     );
   }
+  // Two tables in step: the editor's none, one and more forms, then the list's.
   const others = Math.max(0, members - 1);
-  const one = others === 1;
-  if (surface === 'editor') {
-    return phrase(
-      one
-        ? 'FABRICATE.Admin.Manager.Component.SharedNoteEditorOne'
-        : 'FABRICATE.Admin.Manager.Component.SharedNoteEditor',
-      one
-        ? 'Name, image and description are authored in the world catalogue and shared with {count} other system. Everything below belongs to {system} alone.'
-        : 'Name, image and description are authored in the world catalogue and shared with {count} other systems. Everything below belongs to {system} alone.',
-      { count: others, system: systemName }
-    );
-  }
+  const form = (surface === 'editor' ? 0 : 3) + Math.min(others, 2);
   return phrase(
-    one
-      ? 'FABRICATE.Admin.Manager.Component.SharedNoteListOne'
-      : 'FABRICATE.Admin.Manager.Component.SharedNoteList',
-    one
-      ? 'Name, art and description are authored in the world catalogue and shared with {count} other system.'
-      : 'Name, art and description are authored in the world catalogue and shared with {count} other systems.',
-    { count: others }
+    [
+      'FABRICATE.Admin.Manager.Component.SharedNoteEditorNone',
+      'FABRICATE.Admin.Manager.Component.SharedNoteEditorOne',
+      'FABRICATE.Admin.Manager.Component.SharedNoteEditor',
+      'FABRICATE.Admin.Manager.Component.SharedNoteListNone',
+      'FABRICATE.Admin.Manager.Component.SharedNoteListOne',
+      'FABRICATE.Admin.Manager.Component.SharedNoteList',
+    ][form],
+    [
+      'Name, image and description are authored in the world catalogue. Everything below belongs to {system} alone.',
+      'Name, image and description are authored in the world catalogue and shared with {count} other system. Everything below belongs to {system} alone.',
+      'Name, image and description are authored in the world catalogue and shared with {count} other systems. Everything below belongs to {system} alone.',
+      'Name, art and description are authored in the world catalogue.',
+      'Name, art and description are authored in the world catalogue and shared with {count} other system.',
+      'Name, art and description are authored in the world catalogue and shared with {count} other systems.',
+    ][form],
+    { count: others, system: systemName }
   );
 }
 

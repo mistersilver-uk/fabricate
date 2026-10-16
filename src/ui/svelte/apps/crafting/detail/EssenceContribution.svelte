@@ -45,7 +45,7 @@
   .essence-contribution {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--fab-space-1);
     font-size: 10px;
     font-weight: 600;
     color: var(--fab-text-subtle);

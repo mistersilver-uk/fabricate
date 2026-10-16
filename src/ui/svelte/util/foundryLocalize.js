@@ -16,11 +16,12 @@ const LIST_FORMAT_OPTIONS = Object.freeze({ style: 'long', type: 'conjunction' }
 // `getListFormatter` is bound to the language the world is actually running in, which is what makes
 // this correct for a sentence assembled at render time — `items.join(', ')` and an authored
 // separator key are both wrong outside English. Degrades to the platform locale with no i18n.
-export function formatList(items) {
+// `options` replaces the conjunction for a list that is not a sentence, such as a terse summary.
+export function formatList(items, options = LIST_FORMAT_OPTIONS) {
   const values = Array.isArray(items) ? items.map((item) => String(item ?? '')) : [];
   const i18n = globalThis.game?.i18n;
   if (typeof i18n?.getListFormatter !== 'function') {
-    return new Intl.ListFormat(undefined, LIST_FORMAT_OPTIONS).format(values);
+    return new Intl.ListFormat(undefined, options).format(values);
   }
-  return i18n.getListFormatter(LIST_FORMAT_OPTIONS).format(values);
+  return i18n.getListFormatter(options).format(values);
 }

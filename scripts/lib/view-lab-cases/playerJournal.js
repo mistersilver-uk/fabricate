@@ -6,9 +6,11 @@ import {
   ANCHORED_POPOVER_SOURCES,
   COUNT_ADVANTAGE_FOOTER,
   JOURNAL_SOURCES,
+  PLAYER_DETAIL_HEADER,
   PLAYER_VIEW_STATE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { journalAwardChoiceCases } from './journalAwardChoiceCases.js';
 import { journalBlindRunCases } from './journalBlindRunCases.js';
 import { journalHistoryBatchCases, journalHistoryDataCases } from './journalHistoryCases.js';
 import { journalLifecycleCases } from './journalLifecycleCases.js';
@@ -24,6 +26,12 @@ const JOURNAL_ADDITIONAL_DICE_SOURCES = Object.freeze([
   /^src\/systems\/preparedDecisionPolicy\.js$/,
   /^src\/ui\/svelte\/apps\/crafting\/RollPromptAdditionalDice\.svelte$/,
 ]);
+
+/** A routed ladder tier's band (issue 2257 D14): a bare mono figure, named by its tone and inked by it. */
+const ROUTED_BAND = (tier, tone, ink) => ({
+  selector: `[data-journal-detail] [data-outcome-tier="${tier}"] [data-outcome-band="${tone}"]`,
+  styles: `font-size: 10px; border-width: 0; color: var(${ink})`,
+});
 
 export const CASES = Object.freeze([
   playerCase({
@@ -51,6 +59,32 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
+  }),
+  playerCase({
+    id: 'player-alchemy-brew-enabled',
+    label: 'Player app — Alchemy workbench with Brew enabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'alchemy' },
+    // One component on the bench is an experiment, which Brew offers: the view's one primary, live.
+    steps: [{ selector: '[data-alchemy-inventory-row="al-sulphur"]' }],
+    expectSelector:
+      '.alchemy-workbench:has([data-alchemy-chip]) [data-alchemy-brew]:not([disabled])',
+    kinds: ['player', 'alchemy'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
+    id: 'player-alchemy-known-recipe',
+    label: 'Player app — Alchemy known recipe selected',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The alchemy journal state grants the player one recipe, so Known recipes draws a row; choosing
+    // it presses the row and loads the bench, which the bench then matches (issue 1778).
+    query: { tab: 'alchemy', journalCaseState: 'alchemy' },
+    steps: [{ selector: '[data-alchemy-recipe="al-r-fire"]' }],
+    expectSelector: '[data-alchemy-recipe="al-r-fire"].is-selected.is-match',
+    kinds: ['player', 'alchemy'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
   playerCase({
     id: 'player-alchemy-stacked',
@@ -102,6 +136,20 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'journal' },
     steps: [],
+    // The Finished list's time is the mono log line, muted on a failed entry too (issue 2257).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-history-run-id="lab-run-failed"] .fab-log-list-when',
+          styles:
+            'font-family: var(--fab-font-mono); font-size: 9.5px; text-overflow: ellipsis; color: var(--fab-text-muted)',
+        },
+        {
+          selector: '.fab-log-list-entry:has([data-history-run-id="lab-run-failed"])',
+          styles: 'box-sizing: border-box; height: 44px',
+        },
+      ],
+    },
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/, PLAYER_VIEW_STATE],
   }),
@@ -123,7 +171,11 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"]:has([data-history-stages]):not(:has([data-stage-nav]))',
     kinds: ['player', 'journal'],
-    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   playerCase({
     id: 'player-journal-check-roll-prompt',
@@ -313,8 +365,15 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '[data-journal-detail] [data-outcome-ladder]' +
-      ':has([data-outcome-tier="lab-abundant"] .manager-chip:text-is("≤15"))' +
-      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is(">15"))',
+      ':has([data-outcome-tier="lab-abundant"] [data-outcome-band]:text-is("≤15"))' +
+      ':has([data-outcome-tier="lab-failed"] [data-outcome-band]:text-is(">15"))',
+    // Issue 2257 D14: each band a bare mono figure, inked by its tier.
+    expectLayout: {
+      controls: [
+        ROUTED_BAND('lab-abundant', 'neutral', '--fab-text-secondary'),
+        ROUTED_BAND('lab-failed', 'danger', '--fab-danger-text'),
+      ],
+    },
     kinds: ['player', 'journal', 'gathering'],
     sourceMatches: [
       JOURNAL_SOURCES,
@@ -329,21 +388,21 @@ export const CASES = Object.freeze([
       'player-journal-routed-bands-under-crafting',
       { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under' },
       'lab-v1-journal-check-prompt',
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("≤7"))' +
-        ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is(">12"))',
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("≤7"))' +
+        ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is(">12"))',
     ],
     [
       'player-journal-routed-bands-under-attribute',
       { journalCaseState: 'gathering-journal-check-prompt', gatheringTaskMode: 'routed-under' },
       'lab-v1-gathering-journal-check-prompt',
-      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is("Failed · −15"))',
+      ':has([data-outcome-tier="lab-failed"] [data-outcome-band]:text-is("Failed · −15"))',
     ],
     [
       'player-journal-routed-bands-under-multiply',
       { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under-multiply' },
       'lab-v1-journal-check-prompt',
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("Ruined · Otherwise"))' +
-        ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("Standard · ×½"))',
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("Ruined · Otherwise"))' +
+        ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("Standard · ×½"))',
     ],
   ].map(([id, query, runId, ladder]) =>
     playerCase({
@@ -376,7 +435,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Standard check"))' +
       ':has-text("1d20 = 11 · target 14 · margin +3")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -424,12 +483,18 @@ export const CASES = Object.freeze([
       '[data-journal-detail]' +
       ':has([data-journal-summary-card="check"]:has-text("2 successes needed · d10s"))' +
       ' [data-outcome-ladder]' +
-      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
-      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("2–3"))' +
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–1"))' +
+      ':has([data-outcome-tier="count-botch"] [data-outcome-band]:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("2–3"))' +
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("0–1"))' +
       // In ladder order: a best-first ladder closes on its Botch row.
       ':has([data-outcome-tier="rw-masterwork"] ~ [data-outcome-tier="rw-ruined"] + [data-outcome-tier="count-botch"])',
+    expectLayout: {
+      controls: [
+        ROUTED_BAND('rw-masterwork', 'neutral', '--fab-text-secondary'),
+        ROUTED_BAND('rw-ruined', 'danger', '--fab-danger-text'),
+      ],
+    },
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,
@@ -453,12 +518,13 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '[data-journal-detail] [data-outcome-ladder]' +
-      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("3"))' +
-      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
-      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–2"))' +
-      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] [data-outcome-band]:text-is("3"))' +
+      ':has([data-outcome-tier="count-botch"] [data-outcome-band]:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-ruined"] [data-outcome-band]:text-is("0–2"))' +
+      ':has([data-outcome-tier="rw-masterwork"] [data-outcome-band]:text-is("4+"))' +
       ':has([data-outcome-tier="rw-standard"] + [data-outcome-tier="count-botch"]' +
       ' + [data-outcome-tier="rw-ruined"] + [data-outcome-tier="rw-masterwork"])',
+    expectLayout: { controls: [ROUTED_BAND('rw-standard', 'neutral', '--fab-text-secondary')] },
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,
@@ -485,7 +551,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Standard check"))' +
       ':has-text("3 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -509,7 +575,7 @@ export const CASES = Object.freeze([
     steps: [{ selector: '[data-history-run-id="lab-v1-finished-routed-count"]' }],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Routed by Check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Routed by Check"))' +
       ' [data-journal-history-detail]:has-text("6 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -518,8 +584,25 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/journal\/runDetailPresentation\.js$/,
     ],
   }),
+  // Issue 2366: a pick that went stale leaves its slot on the open face, drawn as the empty ring.
+  playerCase({
+    id: 'fabricate-journal-lifecycle-stale-choice',
+    label: 'Player Journal — stale choice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'stale-choice' },
+    steps: [{ selector: '[data-run-id="lab-v1-stale-choice"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail][data-run-key*="lab-v1-stale-choice"]' +
+      ' [data-slot-row] [data-slot-state="open"] .fab-slot-tile' +
+      ' i.fa-regular.fa-circle:not(.fas):not(.fa-solid)',
+    kinds: ['player', 'journal'],
+    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),
   ...journalHistoryDataCases(),
+  ...journalAwardChoiceCases(),
 ]);

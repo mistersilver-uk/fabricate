@@ -73,6 +73,15 @@ function offeredRoutes(extensionSurfaces) {
   return routes;
 }
 
+/** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
+ *  (issue 1773). */
+function journalRunNavigator(services, selectTab) {
+  return (runId) => {
+    if (runId) services.journal?.select?.(runId, 'crafting');
+    selectTab('journal');
+  };
+}
+
 // componentId is a per-system id, so the system is carried with it: a station from system A must
 // not satisfy a system-B Tool sharing the string. The library Tool id is carried too (issue 1119),
 // since an item-sourced Tool has no componentId.
@@ -238,7 +247,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
       // Every Foundry-facing call routes through the `game.fabricate` facade, so stores stay
       // Foundry-free. That is the rule for every seam in this bag.
-      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(withStation(opts)) ?? null,
       // Synchronous, because the store's `selectedRecipe` $derived reads it without an async
       // round-trip; null when the facade is absent or the viewer may not see the recipe.
       hydrateCraftingRecipe: (opts = {}) =>
@@ -345,13 +354,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // All three tab stores read the SAME actor and source selection, so they agree on what the
     // player owns; only the workbench and discipline state is local to this one.
     services.alchemy = createAlchemyStore({ services });
-    // Both stores are the singletons the Crafting tab reads, so the selection is already applied
-    // by the time that tab renders.
+    // Both stores are the Crafting tab's singletons, so the selection lands before it renders.
     services.navigateToCraftingRecipe = (recipeId) => {
       if (recipeId) services.crafting?.select?.(recipeId);
       this._selectTab('crafting');
     };
     services.journal = createJournalStore({ services });
+    services.navigateToJournalRun = journalRunNavigator(services, (tab) => this._selectTab(tab));
     return services;
   }
 

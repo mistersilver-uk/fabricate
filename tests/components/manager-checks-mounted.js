@@ -653,7 +653,7 @@ export function registerChecksCases() {
     // card, and the exemption that excused it has been overruled rather than reworded.
     assert.ok(
       !target.querySelector(
-        '[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'
+        '[data-checks-panel="crafting"] .fabricate-card [data-recipe-section="failure-consume-ingredients"]'
       ),
       'no card wraps the two failure flags'
     );
@@ -1689,7 +1689,7 @@ export function registerChecksCases() {
     // Add appends a new trigger; remove drops one.
     triggers.querySelector('[data-add-trigger]').click();
     assert.equal(emitted.at(-1).checkBreakage.triggers.length, 3, 'add appends a trigger');
-    triggers.querySelector('[data-trigger="c1"] [data-remove-trigger]').click();
+    triggers.querySelector(':scope [data-trigger="c1"] [data-rule-row-remove]').click();
     assert.deepEqual(
       emitted.at(-1).checkBreakage.triggers.map((t) => t.id),
       ['c2'],
@@ -1873,13 +1873,13 @@ export function registerChecksCases() {
 
   // A trigger's controls sit behind a disclosure (issue 1096).
   function openTrigger(root, id) {
-    const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+    const disclosure = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-disclosure]`);
     assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
     disclosure.click();
     flushSync();
     const card = root.querySelector(`[data-trigger="${id}"]`);
     assert.ok(
-      Boolean(card.querySelector(`[data-trigger-body="${id}"]`)),
+      Boolean(card.querySelector('[data-rule-row-body]')),
       `the head of trigger ${id} opens its body`
     );
     return card;
@@ -3473,9 +3473,10 @@ export function registerChecksCases() {
     // `@ingredients` resolved against NOTHING. A GM clicked the chip.
     await mountChecks([], routedCraftingOptions('1d20'));
     await openChecksActivity('crafting');
-    const chips = [...target.querySelectorAll('[data-check-formula-token]')];
-    assert.ok(chips.length > 0, 'the formula field offers quick-add chips');
-    const offered = chips.map((chip) => chip.getAttribute('data-check-formula-token'));
+    const formulaField = target.querySelector('[data-check-roll-formula]').parentElement;
+    const chips = [...formulaField.querySelectorAll('.fab-expr-input-token')];
+    assert.ok(chips.length > 0, 'the formula field offers quick-add tokens');
+    const offered = chips.map((chip) => chip.textContent);
     assert.ok(
       !offered.includes('@ingredients'),
       `@ingredients resolves against nothing and must never be offered again: ${offered.join(', ')}`

@@ -28,8 +28,8 @@
   attribute is written from the branch exactly as the caller spelled it, never derived from `kind`.
 
   Written as a spread so an unset hook is genuinely absent rather than an empty attribute a
-  presence selector would still match, and so the VALUE reaches the DOM as written. `EmptyState`
-  coerces a bare hook to `data-x="true"` via `dataValue || true`; this one does not, because it
+  presence selector would still match, and so the value reaches the DOM as written. A bare hook
+  on the `<EmptyState>` tag renders `data-x="true"`; this one does not, because it
   carries the box these hooks have always sat on and an exact-value reader must see what it saw
   before.
 

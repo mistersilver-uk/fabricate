@@ -3,7 +3,7 @@
   Tab strip for the recipe editor (Overview / Ingredients / Results / Tools / Access / Books &
   Scrolls / Validation), a thin caller of the promoted `EditorTabs` primitive. This file owns the
   TAB LIST — including the mode gate below — and this site's DOM contract: the
-  `data-recipe-tab-button` hook, the `recipe-tab-*` / `recipe-panel-*` id stem whose panels
+  `data-recipe-tab-button` hook, the `recipe-tab-*` / `recipe-panel-*` id stem whose one panel
   `RecipeEditView.svelte` renders, and the strip's own aria-label. Every class it used to render
   by hand is the primitive's default, so it passes no class override.
 
@@ -96,5 +96,6 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Recipe.Tabs.Label"
   ariaLabel="Recipe editor sections"
   idStem="recipe"
-  hookAttribute="data-recipe-tab-button"
+  tabDataAttr="data-recipe-tab-button"
+  activePanelOnly
 />

@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 
+import { walkNodes } from './helpers/moduleAst.js';
+import { moduleAstOf } from './helpers/parsedSource.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const ADMIN_STORE_PATH = 'src/ui/svelte/stores/adminStore.js';
@@ -52,14 +55,15 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Tool's world-default prerequisites against ONE actor, and the roster it offers is the shared,
   // GM-configurable player-character predicate rather than a second `type === 'character'` test.
   '../../../../systems/characterModifierPrerequisiteCopy.js',
+  // The recipe editor offers a knowledge result only where the selected system's learned
+  // knowledge is observable, read through the service's own import-free leaf.
+  '../../../../systems/learnedKnowledgeObservability.js',
   '../../../../utils/categoryIcons.js',
   '../../../../utils/componentCategories.js',
   '../../../../utils/craftingCheckExpression.js',
   '../../../../utils/failureResultPolicy.js',
   '../../../../utils/recipeCategories.js',
   '../../../../utils/routedOutcomeKeywords.js',
-  // ADDED BY ISSUE 1373, and legitimately under the message below.
-  '../../../../utils/sourceReferenceUnion.js',
   '../../../managerExtensions.js',
   '../../../model/componentBrowserModel.js',
   '../../../model/componentBulkEditModel.js',
@@ -74,13 +78,12 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
+  '../../components/Button.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
-  '../../components/ManagerButton.svelte',
   '../../util/announceAfterFocus.js',
   '../../util/componentEditor.js',
   '../../util/craftingImageDefaults.js',
-  '../../util/dropUtils.js',
   '../../util/foundryBridge.js',
   './AccessTabView.svelte',
   './BooksScrollsView.svelte',
@@ -107,6 +110,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // group and took `Kicker`, `Medallion`, `ComponentEditorHeader`, `ScopedEntryHeaderActions`
   // and the `managerHeaderActionClass` named import with them.
   './ManagerPageHeader.svelte',
+  // Added by issue 1777: the title bar is its own unit.
+  './ManagerTitleBar.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
@@ -140,8 +145,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/worldDowntimePreviewProvider.js',
   // Added by issue 1707, which moved the gathering, travel and environment inspector branch out
   // of the root. The rail owns the whole chain, so it — not the root — imports the four leaves,
-  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` and
-  // `CharacterModifierBoundsRow`, and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
+  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider` and `InlineRenameField`,
+  // and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
   './environment/GatheringInspectorRail.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
@@ -160,6 +165,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Added by issue 1721: the import report and the folder-aware component drop are their own unit.
   './importFlowModel.svelte.js',
   './navRailModel.svelte.js',
+  // Added by issue 1721: the Books & Scrolls selection and recipe-item draft are their own unit.
+  './recipe-item/recipeItemModel.svelte.js',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
   // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE.
@@ -183,6 +190,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',
   './world/WorldPrerequisitesTab.svelte',
+  // Added by issue 1721: the world corpus, entry editors and drop writes are their own unit, which
+  // took `dropUtils.js` and `sourceReferenceUnion.js` with them.
+  './worldScopeModel.svelte.js',
   'svelte',
 ]);
 
@@ -494,13 +504,12 @@ test('the rail declares exactly the props the root hands it, in both directions'
 
 /**
  * Every key the shell hands `<ManagerPageHeader>` is declared by the unit that reads it. The
- * header forwards `{...rest}` to both children, so a mis-keyed prop is not an error: it is a
- * default, and the control it wires goes inert with the census and the compiler both silent
- * (issue 1720).
+ * header forwards `{...rest}` to the trail model and the action group, so a mis-keyed prop is not
+ * an error: it is a default, and the control it wires goes inert with the census and the compiler
+ * both silent (issues 1720 and 1777).
  */
 const HEADER_UNITS = Object.freeze([
   'ManagerPageHeader',
-  'ManagerHeaderBreadcrumbs',
   'ManagerHeaderActions',
   'ManagerHeaderCraftingActions',
   'ManagerHeaderGatheringActions',
@@ -530,8 +539,36 @@ function pageHeaderSiteProps() {
     .map((hit) => hit[1] ?? hit[2]);
 }
 
+/**
+ * The input keys `headerBreadcrumbs.js` reads: every destructured key and every `input.<key>`. It
+ * takes one object, so its reads ARE its declaration.
+ */
+function trailModelInputs() {
+  const { ast } = moduleAstOf('src/ui/svelte/apps/manager/headerBreadcrumbs.js');
+  const keys = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'ObjectPattern') {
+      for (const property of node.properties) {
+        if (property.type === 'Property' && property.key.type === 'Identifier') {
+          keys.add(property.key.name);
+        }
+      }
+    }
+    const readsInput =
+      node.type === 'MemberExpression' &&
+      node.object.type === 'Identifier' &&
+      node.object.name === 'input' &&
+      node.property.type === 'Identifier';
+    if (readsInput) keys.add(node.property.name);
+  }
+  return [...keys];
+}
+
 test('the page-header composition site names no prop the five units leave unread', () => {
-  const declared = new Set(HEADER_UNITS.flatMap(headerUnitProps));
+  const trailInputs = trailModelInputs();
+  // NON-VACUITY: the trail reads its route predicates and its handlers, not a stray key or two.
+  assert.ok(trailInputs.includes('openWorldParties') && trailInputs.length > 30, trailInputs);
+  const declared = new Set([...HEADER_UNITS.flatMap(headerUnitProps), ...trailInputs]);
   const passed = pageHeaderSiteProps();
   // NON-VACUITY: the site is the 138-prop one, not an empty slice.
   assert.ok(passed.length > 100, `the site parsed only ${passed.length} props`);

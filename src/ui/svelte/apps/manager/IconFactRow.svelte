@@ -5,10 +5,11 @@
   projection (issue 881); the geometry kept is the behaviour preview's.
 
   `icon` / `title` / `subtitle` are the row (omit `icon` to release the glyph column); `titleAttr`,
-  `dataAttr`, `dataValue`, `metaAttr`, `metaValue` are hooks; `badge` / `badgeTone` draw a trailing
-  chip. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as mono
-  meta) are OPT-IN, because the design distinguishes them and the call sites were not all in the
-  parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
+  `metaAttr`, `metaValue` are hooks; `badge` / `badgeTone` draw a trailing chip; `class` is appended
+  to the root's own and `{...rest}` lands on the root after it, carrying the caller's `data-*`
+  hook. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as
+  mono meta) are OPT-IN, because the design distinguishes them and the call sites were not all in
+  the parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
   `--fab-info`; `success|danger|warning|neutral|muted` ink the glyph by what the row states, each
   from its token and never a literal. The row owns only its own well; how a container
   STACKS rows stays with the container, and a caller override is not available either —
@@ -23,8 +24,6 @@
     titleAttr = '',
     metaAttr = '',
     metaValue = '',
-    dataAttr = '',
-    dataValue = '',
     tile = false,
     density = 'default',
     tone = 'accent',
@@ -32,16 +31,17 @@
     // groups are indistinguishable. Rendered through the manager's ONE chip, empty by default.
     badge = '',
     badgeTone = 'neutral',
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const titleAttributes = $derived(titleAttr ? { [titleAttr]: true } : {});
   const metaAttributes = $derived(metaAttr ? { [metaAttr]: metaValue || true } : {});
 </script>
 
 <div
-  class="manager-icon-fact-row"
+  class={['manager-icon-fact-row', extraClass]}
   class:is-badged={Boolean(badge)}
   class:is-glyphless={!icon}
   class:is-tiled={tile}
@@ -53,7 +53,7 @@
   class:is-tone-warning={tone === 'warning'}
   class:is-tone-neutral={tone === 'neutral'}
   class:is-tone-muted={tone === 'muted'}
-  {...hookAttributes}
+  {...rest}
 >
   {#if icon}
     <i class={icon} aria-hidden="true"></i>
@@ -80,7 +80,7 @@
     align-items: center;
     gap: var(--fab-space-2);
     min-width: 0;
-    padding: 9px 11px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-bg-1);
@@ -113,7 +113,7 @@
     width: 28px;
     height: 28px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     font-size: 0.7rem;
   }
 
@@ -167,7 +167,7 @@
   .manager-icon-fact-row.is-rule {
     gap: var(--fab-space-3);
     padding: var(--fab-space-3);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
   }
 
@@ -176,8 +176,9 @@
     font-weight: 600;
   }
 
+  /* Muted rather than subtle (issue 1521), the correction `Kicker` and `EmptyState` carry. */
   .manager-icon-fact-row.is-rule small {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 9.5px;
   }
 

@@ -58,7 +58,7 @@ Each row names a sibling spec and the sections that spec holds; the requirements
 | `ui-crafting-app/spec.md` | `Crafting App (Player)` |
 | `ui-gathering-app/spec.md` | `Gathering App (Player)` |
 | `ui-journal-app/spec.md` | `Journal App (Player)` |
-| `ui-extension-points/spec.md` | `Downtime Preview and Premium Extension`, `Player Navigation Extension` |
+| `ui-extension-points/spec.md` | `Downtime Preview and Premium Extension`, `Premium Crafting Icons Advert`, `Player Navigation Extension` |
 
 ## Data Storage (UI-relevant)
 
@@ -75,6 +75,7 @@ World settings:
 - `fabricate.migrationVersion`
 - `fabricate.theme`
 - `fabricate.experimentalFeatures`
+- `fabricate.premiumIconsAdDismissed`
 
 Client settings:
 

@@ -1,0 +1,92 @@
+/** The module sheet's seven theme palettes, and WCAG contrast read over them (issues 2047, 2257). */
+import assert from 'node:assert/strict';
+
+import { declarationsIn, splitSelectorList } from './styleBlockScan.js';
+
+/** One rule's declarations, keyed by property. */
+export const propertiesOf = (rule) =>
+  new Map(declarationsIn('', rule.body).map(({ property, value }) => [property, value]));
+
+/** Each palette's custom properties, keyed by theme id, from its `.fabricate[...]` root. */
+export function themePalettes(sheetRules) {
+  const found = new Map();
+  for (const rule of sheetRules) {
+    for (const selector of splitSelectorList(rule.selector)) {
+      const theme = selector.match(/^\.fabricate\[data-fabricate-theme="([\w-]+)"\]$/u)?.[1];
+      if (theme) found.set(theme, propertiesOf(rule));
+    }
+  }
+  return found;
+}
+
+/** `[r, g, b, a]` from a `#RRGGBB` or a space-separated `rgb(r g b / a%)` palette value. */
+function channels(value) {
+  const hex = value.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/iu);
+  if (hex) return [...hex.slice(1).map((pair) => Number.parseInt(pair, 16)), 1];
+  const rgb = value.match(/^rgb\(([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+)%)?\)$/u);
+  assert.ok(rgb, `a palette value this guard cannot read: ${value}`);
+  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] ? Number(rgb[4]) / 100 : 1];
+}
+
+/** `top` composited over `ground`, as an opaque `rgb()`; `ground` must itself be opaque. */
+function over(top, ground) {
+  const [r, g, b, alpha] = channels(top);
+  const base = channels(ground);
+  assert.equal(base[3], 1, `a ground must be opaque, so flatten its stack first: ${ground}`);
+  return [r, g, b].map((value, index) => value * alpha + base[index] * (1 - alpha));
+}
+
+/** The opaque ground `top` paints over the opaque `base`, for a stack of translucent grounds. */
+export function flatten(top, base) {
+  return `rgb(${over(top, base).join(' ')})`;
+}
+
+/** WCAG contrast of `ink` composited over the opaque `ground`. */
+export function contrast(ink, ground) {
+  const base = channels(ground);
+  const shown = over(ink, ground);
+  const lum = (rgb) =>
+    rgb
+      .map((value) => value / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      .reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+  const [high, low] = [lum(shown), lum(base.slice(0, 3))].sort((a, b) => b - a);
+  return (high + 0.05) / (low + 0.05);
+}
+
+/** The one `--fab-*` token `rules` declare for `property` on the rule listing `selector`; `label` (a file) heads a failure. */
+export function declaredToken(rules, selector, property, label = selector) {
+  const values = rules
+    .filter((rule) => splitSelectorList(rule.selector).includes(selector))
+    .map((rule) => propertiesOf(rule).get(property))
+    .filter(Boolean);
+  assert.equal(
+    values.length,
+    1,
+    `${label}: ${property} on ${selector} is declared ${values.length} times`
+  );
+  const name = values[0].match(/^var\((--fab-[\w-]+)\)$/u)?.[1];
+  assert.ok(name, `${label}: ${selector} ${property} is not one palette token: ${values[0]}`);
+  return name;
+}
+
+/** A translucent `stack`'s opaque ground in one palette's `tokens`, its grounds top first. */
+export const stackGround = (tokens, stack) =>
+  stack
+    .slice(0, -1)
+    .reduceRight((base, layer) => flatten(tokens.get(layer), base), tokens.get(stack.at(-1)));
+
+/**
+ * Each of the seven `themes` where `ink` reads under `floor` on `stack`, its grounds top first;
+ * the floor is 4.5:1 for text and 3:1 for a non-text glyph.
+ */
+export function shortfalls(themes, ink, stack, floor = 4.5) {
+  assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
+  return [...themes].flatMap(([theme, tokens]) => {
+    const ground = stackGround(tokens, stack);
+    const ratio = contrast(tokens.get(ink), ground);
+    return ratio < floor
+      ? [`${theme}: ${ink} on ${stack.join(' over ')} ${ratio.toFixed(2)}:1`]
+      : [];
+  });
+}

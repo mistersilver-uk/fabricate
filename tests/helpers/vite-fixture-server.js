@@ -4,7 +4,7 @@
  * @see tests/components/player-select-conversion-rendered.test.js
  * @see tests/components/overlay-portal-host-position.test.js
  */
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { svelte } from '@sveltejs/vite-plugin-svelte';
@@ -15,8 +15,25 @@ import { viteDepCacheDir } from './vite-dep-cache-dir.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+/** A bare `styles/` basename: no separator, no traversal, so nothing outside `styles/` is served. */
+const STYLES_BASENAME = /^[\w-][\w.-]*\.css$/u;
+
+/** The `styles/` file a mount-relative request names, or `null` for anything else. */
+export function stylesFileFor(requested) {
+  let name;
+  try {
+    name = decodeURIComponent(requested.split(/[?#]/u)[0]);
+  } catch {
+    return null;
+  }
+  if (!STYLES_BASENAME.test(name) || name.includes('..')) return null;
+  const file = join(repoRoot, 'styles', name);
+  return existsSync(file) ? file : null;
+}
+
 /**
- * Serve `styles/fabricate.css` RAW, outside Vite's CSS pipeline.
+ * Serve `styles/*.css` RAW, outside Vite's CSS pipeline, so the module sheet's sibling partials
+ * resolve beside it.
  *
  * @param {string} prefix The URL prefix to mount under, e.g. `/@overlay-host-styles/`.
  * @returns {object} a Vite plugin.
@@ -28,13 +45,14 @@ function rawStylesheetMount(prefix) {
       server.middlewares.use((request, response, next) => {
         const url = request.url ?? '';
         if (!url.startsWith(prefix)) return next();
-        if (url.slice(prefix.length).split('?')[0] !== 'fabricate.css') {
+        const file = stylesFileFor(url.slice(prefix.length));
+        if (!file) {
           response.statusCode = 404;
           response.end('not found');
           return;
         }
         response.setHeader('Content-Type', 'text/css; charset=utf-8');
-        createReadStream(join(repoRoot, 'styles', 'fabricate.css')).pipe(response);
+        createReadStream(file).pipe(response);
       });
     },
   };
@@ -43,13 +61,15 @@ function rawStylesheetMount(prefix) {
 /**
  * A started-and-stopped Vite server plus Chromium, for a suite's `before`/`after`.
  *
- * @param {string} options.styleMountPrefix The URL prefix `styles/fabricate.css` is served under.
+ * @param {string} options.styleMountPrefix The URL prefix `styles/*.css` is served under.
  * @param {object[]} [options.extraPlugins] Further Vite plugins, applied before the Svelte one.
  */
 export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] }) {
   let server = null;
   let browser = null;
   let origin = '';
+  /** One context per distinct option set, so its pages share the HTTP cache of the dev server. */
+  const contexts = new Map();
 
   return {
     async start() {
@@ -75,6 +95,7 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
     },
 
     async stop() {
+      contexts.clear();
       await browser?.close();
       await server?.close();
       browser = null;
@@ -92,11 +113,18 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
     },
 
     /**
-     * @param {object} [options] Forwarded to `browser.newPage`.
+     * @param {object} [options] Forwarded to `browser.newContext`.
      * @returns {Promise<import('playwright').Page>}
      */
-    newPage(options = {}) {
-      return browser.newPage(options);
+    async newPage(options = {}) {
+      const key = JSON.stringify(options);
+      if (!contexts.has(key)) {
+        // A failed launch is not cached, so the next page tries again rather than inheriting it.
+        const pending = browser.newContext(options);
+        pending.catch(() => contexts.delete(key));
+        contexts.set(key, pending);
+      }
+      return (await contexts.get(key)).newPage();
     },
   };
 }

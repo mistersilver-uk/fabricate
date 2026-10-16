@@ -47,6 +47,8 @@ function distinct(values) {
  * @property {string[]} names the primitive names its `h4` yields, in document order
  * @property {Record<string, string|null>} perNameStatus each of those names against its own
  *   `data-status-<Name>`, `null` where the block carries no attribute for it
+ * @property {string[]} apiNames the leading identifier of every bold run in its "Svelte API"
+ *   list, each run split on `·` and `/`; empty when the block states no API
  */
 
 /**
@@ -63,6 +65,16 @@ function distinct(values) {
  * @property {DesignLibraryBlock[]} blocks one record per `div.spec`, in document order
  */
 
+/** The names a block's "Svelte API" list sets in bold: `<b>title · intro</b>` yields both. */
+function readApiNames(block) {
+  const headings = [...block.querySelectorAll(':scope .notes h5')];
+  const api = headings.find((h5) => h5.textContent === 'Svelte API');
+  return [...(api?.parentElement.querySelectorAll(':scope li > b') ?? [])]
+    .flatMap((bold) => bold.textContent.split(/[·/]/u))
+    .map((run) => /[A-Za-z_$][\w$]*/u.exec(run)?.[0])
+    .filter(Boolean);
+}
+
 /**
  * One `div.spec`'s status record: the block's own declared status and its per-name statuses.
  *
@@ -78,6 +90,7 @@ function readBlock(block) {
     perNameStatus: Object.fromEntries(
       names.map((name) => [name, block.getAttribute(`data-status-${name.toLowerCase()}`)])
     ),
+    apiNames: readApiNames(block),
   };
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -10,9 +11,10 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // published — lives in the lib for the same two reasons, plus a third: it is a leaf that imports
 // nothing from this file.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+import { logicalStylesheetPath } from './lib/stylesheetSource.js';
 // The View Lab's own case registry, for the two things a published frame needs and this file cannot
-// derive: what to call it, and whether it needs a caption.
-import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
+// derive: what to call it, whether it needs a caption, and where the Primitive Lab's boundary lies.
+import { evidenceNoteForCaseId, isPrimitiveLabPath, labelForCaseId } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -66,9 +68,9 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  // The shared side-panel primitives the Tool Studio's preview and library inspector render (issue
+  // The shared side-panel fact row the Tool Studio's preview and library inspector render (issue
   // 881).
-  /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/IconFactRow\.svelte$/,
 ];
 
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
@@ -149,7 +151,7 @@ const requirementRailFrame = (id, label) => ({
 // header actions of every manager frame the shell appears in are drawn by these six.
 const PAGE_HEADER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ManagerPageHeader\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderBreadcrumbs\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/headerBreadcrumbs\.js$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderCraftingActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderGatheringActions\.svelte$/,
@@ -190,6 +192,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],
@@ -205,6 +208,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],
@@ -360,9 +364,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-component-edit-difficulty',
     label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    // The difficulty control rehomed from the deleted ComponentDifficultyInspector into
-    // ComponentEditView's body.
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    // The staged difficulty control is ComponentDifficultyCard, which ComponentEditView renders.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentDifficultyCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit-salvage',
@@ -372,16 +378,20 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvage(?:Card|Stages)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
     ],
   },
   {
-    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add group
+    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add result set
     // control hidden and the required hint shown.
     id: 'manager-component-edit-salvage-simple',
-    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)',
+    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add result set, required hint)',
     smokeLabels: ['manager-component-edit-salvage-simple'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvageCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',
@@ -390,10 +400,6 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
-      // The rail's standing help card renders through the shared explainer primitive
-      // (issue 883), whose CSS is co-located in its own scoped block; this is the frame
-      // that shows it on this screen.
-      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
     ],
   },
   {
@@ -494,7 +500,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-gathering-tasks',
     label: 'Manager gathering tasks',
     smokeLabels: ['manager-gathering-task-editor-normal', 'manager-gathering-task-editor-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/gathering-task\//, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
   },
   {
     id: 'manager-gathering-events',
@@ -600,7 +606,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the
   // rendering file is now `ImportReportModal.svelte` rather than the app shell's HTML
-  // builder — and `ManagerModal.svelte`, the chrome BOTH import-flow modals render
+  // builder — and `Modal.svelte`, the chrome BOTH import-flow modals render
   // through, changes this frame's appearance too. All four are load-bearing.
   {
     id: 'manager-import-report',
@@ -612,7 +618,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
-      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       // The model that opens both import-flow modals (issue 1721).
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
@@ -626,7 +632,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
-      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
@@ -1128,6 +1134,7 @@ export function normalizePath(filePath) {
 
 export function isUiFile(filePath) {
   const normalized = normalizePath(filePath);
+  if (isPrimitiveLabPath(normalized)) return false;
   // `lang/` is deliberately excluded: a localization file is not itself a UI render target.
   return normalized.startsWith('src/ui/')
     || normalized.startsWith('styles/')
@@ -1140,7 +1147,9 @@ export function hasUiChanges(files = []) {
 }
 
 export function mapChangedFilesToViews(files = []) {
-  const normalizedFiles = files.map(normalizePath).filter(Boolean);
+  const normalizedFiles = files
+    .map(file => logicalStylesheetPath(normalizePath(file)))
+    .filter(file => file && !isPrimitiveLabPath(file));
   const matched = [];
   for (const recipe of VIEW_RECIPES) {
     if (normalizedFiles.some(file => recipe.matches.some(pattern => pattern.test(file)))) {
@@ -1413,15 +1422,17 @@ export function sanitizeLabel(label = '') {
 // A frame's caption, when it has one, sits beneath the image as its own paragraph rather than
 // inside the alt text.
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
+  return uploaded
+    .map(({ label, note, url }) => frameMarkdown(prNumber, sanitizeLabel(label), sanitizeLabel(note ?? ''), url))
+    .join('\n\n');
+}
+
+/** One published frame: its image, then its already-sanitized caption as a quoted paragraph. */
+function frameMarkdown(prNumber, alt, caption, url) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded
-    .map(({ label, note, url }) => {
-      const image = `![${prefix}${sanitizeLabel(label)}](${url})`;
-      const caption = sanitizeLabel(note ?? '');
-      return caption ? `${image}\n\n> ${caption}` : image;
-    })
-    .join('\n\n');
+  const image = `![${prefix}${alt}](${url})`;
+  return caption ? `${image}\n\n> ${caption}` : image;
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -1500,8 +1511,8 @@ function normalizeHeadShaSegment(headSha) {
   return value;
 }
 
-// Upload collected screenshots to S3.
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId = labelForCaseId, noteForId = evidenceNoteForCaseId } = {}) {
+// The S3 bucket, writer and PR-scoped key prefix (`<prefix>/<pr>[/<head-sha>]`) uploads go to.
+async function s3Destination({ prNumber, headSha, root = ROOT, config, putObject }) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
@@ -1509,13 +1520,19 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
     throw new Error('S3 is not configured. Set bucket/baseUrl in release.s3.config.json (or S3_RELEASE_BUCKET/RELEASE_BASE_URL).');
   }
   const put = putObject || await defaultS3PutFactory(cfg.region);
+  const prScope = shaSegment
+    ? `${cfg.prefix}/${normalizedPrNumber}/${shaSegment}`
+    : `${cfg.prefix}/${normalizedPrNumber}`;
+  return { cfg, put, prScope };
+}
+
+// Upload collected screenshots to S3.
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId = labelForCaseId, noteForId = evidenceNoteForCaseId } = {}) {
+  const { cfg, put, prScope } = await s3Destination({ prNumber, headSha, root, config, putObject });
   const uploaded = [];
   for (const file of files) {
     const name = basename(file);
     const viewId = name.slice(0, name.length - extensionOf(file).length);
-    const prScope = shaSegment
-      ? `${cfg.prefix}/${normalizedPrNumber}/${shaSegment}`
-      : `${cfg.prefix}/${normalizedPrNumber}`;
     const key = `${prScope}/${name}`;
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
@@ -1533,6 +1550,177 @@ export async function deletePrScreenshotsFromS3({ prNumber, root = ROOT, config,
   const prefix = `${cfg.prefix}/${normalizedPrNumber}/`;
   const impl = listAndDelete || await defaultS3ListAndDelete(cfg.region);
   return impl({ bucket: cfg.bucket, prefix });
+}
+
+// Design-library frames (issue 2413) are supplementary and best-effort: the capture leaves
+// `<frame-id>.png` files and `manifest.json` in the library directory, and every string the
+// selection or the manifest carries reaches the PR body only through `libraryText`.
+const LIBRARY_FRAME_FILE = /^[a-z0-9-]+\.png$/;
+const LIBRARY_FRAME_ID = /^[a-z0-9-]+$/;
+const LIBRARY_MANIFEST = 'manifest.json';
+const LIBRARY_UNLOCATED_PREFIX = 'unlocated:';
+const LIBRARY_TEXT_MAX = 200;
+const LIBRARY_NOT_CAPTURED_MAX = 20;
+const LIBRARY_SECTION_MAX = 20_000;
+const LIBRARY_OMISSION_RESERVE = 200;
+
+/** The `--library-targets` keys, comma- or newline-separated, deduplicated in order. */
+function parseLibraryTargets(value = '') {
+  return [...new Set(String(value ?? '').split(/[,\n]/).map(key => key.trim()).filter(Boolean))];
+}
+
+/** A manifest- or selection-sourced string made inert for the PR body and cut to 200 characters. */
+function libraryText(value) {
+  const cut = [...String(value ?? '')].slice(0, LIBRARY_TEXT_MAX).join('');
+  return sanitizeLabel(cut.replaceAll('\\', '\\\\')).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+/** One line of the run log, so a manifest string cannot start a workflow command of its own. */
+function libraryLogLine(value) {
+  // eslint-disable-next-line no-control-regex
+  return String(value).replaceAll(/[\u{0}-\u{1F}\u{7F}]+/gu, ' ');
+}
+
+/** The library directory's frame PNGs by id, and its manifest or why there is none. */
+function readLibraryArtifact(dir) {
+  const empty = { pngs: new Map(), manifest: null, problem: 'missing' };
+  if (!dir) return empty;
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch (error) {
+    return error.code === 'ENOENT' ? empty : { ...empty, problem: `unreadable (${error.message})` };
+  }
+  const pngs = new Map(names.filter(name => LIBRARY_FRAME_FILE.test(name))
+    .sort((a, b) => (a < b ? -1 : 1))
+    .map(name => [name.slice(0, -'.png'.length), join(dir, name)]));
+  if (!names.includes(LIBRARY_MANIFEST)) return { ...empty, pngs };
+  try {
+    const manifest = JSON.parse(readFileSync(join(dir, LIBRARY_MANIFEST), 'utf8'));
+    if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+      throw new Error('it is not a JSON object');
+    }
+    return { pngs, manifest, problem: null };
+  } catch (error) {
+    return { pngs, manifest: null, problem: `unreadable (${error.message})` };
+  }
+}
+
+const listOf = value => (Array.isArray(value) ? value : []);
+const entryId = entry => String(typeof entry === 'string' ? entry : entry?.id);
+const problemText = problem => (typeof problem === 'string' ? problem : (problem?.message ?? JSON.stringify(problem)));
+
+/** The note an `unlocated:<file>:<count>` selection key stands for. */
+function unlocatedNote(key) {
+  const rest = key.slice(LIBRARY_UNLOCATED_PREFIX.length);
+  const split = rest.lastIndexOf(':');
+  const [file, count] = split === -1 ? [rest, 'some'] : [rest.slice(0, split), rest.slice(split + 1)];
+  return `could not locate ${count} hunk(s) in ${file}; touched units may be missing`;
+}
+
+/** The manifest's frames whose PNG arrived, the selection keys they account for, and the rest. */
+function manifestFrames(manifest, pngs) {
+  const frames = [];
+  const accounted = new Set();
+  const notCaptured = [];
+  for (const frame of listOf(manifest.frames)) {
+    if (typeof frame?.id !== 'string' || !LIBRARY_FRAME_ID.test(frame.id)) {
+      notCaptured.push(`${entryId(frame)}: not a library frame id`);
+      continue;
+    }
+    for (const key of listOf(frame.targets)) accounted.add(String(key));
+    const label = frame.label || `Library · ${frame.id}`;
+    const file = pngs.get(frame.id);
+    if (file) frames.push({ id: frame.id, file, label, note: frame.note ?? '' });
+    else notCaptured.push(`${label}: image missing from the artifact`);
+  }
+  return { frames, accounted, notCaptured };
+}
+
+/**
+ * Reconciles the selected keys against the library artifact: the frames to publish, and a line
+ * for every failure, overflow, unrecorded key, lab problem and unlocated hunk.
+ */
+function reconcileLibrary(targets, artifact) {
+  const units = targets.filter(key => !key.startsWith(LIBRARY_UNLOCATED_PREFIX));
+  const notCaptured = targets.filter(key => key.startsWith(LIBRARY_UNLOCATED_PREFIX)).map(unlocatedNote);
+  const { manifest, pngs } = artifact;
+  if (!manifest) {
+    if (units.length > 0 || pngs.size > 0) {
+      notCaptured.push(`the library manifest is ${artifact.problem}, so the ${units.length} selected unit(s) could not be reconciled`);
+    }
+    const frames = [...pngs].map(([id, file]) => ({ id, file, label: `Library · ${id}`, note: '' }));
+    return { frames, notCaptured };
+  }
+  const found = manifestFrames(manifest, pngs);
+  notCaptured.push(...found.notCaptured);
+  for (const failure of listOf(manifest.failures)) {
+    found.accounted.add(entryId(failure));
+    notCaptured.push(`${entryId(failure)}: ${failure?.reason ?? 'failed'}`);
+  }
+  for (const entry of listOf(manifest.overflow)) {
+    found.accounted.add(entryId(entry));
+    notCaptured.push(`${entryId(entry)}: over the library unit cap`);
+  }
+  notCaptured.push(
+    ...units.filter(unit => !found.accounted.has(unit)).map(key => `${key}: no record in the library manifest`),
+    ...listOf(manifest.labProblems).map(problem => `Primitive Lab reported: ${problemText(problem)}`),
+  );
+  return { frames: found.frames, notCaptured };
+}
+
+/** Uploads each library frame on its own, so one failed object costs that frame and no other. */
+async function uploadLibraryFrames(frames, { cfg, put, prScope }) {
+  const uploaded = [];
+  const failed = [];
+  for (const frame of frames) {
+    const key = `${prScope}/library/${frame.id}.png`;
+    try {
+      await put({ bucket: cfg.bucket, key, body: readFileSync(frame.file), contentType: contentTypeFor(frame.file) });
+      uploaded.push({ ...frame, key, url: `${cfg.baseUrl}/${key}` });
+    } catch (error) {
+      failed.push(`${frame.label}: upload failed: ${error.message}`);
+    }
+  }
+  return { uploaded, failed };
+}
+
+async function publishLibraryFrames(library, destinationOptions) {
+  if (library.frames.length === 0) return { uploaded: [], notCaptured: library.notCaptured };
+  const { uploaded, failed } = await uploadLibraryFrames(library.frames, await s3Destination(destinationOptions));
+  return { uploaded, notCaptured: [...library.notCaptured, ...failed] };
+}
+
+function libraryNotCapturedMarkdown(notCaptured) {
+  if (notCaptured.length === 0) return '';
+  const lines = notCaptured.slice(0, LIBRARY_NOT_CAPTURED_MAX).map(entry => `- ${libraryText(entry)}`);
+  const rest = notCaptured.length - lines.length;
+  if (rest > 0) lines.push(`- and ${rest} more; see the run log`);
+  return `**Not captured**\n\n${lines.join('\n')}`;
+}
+
+/** The managed block's `### Library` section, at most 20,000 characters. */
+function buildLibrarySection(prNumber, { uploaded = [], notCaptured = [] } = {}) {
+  const heading = '### Library';
+  const tail = libraryNotCapturedMarkdown(notCaptured);
+  let budget = LIBRARY_SECTION_MAX - heading.length - tail.length - LIBRARY_OMISSION_RESERVE;
+  const parts = [heading];
+  let omitted = 0;
+  for (const frame of uploaded) {
+    const chunk = frameMarkdown(prNumber, libraryText(frame.label), libraryText(frame.note), frame.url);
+    if (omitted === 0 && chunk.length + 2 <= budget) {
+      parts.push(chunk);
+      budget -= chunk.length + 2;
+    } else {
+      omitted += 1;
+    }
+  }
+  if (uploaded.length === 0) parts.push('library capture produced no frames; see the run log');
+  if (omitted > 0) {
+    parts.push(`${omitted} more frame(s) omitted to keep this section under 20,000 characters; see the run log`);
+  }
+  if (tail) parts.push(tail);
+  return parts.join('\n\n');
 }
 
 function defaultGhRunner(args, { input } = {}) {
@@ -1555,6 +1743,8 @@ export async function publishScreenshotEvidence({
   config,
   headSha,
   labelForId,
+  libraryDir,
+  libraryTargets = '',
 } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const destinationRoot = resolve(root, dir || `tmp/pr-screenshots/${normalizedPrNumber}`);
@@ -1567,7 +1757,10 @@ export async function publishScreenshotEvidence({
   const files = existsSync(destinationRoot)
     ? listImages(destinationRoot).sort((a, b) => a.localeCompare(b))
     : [];
-  if (files.length === 0) {
+  const targets = parseLibraryTargets(libraryTargets);
+  const library = reconcileLibrary(targets, readLibraryArtifact(libraryDir && resolve(root, libraryDir)));
+  const hasLibrary = targets.length > 0 || library.frames.length > 0;
+  if (files.length === 0 && !hasLibrary) {
     return {
       skipped: true,
       reason: `No screenshots to publish in ${relative(root, destinationRoot).replaceAll(sep, '/')}`,
@@ -1575,7 +1768,10 @@ export async function publishScreenshotEvidence({
     };
   }
 
-  const uploaded = await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject, headSha, labelForId });
+  const uploaded = files.length > 0
+    ? await uploadScreenshotObjects({ prNumber: normalizedPrNumber, files, root, config, putObject, headSha, labelForId })
+    : [];
+  const libraryResult = await publishLibraryFrames(library, { prNumber: normalizedPrNumber, headSha, root, config, putObject });
 
   const repoArgs = repo ? ['--repo', repo] : [];
   const view = runGh(['pr', 'view', String(normalizedPrNumber), ...repoArgs, '--json', 'body', '--jq', '.body']);
@@ -1583,16 +1779,21 @@ export async function publishScreenshotEvidence({
     throw new Error(`Failed to read PR #${normalizedPrNumber} body: ${view.stderr || 'unknown error'}`);
   }
   const currentBody = String(view.stdout || '').replace(/\r\n/g, '\n').replace(/\n+$/, '');
-  const newBody = upsertScreenshotsBlock(currentBody, buildScreenshotMarkdown(normalizedPrNumber, uploaded));
+  const blockMarkdown = [
+    buildScreenshotMarkdown(normalizedPrNumber, uploaded),
+    hasLibrary ? buildLibrarySection(normalizedPrNumber, libraryResult) : '',
+  ].filter(Boolean).join('\n\n');
+  const newBody = upsertScreenshotsBlock(currentBody, blockMarkdown);
 
-  const bodyFile = join(destinationRoot, '.pr-body.md');
+  // Never inside the output directory, which a library-only run does not have.
+  const bodyFile = join(mkdtempSync(join(tmpdir(), 'fabricate-pr-body-')), 'pr-body.md');
   writeFileSync(bodyFile, newBody);
   const edit = runGh(['pr', 'edit', String(normalizedPrNumber), ...repoArgs, '--body-file', bodyFile]);
   if (edit.status !== 0) {
     throw new Error(`Failed to update PR #${normalizedPrNumber} body: ${edit.stderr || 'unknown error'}`);
   }
 
-  return { skipped: false, uploaded, destinationRoot, bodyFile };
+  return { skipped: false, uploaded, library: libraryResult, destinationRoot, bodyFile };
 }
 
 function listImages(dir) {
@@ -1786,6 +1987,22 @@ function defaultSleep(ms) {
   return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
+// The run log of a publish: every uploaded object, and every library unit not captured.
+function reportPublished(result, prNumber) {
+  if (result.skipped) {
+    console.log(result.reason);
+    return;
+  }
+  for (const item of result.uploaded) {
+    console.log(`${item.viewId} <= ${item.url}`);
+  }
+  for (const item of result.library.uploaded) console.log(`library/${item.id} <= ${item.url}`);
+  for (const entry of result.library.notCaptured) console.log(`Library not captured: ${libraryLogLine(entry)}`);
+  const libraryCount = result.library.uploaded.length;
+  const librarySuffix = libraryCount > 0 ? ` and ${libraryCount} library frame${libraryCount === 1 ? '' : 's'}` : '';
+  console.log(`Updated PR #${normalizeOptionalPrNumber(prNumber)} body with ${result.uploaded.length} screenshot${result.uploaded.length === 1 ? '' : 's'}${librarySuffix}.`);
+}
+
 // Apply the module's verdict.
 function reportScreenshotGateDecision(decision) {
   const prefix = decision.code ? `${decision.code}: ` : '';
@@ -1921,15 +2138,10 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       // Revision-addressed keys (`<prefix>/<pr>/<head-sha>/<view>.png`) when the head
       // SHA is supplied; without it the keys fall back to the legacy PR-scoped path.
       headSha: args.headSha,
+      libraryDir: args.libraryDir,
+      libraryTargets: args.libraryTargets,
     });
-    if (result.skipped) {
-      console.log(result.reason);
-      return;
-    }
-    for (const item of result.uploaded) {
-      console.log(`${item.viewId} <= ${item.url}`);
-    }
-    console.log(`Updated PR #${normalizeOptionalPrNumber(args.pr)} body with ${result.uploaded.length} screenshot${result.uploaded.length === 1 ? '' : 's'}.`);
+    reportPublished(result, args.pr);
     return;
   }
 

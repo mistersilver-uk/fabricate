@@ -26,6 +26,11 @@ const extensionHostSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/PlayerExtensionHost.svelte'),
   'utf8'
 );
+// ratchet-exempt(source-pin): an absence gate for premium tokens on the player side, not a pin on the bar's shape
+const topBarSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/ActorSelectTopBar.svelte'),
+  'utf8'
+);
 
 describe('FabricateAppRoot shell', () => {
   it('renders the planned navigation tabs', () => {
@@ -125,17 +130,19 @@ describe('FabricateAppRoot shell', () => {
   });
 
   // AC12 / maintainer decision A1. Scope prose expires when an issue closes; this does not.
-  it('carries no premium signal of any kind, in either player-side component', () => {
+  it('carries no premium signal of any kind, in any player-side component', () => {
     const forbidden = [
       'premiumInstalled',
       'registeredSurfaceIds',
       'manager-titlebar-badge',
       'patreon.com',
       'PREMIUM',
+      'AppTitleBar',
     ];
     for (const [name, source] of [
       ['FabricateAppRoot.svelte', rootSource],
       ['PlayerExtensionHost.svelte', extensionHostSource],
+      ['ActorSelectTopBar.svelte', topBarSource],
     ]) {
       for (const token of forbidden) {
         assert.ok(
@@ -222,45 +229,25 @@ describe('FabricateAppRoot shell', () => {
     );
   });
 
-  it('exposes an accessible tablist driven by host state', () => {
-    assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
+  it('drives the rail tablist from host state', () => {
     assert.ok(
       rootSource.includes('activeTab === tab.routeKey'),
       'active state should derive from the activeTab prop'
     );
     assert.ok(
-      rootSource.includes('onSelectTab?.(tab.routeKey)'),
+      rootSource.includes('onSelectTab?.(routeKey)'),
       'clicks should delegate selection to the host'
     );
     // The rail-button accessibility contract (issue 1198). It predates this change and is
     // closed by it, because this change is what puts third-party content inside the panel and
     // grows the tablist.
-    assert.ok(rootSource.includes('aria-controls="player-nav-panel"'), 'buttons control the panel');
+    assert.ok(rootSource.includes('panelId="player-nav-panel"'), 'buttons control the panel');
     assert.ok(
       rootSource.includes('aria-labelledby={activeNavTab'),
       'and the panel is labelled by the active button'
     );
-    // The tab stop falls back to the first entry when the active tab names no rendered entry,
-    // so it is bound to focusableTab rather than activeTab; aria-selected stays on activeTab.
-    assert.ok(
-      rootSource.includes('tab.routeKey === focusableTab?.routeKey ? 0 : -1'),
-      'the rail uses a roving tabindex'
-    );
-    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
-      assert.ok(rootSource.includes(`'${key}'`), `the vertical rail should handle ${key}`);
-    }
-    assert.ok(
-      !rootSource.includes("'ArrowLeft'") && !rootSource.includes("'ArrowRight'"),
-      'the rail is aria-orientation="vertical", so the horizontal pair would be wrong'
-    );
-    // A third-party label is unbounded and the rail column is 84px wide with a fixed 64px
-    // button, so the label must truncate rather than put a horizontal scrollbar in the rail.
-    assert.ok(
-      /\.fabricate-app-nav-label \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/s.test(
-        rootSource
-      ),
-      'the rail label should truncate with an ellipsis'
-    );
+    // The tablist itself, its roving stop, its vertical keys and its truncating label are
+    // `NavSidebar`'s, pinned by `tests/components/nav-sidebar-mounted.test.js` (issue 1777).
   });
 });
 
@@ -291,6 +278,27 @@ describe('SvelteFabricateApp shell window', () => {
         /AuthoritySetup/,
         'and no setup confirmation copy is left addressing a dialog nothing opens'
       );
+    });
+  });
+  it('1773: opening a run in the Journal selects that run, then switches to the Journal tab', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const services = app._buildServices();
+      const calls = [];
+      services.journal = {
+        select: (...args) => {
+          calls.push(['select', ...args]);
+        },
+      };
+      app._selectTab = (tab) => {
+        calls.push(['tab', tab]);
+      };
+      services.navigateToJournalRun('run-7');
+      assert.deepEqual(calls, [
+        ['select', 'run-7', 'crafting'],
+        ['tab', 'journal'],
+      ]);
     });
   });
   // Issue 2048: the listing and the attempt must carry the SAME interactable ref, read per call,

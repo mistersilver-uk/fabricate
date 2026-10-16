@@ -11,6 +11,7 @@ import test, { after, before } from 'node:test';
 
 import { chromium } from 'playwright';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -23,7 +24,7 @@ const rollPrompt = scopedComponentCss(
 const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
 <style>${read('tests/fixtures/foundry-core-input-min.css')}</style>
-<style>@layer modules {${read('styles/fabricate.css')}}</style>
+<style>@layer modules {${readStylesheet()}}</style>
 <style>${rollPrompt.css}</style>
 <style>:root{--font-primary:Arial,sans-serif}</style></head>
 <body class="game"><div class="application theme-dark"><section class="window-content">
@@ -37,16 +38,19 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
     <span class="manager-recipe-option-search is-typing" data-case="typing">
       <input type="text" value="iron" />
     </span>
-    <div class="manager-checks-formula-input" data-case="formula">
-      <i class="fas fa-dice" aria-hidden="true"></i>
-      <input placeholder="1d20 + @abilities.int.mod" />
-    </div>
+    <label class="fabricate-field manager-prerequisite-path" data-case="path">
+      <span class="visually-hidden">Property path</span>
+      <div class="manager-prerequisite-path-input">
+        <span class="manager-prerequisite-at" aria-hidden="true">@</span>
+        <input type="text" data-prerequisite-path placeholder="abilities.int.mod" />
+      </div>
+    </label>
     <div data-case="scroller" style="overflow:auto;width:320px">
       <input type="text" placeholder="Bonus" style="display:block;width:100%;box-sizing:border-box" />
       <input type="checkbox" />
     </div>
     <div class="fabricate-roll-prompt ${rollPrompt.hashClass}" data-case="prompt">
-      <label class="fabricate-field manager-field prompt-field bonus-field">
+      <label class="fabricate-field prompt-field bonus-field">
         <input type="text" name="situationalBonus" placeholder="+0" />
       </label>
     </div>
@@ -119,7 +123,7 @@ const token = (name) =>
     name
   );
 
-for (const wrapper of ['option', 'formula']) {
+for (const wrapper of ['option', 'path']) {
   test(`the ${wrapper} field's empty caret box fills its wrapper and lights it`, async () => {
     const { focused, rested } = await measureFocused(`[data-case="${wrapper}"] input`);
     const accent = await token('accent');

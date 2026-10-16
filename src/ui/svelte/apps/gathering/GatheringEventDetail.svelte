@@ -6,13 +6,15 @@
 
    - no event selected but events exist  -> "Select an event" hint
    - no events (or redacted for a blind site) -> "No events" hint
-   - an event selected -> header (image, name), description, a danger-tag row, the
-     per-event event-chance bar, and a details card listing the event's
-     matching criteria (weather / time of day / biomes / regions) and any linked
-     scene (reusing LinkedScene).
+   - an event selected -> the identity header (tile, name, danger tags, no primary),
+     description, the per-event event-chance bar, and a details card listing the
+     event's matching criteria (weather / time of day / biomes / regions) and any
+     linked scene (reusing LinkedScene).
 -->
 <script>
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import {
@@ -74,9 +76,18 @@
       regions.length > 0 ||
       sceneUuid !== ''
   );
-
-  const titleId = 'gathering-event-detail-title';
 </script>
+
+{#snippet tags()}
+  <ul class="gathering-event-detail-tags" data-gathering-event-tags>
+    {#each dangerTags as tag (tag)}
+      <li class={`gathering-event-detail-tag is-danger ${riskClass(tag)}`}>
+        <i class="fas fa-skull" aria-hidden="true"></i>
+        <span>{riskLabel(tag, localize)}</span>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
 
 {#if event == null}
   <div
@@ -95,34 +106,15 @@
 {:else}
   <section
     class="gathering-event-detail"
-    aria-labelledby={titleId}
-    aria-label={localize('FABRICATE.App.Gathering.Detail.EventInspectorLabel')}
+    aria-label={name || localize('FABRICATE.App.Gathering.Detail.EventInspectorLabel')}
     data-gathering-event-detail
     data-detail-event-id={String(event?.id ?? '')}
   >
-    <header class="gathering-event-detail-header">
-      <span class="gathering-event-detail-thumb-wrap">
-        <img
-          class="gathering-event-detail-thumb"
-          class:is-fallback={!img}
-          src={img || DEFAULT_GATHERING_EVENT_IMG}
-          alt=""
-        />
-      </span>
-      <span class="gathering-event-detail-heading">
-        <h2 id={titleId} class="gathering-event-detail-title" title={name}>{name}</h2>
-        {#if dangerTags.length > 0}
-          <ul class="gathering-event-detail-tags" data-gathering-event-tags>
-            {#each dangerTags as tag (tag)}
-              <li class={`gathering-event-detail-tag is-danger ${riskClass(tag)}`}>
-                <i class="fas fa-skull" aria-hidden="true"></i>
-                <span>{riskLabel(tag, localize)}</span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </span>
-    </header>
+    <PlayerDetailHeader
+      {name}
+      art={img || DEFAULT_GATHERING_EVENT_IMG}
+      chips={dangerTags.length > 0 ? tags : null}
+    />
 
     <p class="gathering-event-detail-description" class:is-fallback={!hasDescription}>
       {descriptionText}
@@ -133,7 +125,7 @@
     {/if}
 
     {#if hasDetails}
-      <div class="gathering-event-detail-card" data-gathering-event-details>
+      <InspectorCard class="gathering-event-detail-card" data-gathering-event-details="">
         <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}</Kicker>
 
         {#if weatherChips.length > 0}
@@ -206,7 +198,7 @@
             <LinkedScene {sceneUuid} {services} />
           </div>
         {/if}
-      </div>
+      </InspectorCard>
     {/if}
   </section>
 {/if}
@@ -217,7 +209,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: var(--fab-space-3);
     height: 100%;
     padding: var(--fab-space-4);
     box-sizing: border-box;
@@ -246,49 +238,9 @@
     color: var(--fab-text);
   }
 
-  .gathering-event-detail-header {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-  }
-
-  .gathering-event-detail-thumb-wrap {
-    flex: 0 0 auto;
-    width: 64px;
-    height: 64px;
-  }
-
-  .gathering-event-detail-thumb {
-    display: block;
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
-  }
-
-  .gathering-event-detail-thumb.is-fallback {
-    object-fit: contain;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-
-  .gathering-event-detail-heading {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .gathering-event-detail-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* The header grows along its own row; in this column it must not take the free height. */
+  .gathering-event-detail > :global(.player-detail-header) {
+    flex: none;
   }
 
   .gathering-event-detail-tags {
@@ -297,14 +249,14 @@
     padding: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .gathering-event-detail-tag {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 9px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2xs) var(--fab-space-2);
     border-radius: 999px;
     font-size: 12px;
     background: var(--fab-surface-raised);
@@ -345,27 +297,16 @@
     color: var(--fab-text-muted);
   }
 
-  /* Matching-criteria card, styled like the task requirements card. */
-  .gathering-event-detail-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-  }
-
   .gathering-event-detail-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-event-detail-group-label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-text);
@@ -378,14 +319,14 @@
   .gathering-event-detail-group-values {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-event-detail-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 9px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2xs) var(--fab-space-2);
     border-radius: 999px;
     font-size: 11px;
     background: var(--fab-surface-raised);

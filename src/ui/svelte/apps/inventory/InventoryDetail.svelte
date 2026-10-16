@@ -63,9 +63,9 @@
     centring and nothing else, which is the answer `PlayerViewState` and
     `GatheringEnvironmentList` both take for the same reason.
 
-    The hook stays ON THE WRAPPER, which is the box it has always sat on, so it keeps rendering
-    `data-inventory-detail-empty=""` rather than the `="true"` `EmptyState` coerces a bare hook
-    to (`EmptyState.svelte:84`, `dataValue || true`).
+    The hook stays on the wrapper, which is the box it has always sat on, so it keeps rendering
+    `data-inventory-detail-empty=""` rather than the `="true"` a bare hook on the `<EmptyState>`
+    tag renders.
   -->
   <div class="inventory-detail-empty" data-inventory-detail-empty>
     <EmptyState

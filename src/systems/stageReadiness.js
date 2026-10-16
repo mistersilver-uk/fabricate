@@ -13,6 +13,8 @@ export const STAGE_BLOCKERS = Object.freeze({
   choice: 'choiceRequired',
   route: 'routeRequired',
   tool: 'toolRequired',
+  // An earlier stage's reward is owed a pick (issue 1773); distinct from `choice`.
+  award: 'awardChoicePending',
 });
 
 /**

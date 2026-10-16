@@ -230,7 +230,7 @@
           value={rule.source}
           groupName={`${uid}-additional-dice-source`}
           ariaLabel={titles.source}
-          dataAttr="data-check-additional-dice-source"
+          data-check-additional-dice-source
           optionDataAttr="data-check-additional-dice-source-option"
           onChange={(next) => write('source', next)}
         />
@@ -257,7 +257,7 @@
             expression: 'data-check-additional-dice-path',
             resolution: 'data-check-additional-dice-path-line',
           }}
-          inputAttrs={{ 'data-validation-target': 'checks-additional-dice-path' }}
+          validationTarget="checks-additional-dice-path"
           placeholder="system.resources.momentum.value"
           documentPath={pathCopy}
           onChange={(next) => write('path', next)}
@@ -332,6 +332,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--fab-space-2);
+  }
+
+  /* Each zone fills its well's flex column, so paired wells end level. */
+  .manager-checks-additional-dice-macros :global(.fabricate-link-field) {
+    flex: 1 1 auto;
   }
 
   .manager-checks-additional-dice-hint {

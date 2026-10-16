@@ -15,9 +15,11 @@ world-component-entry-essences
 world-component-entry-systems
 world-component-entry-validation
 world-component-entry-stacked
+world-component-entry-980
 world-vocabulary
 world-essence-catalogue-resting
 world-essence-catalogue
+world-essence-catalogue-bulk
 world-essence-entry
 world-essence-entry-systems
 world-essence-entry-dirty

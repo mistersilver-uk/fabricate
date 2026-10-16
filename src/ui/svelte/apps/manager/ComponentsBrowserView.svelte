@@ -3,14 +3,14 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import { createBulkSelection } from './bulkSelection.svelte.js';
   import { createBrowserListState } from './browserListState.svelte.js';
@@ -67,6 +67,13 @@
   // The root's lifted object when bound, else the local fallback. Both are `$state` proxies, so
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
+
+  // The head zone and the list take one option set, so both hand a drop to the same import flow.
+  const dropOptions = $derived({
+    onDrop: onDropComponent,
+    disabled: !dropEnabled,
+    activeClass: 'is-drop-active',
+  });
 
   // The filters name a vocabulary the new system does not share; sort and grouping are kept.
   const list = createBrowserListState({
@@ -486,21 +493,12 @@
   data-component-library
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
-  <!--
-    ONE HEAD, AND THE CHILD COUNT IS THE POINT. `.manager-main` on this route is a four-track grid
-    for four children: this head, the toolbar, the list and the pager. A fifth DIRECT child pushes
-    every child down one track and the toolbar lands in a `minmax(0, 1fr)` track that collapses. The
-    `SharedDefinitionCallout` that used to head this pane is gone — its content is the inspector's
-    `Shared identity` card — and the drop zone stays under maintainer ruling M2.
-  -->
+  <!-- `.manager-main` here is a four-track grid for this head, the toolbar, the list and the pager,
+    so a fifth direct child collapses the toolbar's track. The drop zone stays under ruling M2. -->
   <div class="manager-component-head">
     <section
       class="manager-component-drop-zone"
-      use:dragDrop={{
-        onDrop: onDropComponent,
-        disabled: !dropEnabled,
-        activeClass: 'is-drop-active',
-      }}
+      use:dragDrop={dropOptions}
       aria-label={text(
         'FABRICATE.Admin.Manager.Component.DropZoneLabel',
         'Drop Foundry items to add components'
@@ -531,7 +529,7 @@
   -->
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue 1157).
        The manager root lands the keyboard here when an action empties the bulk selection. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-component-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -540,20 +538,15 @@
   >
     <div class="manager-component-filter-row">
       <!--
-        THREE CONTROLS AT 38px, a published rung (26 / 28 / 30 / 34 / 38 / 44) and what the reference
-        draws: the field takes `size="38"` and each filter's `Select` root carries `is-size-38`. The
-        asymmetry is the primitives' shape — `ManagerSearchField` publishes a size prop, while
-        `Select` publishes three rungs and no 38, so the opt-in is this bar's rule: it lifts the
-        `toolbar` rung's 34px trigger to 38 beside the scoped catalogue's lead row, which takes the
-        same rule for the same reason.
+        ONE 38px SHELL ACROSS THE ROW (issue 1782): the search is 38 by default and each filter takes
+        `Select`'s `form` rung, the same box; the second row's sort keeps `toolbar`.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component types
            into this field rather than depending on where that component happens to sort. -->
-      <ManagerSearchField
-        size="38"
+      <SearchField
         data-component-search=""
         value={itemSearchTerm || ''}
-        onInput={(next) => onSearchChange(next)}
+        onChange={(next) => onSearchChange(next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
           'Search name or tags…'
@@ -566,8 +559,8 @@
            names, so that list drops the tick; the essence list keeps it for the three
            near-identical predicates heading it. -->
       <Select
-        size="toolbar"
-        class="manager-component-category-filter is-size-38"
+        size="form"
+        class="manager-component-category-filter"
         value={ui.categoryFilter}
         options={categorySelectOptions}
         showTick={false}
@@ -575,14 +568,14 @@
           'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
           'Filter components by category'
         )}
-        triggerData={{ 'data-component-category-filter': '' }}
+        triggerProps={{ 'data-component-category-filter': '' }}
         onChange={setCategoryFilter}
       />
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
         <Select
-          size="toolbar"
-          class="manager-component-essence-filter is-size-38"
+          size="form"
+          class="manager-component-essence-filter"
           value={ui.essenceFilter}
           options={essenceSelectOptions}
           minWidth={ESSENCE_FILTER_PANEL_MIN_WIDTH}
@@ -590,7 +583,7 @@
             'FABRICATE.Admin.Manager.Component.EssenceFilterLabel',
             'Filter components by essence'
           )}
-          triggerData={{ 'data-component-essence-filter': '' }}
+          triggerProps={{ 'data-component-essence-filter': '' }}
           onChange={setEssenceFilter}
         />
       {/if}
@@ -603,7 +596,7 @@
         density="compact"
         tone="accent"
         groupName="component-membership"
-        dataAttr="data-component-membership-filter"
+        data-component-membership-filter
         optionDataAttr="data-component-membership-option"
         ariaLabel={text(
           'FABRICATE.Admin.Manager.Component.MembershipFilterLabel',
@@ -664,10 +657,10 @@
           value={ui.sortKey}
           options={sortOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Component.SortLabel', 'Sort components')}
-          triggerData={{ 'data-component-sort': '' }}
+          triggerProps={{ 'data-component-sort': '' }}
           onChange={setSortKey}
         />
-        <ManagerButton
+        <Button
           class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
           aria-label={text(
@@ -687,16 +680,18 @@
               ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
               : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
       <!-- THE COUNT AND THE BODY AGREE, IN BOTH COHORTS: `{shown} of {total} catalogue entries`, or
         `{shown} shown · {mine} of {all} in this system` once widened, over the rows actually drawn. -->
       <span class="manager-component-count" data-component-count>{countText}</span>
     </div>
-  </ManagerToolbar>
+  </FilterBar>
 
+  <!-- The head zone's sibling, never its ancestor, so a drop on either imports once. -->
   <section
     class="manager-table-scroll"
+    use:dragDrop={dropOptions}
     aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
   >
     <!-- THE ZERO STATE IS GATED ON THE COHORT, never on the raw prop: an empty system under `All
@@ -708,7 +703,7 @@
         title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
         hint={text(
           'FABRICATE.Admin.Manager.Component.EmptyHint',
-          'Drop Foundry items into this page to add components to the selected system.'
+          'Drop Foundry items here to add components to the selected system.'
         )}
       />
     {:else if filteredComponents.length === 0 && visibleGhostRows.length === 0}
@@ -721,8 +716,8 @@
           'No components match these filters.'
         )}
       >
-        <ManagerButton data-clear-filters="components" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="components" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}

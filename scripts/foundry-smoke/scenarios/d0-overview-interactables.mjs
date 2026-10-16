@@ -596,8 +596,8 @@ export default {
       // open window without rescanning a newly-activated scene.
       await closeOpenApplications(page);
 
-      // Empty-state capture: a scene with ZERO interactables exercises the
-      // dedicated .fab-im-empty branch. Create a throwaway scene, activate it,
+      // Empty-state capture: a scene with ZERO interactables exercises the dedicated
+      // [data-interactable-manager-empty] branch. Create a throwaway scene, activate it,
       // re-open the panel, and capture the empty list. Tracked for cleanup.
       const emptySceneId = await page.evaluate(async () => {
         const scene = await Scene.create({
@@ -620,7 +620,7 @@ export default {
         .first()
         .waitFor({ state: 'visible', timeout: 10_000 });
       await page
-        .locator('.fabricate-interactables-manager .fab-im-empty')
+        .locator('.fabricate-interactables-manager [data-interactable-manager-empty]')
         .first()
         .waitFor({ state: 'visible', timeout: 10_000 });
       await assertNoScreenshotOverlays(page, {

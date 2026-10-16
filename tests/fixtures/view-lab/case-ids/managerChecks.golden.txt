@@ -10,6 +10,8 @@ manager-checks-outcomes-range-notices
 manager-checks-triggers-notice
 manager-checks-off
 manager-checks-stacked-floor
+manager-checks-formula-card
+manager-checks-character-value-unresolved
 manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
 manager-checks-alchemy-behaviour
@@ -84,6 +86,7 @@ manager-checks-count-routed
 manager-checks-count-progressive
 manager-checks-count-zero
 manager-checks-count-botch
+manager-checks-count-botch-odds
 manager-checks-count-over-rolled-failure
 manager-checks-count-routed-rolled
 manager-checks-count-forced
@@ -118,7 +121,9 @@ manager-checks-v3-count-additional-dice-path-empty
 manager-checks-v3-count-additional-dice-unresolved
 manager-checks-v3-count-additional-dice-overridden
 manager-checks-v3-count-additional-dice-macro
+manager-checks-v3-count-additional-dice-macro-narrow
 manager-checks-v3-count-additional-dice-macro-pair
+manager-checks-v3-count-additional-dice-macro-pair-narrow
 manager-checks-v3-count-additional-dice-no-actor
 manager-checks-v3-count-ceiling-additional
 manager-checks-validation-additional-dice

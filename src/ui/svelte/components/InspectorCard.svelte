@@ -24,9 +24,7 @@
 <script>
   let { children = undefined, class: extraClass = '', ...rest } = $props();
 
-  const classes = $derived(
-    ['fabricate-card', 'manager-inspector-card', extraClass].filter(Boolean).join(' ')
-  );
+  const classes = $derived(['fabricate-card', extraClass].filter(Boolean).join(' '));
 </script>
 
 <section class={classes} {...rest}>{@render children?.()}</section>

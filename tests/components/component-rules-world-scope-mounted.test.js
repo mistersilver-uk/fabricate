@@ -8,6 +8,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import {
   COMPONENT_SYSTEMS,
@@ -34,6 +35,7 @@ const editor = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-rules-world-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -144,15 +146,23 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     // AC-13 and AC-16's mounted half. The banner is the ONE callout since issue 1371's parity
     // round 4 (gap-list row 129): the `SharedDefinitionCallout` under the identity strip and the
     // strip itself were two stacked cards making one statement, and the reference draws one.
-    it('reads 0 other systems for a component NO system has a record for', async () => {
+    it('states no sharing for a component no system has a record for', async () => {
       const { target } = await openEditor(componentRecord('resin', 'Wildwood Resin', 'general'));
       const note = target.querySelector('[data-component-identity-note]');
       assert.ok(Boolean(note), 'the editor renders the identity callout');
-      assert.match(note.textContent, /0 other systems/);
+      assert.match(note.textContent, /authored in the world catalogue\. Everything below belongs to/);
       assert.ok(
-        !note.textContent.includes('-1'),
-        "transcribing the prototype's own unclamped string renders `shared with -1 other systems`"
+        !note.textContent.includes('other system'),
+        'a component no system holds is shared with none, so no count of other systems is stated'
       );
+    });
+
+    it('and for a component this system alone holds, the default after an import', async () => {
+      // Issue 2218: `coal` is held by Forge and by no other system.
+      const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'));
+      const note = target.querySelector('[data-component-identity-note]').textContent;
+      assert.match(note, /authored in the world catalogue\. Everything below belongs to/);
+      assert.ok(!note.includes('other system'), 'no count of other systems is stated');
     });
 
     it('and 1 other system for one two systems hold', async () => {

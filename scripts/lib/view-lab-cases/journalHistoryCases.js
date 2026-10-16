@@ -111,9 +111,84 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':not(:has([data-history-summary]))',
 });
 
-/** Sixteen full-window history-data witnesses: eight persisted states at both Journal widths. */
+/**
+ * Issue 2257 D15: a shared-model row after its roll, on the one history witness the scale's capture
+ * publishes: the borderless 26px mark.
+ */
+const JOURNAL_HISTORY_DATA_LAYOUT = Object.freeze({
+  'unknown-material-resolution-1240': {
+    containerSelector: '[data-journal-detail] [data-yield-scale]',
+    controls: [
+      {
+        selector: '[data-journal-detail] [data-yield-entry="unknown-silver-ore"] .fab-medallion',
+        styles: 'width: 26px; border-width: 0',
+      },
+    ],
+  },
+});
+
+/** Issue 1773: a craft's credit and grants read as result rows, labelled, rolled and reasoned. */
+const REWARD_AWARDS_CASE = playerCase({
+  id: 'player-journal-reward-awards',
+  label: 'Player Journal — a craft that credited currency and taught recipes',
+  smokeLabels: [],
+  reaches: 'beyond',
+  query: { tab: 'journal', journalCaseState: 'history-data-reward-awards' },
+  position: { width: 1240, height: 880 },
+  steps: [{ selector: '[data-history-run-id="lab-v1-history-data-reward-awards"]' }],
+  expectTab: 'journal',
+  expectSelector:
+    '[data-journal-detail]' +
+    ':has([data-history-items="produced"] [title="Iron Ingot"])' +
+    ':has([data-journal-fact] i.fa-coins)' +
+    ':has([data-journal-fact] i.fa-book-open + * + *)',
+  kinds: ['player', 'journal'],
+  sourceMatches: [JOURNAL_SOURCES, /^src\/systems\/(?:runHistoryEvidence|resultKindAward)\.js$/],
+});
+
+/** Issue 1773: a multi-stage run's rewards read as its final stage card's facts, each glyph drawn. */
+const REWARD_AWARDS_MULTI_CASE = playerCase({
+  id: 'player-journal-reward-awards-multi',
+  label: 'Player Journal — a multi-stage craft whose last stage credited and taught',
+  smokeLabels: [],
+  reaches: 'beyond',
+  query: { tab: 'journal', journalCaseState: 'history-data-reward-awards-multi' },
+  position: { width: 1240, height: 880 },
+  steps: [{ selector: '[data-history-run-id="lab-v1-history-data-reward-awards-multi"]' }],
+  expectTab: 'journal',
+  expectSelector:
+    '[data-history-stages] [data-stage-card="2"]' +
+    ':has([data-stage-fact] i.fa-coins):has([data-stage-fact] i.fa-book-open)',
+  kinds: ['player', 'journal'],
+  sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/presenters\/resultKindGlyphs\.js$/],
+});
+
+/** Issue 1773: a credit the run just paid is evidence in the run-completed banner. */
+const REWARD_JUST_RESOLVED_CASE = playerCase({
+  id: 'player-journal-reward-just-resolved',
+  label: 'Player Journal — a just-finished craft that paid a credit, in its completed banner',
+  smokeLabels: [],
+  reaches: 'beyond',
+  query: { tab: 'journal', journalCaseState: 'history-just-resolved-rewards' },
+  position: { width: 1240, height: 880 },
+  steps: [
+    { selector: '[data-journal-search] input', fill: 'Wax a Hemp Cord' },
+    { selector: '[data-run-id="lab-v1-history-just-resolved-rewards"]' },
+    { selector: '[data-journal-search] input', fill: '' },
+    { selector: '[data-run-action="primary"]' },
+  ],
+  expectTab: 'journal',
+  expectSelector:
+    '[data-journal-verdict="succeeded"] .fab-notice-evidence' +
+    ':has([data-history-items="transient-produced"]):has([data-journal-fact] i.fa-coins)',
+  kinds: ['player', 'journal'],
+  sourceMatches: [JOURNAL_SOURCES, /^src\/systems\/resultKindAward\.js$/],
+});
+
+/** Sixteen full-window history-data witnesses (eight persisted states at both Journal widths),
+ *  then the three reward-award witnesses. */
 export function journalHistoryDataCases() {
-  return [1240, 1024].flatMap((width) =>
+  const states = [1240, 1024].flatMap((width) =>
     Object.entries(JOURNAL_HISTORY_DATA_EVIDENCE).map(([state, evidence]) =>
       playerCase({
         id: `fabricate-journal-history-data-${state}-${width}`,
@@ -130,6 +205,9 @@ export function journalHistoryDataCases() {
         steps: [{ selector: `[data-history-run-id="lab-v1-history-data-${state}"]` }],
         expectTab: 'journal',
         expectSelector: `[data-journal-detail]${evidence}`,
+        ...(JOURNAL_HISTORY_DATA_LAYOUT[`${state}-${width}`] && {
+          expectLayout: JOURNAL_HISTORY_DATA_LAYOUT[`${state}-${width}`],
+        }),
         kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
         // `YieldScale` is a broad signal routed by `BROAD_SIGNAL_CASE_OVERRIDES`, which is where it is named.
         sourceMatches: [
@@ -140,4 +218,5 @@ export function journalHistoryDataCases() {
       })
     )
   );
+  return [...states, REWARD_AWARDS_CASE, REWARD_AWARDS_MULTI_CASE, REWARD_JUST_RESOLVED_CASE];
 }

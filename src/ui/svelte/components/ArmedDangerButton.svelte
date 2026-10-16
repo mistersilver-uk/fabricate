@@ -8,10 +8,11 @@
   | `token` | `<action>:<documentId>` | `''` | The stable arm token. See the invariants: NEVER a row index. |
   | `armed` | boolean | `false` | Whether THIS button holds the single armed token. Mutual exclusion is the owner's invariant. |
   | `idleLabel` / `armedLabel` / `busyLabel` / `idleIcon` / `armedIcon` / `busyIcon` | localized strings / Font Awesome classes | `''` / trash, triangle-exclamation, spinner | Button copy and glyph per face; `idleIcon=""` suppresses the IDLE glyph only. |
-  | `idleAriaLabel` / `armedAriaLabel` / `describedBy` | consequence sentences / element id | `''` | Each sentence MUST contain its state's visible label; `describedBy` names an element describing the consequence and is omitted rather than emitted empty. |
+  | `idleAriaLabel` / `armedAriaLabel` / `ariaDescribedBy` | consequence sentences / element id | `''` | Each sentence must contain its state's visible label; `ariaDescribedBy` names an element describing the consequence and is omitted rather than emitted empty. |
   | `disabled` | boolean | `false` | Disables both arming and confirming. |
   | `busy` | boolean | `false` | An optional third face for a caller whose confirm starts a write it can await. Not a variant of `armed` — see the invariants. |
   | `showTitle` | boolean | `true` | Whether the accessible name is ALSO a hover `title`. |
+  | `size` | `''` \| `'38'` | `''` | `Button`'s control-height rung: `'38'` stands it among the page header's 38px actions (issue 2257 D10); anything else draws the family's 34. |
 
   Callbacks:
   - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)`.
@@ -22,14 +23,13 @@
 
   Invariants:
   - It is a real `<button type="button">`, and it WRITES THE FAMILY ROOT, `fabricate-button`, FIRST:
-    it is a consumer of the `manager-button`
-    CSS contract rather than of `ManagerButton.svelte` — a deferral
-    `tests/manager-button-source-contract.test.js` pins — and a carrier spelling `manager-button`
-    without the root matches nothing in the family. It is shared without being a family root of its
+    it is a consumer of the `fabricate-button`
+    CSS contract rather than of `Button.svelte` — a deferral
+    `tests/manager-button-source-contract.test.js` pins — and a carrier without that root matches
+    nothing in the family. It is shared without being a family root of its
     own, which `openspec/specs/design-system/spec.md` admits.
-  - It does NOT emit `data-keyboard-focus`, so it still lets Foundry's Space and arrow bindings fire
-    while it holds focus. Adding it is a real behaviour change; its row stays in the formless-button
-    ledger until the filed successor lands.
+  - It emits `data-keyboard-focus="true"`: Foundry's `KeyboardManager#hasFocus` is false for a formless
+    button without it, so every keybinding (Space, the arrows, Escape) would fire while it is focused.
   - THE CALLER KEYS THE ARMED TOKEN ON THE TARGET DOCUMENT ID, NEVER A ROW INDEX, because a surface
     that re-projects rows asynchronously turns an index-keyed token into a destructive misfire: arm
     row 2, let another client delete row 0, re-project, and the second click hits a different copy.
@@ -57,12 +57,13 @@
     armedIcon = 'fas fa-triangle-exclamation',
     idleAriaLabel = '',
     armedAriaLabel = '',
-    describedBy = '',
+    ariaDescribedBy = '',
     disabled = false,
     busy = false,
     busyLabel = '',
     busyIcon = 'fas fa-spinner fa-spin',
     showTitle = true,
+    size = '',
     onArm = () => {},
     onDisarm = () => {},
     onConfirm = () => {},
@@ -82,6 +83,7 @@
   const icon = $derived(faceOf(busyIcon, armedIcon, idleIcon));
   const consequence = $derived(faceOf(busyLabel, armedAriaLabel, idleAriaLabel));
   const isInert = $derived(disabled === true || inFlight);
+  const atRung38 = $derived(String(size ?? '') === '38');
 
   function handleClick() {
     if (isInert) return;
@@ -112,13 +114,16 @@
 <button
   bind:this={element}
   type="button"
-  class="fabricate-button manager-button is-danger"
+  class="fabricate-button is-danger"
+  data-keyboard-focus="true"
+  class:fab-manager-button={atRung38}
+  class:is-size-38={atRung38}
   class:is-armed={armed}
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
-  aria-describedby={describedBy || undefined}
+  aria-describedby={ariaDescribedBy || undefined}
   aria-busy={inFlight ? 'true' : undefined}
   title={showTitle ? consequence : undefined}
   disabled={isInert}

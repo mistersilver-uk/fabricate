@@ -21,6 +21,7 @@ import {
   assertGateCases,
   checkGate,
   emptyMarkerFailure,
+  exemptAt,
   gateOver,
   styleCorpusOf,
   workingTree,
@@ -44,6 +45,12 @@ import {
   isExemptSpacingPixels,
   isSpacingScaleToken,
 } from './spacing-known-literals.js';
+import {
+  inSvelteScope,
+  offScaleLengthsIn,
+  scaleOf,
+  spacingContext,
+} from './spacing-scale-classifier.js';
 
 /** Floors with deliberate headroom below the roughly 1445 and 1642 they were chosen against. */
 const STYLESHEET_SPACING_DECLARATION_FLOOR = 1289;
@@ -61,9 +68,12 @@ let cached = null;
 function scan() {
   if (cached === null) {
     const { readFile, listFiles } = workingTree(STYLE_CORPUS);
-    const corpus = styleCorpusOf(readFile, listFiles()).styles;
+    const styleCorpus = styleCorpusOf(readFile, listFiles());
+    const corpus = styleCorpus.styles;
     cached = {
       corpus,
+      // Each declaration with its rule's selector and its own line, for the sheet's absolute check.
+      styleCorpus,
       raw: rawSpacing(corpus),
       // The complement, over the same corpus and the same definitions.
       exempt: scanSpacing(corpus, isExemptSpacingPixels),
@@ -166,7 +176,17 @@ test('every spacing property spelling is scanned, including the logical longhand
       }
     }
   }
-  for (const property of ['row-gap', 'column-gap']) {
+  for (const family of ['scroll-padding', 'scroll-margin']) {
+    for (const suffix of ['', '-top', '-right', '-bottom', '-left']) {
+      if (!scanned.has(`${family}${suffix}`)) missing.push(`${family}${suffix}`);
+    }
+    for (const side of ['block', 'inline']) {
+      for (const suffix of ['', '-start', '-end']) {
+        if (!scanned.has(`${family}-${side}${suffix}`)) missing.push(`${family}-${side}${suffix}`);
+      }
+    }
+  }
+  for (const property of ['row-gap', 'column-gap', 'border-spacing']) {
     if (!scanned.has(property)) missing.push(property);
   }
 
@@ -197,8 +217,8 @@ test('both stylesheet corpora are still being scanned', () => {
     `only ${svelte} spacing declarations found in Svelte <style> blocks, against roughly ` +
       `${FLOOR_REFERENCE_SVELTE_SPACING_DECLARATIONS} when the floor of ` +
       `${SVELTE_SPACING_DECLARATION_FLOOR} was set. This is the corpus stylelint cannot reach, so ` +
-      'nothing else in the repository would notice: the likely cause is the line-anchored ' +
-      '`<style>` extractor, not 200 deleted components. A broken extractor makes this gate report ' +
+      'nothing else in the repository would notice: the likely cause is the `<style>` ' +
+      'extractor, not 200 deleted components. A broken extractor makes this gate report ' +
       'a CLEANER tree, which is why the floor is stated per corpus rather than over the total.'
   );
   assert.ok(
@@ -309,18 +329,13 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
 });
 
 /**
- * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name.
- * The live shape of that gap has TWO forms, and the worked example is re-pointed at a surviving
- * one: `apps/inventory/detail/InventoryDetailHeader.svelte` sets `--inventory-detail-thumb-size`
- * in markup from a JS prop and reads it back in a scanned declaration, and `components/Medallion`
- * writes `width`/`height` straight into a `style` attribute from its own `size` prop. Both are
- * SIZES rather than spacing, so neither is this ratchet's debt; they are named because the shape
- * is what this note is about, and the file it used to name — a crafting thumbnail doing the same
- * thing — was deleted at issue 1506 when both crafting tiles retired into that one tile. The
- * control-height ladder records the same blind spot for the same reason. Closing it would mean
- * resolving a token through Svelte markup and a JS prop default, which is a different scanner
- * from this one. So "no new raw spacing literal has been introduced" is a claim about what the
- * two stylesheet corpora DECLARE, not about what the product renders.
+ * What this ratchet does not see: a value a component computes in script and writes into a `style`
+ * attribute, as `components/Medallion` writes `width`/`height` from its own `size` prop. That is a
+ * size rather than spacing, so it is not this ratchet's debt; it is named because closing the gap
+ * would mean resolving a token through Svelte markup and a JS prop default, a different scanner
+ * from this one, and the control-height ladder records the same blind spot. So "no new raw spacing
+ * literal has been introduced" is a claim about what the two stylesheet corpora declare;
+ * `spacing-scale-markup.test.js` holds the Svelte markup's static styles.
  */
 test('no new raw spacing literal has been introduced', (t) => {
   checkGate(
@@ -365,9 +380,188 @@ test('no raw spacing literal has been laundered into a private token', () => {
   );
 });
 
-/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
+/* ───────────────────────── the sheet is on the scale (issue 1523) ───────────────────────── */
 
 const SHEET = 'styles/fabricate.css';
+
+/** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
+const POSITION_OFFSET =
+  /^(?:top|right|bottom|left|inset(?:-(?:block|inline)(?:-(?:start|end))?)?)$/iu;
+
+test('the off-scale classifier reads tokens, exemptions, private tokens and other units', () => {
+  const definitions = new Map([['--inset', ['13px']]]);
+  const scale = scaleOf(
+    new Map([
+      ['--fab-space-1', ['4px']],
+      ['--fab-space-2', ['8px']],
+      ['--fab-space-3', ['12px']],
+      ['--fab-space-4', ['16px']],
+      ['--fab-space-2xs', ['2px']],
+      ['--fab-space-chip', ['6px']],
+    ])
+  );
+  const probes = {
+    '14px': ['14px'],
+    'var(--fab-space-3)': [],
+    '1px var(--fab-space-chip)': [],
+    'calc(-1 * var(--fab-space-2))': [],
+    '36px 0 0': [],
+    '0 auto': [],
+    'var(--inset)': ['13px'],
+    '0.15rem': ['0.15rem'],
+    '0 0.4em': ['0.4em'],
+    '-0.5em 0': ['0.5em'],
+    '10dvh': ['10dvh'],
+    '2pt': ['2pt'],
+    '4cqw 0': ['4cqw'],
+    'calc(1px + 1px)': ['1px in calc()'],
+    'calc(1px * 13)': ['1px in calc()', 'calc() = 13px'],
+    'min(1px, 100%)': ['100%', '1px in min()'],
+    'calc(var(--fab-space-2) * -1)': [],
+    'var(--fab-space-2xs)': [],
+    'calc(var(--fab-space-3) + var(--fab-space-2xs))': ['calc() = 14px'],
+    '0 calc(var(--fab-space-chip) / 2)': ['calc() = 3px'],
+    'calc(var(--fab-space-2) * 2 + var(--fab-space-3))': ['calc() = 28px'],
+    'calc(var(--fab-space-2) + var(--fab-space-1))': [],
+    'calc(-1 * (var(--fab-space-3) + var(--fab-space-2xs)))': ['calc() = -14px'],
+    'calc(100% - var(--fab-space-2))': ['100%'],
+  };
+  for (const [value, expected] of Object.entries(probes)) {
+    assert.deepEqual(offScaleLengthsIn(value, definitions, scale), expected, value);
+  }
+});
+
+/**
+ * The corpora the absolute checks hold, each with floors that prove it is still being read. The
+ * Svelte floors sit above what the manager and component roots alone carry, so a scope that stops
+ * reading the player apps fails them.
+ */
+const ABSOLUTE_SCOPES = Object.freeze([
+  {
+    label: SHEET,
+    includes: (file) => file === SHEET,
+    floors: { spacing: STYLESHEET_SPACING_DECLARATION_FLOOR, offsets: 40, sizes: 400 },
+  },
+  {
+    label: 'Svelte',
+    includes: inSvelteScope,
+    floors: { spacing: SVELTE_SPACING_DECLARATION_FLOOR, offsets: 32, sizes: 1350 },
+  },
+]);
+
+/** The declarations of `properties` (a predicate) in one scope. */
+const scopeDeclarations = (styleCorpus, scope, properties) =>
+  styleCorpus.declarations.filter(
+    (declaration) =>
+      scope.includes(declaration.file) && properties(declaration.property.toLowerCase())
+  );
+
+const SCANNED_SPACING = new Set(SCANNED_SPACING_PROPERTIES);
+
+/** One scope's unmarked spacing declarations, and those off the scale with their lengths. */
+function offScaleSpacing(styleCorpus, scope) {
+  const { definitions, scale } = spacingContext(styleCorpus);
+  const declarations = scopeDeclarations(styleCorpus, scope, (property) =>
+    SCANNED_SPACING.has(property)
+  ).filter(
+    (declaration) =>
+      !exemptAt(declaration.file, styleCorpus.sources[declaration.file], declaration.at)
+  );
+  const offScale = [];
+  for (const declaration of declarations) {
+    const lengths = offScaleLengthsIn(declaration.value, definitions, scale);
+    if (lengths.length > 0) offScale.push({ ...declaration, lengths });
+  }
+  return { declarations, offScale };
+}
+
+for (const scope of ABSOLUTE_SCOPES) {
+  test(`no spacing length in ${scope.label} is off the scale`, () => {
+    const { declarations, offScale } = offScaleSpacing(scan().styleCorpus, scope);
+    assert.ok(
+      declarations.length >= scope.floors.spacing,
+      `only ${declarations.length} spacing declarations read in ${scope.label}, so this check ` +
+        'is not reading it'
+    );
+
+    const failures = offScale.map(
+      ({ file, at, selector, property, value, lengths }) =>
+        `${file}:${at} ${selector}\n      ${property}: ${value} (${lengths.join(', ')})`
+    );
+    assert.deepEqual(
+      failures,
+      [],
+      `a spacing length in ${scope.label} is off the published scale. Snap it to the nearest ` +
+        `\`${SPACING_SCALE_PREFIX}-*\` member and write the token; a tie goes to the main 4px ` +
+        'rung against a fine one, and up between two main rungs. A derived alignment that ' +
+        'cannot snap carries a reasoned `ratchet-exempt(design-system)` marker:\n  ' +
+        failures.join('\n  ')
+    );
+  });
+}
+
+/** The sizing properties, which MUST NOT derive from the spacing scale (ui-visual-style spec). */
+const SIZE_PROPERTY =
+  /^(?:width|height|inline-size|block-size|(?:min|max)-(?:width|height|inline-size|block-size)|flex-basis|flex)$/iu;
+
+/** Each declaration in `declarations` that reads a `--fab-space-*` token, as a failure line. */
+const readingScale = (declarations) =>
+  declarations
+    .filter((declaration) =>
+      varReferencesIn(declaration.value).some((reference) => isSpacingScaleToken(reference.name))
+    )
+    .map(
+      (declaration) =>
+        `${declaration.file}:${declaration.at} ${declaration.selector} ` +
+        `${declaration.property}: ${declaration.value}`
+    );
+
+for (const scope of ABSOLUTE_SCOPES) {
+  test(`no width, height or flex basis in ${scope.label} reads the spacing scale`, () => {
+    const { styleCorpus } = scan();
+    const sizes = scopeDeclarations(styleCorpus, scope, (property) => SIZE_PROPERTY.test(property));
+    assert.ok(
+      sizes.length >= scope.floors.sizes,
+      `only ${sizes.length} size declarations read in ${scope.label}`
+    );
+
+    // A named derived token (`--fab-icon-picker-row`, computed from its chip) is the spec's own
+    // example of a size that may be built from the scale; it is DEFINED on a custom property,
+    // which this check does not read, and used by name, which carries no `--fab-space-*`.
+    const reading = readingScale(sizes);
+    assert.deepEqual(
+      reading,
+      [],
+      'a width, height, min/max size or flex basis derives from the spacing scale. ' +
+        '`ui-visual-style` rules sizes out of the scale, so write the size as a literal or as a ' +
+        'named derived token:\n  ' +
+        reading.join('\n  ')
+    );
+  });
+
+  test(`no positioning offset in ${scope.label} reads the spacing scale`, () => {
+    const { styleCorpus } = scan();
+    const offsets = scopeDeclarations(styleCorpus, scope, (property) =>
+      POSITION_OFFSET.test(property)
+    );
+    assert.ok(
+      offsets.length >= scope.floors.offsets,
+      `only ${offsets.length} offsets read in ${scope.label}`
+    );
+
+    const reading = readingScale(offsets);
+    assert.deepEqual(
+      reading,
+      [],
+      'a positioning offset reads the spacing scale. `ui-visual-style` rules offsets out of the ' +
+        'scale, so write the offset as a literal:\n  ' +
+        reading.join('\n  ')
+    );
+  });
+}
+
+/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
+
 const PROBE = 'src/ui/svelte/Probe.svelte';
 const REASON = 'ratchet-exempt(design-system): the probe needs it';
 
@@ -449,5 +643,34 @@ test('a reasoned marker at the declaration exempts it, and an empty one fails', 
         emptyMarkerFailure(SHEET, 3),
       ],
     },
+  ]);
+});
+
+/** The Svelte scope's off-scale check as a gate, so a throwaway repository can prove its paths. */
+const SVELTE_OFF_SCALE_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
+  offScaleSpacing(
+    styleCorpusOf(readFile, files),
+    ABSOLUTE_SCOPES.find((scope) => scope.includes === inSvelteScope)
+  ).offScale.map(({ file, at, property, lengths }) => ({
+    file,
+    line: at,
+    id: `${property} ${lengths}`,
+  }))
+);
+
+test('the Svelte scope reads manager, components and every player app', (t) => {
+  const offender = '<div class="p"></div>\n<style>\n  .p { padding: 13px; }\n</style>\n';
+  const fails = (file) => ({
+    head: { [file]: offender },
+    failures: [`${spacing(file, 'padding 13px')} is new (1)`],
+  });
+  assertGateCases(t, SVELTE_OFF_SCALE_GATE, WIRING_BASE, [
+    fails('src/ui/svelte/apps/manager/Probe.svelte'),
+    fails('src/ui/svelte/apps/manager/new-area/Probe.svelte'),
+    fails('src/ui/svelte/components/Probe.svelte'),
+    ...['crafting', 'gathering', 'alchemy', 'inventory', 'journal', 'interactables'].map((app) =>
+      fails(`src/ui/svelte/apps/${app}/Probe.svelte`)
+    ),
+    fails('src/ui/svelte/apps/InteractableProbe.svelte'),
   ]);
 });

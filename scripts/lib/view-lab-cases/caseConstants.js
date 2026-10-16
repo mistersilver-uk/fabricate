@@ -8,7 +8,7 @@ export const MANAGER = 'fabricate-crafting-system-manager';
 
 // Only the recomposed Journal's reachable render surfaces claim its frames.
 export const JOURNAL_SOURCES =
-  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
+  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
 /** The three GM canvas windows (issue 1520). */
 export const CANVAS_BROWSER = 'fabricate-interactable-browser';
@@ -39,6 +39,18 @@ export const CHECKS_ROUTE_MODEL_PATTERN =
 export const GATHERING_ROUTE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/gathering(?:RouteModel|Display|DraftHandlers|ModifierHandlers)\./;
 
+/** The gathering task editor and the tabs and cards under `gathering-task/` (issue 1522). */
+export const GATHERING_TASK_EDITOR_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(?:GatheringTaskEditView\.svelte$|gathering-task\/)/;
+
+/** The world-scope model and the drop classification behind the world frames (issue 1721). */
+export const WORLD_SCOPE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(worldScopeModel\.svelte|dropUuidClassification)\.js$/;
+
+/** The Premium crafting-icons advert in the two component screens' headers (issue 2220). */
+export const PREMIUM_ICONS_AD_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(ManagerPremiumIconsAd\.svelte|premiumIconsAdModel\.js)$/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
@@ -53,6 +65,16 @@ export const TOOL_LIST_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
 ];
+
+/** The component rules editor and the cards it renders (issue 1522). */
+export const COMPONENT_EDITOR_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/component\/Component(?:CategoryTagsCards|DifficultyCard|EssencesCard|IdentityStrip|SalvageStages|SalvageCard|RulesValidationTab)\.svelte$/,
+];
+
+/** The GM read-only stage complication list both studios' stage rows render (issue 2445). */
+export const STAGE_COMPLICATION_LIST_MATCH =
+  /^src\/ui\/svelte\/apps\/manager\/StageComplicationList\.svelte$/;
 
 /** The trigger set every system Tool rules editor frame shares (issue 1373). */
 export const TOOL_EDITOR_SHELL_MATCHES = [
@@ -86,11 +108,19 @@ const CRAFTING_MODE_FILES = Object.freeze({
   simple: ['SimpleRecipeBody', 'StepRequirementsList'],
   routedByIngredients: ['IngredientRoutedBody'],
   routedByCheck: ['RoutedByCheckBody', 'OutcomeTierTable'],
-  progressive: ['ProgressiveBody', 'ProgressiveStageList'],
+  progressive: [
+    'ProgressiveBody',
+    'ProgressiveStageList',
+    'ProgressiveStageRow',
+    'ProgressiveStageBand',
+  ],
 });
 
 /** The one not-yet-ready chrome all five player views draw (issue 1514). */
 export const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
+
+/** The identity row every player detail pane leads with (issue 1518). */
+export const PLAYER_DETAIL_HEADER = /^src\/ui\/svelte\/apps\/PlayerDetailHeader\.svelte$/;
 
 /** Everything under `crafting/` that is not one mode's own body. Applies to every crafting case. */
 export const CRAFTING_SHARED = new RegExp(
@@ -112,6 +142,10 @@ export const CRAFTING_SIMPLE = craftingMode('simple');
 export const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
 export const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
 export const CRAFTING_PROGRESSIVE = craftingMode('progressive');
+
+/** The progressive stage list and the row and band it composes; salvage draws them too (issue 2381). */
+export const PROGRESSIVE_STAGE_PARTS =
+  /^src\/ui\/svelte\/apps\/crafting\/detail\/ProgressiveStage(?:List|Row|Band)\.svelte$/;
 
 /** Bulk salvage / bulk destroy (issue 859): the fields every one of its cases shares. */
 export const BULK_DEFAULTS = Object.freeze({

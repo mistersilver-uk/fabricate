@@ -2,7 +2,8 @@
  * Which header-action branch every manager route selects, and which family owns it (issue 1720).
  *
  * `LADDER` is transcribed from the shell's own 26-branch chain as it stood before the extraction,
- * so it is an oracle rather than a re-reading of the source it checks. The observed answer is
+ * plus the world Component catalogue's empty arm (issue 2220), so it is an oracle rather than a
+ * re-reading of the source it checks. The observed answer is
  * evaluated out of the shipped markup, so moving a branch into another file, dropping one, or
  * changing a predicate is visible here even though the rendered DOM of any one route is not.
  * A reordering is not, where the predicates it crosses are disjoint by `currentView`: that
@@ -56,7 +57,8 @@ const VISIBLE =
   "(currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && " +
   "!isWorldScopedRoute) || currentView === 'world-essences' || " +
   "currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || " +
-  "currentView === 'world-component-entry'";
+  "currentView === 'world-component-entry' || " +
+  "(currentView === 'world-components' && header.premiumIconsAdVisible)";
 
 /**
  * The shipped chain, in order, with the family that owns each branch. `default` is the trailing
@@ -88,6 +90,7 @@ const LADDER = Object.freeze(
     ["currentView === 'environment-edit'", 'gathering'],
     ["currentView === 'gathering-task-edit'", 'gathering'],
     ["currentView === 'gathering-event-edit'", 'gathering'],
+    ["currentView === 'world-components'", 'world'],
     ["currentView === 'system-edit'", 'world'],
     ['default', 'world'],
   ].map(([id, family]) => Object.freeze({ id, family }))
@@ -228,7 +231,7 @@ const TAB_CASES = Object.freeze([
   Object.freeze({ worldTravelTab: 'map', displayedGatheringTab: 'environments' }),
 ]);
 
-function scopeFor(currentView, tabs, actionsFamily) {
+function scopeFor(currentView, tabs, { actionsFamily, premiumIconsAdVisible = false }) {
   return {
     currentView,
     displayedGatheringTab: tabs.displayedGatheringTab,
@@ -237,7 +240,7 @@ function scopeFor(currentView, tabs, actionsFamily) {
     isWorldRulesRoute: WORLD_RULES_VIEWS.includes(currentView),
     isWorldScopedRoute: WORLD_SCOPED_VIEWS.includes(currentView),
     isWorldTravelRoute: currentView === 'world-travel',
-    header: { actionsFamily },
+    header: { actionsFamily, premiumIconsAdVisible },
   };
 }
 
@@ -263,8 +266,11 @@ describe('the manager page header routes every view to one action family', () =>
     compiler.cleanup();
   });
 
-  /** The shipped `actionsFamily`, read off the model the shell builds rather than restated here. */
-  function modelFamily(currentView) {
+  /**
+   * The shipped model, which answers `actionsFamily` and `premiumIconsAdVisible`, read off what the
+   * shell builds rather than restated here. `advert` opens every gate the Premium advert has.
+   */
+  function headerFor(currentView, advert = false) {
     return createHeaderModel({
       route: {
         currentView: () => currentView,
@@ -272,12 +278,28 @@ describe('the manager page header routes every view to one action family', () =>
         isWorldRulesRoute: () => WORLD_RULES_VIEWS.includes(currentView),
         isWorldScopedRoute: () => WORLD_SCOPED_VIEWS.includes(currentView),
       },
-      state: {},
-    }).actionsFamily;
+      state: advert
+        ? { experimentalFeaturesEnabled: () => true, premiumInstalled: () => false }
+        : {},
+    });
+  }
+
+  const modelFamily = (currentView, advert) => headerFor(currentView, advert).actionsFamily;
+
+  /** Both advert states, since the advert is the one input that reopens a hidden group. */
+  const ADVERT_STATES = Object.freeze([false, true]);
+
+  /** The scope the chain is evaluated in, with the model's own two answers on `header`. */
+  function modelScope(currentView, tabs, advert) {
+    const header = headerFor(currentView, advert);
+    return scopeFor(currentView, tabs, {
+      actionsFamily: header.actionsFamily,
+      premiumIconsAdVisible: header.premiumIconsAdVisible,
+    });
   }
 
   it('NON-VACUITY: the oracle, the route set and the shipped chain are all real', () => {
-    assert.equal(LADDER.length, 26, 'the pre-extraction chain is 26 branches');
+    assert.equal(LADDER.length, 27, 'the pre-extraction chain is 26 branches, plus one');
     assert.ok(routeTokens().length >= 33, `the scan found only ${routeTokens().length} routes`);
     assert.ok(
       chainStarting(ACTIONS_FILE, LADDER[0].id).length >= 10,
@@ -287,8 +309,10 @@ describe('the manager page header routes every view to one action family', () =>
 
   it('answers exactly one of the four families for every route', () => {
     for (const currentView of routeTokens()) {
-      const family = modelFamily(currentView);
-      assert.ok(FAMILIES.includes(family), `${currentView} answers ${family}, which is no family`);
+      for (const advert of ADVERT_STATES) {
+        const family = modelFamily(currentView, advert);
+        assert.ok(FAMILIES.includes(family), `${currentView} answers ${family}, which is no family`);
+      }
     }
   });
 
@@ -296,10 +320,12 @@ describe('the manager page header routes every view to one action family', () =>
     const mismatches = [];
     for (const currentView of routeTokens()) {
       for (const tabs of TAB_CASES) {
-        const expected = oracleBranch(scopeFor(currentView, tabs, modelFamily(currentView)));
-        const observed = selectedBranch(scopeFor(currentView, tabs, modelFamily(currentView)));
-        if (observed !== expected) {
-          mismatches.push(`${currentView} (${tabs.worldTravelTab}/${tabs.displayedGatheringTab})`);
+        for (const advert of ADVERT_STATES) {
+          const scope = modelScope(currentView, tabs, advert);
+          if (selectedBranch(scope) !== oracleBranch(scope)) {
+            const tab = `${tabs.worldTravelTab}/${tabs.displayedGatheringTab}`;
+            mismatches.push(`${currentView} (${tab}, advert ${advert})`);
+          }
         }
       }
     }
@@ -310,17 +336,37 @@ describe('the manager page header routes every view to one action family', () =>
     const wrong = [];
     for (const currentView of routeTokens()) {
       for (const tabs of TAB_CASES) {
-        const family = modelFamily(currentView);
-        const owner = familyOf(oracleBranch(scopeFor(currentView, tabs, family)));
-        if (owner !== family) wrong.push(`${currentView}: ${family} owns none of its branch`);
+        for (const advert of ADVERT_STATES) {
+          const scope = modelScope(currentView, tabs, advert);
+          const family = scope.header.actionsFamily;
+          if (familyOf(oracleBranch(scope)) !== family) {
+            wrong.push(`${currentView} (advert ${advert}): ${family} owns none of its branch`);
+          }
+        }
       }
     }
     assert.deepEqual(wrong, [], 'a route dispatched to a family that holds no branch for it');
   });
 
+  it('shows the Premium advert on exactly the two component list routes', () => {
+    const shown = (advert) =>
+      routeTokens().filter((view) => headerFor(view, advert).premiumIconsAdVisible);
+    assert.deepEqual(shown(true), ['components', 'world-components']);
+    assert.deepEqual(shown(false), [], 'the advert shows with its gates shut');
+  });
+
+  it('opens the world Component catalogue group for the advert alone', () => {
+    const scope = modelScope('world-components', TAB_CASES[0], true);
+    assert.equal(scope.header.premiumIconsAdVisible, true, 'the advert never opened');
+    assert.equal(evaluate(VISIBLE, scope), true);
+    assert.equal(selectedBranch(scope), "currentView === 'world-components'");
+    assert.equal(scope.header.actionsFamily, 'world');
+  });
+
   it('draws no action group at all on the routes the gate hides', () => {
     const hidden = routeTokens().filter(
-      (currentView) => !evaluate(VISIBLE, scopeFor(currentView, TAB_CASES[0], 'none'))
+      (currentView) =>
+        !evaluate(VISIBLE, scopeFor(currentView, TAB_CASES[0], { actionsFamily: 'none' }))
     );
     assert.deepEqual(
       hidden,
@@ -337,7 +383,7 @@ describe('the manager page header routes every view to one action family', () =>
       'the Tool Studio, the three World Rules tabs and the four unre-admitted scoped routes'
     );
     for (const currentView of hidden) {
-      assert.equal(modelFamily(currentView), 'none', `${currentView} still claims a family`);
+      assert.equal(modelFamily(currentView, false), 'none', `${currentView} still claims a family`);
     }
   });
 });

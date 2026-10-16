@@ -86,6 +86,8 @@ jobs:
       ids: ${{ steps.select.outputs.ids }}
       render: ${{ steps.select.outputs.render }}
       matrix: ${{ steps.select.outputs.matrix }}
+      apps: ${{ steps.select.outputs.apps }}
+      library: ${{ steps.library.outputs.library }}
       foundry_cache_hit: ${{ steps.foundry-cache.outputs.cache-hit }}
 
     steps:
@@ -99,9 +101,8 @@ jobs:
             echo "SKIP_CAPTURE=true" >> "$GITHUB_ENV"
           fi
 
-      - name: Compute the selected cases
+      - name: Fetch the changed files
         if: env.SKIP_CAPTURE != 'true'
-        id: select
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -113,12 +114,47 @@ jobs:
           # Each entry's `patch` comes along for the ride, because the selector uses it: a change
           # confined to case-object literals in `scripts/lib/view-lab-cases/` selects those
           # cases instead of surface coverage, which is the difference between a two-minute
-          # capture and a four-minute one. The library never reads git itself — it is a pure function of what
-          # this step hands it — and it widens back to surface coverage (one frame of every route
-          # and tab the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
-          # them for very large diffs) costs frames, never evidence.
+          # capture and a four-minute one. `viewLabCases.js` never reads git itself — it is a pure
+          # function of what this step hands it — and it widens back to surface coverage (one frame
+          # of every route and tab the lab renders) for any patch it cannot verify, so a `patch` the
+          # API omits (it drops them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
+
+      # The design-library units (issue 2413) are supplementary evidence, so this step may fail
+      # without costing the app frames; a failed fetch fails the step above, and so `select`.
+      - name: Compute the selected library units
+        if: env.SKIP_CAPTURE != 'true'
+        id: library
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          node -e '
+            const { appendFileSync, readFileSync } = require("node:fs");
+            (async () => {
+              let keys = [];
+              try {
+                const { selectLibraryTargets } = await import("./scripts/lib/primitiveLabSelection.js");
+                const entries = readFileSync("changed-files.jsonl", "utf8")
+                  .split("\n")
+                  .filter(Boolean)
+                  .map((line) => JSON.parse(line));
+                const files = entries.map((entry) => entry.filename);
+                const patches = Object.fromEntries(entries.map((entry) => [entry.filename, entry.patch]));
+                keys = selectLibraryTargets(files, { patches }).map((record) => record.key);
+              } catch (error) {
+                console.log(`::warning::Library selection failed, so no library units render: ${error?.message ?? error}`);
+              }
+              appendFileSync(process.env.GITHUB_OUTPUT, `library=${keys.join(",")}\n`);
+            })();
+          '
+
+      - name: Compute the selected cases
+        if: env.SKIP_CAPTURE != 'true'
+        id: select
+        env:
+          LIBRARY: ${{ steps.library.outputs.library }}
+        run: |
           SELECTION=$(node -e '
             const { readFileSync } = require("node:fs");
             import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, rendersCapture }) => {
@@ -136,10 +172,14 @@ jobs:
           IDS=$(printf '%s' "$SELECTION" | tail -n +2)
           echo "ids=$IDS" >> "$GITHUB_OUTPUT"
           echo "render=$RENDER" >> "$GITHUB_OUTPUT"
+          APPS=""
+          if [ "$RENDER" = "true" ]; then APPS="$IDS"; fi
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          UNITS=$(printf '%s' "$LIBRARY" | tr ',' '\n' | grep -v '^unlocated:' | grep -c . || true)
           if [ -z "$IDS" ]; then
-            echo "No changed file selects a View Lab case; nothing to render."
+            echo "No changed file selects a View Lab case; nothing to render; library units: $UNITS."
           else
-            echo "Selected $(echo "$IDS" | tr ',' '\n' | wc -l) case(s)."
+            echo "Selected $(echo "$IDS" | tr ',' '\n' | wc -l) case(s); library units: $UNITS."
           fi
           # `rendersCapture` is true when the change arms `check-screenshots` (`isUiFile` over the
           # changed set), and also when a non-render product file a case's `sourceMatches` names
@@ -159,7 +199,7 @@ jobs:
           # The shards: balanced, each in selection order, every distinct-evidence group on one
           # runner so the renderer's byte-identity check still sees the whole group. None when
           # nothing renders; verify-chrome still verifies the harvest.
-          MATRIX=$(node scripts/view-lab-shards.mjs plan "$IDS" "$RENDER")
+          MATRIX=$(node scripts/view-lab-shards.mjs plan "$IDS" "$RENDER" "$LIBRARY")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
       # Probe, do not restore: `warm-foundry` fills a cold cache once, so the shards and
@@ -178,7 +218,7 @@ jobs:
   # rather than needing always() to survive a skipped dependency.
   warm-foundry:
     needs: select
-    if: needs.select.outputs.ids != ''
+    if: needs.select.outputs.ids != '' || needs.select.outputs.library != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -202,10 +242,12 @@ jobs:
 
   render:
     needs: [select, warm-foundry]
-    if: needs.select.outputs.ids != '' && needs.select.outputs.render == 'true'
+    if: (needs.select.outputs.ids != '' && needs.select.outputs.render == 'true') || needs.select.outputs.library != ''
     name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # The library leg is supplementary: its failure never withholds the app frames from capture.
+    continue-on-error: ${{ matrix.kind == 'library' }}
     permissions:
       contents: read
     strategy:
@@ -222,11 +264,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        continue-on-error: ${{ matrix.kind == 'library' }}
 
       - name: Prepare the View Lab
+        continue-on-error: ${{ matrix.kind == 'library' }}
         uses: ./.github/actions/prepare-view-lab
 
       - name: Render the selected frames
+        if: matrix.kind == 'apps'
         env:
           CASE_IDS: ${{ matrix.ids }}
         run: node scripts/view-lab-screenshots.mjs apps "$CASE_IDS"
@@ -234,6 +279,7 @@ jobs:
       # The PNGs and the manifest BY NAME, never the directory or a parent of it: see LICENSING
       # above. A day is enough for `capture` to read them.
       - name: Upload this shard's frames
+        if: matrix.kind == 'apps'
         uses: actions/upload-artifact@v6
         with:
           name: view-lab-shard-${{ matrix.shard }}
@@ -243,12 +289,34 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      # Its 15 minutes sit inside the job's, so the capture-timeout sum in `ci.yml` is unchanged.
+      - name: Capture the selected library units
+        if: matrix.kind == 'library'
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          LIBRARY_TARGETS: ${{ matrix.targets }}
+        run: node scripts/primitive-lab-capture.mjs "$LIBRARY_TARGETS"
+
+      # By name, as above; never `view-lab-shard-*`, which the shard merge would read as a shard.
+      - name: Upload the library units
+        if: matrix.kind == 'library'
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: primitive-lab-units
+          path: |
+            ui-screenshot-artifact/library/*.png
+            ui-screenshot-artifact/library/manifest.json
+          if-no-files-found: ignore
+          retention-days: 1
+
   # The chrome-dependent suites verify the one harvest every shard draws from, so they run ONCE,
   # beside the shards rather than ahead of any of them; `capture` needs this job, so a failed
   # verification still withholds the publish.
   verify-chrome:
     needs: [select, warm-foundry]
-    if: needs.select.outputs.ids != ''
+    if: needs.select.outputs.ids != '' || needs.select.outputs.library != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -321,7 +389,8 @@ jobs:
             tests/view-lab-fixture-assets.test.js \
             tests/components/components-browser-rendered.test.js \
             tests/components/component-edit-frame-rendered.test.js \
-            tests/components/world-component-entry-frame-rendered.test.js
+            tests/components/world-component-entry-frame-rendered.test.js \
+            tests/components/kicker-face-rendered.test.js
 
   # Runs only when every shard and the chrome verification succeeded: a failure there fails the
   # run unpublished, as a failed render always has.
@@ -352,6 +421,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Download every shard's frames
+        if: needs.select.outputs.apps != ''
         uses: actions/download-artifact@v7
         with:
           pattern: view-lab-shard-*
@@ -360,9 +430,19 @@ jobs:
       # One manifest, identical to what a single unsharded render writes, and a refusal when the
       # shards lost, repeated or invented a case.
       - name: Merge the shards into one frame set
+        if: needs.select.outputs.apps != ''
         env:
-          CASE_IDS: ${{ needs.select.outputs.ids }}
+          CASE_IDS: ${{ needs.select.outputs.apps }}
         run: node scripts/view-lab-shards.mjs merge "$CASE_IDS" ui-screenshot-artifact/shards ui-screenshot-artifact/apps
+
+      # Absent when the library leg failed; publish then names the units it could not capture.
+      - name: Download the library units
+        if: needs.select.outputs.library != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: primitive-lab-units
+          path: ui-screenshot-artifact/library
 
       # OIDC role assumption, matching every other AWS workflow in this repo
       # (`pr-screenshots-cleanup.yml`, `backfill-provenance.yml`, `promote-to-*.yml`). This job
@@ -399,6 +479,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LIBRARY_TARGETS: ${{ needs.select.outputs.library }}
         run: |
           if [ "${{ steps.aws.outcome }}" != "success" ]; then
             echo "::warning::Could not assume the screenshot upload role, so no frames were published."
@@ -411,4 +492,6 @@ jobs:
             --pr "$PR_NUMBER" \
             --repo "$PR_REPO" \
             --output-dir ui-screenshot-artifact/apps \
-            --head-sha "$HEAD_SHA"
+            --head-sha "$HEAD_SHA" \
+            --library-dir ui-screenshot-artifact/library \
+            --library-targets "$LIBRARY_TARGETS"

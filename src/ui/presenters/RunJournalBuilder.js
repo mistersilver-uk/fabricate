@@ -1,3 +1,4 @@
+import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
@@ -17,7 +18,7 @@ import {
 } from '../../systems/historyItemEvidence.js';
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
-import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
+import { historyEvidenceFields, splitHistoryReceipts } from '../../systems/runHistoryEvidence.js';
 import {
   craftingOutcomeBand,
   ladderRule,
@@ -26,6 +27,7 @@ import {
   withCountBotch,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
+import { resolveRunRecipe } from '../../systems/runTerms.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
   STAGE_BLOCKERS,
@@ -55,6 +57,21 @@ import {
   recordedNumber,
   taskCountNeed,
 } from './journalCheckText.js';
+import { taughtNameReader } from './resultOutputRows.js';
+import {
+  awardChoiceFields,
+  awardHeldAvailability,
+  inFlightAwardJournal,
+  stepAwardEvidence,
+} from './runAwardChoiceProjection.js';
+import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
+import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
+import {
+  ingredientNeed,
+  ingredientOptionName,
+  ingredientOverrideIndex,
+  selectedIngredientIndex,
+} from './runJournalIngredientOptions.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -119,25 +136,6 @@ function historicalStepAttempted(step, run, index) {
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
-const SAFE_EXECUTION_EFFECT_KINDS = new Set([
-  'executeCraftingStage',
-  'consumeItems',
-  'awardItems',
-  'consumeIngredients',
-  'consumeAlchemyExtras',
-  'spendCurrency',
-  'applyToolUsage',
-  'awardResults',
-  'finalizeCraftingStage',
-  'recordRecipeUse',
-  'learnAlchemyRecipe',
-  'fireComplications',
-  'postCraftChat',
-  'recordAlchemyDeadEnd',
-  'consumeAlchemyItems',
-  'createGatheredResults',
-  'refundStageConsumption',
-]);
 
 /**
  * Defensively drop models that repeat a native run identity, keeping the first
@@ -172,9 +170,6 @@ function dedupeRunModelsById(models, phase) {
  * into a non-negative second count. Mirrors `CraftingRunManager._durationToSeconds`
  * (months = 30 days, years = 365 days) so the projection's required-time read
  * matches the gate the engine arms.
- *
- * @param {object|null} timeRequirement
- * @returns {number}
  */
 function durationToSeconds(timeRequirement = null) {
   if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
@@ -207,7 +202,7 @@ function durationToSeconds(timeRequirement = null) {
  * Native actor/type/id keys retain identity while `activityKind` distinguishes alchemy.
  * Lifecycle actions, paused-first readiness, current-stage selection intent and allowlisted
  * recovery evidence supplement the legacy `manualAdvance` compatibility flag.
- * The completion-preference action describes visibility, not automatic material-spending eligibility.
+ * Completion preference states visibility; `completesAsTimePasses` states scan eligibility.
  * Authored requirements and possible yields remain distinct from actual spending and awards.
  *
  * Like {@link GatheringListingBuilder} it never returns raw Foundry documents:
@@ -286,6 +281,7 @@ export class RunJournalBuilder {
     resolveItemEssences = null,
     affordCurrency = null,
     affordCurrencySpends = null,
+    getAwardChoiceClaimability = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -320,6 +316,7 @@ export class RunJournalBuilder {
     this._affordCurrency = typeof affordCurrency === 'function' ? affordCurrency : undefined;
     this._affordCurrencySpends =
       typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
+    this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
   }
 
   /**
@@ -383,7 +380,7 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     });
-    const history = this._buildRunModels({
+    const closed = this._buildRunModels({
       actor,
       viewer: resolvedViewer,
       worldTime,
@@ -393,6 +390,9 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     }).filter((run) => !dismissedRunKeys.has(run.key));
+    // A closed run still owing a pick is listed, and counted, under Active until it is settled.
+    activeRuns.push(...closed.filter((run) => run.awardChoicePending));
+    const history = closed.filter((run) => !run.awardChoicePending);
     return {
       selectedActorId: idOf(actor),
       selectedActorUuid: this._actorUuid(actor),
@@ -405,7 +405,7 @@ export class RunJournalBuilder {
   }
 
   /**
-   * The recipe every non-fizzle crafting run in the pass resolves to, keyed by run id.
+   * The recipe every non-fizzle crafting run in the pass resolves to, its accepted terms first.
    *
    * Resolved once here instead of once inside each `_craftingRunModel`, because
    * {@link buildListing} needs the recipes up front to give the pass snapshot their legacy
@@ -418,10 +418,9 @@ export class RunJournalBuilder {
   _craftingRunRecipes(runs) {
     const byRunId = new Map();
     for (const run of runs) {
-      // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe, so
-      // resolving one for it here would add a lookup the pass does not make today.
+      // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe.
       if (!run?.id || run.isFizzle === true || byRunId.has(run.id)) continue;
-      const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
+      const recipe = resolveRunRecipe(run, this._recipeManager);
       if (recipe) byRunId.set(run.id, recipe);
     }
     return byRunId;
@@ -467,7 +466,7 @@ export class RunJournalBuilder {
       ? runs.filter((run) => accessByRun.get(run)?.visible === true && !run.isFizzle)
       : [];
     const crafting = runs.map((run, runIndex) =>
-      this._craftingRunModel({
+      this._withAwardChoices({
         run,
         actor,
         viewer,
@@ -638,7 +637,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
-      selectionAvailability: currentStep?.selectionAvailability ?? null,
+      selectionAvailability: this._awardHeld(run, actor, currentStep?.selectionAvailability),
       stageStart: this._stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
@@ -728,6 +727,39 @@ export class RunJournalBuilder {
       canCancel: lifecycleProjection.actions.cancel,
       refundOnCancel: system?.features?.refundOnPlayerCancel !== false,
     };
+  }
+
+  /** `_craftingRunModel` with the run's award choices for this viewer (issue 1773). */
+  _withAwardChoices(args) {
+    const { run, actor, viewer, authority, recipe, access } = args;
+    const model = this._craftingRunModel(args);
+    if (!model || run.isFizzle === true) return model;
+    const { _recipeManager: recipeManager, _recipeVisibility: recipeVisibility, localize } = this;
+    const taughtName = taughtNameReader(
+      { recipeManager, recipeVisibility },
+      { isGM: viewer?.isGM === true, viewer, craftingActor: actor, knowledgeSources: [actor] }
+    );
+    const currencyUnits = () => recipeManager?._resolveNormalizedCurrencyUnits?.(recipe) ?? [];
+    const system = this._getSystem(stringOrNull(run.craftingSystemId));
+    const claimability = () => this._awardChoiceClaimability({ run, actor });
+    const fields = awardChoiceFields({
+      run,
+      actions: model.actions,
+      owner: actor?.isOwner === true,
+      entitled: viewer?.isGM === true || access?.visible === true,
+      authority,
+      describe: { system, currencyUnits, taughtName, localize },
+      claimability,
+    });
+    const bolt = completesAsTimePasses({ run, recipe, getSystem: this._getSystem, claimability });
+    return { ...model, ...fields, completesAsTimePasses: bolt };
+  }
+
+  /** The current stage's readiness, held while an earlier stage owes a claimable pick. */
+  _awardHeld(run, actor, availability) {
+    return awardHeldAvailability(availability, run, () =>
+      this._awardChoiceClaimability({ run, actor })
+    );
   }
 
   /**
@@ -896,7 +928,7 @@ export class RunJournalBuilder {
       completedAt: historyEntitled ? recordedNumber(runStep?.completedAt) : null,
       presentationSnapshot: evidence.presentationSnapshot ?? null,
       resolutionSnapshot: evidence.resolutionSnapshot ?? null,
-      ...(historyEntitled && historyEvidenceFields(runStep)),
+      ...(historyEntitled && stepAwardEvidence(runStep)),
       essenceSpend: evidence.essenceSpend ?? null,
       currencySpends:
         evidence.currencySpends ??
@@ -1568,55 +1600,32 @@ export class RunJournalBuilder {
     system,
     selection,
   }) {
-    const groupId = stringOrNull(group?.id);
-    const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
-    const options = normalizeList(group?.options).map((option, index) => {
-      const candidate = this._resolveIngredientSelection({
-        ingredientSet,
-        recipe,
-        actor,
-        items,
-        optionOverrides: {
-          ...optionOverrides,
-          [groupId]: { optionIndex: index },
-        },
-        essenceAllocation,
-        editFeasibility: true,
-      });
-      const presentation = this._ingredientOptionPresentation({
-        group,
-        option,
-        index,
-        available: candidate?.success === true,
-        recipe,
-        items,
-        system,
-      });
-      presentation.candidates = presentation.candidates.map((item) => {
-        const resolved = this._resolveIngredientSelection({
-          ingredientSet,
+    return choiceAvailability({
+      group,
+      ingredientSet,
+      optionOverrides,
+      selection,
+      resolve: (set, overrides) =>
+        this._resolveIngredientSelection({
+          ingredientSet: set,
           recipe,
           actor,
           items,
+          optionOverrides: overrides,
           essenceAllocation,
           editFeasibility: true,
-          optionOverrides: {
-            ...optionOverrides,
-            [groupId]: { optionIndex: index, heldItemId: item.itemId },
-          },
-        });
-        const claimed = normalizeList(resolved?.plan)
-          .filter(
-            (entry) =>
-              entry.ingredient !== option &&
-              (stringOrNull(entry.item?.uuid) || stringOrNull(idOf(entry.item))) === item.itemId
-          )
-          .reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
-        return { ...item, claimed, available: resolved?.success === true };
-      });
-      return presentation;
+        }),
+      present: (option, index, available) =>
+        this._ingredientOptionPresentation({
+          group,
+          option,
+          index,
+          available,
+          recipe,
+          items,
+          system,
+        }),
     });
-    return { groupId, selectedOptionIndex, options };
   }
 
   _requirementPresentation({ group, recipe, items, optionOverrides, selection, system, choice }) {
@@ -2493,7 +2502,7 @@ export class RunJournalBuilder {
     const lifecycleContract = getRunLifecycleContract(run);
     const recoveryEvidence =
       this._recoveryEvidence(
-        run?.executionJournal,
+        inFlightAwardJournal(run) ?? run?.executionJournal,
         evidenceEntitled,
         stringOrNull(run?.craftingSystemId)
       ) ?? this._nativeRecoveryEvidence(run, evidenceEntitled);
@@ -2724,14 +2733,15 @@ export class RunJournalBuilder {
         }[settlement[key]],
         hasReceipt: true,
         receipt: entitled
-          ? {
-              items: normalizeList(
-                key === 'consumption'
-                  ? (owner.consumedIngredients ?? owner.consumedComponents)
-                  : owner.createdResults
-              ).map((entry) => this._mapResult(entry, run.craftingSystemId, false)),
-              currencies: [],
-            }
+          ? this._receiptProjection(
+              key === 'consumption'
+                ? normalizeList(owner.consumedIngredients ?? owner.consumedComponents)
+                : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(
+                    normalizeList
+                  ),
+              run.craftingSystemId,
+              { resolveMetadata: false }
+            )
           : null,
       }));
     return {
@@ -2774,16 +2784,31 @@ export class RunJournalBuilder {
       entries = normalizeList(receipt.results);
     } else if (effect.kind === 'createGatheredResults') {
       entries = normalizeList(receipt);
+    } else if (['awardRewards', 'awardChoice'].includes(effect.kind)) {
+      entries = [receipt.createdResults, receipt.currencyCredits, receipt.knowledgeGrants].flatMap(
+        normalizeList
+      );
     }
+    const spends = effect.kind === 'spendCurrency' ? normalizeList(receipt.settledSpends) : [];
+    return this._receiptProjection(entries, systemId, { spends });
+  }
+
+  /** A receipt's rows by shape (issue 1773): Item receipts as items, a spend or a credit as a
+   *  currency row and a grant as a grant row, so a reconciling GM sees what a reward step paid. */
+  _receiptProjection(entries, systemId, { spends = [], resolveMetadata = true } = {}) {
+    const { items, currencyCredits, knowledgeGrants } = splitHistoryReceipts(entries);
+    const grants = knowledgeGrants.map(({ recipeId, recipeName, outcome }) => ({
+      recipeId,
+      recipeName: recipeName ?? null,
+      outcome,
+    }));
     return {
-      items: entries.map((entry) => this._mapResult(entry, systemId)),
-      currencies:
-        effect.kind === 'spendCurrency'
-          ? normalizeList(receipt.settledSpends).map((spend) => ({
-              unit: stringOrEmpty(spend?.unit),
-              amount: numberOrNull(spend?.amount),
-            }))
-          : [],
+      items: items.map((entry) => this._mapResult(entry, systemId, resolveMetadata)),
+      currencies: [...spends, ...currencyCredits].map((entry) => ({
+        unit: stringOrEmpty(entry?.unit),
+        amount: numberOrNull(entry?.amount),
+      })),
+      ...(grants.length > 0 && { grants }),
     };
   }
 }
@@ -2817,57 +2842,6 @@ function normalizeName(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase();
-}
-
-function ingredientOverrideIndex(group, optionOverrides) {
-  const groupId = stringOrNull(group?.id);
-  if (!Object.hasOwn(optionOverrides, groupId)) return;
-  const raw = optionOverrides[groupId]?.optionIndex;
-  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
-  if (typeof raw === 'string' && !raw.trim()) {
-    return null;
-  }
-  const index = Number(raw);
-  return Number.isSafeInteger(index) && index >= 0 && index < normalizeList(group?.options).length
-    ? index
-    : null;
-}
-
-function selectedIngredientIndex(group, optionOverrides, selection) {
-  const options = normalizeList(group?.options);
-  const override = ingredientOverrideIndex(group, optionOverrides);
-  if (override !== undefined) return override;
-  const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
-    options.includes(ingredient)
-  );
-  const selectedIndex = options.indexOf(selected);
-  return Math.max(selectedIndex, 0);
-}
-
-function ingredientNeed(option) {
-  const match = plainObjectOrNull(option?.match);
-  if (match?.type === 'essence' || match?.type === 'currency') {
-    return Math.max(0, numberOrNull(match.amount) ?? 0);
-  }
-  return Math.max(0, numberOrNull(option?.quantity) ?? 1);
-}
-
-function ingredientOptionName({ group, option, kind, match, definition, component }) {
-  if (kind === 'component') {
-    return stringOrEmpty(component?.name) || stringOrEmpty(match?.componentId);
-  }
-  if (kind === 'essence') {
-    const essenceName = stringOrEmpty(definition?.name) || stringOrEmpty(match?.essenceId);
-    return essenceName ? `${essenceName} essence` : '';
-  }
-  if (kind === 'currency') {
-    return `${ingredientNeed(option)} ${stringOrEmpty(match?.unit)}`.trim();
-  }
-  if (kind === 'tag') {
-    const tags = normalizeList(match?.tags).map(stringOrEmpty).filter(Boolean);
-    return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
-  }
-  return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
 }
 
 /**
@@ -2950,8 +2924,4 @@ function safeMissingGroup(group) {
     need: numberOrNull(group?.need),
     have: numberOrNull(group?.have),
   };
-}
-
-function missingGroupId(group) {
-  return stringOrNull(group?.group?.id ?? group?.groupId ?? group?.id);
 }

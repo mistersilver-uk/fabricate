@@ -5,12 +5,29 @@
 import { JOURNAL_SOURCES } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
+/** Issue 2257 D22: the run kickers in `Kicker`'s muted scale, the switch's well, and the heading they set. */
+const RUN_KICKER = 'font-size: 8.5px; letter-spacing: 0.935px; color: var(--fab-text-muted)';
+const RUN_KICKER_CLAIMS = Object.freeze({
+  'waiting-auto-eligible': [
+    { selector: '[data-run-completion] > :first-child', styles: RUN_KICKER },
+    { selector: '[data-run-completion-switch]', styles: 'box-sizing: border-box; height: 36px' },
+  ],
+  'past-stage': [
+    { selector: '[data-journal-detail] .fab-run-progress-heading .fab-kicker', styles: RUN_KICKER },
+    {
+      selector: '[data-journal-detail] .fab-run-progress-heading',
+      styles: 'box-sizing: border-box; height: 11.046875px',
+    },
+  ],
+});
+
 /** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
 export function journalLifecycleCases() {
   const states = [
     'ready-single',
     'legacy-armed',
     'waiting-auto-eligible',
+    'waiting-auto-completes',
     'waiting-open-choice',
     'stage-not-started',
     'awaiting-choice',
@@ -79,8 +96,17 @@ export function journalLifecycleCases() {
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
+    'kind-filter-open',
     'history-settling',
+  ];
+  // A state with no fixture of its own walks another state's world.
+  const fixtureStates = { 'kind-filter-open': 'kind-toggles' };
+  const fixtureOf = (state) => fixtureStates[state] ?? state.replace(/-finished$/, '');
+  // The run-type filter's closed and open faces claim it, rather than every lifecycle frame.
+  const kindFilterSources = [
+    /^src\/ui\/svelte\/apps\/journal\/JournalKindFilter\.svelte$/,
+    /^src\/ui\/svelte\/util\/journalRunKinds\.js$/,
   ];
   const selectRivets = [
     { selector: '[data-journal-search] input', fill: 'Forge Iron Rivets' },
@@ -103,7 +129,7 @@ export function journalLifecycleCases() {
           'empty-search',
           'wide',
           'narrow',
-          'kind-menu-open',
+          'kind-toggles',
           'finished-cancelled',
         ],
       ],
@@ -132,7 +158,7 @@ export function journalLifecycleCases() {
     narrow: 'lab-v1-wide',
   };
   const selectCaseRun = (state) => {
-    const fixtureState = state.replace(/-finished$/, '');
+    const fixtureState = fixtureOf(state);
     const name = selectionNames[fixtureState];
     if (!name) return [];
     const id = selectedIds[fixtureState] ?? `lab-v1-${fixtureState}`;
@@ -142,7 +168,23 @@ export function journalLifecycleCases() {
       { selector: '[data-journal-search] input', fill: '' },
     ];
   };
+  // The run-type multi-select: its trigger opens and shuts the panel, and each row flips one kind.
+  const kindTrigger = { selector: '[data-journal-kind-trigger]' };
+  const kindOption = (kind) => `[data-journal-kind-option="${kind}"]`;
+  const untickKinds = (...kinds) => kinds.map((kind) => ({ selector: kindOption(kind) }));
+  const showOnlyKind = (kind) => [
+    kindTrigger,
+    ...untickKinds(
+      ...['crafting', 'gathering', 'salvage', 'alchemy'].filter((other) => other !== kind)
+    ),
+    kindTrigger,
+  ];
   const steps = {
+    // Issue 1644: a run counting down sorts after the four ready ones, so its search stays applied.
+    'waiting-auto-completes': [
+      { selector: '[data-journal-search] input', fill: 'Cure a Salted Hide' },
+      { selector: '[data-run-id="lab-v1-waiting-auto-completes"]' },
+    ],
     // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
@@ -188,17 +230,12 @@ export function journalLifecycleCases() {
     'stale-action': [{ selector: '[data-run-action="primary"]' }],
     'command-timeout': [{ selector: '[data-run-action="primary"]' }],
     'roll-cancelled': [{ selector: '[data-run-action="primary"]' }],
-    alchemy: [
-      { selector: '[data-journal-kind-filter]' },
-      { selector: '[data-popover-option="alchemy"]' },
-    ],
-    salvage: [
-      { selector: '[data-journal-kind-filter]' },
-      { selector: '[data-popover-option="salvage"]' },
-    ],
+    alchemy: showOnlyKind('alchemy'),
+    salvage: showOnlyKind('salvage'),
     'past-routed-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-routed-stage': [{ selector: '[data-stage-nav-index="3"]' }],
-    'kind-menu-open': [{ selector: '[data-journal-kind-filter]' }],
+    'kind-toggles': [kindTrigger, ...untickKinds('gathering'), kindTrigger],
+    'kind-filter-open': [kindTrigger, ...untickKinds('gathering', 'alchemy')],
     'essence-overshoot': [
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
@@ -229,6 +266,7 @@ export function journalLifecycleCases() {
   };
   const detail = '[data-journal-detail]';
   const primary = '[data-run-action="primary"]';
+  const bolt = '[data-run-completes-as-time-passes][role="img"]';
   const enabledPrimary = `${primary}:not(:disabled):not([aria-busy="true"])`;
   const has = (...selectors) => selectors.map((selector) => `:has(${selector})`).join('');
   const lacks = (...selectors) => selectors.map((selector) => `:not(:has(${selector}))`).join('');
@@ -286,6 +324,13 @@ export function journalLifecycleCases() {
         '[data-journal-summary-card="time"]',
         `${primary}:disabled`
       ),
+    // Issue 1644: the one fixture the engine would finish unattended, so its row carries the named bolt.
+    'waiting-auto-completes':
+      '.journal-view-container' +
+      has(
+        `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt} + [data-run-status="waiting"]`,
+        `${detail} [data-run-completion-switch] input[value="worldTime"]:checked`
+      ),
     // An open requirement rail belongs to an unbegun stage (D-028), which offers the begin decision instead.
     'waiting-open-choice':
       detail +
@@ -303,7 +348,7 @@ export function journalLifecycleCases() {
       '.journal-view-container' +
       has(
         '[data-run-id="lab-v1-awaiting-choice"] [data-run-attention="choice"]',
-        `${detail} .journal-detail-meta [data-run-attention="choice"]`,
+        `${detail} .player-detail-header-meta [data-run-attention="choice"]`,
         '[data-journal-awaiting-choice="true"][data-notice-tone="info"]',
         '[data-journal-route] input:not(:disabled)'
       ) +
@@ -480,7 +525,7 @@ export function journalLifecycleCases() {
       has(
         '[data-run-action="primary"]:not(:disabled)',
         '[data-journal-stage-consumed] [data-list-row]',
-        '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]'
+        '.journal-detail-header [data-player-detail-header] img[src$="bottle-bulb-corked-glowing-red.webp"]'
       ) +
       lacks('[data-journal-verdict]', '[data-slot-row]'),
     salvage: terminal('succeeded', '[data-history-items="produced"]'),
@@ -560,7 +605,22 @@ export function journalLifecycleCases() {
         '[data-stage-nav-return]'
       ) +
       lacks('[data-journal-summary]', '[data-journal-time-remaining]'),
-    'kind-menu-open': '[role="listbox"] [data-popover-option="gathering"]',
+    'kind-toggles':
+      '.journal-view-container' +
+      has(
+        '[data-journal-kind-filter][data-journal-kind-shown="crafting salvage alchemy"]',
+        '[data-journal-kind-trigger][aria-expanded="false"]',
+        '[data-run-id]'
+      ),
+    'kind-filter-open':
+      '.journal-kind-popover' +
+      has(
+        `${kindOption('crafting')}[aria-selected="true"]`,
+        `${kindOption('gathering')}[aria-selected="false"]`,
+        `${kindOption('salvage')}[aria-selected="true"]`,
+        `${kindOption('alchemy')}[aria-selected="false"]`,
+        '[data-journal-kind-show-all]'
+      ),
     'history-checked-choice': terminal(
       'succeeded',
       '[data-history-summary="check"] ~ [data-history-items="consumed"] ~ [data-history-items="produced"]'
@@ -662,7 +722,7 @@ export function journalLifecycleCases() {
       reaches: 'beyond',
       query: {
         tab: 'journal',
-        journalCaseState: state.replace(/-finished$/, ''),
+        journalCaseState: fixtureOf(state),
         ...(['history-gm-deleted-recipe', 'claim-retained'].includes(state) && { viewer: 'gm' }),
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
@@ -679,11 +739,20 @@ export function journalLifecycleCases() {
       expectTab: 'journal',
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
+      ...(state === 'waiting-auto-completes' && {
+        expectAttributes: ['aria-label', 'data-tooltip'].map((name) => ({
+          selector: `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt}`,
+          name,
+          value: 'Finishes this stage as time passes',
+        })),
+      }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),
-      ...(state === 'kind-menu-open' && { expectCenterHit: '[data-popover-option="gathering"]' }),
+      ...(state === 'kind-toggles' && { expectCenterHit: kindTrigger.selector }),
+      ...(state === 'kind-filter-open' && { expectCenterHit: kindOption('salvage') }),
       ...(state === 'current-choice-closed' && {
         expectCenterHit: '[data-slot-row] button.fab-slot-tile',
       }),
+      ...(RUN_KICKER_CLAIMS[state] && { expectLayout: { controls: RUN_KICKER_CLAIMS[state] } }),
       ...(['narrow', 'wide'].includes(state) && {
         expectLayout: {
           containerSelector: '.journal-view-container',
@@ -697,6 +766,7 @@ export function journalLifecycleCases() {
         JOURNAL_SOURCES,
         /^src\/ui\/svelte\/stores\/journalStore/,
         /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+        ...(['kind-toggles', 'kind-filter-open'].includes(state) ? kindFilterSources : []),
       ],
     })
   );

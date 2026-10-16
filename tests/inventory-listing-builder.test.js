@@ -787,6 +787,27 @@ describe('InventoryListingBuilder — tools + produced-by', () => {
     assert.equal(rowByComponent(listing, 'c1').producedBy[0].recipeId, 'r1');
   });
 
+  it('lists a recipe offering the component only as a choice group alternative (issue 1773)', () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'c2' },
+        { id: 'b', componentId: 'c1' },
+      ],
+    };
+    const recipe = {
+      id: 'r1',
+      name: 'Smelt Either',
+      img: 'icons/smelt.webp',
+      craftingSystemId: 'sys-1',
+      ingredientSets: [],
+      steps: [{ id: 's1', resultGroups: [{ id: 'g1', results: [choice] }] }],
+    };
+    const { builder } = makeBuilder({ recipes: [recipe] });
+    const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
+    assert.equal(rowByComponent(listing, 'c1').producedBy[0]?.recipeId, 'r1');
+  });
+
   it('lists salvage producers (kind: salvage) from a component whose salvage yields it', () => {
     const system = makeSystem({
       components: [

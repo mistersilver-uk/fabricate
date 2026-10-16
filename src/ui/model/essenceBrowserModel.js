@@ -18,9 +18,6 @@ export const ESSENCE_STATUS_FILTERS = Object.freeze(['all', 'enabled', 'disabled
 /** The source-state filter's options, in render order. */
 export const ESSENCE_SOURCE_FILTERS = Object.freeze(['all', 'linked', 'none', 'needs-attention']);
 
-/** The library's two presentations. */
-export const ESSENCE_VIEW_MODES = Object.freeze(['list', 'grid']);
-
 /** Default page size. */
 export const ESSENCE_DEFAULT_PAGE_SIZE = 25;
 

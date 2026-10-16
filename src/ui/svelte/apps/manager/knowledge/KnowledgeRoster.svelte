@@ -13,7 +13,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Avatar from '../../../components/Avatar.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
 
   let {
     characters = [],
@@ -45,17 +45,17 @@
   class="manager-knowledge-roster"
   aria-label={text('FABRICATE.Admin.Manager.Knowledge.RosterLabel', 'Characters')}
 >
-  <!-- The `flex: 0 0 auto` override is authored against `.manager-knowledge-roster .manager-search`,
+  <!-- The `flex: 0 0 auto` override is authored against `.manager-knowledge-roster .fabricate-search`,
        beside the Access roster's identical one, so this needs no class of its own. -->
-  <ManagerSearchField
+  <SearchField
     value={searchTerm}
-    onInput={(next) => onSearch(next)}
+    onChange={(next) => onSearch(next)}
     placeholder={text(
       'FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder',
       'Search characters...'
     )}
     ariaLabel={text('FABRICATE.Admin.Manager.Knowledge.SearchLabel', 'Search characters')}
-    inputAttrs={{ 'data-knowledge-search': '' }}
+    inputProps={{ 'data-knowledge-search': '' }}
   />
 
   <div class="manager-knowledge-roster-scroll">
@@ -67,7 +67,7 @@
           'FABRICATE.Admin.Manager.Knowledge.RosterLoadingTitle',
           'Loading player characters...'
         )}
-        dataAttr="data-knowledge-roster-loading"
+        data-knowledge-roster-loading
       />
     {:else if error}
       <!-- The detail pane carries the failure notice; the roster makes no claim at all. -->
@@ -108,7 +108,7 @@
             data-knowledge-actor={character.id}
             onclick={() => onSelect(character.id)}
           >
-            <Avatar art={character.img} name={character.name} size={34} alt="" />
+            <Avatar art={character.img} name={character.name} size={32} alt="" />
             <span class="manager-knowledge-roster-copy">
               <strong class="manager-knowledge-roster-name" title={character.name}
                 >{character.name}</strong

@@ -257,6 +257,7 @@ An ABSENT store seam MUST SKIP the merge rather than construct one, so an import
 Any first write flips that entity type's Valid Id Basis from UNKNOWN to KNOWN across every system in the world, including systems the import never touched.
 So an import into an unmigrated world leaves its three settings ABSENT and behaves exactly as the previous schema does; the derived slices are computed and then DISCARDED, and nothing is lost, because when that world later migrates the `1.30.0` pass derives the world entities for the imported system from the in-system arrays the import did land.
 Because the destination is already seeded whenever a write happens, the merge only ever WIDENS a KNOWN basis, and widening a basis can never prune anything that was surviving.
+A COMPONENT import is not this merge and is not bound by this rule: it brings Items into one system, registers each as a World Component, and can itself seed `fabricate.componentScope` (`data-models/spec.md` -> Scoped Entity Definitions, `### Component scope` requirement 6), after which that scope is a seeded destination for every later import here while the essence and tool scopes stay as they were.
 
 An incoming slice adding no record to any of the three layers MUST write nothing, evaluated INDEPENDENTLY for each of the two writes.
 
@@ -408,6 +409,11 @@ Import MUST NOT auto-remove recipes lacking provenance (GM-authored, or imported
 Auto-pruning therefore takes effect from the first provenance-stamping reinstall ONWARD: recipes imported before this feature are unprovenanced on their first post-fix reinstall and resolve via the report-only path.
 Pruning MUST persist in the same single batched `recipes` write as the import (a prune-only reinstall still writes once), and the actor-flag cleanup following the prune MUST run as ONE bulk pass across affected actors, not once per pruned recipe.
 A copy-mode / fresh-system import mints a new system id and has no persisted recipes to overwrite, so it never enters the prune path.
+
+A provenance-matched orphan candidate that a begun crafting run still resolves against MUST NOT be pruned: it is preserved and reported with `reason: 'activeRuns'`, alongside `unprovenanced` and `foreignProvenance` above.
+The held set MUST be computed from every actor's active runs before pruning, over the same actor roster the run manager exposes, so the exception applies regardless of import mode wherever a run persists.
+This is a genuine exception, not a delay folded into the absent-set: the recipe IS in the absent-set (it is genuinely missing from the incoming payload), and it is spared anyway because a run resolves it through the accepted terms it captured at start (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms), and deleting the recipe out from under an in-progress craft would discard work the player already committed to.
+For example, a reinstall of a pack whose new payload no longer ships a recipe an actor's run is executing leaves that recipe in place, reported rather than removed, while the run resolves and completes against the terms it accepted at start; only once no active run references the recipe does a later import prune it under the rule above.
 
 ### Orphan reporting
 

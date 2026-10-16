@@ -6,7 +6,7 @@
     label = '',
     ariaLabel = '',
     art = '',
-    icon = 'fas fa-circle',
+    icon = '',
     tint = '',
     state = 'met',
     pip = '',
@@ -18,8 +18,11 @@
     onActivate = () => {},
   } = $props();
 
-  const states = new Set(['met', 'short', 'open']);
+  const states = new Set(['met', 'partial', 'short', 'open']);
   const resolvedState = $derived(states.has(state) ? state : 'met');
+  // An open face with no caller glyph or art draws the empty ring (design-system spec, run detail).
+  const unpicked = $derived(resolvedState === 'open' && !icon && !art);
+  const glyphClass = $derived(icon || (unpicked ? 'fa-regular fa-circle' : 'fas fa-circle'));
   const host = $derived(interactive ? 'button' : 'div');
   const attributes = $derived(
     interactive
@@ -39,13 +42,16 @@
     this={host}
     class="fab-slot-tile is-{resolvedState}"
     class:is-selected={pressed}
+    class:is-unpicked={unpicked}
     onclick={interactive && !disabled ? onActivate : undefined}
     {...attributes}
   >
-    <Medallion {art} {icon} {tint} alt="" size={56} glyph={19} />
+    <!-- ratchet-exempt(design-system): the specimen's own 56px tap target, not a record tile -->
+    <Medallion {art} icon={glyphClass} {tint} alt="" size={56} glyph={unpicked ? 15 : 19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}
+    {#if pressed}<i class="fab-slot-tick fa-solid fa-circle-check" aria-hidden="true"></i>{/if}
   </svelte:element>
   <span class="fab-slot-caption">{label}</span>
   {#if interactive && affordance}
@@ -72,7 +78,7 @@
     padding: 0;
     place-items: center;
     overflow: visible;
-    border: 1px solid var(--fab-border);
+    border: 0;
     border-radius: 11px;
     background: var(--fab-bg-3);
     color: inherit;
@@ -83,18 +89,40 @@
     cursor: pointer;
   }
 
+  /* The edge is a ring outside the tile, declared per state because the open face draws its dashed border instead. */
+  .fab-slot-tile.is-met {
+    box-shadow: 0 0 0 1px var(--fab-border);
+  }
+
   .fab-slot-tile.is-short {
-    border-color: var(--fab-danger-border);
+    box-shadow: 0 0 0 1px var(--fab-danger-border);
+  }
+
+  .fab-slot-tile.is-partial {
+    box-shadow: 0 0 0 1px var(--fab-warning-border);
   }
 
   .fab-slot-tile.is-open {
-    border-style: dashed;
-    border-color: var(--fab-accent-border);
+    border: 1px dashed var(--fab-accent-border);
+  }
+
+  .fab-slot-tile.is-unpicked {
+    --fab-medallion-tint: var(--fab-accent-text);
   }
 
   .fab-slot-tile.is-selected {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  .fab-slot-tick {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    font-size: 13px;
+    color: var(--fab-accent);
+    background: var(--fab-bg-1);
+    border-radius: 50%;
   }
 
   .fab-slot-tile :global(.fab-medallion) {
@@ -112,21 +140,29 @@
     transform: translateX(-50%);
     border-radius: 999px;
     background: var(--fab-success);
-    color: var(--fab-bg-0);
+    color: var(--fab-on-success);
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
+    line-height: 1.6;
     white-space: nowrap;
   }
 
   .is-short .fab-slot-pip {
     background: var(--fab-danger);
+    color: var(--fab-on-danger);
+  }
+
+  /* Met and short pips keep their on-colours; every other pip takes the page ground (issue 2257). */
+  .is-partial .fab-slot-pip {
+    background: var(--fab-warning);
+    color: var(--fab-bg-0);
   }
 
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
+    color: var(--fab-bg-0);
   }
 
   .fab-slot-caption {
@@ -147,6 +183,10 @@
     color: var(--fab-danger-text);
   }
 
+  [data-slot-state='partial'] .fab-slot-caption {
+    color: var(--fab-warning-text);
+  }
+
   [data-slot-state='open'] .fab-slot-caption {
     color: var(--fab-accent-text);
   }
@@ -154,7 +194,7 @@
   .fab-slot-affordance {
     display: flex;
     align-items: center;
-    gap: calc(var(--fab-space-chip) / 2);
+    gap: var(--fab-space-1);
     color: var(--fab-accent);
     font-size: 8px;
     font-weight: 600;

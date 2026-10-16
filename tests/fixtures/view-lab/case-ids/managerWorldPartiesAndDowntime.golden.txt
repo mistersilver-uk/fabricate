@@ -3,6 +3,7 @@ manager-world-travel-expanded-neutral
 manager-world-parties-normal
 manager-world-parties-stacked
 manager-world-parties-card-stacked-680
+manager-world-parties-card-700
 manager-world-parties-no-selection
 manager-world-parties-empty
 manager-world-parties-search-filtered
@@ -20,3 +21,5 @@ manager-world-downtime-test-companion-installed
 manager-world-downtime-test-companion-chrome
 manager-world-downtime-test-companion-rollup
 manager-world-downtime-test-companion-tab-navigation
+manager-world-downtime-narrow-settings
+manager-world-downtime-tracking-described

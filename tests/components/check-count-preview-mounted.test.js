@@ -153,8 +153,8 @@ async function roll(root, done = '[data-checks-simulator-readout], [data-checks-
 const odds = (root) => root.querySelector('[data-checks-odds-state]');
 const rollButton = (root) => root.querySelector('[data-checks-simulator-roll]');
 const oddsRows = (root) =>
-  [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
-    cell.dataset.checksOddsPercent,
+  [...root.querySelectorAll('[data-banded-bar-percent]')].map((cell) => [
+    cell.dataset.bandedBarPercent,
     cell.textContent.trim(),
   ]);
 
@@ -215,9 +215,9 @@ describe('count odds and the simulator readout', () => {
       breakdown: '4 qualified − 2 cancelled = 2 net · Idrin',
       total: '2',
       line: ['needs 2 · margin +0', 'margin'],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.count,
-      rows: [['result-group', 'Result group produced', 'Success']],
+      rows: [['result-group', 'Result set produced', 'Success']],
     });
     // The shared tiles sit under the medallion row (issue 2006).
     assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .fabricate-dice-tiles')));
@@ -327,7 +327,14 @@ describe('count odds and the simulator readout', () => {
       }),
       tiers: [],
     });
-    assert.equal(odds(root).querySelector('[data-checks-odds-row]').dataset.checksOddsRow, 'botch');
+    // A one-outcome chart is the single-row `BandedBar`, a meter, rather than a histogram (issue 1782).
+    const only = odds(root).querySelector('[data-banded-bar-track]');
+    assert.equal(only.dataset.bandedBarTrack, 'botch');
+    assert.equal(only.closest('[role="meter"]').getAttribute('aria-valuenow'), '100');
+    assert.ok(
+      only.closest('.fab-banded-bar-band[data-banded-bar-row="botch"]'),
+      'drawn in the band row the histogram draws, not as a chance bar'
+    );
     await roll(root);
     const readout = root.querySelector('[data-checks-simulator-readout][data-checks-simulator-botch]');
     assert.ok(Boolean(readout), 'the readout is marked a botch');
@@ -422,8 +429,8 @@ describe('the count readout per outcome (issue 2080)', () => {
     const readout = await rolled(await mountRouted(ROUTED_COUNT));
     assert.deepEqual([readout.line, readout.card, readout.rows], [
       ['needs 2 · margin +1', 'margin'],
-      ['success', 'Fine', 'The recipe’s result group is produced'],
-      [['result-group', 'Result group produced', 'Fine']],
+      ['success', 'Fine', 'The recipe’s result set is produced'],
+      [['result-group', 'Result set produced', 'Fine']],
     ]);
   });
 
@@ -465,7 +472,7 @@ describe('the count readout per outcome (issue 2080)', () => {
     assert.deepEqual([readout.total, readout.line, readout.card, readout.note], [
       '−3',
       ['needs 1 · margin −4', 'margin'],
-      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['success', 'Success', 'The recipe’s result set is produced'],
       ['forced', 'Trigger fired — automatic success.'],
     ]);
   });

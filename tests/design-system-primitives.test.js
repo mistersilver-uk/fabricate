@@ -3,6 +3,7 @@
  * (issue 1116).
  */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -30,6 +31,13 @@ import {
   checkGate,
   manifestRows,
 } from './helpers/designSystemRatchet.js';
+import { LIST_ROW_ADOPTERS } from './helpers/listRowContract.js';
+import {
+  assertMovedByDiff,
+  headManifest,
+  isPrimitiveFile,
+  registerBase,
+} from './helpers/registerBase.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -73,26 +81,40 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(IconFactRow)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
  */
 const EXPECTED_OVERRIDE_KEYS = [
+  // Issue 1521: the fact row, on the frames that draw its `rule` density.
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // Issue 2420: the manager's title band, on the seven frames ManagerTitleBar's cases draw.
+  'src/ui/svelte/components/AppTitleBar.svelte',
+  // Issue 1522: identity art picked as a picture, on the frames that draw each of its states.
+  'src/ui/svelte/components/ArtPicker.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1782: the three instruments arrive over the fill leaf, which gains its own frame.
+  'src/ui/svelte/components/BandedBar.svelte',
+  // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
+  'src/ui/svelte/components/Button.svelte',
   // Issue 1505: the widened standing statement, the FIRST entry whose primitive earned its frames by
   // re-authoring rather than by a new state, and — with `EmptyState` — moved here by issue 1710.
   'src/ui/svelte/components/Callout.svelte',
   // Issue 1508: the percentage slider, and the second key gained by a family being RE-ROOTED rather
   // than by a component arriving or acquiring a state.
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
+  'src/ui/svelte/components/Chip.svelte',
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
+  // Issue 1782: the data table, on the drop rules card and the crafting IO table.
+  'src/ui/svelte/components/DataTable.svelte',
   // Issue 2006: the die tiles, a primitive ARRIVING, on the simulator's two rolled count frames.
   'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
@@ -102,49 +124,77 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  // Issue 1521: the strip of current values, on the check card's facts and the stamina pool.
+  'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
-  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
-  'src/ui/svelte/components/ManagerModal.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  // Issue 1782: the log list, on the journal's Finished list with a failed and a selected entry.
+  'src/ui/svelte/components/LogList.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
   // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
   'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Meter.svelte',
+  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
+  'src/ui/svelte/components/Modal.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 1777: the app navigation and its labelled rows, on both rail states and the player shell.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // Issue 1777: the page header, on the Tool library and Tool editor frames.
+  'src/ui/svelte/components/PageHeader.svelte',
+  // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
+  'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1782: the inspector rail section, on a frame of each of its three inspectors.
+  'src/ui/svelte/components/Rail.svelte',
+  // Issue 2431: the range bar's marker, on the time-of-day bar's frame, its only caller's.
+  'src/ui/svelte/components/RangeBarMarker.svelte',
+  // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  // Issue 2465: the expression field, on the seventeen frames that draw it.
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // Issue 1782: the rule row and its sentence, on an opened trigger, presets and a drop modifier.
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
   // override itself and everything about where it sorts.
   'src/ui/svelte/components/RunActionBar.svelte',
   'src/ui/svelte/components/RunProgress.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   // Issue 1719: the picker's portaled panel, extracted as an internal part of the entry above. It
   // sorts immediately after its parent, which is the whole reason the part is named for the part
   // rather than for a new piece of vocabulary. Its entry names fifteen frames against the
   // parent's ten, because every caller that opens a panel draws this file and only this file.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  // Issue 1516: the track, whose 30px inline rung only the requirement row's amount toggle draws.
+  'src/ui/svelte/components/SegmentedControl.svelte',
   // Issue 1504: the app's own select.
   'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 1782: the set picker, in its session form and its staged form's four states.
+  'src/ui/svelte/components/SetPicker.svelte',
   // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because this
   // list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`.
   'src/ui/svelte/components/SlotRow.svelte',
@@ -153,18 +203,31 @@ const EXPECTED_OVERRIDE_KEYS = [
   // because it arrives with three named frames — the surfaces whose row geometry moved — rather
   // than with the representative pair, which would publish two frames that do not contain it.
   'src/ui/svelte/components/SortableList.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
   'src/ui/svelte/components/StageCard.svelte',
   'src/ui/svelte/components/StageNav.svelte',
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // Issue 2424: the published tier track, on its specimen mounted through the seam.
+  'src/ui/svelte/components/TierTrack.svelte',
+  // Issue 2257: the tint palette and its trigger, on the frames that draw a pressed cell.
+  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 1782: the typeahead, on the limits tab and each site's open list.
+  'src/ui/svelte/components/Typeahead.svelte',
+  // Issue 2412: the list and grid switch, on the essence browser's list and its grid.
+  'src/ui/svelte/components/ViewToggle.svelte',
   // Issue 2008: the well below a card, a primitive ARRIVING, on the Formula card's option groups.
   'src/ui/svelte/components/Well.svelte',
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
   // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
   'src/ui/svelte/components/WorldClockChip.svelte',
+  // Issue 2321: the cross-reference list, on the inventory inspector, a tool's Required for and an
+  // essence's Contributing.
+  'src/ui/svelte/components/XrefList.svelte',
   'src/ui/svelte/components/YieldScale.svelte',
   'styles/fabricate.css',
 ];
@@ -200,17 +263,8 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
-  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPopover.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
-  'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
@@ -224,19 +278,58 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
-  // screen is its second independent caller, and property (e) below reported it as a component that
-  // had crossed the membership bar with nobody adjudicating it.
-  // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
-  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
-  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
-  // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
     'no case publishes, so override values cannot be checked'
+  );
+});
+
+test('a primitive neither appears nor vanishes without a register row (issue 1495)', (t) => {
+  // Counts are the base's plus this diff's own rows, never a literal a PR hand-edits.
+  const base = registerBase();
+  if (base.skipped) return t.skip(base.skipped);
+  const head = headManifest();
+  const paths = (rows) => rows.map((row) => row.path);
+  assertMovedByDiff(
+    'shipped primitive rows',
+    paths(base.manifest.designSystemPrimitives),
+    paths(head.designSystemPrimitives),
+    DESIGN_SYSTEM_PRIMITIVES.length
+  );
+  assertMovedByDiff(
+    'recorded non-member rows',
+    paths(base.manifest.notAPrimitive),
+    paths(head.notAPrimitive),
+    NOT_A_PRIMITIVE.length
+  );
+  // The component files and the rows must move together: a file with no row, or a row whose file
+  // went, shows here by name.
+  const rowPaths = (manifest) => [
+    ...paths(manifest.designSystemPrimitives),
+    ...paths(manifest.notAPrimitive),
+  ];
+  const baseRows = new Set(rowPaths(base.manifest).filter(isPrimitiveFile));
+  const headRows = new Set(rowPaths(head).filter(isPrimitiveFile));
+  assert.deepEqual(
+    base.files.added.filter((file) => !headRows.has(file)),
+    [],
+    'a component joined a primitive directory without a manifest row'
+  );
+  assert.deepEqual(
+    base.files.removed.filter((file) => headRows.has(file)),
+    [],
+    'a component left a primitive directory and its manifest row stayed'
+  );
+  assert.deepEqual(
+    [...headRows].filter((file) => !baseRows.has(file) && !base.files.added.includes(file)),
+    [],
+    'a manifest row appeared for a component the diff did not add'
+  );
+  assert.deepEqual(
+    [...baseRows].filter((file) => !headRows.has(file) && !base.files.removed.includes(file)),
+    [],
+    'a manifest row vanished while its component file stayed'
   );
 });
 
@@ -248,7 +341,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 131);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 117);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -293,13 +386,23 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
     stepperCases.includes('manager-gathering-economy-actors'),
     `a Stepper change selected ${JSON.stringify(stepperCases)}, none of which renders a stepper`
   );
+  assert.ok(
+    stepperCases.includes('manager-checks-parity-outcomes-multiply'),
+    `a Stepper change selected ${JSON.stringify(stepperCases)}, none of which reaches its endpoint`
+  );
 
   // Containment, not equality: the shipped selectors are scoped ('.fabricate-manager
   // [data-band-strip-band]'), so an equality criterion would fail a correct implementation.
+  const selectorsOf = (caseIds) =>
+    caseIds
+      .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
+      .join(' ');
+  assert.ok(
+    selectorsOf(stepperCases).includes('[data-stepper-endpoint]'),
+    `no selected case anchors on the null endpoint: ${JSON.stringify(stepperCases)}`
+  );
   const stripCases = selectedFor('src/ui/svelte/components/ThresholdBandStrip.svelte');
-  const stripSelectors = stripCases
-    .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
-    .join(' ');
+  const stripSelectors = selectorsOf(stripCases);
   assert.ok(
     stripSelectors.includes('[data-band-strip-band]'),
     `no selected case anchors on a band: ${JSON.stringify(stripCases)}`
@@ -310,13 +413,23 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
   );
 });
 
-test('(a) the two older overrides still name the frame that renders their state', () => {
+test('(a) the older overrides still name the frame that renders their state', () => {
   // The DOMAIN is pinned above and the VALUES have to be pinned too, one primitive at a time,
   // because a value is only ever wrong in a way no other assertion can see: repoint an override at
   // a case id that is already in the representative pair and the selection is unchanged, the entry
   // still resolves, and the primitive silently goes back to publishing frames that do not contain
   // it.
   const expectations = [
+    [
+      'src/ui/svelte/components/TintPicker.svelte',
+      'manager-gathering-biome-colour-popover-cursor',
+      'the one frame that draws the keyboard cursor on a swatch that is not pressed',
+    ],
+    [
+      'src/ui/svelte/components/TintPicker.svelte',
+      'manager-gathering-biome-colour-popover-cursor-selected',
+      'the one frame that draws the cursor and the selected ring on one swatch',
+    ],
     [
       'src/ui/svelte/components/IconPicker.svelte',
       'manager-system-edit-lists',
@@ -334,8 +447,190 @@ test('(a) the two older overrides still name the frame that renders their state'
     [
       'src/ui/svelte/components/EmptyState.svelte',
       'world-tool-entry-on-break-repair-tag-picker-empty',
-      'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
-        'bordered panel filling a region',
+      'the frame that draws the `note` variant inside the picker popover it was made for — both ' +
+        'representative frames are populated states',
+    ],
+    // The link field's other hosts (issue 2466): one frame of each, beside the world Tool screens.
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-component-entry-definition',
+      'the frame that draws the compact prompt, on its one caller`s source card',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-component-catalogue',
+      'the frame that draws the empty prompt above the world component catalogue',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'world-essence-entry',
+      'the frame that draws a linked zone whose name is the stored address',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-environment-edit-scene-linked',
+      'the one frame that draws a linked document`s image in the tile',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-environment-edit-scene-unlinked-narrow',
+      'the frame that draws the empty prompt in the scene card at 1000px',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-recipe-item-overview',
+      'the frame that draws a linked source with its image, a hint and both actions in a column',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-essence-edit-on-craft',
+      'the frame that draws a missing link with a hint and a subline',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-crafting-dynamic-dc',
+      'the frame that draws the empty prompt in the Checks card`s DC macro well',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro',
+      'the frame that draws a linked well beside an empty one',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-narrow',
+      'the frame that draws a linked well beside an empty one near the 220px floor',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-pair',
+      'the frame that draws two linked wells, each with a uuid and two actions',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-checks-v3-count-additional-dice-macro-pair-narrow',
+      'the frame that draws two linked wells near the 220px floor',
+    ],
+    [
+      'src/ui/svelte/components/ItemDropZone.svelte',
+      'manager-component-complications-macro-linked',
+      'the frame that draws the complication macro zone linked, with its uuid as the hint',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'interactables-browser-tasks',
+      'the one caller whose tab entries carry no icon, so the only frame that draws the ' +
+        'glyph-less strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-tracking-described',
+      'the frame that draws the premium padlock and the wide strip`s description above its own tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-narrow-settings',
+      'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-component-edit-validation',
+      'the frame that draws the strip as a row of the component entry column',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'player-gathering-events',
+      'a frame that draws the strip outside the manager',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-tool-parity-06-breakage-900x700',
+      'the one frame in the tool strip`s 832 to 900px rung, where it wraps',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-tool-parity-05-validation-1280x720',
+      'the frame that draws the Tool editor`s strip on its Validation tab at 1280px',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-essence-edit-validation',
+      'the frame that draws the Essence editor`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-recipe-edit-validation',
+      'the frame that draws the Recipe editor`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-gathering-task-editor-normal',
+      'the frame that draws the Gathering task editor`s strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-component-entry-validation',
+      'the frame that draws the World Component entry`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-essence-entry',
+      'the frame that draws the World Essence entry`s strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'world-tool-entry-validation',
+      'the frame that draws the World Tool entry`s strip on its Validation tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'player-salvage',
+      'a second frame that draws the strip outside the manager, in the player app`s inventory',
+    ],
+    [
+      'src/ui/svelte/components/Callout.svelte',
+      'manager-essence-edit-unscoped-on-craft',
+      'the one frame that draws the `items` form, the essence On craft primer',
+    ],
+    [
+      'src/ui/svelte/apps/manager/IconFactRow.svelte',
+      'world-essence-catalogue',
+      'a frame that draws the `rule` density as catalogue cards',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
+      'player-crafting-check-descriptor-under-resolved',
+      'the frame that draws the check strip with its target source fact',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
+      'player-crafting-check-formula-unresolved',
+      'the one frame that draws the check strip over its danger notice',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
+      'player-gathering-economy-strip',
+      'the one frame that draws the stamina pool strip',
+    ],
+    [
+      'src/ui/svelte/components/NavSidebarRows.svelte',
+      'manager-world-travel-with-gathering-expanded',
+      'the one frame that measures an open group box whose parent is not the current route',
+    ],
+    [
+      'src/ui/svelte/components/NavSidebarRows.svelte',
+      'manager-recipes-normal',
+      'a frame that measures an open group box on its own route',
+    ],
+    [
+      'src/ui/svelte/components/RunActionBar.svelte',
+      'fabricate-journal-lifecycle-waiting-auto-eligible',
+      'the one frame that draws the completion switch and its kicker',
+    ],
+    [
+      'src/ui/svelte/components/ActionMenu.svelte',
+      'manager-recipe-edit-ingredients-adder-menu',
+      'the ingredient set`s adder menu, the results adder`s sibling',
     ],
   ];
   for (const [file, caseId, because] of expectations) {
@@ -348,6 +643,185 @@ test('(a) the two older overrides still name the frame that renders their state'
       selected.includes(caseId),
       `a ${file} change selected ${JSON.stringify(selected)}, which does not include '${caseId}'`
     );
+  }
+});
+
+test('(a) the three player-window overrides name a frame that draws the primitive', () => {
+  // Each expected id is a player frame outside the representative pair, so repointing an entry
+  // at the pair, or at a manager frame, reds here rather than passing as an unchanged selection.
+  // A third member lists the specimens a published primitive also names (issue 2448).
+  const expectations = [
+    [
+      'src/ui/svelte/components/Chip.svelte',
+      ['player-crafting-simple'],
+      ['manager-published-leaves-specimen'],
+    ],
+    [
+      'src/ui/svelte/components/Button.svelte',
+      [
+        'fabricate-journal-lifecycle-ready-single',
+        'fabricate-journal-lifecycle-cancel-confirmation',
+      ],
+      [
+        'manager-published-leaves-specimen',
+        'manager-published-controls-specimen',
+        'manager-published-buttons-specimen',
+      ],
+    ],
+    ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
+  ];
+  for (const [file, caseIds, specimens = []] of expectations) {
+    assert.deepEqual(
+      [...BROAD_SIGNAL_CASE_OVERRIDES[file]],
+      [...caseIds, ...specimens],
+      `${file} names its frames`
+    );
+    const selected = mapChangedFilesToCases([file]);
+    for (const caseId of caseIds) {
+      const viewCase = selected.find((candidate) => candidate.id === caseId);
+      assert.ok(Boolean(viewCase), `a ${file} change does not select '${caseId}'`);
+      assert.ok(viewCase.kinds.includes('player'), `'${caseId}' is not a player-window frame`);
+    }
+  }
+
+  // The button's frames anchor on the controls the run action bar renders through it.
+  const anchors = BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/Button.svelte']
+    .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
+    .join(' ');
+  for (const action of ['primary', 'cancel-confirm', 'cancel-keep']) {
+    assert.ok(
+      anchors.includes(`[data-run-action="${action}"]`),
+      `no Button frame anchors on the run action bar's ${action} control`
+    );
+  }
+});
+
+test('(a) a search field change publishes every surface the 38px shell moved, and a compact one', () => {
+  const file = 'src/ui/svelte/components/SearchField.svelte';
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of [
+    'manager-recipes-normal',
+    'manager-recipes-narrow',
+    'manager-books-scrolls-normal',
+    'manager-gathering-tasks-browse-normal',
+    'manager-default-selection',
+    'manager-access-recipe-selected',
+    'manager-tool-parity-01-library-1280x720',
+    // The compact form, which the 38px shell must leave pixel-identical.
+    'world-component-entry-systems',
+  ]) {
+    assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
+  }
+});
+
+test("(a) an AppTitleBar change publishes the title band's frames", () => {
+  const file = 'src/ui/svelte/components/AppTitleBar.svelte';
+  const frames = [
+    'manager-default-selection',
+    'manager-systems-empty',
+    'manager-selected-normal',
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-selected-stacked',
+    'manager-world-downtime-test-companion-installed',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `an AppTitleBar change does not select '${caseId}'`);
+  }
+});
+
+test('(a) an XrefList change publishes the inspector and its two cross-reference frames', () => {
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/XrefList.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const caseId of [
+    'player-inventory',
+    'player-inventory-xref-tool',
+    'player-inventory-xref-essence',
+  ]) {
+    assert.ok(selected.includes(caseId), `an XrefList change does not select '${caseId}'`);
+  }
+});
+
+test('(a) a TierTrack change publishes its specimen mounted through the seam', () => {
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/TierTrack.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  assert.ok(
+    selected.includes('manager-published-tier-track-specimen'),
+    'a TierTrack change does not select its specimen'
+  );
+});
+
+test('(a) a change to each leaf issue 2448 published, or to a primitive one draws, selects the leaves specimen', () => {
+  for (const name of [
+    'Avatar',
+    'Medallion',
+    'FillBar',
+    'Meter',
+    'BandedBar',
+    'StatBox',
+    'InfoStrip',
+    'Kicker',
+    'Chip',
+    'Rail',
+    'InspectorCard',
+    'EmptyState',
+    'Notice',
+    'Button',
+  ]) {
+    const selected = mapChangedFilesToCases([`src/ui/svelte/components/${name}.svelte`]).map(
+      (viewCase) => viewCase.id
+    );
+    assert.ok(
+      selected.includes('manager-published-leaves-specimen'),
+      `a ${name} change does not select the published leaves specimen`
+    );
+  }
+});
+
+test('(a) a Notice change publishes the three specimens that mount it, after the frame that draws it', () => {
+  const file = 'src/ui/svelte/components/Notice.svelte';
+  const frames = [
+    'player-inventory-bulk-report',
+    'manager-published-leaves-specimen',
+    'manager-published-controls-specimen',
+    'manager-published-buttons-specimen',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Notice change does not select '${caseId}'`);
+  }
+});
+
+test('(a) a ViewToggle change publishes the essence browser in both arrangements', () => {
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/ViewToggle.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const caseId of ['manager-essences-normal', 'manager-essences-grid']) {
+    assert.ok(selected.includes(caseId), `a ViewToggle change does not select '${caseId}'`);
+  }
+});
+
+test('(a) a ListRow change publishes a frame for every converted selectable site', () => {
+  // Issue 1778: each converted site names the frame that draws it, and the frame must be selected.
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/ListRow.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const { file, frame } of LIST_ROW_ADOPTERS) {
+    assert.ok(existsSync(path.join(REPO_ROOT, file)), `${file} does not exist`);
+    assert.ok(selected.includes(frame), `a ListRow change does not select '${frame}' for ${file}`);
   }
 });
 
@@ -418,8 +892,8 @@ const COUNT_WORDS = new Map([
 const PROSE_CALLER_COUNT =
   /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+callers?\b/gi;
 
-/** A backticked component path or partial path, as the `why` prose writes one. */
-const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
+/** A backticked component or rune-module path, or a partial path, as the `why` prose writes one. */
+const BACKTICKED_COMPONENT = /`([^`]*\.svelte(?:\.js)?)`/g;
 
 /**
  * Whether `token` names `file`, anchored on the path separator.
@@ -464,6 +938,45 @@ test('the importer scan is measuring a populated tree, not silently matching not
       'It is the most-imported component in the repository, so a low count here means the scan is ' +
       'broken rather than that the tree changed.'
   );
+});
+
+/** The expression field (issue 2465), and the cases its override names: the ones that draw it. */
+const EXPRESSION_FIELD = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
+const EXPRESSION_FIELD_CASES = [
+  'manager-system-edit-lists',
+  'manager-checks-stacked-floor',
+  'manager-checks-formula-card',
+  'manager-checks-character-value-unresolved',
+  'manager-checks-parity-under-attribute',
+  'manager-checks-v3-count-over-narrow',
+  'manager-checks-v3-count-additional-dice-path',
+  'manager-recipe-edit-results-rolled',
+  'manager-recipe-edit-results-rolled-narrow',
+  'manager-component-edit-salvage-rolled-narrow',
+  'manager-recipe-edit-results-group-player-anyone',
+  'manager-recipe-edit-results-group-rolled-anyone',
+  'manager-recipe-edit-results-group-rolled-upto-repeats',
+  'manager-recipe-edit-results-group-rolled-upto-repeats-narrow',
+  'manager-recipe-edit-results-group-rolled-overlap',
+  'manager-recipe-edit-results-group-rolled-overlap-narrow',
+  'manager-recipe-edit-results-group-failure-role',
+];
+
+test("the expression field's override names the cases that draw it, each claiming an importer", () => {
+  assert.deepEqual(BROAD_SIGNAL_CASE_OVERRIDES[EXPRESSION_FIELD], EXPRESSION_FIELD_CASES);
+  const selected = new Set(
+    mapChangedFilesToCases([EXPRESSION_FIELD]).map((viewCase) => viewCase.id)
+  );
+  const importers = IMPORTERS.importersOf(EXPRESSION_FIELD);
+  assert.ok(importers.length > 0, 'the field has no measured importer, so no case can claim one');
+  for (const id of EXPRESSION_FIELD_CASES) {
+    assert.ok(selected.has(id), `a change to the field does not select ${id}`);
+    const patterns = VIEW_LAB_CASES.find((viewCase) => viewCase.id === id).sourceMatches ?? [];
+    assert.ok(
+      importers.some((file) => patterns.some((pattern) => pattern.test(file))),
+      `${id} claims no importer of the field by sourceMatches, so nothing says it draws one`
+    );
+  }
 });
 
 test('(d) every recorded non-member names exactly the callers it has', () => {
@@ -821,7 +1334,7 @@ test('(e) the register gate reads the import graph and the manifest on each side
   ]);
 });
 
-test('(e) exactly two shared member rows live outside the primitive directory', () => {
+test('(e) exactly four shared member rows live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
@@ -829,6 +1342,8 @@ test('(e) exactly two shared member rows live outside the primitive directory', 
     [
       'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
       'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+      'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
+      'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
     ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +
       `${PRIMITIVE_DIRECTORY} must update that sentence with it`
@@ -862,5 +1377,26 @@ test('(f) no file under components/ imports from the application tree', () => {
       'depends on, so an edge in this direction makes one primitive unusable without the manager ' +
       'and reverses the dependency the `design-system` capability specifies. Move the imported ' +
       'file into the primitive directory, or take the dependency out of the primitive.'
+  );
+});
+
+test('(g) no tracked file under scripts, src, openspec, tests or docs names the field by its old path', () => {
+  // The needle is built from parts so this clause's own file does not hold it.
+  const needle = ['apps/manager', 'RollDataExpressionInput'].join('/');
+  const tracked = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', 'scripts', 'src', 'openspec', 'tests', 'docs'],
+    { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+  )
+    .split('\0')
+    .filter(Boolean);
+  assert.ok(tracked.length > 1000, `only ${tracked.length} tracked files walked`);
+
+  const stale = tracked.filter((file) => readFileSync(path.join(REPO_ROOT, file)).includes(needle));
+  assert.deepEqual(
+    stale,
+    [],
+    `${needle} is where the field stood before issue 2465 moved it into ${PRIMITIVE_DIRECTORY}; ` +
+      'point these at the new path, including any prose that names it'
   );
 });

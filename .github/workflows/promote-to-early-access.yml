@@ -166,7 +166,7 @@ jobs:
 
       - name: Mint an App installation token (bypass actor + workflow trigger)
         id: apptoken
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.RELEASE_BOT_KEY }}

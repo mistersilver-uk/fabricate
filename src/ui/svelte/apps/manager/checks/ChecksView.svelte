@@ -13,7 +13,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import CheckFailurePolicy from './CheckFailurePolicy.svelte';
@@ -657,7 +657,7 @@
     if (routeIsRouted)
       return text(
         'FABRICATE.Admin.Manager.Checks.Sections.OutcomesLeadRouted',
-        'What each result of the roll produces. A record binds its result groups to the tiers set here.'
+        'What each result of the roll produces. A record binds its result sets to the tiers set here.'
       );
     if (activeMode === 'progressive')
       return text(
@@ -1091,7 +1091,7 @@
       'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
       'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
     )}
-    dataAttr="data-gathering-failure-dormant"
+    data-gathering-failure-dormant
   />
   <InspectorCard data-gathering-failure-outcome="">
     <h3 class="manager-checks-card-title">
@@ -1123,7 +1123,7 @@
         )}
       </p>
     {/if}
-    <ManagerButton
+    <Button
       data-gathering-failure-outcome-link
       disabled={!previewedGatheringTask}
       onclick={() => onOpenGatheringTask(previewedGatheringTask?.id || '')}
@@ -1135,7 +1135,7 @@
           'Open this task'
         )}</span
       >
-    </ManagerButton>
+    </Button>
   </InspectorCard>
 {/snippet}
 
@@ -1143,8 +1143,7 @@
 {#snippet inapplicableSection(sectionLabel)}
   <EmptyState
     icon="fas fa-circle-minus"
-    dataAttr="data-checks-section-empty"
-    dataValue={activeSection}
+    data-checks-section-empty={activeSection || true}
     title={text('FABRICATE.Admin.Manager.Checks.Sections.InapplicableTitle', 'Nothing to set here')}
     hint={text(
       'FABRICATE.Admin.Manager.Checks.Sections.InapplicableHint',
@@ -1161,13 +1160,9 @@
   data-checks-editor
   bind:this={checksRoot}
 >
-  <!--
-        THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: a row
-        action routes to another ACTIVITY, unmounting the validation panel — live region included
-        — in the update that was supposed to announce. So the `aria-live` element is ALWAYS in the
-        DOM, outside the validation branch, with its own `{#if}` inside it. A THIRD CHILD OF THIS
-        TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute`.
-      -->
+  <!-- The row action's live region: a row action routes to another activity and unmounts the
+       validation panel, so the `aria-live` element stays outside that branch with its own `{#if}`;
+       being `position: absolute`, it is a safe third child of this two-row grid. -->
   <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -1194,39 +1189,42 @@
       data-keyboard-focus="true"
       bind:this={sectionPanel}
     >
-      <!-- The section's warning dot, explained IN the panel and first in it, as the prototype
-           draws it: amber, title over detail, with a Review action. -->
+      <!-- The section's warning dot, explained first in the panel: the notices' stacking region. -->
       {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
-        <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
+        <div
+          class="manager-checks-section-notices"
+          data-notice-position="stack"
+          data-checks-section-notices={activeSection}
+        >
           {#each sectionNotices as issue (issue.key)}
             <Notice
               tone="warning"
               title={issue.title}
               detail={issue.detail}
               action={issue.action}
-              dataAttr="data-checks-section-notice"
-              dataValue={issue.id}
+              data-checks-section-notice={issue.id === undefined ? '' : issue.id}
             />
           {/each}
         </div>
       {/if}
 
+      <!-- The heading block, in plain block flow so the head's margin collapses through it. The
+           mode stays a callout: it documents the mode, where a notice reports this check's state. -->
       {#if paneHead && !routeIsOff}
-        <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
-          <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
-          <p class="manager-checks-pane-lead">{paneHead.lead}</p>
-        </header>
-      {/if}
-
-      <!-- WHAT THIS MODE DOES stays a callout: it documents the mode, where a notice reports
-           THIS check's state. -->
-      {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
-        <CheckModeCallout
-          {activity}
-          mode={calloutMode}
-          {alchemyCheckMode}
-          outcomeCount={outcomeCount ?? 0}
-        />
+        <div data-tab-heading>
+          <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
+            <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
+            <p class="manager-checks-pane-lead">{paneHead.lead}</p>
+          </header>
+          {#if activeSection === 'roll'}
+            <CheckModeCallout
+              {activity}
+              mode={calloutMode}
+              {alchemyCheckMode}
+              outcomeCount={outcomeCount ?? 0}
+            />
+          {/if}
+        </div>
       {/if}
 
       {#if activity === 'validation'}
@@ -1243,21 +1241,21 @@
         <div class="manager-checks-page" data-checks-panel={activity} data-checks-off>
           <EmptyState
             icon="fas fa-dice-d20"
-            dataAttr="data-checks-off-empty"
+            data-checks-off-empty
             title={text('FABRICATE.Admin.Manager.Checks.Off.Title', 'This activity needs no check')}
             hint={text(
               'FABRICATE.Admin.Manager.Checks.Off.Lead',
               'This system can roll a check here, but it is switched off. Every attempt that meets its requirements succeeds outright — no formula, no DC, no failure policy.'
             )}
           >
-            <ManagerButton
+            <Button
               role="primary"
               data-checks-turn-on
               onclick={() => onToggleCheckActive(activity, true)}
             >
               <i class="fas fa-power-off" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Checks.Off.TurnOn', 'Turn this check on')}</span>
-            </ManagerButton>
+            </Button>
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}
@@ -1280,7 +1278,7 @@
                 selectedValue={alchemyCheckMode}
                 groupName="crafting-alchemy-checkmode"
                 columns={2}
-                dataAttr="data-crafting-alchemy-checkmode"
+                data-crafting-alchemy-checkmode
                 optionDataAttr="data-crafting-alchemy-checkmode-option"
                 onChange={(mode) => onSetAlchemyCheckMode(mode)}
               />
@@ -1526,7 +1524,7 @@
                 'FABRICATE.Admin.Manager.Checks.Crafting.FailureSalvageNote',
                 'Salvage failures follow their own separate policy on the Salvage check. An individual trigger can also break tools on its own — see Triggers.'
               )}
-              dataAttr="data-failure-salvage-note"
+              data-failure-salvage-note
             />
           {/if}
 

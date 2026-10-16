@@ -44,7 +44,7 @@ const NO_NEIGHBOURS = Object.freeze([]);
 /**
  * Extract input and output component IDs from a recipe.
  * Walks ingredientSets[].ingredientGroups[].options[].match.componentId (inputs)
- * and resultGroups[].results[].componentId (outputs).
+ * and resultGroups[].results[].componentId, per alternative of a choice group (outputs).
  */
 export function extractComponentIds(recipe) {
   const inputIds = new Set();
@@ -65,7 +65,7 @@ export function extractComponentIds(recipe) {
   }
 
   for (const group of recipe.resultGroups || []) {
-    for (const result of group.results || []) {
+    for (const result of (group.results || []).flatMap((r) => r?.alternatives ?? [r])) {
       const cid = result?.componentId || result?.systemItemId;
       if (cid) outputIds.add(cid);
     }

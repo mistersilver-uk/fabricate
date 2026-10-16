@@ -875,6 +875,8 @@ type CurrencyConfig = {
    No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
    The paths that are not recipe-keyed are the two published world-scoped members of requirements 10 to 14, the affordability check and the currency credit — and one of those two WRITES.
    Both read the world half alone through the same `getCurrencyConfig` seam and compose nothing.
+   A recipe's currency result is a recipe-keyed credit.
+   It composes the system's `requirements.currency.enabled` through `getCurrencyRequirementConfig` and then reuses the credit effect writer.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
 10. The published affordability check (`game.fabricate.checkAffordability`) and the published currency credit (`game.fabricate.creditCurrency`), both members of the companion contract — see `companion-api` — answer against the WORLD configuration ALONE and consult no crafting system's `requirements.currency.enabled` toggle.
@@ -1346,8 +1348,8 @@ This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whol
 `essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
-Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
-SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "refreshed by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration and by the component import that registers it (requirement 12b), feeds no display precedence, and is REFRESHED by nothing thereafter: the world entry editors write it, and nothing copies it again from this record or from the linked source Item.
 
 ### Properties
 
@@ -1453,7 +1455,9 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    9d.
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
-11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
+11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids` unless another component of its system claims it (an import withholds it, replace-source refuses) or a World Component other than the one the import adopts claims it (an import withholds it).
+    The broken canonical source UUID is never a find-existing or adoption reference.
+    A first import that withholds it still reports the fallback it took.
     The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
@@ -1461,7 +1465,7 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     Each write replaces the entire setting and is replicated to every connected client, so a per-item write makes a bulk import quadratic in corpus size.
     The bound covers the per-folder category/tag set-apply as well as the item import: a mapping commit that imports across several folders still writes once in total, not once per folder.
     Batching must not change any per-item outcome: the same added / updated / skipped classification, the same counts, the same aggregated broken-source fallbacks, the same durable role-flag stamp on each source document, and the same overwrite-on-redrop application of a folder's mapping to already-present components.
-    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing at all.
+    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing to `craftingSystems`; whether it writes `fabricate.componentScope` is requirement 12c's.
     An item that fails part-way through a run must still surface its error to the caller, and the items imported before it must be carried by the run's single write rather than lost.
     A single-item import is its own batch of one and must persist immediately.
     The bound is on the number of PERSISTENCE OPERATIONS a run issues, not on the identity of the key it writes, so a backend that addresses records individually inherits it unchanged.
@@ -1470,6 +1474,18 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     A bare whole-corpus flush is explicitly NOT a violation of that half.
     A run that names nothing is telling the repository it does not know what moved, which is exactly what a deferred-persistence batch flushes with, and narrowing it would drop the in-place mutations such a batch relies on being flushed.
     What the whole-corpus flush costs is a COMPARISON rather than a write: it diffs every system's extracted records against the index, emitting no extra write and no extra replication.
+    12b.
+    A component import registers a World Component as `### Component scope` requirement 6 states.
+    12c.
+    A bulk import persists its registrations with a single `fabricate.componentScope` write, issued after its `craftingSystems` write and only when that write resolved or was not needed, and a run that registers nothing writes nothing to that setting.
+    A single-item import is its own batch of one here too: it writes its registration after its own `craftingSystems` write.
+    A caller that defers its `craftingSystems` write registers only through a registrations array it hands to `flushWorldComponentRegistrations` after that write; without one, the import registers and adopts nothing.
+    The registrations belong to the run that recorded them, and a registration is written only for a record the persisted `craftingSystems` setting holds, so a record a rejected or still-pending write left only in memory is registered by the import that next finds it persisted.
+    The residual is two overlapping runs over one system: when one run saves before the other flushes, the other registers the first run's freshly adopted record as one the system already held, so its membership keeps the record's own values instead of inheriting the world's.
+    A non-GM flush registers and writes nothing, and is answered rather than refused.
+    Each registration is decided again when the write is issued, against the scope as it then stands and the system's current records, so a record deleted in the meantime registers nothing and a scope edit made in the meantime survives.
+    A rejected `fabricate.componentScope` write is reported on the run's result as `worldRegistrationError`, the import handlers warn the GM once, and it never replaces an error the import is already raising.
+    It leaves an in-system record with no World Component, which the next import of that Item registers.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -1813,15 +1829,19 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
 - Find-existing prefers the definition that claims the source's own uuid over one that claims only its compendium source.
   A pack Item's own uuid is read in both spellings, with and without the document-type segment.
   Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
-  For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
-- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  For every kind, find-existing does not match through a compendium source that does not resolve: the registration records it only as an alias, and the source matches only a definition claiming its own uuid.
+  So Items sharing such an entry register separately, and importing one again finds its definition by its own uuid.
+  A component records that alias only when no other component of its system, and no World Component other than the one it adopts, claims it, compared without a pack uuid's document-type segment.
+  A source does not resolve when its pack is missing (its module or system disabled or uninstalled, or held back by a core compatibility gate), its entry was deleted, or the server lookup failed; the split it makes is permanent, the first import still reports its fallback, and the recovery is to delete the split definition, restore the entry and import again.
+- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or, when the named definition does not carry its stored name, for a derivative or a source whose compendium source does not resolve, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
   A component's find-existing reads no durable leaf: it keys on the source references alone, and registration overwrites whatever leaf a world source carries.
   A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
-- The derivative gate never un-merges.
-  A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
-- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; neither reaches the runtime matcher.
+- Neither the derivative gate nor the unresolvable-source rule un-merges.
+  A component that absorbed derivatives, or Items sharing an unresolvable entry, keeps their uuids in `aliasItemUuids`, and the recovery is to delete it and import the Items again.
+- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; the unresolvable-source rule is a registration rule; none reaches the runtime matcher.
   Source repair applies the clone gate and own-uuid precedence only, so an unregistered derivative whose compendium source a definition still claims is stamped with that definition's id.
   An actor-owned drag copy may carry `_stats.duplicateSource`, depending on the core build, and its `compendiumSource` is legitimate provenance there either way (tier 3).
+  An owned copy with no leaf, whose only source reference is an unresolvable compendium source, resolves to the first definition claiming it.
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
   A derivative's `_stats.compendiumSource` is left on the Item.
 - Existing stored `originItemUuid` values are never recomputed.
@@ -1829,6 +1849,7 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
 
 Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: both copies carry the compendium entry's name, so the second registration is neither a clone nor a derivative, its `compendiumSource` still matches, and find-existing dedups.
 It is distinguished from a clone by the absence of `_stats.duplicateSource` and from a derivative by that name.
+It holds only while the entry resolves; a copy imported while it does not registers separately, stays split once it resolves, and rejoins only by deleting its definition and importing it again.
 
 ### Repair and Auto-Stamp
 
@@ -1993,7 +2014,7 @@ Ingredient = {
   extractEffects: boolean,
 
   match: {
-    type: "component" | "tags" | "currency",
+    type: "component" | "tags" | "currency" | "essence",
 
     // type = "component"
     componentId?: string,
@@ -2170,6 +2191,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 >
 > **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
 > The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
+> That rule binds the crafting-system envelope import; a component import, which brings Items into one system, is governed by `### Component scope` requirement 6.
 >
 > **STILL NOT LIVE**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
 > **What `## CraftingSystem` REQUIREMENT 36's OWN RETIREMENT retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and that requirement states which and why.
@@ -2459,6 +2481,7 @@ SystemMembershipRecord = {
 
     **THE FIRST GM-AUTHORED WORLD ENTITY FLIPS `isSeeded()`, AND THAT IS A BASIS INPUT.**
     Issue 1362 ships the first writer that is not the migration, so `isSeeded("entities")` can now become true on a world that has never been migrated: `worldScope.<type>.createEntity` persists the setting, and the write replicates to every client.
+    Component import is the second such writer (issue 2218): the first registration it writes seeds `fabricate.componentScope` on a world the migration never wrote, and it flips `isSeeded("entities")` on the same terms.
     The basis stays KNOWN-COMPLETE across that transition, and it is worth stating why rather than leaving a destructive-prune gate to be re-derived.
     The basis is the UNION of the world set with the system's SURVIVING legacy array, so the moment the world half starts vouching the legacy half has not stopped: a world that authors one component still carries every in-system component it had, and both id sets are in the basis.
     The predicate is PER SUB-KEY, so a component write cannot vouch for essences or tools — each entity type has its own setting and its own `isSeeded("entities")`.
@@ -2597,6 +2620,28 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    Still open, and still the tool family's follow-up: the tool family's `removeFromSystem` is the generic verb and has neither the cascade nor the ordering, and no verb here can report a compensation that itself fails.
    **AND THE ADD PATH ROLLS BACK THE RECORD IT WROTE.** A seed refused for a duplicate source reference removes the membership record THIS CALL wrote and reports `false`; a record authored earlier is left alone, so an unrelated collision cannot delete a GM's own membership.
    The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
+6. Every component-import path — single item, compendium pack, folder, the folder-mapping commit, the Compendium Directory action and `addItemFromUuid` — registers the component as a World Component the target system holds: a world entity carrying the component's identity and source link, and a membership record for `(component, system)` (issue 2218).
+   The in-system record's id is the world entity's id.
+   An Item embedded in an actor registers nothing, and an unresolvable uuid that addresses an embedded document registers nothing either.
+   Two records share a source when their source references intersect, and a pack Item's uuid is compared without its document-type segment, so the type-less spelling earlier bulk imports stored matches the document's own.
+   An id match alone binds nothing: a component whose id a world entity carries without sharing its source is left unregistered, because ids are not globally unique.
+   6a.
+   The membership record inherits every section, with two exceptions that apply only against a world default the World Component already carries: a record created for a component the system already held never changes what that component resolves, and a category the same run's folder mapping staged is kept rather than replaced by the world's.
+   For a component the system already held, each section the world default authors with a value different from the in-system record's is written as an override carrying the record's own value: `category` verbatim, and `essences` wherever the two normalized maps differ.
+   For a record the run added, a category other than the reserved `general` that differs from an authored world category is written as an override, and every other section inherits, as it does for a component added from the catalogue.
+   A World Component the import itself creates carries no world default, so its record inherits every section and resolves the in-system record's own values until a world default is authored.
+   6b.
+   An imported Item that shares a source reference, other than a compendium source that does not resolve, with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
+   The new record keeps the identity the import read from its Item and the entity keeps its stored one, so the two can differ from the start; `## Scoped Entity Definitions` requirement 15 answers the in-system record's and names the pair in its drift report.
+   The match is made before the new record's id is minted and takes the first sharing entity in roster order.
+   It reads the World Component's stored source link, which is not refreshed when a system re-points its own record.
+   Where the target system already holds a record under that id, nothing is written at world scope.
+   6c.
+   A component the import finds already present with no World Component gains one, created from the in-system record.
+   6d.
+   The exception to 6c is a component whose source reference a World Component under a different id already shares: it is left unregistered, because binding it would re-key a component that recipes, salvage results, gathering drop rows, tool links and owned-item identity flags may name, and an import re-keys nothing.
+   Its recovery is to delete the other World Component where no system holds it, then import again.
+   An import does not leave a new record unregistered through such a source when the World Component claiming it is already flushed, because it withholds that alias there.
 
 ### Essence scope
 
@@ -2995,6 +3040,7 @@ Tool = {
     Consulting `componentId` alone is invalid: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver renders the fallback name and the item-bag sentinel for a Tool whose identity is fully populated (issue 976).
     A surface that renders the Tool's description resolves it the same way — the snapshot `description` first, then the linked component's — because the same omission blanks a populated description.
     `label` is never substituted into the snapshot and the snapshot is never written back to `label`; they are distinct fields per requirement 1.
+    The canvas-interactable Tool source name (the Manage Interactables panel row and the interactable config panel's linked-tool name) resolves through this same precedence via `resolveInteractableSourceLabel` (`src/ui/interactableSourceLibrary.js`), which returns null when no rung yields a name so each caller applies its own last resort (see `ui-world-scope` Canvas Interactables — Manage Interactables Panel).
     The reference implementation is `resolveToolDisplayName` / `resolveToolDisplayImage` / `resolveToolDescription` (`src/models/toolDisplay.js`), which `toolStudio.js` re-exports unchanged; a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
     The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
     Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
@@ -3134,12 +3180,12 @@ Result = {
    The RESOLVED amount of a rolled result is a separate value, and only it may be zero.
    A zero resolved amount is an EMPTY AWARD: the result creates no item, and the award states the roll that produced nothing rather than omitting the result.
    Zero is the floor, so a negative total clamps to it.
-3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true, and only on a `component` result.
 4. `kind` is a closed set, and an absent `kind` IS `"component"`.
    Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
    An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
-5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
-   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world unit id; where it is `"knowledge"`, `recipeId` is required and names a recipe of the same crafting system, and `quantityFormula` is not valid.
+   A `"knowledge"` result grants through the knowledge grant `game.fabricate.grantRecipeKnowledge` is built on, never by writing an item, and an already-known recipe writes nothing.
 6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
    An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
 7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
@@ -3153,14 +3199,15 @@ Result = {
 The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
 This section states only what is persisted.
 
-8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+8. `alternatives` PRESENT makes this result a choice group, and every alternative, including the one the group was converted from, is an entry in that array.
    The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
    `alternatives` holds two or more entries; a group reduced to one is a plain result again.
-   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+   Alternatives do not nest: an alternative MUST NOT carry `alternatives` of its own.
 9. `chooser` defaults to `"playerChooses"` and is read only on a group.
-   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every alternative's `selectionRange`.
+   `selectionFormula` is not written under `"playerChooses"`.
 10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
-    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither, and neither is written there.
     `awardCount` must be positive.
     `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
 11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
@@ -3168,18 +3215,22 @@ This section states only what is persisted.
     `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
 12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
     A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
-13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
-    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+13. `selectionRange` is read only on an alternative of a group whose `chooser` is `"rolled"`, and is not written on an alternative of any other group; `from` and `to` are inclusive whole numbers.
+    The ranges of a group's alternatives are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest alternative and a roll above the highest selects the highest, so no authored group can produce nothing.
+    A roll selects the alternative with the highest `from` at or below it, and a roll below every `from` selects the lowest.
+    Ranges MUST NOT overlap and `from` MUST NOT exceed `to`.
+    Without repeats, each later roll is read against the alternatives not yet awarded.
     Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
     A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+    A non-component `kind` is not valid inside a `progressive` result group either.
 15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
     The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
 16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
     `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
     Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
-17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade either drops a group's settings or, where the older build requires a `componentId`, fails the recipe's validation until the result is removed, and the release's upgrade note says so, because an older build cannot.
 
 ## Versioned Run Lifecycle
 
@@ -3208,6 +3259,7 @@ RunLifecycle = {
     }>,
     outcome?: object | null,
   },
+  awardChoiceJournal?: object, // the `executionJournal` shape, holding the latest award-choice settle
 }
 ```
 
@@ -3235,6 +3287,17 @@ It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
 Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+10. A terminal run accepts one kind of mutation, settling a pending award choice, once per choice.
+Each settle advances `runRevision` and journals into `awardChoiceJournal`, which holds the latest settle and never replaces `executionJournal`.
+Each settle's receipts are appended to the step that held its choice, so a later settle replacing the journal loses none of them.
+A clean-up that forfeits an owed choice (Crafting Runs Flag requirement 5) also advances `runRevision`, without a journal entry.
+An active run's settle journals there too, so the stage's committed journal, its `award-results` receipt and its committed replay are untouched.
+The settle runs under a grant issued for `chooseAward`, a grant issued for another operation is refused, and a new request for a settled choice awards nothing.
+Its effects are `award-choice` (kind `awardChoice`, planned `{ choiceId, picks }`, every pick's amount resolved before the first write), `settle-choice` (kind `settleAwardChoice`) and `post-chat` (kind `postCraftChat`).
+A fresh settle is refused before its plan exists when a pick is unclaimable or fails the craft-time pre-flight, and every pick's amount and reward plan is resolved then, so `award-choice` only writes.
+A resumed settle runs the plan it persisted and is not judged again.
+The two journals exclude each other: neither a settle nor a stage plans while the other's plan is unfinished, each refusing `EXECUTION_IN_PROGRESS`, and the world-time sweep skips a run whose settle is planned.
+Reload reconstruction reads `awardChoiceJournal` as it reads `executionJournal`, so an award choice interrupted mid-effect is recovery-required.
 
 ### Authority Ledger and Recovery Boundary
 
@@ -3339,6 +3402,9 @@ CraftingRun = {
   steps: CraftingRunStepState[],
 
   componentSourceActorUuids: string[],
+
+  // The recipe and crafting-check terms the run accepted at start; see requirement 5.
+  termsSnapshot?: { recipe: object, craftingCheck: object | null },
 }
 ```
 
@@ -3348,6 +3414,10 @@ CraftingRun = {
 2. `currentStepIndex` must be `null` for terminal statuses (`succeeded`, `failed`, `cancelled`).
 3. `status` must be `waitingTime` when progression is blocked only by elapsed time.
 4. `finishedAt` is required for terminal statuses and must be absent for non-terminal statuses.
+5. `termsSnapshot`, when present, captures the recipe and crafting-check terms the run accepted at start: `recipe` is the run's recipe as serialized by `Recipe.toJSON()`, and `craftingCheck` is the owning system's `craftingCheck` config as it stood at that moment, or `null` when the system authors none.
+   It is written once, at run creation, and is never updated by a later edit to the live recipe or system.
+   It is absent for a recipe that could not serialize itself and for any run begun before this field existed, and resolution for such a run falls back to the live recipe (`recipes-and-steps/spec.md` § A begun run keeps its accepted terms).
+   It is removed from the run record when the run completes, before the record is archived to history, so a history entry never carries it.
 
 ## CraftingRunStepState
 
@@ -3478,6 +3548,33 @@ CraftingRunStepState = {
     img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 
+  // What a `currency` and a `knowledge` result awarded (issue 1773); absent on a step written before
+  // it and on a step whose routed set held neither. `amount: 0` is an empty award with no write.
+  // `unitName` and `recipeName` are captured at award time, as `createdResults` names are.
+  currencyCredits?: Array<{
+    resultId: string, alternativeId?: string, unit: string, amount: number,
+    rolled?: { formula: string, total: number }, label?: string, reason?: string, unitName?: string,
+  }>,
+  knowledgeGrants?: Array<{
+    resultId: string, alternativeId?: string, recipeId: string,
+    outcome: "granted" | "alreadyKnown", recipeName?: string,
+  }>,
+
+  // What a result-side choice group awarded, and the pick a group whose chooser is the player
+  // still owes (issue 1773); absent on a step written before it and on one whose set held no group.
+  // `choiceId` is the carrier's `Result.id`, `count` the resolved N rather than the authored count.
+  groupAwards?: Array<{
+    choiceId: string, chooser: "playerChooses" | "rolled", awardStrategy: "anyOne" | "upTo",
+    count: number, countRoll?: { formula: string, total: number },
+    selections: Array<{ alternativeId: string, roll?: { formula: string, total: number } }>,
+  }>,
+  pendingAwardChoices?: Array<{
+    choiceId: string, resultGroupId: string | null, resultRowId?: string,
+    awardStrategy: "anyOne" | "upTo", count: number, countRoll?: { formula: string, total: number },
+    alternatives: Array<object>, // the alternatives as snapshotted at award time, without ranges
+    picks?: string[], settledAt?: number, outcome?: "awarded" | "forfeited",
+  }>,
+
   failureReason?: string,
 }
 ```
@@ -3520,6 +3617,25 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+9. `currencyCredits` and `knowledgeGrants` are each absent on a step written before issue 1773, and an older build ignores them.
+   They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency, knowledge or choice-group result, and by the unversioned award paths right after their items.
+   A credit is written through the world strategy's own writer.
+   Under `actorProperty` the credit and the marker `{ runId, effectId: 'award-rewards', resultId, index }` ride one `actor.update`; an `actorInventory` credit is proven by the balance delta and a `macro` credit by nothing, and neither writes a marker.
+   `runId` is the run's id on every path that holds a run, and `index` is the credit's position in the step's reward plan.
+   A craft refuses a reward its world cannot honour before anything is consumed, at the run's start and again when a later stage starts: an unconfigured unit, currency off, a credit the writer would refuse without writing (a synthetic-token crafter, `creditNotConfigured`, `currencySourceMissing`, `balanceUnreadable`), a taught recipe outside the system, and `knowledgeNotObservable`.
+   An interrupted reward step is recovery-required and never replayed; on the unversioned paths the credits and grants it confirmed stay in `currencyCredits` and `knowledgeGrants`, never as `createdResults` rows.
+10. `groupAwards` and `pendingAwardChoices` are each absent on a step written before issue 1773, and an older build ignores them, so an unsettled choice is stranded there.
+   `award-results` writes them into its receipt, and the step persists them when it finalizes; `award-rewards` is planned whenever the routed set holds a choice group, because a group's draw is rolled after the plan is persisted.
+   A rolled group's draws award through each alternative's own kind, so a drawn credit or grant names the carrier as `resultId` and the alternative as `alternativeId`.
+   An N of 0 records an empty `groupAwards` entry and leaves no pending choice.
+   A pending choice records the carrier's linked `resultRowId`, so an Item its settle awards carries the same `resultRowId` a stage draw does.
+   A pending choice is settled exactly once, writing `picks`, `settledAt` and `outcome` onto its entry and appending the award's receipts and a `groupAwards` entry to the same step.
+   For a settled choice whose chooser is the player, that entry's `selections` lists the picks in pick order, none carrying a `roll`, and its `count` is the resolved N; a forfeited choice's entry lists none.
+   A settled entry stays in `pendingAwardChoices` as the record of its choice.
+   A choice with no claimable alternative settles `forfeited`; claimability is judged at settle time, and an alternative whose component or Item is gone, whose credit the world writer would refuse, or whose taught recipe is gone, outside the system, unobservable or already known is not claimable.
+   While an unsettled choice has a claimable alternative, a later stage's start and execute refuse with the blocker `awardChoicePending`, and the world-time sweep skips the run by that same predicate.
+   A run holding an unsettled choice survives the history limit, and a prune that would drop it forfeits the choice instead (Crafting Runs Flag, requirement 5).
+   A versioned step carries no `historySettlement`, so nothing reads an owed step's awards as complete before the settle.
 
 #### Optional historical evidence
 
@@ -3567,10 +3683,14 @@ Requirements:
 2. `history` contains only terminal runs (`succeeded`, `failed`, `cancelled`).
 3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
+   A terminal run holding an unsettled award choice is never evicted by the cap, whatever its age, and the cap counts only the other runs.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
+   Where that clean-up would drop a run still owing an award choice, it settles the choice `forfeited` instead and keeps the run until the next clean-up, which drops it as any other.
+   The forfeit is recorded against the run's recorded recipe id and system.
 6. Run-flag writes must be document-coherent.
    A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
    A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+   The same cap applies to that union and keeps such a run.
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
    The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 
@@ -3617,7 +3737,8 @@ Requirements:
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
    It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
    Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
-4. `granted` and `grantedBy` are optional scalars written only by the companion contract's knowledge grant (see `companion-api` and `recipe-visibility`).
+4. `granted` and `grantedBy` are written by the knowledge grant and by a `knowledge` result's award (see `companion-api` and `recipe-visibility`).
+   The award's `grantedBy` is the awarding recipe's name, trimmed, cut between code points to at most 64 UTF-16 units, the length the grant accepts, and then trimmed at its end, because it names a record rather than a module and a cut name still names it.
    `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
    `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
    The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.
@@ -3718,8 +3839,11 @@ RunModel = {
   completionMode: "manual" | "worldTime",
   pauseState: { pausedAt: number, remainingSeconds: number } | null,
   pausedDurationSeconds: number,
-  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, disabledReason },
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, chooseAward, disabledReason },
   awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
+  awardChoicePending: boolean,           // the run still owes an unsettled award choice; false when it owes none.
+  awardChoices: AwardChoiceModel[],      // each owed choice for an entitled viewer; [] for one not entitled; absent when none is owed
+  awardChoiceBlocker: string | null,     // why this viewer may not settle now: notOwner, notEntitled, an authority reason, recoveryRequired, executionInProgress
   recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
   derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
@@ -3762,6 +3886,21 @@ When the system's `features.refundOnPlayerCancel` policy is on (default), the re
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
 Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
+
+### AwardChoiceModel
+
+```js
+AwardChoiceModel = {                     // one award choice a run still owes (issue 1773)
+  choiceId: string,
+  stepIndex: number,
+  awardStrategy: "anyOne" | "upTo",
+  count: number,                         // the resolved N
+  countRoll: { formula, total } | null,
+  ceiling: number,                       // 1 under anyOne, else min(N, alternative count)
+  alternatives: Array<{ id, kind, name, img, glyph, quantity, quantityFormula, amountText,
+    unclaimable: string | null }>,       // why it cannot be claimed now, judged by the settle's own rule: one of alreadyKnown, recipeMissing, knowledgeNotObservable, componentMissing, currencyDisabled, unitMissing, other
+}
+```
 
 ### StepModel
 
@@ -3807,6 +3946,10 @@ StepModel = {
   selectionAvailability: object | null,  // current-stage live solver projection only
   craftingYield: object | null,          // current-stage authored output only
   yieldPreview: object | null,           // entitled future-stage authored output, never historical awards
+  currencyCredits?: object[],            // entitled; the four award keys of CraftingRunStepState, each absent when unrecorded
+  knowledgeGrants?: object[],
+  groupAwards?: object[],
+  pendingAwardChoices?: object[],
   inputPreview: {                        // entitled future-stage authored inputs, never selection intent
     source: "preview",
     stageIndex: number,
@@ -3853,7 +3996,8 @@ StepModel = {
    The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
    Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
    An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused for the same causes.
-   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired` or `sourcesUnavailable` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired`, `sourcesUnavailable` or `awardChoicePending` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `awardChoicePending` is the cause while an earlier stage owes an award choice with a claimable alternative, the same predicate the engine's stage start refuses on; it is distinct from `choiceRequired`, because what is owed is a reward to pick rather than a stage input.
    `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
    The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
    Both report `awaitingChoice`, because either way what the run is waiting on is the player's own decision, and both read as guidance rather than as a refusal.
@@ -3865,6 +4009,9 @@ StepModel = {
    Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
    Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
    User-specific terminal dismissals filter the composite key before counts without deleting native history.
+   `actions.chooseAward` is offered on a crafting run that still owes an award choice, to a GM or to the actor's owner when entitled to the run's evidence, while the authority is available and neither of the run's journals is recovery-required or planned, so one settle runs at a time.
+   A settle interrupted between its journal writes is resolved when the GM reconciles it or boot recovery runs: its plan is discarded when nothing applied, so the choice can be sent again under any request, and it becomes recovery-required otherwise.
+   A terminal run that still owes a choice is listed and counted under `activeRuns` and is not dismissible, unless its settle is recovery-required, which the run's `recoveryEvidence` then reports.
 
 4. **Stage browsing is not execution.**
    Browsing MUST NOT mutate the persisted step index or selections.
@@ -4725,6 +4872,8 @@ That is a finding rather than an omission: a later surface needing an audience-s
 
 One rule answers "does this actor plausibly have the materials for this recipe?", and both surfaces consume it rather than each deriving one.
 It reads the inventory snapshot's per-system component quantities, per-tag quantities and essence totals, and nothing else.
+An item's essences are counted by the engine's own rule: its own essences flag when that carries any, else its component's, so a flag-only carrier counts and a flagged item never counts its component's essences as well.
+Every requirement the totals can bound is held to them: a component option by its quantity, a tag option by its tag total, a set's essence cost and an ingredient group's essence option by the essence total against the amount, so a group whose only option is an essence its carriers cannot cover is a definitive negative.
 
 This is the same rule the inventory snapshot introduced as the **indexed availability projection**.
 "Cheap availability" and "indexed availability projection" name one rule with one implementation; a second name for it is not a second rule, and no surface may hold a second implementation.
@@ -4744,9 +4893,14 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material or Tool shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
+The cheap rule consults no Tool, so the summary phase asks the Tool owner (`RecipeManager`'s Tool matcher, over the same Active Canvas Tool the detail phase uses) which ingredient sets of the recipe's first execution step have every required Tool available.
+The material term is then the cheap rule over those sets alone, because exact craftability needs one set to hold both its Tools and its materials; no such set is a shortfall exactly as a material one is, so a recipe missing a required Tool MUST NOT list as available.
+The summary's own `availability` field stays the Tool-free cheap rule.
+That Tool answer is resolved once per system and Tool per pass, not once per row, and it stays an upper bound: a Tool held only as one of the set's ingredients still counts.
+A redacted teaser is never asked, since its status is `discovery` regardless.
 
 The browse status is a SHARED field, so the rule that derives it is one rule for both audiences.
 Its exhaustion INPUT is nevertheless empty for a GM, because a GM bypasses the knowledge gate that produces exhaustion at all; a GM-audience row is therefore never exhausted.

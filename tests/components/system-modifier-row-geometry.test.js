@@ -10,15 +10,21 @@
  * free space and a centring container has nothing to distribute. A NEW entry has an empty
  * expression, the `→ path` span is not rendered at all, nothing grows, and the row centres.
  */
-import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test, { after, before } from 'node:test';
+
 import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { walkNodes } from '../helpers/moduleAst.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
+import { attributeValue } from '../helpers/svelteStructureContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 /*
  * Core's bare `button` rule, copied from a harvested Foundry 14.365 `css/foundry2.css`
@@ -68,7 +74,7 @@ function modifierRow(label, expression) {
           <span class="manager-modifier-label">${label}</span>
           ${path}
         </button>
-        <button type="button" class="fabricate-icon-button manager-icon-button" aria-label="Delete modifier">
+        <button type="button" class="fabricate-icon-button" aria-label="Delete modifier">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>
@@ -79,7 +85,7 @@ const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
-      <section class="fabricate-card manager-inspector-card" data-world-modifiers style="width: 720px">
+      <section class="fabricate-card" data-world-modifiers style="width: 720px">
         <ul class="manager-character-modifier-list">
           ${modifierRow('Survival', '@skills.sur.mod')}
           ${modifierRow('Modifier', '')}
@@ -138,19 +144,19 @@ const FIELD_FIXTURE = `
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
       <div class="manager-modifier-body" style="width: 520px">
-        <label class="fabricate-field manager-field" data-case="label">
+        <label class="fabricate-field" data-case="label">
           <span>Label</span>
           <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
-        <label class="fabricate-field manager-field" data-case="plain">
+        <div class="fabricate-field" data-case="plain">
           <span>Expression</span>
           <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
-        </label>
-        <label class="manager-tool-bonus-field" data-case="capped">
-          <span>Bonus expression</span>
-          <div class="manager-prerequisite-path-input manager-roll-data-expression-input">
+        </div>
+        <label class="fabricate-field manager-prerequisite-path" data-case="capped">
+          <span class="visually-hidden">Property path</span>
+          <div class="manager-prerequisite-path-input">
             <span class="manager-prerequisite-at" aria-hidden="true">@</span>
-            <input type="text" data-roll-data-expression="tool-bonus" value="prof" />
+            <input type="text" data-prerequisite-path value="abilities.int.mod" />
           </div>
         </label>
       </div>
@@ -158,31 +164,56 @@ const FIELD_FIXTURE = `
   </section>
 </div>`;
 
+const EXPRESSION_FIELD = 'src/ui/svelte/components/RollDataExpressionInput.svelte';
+const PREREQUISITES_CARD = 'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
+const ELEMENT_TYPES = Object.freeze(['RegularElement', 'SvelteElement', 'Component']);
+const classTokens = (node) =>
+  node.type === 'RegularElement'
+    ? (attributeValue(node, 'class') ?? '').split(/\s+/u).filter(Boolean)
+    : [];
+
 test('the un-capped expression field renders as an ordinary field, with no affix seam', async () => {
-  // THE FIXTURE IS ANCHORED TO THE COMPONENT.
-  const component = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte'),
-    'utf8'
+  // The fixture is anchored to the two templates it mirrors, by their parsed markup.
+  const { fragment } = componentAstOf(EXPRESSION_FIELD);
+  const roots = fragment.nodes.filter(
+    (node) => ELEMENT_TYPES.includes(node.type) || node.type === 'IfBlock'
   );
-  const markup = component.slice(component.indexOf('{#snippet field()}'));
-  const branch = markup.indexOf('{:else}');
-  assert.ok(branch > -1, 'the component still branches on `sigil`');
-  assert.ok(
-    markup.slice(0, branch).includes('manager-prerequisite-path-input'),
-    'the SIGIL branch still renders the affix wrapper, which is what the un-capped branch is ' +
-      'measured AGAINST below'
+  assert.deepEqual(
+    roots.map((node) => (node.type === 'IfBlock' ? '{#if}' : node.name)),
+    ['input', '{#if}', '{#if}'],
+    "the template's root elements are the input, then two `{#if}`s, and nothing wraps the input"
   );
-  // THE TOOL STUDIO NO LONGER DEPENDS ON IT.
-  assert.ok(
-    !markup.slice(branch).includes('manager-prerequisite-path-input'),
-    'and the un-capped branch renders a BARE input: the wrapper is the prerequisite field’s ' +
-      'affix layout, and a field with no affix that keeps it draws the seam this test is about'
+  const held = (branch) =>
+    [branch.consequent, branch.alternate].flatMap((arm) =>
+      (arm?.nodes ?? [])
+        .filter((node) => ELEMENT_TYPES.includes(node.type))
+        .map((node) => [node.name, ...classTokens(node)])
+    );
+  const [, row, status] = roots;
+  assert.deepEqual(
+    held(row),
+    [['div', 'fab-expr-input-row']],
+    'the first `{#if}` holds the one row, which stands after the input and never beside it'
   );
-  // Scoped to the MARKUP, not the whole file.
-  assert.ok(
-    !markup.includes('is-formula'),
-    'and the dead `is-formula` hook is gone from the markup: a class the sheet has no rule for ' +
-      'reads as a fix and is not one'
+  assert.deepEqual(
+    held(status),
+    [['span', 'visually-hidden']],
+    'the second holds the status region, beside the row and never inside it'
+  );
+  assert.equal(
+    [...walkNodes(fragment)].filter((node) => node.type === 'IfBlock').length,
+    4,
+    'the row, the reading and the group of tokens inside it, and the status region: no other form'
+  );
+  const wrapper = [...walkNodes(componentAstOf(PREREQUISITES_CARD).fragment)].find((node) =>
+    classTokens(node).includes('manager-prerequisite-path-input')
+  );
+  assert.deepEqual(
+    (wrapper?.fragment.nodes ?? [])
+      .filter((node) => ELEMENT_TYPES.includes(node.type))
+      .map((node) => [node.name, ...classTokens(node)]),
+    [['span', 'manager-prerequisite-at'], ['input']],
+    'the prerequisites card still draws the affix wrapper the capped case is measured in'
   );
 
   const context = await browser.newContext({
@@ -232,7 +263,7 @@ test('the un-capped expression field renders as an ordinary field, with no affix
         'draw one around it'
     );
 
-    // THE NON-VACUITY HALF. The capped shape is the Tool Studio's, unchanged by this work.
+    // The non-vacuity half: the capped shape is the prerequisites card's property path.
     assert.ok(
       Math.abs(fields.capped.inset - fields.label.inset) > 0.5,
       'the capped shape still insets its input behind a cap ' +

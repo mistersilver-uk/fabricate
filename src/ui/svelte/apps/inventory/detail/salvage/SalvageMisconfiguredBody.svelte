@@ -49,6 +49,5 @@
   icon="fas fa-screwdriver-wrench"
   title={localize('FABRICATE.App.Inventory.Salvage.MisconfiguredTitle')}
   detail={localize(ruleKey)}
-  dataAttr="data-inventory-salvage-body"
-  dataValue="misconfigured"
+  data-inventory-salvage-body="misconfigured"
 />

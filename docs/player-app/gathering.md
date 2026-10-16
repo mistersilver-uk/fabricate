@@ -71,15 +71,19 @@ GMs can see real blind task names through GM-facing surfaces.
 ## Detail Column
 
 Selecting an environment fills the center **detail** column.
-It opens with an environment header (the name, a short description, and info pips for any present biome and danger level) plus a mode hint describing how that environment is gathered.
+It opens with an environment header (the environment's picture, its name, and info pips for any present biome and danger level), then a short description and a mode hint describing how that environment is gathered.
 
 How the rest of the column reads depends on the selection mode:
 
 - **Targeted environments** show a list of task rows.
-  Each row carries the task name, description, a **success-chance bar**, and an **Attempt** button.
-  A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline and its Attempt button disabled.
-- **Blind environments** show a single **Attempt gathering** button that resolves one hidden task at random.
-  When the system reveals discovered tasks, a **Discovered Tasks** section lists the tasks this character has already revealed as their own visible rows (each with its own success-chance bar and Attempt button), with a count of how many have been discovered out of the full pool.
+  Each row carries the task name, description, and a **success-chance bar**.
+  Selecting a row opens the task in the right-hand column, whose header carries the task's **Attempt** button.
+  A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline.
+  Its Attempt button stays in the header but is disabled, and a **Can't attempt** note directly beneath the header says why.
+- **Blind environments** carry a single **Attempt gathering** button in the environment header that resolves one hidden task at random.
+  When it is unavailable it stays in place, disabled, with a general note beneath the header, because the reason may come from a task you cannot see.
+  When the system reveals discovered tasks, a **Discovered Tasks** section lists the tasks this character has already revealed as their own visible rows, each with its own success-chance bar, with a count of how many have been discovered out of the full pool.
+  Selecting a discovered task opens it in the right-hand column with that task's own Attempt button.
   Before anything has been revealed the section reads as nothing discovered yet.
 
 The success-chance bar shows the chance that at least one item drops.
@@ -118,9 +122,19 @@ An absent receipt does not mean zero items, while an explicitly recorded empty o
 **This run** retains compact world-time facts, followed by guidance about the closed record.
 Blind history keeps protected details hidden and uses a generic pouch image, while entitled GM previews can show the task's own image.
 
+An untimed d100 gather opens the roll prompt when you start it, with a situational bonus and the roll mode, and no target.
+Each item row and event is graded against its own chance, so the prompt has no single target to show.
+The bonus also applies to every event roll, so a positive bonus makes hazards likelier as well as finds.
+The result applies only after you answer the prompt.
+A timed d100 gather does not prompt.
+Dismissing the prompt leaves the run ready in the Journal under **Roll a d100**, with its start-time costs spent, and the Gathering tab refreshes.
+Today a timed d100 run shows the same **Roll a d100** label once it is ready, but it completes without a prompt.
+
 A required player check opens an interactive dialog when you execute the ready run.
 Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.
 For non-secret checks you are entitled to see, the evaluated roll can post from your client so a module like Dice So Nice can animate it.
+A d100 roll posts after the result card, with any bonus dice in the same message.
+An opaque blind attempt's d100 roll posts GM-private when it is evaluated.
 Secret checks use a generic prompt and GM private posting without sending secret roll details back to the player.
 Foundry's private presentation does not guarantee confidentiality.
 See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the check controls.

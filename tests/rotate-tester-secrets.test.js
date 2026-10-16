@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { executableExtensions } from '../scripts/lib/resolveExecutable.js';
 import { resolveChannelConfig } from '../scripts/release-s3.js';
 import {
+  defaultLabel,
   main,
   newSegment,
   parseArgs,
@@ -528,10 +529,12 @@ test('main --apply writes one real segment per secret and announces the new pref
   const { lines, log } = collectLog();
 
   // `newSegment` is deliberately not injected: reading the real generator's output back out of
-  // the write is the only way a constant segment shows up as a failure.
+  // the write is the only way a constant segment shows up as a failure. No `--label` either, so
+  // the default month label is what reaches `gh`; the injected date is one no real clock can
+  // match, so dropping `deps.now` fails here rather than only once the month rolls over.
   await main({
     argv: ['--config', config, '--premium-config', premiumConfig, '--apply'],
-    deps: { runGh: gh.runGh, log },
+    deps: { runGh: gh.runGh, log, now: () => new Date('1999-03-15T00:00:00Z') },
   });
 
   const sets = gh.calls.slice(1);
@@ -548,7 +551,7 @@ test('main --apply writes one real segment per secret and announces the new pref
   );
 
   const written = sets.map(({ input }) => input);
-  for (const value of written) assert.match(value, /^[0-9a-f]{32}$/);
+  for (const value of written) assert.match(value, /^mar1999-[0-9a-f]{32}$/);
   assert.equal(written[0], written[1], 'a shared secret reaches both repositories with one value');
   assert.equal(written[2], written[3], 'and so does the early-access one');
   assert.equal(new Set(written).size, 3, 'one segment per secret, and no two secrets share one');
@@ -684,10 +687,68 @@ test('--help prints and rotates nothing', async () => {
 
 // the segment, the flags, and the deliberate absence from CI
 
-test('a segment is 32 hex characters and is not repeated', () => {
+test('a segment is 32 hex characters, prefixed by its label, and is not repeated', () => {
   const first = newSegment();
   assert.match(first, /^[0-9a-f]{32}$/);
   assert.notEqual(first, newSegment());
+
+  // The label names the month; the hex is still all of the entropy, so it must still vary.
+  const labelled = newSegment('oct2026');
+  assert.match(labelled, /^oct2026-[0-9a-f]{32}$/);
+  assert.notEqual(labelled, newSegment('oct2026'));
+});
+
+test('the default label is the UTC month and year, whatever the local clock says', () => {
+  assert.equal(defaultLabel(new Date('2026-10-04T12:00:00Z')), 'oct2026');
+  // Both edges of a year boundary, where a local-time reading would name the wrong month AND year.
+  assert.equal(defaultLabel(new Date('2026-12-31T23:59:59Z')), 'dec2026');
+  assert.equal(defaultLabel(new Date('2027-01-01T00:00:00Z')), 'jan2027');
+
+  // The edges above cannot tell UTC from local time on a host whose zone sits at UTC+0 (and `TZ`
+  // is not honoured by Node on Windows), so this double makes the two readings disagree outright.
+  const disagreeing = {
+    getUTCMonth: () => 9,
+    getUTCFullYear: () => 2026,
+    getMonth: () => 0,
+    getFullYear: () => 2027,
+  };
+  assert.equal(defaultLabel(disagreeing), 'oct2026');
+});
+
+test('--label overrides the month, and an unusable label is refused before any `gh` call', async () => {
+  assert.equal(parseArgs([]).label, null);
+  assert.equal(parseArgs(['--label', 'oct2026']).label, 'oct2026');
+  assert.equal(parseArgs(['--label', 'oct2026-late']).label, 'oct2026-late');
+  assert.throws(() => parseArgs(['--label']), /--label requires a value/);
+
+  // Each of these would either break the S3 key or the URL, or read as a different feed.
+  for (const rejected of ['Oct2026', 'oct 2026', 'oct/2026', '-oct2026', 'oct2026-', 'oct--2026']) {
+    assert.throws(
+      () => parseArgs(['--label', rejected]),
+      /is not usable in a feed path/,
+      `--label ${JSON.stringify(rejected)} must be refused`
+    );
+  }
+  await assert.rejects(
+    main({ argv: ['--label', 'oct/2026', '--apply'], deps: { runGh: refuseGh, log: () => {} } }),
+    /is not usable in a feed path/
+  );
+});
+
+test('main names the label in the dry run and writes it into every segment under --apply', async () => {
+  const { config, premiumConfig } = await writeConfigs();
+  const base = ['--config', config, '--premium-config', premiumConfig, '--label', 'nov2026'];
+
+  // The dry run is where a wrong default month must be visible, before anything is written.
+  const dry = collectLog();
+  await main({ argv: base, deps: { runGh: refuseGh, log: dry.log } });
+  assert.match(dry.lines.join('\n'), /each new segment is nov2026-<32 hex characters>/);
+
+  const gh = ghDouble();
+  await main({ argv: [...base, '--apply'], deps: { runGh: gh.runGh, log: () => {} } });
+  const written = gh.calls.slice(1).map(({ input }) => input);
+  assert.equal(written.length, 5);
+  for (const value of written) assert.match(value, /^nov2026-[0-9a-f]{32}$/);
 });
 
 test('the default is a dry run, and only the exact token --apply changes that', () => {

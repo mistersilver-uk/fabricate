@@ -11,6 +11,8 @@ Everything in this section describes the window your **players** use, rather tha
 
 Players conduct the whole loop in a single Fabricate window, opened from the **Crafting** action in the Items Directory.
 The window carries one tab per activity, and a tab is only offered when at least one crafting system the player can see enables it.
+Each tab is a labelled icon in the window's left rail, and the **Journal** icon carries a count of the selected character's active runs on its corner.
+The selected item, recipe, environment, or run leads with a header naming it beside its picture, and that header holds the main action, such as **Craft**, **Attempt**, or **Salvage**, when one is available.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 

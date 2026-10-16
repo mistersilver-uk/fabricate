@@ -11,7 +11,10 @@ import {
   projectKnowledgeSnapshot,
   projectLearnedRecipeRow,
 } from '../../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
@@ -19,6 +22,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-knowledge-view-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -64,8 +68,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRecipeItemsTab.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRecipesTab.svelte',
     // THE manager's labelled push-button (issue 1118). Both resets and the owned-copy row`s Expend use render it.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    // The `Field` the search field's labelled form renders (issue 1782).
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/KnowledgeView.svelte',
@@ -244,6 +250,26 @@ describe('KnowledgeView mounted behaviour', () => {
       knowledge: makeKnowledge({ systemId: 'smithing', defaultTab: KNOWLEDGE_TAB_RECIPE_ITEMS }),
     });
     assert.equal(panel(target), KNOWLEDGE_TAB_RECIPE_ITEMS, 'a switch lands on the new default');
+  });
+
+  it('points only the selected tab at its panel', async () => {
+    const tab = (target, id) => target.querySelector(`[data-knowledge-tab="${id}"]`);
+    const assertSelected = (target, selectedId, otherId) => {
+      const selected = tab(target, selectedId);
+      assert.equal(selected.getAttribute('aria-selected'), 'true');
+      assert.equal(selected.getAttribute('aria-controls'), `knowledge-panel-${selectedId}`);
+      const panel = target.querySelector(`#${selected.getAttribute('aria-controls')}`);
+      assert.ok(panel?.matches('[data-knowledge-panel]'), 'aria-controls resolves to the panel');
+      assert.equal(panel.getAttribute('role'), 'tabpanel');
+      assert.equal(panel.getAttribute('aria-labelledby'), selected.id);
+      assert.ok(!tab(target, otherId).hasAttribute('aria-controls'), 'the hidden panel is unnamed');
+    };
+    const target = await harness.mount(makeProps());
+    assertSelected(target, KNOWLEDGE_TAB_RECIPE_ITEMS, KNOWLEDGE_TAB_LEARNED_RECIPES);
+
+    tab(target, KNOWLEDGE_TAB_LEARNED_RECIPES).click();
+    await harness.setProps({});
+    assertSelected(target, KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS);
   });
 
   // The five chip COMBINATIONS. `inert` is an independent chip.

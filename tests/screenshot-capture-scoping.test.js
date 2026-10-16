@@ -219,6 +219,17 @@ test('styles/fabricate.css scopes to the two rail frames and the global core set
   );
 });
 
+test('a stylesheet partial scopes to the same views as the sheet it is part of', () => {
+  const ids = (files) => mapChangedFilesToViews(files).map(v => v.id);
+  const sheet = ids(['styles/fabricate.css']);
+  for (const partial of [
+    'styles/fabricate-manager-rail-gathering.css',
+    String.raw`.\styles\fabricate-tokens.css`,
+  ]) {
+    assert.deepEqual(ids([partial]), sheet, partial);
+  }
+});
+
 test('Tool Studio frames are triggered only by Tool Studio files', () => {
   const own = mapChangedFilesToViews([
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
@@ -1024,13 +1035,12 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-scoped-list-filter',
   'data-recipe-bulk-category',
   'data-recipe-bulk-check-tier',
-  // ISSUE 1511 — the player app's six.
+  // ISSUE 1511 — the player app's six, less the book page size `Pagination` now draws.
   'data-inventory-system-select',
   'data-journal-sort',
   'data-crafting-category-filter',
   'data-crafting-system-filter',
   'data-inventory-sort',
-  'data-inventory-page-size',
   // ISSUE 1510 PHASE 1 — the manager's settings and tabs.
   'data-world-currency-strategy-select',
   'data-world-currency-provider-select',
@@ -1121,6 +1131,9 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-tool-sort-key',
   'data-vocabulary-sort',
   'data-recipe-route="ingredient-set"',
+  // Issue 1777 — the manager rail's crafting-system scope select, the last native select a capture
+  // producer drove.
+  'data-manager-scope-select',
 ]);
 
 /**
@@ -1134,7 +1147,7 @@ function assertEveryConvertedHookResolves() {
   // component-emitted attribute, and one collector for the tree is one collector.
   const sources = Object.values(SOURCES);
   const missing = CONVERTED_SELECT_HOOKS.filter((hook) => {
-    // A valued hook is written `'data-x': 'y'` through `triggerData`, never as the literal
+    // A valued hook is written `'data-x': 'y'` through `triggerProps`, never as the literal
     // attribute, so both spellings count as resolving it.
     const valued = /^([^=]+)="(.+)"$/u.exec(hook);
     const needles = valued ? [`'${valued[1]}': '${valued[2]}'`, hook] : [hook];
@@ -1185,16 +1198,12 @@ function drivenLocators(source, index, bindings) {
   return [...new Set([...bound, hops.at(-1)?.[2] ?? ''])].filter(Boolean);
 }
 
-test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+/** Every `.selectOption(` drive in `producers` aimed at a converted select's hook. */
+function convertedSelectDrives(producers) {
   const offenders = [];
-  let calls = 0;
-  for (const producer of CAPTURE_PRODUCERS) {
+  for (const producer of producers) {
     const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
-      calls += 1;
-      // The locator chain that reaches the call, which may be spread over several lines. A
-      // window rather than a line, because the harness's own idiom wraps a long chain — and the
-      // RESOLVED locator beside it, for the drive written against a binding declared above it.
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
       const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
@@ -1203,38 +1212,38 @@ test('no capture producer drives a converted select with Playwright’s <select>
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — the smoke's two drives of
-  // the manager's crafting-system scope select, a residue control issue 1777 owns — or this scan
-  // is reading a corpus with nothing in it to judge.
-  assert.ok(
-    calls > 0,
-    'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
-      'If the last native select has converted, delete this clause rather than leaving it green.'
-  );
-  const driven = CONVERTED_SELECT_HOOKS.filter((hook) =>
-    CAPTURE_PRODUCERS.some((producer) => producer.source.includes(hook))
-  );
-  assert.ok(
-    driven.length >= 3,
-    `only ${driven.length} converted select hooks are named by a capture producer, against a ` +
-      'floor of 3. A lower number means the hooks were renamed and this ban now names controls ' +
-      'nothing drives.'
-  );
-  assertEveryConvertedHookResolves();
+  return offenders;
+}
+
+test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+  // No producer calls `selectOption` any more (issue 1777 converted the last native select it
+  // drove), so the scan's non-vacuity is a synthetic drive it must catch, bound and unbound.
+  const bound = {
+    path: 'bound.mjs',
+    source:
+      "const scope = page.locator('[data-manager-scope-select]');\n" +
+      "await scope.selectOption('alchemy');\n",
+  };
+  const chained = {
+    path: 'chained.mjs',
+    source: "await page.locator('[data-manager-scope-select]').selectOption('alchemy');\n",
+  };
+  assert.deepEqual(convertedSelectDrives([bound, chained]), [
+    'bound.mjs: `data-manager-scope-select` is driven by .selectOption()',
+    'chained.mjs: `data-manager-scope-select` is driven by .selectOption()',
+  ]);
   assert.deepEqual(
-    offenders,
+    convertedSelectDrives(CAPTURE_PRODUCERS),
     [],
     'these capture steps drive an app-drawn option list with Playwright’s `<select>`-only API, ' +
-      'which throws on a `<button role="combobox">`. Click the trigger, then click the row by ' +
-      'its `[data-popover-option="…"]` identity handle — and address the row from the PAGE, ' +
-      'because the panel is portaled out of the trigger’s container:\n  ' + offenders.join('\n  ')
+      'which throws on a `<button role="combobox">`: click the trigger, then the option row'
   );
 });
 
-// THE REGISTRY DOES NOT CALL `.selectOption(`, SO THE BAN ABOVE CANNOT SEE ITS HALF. A View Lab
-// step names the verb as DATA — `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs`
-// is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
-// spelling of every converted step is a line the ban above reads and passes over, and reverting
+// THE REGISTRY NEVER CALLS `.selectOption(` IN SOURCE. A View Lab step names the verb as DATA —
+// `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs` is what turns it into
+// `await target.selectOption(step.select)` at run time. So the pre-1504 spelling of every
+// converted step is a line no scan for that call can see, and reverting
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
 // this PR's own screenshot evidence — not as a red unit test. Eleven steps converted at issue
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
@@ -1270,6 +1279,7 @@ test('no View Lab step drives a converted select with the registry’s native `s
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );
+  assertEveryConvertedHookResolves();
   assert.deepEqual(
     offenders,
     [],
@@ -1400,8 +1410,8 @@ const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
 const CHECKS_STUDIO_SRC = [
   ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-  // The Checks rail entries and their issue badges are `ManagerSystemNav.svelte`'s (issue 1717).
-  'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
+  // The Checks rail entries and their issue badges are the rail item model's (issue 1777).
+  'src/ui/svelte/apps/manager/managerNavItems.js',
   // `data-checks-save` is the page header's crafting action unit (issue 1720).
   'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
 ]
@@ -1432,7 +1442,7 @@ test('every Checks hook a capture producer navigates by is still shipped', () =>
   // The rail sub-item is addressed by its id, built by interpolation at both ends, so the
   // name-level scan above cannot see it. Pin the two halves against each other instead.
   assert.match(HARNESS, /#manager-checks-nav-\$\{activity\}/);
-  assert.match(CHECKS_STUDIO_SRC, /id=\{`manager-checks-nav-\$\{checksItem\.id\}`\}/);
+  assert.match(CHECKS_STUDIO_SRC, /domId: `manager-checks-nav-\$\{checksItem\.id\}`/);
 });
 
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
@@ -1809,7 +1819,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(HARNESS, /stopImmediatePropagation|stopPropagation/);
   assert.match(
     toolStudioWalk,
-    /scrollToolEditorPanelToReveal\([\s\S]*?alternative-component[\s\S]*?manager-tool-stress-repair/,
+    /scrollToolEditorPanelToReveal\([\s\S]*?\[data-recipe-add="alternative"\][\s\S]*?manager-tool-stress-repair/,
     'repair stress evidence must reveal the populated OR group in the editor pane',
   );
   assert.match(
@@ -1819,11 +1829,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /const addRepairAlternative = firstRepairGroup\.locator\(\s*'\[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    /await repairAlternativeAdder\.click\(\);\s*const addRepairAlternative = page\.locator\(\s*'\.manager-recipe-or-menu \[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    'the Alternative adder opens its menu outside the mutation, and its item mutates once',
   );
   assert.match(
     HARNESS,
-    /const addRepairGroup = editor\.locator\(\s*'\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    /await repairIngredientAdder\.click\(\);\s*const addRepairGroup = page\.locator\(\s*'\.manager-recipe-ingredient-menu \[data-recipe-add="ingredient-tag"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
     'the repair group control must choose one strict-safe pointer target and mutate once',
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
@@ -1907,6 +1918,8 @@ const CHECK_TRIGGERS_SRC = readFileSync(
   'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
   'utf8',
 );
+// Each trigger is a `RuleRow`, which emits the remove hook the walk clicks (issue 1782).
+const TRIGGER_ROW_SRC = `${CHECK_TRIGGERS_SRC}\n${readFileSync('src/ui/svelte/components/RuleRow.svelte', 'utf8')}`;
 
 test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
   // Lint and Prettier cannot see a selector drift in the smoke walk, so this file is the
@@ -1917,25 +1930,31 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
   // BOTH sides are asserted, not just the harness: a harness-only pin stays green
   // through a rename in the component, which is exactly the drift that would surface as
   // a post-merge beta smoke break rather than a red PR.
-  for (const hook of [
-    'data-trigger-tier-step',
-    'data-trigger-tier-step-steps',
-    'data-trigger-tier-step-target',
-    'data-triggers-empty',
-  ]) {
-    assert.ok(HARNESS.includes(hook), `the Phase D0 walk no longer drives [${hook}]`);
-    assert.ok(
-      CHECK_TRIGGERS_SRC.includes(hook),
-      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`,
-    );
-  }
-
+  //
+  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger dirties the
+  // Checks draft and the next navigation raises a discard prompt mid-phase. Its remove selector
+  // pairs the row hook `CheckTriggers` stamps with the part hook `RuleRow` emits.
+  //
   // The mode segments are stamped by `SegmentedControl`'s `optionDataAttr`, so the
   // attribute NAME and the option VALUE are authored apart and only the harness pairs
   // them into one selector — which is the pairing that can rot silently.
-  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="up"]'), 'the up segment');
-  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="target"]'), 'the target segment');
-  assert.match(CHECK_TRIGGERS_SRC, /optionDataAttr="data-trigger-tier-step-mode"/);
+  for (const [walked, emitted] of [
+    ['data-trigger-tier-step', 'data-trigger-tier-step'],
+    ['data-trigger-tier-step-steps', 'data-trigger-tier-step-steps'],
+    ['data-trigger-tier-step-target', 'data-trigger-tier-step-target'],
+    ['data-triggers-empty', 'data-triggers-empty'],
+    ['[data-add-trigger]', 'data-add-trigger'],
+    ['[data-trigger] [data-rule-row-remove]', 'data-trigger={'],
+    ['[data-trigger] [data-rule-row-remove]', 'data-rule-row-remove=""'],
+    ['[data-trigger-tier-step-mode="up"]', 'optionDataAttr="data-trigger-tier-step-mode"'],
+    ['[data-trigger-tier-step-mode="target"]', 'optionDataAttr="data-trigger-tier-step-mode"'],
+  ]) {
+    assert.ok(HARNESS.includes(walked), `the Phase D0 walk no longer drives ${walked}`);
+    assert.ok(
+      TRIGGER_ROW_SRC.includes(emitted),
+      `the trigger rows no longer emit ${emitted}, so the walk points at nothing`,
+    );
+  }
   const tierStepModes = CHECK_TRIGGERS_SRC.match(/const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/)?.[0];
   assert.ok(tierStepModes, 'the TIER_STEP_MODES declaration was not found');
   for (const mode of ['up', 'target']) {
@@ -1944,14 +1963,6 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
       `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`,
     );
   }
-
-  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger
-  // dirties the Checks draft and the next navigation raises a discard prompt mid-phase.
-  assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
-  assert.ok(
-    HARNESS.includes('[data-trigger] [data-remove-trigger]'),
-    'the walk must remove the trigger it authored',
-  );
 });
 
 // ── The shared fixtured-section lifecycle (issues #784 / 785) ──────────────────

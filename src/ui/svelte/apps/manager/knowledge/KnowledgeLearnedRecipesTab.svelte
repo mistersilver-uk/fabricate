@@ -35,12 +35,12 @@
       'FABRICATE.Admin.Manager.Knowledge.LearnedBanner',
       'Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.'
     )}
-    dataAttr="data-knowledge-learned-banner"
+    data-knowledge-learned-banner
   />
 
   {#if learnedRecipes.length === 0}
     <EmptyState
-      dataAttr="data-knowledge-learned-empty"
+      data-knowledge-learned-empty
       icon="fas fa-graduation-cap"
       title={text('FABRICATE.Admin.Manager.Knowledge.LearnedEmptyTitle', 'Nothing learned yet')}
       hint={text(

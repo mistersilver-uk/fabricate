@@ -4,8 +4,8 @@
 
   A thin caller of the promoted `EditorTabs` primitive. This file owns the tab SET, the two badges
   and this site's DOM contract — the `data-essence-tab` hook, the `essence-tab-*` /
-  `essence-panel-*` id stem, the container class and the strip's aria-label — and no rendered id,
-  `aria-controls`, `data-*` attribute or class changed in the conversion.
+  `essence-panel-*` id stem whose one panel `EssenceEditView` renders, the container class and the
+  strip's aria-label.
 
   THE KEYBOARD MODEL CAME WITH THE PRIMITIVE, WHICH IS WHY THE VARIABLE SET IS SAFE: this file used
   to close over `tabs.length` in its own handler, so two-tab and three-tab sets were two things to
@@ -15,8 +15,8 @@
   Lab's source-coverage scan cannot credit ids produced that way. They are also literals in
   `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS`, which is where the scan reads them.
 
-  THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
-  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders NO badge, which is
+  THE ON-CRAFT COUNT COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
+  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders no count, which is
   the primitive's own rule, and the rules set has no `oncraft` tab for the entry to match.
 -->
 <script>
@@ -75,7 +75,7 @@
     if (warnings > 0) {
       return { tone: 'warning', label: String(warnings), name: issueCountLabel(warnings) };
     }
-    // NEUTRAL, not green, and carrying no `is-valid`: a green tick claims a RESULT where the
+    // NEUTRAL, not green: a green tick claims a RESULT where the
     // reference states an absence of findings. `WorldEssenceEntryPage` states the same pair, so
     // the two essence editors cannot disagree about what "clear" looks like. It is ONE pill in
     // two states — a numeral or a tick in the same box — never a second shape.
@@ -87,7 +87,7 @@
   }
 
   const badges = $derived({
-    oncraft: onCraftCount,
+    oncraft: { vehicle: 'count', label: onCraftCount },
     validation: validationBadgeFor(blockingCount, warningCount),
   });
 </script>
@@ -100,7 +100,8 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Essence.Tabs.Label"
   ariaLabel="Essence editor sections"
   idStem="essence"
-  hookAttribute="data-essence-tab"
+  tabDataAttr="data-essence-tab"
   containerClass="manager-essence-editor-tabs manager-editor-tabs"
   danger
+  activePanelOnly
 />

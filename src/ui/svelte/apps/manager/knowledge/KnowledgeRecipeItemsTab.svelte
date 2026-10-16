@@ -38,7 +38,7 @@
       'FABRICATE.Admin.Manager.Knowledge.RecipeItemsBanner',
       'Expending a use spends one charge as if the character read the item. Deleting removes the copy from their pack entirely.'
     )}
-    dataAttr="data-knowledge-items-banner"
+    data-knowledge-items-banner
   />
 
   {#if hasPartyPoolHazard}
@@ -48,13 +48,13 @@
         'FABRICATE.Admin.Manager.Knowledge.PartyPoolWarning',
         'This character holds a party-pool copy. Erase the memory before deleting the copy — deleting the copy first strands its party-pool slot permanently.'
       )}
-      dataAttr="data-knowledge-party-pool-warning"
+      data-knowledge-party-pool-warning
     />
   {/if}
 
   {#if copies.length === 0}
     <EmptyState
-      dataAttr="data-knowledge-items-empty"
+      data-knowledge-items-empty
       icon="fas fa-boxes-stacked"
       title={text('FABRICATE.Admin.Manager.Knowledge.ItemsEmptyTitle', 'No owned copies')}
       hint={text(

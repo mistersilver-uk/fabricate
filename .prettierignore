@@ -39,6 +39,9 @@ openspec/
 # Jekyll owns the docs site; its build output and vendored assets are already excluded above.
 docs/
 
-# The compiled stylesheet. Its source of truth is the component `<style>` blocks and the design
-# tokens; stylelint gates those.
+# The module sheet's entry: it holds only the `@import` rules that join the sheet's text, in
+# cascade order. Stylelint gates it, and Prettier does not own it.
 styles/fabricate.css
+
+# The partials that sheet imports: the same text, which Stylelint gates and Prettier does not own.
+styles/fabricate-*.css

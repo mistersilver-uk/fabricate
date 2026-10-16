@@ -101,7 +101,7 @@
   {#if inertNote}
     <!-- INFO stands: this sentence exists only because the CURRENT configuration makes the
          policy inert, which is exactly the live state the info tint is reserved for. -->
-    <Callout tone="info" text={inertNote} dataAttr="data-failure-result-policy-inert" />
+    <Callout tone="info" text={inertNote} data-failure-result-policy-inert />
   {/if}
   <RadioCardGroup
     legendKey="FABRICATE.Admin.Manager.Checks.FailureResults.Heading"
@@ -110,7 +110,7 @@
     selectedValue={value}
     groupName={`checks-${activity}-failure-result-policy`}
     columns={1}
-    dataAttr="data-failure-result-policy-group"
+    data-failure-result-policy-group
     optionDataAttr="data-failure-result-policy-option"
     onChange={(next) => onChange(next)}
   />

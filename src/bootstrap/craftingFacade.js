@@ -8,6 +8,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { resolveAdvanceSources } from '../systems/advanceCraftingSources.js';
 import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
+import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { withStationPresence } from '../systems/stationPresence.js';
 import {
@@ -46,7 +47,7 @@ function createCraftingListingBuilder(facade, recipeManager) {
 }
 
 /** The cached builder, or one built for this call over the station's presence view. */
-function craftingDetailBuilder(facade, presentTools) {
+function craftingBuilderFor(facade, presentTools) {
   const recipeManager = withStationPresence(facade.recipeManager, presentTools);
   return recipeManager === facade.recipeManager
     ? facade._getCraftingListingBuilder()
@@ -80,11 +81,15 @@ export const craftingFacade = {
     return { craftingActor, componentSourceActors };
   },
 
-  /** The current user is always the viewer; the visibility service honours the GM bypass. */
-  listCraftingForActor(options = {}) {
+  /**
+   * The current user is always the viewer; the visibility service honours the GM bypass.
+   * `presentTools` is the Active Canvas Tool's payload, or null, so a row's Tool verdict agrees
+   * with `hydrateCraftingRecipe`'s.
+   */
+  listCraftingForActor({ presentTools = null, ...options } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
-    return this._getCraftingListingBuilder().buildListing({
+    return craftingBuilderFor(this, presentTools).buildListing({
       craftingActor,
       componentSourceActors,
       viewer: game.user,
@@ -108,7 +113,7 @@ export const craftingFacade = {
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
-    return craftingDetailBuilder(this, presentTools).buildRecipeDetail({
+    return craftingBuilderFor(this, presentTools).buildRecipeDetail({
       recipeId,
       craftingActor,
       componentSourceActors,
@@ -237,12 +242,17 @@ export const craftingFacade = {
     presentTools = null,
   } = {}) {
     this._requireReady();
-    const recipe = this.recipeManager?.getRecipe?.(recipeId);
-    if (!recipe) return null;
+    const liveRecipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!liveRecipe) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
+    // A begun run is judged against the terms it accepted, as the engine resolves it.
+    const run = craftingActor
+      ? this.craftingRunManager?.findActiveRunForRecipe?.(craftingActor, liveRecipe.id)
+      : null;
+    const recipe = (run && resolveRunRecipe(run, this.recipeManager)) ?? liveRecipe;
     const sources =
       componentSourceActors.length > 0
         ? componentSourceActors

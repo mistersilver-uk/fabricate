@@ -125,7 +125,7 @@ export function registerComponentsCases() {
     assert.equal(target.textContent.includes('Evidence'), false);
     assert.equal(target.textContent.includes('Progressive difficulty'), false);
 
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
+    const search = target.querySelector('.fabricate-filter-bar input[type="search"]');
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -454,10 +454,16 @@ export function registerComponentsCases() {
       'the source block renders inside the identity strip, not a rail inspector'
     );
     assert.equal(
-      target.querySelector('.manager-inspector .manager-inspector-card'),
+      target.querySelector('.manager-inspector .fabricate-card'),
       null,
       'the component editor renders no right-rail inspector card'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const rail = target.ownerDocument.createElement('div');
+    rail.innerHTML = '<aside class="manager-inspector"><section class="fabricate-card"></section></aside>';
+    assert.ok(Boolean(rail.querySelector(':scope .manager-inspector .fabricate-card')), 'it can match');
 
     // ── THE SOURCE REGISTER IS GONE FROM THIS SCREEN (issue 1371, parity round 4) ──────────
     // Open-sheet on the name, the overflow's Copy source UUID and Unlink Source Item, and the
@@ -545,7 +551,7 @@ export function registerComponentsCases() {
     assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
     assert.ok(
       saveButton.classList.contains('fab-manager-button'),
-      `the header Save renders through the ManagerButton primitive, got ${saveButton.className}`
+      `the header Save renders through the Button primitive, got ${saveButton.className}`
     );
     assert.ok(
       saveButton.classList.contains('is-primary') && !saveButton.classList.contains('is-ghost'),
@@ -631,9 +637,11 @@ export function registerComponentsCases() {
   for (const { name, options } of difficultyConsumerCases) {
     it(`shows the component difficulty control for ${name}`, async () => {
       await openComponentEditor([], options);
-      const card = target.querySelector('[data-component-edit-section="difficulty"]');
-      assert.ok(card, `difficulty control should render for ${name}`);
-      assert.ok(card.querySelector('input'), 'the difficulty control should expose an input');
+      const cards = target.querySelectorAll('[data-component-edit-section="difficulty"]');
+      assert.equal(cards.length, 1, `exactly one difficulty control should render for ${name}`);
+      const input = cards[0].querySelector('input');
+      assert.ok(input, 'the difficulty control should expose an input');
+      assert.equal(input.value, '2', 'and it reads the persisted difficulty at either placement');
     });
   }
 
@@ -952,13 +960,14 @@ export function registerComponentsCases() {
     );
   });
 
-  it('the salvage yield picker is NOT filtered by the component browser search', async () => {
-    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`.
+  it('the salvage result adder is NOT filtered by the component browser search', async () => {
+    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`. The rows
+    // name from the same options, through the requirement row (issue 1516).
     const calls = [];
     await openComponentSalvageEditor(calls, {
       // Matches ONLY "Iron Ore" (c1) — the component being edited.
       itemSearchTerm: 'iron',
-      salvageResolutionMode: 'progressive',
+      salvageResolutionMode: 'simple',
       componentSalvage: {
         enabled: true,
         resultGroups: [
@@ -968,7 +977,7 @@ export function registerComponentsCases() {
     });
 
     const root = target.querySelector('.fabricate-manager');
-    target.querySelector('.manager-salvage-component-trigger').click();
+    target.querySelector(':scope [data-salvage-section] [data-add-salvage-result]').click();
     await tick();
     flushSync();
 
@@ -1030,7 +1039,11 @@ export function registerComponentsCases() {
     section.querySelector('[data-add-salvage-group]').click();
     await tick();
     flushSync();
-    target.querySelector('[data-salvage-section] [data-add-salvage-result]').click();
+    // The adder picks the component it adds (issue 1516).
+    target.querySelector(':scope [data-salvage-section] [data-add-salvage-result]').click();
+    await tick();
+    flushSync();
+    target.querySelector(':scope .fabricate-manager .manager-travel-option').click();
     await tick();
     flushSync();
 
@@ -1224,6 +1237,10 @@ export function registerComponentsCases() {
           '[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]'
         )
         .click();
+      await tick();
+      flushSync();
+      // The picker is a Results card (issue 1522).
+      target.querySelector('[data-gathering-task-tab="results"]').click();
       await tick();
       flushSync();
 

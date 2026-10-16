@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ArtPicker from '../../../components/ArtPicker.svelte';
   import Field from '../../../components/Field.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -8,6 +9,7 @@
   import { formatList, localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import {
     ADD_SENTINEL,
@@ -113,6 +115,15 @@
       : [{ id: dangerLevel, label: defaultDangerLabel(dangerLevel) }, ...dangerLevelOptions]
   );
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
+  const SELECTION_MODES = [
+    ['targeted', 'Targeted', 'fas fa-eye'],
+    ['blind', 'Blind', 'fas fa-eye-slash'],
+  ].map(([value, name, icon]) => ({
+    value,
+    icon,
+    labelKey: `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${name}`,
+    fallback: name,
+  }));
 
   function addBiome(chosen) {
     const id = String(chosen || '').trim();
@@ -162,6 +173,7 @@
   const instanceId = $props.id();
   const dangerCaptionId = `${instanceId}-danger-level`;
   const dangerHintId = `${instanceId}-danger-level-hint`;
+  const selectionHintId = `${instanceId}-selection-mode-hint`;
 
   // Each add control's name, stated once: the trigger's `aria-label` and its sentinel row's label.
   function addRealmLabel() {
@@ -209,40 +221,27 @@
         </div>
         <div class="manager-task-core-grid">
           <div class="manager-task-media-column">
-            {#if isSceneLinked}
-              <span
-                class="manager-task-image-picker is-scene-linked"
-                data-scene-locked-image
-                title={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
-                  "This image comes from the linked scene and can't be edited. Unlink the scene to choose a custom image."
-                )}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',
-                  'Image provided by the linked scene'
-                )}
-              >
-                <img
-                  src={linkedSceneImage || environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
-                  alt=""
-                />
-                <i class="fas fa-lock" aria-hidden="true"></i>
-              </span>
-            {:else}
-              <button
-                type="button"
-                class="manager-task-image-picker"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage',
-                  'Choose environment image'
-                )}
-                onclick={chooseImage}
-                disabled={typeof onPickImagePath !== 'function'}
-              >
-                <img src={environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
-                <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
-            {/if}
+            <ArtPicker
+              data-scene-locked-image={isSceneLinked ? '' : undefined}
+              art={(isSceneLinked && linkedSceneImage) ||
+                environment.img ||
+                DEFAULT_GATHERING_ENVIRONMENT_IMG}
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage',
+                'Choose environment image'
+              )}
+              onPick={chooseImage}
+              disabled={typeof onPickImagePath !== 'function'}
+              locked={isSceneLinked}
+              lockedLabel={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',
+                'Image provided by the linked scene'
+              )}
+              lockedHint={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
+                "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image."
+              )}
+            />
             <div class="manager-task-core-status">
               <StatusToggle
                 on={environment.enabled !== false}
@@ -339,7 +338,7 @@
                       options={realmAddOptions}
                       showTick={false}
                       ariaLabel={addRealmLabel()}
-                      triggerData={{ 'data-chip-remove-fallback': '' }}
+                      triggerProps={{ 'data-chip-remove-fallback': '' }}
                       onChange={addRealm}
                     />
                   {/if}
@@ -420,7 +419,7 @@
                 options={dangerSelectOptions}
                 ariaLabelledBy={dangerCaptionId}
                 ariaDescribedBy={dangerHintId}
-                triggerData={{ 'data-environment-field': 'dangerLevel' }}
+                triggerProps={{ 'data-environment-field': 'dangerLevel' }}
                 onChange={(next) => onUpdate({ dangerLevel: next })}
               />
             </Field>
@@ -447,7 +446,7 @@
                 options={biomeAddOptions}
                 showTick={false}
                 ariaLabel={addBiomeLabel()}
-                triggerData={{ 'data-chip-remove-fallback': '' }}
+                triggerProps={{ 'data-chip-remove-fallback': '' }}
                 onChange={addBiome}
               />
             {/if}
@@ -507,35 +506,20 @@
               'Player-facing behaviour'
             )}
           </h3>
-          <div
-            class="manager-environment-mode-control"
-            role="radiogroup"
-            aria-label={text(
+          <SegmentedControl
+            options={SELECTION_MODES}
+            value={selectionMode}
+            onChange={(next) => onUpdate({ selectionMode: next })}
+            groupName={`${instanceId}-selection-mode`}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SelectionMode',
               'Task selection mode'
             )}
-          >
-            {#each [['targeted', 'Targeted', 'fas fa-eye'], ['blind', 'Blind', 'fas fa-eye-slash']] as option (option[0])}
-              <button
-                type="button"
-                role="radio"
-                class={`manager-environment-mode-option ${selectionMode === option[0] ? 'is-selected' : ''}`}
-                aria-checked={selectionMode === option[0]}
-                data-selection-mode-option={option[0]}
-                onclick={() => onUpdate({ selectionMode: option[0] })}
-              >
-                <span class="manager-environment-mode-head"
-                  ><i class={option[2]} aria-hidden="true"></i><span
-                    >{text(
-                      `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${option[1]}`,
-                      option[1]
-                    )}</span
-                  ></span
-                >
-              </button>
-            {/each}
-          </div>
-          <p class="manager-muted manager-environment-mode-hint">
+            optionDataAttr="data-selection-mode-option"
+            fill
+            aria-describedby={selectionHintId}
+          />
+          <p id={selectionHintId} class="manager-muted manager-environment-mode-hint">
             {selectionMode === 'blind'
               ? text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindHint',

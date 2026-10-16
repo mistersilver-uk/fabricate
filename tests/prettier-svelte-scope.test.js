@@ -142,7 +142,7 @@ describe('Prettier covers Svelte components', () => {
   });
 
   it('resolves a Svelte parser for a real component', async () => {
-    const sample = path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte');
+    const sample = path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte');
     const info = await prettier.getFileInfo(sample, { ignorePath, resolveConfig: true });
     assert.deepEqual(
       info,
@@ -155,7 +155,7 @@ describe('Prettier covers Svelte components', () => {
   // reported even with no plugin loaded, so it does NOT prove a parser exists.
   it('registers prettier-plugin-svelte in the resolved config', async () => {
     const config = await prettier.resolveConfig(
-      path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
+      path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte')
     );
     assert.ok(
       config?.plugins?.includes('prettier-plugin-svelte'),
@@ -167,7 +167,7 @@ describe('Prettier covers Svelte components', () => {
   // than inherited.
   it('pins the plugin options that decide component formatting', async () => {
     const config = await prettier.resolveConfig(
-      path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
+      path.join(repoRoot, 'src/ui/svelte/apps/manager/IconFactRow.svelte')
     );
     assert.equal(config?.svelteAllowShorthand, true, 'svelteAllowShorthand must be pinned');
     assert.equal(
@@ -279,7 +279,7 @@ describe('format:check actually reaches the component corpus when executed', () 
         ' to zero while format:check still exits 0'
     );
     assert.ok(
-      inspected.some((file) => file.endsWith('ExplainerCard.svelte')),
+      inspected.some((file) => file.endsWith('IconFactRow.svelte')),
       'expected a known real component to appear among the files Prettier actually inspected'
     );
   });
@@ -331,11 +331,11 @@ describe('the report a failing format:check would actually print', () => {
     status: 1,
     stdout: 'Checking formatting...\n',
     stderr:
-      '[warn] src/ui/svelte/apps/manager/ExplainerCard.svelte\n' +
+      '[warn] src/ui/svelte/apps/manager/IconFactRow.svelte\n' +
       '[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n',
   };
   const componentPath = (name) => path.join(repoRoot, 'src/ui/svelte/apps/manager', name);
-  const steady = [componentPath('ExplainerCard.svelte')];
+  const steady = [componentPath('IconFactRow.svelte')];
 
   it("reports exit 1 as Prettier's own verdict, with nothing added to it", () => {
     const report = formatCheckReport(UNFORMATTED, steady, steady);
@@ -422,7 +422,7 @@ describe('the report a failing format:check would actually print', () => {
   it('names the components that appeared and vanished across the invocation', () => {
     const vanished = componentPath('Vanished.svelte');
     const appeared = componentPath('Appeared.svelte');
-    const kept = componentPath('ExplainerCard.svelte');
+    const kept = componentPath('IconFactRow.svelte');
     // Exit 0 on purpose: the listing diff is enrichment reported at ANY exit code, because a tree
     // moving under the run is worth knowing about whatever Prettier concluded.
     const report = formatCheckReport(
@@ -440,7 +440,7 @@ describe('the report a failing format:check would actually print', () => {
       `the report must name what vanished, not just count it:\n${report}`
     );
     assert.ok(
-      !report.includes('ExplainerCard'),
+      !report.includes('IconFactRow'),
       `a component present either side of the run did not move and is not news:\n${report}`
     );
   });

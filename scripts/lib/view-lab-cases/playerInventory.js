@@ -6,7 +6,9 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DEFAULTS,
   CRAFTING_SHARED,
+  PLAYER_DETAIL_HEADER,
   PLAYER_VIEW_STATE,
+  PROGRESSIVE_STAGE_PARTS,
 } from './caseConstants.js';
 import {
   CARD,
@@ -17,6 +19,8 @@ import {
   responsiveLayout,
 } from './caseFactories.js';
 
+/** A book's Read & learn, which is its identity header's one primary. */
+const READ_LEARN_ACTION = '[data-player-detail-header] [data-inventory-learn-all]';
 /** The bulk roll prompt: Fabricate's own modal over the player window. */
 const BULK_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="bulk"]';
 /** The help line under the bonus field, then the batch list holding each `[name, need]` row. */
@@ -71,9 +75,9 @@ const buyOneAndRoll = (prompt) => [
 const SINGLE_SALVAGE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
 /** The Longsword's single salvage, its one bought die rolled at or under 20 (frame 39). */
 const SALVAGE_LONGSWORD_BOUGHT = Object.freeze([
-  { selector: '.inventory-filters input', fill: 'Longsword' },
+  { selector: '[data-inventory-search]', fill: 'Longsword' },
   { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
-  { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+  { selector: '[data-inventory-detail-tab="salvage"]' },
   { selector: '[data-inventory-salvage-action]' },
   ...buyOneAndRoll(SINGLE_SALVAGE_PROMPT),
 ]);
@@ -100,6 +104,13 @@ const SALVAGE_TARGET_SOURCES = Object.freeze([
   /^src\/ui\/presenters\/(?:salvageCheckNeed|checkDescriptor)\.js$/,
 ]);
 
+/** The inventory inspector's cross-reference frames: its own tree, its store and its header. */
+const XREF_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/inventory\//,
+  /^src\/ui\/svelte\/stores\/inventory/,
+  PLAYER_DETAIL_HEADER,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-environments',
@@ -118,6 +129,12 @@ export const CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [],
+    // The shopping list's hero panel pads the specimen's 16 on every side (issue 2257 D9).
+    expectLayout: {
+      controls: [
+        { selector: '.crafting-shopping-empty > .manager-empty', styles: 'padding: 16px' },
+      ],
+    },
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SHARED,
@@ -161,7 +178,48 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
+      PLAYER_DETAIL_HEADER,
     ],
+  }),
+  // Issue 2321: a tool's Required for, a recipe row that opens beside a gathering row that does
+  // not. Idrin is the crafting actor because only Idrin knows a recipe the Alembic is required for.
+  playerCase({
+    id: 'player-inventory-xref-tool',
+    label: 'Player app — Inventory tool Required for, a recipe and a gathering task',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '.fabricate-app-actor-bar .actor-bar-trigger' },
+      { selector: '.actor-bar-popover .manager-travel-option:has-text("Idrin Ashfall")' },
+      { selector: '[data-inventory-search]', fill: 'Alembic' },
+      { selector: CARD_BUTTON('tool:lab-herbalism:hb-tool-alembic') },
+    ],
+    expectSelector:
+      '[data-inventory-section="required"]' +
+      ':has([data-inventory-required-for="hb-r-antitoxin"] > button)' +
+      ':has([data-inventory-required-for-kind="gathering"])',
+    expectCenterHit: '[data-inventory-required-for="hb-r-antitoxin"] > button',
+    kinds: ['player', 'inventory'],
+    sourceMatches: XREF_SOURCES,
+  }),
+  // Issue 2321: an essence's Contributing rows, each a component and the count it carries.
+  playerCase({
+    id: 'player-inventory-xref-essence',
+    label: 'Player app — Inventory essence Contributing',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Earth' },
+      { selector: CARD_BUTTON('essence:lab-smithing:earth') },
+    ],
+    expectSelector:
+      '[data-inventory-section="contributors"]' +
+      ':has([data-inventory-contributor="sm-iron-ore"] .fabricate-list-row-quantity)' +
+      ':has([data-inventory-contributor="sm-oak-haft"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: XREF_SOURCES,
   }),
   playerCase({
     id: 'player-inventory-page-size',
@@ -204,6 +262,39 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  ...[
+    { id: 'player-inventory-book-read-learn', label: '' },
+    {
+      id: 'player-inventory-book-read-learn-stacked',
+      label: ', stacked',
+      position: { width: 1024, height: 860 },
+      kinds: ['responsive'],
+      expectLayout: responsiveLayout('.inventory-view-container', '.inventory-view-grid'),
+    },
+  ].map(({ id, label, kinds = [], ...variant }) =>
+    playerCase({
+      id,
+      label: `Player app — Inventory book, Read & learn${label}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      // A held knowledge book whose learn cap covers its three recipes (issue 1518).
+      query: { tab: 'inventory', learnableBook: '1' },
+      steps: [
+        { selector: '[data-inventory-search]', fill: 'Hedgerow' },
+        { selector: CARD_BUTTON('recipeitem:lab-herbalism:hb-herbal') },
+      ],
+      expectSelector: READ_LEARN_ACTION,
+      expectCenterHit: READ_LEARN_ACTION,
+      kinds: ['player', 'inventory', ...kinds],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/inventory\//,
+        /^src\/ui\/svelte\/stores\/inventory/,
+        /^src\/ui\/svelte\/util\/bookRecipeBrowse\.js$/,
+        PLAYER_DETAIL_HEADER,
+      ],
+      ...variant,
+    })
+  ),
   playerCase({
     id: 'player-salvage',
     label: 'Player app — Salvage',
@@ -212,16 +303,17 @@ export const CASES = Object.freeze([
     query: { tab: 'inventory' },
     // The progressive salvage body with its reorderable stage list, which is the counterpart's own condition.
     steps: [
-      { selector: '.inventory-filters input', fill: 'Cracked Alembic' },
+      { selector: '[data-inventory-search]', fill: 'Cracked Alembic' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-herbalism:hb-cracked-alembic"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
+      PROGRESSIVE_STAGE_PARTS,
       /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
@@ -237,6 +329,30 @@ export const CASES = Object.freeze([
       ':not(:has([data-progressive-stage-complications]))',
   }),
   playerCase({
+    id: 'player-salvage-narrow',
+    label: 'Player app — Salvage narrow',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    // The progressive salvage stage list at the narrowest two-column width, where the inspector is about 370px.
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Cracked Alembic' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-herbalism:hb-cracked-alembic"] .inventory-card-button',
+      },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
+    ],
+    position: { width: 1064, height: 860 },
+    kinds: ['player', 'inventory', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      PROGRESSIVE_STAGE_PARTS,
+    ],
+    expectSelector: '[data-inventory-salvage-panel="progressive"] [data-progressive-stage]',
+  }),
+  playerCase({
     id: 'player-salvage-no-check',
     label: 'Player app — Salvage no check',
     smokeLabels: ['player-salvage-no-check'],
@@ -244,12 +360,12 @@ export const CASES = Object.freeze([
     query: { tab: 'inventory' },
     // Simple salvage with no authored roll formula, so every result is recovered outright.
     steps: [
-      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: '[data-inventory-search]', fill: 'Longsword' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -267,12 +383,12 @@ export const CASES = Object.freeze([
     query: { tab: 'inventory' },
     // The pre-roll tool disclosure in both states: the Forge Tongs the actor holds and the Anvil it does not.
     steps: [
-      { selector: '.inventory-filters input', fill: 'Field Toolchest' },
+      { selector: '[data-inventory-search]', fill: 'Field Toolchest' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-toolchest"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -290,12 +406,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: '[data-inventory-search]', fill: 'Longsword' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
         selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
@@ -326,12 +442,12 @@ export const CASES = Object.freeze([
     // The failure toast the player is shown, which the lab reports as a console warning.
     allowedConsoleErrors: [/Salvage check failed/],
     steps: [
-      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: '[data-inventory-search]', fill: 'Longsword' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
         selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
@@ -360,14 +476,18 @@ export const CASES = Object.freeze([
     query: { tab: 'inventory' },
     // One stack registered in two systems collapses to a single card, carrying the system-selector drop-down.
     steps: [
-      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      { selector: '[data-inventory-search]', fill: 'Air Shard' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
       },
     ],
     kinds: ['player', 'inventory'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   // Issue 2005: a roll-under salvage names its target and source in place of a DC, and its banner
   // says the total must stay at or under the target.
@@ -378,12 +498,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-under-skill' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      { selector: '[data-inventory-search]', fill: 'Air Shard' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-panel="simple"]' +
@@ -399,12 +519,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-under' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-runework:rw-slag"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-body="routed"]:has([data-inventory-salvage-target="under"])' +
@@ -421,14 +541,14 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
       { selector: CARD_BUTTON('lab-runework:rw-slag') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
-      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"] .manager-chip)' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-outcome-band][data-inventory-outcome-threshold="16"])' +
       ':not(:has([data-inventory-outcome-band]))',
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -445,15 +565,36 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-count' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
       { selector: CARD_BUTTON('lab-runework:rw-slag') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
-      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"] .manager-chip.is-danger)',
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-outcome-band="danger"][data-inventory-outcome-band="0"])',
+    // Issue 2257 D14, D19: the band a bare figure, and a 24px yield chip inside its tier's body.
+    expectContained: [
+      {
+        container: '[data-inventory-salvage-outcome="rw-salv-masterwork"] .fab-outcome-yields',
+        target:
+          '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-salvage-result="rw-chalk"]',
+      },
+    ],
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-outcome-band]',
+          styles: 'border-width: 0; font-size: 10px',
+        },
+        {
+          selector:
+            '[data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-salvage-result="rw-bar"]',
+          styles: 'min-height: 24px; border-radius: 6px',
+        },
+      ],
+    },
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -470,15 +611,15 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-count-cancel' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
       { selector: CARD_BUTTON('lab-runework:rw-slag') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
-      ' [data-inventory-outcome-band="<−4"] .manager-chip)',
+      ' [data-outcome-band][data-inventory-outcome-band="<−4"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -495,9 +636,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-fixed-routed' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
       { selector: CARD_BUTTON('lab-runework:rw-slag') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-body="routed"][data-inventory-routed-type="fixed"]' +
@@ -510,6 +651,33 @@ export const CASES = Object.freeze([
       /^src\/systems\/runJournalOutcomeBands\.js$/,
     ],
   }),
+  // Issue 1644: after a routed salvage of the slag, the shared ladder marks the one tier it reached.
+  playerCase({
+    id: 'player-salvage-routed-reached',
+    label: 'Player app — Routed salvage after its roll, the reached tier marked "Your roll"',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open' },
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      { selector: `${SINGLE_SALVAGE_PROMPT} button[type="submit"]` },
+      { selector: '[data-outcome-rolled="true"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"][data-outcome-rolled="true"]' +
+      ' .manager-chip[data-inventory-outcome-your-roll])',
+    // Issue 2257: the shorter ladder no longer pushes the salvage note below the pane's fold.
+    expectCenterHit: '[data-inventory-salvage-ribbon]',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
   playerCase({
     id: 'player-salvage-misconfigured',
     label: 'Player app — Salvage misconfigured',
@@ -518,12 +686,12 @@ export const CASES = Object.freeze([
     reaches: 'window',
     query: { tab: 'inventory' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Bent Clasp' },
+      { selector: '[data-inventory-search]', fill: 'Bent Clasp' },
       {
         selector:
           '.inventory-card[data-inventory-card="lab-jewelry:jw-bent-clasp"] .inventory-card-button',
       },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -552,6 +720,8 @@ export const CASES = Object.freeze([
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
       ':has([data-inventory-bulk-yield] .manager-chip.is-positive)' +
       ':has([data-inventory-bulk-yield] .manager-chip.is-accent)',
+    // The bulk panel draws the same identity row through `InventoryDetailHeader`.
+    sourceMatches: [...BULK_DEFAULTS.sourceMatches, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -571,6 +741,11 @@ export const CASES = Object.freeze([
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
       ':has([data-inventory-bulk-queue="preview"] [data-inventory-bulk-queue-row])',
+    // Against the window's scrollport, which clips at the window edge rather than growing with its content.
+    expectContained: [
+      { container: '.fabricate-app-content', target: '.inventory-grid-pagination' },
+      { container: '.fabricate-app-content', target: '[data-inventory-bulk-footer]' },
+    ],
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -665,10 +840,11 @@ export const CASES = Object.freeze([
     // The order note and the renumbering are photographed together, because neither means anything alone.
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
-      { selector: '[data-progressive-stage-move-down]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-progressive-stage] [data-sortable-move="down"]' },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
     ],
+    sourceMatches: [...BULK_DEFAULTS.sourceMatches, PROGRESSIVE_STAGE_PARTS],
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-complication-group="lab-herbalism:hb-cracked-alembic"] ' +
@@ -934,9 +1110,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', rollPromptState: 'salvage-count' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      { selector: '[data-inventory-search]', fill: 'Air Shard' },
       { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
     ],
     expectSelector:
       '[data-inventory-salvage-panel="simple"]:not(:has([data-inventory-salvage-dc]))' +
@@ -954,9 +1130,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count-result' },
     steps: [
-      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: '[data-inventory-search]', fill: 'Longsword' },
       { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
-      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
         selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',

@@ -334,11 +334,11 @@ export class GatheringListingBuilder {
       system,
     });
     const componentsById = this._componentsById(system);
-    const drops = normalizeList(preview?.drops).map((drop) => ({
-      ...drop,
-      img:
-        stringOrNull(componentsById.get(stringOrNull(drop?.componentId))?.img) || DEFAULT_DROP_IMG,
-    }));
+    const drops = normalizeList(preview?.drops).map((drop) => {
+      const component = componentsById.get(stringOrNull(drop?.componentId));
+      const name = stringOrNull(drop?.name) || stringOrNull(component?.name) || '';
+      return { ...drop, name, img: stringOrNull(component?.img) || DEFAULT_DROP_IMG };
+    });
     return {
       resolutionMode: 'd100',
       successChance: preview?.successChance ?? null,

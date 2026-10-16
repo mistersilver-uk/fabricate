@@ -68,7 +68,7 @@
           <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: a result whose
                component has no authored art renders the house fallback rather than a
                broken-image glyph. -->
-          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={24} />
+          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={22} />
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}
@@ -93,7 +93,7 @@
   .salvage-body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
@@ -104,7 +104,7 @@
   .salvage-body-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     line-height: 1;
   }
@@ -116,7 +116,7 @@
   .salvage-dc {
     font-family: var(--fab-font-mono);
     font-size: 8.5px;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 0;
     color: var(--fab-text-secondary);
   }
@@ -131,7 +131,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
   }
@@ -160,7 +160,7 @@
     flex: 0 0 auto;
     font-family: var(--fab-font-mono);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-secondary);
   }
@@ -169,7 +169,7 @@
   .salvage-loss-note {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     margin: 0;
     font-size: 11px;
     line-height: 1.5;

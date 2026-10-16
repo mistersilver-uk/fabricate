@@ -2,7 +2,7 @@
 name: fabricate-quality-engineer-small
 description: Scan Fabricate for likely defects, edge cases, testing gaps, and unreliable UI behavior, then record actionable issues. Use for bug hunts, reliability audits, regression-risk analysis, or creating GitHub issues instead of directly implementing fixes. Use for a small scan of one function or edge case in a single file. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: haiku
+model: claude-haiku-5-5
 ---
 
 You are the Fabricate quality engineer.

@@ -11,6 +11,9 @@
   | `on` | boolean | `false` | the revealed `children` render ONLY when true, which keeps a disabled effect's inputs out of the tab order. Ignored under `control="none"` |
   | `form` | `'condition'` \| `'effect'` \| `'pill'` | `'condition'` | the row's GEOMETRY: a condition is one item in a checklist and is transparent until checked; an effect is a standing affordance inside the "Then" card and keeps its fill; `pill` is a fixed-height inline control sized to its own content. A PROP rather than derived from `control`, because `pill` is a `switch` and deriving would draw it as an effect row. |
   | `onTone` / `tone` / `label` | | `'neutral'` / `'subtle'` / `''` | what the ON state MEANS, the glyph's colour family (colour only), and the control's accessible name, falling back to `title` |
+
+  Rest spread:
+  - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -27,18 +30,17 @@
     detail = '',
     label = '',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     onToggle = () => {},
     children = undefined,
     // A trailing action for the HEAD, where a `switch` would sit; not enforced as exclusive.
     headAction = undefined,
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   // Declared tones only, so a typo renders the default glyph rather than an unstyled class.
   const TONES = new Set(['danger', 'warning', 'success', 'accent', 'info', 'subtle']);
   const toneClass = $derived(TONES.has(tone) ? `is-tone-${tone}` : 'is-tone-subtle');
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const accessibleName = $derived(label || title);
   // Two derivations: PAINTED as enabled and children reachable differ for a `none` row.
   const enabled = $derived(control !== 'none' && on === true);
@@ -55,7 +57,7 @@
     <!-- `wrapper="contents"`: this head is already the `<label>`, and nesting is invalid HTML. -->
     <SelectionCheckbox
       wrapper="contents"
-      size="sm"
+      density="compact"
       checked={on}
       {disabled}
       ariaLabel={accessibleName}
@@ -77,10 +79,10 @@
 {/snippet}
 
 <div
-  class="fab-complication-effect {formClass} {onToneClass}"
+  class={['fab-complication-effect', formClass, onToneClass, extraClass]}
   class:is-on={enabled}
   class:is-disabled={disabled}
-  {...hookAttributes}
+  {...rest}
 >
   {#if control === 'checkbox'}
     <label class="fab-complication-effect-head">{@render headContent()}</label>
@@ -102,8 +104,8 @@
   /* A CONDITION: one item in a checklist. Transparent until it is checked, so the chosen
      ones read as a set against the card behind them. */
   .fab-complication-effect.is-form-condition {
-    padding: 9px 11px;
-    border-radius: 8px;
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border-radius: 9px;
     background: none;
   }
 
@@ -113,7 +115,7 @@
      matches its value; `ComponentComplicationsSection`'s `.fab-complication-card` note records
      why a by-value re-map flattens the section instead of deepening it. */
   .fab-complication-effect.is-form-effect {
-    padding: 11px 12px;
+    padding: var(--fab-space-3);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -124,7 +126,7 @@
     align-items: center;
     width: max-content;
     height: 34px;
-    padding: 0 12px;
+    padding: 0 var(--fab-space-3);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -147,20 +149,15 @@
 
   .fab-complication-effect-head {
     display: flex;
-    gap: 10px;
+    gap: var(--fab-space-3);
     align-items: flex-start;
     margin: 0;
   }
 
-  /* Both roomier forms centre their head; only the EFFECT widens its gap, since on a pill that
-     pixel comes off the control's own width. */
+  /* Both roomier forms centre their head. */
   .fab-complication-effect.is-form-effect .fab-complication-effect-head,
   .fab-complication-effect.is-form-pill .fab-complication-effect-head {
     align-items: center;
-  }
-
-  .fab-complication-effect.is-form-effect .fab-complication-effect-head {
-    gap: 11px;
   }
 
   /* Only the checkbox form makes the whole head a click target; the switch form's head is
@@ -216,7 +213,7 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -241,9 +238,9 @@
   .fab-complication-effect-reveal {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
-    margin: 10px 0 0 24px;
+    margin: var(--fab-space-3) 0 0 var(--fab-space-6);
   }
 
   /* …but ONLY where that column exists: an effect row's control is the switch on the FAR side, so

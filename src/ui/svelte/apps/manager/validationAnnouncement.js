@@ -16,10 +16,25 @@ export function accessibleNameOf(root, element) {
   if (!element || typeof element.getAttribute !== 'function') return '';
   const label = element.getAttribute('aria-label');
   if (label) return label.trim();
+  const labelledBy = namesFromIds(element, element.getAttribute('aria-labelledby'));
+  if (labelledBy) return labelledBy;
   const id = element.getAttribute('id');
   const labelling = id ? root?.querySelector?.(`label[for="${id}"]`) : null;
   if (labelling) return (labelling.textContent || '').trim();
   return (element.getAttribute('title') || '').trim();
+}
+
+/** The text of each id in an `aria-labelledby` list, joined by spaces; absent ids contribute nothing. */
+function namesFromIds(element, ids) {
+  const scope = element.getRootNode?.() ?? element.ownerDocument;
+  if (!ids || typeof scope?.querySelectorAll !== 'function') return '';
+  // Matched by equality rather than a built selector, so an id needs no CSS escaping.
+  const labelled = [...scope.querySelectorAll('[id]')];
+  return ids
+    .split(/\s+/u)
+    .map((id) => (labelled.find((node) => node.id === id)?.textContent || '').trim())
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function announceValidationOutcome({

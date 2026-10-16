@@ -1,8 +1,8 @@
 /** The shared spine of a UI primitive's SOURCE CONTRACT (issues 1422, 1427) (issue 1505). */
 
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import path from 'node:path';
+import test from 'node:test';
 
 import { collectSources, repoRoot, stripComments } from './sourceScan.js';
 import { withoutComments } from './stepperSourceContract.js';
@@ -208,6 +208,48 @@ export function definePrimitiveSourceContract(spec) {
       assert.deepEqual(found, [], `${why}: ${found.join(', ')}`);
     },
   };
+}
+
+/** Every lowercase (native) opening tag in a component's markup, `<script>`/`<style>` removed. */
+export function nativeOpeningTags(markup) {
+  const body = markup.replaceAll(/<(script|style)\b[\s\S]*?<\/\1>/g, '');
+  return openingTagsNamed(body, String.raw`[a-z][\w-]*`);
+}
+
+/**
+ * Register the two clauses a contract holds once every deferral has converted (issue 1777): the
+ * exemption list is the primitive alone, and no other component writes a contract token on a
+ * native element. `components` maps each repo-relative path to its comment-blanked source.
+ */
+export function defineSoleWriterClauses({ label, primitive, exemptions, components, tokens }) {
+  test(`the ${label} exemption list holds only the primitive`, () => {
+    assert.deepEqual(
+      exemptions.map((entry) => entry.file),
+      [primitive],
+      'a deferral is back on the list; convert the site onto the primitive instead'
+    );
+  });
+
+  // Clause (b) restates the whole-file checks for native elements: the scan reads literal class
+  // tokens in lowercase native markup of .svelte files only.
+  test(`no component but the primitive writes the ${label} contract on a native element`, () => {
+    // Positive control: the scan flags the hand-rolled shape and leaves a component tag alone.
+    for (const token of tokens) {
+      const probe = `<section class="x ${token}"></section><Probe class="${token}" />`;
+      assert.equal(nativeOpeningTags(probe).filter((tag) => tag.includes(token)).length, 1);
+    }
+
+    const scanned = Object.entries(components).filter(([file]) => file !== primitive);
+    const tags = scanned.flatMap(([file, source]) =>
+      nativeOpeningTags(source).map((tag) => [file, tag])
+    );
+    assert.ok(tags.length > 1000, `only ${tags.length} native tags scanned, so this is vacuous`);
+
+    const offenders = tags
+      .filter(([, tag]) => tokens.some((token) => tag.includes(token)))
+      .map(([file, tag]) => `${file}: ${tag.replaceAll(/\s+/g, ' ').slice(0, 120)}`);
+    assert.deepEqual(offenders, [], `a hand-rolled ${label} is back:\n  ${offenders.join('\n  ')}`);
+  });
 }
 
 /** The three probes a primitive with no pass-through props is policing. */

@@ -5,12 +5,11 @@
  * `interactable-config-view.test.js` and `interactable-config-actions.test.js`.
  */
 
-import { describe, it, afterEach, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
-import { resolve } from 'node:path';
+import { describe, it, afterEach, before } from 'node:test';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
 import {
   planSetEnabled,
@@ -24,13 +23,8 @@ import {
   CONFIG_PANEL_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
-import { componentAstOf } from '../helpers/parsedSource.js';
 import { identifierNames, walkNodes } from '../helpers/moduleAst.js';
-import {
-  attributeExpression,
-  carriesSpread,
-  declaresAttribute,
-} from '../helpers/svelteStructureContract.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import {
   claimsForComponent,
   constantLiteral,
@@ -39,7 +33,11 @@ import {
   structureOf,
   templateNodes,
 } from '../helpers/structureContract.js';
-import { repoRoot } from '../helpers/sourceScan.js';
+import {
+  attributeExpression,
+  carriesSpread,
+  declaresAttribute,
+} from '../helpers/svelteStructureContract.js';
 
 const APP = 'src/ui/InteractableConfigApp.svelte.js';
 const ROOT = 'src/ui/svelte/apps/InteractableConfigRoot.svelte';
@@ -50,7 +48,7 @@ const SELECT = 'src/ui/svelte/components/Select.svelte';
 const POPOVER_LAYOUT = 'src/ui/svelte/util/iconPickerPopover.js';
 
 /** `styles/fabricate.css` is the shipped global sheet, not `src/` text: it stays a text read. */
-const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const sheetSource = readStylesheet();
 
 /** One mutating seam of the services bag, addressed by name so a claim cannot slide onto another. */
 const seam = (property) => ({ file: APP, member: '_buildServices', property });
@@ -272,6 +270,12 @@ describe('InteractableConfigApp shell', () => {
   defineStructureContract('and tasks', seam('listTasks'), {
     calls: ['listTaskSourceOptions', '_sourceDeps'],
     callsWith: [['listTaskSourceOptions', 'systemId']],
+  });
+
+  defineStructureContract('names its source through the shared label resolver', seam('resolveSourceLabel'), {
+    calls: ['resolveInteractableSourceLabel'],
+    callsNo: ['listSystemTools', 'listSystemComponents'],
+    callsWith: [['resolveInteractableSourceLabel', 'system']],
   });
 
   defineStructureContract(
@@ -666,7 +670,7 @@ describe('InteractableConfigRoot body', () => {
   it('paints the on position with the themed accent token', () => {
     // `styles/fabricate.css` is the shipped global sheet rather than a component's scoped block.
     assert.ok(
-      /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
+      /\.fabricate-toggle\.fabricate-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
     );
   });
@@ -692,11 +696,21 @@ describe('InteractableConfigRoot body', () => {
     }
   });
 
-  // The two controls that declined the conversion.
-  defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
-    passesProps: [['ManagerButton', 'onclick']],
+  // The two controls that declined the conversion, labelled by state (issue 1625).
+  defineStructureContract('keeps Disabled and Locked as state-labelled pressed buttons, state on aria-pressed', ROOT, {
+    spells: [
+      'FABRICATE.Canvas.Interactable.Config.StateDisabled',
+      'FABRICATE.Canvas.Interactable.Config.StateLocked',
+    ],
+    spellsNo: [
+      'FABRICATE.Canvas.Interactable.Config.Enable',
+      'FABRICATE.Canvas.Interactable.Config.Disable',
+      'FABRICATE.Canvas.Interactable.Config.Lock',
+      'FABRICATE.Canvas.Interactable.Config.Unlock',
+    ],
+    passesProps: [['Button', 'onclick']],
     writes: ['aria-pressed'],
-    passesPropsNo: [['ManagerButton', 'on']],
+    passesPropsNo: [['Button', 'on']],
     compares: [false],
     styleDeclares: [
       [
@@ -708,7 +722,7 @@ describe('InteractableConfigRoot body', () => {
   });
 
   it('asks every pressed button for the inverse of the flag it announces', () => {
-    const pressed = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const pressed = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       attributeExpression(node, 'aria-pressed')
     );
     assert.ok(pressed.length > 0, 'at least one button announces a pressed state');
@@ -751,9 +765,10 @@ describe('InteractableConfigRoot body', () => {
       writes: ['data-interactable-identity-section'],
       spells: ['FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'],
       renders: ['Notice'],
-      passesValues: [
-        ['Notice', 'tone', 'warning'],
-        ['Notice', 'dataAttr', 'data-interactable-needs-config'],
+      // The failed load is the panel's other notice (issue 1779), so the banner is located by its hook.
+      rendersTimes: [[{ at: 'Notice', where: ['data-interactable-needs-config', ''] }, 1]],
+      gives: [
+        { at: 'Notice', where: ['data-interactable-needs-config', ''], attribute: 'tone', is: 'warning' },
       ],
       passesProps: [['Notice', 'title']],
       // The section-wide accent box left with the banner; nothing puts the class back.
@@ -762,7 +777,7 @@ describe('InteractableConfigRoot body', () => {
   );
 
   it('and gates Apply until the selection is complete', () => {
-    const gated = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const gated = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       identifierNames(attributeExpression(node, 'disabled') ?? {}).has('canApplyIdentity')
     );
     assert.equal(gated.length, 1, 'exactly one button is disabled until the selection completes');

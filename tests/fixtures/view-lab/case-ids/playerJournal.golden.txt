@@ -1,5 +1,7 @@
 player-alchemy-chooser
 player-alchemy-workbench
+player-alchemy-brew-enabled
+player-alchemy-known-recipe
 player-alchemy-stacked
 player-journal-stacked
 player-journal-sort-list
@@ -21,11 +23,13 @@ player-journal-routed-bands-count
 player-journal-routed-bands-count-unordered
 player-journal-roll-line-count
 player-journal-roll-line-routed-count
+fabricate-journal-lifecycle-stale-choice
 fabricate-journal-blind-run
 fabricate-journal-blind-run-gm
 fabricate-journal-lifecycle-ready-single
 fabricate-journal-lifecycle-legacy-armed
 fabricate-journal-lifecycle-waiting-auto-eligible
+fabricate-journal-lifecycle-waiting-auto-completes
 fabricate-journal-lifecycle-waiting-open-choice
 fabricate-journal-lifecycle-stage-not-started
 fabricate-journal-lifecycle-awaiting-choice
@@ -94,7 +98,8 @@ fabricate-journal-lifecycle-current-choice-closed
 fabricate-journal-lifecycle-essence-overshoot
 fabricate-journal-lifecycle-past-routed-stage
 fabricate-journal-lifecycle-future-routed-stage
-fabricate-journal-lifecycle-kind-menu-open
+fabricate-journal-lifecycle-kind-toggles
+fabricate-journal-lifecycle-kind-filter-open
 fabricate-journal-lifecycle-history-settling
 fabricate-journal-history-batch-full-1240
 fabricate-journal-history-batch-partial-1240
@@ -122,3 +127,13 @@ fabricate-journal-history-data-settled-zero-1024
 fabricate-journal-history-data-uncertain-awards-1024
 fabricate-journal-history-data-fizzle-1024
 fabricate-journal-history-data-salvage-1024
+player-journal-reward-awards
+player-journal-reward-awards-multi
+player-journal-reward-just-resolved
+player-journal-award-choice
+player-journal-award-choice-hearth-herb
+player-journal-award-choice-ceiling
+player-journal-award-choice-narrow
+player-journal-award-choice-forfeit
+player-journal-list-award-pending
+player-journal-award-choice-history

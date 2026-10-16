@@ -8,13 +8,13 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 // EnvironmentsBrowserView's Settings tab renders the biome vocabulary panel, which
-// mounts IconPicker + (conditionally) ManagerColorPopover side by side, plus every
+// mounts IconPicker + (conditionally) TintPicker side by side, plus every
 // retained Gathering and World content views EnvironmentsBrowserView statically imports. A `.svelte`
 // or `.js` the mounted tree renders but this allowlist omits does NOT fail the
 // suite — it HANGS (reported as `# cancelled`).
@@ -26,6 +26,8 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/gatheringImageDefaults.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/apps/manager/recordPickerOptions.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
@@ -53,6 +55,12 @@ const harness = createMountedComponentHarness({
     // `ActionMenu`'s own import-free leaves (issue 1515).
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/actionMenuLayout.js',
+    // The Times of day panel's time-of-day bar (issue 2431).
+    'src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js',
+    'src/systems/normalize/gatheringConditionOptions.js',
+    'src/utils/scalars.js',
+    'src/ui/svelte/util/worldTimeLabel.js',
+    'src/ui/svelte/util/rangeBarGeometry.js',
   ],
   // The browse-list wiring is a runes composable (issue 1716), reached by this view and by the
   // two gathering browsers it compiles below, so it is compiled rather than copied. An omission
@@ -63,23 +71,26 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // THE shared overflow action menu (issue 1477). All three browsers in this tree render one
-    // per row since issue 1515, and it renders `IconButton` above as its trigger.
+    // per row since issue 1515, and it renders `IconButton` above as its trigger and `Kicker` as
+    // its heading.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/TintPickerButton.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     // The parties pane's refusal banner is the shared notice as of issue 1515.
     'src/ui/svelte/components/Notice.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/PartyNameField.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     // The three card components the parties rebuild added (issue 1182).
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
@@ -91,6 +102,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
+    'src/ui/svelte/components/RangeBarMarker.svelte',
+    'src/ui/svelte/components/ThresholdBandStrip.svelte',
+    'src/ui/svelte/apps/manager/environment/TimeOfDayBar.svelte',
+    'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',

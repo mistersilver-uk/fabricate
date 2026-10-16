@@ -25,6 +25,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import { formatList, localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
   import ModifierPillSelect from '../../components/ModifierPillSelect.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import { resolveMaxModifierPicks } from '../../../../systems/checkModifierResolver.js';
@@ -39,11 +40,6 @@
     testId = 'subject-modifier',
     onChange = () => {},
   } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   // The inherit sentences name the ACTIVITY's check, since the default set is per-activity.
   const SUBJECT_COPY = {
@@ -111,13 +107,13 @@
 
   // A cap of exactly 1 gets its own sentence, following `RecipeOverviewTab`'s pair.
   const capText = $derived.by(() => {
-    if (capLimit === 1) return text(copy.capOneKey, copy.capOne);
+    if (capLimit === 1) return localizeOr(copy.capOneKey, copy.capOne);
     const translated = localize(copy.capKey, { count: capLimit });
     if (translated && translated !== copy.capKey) return translated;
     return copy.cap.replace('{count}', String(capLimit));
   });
   const capReachedText = $derived(
-    text(
+    localizeOr(
       'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierCapReached',
       'Remove one to pick another.'
     )
@@ -128,7 +124,7 @@
   const SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierSuppressed';
   const suppressedText = $derived.by(() => {
     if (suppressedCount === 1) {
-      return text(
+      return localizeOr(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierSuppressedOne',
         'One chosen modifier is hidden because the check no longer marks it selectable. It is kept and returns if the check marks it again.'
       );
@@ -143,11 +139,11 @@
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
   const emptyRowText = $derived(
     allPicksSuppressed
-      ? text(
+      ? localizeOr(
           ALL_SUPPRESSED_KEY,
           'All chosen modifiers are currently hidden — the check no longer marks them selectable. They are kept and return if the check marks them again.'
         )
-      : text(copy.emptySetKey, copy.emptySet)
+      : localizeOr(copy.emptySetKey, copy.emptySet)
   );
 
   // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression a GM can see PART of; once
@@ -172,7 +168,10 @@
         .map(
           (option) =>
             option.label ||
-            text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
+            localizeOr(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed',
+              'Unnamed modifier'
+            )
         )
     )
   );
@@ -180,7 +179,7 @@
   // A `{list}` PLACEHOLDER, never concatenated: a list's position in its sentence is a
   // translator's decision.
   const inheritText = $derived.by(() => {
-    if (!inheritedNames) return text(copy.inheritEmptyKey, copy.inheritEmpty);
+    if (!inheritedNames) return localizeOr(copy.inheritEmptyKey, copy.inheritEmpty);
     const translated = localize(copy.inheritKey, { list: inheritedNames });
     if (translated && translated !== copy.inheritKey) return translated;
     return copy.inherit.replace('{list}', inheritedNames);
@@ -200,14 +199,14 @@
 {#if options.length > 0}
   <Field as="div" class="is-wide" data-subject-modifier-picker={testId}>
     <span class="manager-recipe-micro-label" id={LABEL_ID}>
-      {text(copy.headingKey, copy.heading)}
+      {localizeOr(copy.headingKey, copy.heading)}
     </span>
     <div class="manager-subject-modifier-mode">
       <SelectionCheckbox
-        size="sm"
+        density="compact"
         checked={authored}
         {disabled}
-        ariaLabel={text(copy.authorKey, copy.author)}
+        ariaLabel={localizeOr(copy.authorKey, copy.author)}
         data-subject-modifier-authored={authored ? 'custom' : 'inherit'}
         onChange={toggleAuthored}
       />
@@ -215,7 +214,7 @@
            `aria-hidden` — `ui-entity-editors/spec.md`'s "one of the two, never both". Not a
            `<label for>` either, since the primitive renders its own. -->
       <span class="manager-muted" aria-hidden="true">
-        {text(copy.authorKey, copy.author)}
+        {localizeOr(copy.authorKey, copy.author)}
       </span>
     </div>
 
@@ -227,11 +226,14 @@
         selectedIds={picked}
         {disabled}
         addDisabled={atCap}
-        {testId}
-        {describedBy}
-        labelledBy={LABEL_ID}
-        menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
-        allSelectedLabel={text(
+        data-modifier-pill-select={testId || undefined}
+        ariaDescribedBy={describedBy}
+        ariaLabelledBy={LABEL_ID}
+        triggerLabel={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd',
+          'Add modifier'
+        )}
+        allSelectedLabel={localizeOr(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
           'All modifiers selected.'
         )}
@@ -273,6 +275,6 @@
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
-    margin-block: 0.25rem;
+    margin-block: var(--fab-space-1);
   }
 </style>

@@ -143,7 +143,7 @@ export default {
     // system whatever a recipe is authored to do.
     const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
     try {
-      await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
+      await chooseSelectOption(page, scopeSelect, { value: executionFixtures?.simple?.systemId });
       await settleManagerNav(page);
       await page
         .locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]')
@@ -155,7 +155,9 @@ export default {
         label: 'manager-recipes-no-check',
       });
     } finally {
-      await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
+      await chooseSelectOption(page, scopeSelect, { value: craftingSetup.systemId }).catch(
+        () => {}
+      );
       await settleManagerNav(page);
       await openManagerCraftingSection(page, 'recipes', 'recipes');
     }
@@ -449,10 +451,10 @@ export default {
       // (1) Disable-confirm, cancelled.
       const featureTile = await openManagerMultiStepFeatureTile(page);
       await featureTile
-        .locator('.manager-status-toggle.is-on')
+        .locator('.fabricate-toggle.is-on')
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
-      await featureTile.locator('.manager-status-toggle').first().click();
+      await featureTile.locator('.fabricate-toggle').first().click();
 
       const disableDialog = page
         .locator('.application.dialog:has(button[data-action="yes"]):has(button[data-action="no"])')
@@ -479,7 +481,7 @@ export default {
       await disableDialog.locator('button[data-action="no"]').first().click();
       await disableDialog.waitFor({ state: 'detached', timeout: 10_000 });
       await featureTile
-        .locator('.manager-status-toggle.is-on')
+        .locator('.fabricate-toggle.is-on')
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
       results.steps.push({ step: 'multistep-disable-confirm', passed: true });
@@ -502,10 +504,10 @@ export default {
       // (2) Collapsed editor.
       const featureTile = await openManagerMultiStepFeatureTile(page);
       await featureTile
-        .locator('.manager-status-toggle.is-on')
+        .locator('.fabricate-toggle.is-on')
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
-      await featureTile.locator('.manager-status-toggle').first().click();
+      await featureTile.locator('.fabricate-toggle').first().click();
       const confirmDialog = page
         .locator('.application.dialog:has(button[data-action="yes"]):has(button[data-action="no"])')
         .filter({ hasText: 'Existing multi-step recipes will run as one combined action' })
@@ -516,7 +518,7 @@ export default {
       // The store's toggleFeature refreshes after updateSystem; wait for the tile to
       // flip OFF so the recipe editor below receives multiStepEnabled=false.
       await featureTile
-        .locator('.manager-status-toggle.is-off')
+        .locator('.fabricate-toggle.is-off')
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
 
@@ -555,11 +557,11 @@ export default {
       // sees the enabled editor.
       try {
         const featureTile = await openManagerMultiStepFeatureTile(page);
-        if ((await featureTile.locator('.manager-status-toggle.is-off').count()) > 0) {
-          await featureTile.locator('.manager-status-toggle').first().click();
+        if ((await featureTile.locator('.fabricate-toggle.is-off').count()) > 0) {
+          await featureTile.locator('.fabricate-toggle').first().click();
         }
         await featureTile
-          .locator('.manager-status-toggle.is-on')
+          .locator('.fabricate-toggle.is-on')
           .first()
           .waitFor({ state: 'visible', timeout: 5000 });
         await openManagerRecipeEditor(page, 'Multi-Step Alloy');

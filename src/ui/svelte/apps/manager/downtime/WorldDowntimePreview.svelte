@@ -1,6 +1,7 @@
 <script>
   import { downtimePreviewDefinition } from './worldDowntimePreviewProvider.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { PREMIUM_PATREON_URL as cta } from '../premiumIconsAdModel.js';
 
   let { tabId = 'tracking', hidden = false } = $props();
   const preview = $derived(downtimePreviewDefinition(tabId));
@@ -16,7 +17,6 @@
       value: localize(`${copyBase}.Rows.${index + 1}.Value`),
     }))
   );
-  const cta = 'https://www.patreon.com/c/mistersilver';
 </script>
 
 <div
@@ -124,21 +124,20 @@
     a screenful of empty surface to scroll at ordinary window heights.
   */
   .downtime-preview {
-    container-type: inline-size;
+    container: fabricate-downtime-preview / inline-size;
     min-width: 0;
-    padding: 18px 20px 24px;
+    padding: var(--fab-space-5) var(--fab-space-5) var(--fab-space-6);
     color: var(--fab-text);
   }
 
   .downtime-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
-    gap: 18px;
-    padding: 22px;
+    gap: var(--fab-space-5);
+    padding: var(--fab-space-6);
     border: 1px solid var(--fab-accent-border);
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-surface);
-    box-shadow: var(--fab-shadow-lg);
   }
 
   /* A centred stack against the board, with the design's 4px inner inset. */
@@ -147,7 +146,7 @@
     min-width: 0;
     flex-direction: column;
     justify-content: center;
-    padding: 2px 4px;
+    padding: var(--fab-space-2xs) var(--fab-space-1);
   }
 
   /*
@@ -168,9 +167,9 @@
   }
 
   .downtime-premium {
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 20px;
-    padding: 4px 9px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     font-size: 8.5px;
     letter-spacing: 0.12em;
   }
@@ -181,7 +180,7 @@
     BROWSER viewport, not the ApplicationV2 window, exactly as the container-query note below says.
   */
   h2 {
-    margin: 13px 0 0;
+    margin: var(--fab-space-3) 0 0;
     font-size: 27px;
     font-weight: 600;
     line-height: 1.12;
@@ -189,7 +188,7 @@
 
   /* 12.5px x 1.65 is the design's 20.625px leading; sub-body copy restates its size or inherits 14px. */
   p {
-    margin: 10px 0 0;
+    margin: var(--fab-space-3) 0 0;
     color: var(--fab-text-muted);
     font-size: 12.5px;
     line-height: 1.65;
@@ -199,8 +198,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-top: 8px;
+    gap: var(--fab-space-3);
+    margin-top: var(--fab-space-2);
   }
 
   .downtime-cta {
@@ -208,8 +207,8 @@
     min-height: 38px;
     align-items: center;
     justify-content: center;
-    gap: 9px;
-    padding: 0 16px;
+    gap: var(--fab-space-2);
+    padding: 0 var(--fab-space-4);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
     background: var(--fab-accent);
@@ -217,7 +216,6 @@
     font-size: 11.5px;
     font-weight: 700;
     text-decoration: none;
-    box-shadow: var(--fab-shadow-sm);
   }
 
   .downtime-cta:focus-visible {
@@ -236,8 +234,8 @@
   .downtime-preview-note {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin: 14px 0 0;
+    gap: var(--fab-space-chip);
+    margin: var(--fab-space-4) 0 0;
     color: var(--fab-text-subtle);
     font-size: 9.5px;
     font-weight: 500;
@@ -257,9 +255,9 @@
   */
   .downtime-board {
     align-self: center;
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-0);
   }
 
@@ -270,15 +268,15 @@
   }
 
   .downtime-board header {
-    gap: 9px;
-    padding-bottom: 10px;
+    gap: var(--fab-space-2);
+    padding-bottom: var(--fab-space-3);
   }
 
   .downtime-board-rows {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    margin-top: 10px;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
   }
 
   .downtime-board-heading {
@@ -308,7 +306,7 @@
     width: 30px;
     height: 30px;
     place-items: center;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-accent-soft);
 
     /* The tile carries the colour and the glyph inherits it, so a tinted slot follows its row. */
@@ -351,18 +349,18 @@
   }
 
   .downtime-board-badge {
-    gap: 6px;
+    gap: var(--fab-space-chip);
     height: 17px;
     margin-left: auto;
-    padding: 3px 7px;
+    padding: var(--fab-space-1) var(--fab-space-chip);
     font-size: 7.5px;
     letter-spacing: 0.08em;
   }
 
   .downtime-board-row {
     min-height: 48px;
-    gap: 9px;
-    padding: 9px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-2);
@@ -404,7 +402,7 @@
     color: var(--fab-accent);
     font-family: var(--fab-font-mono);
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
@@ -412,27 +410,27 @@
   .downtime-board-note {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin-top: 10px;
-    padding: 8px 9px;
+    gap: var(--fab-space-chip);
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-2);
     border: 1px dashed var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-text-subtle);
     font-size: 9px;
     line-height: 1.4;
   }
 
   .downtime-benefits {
-    margin-top: 17px;
+    margin-top: var(--fab-space-4);
   }
 
   .downtime-benefits-header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--fab-space-4);
     min-width: 0;
-    margin-bottom: 9px;
+    margin-bottom: var(--fab-space-2);
     flex-wrap: wrap;
   }
 
@@ -457,7 +455,7 @@
   }
 
   .downtime-benefits h3 {
-    margin: 3px 0 0;
+    margin: var(--fab-space-1) 0 0;
     font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
@@ -466,20 +464,20 @@
   .downtime-feature-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 9px;
+    gap: var(--fab-space-2);
   }
 
   article {
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-2);
   }
 
   .downtime-feature-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
     background: var(--fab-bg-0);
     font-size: 13px;
   }
@@ -489,48 +487,47 @@
   }
 
   h4 {
-    margin: 10px 0 0;
+    margin: var(--fab-space-3) 0 0;
     font-size: 12px;
     font-weight: 600;
     line-height: 1.3;
   }
 
   article p {
-    margin: 4px 0 0;
+    margin: var(--fab-space-1) 0 0;
     font-size: 10px;
     line-height: 1.5;
   }
 
   /*
-    ApplicationV2 windows resize inside Foundry's fixed browser viewport, so a breakpoint must follow
-    this PANEL: a `vw` query measures the browser, not the window the GM sized.
-
-    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, and the two differ, so they
-    get separate queries. One shared 1040px collapsed both far above either honest limit — a
-    container query measures the CONTENT box, so an ordinary 1314px window gives this panel 1028px.
+    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, on this PANEL's content
+    box (an ordinary 1314px window gives it 1028px). The panel's own inset answers the manager
+    instead, because no container can query itself.
 
       - 940px is the feature grid's: four cards plus three 9px gutters need 4x228px, and 228px is
         the narrowest a card reads at with a 32px tile above 10px copy.
       - 720px is the hero's: the board column is pinned at its 260px minimum from 864px down, so
         below 720px the copy column is under 420px and the headline outgrows the board's height.
   */
-  @container (max-width: 940px) {
+  @container fabricate-downtime-preview (max-width: 940px) {
     .downtime-feature-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @container (max-width: 720px) {
+  @container fabricate-downtime-preview (max-width: 720px) {
     .downtime-hero {
       grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  @container (max-width: 640px) {
+  @container fabricate-manager (max-width: 680px) {
     .downtime-preview {
-      padding: 10px;
+      padding: var(--fab-space-3);
     }
+  }
 
+  @container fabricate-downtime-preview (max-width: 640px) {
     .downtime-feature-grid {
       grid-template-columns: minmax(0, 1fr);
     }

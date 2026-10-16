@@ -5,90 +5,28 @@ import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  STATUS_TONE_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
+  ESSENCE_CATALOGUE_BULK_RAW_MODULES,
+  ESSENCE_WORLD_SCOPE_RAW_MODULES,
+  ESSENCE_WORLD_SHELL_MODULES,
+} from '../helpers/essenceWorldScopeModules.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-
-const SCOPED_RAW_MODULES = [
-  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
-  ...STATUS_TONE_RAW_MODULES,
-  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-  ...SEARCHABLE_POPOVER_RAW_MODULES,
-  ...FOUNDRY_BRIDGE_RAW_MODULES,
-  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-  'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
-  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
-  'src/ui/svelte/stores/worldScopeProjection.js',
-  // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
-  // per-entry references now, so its own static closure reaches the vocabulary core and the
-  // shipped counter. The harness validates this closure and names the miss, unlike the
-  // hand-rolled trees elsewhere.
-  'src/systems/worldVocabulary.js',
-  'src/ui/model/vocabularyUsage.js',
-  'src/utils/componentCategories.js',
-  // #1663: the ONE implementation behind both category shims; imports nothing.
-  'src/utils/categoryNormalization.js',
-  'src/utils/recipeCategories.js',
-  'src/systems/componentScope.js',
-  'src/systems/essenceScope.js',
-  'src/systems/toolScope.js',
-  'src/systems/scopedDefinitions.js',
-  'src/systems/scopedDefinitionStore.js',
-  'src/utils/scalars.js',
-  'src/systems/worldScopeEntityGrouping.js',
-  'src/utils/definitionIndex.js',
-  'src/utils/sourceReferenceUnion.js',
-  'src/ui/model/browserPagination.js',
-  'src/utils/bulkSelectionModel.js',
-  'src/ui/model/scopedEntityListModel.js',
-  // The frame's lifted view-state (issue 1438).
-  'src/ui/model/managerBrowserViewState.js',
-];
-
-const SHELL_MODULES = [
-  'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-  'src/ui/svelte/components/ArmedDangerButton.svelte',
-  // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
-  // FAIL the suite, it HANGS it and reports `# cancelled` — see
-  // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
-  'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
-  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
-  // (`...SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: `Pagination` and the
-  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
-  // this shell rather than new controls on these screens.
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
-  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
-  'src/ui/svelte/components/StatusToggle.svelte',
-  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
-  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
-  'src/ui/svelte/components/SegmentedControl.svelte',
-  'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
-  // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
-  // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
-  'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
-  'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
-];
 
 const pageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-catalogue-',
-  rawModules: SCOPED_RAW_MODULES,
+  rawModules: [...ESSENCE_WORLD_SCOPE_RAW_MODULES, ...ESSENCE_CATALOGUE_BULK_RAW_MODULES],
   compiledModules: [
-    ...SHELL_MODULES,
+    ...ESSENCE_WORLD_SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
+    ...ESSENCE_CATALOGUE_BULK_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
@@ -99,7 +37,7 @@ const entryHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-entry-',
   rawModules: [
-    ...SCOPED_RAW_MODULES,
+    ...ESSENCE_WORLD_SCOPE_RAW_MODULES,
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     'src/ui/svelte/util/essenceIcons.js',
@@ -123,17 +61,18 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/model/essenceValidation.js',
   ],
   compiledModules: [
-    ...SHELL_MODULES,
+    ...ESSENCE_WORLD_SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
+    // The preview's player tile is a ListRow card (issue 1778).
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
@@ -144,8 +83,8 @@ const entryHarness = createMountedComponentHarness({
 const shellHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-control-',
-  rawModules: SCOPED_RAW_MODULES,
-  compiledModules: [...SHELL_MODULES, ...SELECT_COMPILED_MODULES],
+  rawModules: ESSENCE_WORLD_SCOPE_RAW_MODULES,
+  compiledModules: [...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 });
 
@@ -165,8 +104,20 @@ function essenceScope() {
     entityType: 'essence',
     corpus: {
       entities: [
-        { id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember', description: 'Cinders' },
-        { id: 'brine', name: 'Brine', icon: 'fas fa-water', colorToken: 'tide', description: 'Salt' },
+        {
+          id: 'ash',
+          name: 'Ash',
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          description: 'Cinders',
+        },
+        {
+          id: 'brine',
+          name: 'Brine',
+          icon: 'fas fa-water',
+          colorToken: 'tide',
+          description: 'Salt',
+        },
       ],
       defaults: [{ id: 'ash', effectSource: 'Item.ember' }],
       membership: [
@@ -272,9 +223,20 @@ describe('the essence catalogue opens with its first shown row inspected', () =>
     assert.deepEqual(selectedIds(root), [], 'a stale catalogue id leaves the inspector resting');
     assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
   });
+
+  it('rolls the member systems up into one enabled card beside the world defaults', async () => {
+    const root = await pageHarness.mount(pageProps());
+    const card = root.querySelector('[data-scoped-list-extra-card]');
+    assert.ok(Boolean(card?.closest('[data-scoped-list-defaults]')), 'a member draws the card');
+    assert.equal(card.getAttribute('data-scoped-list-extra-card'), 'enabled');
+    assert.ok(card.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'as a rule-density tile');
+    assert.equal(card.querySelector('strong').textContent.trim(), '1 of 2 systems have it enabled');
+    assert.match(card.querySelector('small').textContent, /run nothing on craft/);
+    pageHarness.remount();
+  });
 });
 
-describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
+describe('criterion 4— the essence catalogue renders NO source-item affordance', () => {
   it('renders the identity as a GLYPH, with no image and no source badge anywhere', async () => {
     const root = await pageHarness.mount(pageProps());
 
@@ -425,6 +387,14 @@ describe('the catalogue owns no create affordance; the page header does', () => 
     );
     pageHarness.remount();
   });
+
+  it('pins Open definition as the rail’s one full-width primary (issue 1521)', async () => {
+    const root = await pageHarness.mount(pageProps());
+    assertInspectorVerbs(root.querySelector('[data-scoped-list-inspector]'), [
+      ['[data-scoped-essence-open-entry]', 'primary'],
+    ]);
+    pageHarness.remount();
+  });
 });
 
 // ── THE ENTRY EDITOR BUFFERS ITS EDIT (issue 1372, maintainer parity round 4) ────────────────
@@ -499,7 +469,10 @@ describe('the world essence entry editor buffers its edit until Save', () => {
   it('pairs the projected carrier name and artwork in the preview', async () => {
     const { root } = await mountEntry();
     const component = root.querySelector('[data-essence-preview-component]');
-    assert.equal(component.querySelector('.inventory-card-name').textContent.trim(), 'Ashen Thread');
+    assert.equal(
+      component.querySelector('.inventory-card-name').textContent.trim(),
+      'Ashen Thread'
+    );
     assert.equal(
       component.querySelector('.inventory-card-art img').getAttribute('src'),
       'icons/commodities/materials/thread-plain-grey.webp'
@@ -512,9 +485,7 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     await entryHarness.setProps({});
 
     assert.equal(await reported.handle.save(), true);
-    assert.deepEqual(actions.calls, [
-      ['updateWorldDefaultSection', 'ash', 'effectSource', null],
-    ]);
+    assert.deepEqual(actions.calls, [['updateWorldDefaultSection', 'ash', 'effectSource', null]]);
     assert.equal(
       reported.handle.isDirty(),
       false,
@@ -580,7 +551,10 @@ describe('the world essence entry editor buffers its edit until Save', () => {
         onDraftChange: (handle) => (reported.handle = handle),
         onDirtyChange: () => {},
       });
-      assert.ok(reported.handle, 'the editor reported no draft handle, so nothing below is measured');
+      assert.ok(
+        reported.handle,
+        'the editor reported no draft handle, so nothing below is measured'
+      );
 
       // The IDENTITY patch lands first and the sections after it.
       const name = root.querySelector('[data-scoped-entry-name]');
@@ -638,7 +612,10 @@ describe('the essence entry row states what an essence removal actually does', (
     assert.ok(Boolean(remove), 'the member row rendered its armed Remove');
     const note = remove.getAttribute('aria-label');
     assert.match(note, /Remove Ash from Mythwright Forge/, 'the sentence names this pair');
-    assert.match(note, /Its overrides go with it; the world record and every other system are untouched\./);
+    assert.match(
+      note,
+      /Its overrides go with it; the world record and every other system are untouched\./
+    );
     assert.equal(
       /recipe/.test(note),
       false,
@@ -659,15 +636,23 @@ describe('the essence entry row states what an essence removal actually does', (
       onOpenSystemRules: (...args) => calls.push(['rules', ...args]),
     });
 
-    assert.match(root.querySelector('[data-scoped-entry-systems-card]').textContent, /Systems using this essence/);
+    assert.match(
+      root.querySelector('[data-scoped-entry-systems-card]').textContent,
+      /Systems using this essence/
+    );
     root.querySelector('[data-scoped-entry-system-filter="with"] input').click();
     await entryHarness.setProps({});
     assert.deepEqual(
-      [...root.querySelectorAll('[data-scoped-entry-system]')].map((row) => row.dataset.scopedEntrySystem),
+      [...root.querySelectorAll('[data-scoped-entry-system]')].map(
+        (row) => row.dataset.scopedEntrySystem
+      ),
       ['sys-a', 'sys-b'],
       'disabled rules remain in With rules because membership is independent of enabled state'
     );
-    assert.match(root.querySelector('[data-scoped-entry-system="sys-b"]').textContent, /Disabled here/);
+    assert.match(
+      root.querySelector('[data-scoped-entry-system="sys-b"]').textContent,
+      /Disabled here/
+    );
 
     root.querySelector('[data-scoped-entry-system-rules="sys-b"]').click();
     assert.deepEqual(calls, [['rules', 'ash', 'sys-b']]);

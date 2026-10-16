@@ -105,13 +105,11 @@ Choose what happens when those prerequisites fail:
 ## Tool check bonuses
 
 A Tool's bonus is a roll expression.
-See [Expressions]({% link expressions.md %}) for the syntax, and for the one respect in which this field differs from every other expression field in Fabricate.
+See [Expressions]({% link expressions.md %}) for the syntax.
 
-Enable **Tool check bonus** in the **Requirements** tab and enter a bonus expression.
+Enable the bonus under **Bonus to the check** in the **Requirements** tab and pick a modifier from the **World modifiers** list.
+The Tool takes that modifier's expression as written.
 The expression is evaluated against the actor who supplies the Tool.
-Enter a roll-data path without its leading `@`.
-Fabricate adds the `@` when it stores the path.
-Numeric and dice expressions are stored as entered.
 
 Crafting and salvage add every distinct eligible Tool bonus to the check.
 Recipes store only which Tools they require; bonus behavior is configured on the Tool itself.
@@ -192,7 +190,10 @@ Choose **Mark as broken** to author optional **Repair materials**.
 Repair materials use the same structure as recipe ingredients.
 Every required group must be satisfied, and any one option inside a group can satisfy that group.
 
-You can add requirements for Components, tags, essences, and currency.
+Add a requirement with the dashed **Ingredient** adder, which opens a menu offering Components, tags, essences, and currency.
+To give a requirement another way to be met, use its **or…** control, which opens an **Accept instead** menu of the same kinds.
+A tag requirement's adder shows how many components carry each tag, marks the tags the row already holds, and removes a held tag when you choose it again.
+On a world Tool the count is of world catalogue components carrying the tag as a default, because the repair materials there are a seed each adopting system copies.
 Every added group must be complete and every option must have a positive quantity before the Tool can be saved.
 
 {: .warning }

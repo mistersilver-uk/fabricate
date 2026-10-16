@@ -296,36 +296,53 @@ describe('the additional-dice group reads, writes and links what pays for the di
   });
 
   it('reads the stored path for the Preview-as character, never its prepared data', async () => {
+    const NO_NUMBER = `Brenna has no stored number at ${PATH}, so they could not buy additional dice.`;
+    const OVERRIDDEN = `An active effect changes Brenna's ${PATH}, so spending it would not lower it. Use a stored value.`;
+    const UNRESOLVED = ['unresolved', 'Unresolved'];
     const cases = [
-      [null, 'muted', 'Choose a character in Preview as to see what this resolves to.'],
-      [actor(2), 'resolved', 'Brenna → 2'],
-      [
-        actor(undefined),
-        'warning',
-        `Brenna has no stored number at ${PATH}, so they could not buy additional dice.`,
-      ],
-      [
-        actor('3'),
-        'warning',
-        `Brenna has no stored number at ${PATH}, so they could not buy additional dice.`,
-      ],
+      [null, null, ['muted', 'Choose a character in Preview as to see what this resolves to.']],
+      // The stored 2, never the prepared 9: the reading alone, and no line beside it.
+      [actor(2), ['resolved', '= 2'], null],
+      [actor(undefined), UNRESOLVED, ['warning', NO_NUMBER]],
+      [actor('3'), UNRESOLVED, ['warning', NO_NUMBER]],
       [
         actor(2, { system: { resources: { momentum: { value: 2 } } } }),
-        'warning',
-        `An active effect changes Brenna's ${PATH}, so spending it would not lower it. Use a stored value.`,
+        UNRESOLVED,
+        ['warning', OVERRIDDEN],
       ],
     ];
-    for (const [document, tone, sentence] of cases) {
+    for (const [document, reading, sentence] of cases) {
       simple.harness.remount();
       const state = await mountControlled(simple.harness, enabled(), {
         previewCharacter: previewCharacter(document),
       });
       const input = state.query('[data-check-additional-dice-path]');
-      assert.equal(line(state).getAttribute('data-check-additional-dice-path-line'), tone);
-      assert.equal(line(state).textContent.trim(), sentence);
-      assert.equal(input.getAttribute('aria-describedby'), line(state).id);
-      assert.equal(input.getAttribute('aria-invalid'), tone === 'warning' ? 'true' : 'false');
+      const chip = state
+        .query('[data-check-additional-dice-path-field]')
+        .querySelector('[data-expr-input-reading]');
+      const drawn = line(state);
+      assert.deepEqual(chip ? [chip.dataset.exprInputReading, chip.textContent] : null, reading);
+      assert.deepEqual(
+        drawn
+          ? [drawn.getAttribute('data-check-additional-dice-path-line'), drawn.textContent.trim()]
+          : null,
+        sentence
+      );
+      assert.equal(
+        input.getAttribute('aria-describedby'),
+        [chip, drawn].flatMap((node) => (node ? [node.id] : [])).join(' '),
+        'the reading describes the field, then the line'
+      );
+      assert.equal(
+        input.getAttribute('aria-invalid'),
+        sentence?.[0] === 'warning' ? 'true' : 'false'
+      );
       assert.equal(input.getAttribute('aria-label'), 'Path on the crafting character');
+      assert.equal(
+        input.getAttribute('data-validation-target'),
+        'checks-additional-dice-path',
+        'the Validation route lands on this input'
+      );
     }
   });
 

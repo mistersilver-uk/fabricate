@@ -617,8 +617,8 @@ describe('the _scopeBasis call sites', () => {
   // Named as a prune site by the delta, and it IS one — it loops `addItemFromUuid` per item.
   defineStructureContract(
     'addItemsFromPack reaches the basis through addItemFromUuid',
-    { file: MANAGER, member: 'addItemsFromPack' },
-    { calls: ['addItemFromUuid'], callsNo: ['_scopeBasis'] }
+    { file: ITEM_SOURCES, fn: 'addItemsFromPack' },
+    { calls: ['addItemFromUuid'], callsNo: ['scopeBasis'] }
   );
 });
 

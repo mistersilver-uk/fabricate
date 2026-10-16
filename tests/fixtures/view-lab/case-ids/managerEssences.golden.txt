@@ -1,11 +1,14 @@
 manager-essences-normal
 manager-essences-stacked
 manager-essences-disabled-in-use
+manager-essences-inspector-verbs
 manager-essences-source-picker
 manager-essences-grid
 manager-essences-bulk-edit
 manager-essences-bulk-delete-armed
 manager-essence-edit-first-state
+manager-essence-edit-save-failed
 manager-essence-edit-on-craft
+manager-essence-edit-unscoped-on-craft
 manager-essence-edit-validation
 manager-essences-membership-all

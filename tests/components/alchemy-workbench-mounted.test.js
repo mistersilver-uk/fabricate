@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { injectedCss } from '../helpers/chipPaint.js';
 import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -23,7 +24,11 @@ const BENCH_WITH_ESSENCES = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-workbench-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/actions/dragDrop.js'
+  ],
   compiledModules: [
     // The shared notice the last-brew banner composes (issue 1505) plus the tile and the label
     // the bench and the Produces heading draw (issue 1514), as ONE spread. A compiled component
@@ -53,6 +58,17 @@ describe('Workbench (mounted)', () => {
     assert.equal(brewButton(target).disabled, true, 'empty mode disables Brew');
   });
 
+  it('toggles the bench drag-over accent on dragover and dragleave', async () => {
+    const target = await harness.mount({ mode: 'empty', benchEmpty: true });
+    const bench = target.querySelector('[data-alchemy-dropzone]');
+    bench.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    assert.ok(bench.classList.contains('is-dragover'), 'dragover lights the bench');
+    bench.dispatchEvent(new Event('dragleave', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    assert.ok(!bench.classList.contains('is-dragover'), 'dragleave clears it');
+  });
+
   it('ready mode: status names the target and Brew is enabled', async () => {
     const target = await harness.mount({
       mode: 'ready',
@@ -66,6 +82,27 @@ describe('Workbench (mounted)', () => {
     assert.ok(statusPill(target).textContent.includes('Elixir of Vigor'), 'status names the ready recipe');
     assert.equal(brewButton(target).disabled, false, 'ready mode enables Brew');
     assert.equal(target.querySelector('[data-alchemy-status]').getAttribute('aria-live'), 'polite');
+  });
+
+  // Issue 1518: the shared button family at its shipped geometry; no ready pulse.
+  it('draws Brew as the bench’s one full-width primary and Clear as a ghost, with no pulse', async () => {
+    const target = await harness.mount({
+      mode: 'ready',
+      targetName: 'X',
+      benchEmpty: false,
+      benchChips: BENCH,
+      result: RESULT,
+      brewEnabled: true,
+    });
+    const brew = brewButton(target);
+    for (const name of ['fab-manager-button', 'is-primary', 'is-full-width']) {
+      assert.ok(brew.classList.contains(name), `Brew carries ${name}`);
+    }
+    assert.equal(target.querySelectorAll('.fabricate-button.is-primary').length, 1, 'one primary');
+    const clear = target.querySelector('[data-alchemy-clear]');
+    assert.ok(clear.classList.contains('fab-manager-button') && clear.classList.contains('is-ghost'));
+    assert.equal(clear.disabled, false);
+    assert.ok(!/brewpulse|@keyframes/.test(injectedCss()), 'no ready pulse is declared');
   });
 
   it('assembling mode: Brew is disabled (mid-build)', async () => {
@@ -330,7 +367,7 @@ describe('Workbench primitive adoption (issue 1514)', () => {
 
   const MISSING = [{ componentId: 'ash', name: 'Ashroot', need: 2 }];
 
-  it('draws the bench chip and the result tile at the sizes their rules drew, glyph and ink carried', async () => {
+  it('draws the bench chip and the result tile on the 38px art rung, glyph and ink carried', async () => {
     const target = await harness.mount({
       mode: 'ready',
       targetName: 'Elixir',
@@ -348,8 +385,8 @@ describe('Workbench primitive adoption (issue 1514)', () => {
         chip: /width:\s*(\d+)px/.exec(tiles.chip.getAttribute('style'))?.[1],
         result: /width:\s*(\d+)px/.exec(tiles.result.getAttribute('style'))?.[1]
       },
-      { chip: '40', result: '46' },
-      'the 40px bench chip and the 46px result tile keep the boxes their own rules drew'
+      { chip: '38', result: '38' },
+      "the bench chip and the result tile sit on the art ladder's 38px rung"
     );
     for (const [name, tile] of Object.entries(tiles)) {
       assert.equal(tile.getAttribute('data-medallion-tint'), 'peach', `${name} keeps the peach ink`);
@@ -357,8 +394,8 @@ describe('Workbench primitive adoption (issue 1514)', () => {
     }
     assert.match(
       tiles.result.getAttribute('style'),
-      /--fab-medallion-glyph:\s*19px/,
-      "the result tile keeps its rule's 19px glyph rather than the tile's 0.9rem default"
+      /--fab-medallion-glyph:\s*15px/,
+      "the result tile takes the 38px rung's 15px glyph rather than the tile's 0.9rem default"
     );
   });
 

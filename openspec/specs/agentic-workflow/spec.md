@@ -623,9 +623,13 @@ Each frame MUST be named from the canonical view-case registry rather than by it
 This repository is public and its pull requests are readable by anyone; a frame that photographs Core's own companion seam necessarily shows a stand-in module registered by the test harness, and an uncaptioned picture of it reads as a shipped feature to precisely the readers who know it is not one.
 The caption MUST sit beside the image rather than in its alt text, which is read by a screen reader and by almost nothing else a reviewer uses.
 
+Design-library frames are a separate, supplementary kind of evidence.
+They depict a design-library unit (a captioned unit or a whole drawn entry of the design-system library) rather than an application window, so the full-window, registry-naming, view-provenance, legibility and rendered-none rules above apply to application frames only.
+A design-library frame is instead named for its entry and caption, carries the pull request's head and its library kind in its published location, says in its own caption when the Primitive Lab reported a problem, and never stands in for, satisfies or fails application-window evidence.
+
 #### Scenario: UI files changed
 
-- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
+- **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css` other than the Primitive Lab's own (`tests/view-lab/primitives.html` and `tests/view-lab/primitives/`), or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
 - **AND** a view the registry covers IS captured by the Foundry-free renderer, which is the DEFAULT producer: it renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
 - **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which is the fallback producer rather than the routine one
@@ -722,8 +726,47 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
 - **AND** widening happens on an input the registry does not narrow, a diff it cannot parse, a hunk with no anchor or an empty sequence to anchor by, or a changed line landing outside every attributed region — and not merely because a recurring anchor's candidate locations disagree, since disagreement is answered by their union
 - **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the corpus
+- **AND** the table of per-file overrides for broad shared signals is narrowed by entry: a diff confined to that table's entries selects, for each entry it adds, removes or changes, the cases that entry names together with the representative set a broad signal selects, an edit to nothing but comments or blank lines inside the table selects nothing from that file, and any other change to the file that holds the table selects the surface set
+- **AND** the cases of the entries and ids a diff removes from that table are read from the lines it removes, because the file the selector loads no longer contains them, and a removal narrows only where the hunk carrying it is located by its remaining content inside the table
+- **AND** that table narrows only while its parsed entries agree exactly with the table the selector loads, so a table the parser cannot read widens to the surface set rather than selecting less
 - **AND** widening is a UNION at every level and never a replacement: a change whose reach is partly attributable and partly not selects what was attributed TOGETHER WITH the surface set, whether the unattributable part is another hunk of the same patch, another shared input in the same change, or a co-changed render file
 - **AND** the reason that has to hold at every level is that the surface set contains no detailed state, so replacing an attributed selection with it would publish a capture of everything except the thing the change altered
+
+#### Scenario: only the Primitive Lab changes
+
+- **WHEN** a PR changes only the Primitive Lab's page or files under its directory (`tests/view-lab/primitives.html`, `tests/view-lab/primitives/`)
+- **THEN** those files are not render files: they do not arm the evidence gate, and the automated producer selects, renders and publishes no application frame for them, because no application window draws them and a local `npm run lab:check` verifies them
+- **AND** a PR that changes them alongside any other render file is armed by that other file, and its selection is exactly what that file selects
+- **AND** the gate and the automated producer apply the same exclusion, so neither arms on a file the other ignores
+
+#### Scenario: a change builds, stands up or redraws a design-library component
+
+- **WHEN** a PR changes a Primitive Lab catalogue row, a Primitive Lab fixture, the source of a component a catalogue row mounts, the design-system manifest entry for such a component, or a drawn entry or unit of the design-system library (the **library inputs**)
+- **THEN** the library units those changes reach are selected from the changed-file set, with catalogue and library edits attributed by locating each hunk in the file's own content
+- **AND** the same automated producer run that renders application frames renders each selected unit through the Primitive Lab, after the same chrome verification
+- **AND** each unit is published once, as one image showing the unit as the library draws it beside the same unit as the Primitive Lab renders it, to the same host and under the pull request's current head, beneath a Library heading inside the managed screenshot block
+- **AND** the selection is capped so the capture stays fast, and every unit selected but not captured, whether over the cap or because its capture failed, is named in the Library section rather than dropped silently
+- **AND** library frames reach the pull request only through the automated producer's publish; a local capture is for inspection and is not published as evidence
+
+#### Scenario: library frames are not application evidence
+
+- **WHEN** the evidence gate reads a managed screenshot block that carries library frames
+- **THEN** it identifies them by their published location, as it does application frames, and excludes them from case and head matching
+- **AND** library frames alone never satisfy an armed gate, and their presence never makes an armed gate report stale or unrelated evidence
+- **AND** a change confined to Primitive Lab catalogue rows, fixtures and machinery, the design-system manifest, and the library's drawing does not arm the gate, yet its library frames are still rendered and published; a change to a component's source arms the gate as any render file does, and its library frames are published beside its application frames
+
+#### Scenario: the Primitive Lab's own machinery changes
+
+- **WHEN** a PR changes the Primitive Lab's page, harness or capture machinery rather than a catalogue row, fixture or drawing
+- **THEN** one unit per catalogue section is selected by default, derived from the catalogue rather than listed
+- **AND** a library or catalogue hunk that cannot be located, a missing patch, and a library edit outside every entry widen the selection by this library coverage as a UNION with whatever the change did attribute, never a replacement, by the same rule as application widening; a hunk that cannot be located is also named in the Library section
+
+#### Scenario: a library capture fails
+
+- **WHEN** rendering the library units fails, in part or in whole
+- **THEN** the application frames from the same run are still published
+- **AND** the Library section names what was not captured and why, including any problem the Primitive Lab reported
+- **AND** a run whose only selection is library units and which captures none concludes without failing the producer, naming that outcome in the Library section; the render-none failure rule applies to application cases
 
 #### Scenario: screenshot capture is blocked
 

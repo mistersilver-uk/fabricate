@@ -36,10 +36,11 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} },
 };
 
-const { evaluateSystemValidation, computeSystemVisibility } = await import(
-  '../src/systems/systemValidation.js'
-);
+const { evaluateSystemValidation, computeSystemVisibility } =
+  await import('../src/systems/systemValidation.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
+const { Recipe } = await import('../src/models/Recipe.js');
+const { seededRollClass, withRoll } = await import('./helpers/seededRoll.js');
 
 // Shared fixtures (kept here so Sonar duplication stays low across the suite).
 
@@ -62,7 +63,11 @@ function makeRecipe(overrides = {}) {
       {
         id: 'set-1',
         ingredientGroups: [
-          { id: 'group-1', name: 'Iron', options: [{ id: 'opt-1', match: componentMatch('iron') }] },
+          {
+            id: 'group-1',
+            name: 'Iron',
+            options: [{ id: 'opt-1', match: componentMatch('iron') }],
+          },
         ],
         essences: {},
       },
@@ -109,6 +114,22 @@ describe('evaluateSystemValidation — composition', () => {
     assert.ok(noResultGroup, 'expected the missing-result-group issue to surface');
     assert.equal(noResultGroup.blocks, 'enable');
     assert.equal(report.blocksSystem, false, 'a per-recipe gap is not a system blocker');
+  });
+
+  it('flags a choice group in a progressive system’s result set (issue 1773)', () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'iron' },
+        { id: 'b', componentId: 'gold' },
+      ],
+    };
+    const recipe = makeRecipe({ id: 'r-1', resultGroups: [{ id: 'rg', results: [choice] }] });
+    const issues = (resolutionMode) =>
+      evaluateSystemValidation(makeSystem({ resolutionMode }), { recipes: [recipe] }).issues;
+    const flagged = issues('progressive').find(({ code }) => code === 'choiceGroupInProgressive');
+    assert.match(flagged?.message ?? '', /progressive system cannot award/, 'in its own words');
+    assert.ok(issues('simple').every(({ code }) => code !== 'choiceGroupInProgressive'));
   });
 
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
@@ -197,8 +218,7 @@ describe('evaluateSystemValidation — composition', () => {
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
     assert.equal(
       report.issues.some(
-        (issue) =>
-          issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
+        (issue) => issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
       ),
       false,
       'a single-result-group routedByCheck recipe needs no mapping'
@@ -209,7 +229,12 @@ describe('evaluateSystemValidation — composition', () => {
     const component = {
       id: 'comp-1',
       name: 'Cracked Gem',
-      salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [] },
+          { id: 'g2', results: [] },
+        ],
+      },
     };
     const system = makeSystem({ salvageResolutionMode: 'simple' });
     const report = evaluateSystemValidation(system, { components: [component] });
@@ -246,7 +271,12 @@ describe('evaluateSystemValidation — composition', () => {
     // deep-link navigation) still carries the id, but no user-facing label may.
     const component = {
       id: 'secret-internal-component-id',
-      salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [] },
+          { id: 'g2', results: [] },
+        ],
+      },
     };
     const system = makeSystem({ salvageResolutionMode: 'simple' });
     const report = evaluateSystemValidation(system, { components: [component] });
@@ -426,8 +456,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
 
     assert.equal(
       report.issues.some(
-        (issue) =>
-          issue.code === 'salvageRoutedNoTiers' || issue.code === 'salvageRoutedNoFormula'
+        (issue) => issue.code === 'salvageRoutedNoTiers' || issue.code === 'salvageRoutedNoFormula'
       ),
       false,
       'a configured routed salvage check clears the salvage system issues'
@@ -599,7 +628,12 @@ describe('computeSystemVisibility', () => {
       {
         id: 'bad-salvage',
         name: 'Cracked Gem',
-        salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [] },
+            { id: 'g2', results: [] },
+          ],
+        },
       },
     ];
     const { blocksSystem, hiddenEntityIds } = computeSystemVisibility(system, { components });
@@ -692,5 +726,38 @@ describe('alchemyGlobalNoDiscovery', () => {
       report.issues.some((entry) => entry.code === 'alchemyGlobalNoDiscovery'),
       false
     );
+  });
+});
+
+describe('evaluateSystemValidation: the incomplete check follows the resolution mode', () => {
+  // A disabled shell (no ingredient set) whose result carries a formula Foundry cannot roll.
+  const { Roll } = seededRollClass();
+  const staleShell = () =>
+    new Recipe({
+      id: 'r-stale',
+      name: 'Stale',
+      craftingSystemId: 'sys-1',
+      enabled: false,
+      ingredientSets: [],
+      resultGroups: [
+        {
+          id: 'rg',
+          results: [{ id: 'res', componentId: 'iron', quantity: 1, quantityFormula: 'max(, 2)' }],
+        },
+      ],
+    });
+  const flagsDisabledIncomplete = (mode) =>
+    withRoll(Roll, () =>
+      evaluateSystemValidation(makeSystem({ resolutionMode: mode }), {
+        recipes: [staleShell()],
+      }).issues.some((issue) => issue.code === 'disabledIncomplete')
+    );
+
+  it('reads a progressive shell with a stale formula as incomplete, since the formula is dropped', async () => {
+    assert.equal(await flagsDisabledIncomplete('progressive'), true);
+  });
+
+  it('reads the same shell as structurally broken, not incomplete, under another mode', async () => {
+    assert.equal(await flagsDisabledIncomplete('simple'), false);
   });
 });

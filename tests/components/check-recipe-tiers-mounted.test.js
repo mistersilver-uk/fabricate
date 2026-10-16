@@ -29,7 +29,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // The tier row is the shared ordered list's row as of issue 1512, and the list renders the
     // icon button and the row disclosure behind it.
     'src/ui/svelte/components/IconButton.svelte',
@@ -126,7 +126,9 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
     const target = await harness.mount({ tiers: TIERS, onChange: (next) => emitted.push(next) });
     const rows = [...target.querySelectorAll('[data-tier-row]')];
 
-    rows[2].dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
+    rows[2]
+      .querySelector('[data-sortable-grip]')
+      .dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
     flushSync();
     assert.ok(
       target.querySelector('[data-tier-row="t-hard"]').classList.contains('is-dragging'),

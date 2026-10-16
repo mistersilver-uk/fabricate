@@ -112,12 +112,10 @@ The spacing scale is canonically specified in `openspec/specs/ui-visual-style/sp
   /* spacing — 4px base */
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-chip:6px; --fab-space-2:8px;
   --fab-space-3:12px; --fab-space-4:16px; --fab-space-5:20px; --fab-space-6:24px;
-  /* radius — the two the Books & Scrolls tab and the item-page inspector share.
-     OFF the canonical ladder below FOR THE ELEMENTS THEY PAINT: 5px is not a rung at
-     all, and 6px is the chip rung carried by a panel, which takes 11. They are carried
-     at their shipped values because correcting them moves pixels. */
-  --fab-books-control-radius:5px;      /* Books & Scrolls + inspector only */
-  --fab-books-panel-radius:6px;        /* Books & Scrolls + inspector only */
+  /* radius — the two the Books & Scrolls tab and the item-page inspector share,
+     on the canonical ladder below: a control at 7 and a panel at 11. */
+  --fab-books-control-radius:7px;      /* Books & Scrolls + inspector only */
+  --fab-books-panel-radius:11px;       /* Books & Scrolls + inspector only */
 }
 ```
 
@@ -230,12 +228,11 @@ sans; mono is only for dice formulas and run IDs.
 - **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
-  Two shipped tokens, `--fab-books-control-radius` (5px) and `--fab-books-panel-radius` (6px),
-  are off that ladder **for the elements they paint** — 5px is not a rung at all, and 6px is the
-  chip rung carried by a panel, which takes 11.
+  Two shipped tokens, `--fab-books-control-radius` (7px) and `--fab-books-panel-radius` (11px),
+  carry the control and panel rungs of that ladder.
   They are read by the Books & Scrolls tab and the item-page inspector and by nothing else, and
-  they are named for the surface that carries them, not for a control class, precisely so they
-  read as that surface's debt rather than as a second ladder.
+  they are named for the surface that carries them, not for a control class, so they never read
+  as a second ladder.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
   row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
@@ -285,8 +282,7 @@ Use the expression `{' '}`, which survives the trim.
 | Primitive or contract | Shipped source | Reuse for |
 |---|---|---|
 | `EmptyState` | `src/ui/svelte/components/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
-| `Callout` | `src/ui/svelte/components/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
-| `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
+| `Callout` | `src/ui/svelte/components/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard, and every "how this surface works" note, whose glyph-led points (a bold lead and a muted line) are its `items`. One shape; tone changes colour only, never geometry or type |
 | `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
 | `Medallion` | `src/ui/svelte/components/Medallion.svelte` | THE art tile, manager and player alike — a record's linked image with a glyph fallback, the canonical surface, radius and sizing, and a `tint` that recolours the glyph only. Player item/recipe imagery and its missing-art fallback resolve through `src/ui/svelte/util/craftingArtResolution.js` and pass the result to this tile; never hand-roll a second thumbnail |
 | `Avatar` | `src/ui/svelte/components/Avatar.svelte` | THE actor portrait — a person, a party, a vehicle or a place — with an INITIALS fallback where the art tile has a glyph one. `shape` is caller-supplied (round for people, rounded-square for the rest) because actor type is system-defined and eligibility comes from a world setting, not a type map; never hand-roll a second portrait tile |
@@ -417,15 +413,16 @@ Distinguish the two supported track meanings:
 Do not apply a value-width clip to a green-to-red risk scale, because that falsely hides the future semantic range.
 Do not render a full-width solid tier colour for a progress-style chance control, because that falsely implies the entire scale has the current value.
 
-### 5.9 Nav rail item (Player, 60–84px)
+### 5.9 Nav rail item (Player, 72px rail)
 
-Active = accent-soft fill + accent-border.
-Count badge = success pill, top-right.
+Active = the item takes `--fab-surface-active`, and the 44×44 well at radius 9 takes `--fab-accent-soft`, with a 20px accent glyph and a 10/600 label.
+No border.
+Count = a filled success pip on the well's outer corner, with a 2px ring in the rail's ground colour.
 
 ```html
-<div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;background:var(--fab-accent-soft);border:1px solid var(--fab-accent-border);color:var(--fab-accent)"><i class="fa-solid fa-hammer" style="font-size:16px"></i><span style="font:600 10px var(--sans)">Crafting</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:8px 0 6px;border-radius:9px;background:var(--fab-surface-active);color:var(--fab-accent)"><span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9px;background:var(--fab-accent-soft)"><i class="fa-solid fa-hammer" style="font-size:20px"></i></span><span style="font:600 10px var(--sans)">Crafting</span></div>
 
-<div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;color:var(--fab-text-muted);position:relative"><i class="fa-solid fa-book-open" style="font-size:16px"></i><span style="font:500 10px var(--sans)">Journal</span><span style="position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);border:1px solid var(--fab-success-border);color:var(--fab-on-accent);font:700 9px/16px var(--sans);text-align:center">2</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:8px 0 6px;border-radius:9px;color:var(--fab-text-muted)"><span style="position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:9px"><i class="fa-solid fa-book-open" style="font-size:20px"></i><span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);box-shadow:0 0 0 2px var(--fab-surface-soft),0 0 0 2px var(--fab-bg-1);color:var(--fab-on-success);font:500 9px/16px var(--fab-font-mono);text-align:center">2</span></span><span style="font:600 10px var(--sans)">Journal</span></div>
 ```
 
 ### 5.10 Stat box
@@ -452,13 +449,13 @@ An uppercase micro-label over a value or meter.
 
 ### 6.1 Player shell — three-column triptych
 
-Dark titlebar → actor + conditions bar → **84px icon rail · browse · detail · inspector**.
+Dark titlebar → actor + conditions bar → **72px icon rail · browse · detail · inspector**.
 Left and right are fixed, the middle flexes.
-Rail **84px** · browse **300–340px** · inspector **300–336px** · min-window **1024×640**.
+Rail **72px** · browse **300–340px** · inspector **300–336px** · min-window **1024×640**.
 Panels step darker left → right: bg-1 · bg-1 · **bg-2**.
 
 ```html
-<div style="display:grid;grid-template-columns:84px 320px minmax(0,1fr) 320px;min-height:100vh">
+<div style="display:grid;grid-template-columns:72px 320px minmax(0,1fr) 320px;min-height:100vh">
   <nav style="background:var(--fab-bg-0);border-right:1px solid var(--fab-border)">…rail…</nav>
   <section style="background:var(--fab-bg-1);border-right:1px solid var(--fab-border)">…browse…</section>
   <main style="background:var(--fab-bg-1);border-right:1px solid var(--fab-border)">…detail…</main>

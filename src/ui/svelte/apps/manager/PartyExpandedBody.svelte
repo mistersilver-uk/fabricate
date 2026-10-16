@@ -36,7 +36,7 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
-  import PartyNameField from './PartyNameField.svelte';
+  import InlineRenameField from './InlineRenameField.svelte';
   import PartyMemberRow from './PartyMemberRow.svelte';
   import PartyAddMemberPanel from './PartyAddMemberPanel.svelte';
   import PartyTravelActorPanel from './PartyTravelActorPanel.svelte';
@@ -227,7 +227,7 @@
     <span class="manager-party-icon" aria-hidden="true"><i class="fas fa-users"></i></span>
 
     <div class="manager-party-identity">
-      <PartyNameField
+      <InlineRenameField
         name={party.name}
         disabled={saving}
         onRename={(name) => onRename(party.id, name)}
@@ -303,7 +303,7 @@
             'FABRICATE.Admin.Manager.World.Parties.Members.Empty',
             "No members yet. Only the travel actor's own location resolves until you add characters."
           )}
-          dataAttr="data-manager-party-members-empty"
+          data-manager-party-members-empty
         />
       {/if}
 
@@ -381,7 +381,7 @@
 
 <style>
   /* Theme-ROOT tokens only (`--fab-manager-*` is declared inside `.fabricate-manager`). Geometry
-     is the prototype's: an 11px head gap over a `minmax(0,1fr) 210px` body at 12px.
+     is the prototype's on the scale: a 12px head gap over a `minmax(0,1fr) 210px` body at 12px.
 
      `flex-start`, NOT `center`. The identity cell is TWO lines — the name field over the
      meta line — while the enable pill and delete are one control each, so centring the
@@ -392,7 +392,7 @@
   .manager-party-head {
     display: flex;
     align-items: flex-start;
-    gap: 11px;
+    gap: var(--fab-space-3);
   }
 
   /* 30px, matching the name field and both head buttons, so the band is uniform. */
@@ -403,7 +403,7 @@
     justify-content: center;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-accent);
     background: var(--fab-bg-0);
     font-size: 13px;
@@ -431,11 +431,11 @@
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 30px;
-    padding: 0 11px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-soft);
     font-family: var(--font-primary);
@@ -461,7 +461,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-danger-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-danger-text);
     background: var(--fab-danger-soft);
     font-size: 11px;
@@ -470,8 +470,8 @@
   .manager-party-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 210px;
-    gap: 12px;
-    margin-top: 11px;
+    gap: var(--fab-space-3);
+    margin-top: var(--fab-space-3);
   }
 
   .manager-party-members-col {
@@ -494,10 +494,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     width: 100%;
     height: auto;
-    padding: 8px;
+    padding: var(--fab-space-2);
     border: 1px dashed var(--fab-border-strong);
     border-radius: 9px;
     color: var(--fab-text-secondary);
@@ -555,7 +555,7 @@
     line-height: 1.4;
   }
 
-  @container fabricate-manager (max-width: 720px) {
+  @container fabricate-manager (max-width: 680px) {
     .manager-party-body {
       grid-template-columns: 1fr;
     }

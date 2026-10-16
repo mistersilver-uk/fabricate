@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { localize } from '../../src/ui/svelte/util/foundryLocalize.js';
+import { formatList, localize } from '../../src/ui/svelte/util/foundryLocalize.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
 test('localize(key) calls game.i18n.localize and returns result', () => {
@@ -44,5 +44,45 @@ test('localize with data without game.i18n returns key', () => {
   delete globalThis.game;
 
   assert.equal(localize('MY.Key', { name: 'foo' }), 'MY.Key');
+  env.restore();
+});
+
+test('formatList passes caller options to game.i18n.getListFormatter', () => {
+  const seen = [];
+  const env = installFoundryBridgeEnv({
+    labels: {
+      getListFormatter: (options) => {
+        seen.push(options);
+        return { format: (values) => values.join('|') };
+      },
+    },
+  });
+  const options = { style: 'short', type: 'unit' };
+
+  assert.equal(formatList(['a', 'b'], options), 'a|b');
+  assert.equal(seen[0], options);
+  env.restore();
+});
+
+test('formatList defaults to the long conjunction on game.i18n.getListFormatter', () => {
+  const seen = [];
+  const env = installFoundryBridgeEnv({
+    labels: {
+      getListFormatter: (options) => {
+        seen.push(options);
+        return { format: (values) => values.join('|') };
+      },
+    },
+  });
+
+  formatList(['a', 'b']);
+  assert.deepEqual(seen, [{ style: 'long', type: 'conjunction' }]);
+  env.restore();
+});
+
+test('formatList falls back to Intl.ListFormat as "a and b" without a formatter', () => {
+  const env = installFoundryBridgeEnv({ labels: {} });
+
+  assert.equal(formatList(['a', 'b']), 'a and b');
   env.restore();
 });

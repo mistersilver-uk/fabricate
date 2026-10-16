@@ -1,5 +1,5 @@
 <!--
-  The interactive check prompt, single or bulk, in the shared `ManagerModal` chrome: one header, a
+  The interactive check prompt, single or bulk, in the shared `Modal` chrome: one header, a
   scrolling body and a footer of Disadvantage / Roll / Advantage as the check's advantage offer
   allows, or one Roll.
 
@@ -20,7 +20,7 @@
   import Field from '../../components/Field.svelte';
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import ManagerModal from '../../components/ManagerModal.svelte';
+  import Modal from '../../components/Modal.svelte';
   import Notice from '../../components/Notice.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
   import RollPromptAdditionalDice from './RollPromptAdditionalDice.svelte';
@@ -90,13 +90,13 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   open
   title={data.title}
   subtitle={data.subtitle}
   closeLabel={data.labels.close}
   width="500px"
-  rootAttributes={{ 'data-roll-prompt': data.kind }}
+  dialogProps={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
   initialFocus={INITIAL_FOCUS}
@@ -107,7 +107,7 @@
   {#snippet body()}
     <div class="fabricate-roll-prompt">
       {#if data.notice}
-        <Notice tone="warning" title={data.notice} dataAttr="data-roll-prompt-notice" />
+        <Notice tone="warning" title={data.notice} data-roll-prompt-notice="" />
       {/if}
       {#if data.kind === 'single'}
         {#if data.formula || data.dc !== null}
@@ -171,7 +171,7 @@
               >
                 {#if multiPick}
                   <SelectionCheckbox
-                    size="sm"
+                    density="compact"
                     wrapper="contents"
                     name="craftingModifier"
                     value={modifier.id}
@@ -265,14 +265,14 @@
       onAction={answer}
     />
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   .fabricate-roll-prompt {
     display: grid;
     align-content: start;
     flex: 1 1 auto;
-    gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
+    gap: var(--fab-space-4);
     min-height: 0;
     overflow-y: auto;
     color: var(--fab-text);
@@ -289,7 +289,7 @@
     height: 44px;
     flex: none;
     border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
+    border-radius: 11px;
     background: var(--fab-bg-2);
     color: var(--fab-accent);
     font-size: 17px;
@@ -343,10 +343,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: calc(var(--fab-space-2) + var(--fab-space-2xs));
+    gap: var(--fab-space-3);
     min-height: 30px;
     box-sizing: border-box;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    padding: 0 var(--fab-space-3);
     background: var(--fab-bg-2);
   }
   .bulk-row + .bulk-row {
@@ -447,24 +447,24 @@
   }
   .bonus-group {
     display: grid;
-    gap: calc(var(--fab-space-1) + 1px);
+    gap: var(--fab-space-1);
   }
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']) {
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']) {
     width: 100%;
     box-sizing: border-box;
     height: 30px;
     min-height: 30px;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-2);
     color: var(--fab-text);
     line-height: normal;
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']),
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']),
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
     font-family: var(--fab-font-mono);
     font-size: 12px;
@@ -479,6 +479,6 @@
   /* `100%` is the viewport at scale 1 and the window when Foundry scales it with a transform,
      where `vh` would overflow the window. */
   :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
-    max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
+    max-height: min(640px, calc(100% - (2 * 16px)));
   }
 </style>

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
+import { styleCorpusOf } from '../helpers/designSystemRatchet.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -218,5 +219,29 @@ describe('Avatar (mounted) — the tint is class-gated, and the ring is the edge
       /box-shadow/,
       'the ring is a border colour, never a shadow that grows the tinted tile`s footprint'
     );
+  });
+});
+
+describe('Avatar (mounted) — the corner at each portrait rung', () => {
+  it('is a circle at 26 and 32, and the rounded square takes the 32px portrait`s 9', async () => {
+    for (const size of [26, 32]) {
+      for (const [shape, classes] of [
+        ['round', ['fab-avatar']],
+        ['square', ['fab-avatar', 'is-square']],
+      ]) {
+        const root = await harness.mount({ art: '', name: 'Idrin', size, shape });
+        assert.deepEqual(classesOf(root), classes, `a ${shape} ${size}px portrait`);
+        harness.remount();
+      }
+    }
+    // ratchet-exempt(source-pin): a mount computes no scoped style; this reads the declared corners
+    const source = readFileSync(resolve(repoRoot, PRIMITIVE), 'utf8');
+    const corpus = styleCorpusOf((file) => (file === PRIMITIVE ? source : undefined), [PRIMITIVE]);
+    const radiusOf = (selector) =>
+      corpus.declarations
+        .filter((d) => d.selector === selector && d.property === 'border-radius')
+        .map((d) => d.value);
+    assert.deepEqual(radiusOf('.fab-avatar'), ['999px'], 'a person is round at every rung');
+    assert.deepEqual(radiusOf('.fab-avatar.is-square'), ['9px'], 'the spec`s square portrait');
   });
 });

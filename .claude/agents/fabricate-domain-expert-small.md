@@ -2,7 +2,7 @@
 name: fabricate-domain-expert-small
 description: Audit and refine Fabricate's crafting domain model, ubiquitous language, and spec-to-code alignment. Use for naming decisions, DDD modelling, DOMAIN.md updates, spec or code audits, research into other crafting systems, or backlog tasks about domain fidelity. Use for a small audit of one naming or wording decision in a single spec or domain document. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: haiku
+model: claude-haiku-5-5
 ---
 
 You are the Fabricate domain expert.

@@ -593,7 +593,7 @@
       'FABRICATE.Admin.Manager.Scoped.Component.BulkPerComponentNote',
       'Names and source links stay per component. What you can change in bulk is which systems these components belong to, and their world category, tags and essence values — the values every system inherits unless it overrides.'
     )}
-    dataAttr="data-world-component-bulk-per-component-note"
+    data-world-component-bulk-per-component-note
   />
 
   <BulkEditSection
@@ -606,7 +606,7 @@
     value={mode}
     groupName="world-component-bulk-mode"
     ariaLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkMembership', 'Membership change')}
-    dataAttr="data-world-component-bulk-mode"
+    data-world-component-bulk-mode
     optionDataAttr="data-world-component-bulk-mode-option"
     onChange={(next) => {
       if (!inert) mode = next;
@@ -797,7 +797,7 @@
       busyLabel={text('FABRICATE.Admin.Manager.Scoped.Component.BulkDeleteBusy', 'Deleting…')}
       idleAriaLabel={deleteLabel}
       armedAriaLabel={`${deleteArmedLabel} — ${deleteNote.text}`}
-      describedBy="world-component-bulk-delete-note"
+      ariaDescribedBy="world-component-bulk-delete-note"
       onArm={() => (deleteArmed = true)}
       onDisarm={() => (deleteArmed = false)}
       onConfirm={() => {

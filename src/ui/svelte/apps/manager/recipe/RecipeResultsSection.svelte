@@ -12,9 +12,9 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     resultGroups = [],
@@ -22,6 +22,10 @@
     // undeletable "On a failed check" set — instead of the generic add/remove list.
     alchemySimple = false,
     componentOptions = [],
+    // The card's `surface` and `resultKinds`: `'recipe'` with what a result row offers and names,
+    // forwarded to every group card; a gathering task passes neither.
+    surface = 'gathering',
+    resultKinds = null,
     // Result routing (routed systems only): `ingredientSets` builds the per-result-set options
     // and assignments, `outcomeTierOptions` is the system's routed-check tiers.
     routingProvider = null,
@@ -44,11 +48,6 @@
     idPrefix = '',
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
   // result set is immediately routable.
   function newId() {
@@ -62,7 +61,7 @@
 
   function setDisplayName(set, index) {
     const name = String(set?.name || '').trim();
-    return name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
+    return name || `${localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
   // Ingredient-set options for one group: a set routes to at most one, so an already-routed
@@ -167,19 +166,26 @@
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
         {componentOptions}
+        {surface}
+        {resultKinds}
         {onOpenComponent}
         hideRemove={true}
-        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
+        staticLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
       <RecipeResultGroupCard
         group={alchemyFailureGroup}
         {componentOptions}
+        {surface}
+        {resultKinds}
         {onOpenComponent}
         reserved={true}
         hideRemove={true}
         roleAccent="warning"
-        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure', 'On a failed check')}
+        staticLabel={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure',
+          'On a failed check'
+        )}
         onChange={(nextGroup) => updateAlchemyPair('failure', nextGroup)}
       />
     </div>
@@ -190,6 +196,8 @@
         group={simpleGroup}
         chromeless={true}
         {componentOptions}
+        {surface}
+        {resultKinds}
         {progressive}
         {isTerminalStep}
         {onOpenComponent}
@@ -200,22 +208,17 @@
     <EmptyState
       compact
       icon="fas fa-gift"
-      title={text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
-      hint={text(
+      title={localizeOr('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
+      hint={localizeOr(
         'FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint',
         'Add a set of items this recipe can produce.'
       )}
       contextClass="manager-recipe-tab-empty"
     >
-      <ManagerButton
-        role="dashed"
-        fullWidth
-        data-recipe-add="result-set"
-        onclick={() => addGroup()}
-      >
+      <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
-      </ManagerButton>
+        <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
+      </Button>
     </EmptyState>
   {:else}
     <!-- Results has NO OR relationship between groups: the producing one is chosen at craft
@@ -226,6 +229,8 @@
           <RecipeResultGroupCard
             {group}
             {componentOptions}
+            {surface}
+            {resultKinds}
             {routingProvider}
             {progressive}
             {isTerminalStep}
@@ -243,9 +248,9 @@
         </li>
       {/each}
     </ul>
-    <ManagerButton role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
+    <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
-    </ManagerButton>
+      <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
+    </Button>
   {/if}
 </section>

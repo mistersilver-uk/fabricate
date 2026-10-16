@@ -815,7 +815,6 @@ describe('UI PR screenshot evidence', () => {
     // chooser is open all route to the whole set.
     for (const file of [
       'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-      'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
       'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
       'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
       'src/ui/svelte/util/requirementSlots.js',
@@ -920,13 +919,13 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
     assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
-    // The alternatives picker is now the chooser ONE slot opens, so the walk must open
-    // that slot before waiting on the section. Bounded to one module (issue 1692): a lazy
+    // The alternatives are the panel ONE slot opens, so the walk must open that slot before
+    // waiting on its panel. Bounded to one module (issue 1692): a lazy
     // `[^]*?` scan over the whole concatenated harness could otherwise be satisfied by text
     // spanning two unrelated modules.
     assert.ok(
       withinOneModule(
-        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/
+        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-requirement-panel\]/
       ),
       'the alternatives capture must open its slot before waiting on the chooser, in one module'
     );
@@ -1082,6 +1081,25 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
   });
 
+  // Issue 1522: the editor's cards keep the recipes the editor's body selected before they moved.
+  it('maps each extracted component-editor card to the recipes that photograph it', () => {
+    const viewsOf = (name) =>
+      mapChangedFilesToViews([`src/ui/svelte/apps/manager/component/${name}.svelte`]).map(v => v.id);
+    for (const [card, expected] of [
+      ['ComponentCategoryTagsCards', ['manager-component-edit']],
+      ['ComponentEssencesCard', ['manager-component-edit']],
+      ['ComponentRulesValidationTab', ['manager-component-edit']],
+      ['ComponentDifficultyCard', ['manager-component-edit', 'manager-component-edit-difficulty']],
+      ['ComponentSalvageStages', ['manager-component-edit', 'manager-component-edit-salvage']],
+      [
+        'ComponentSalvageCard',
+        ['manager-component-edit', 'manager-component-edit-salvage', 'manager-component-edit-salvage-simple'],
+      ],
+    ]) {
+      assert.deepEqual(viewsOf(card), expected, `${card} maps to its recipes`);
+    }
+  });
+
   // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so `collect`
   // publishes it; appending its label to `player-salvage` would never publish it.
   it('maps the issue-777 required-tools frame to its changed source', () => {
@@ -1149,7 +1167,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',
-      'src/ui/svelte/components/ManagerModal.svelte',
+      'src/ui/svelte/components/Modal.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
       assert.ok(
@@ -1163,9 +1181,9 @@ describe('UI PR screenshot evidence', () => {
 
   // The shared modal chrome (issue 877) is rendered by BOTH import-flow modals, so a
   // change to it must republish both frames, not just the report's.
-  it('maps the shared ManagerModal chrome to both import-flow frames', () => {
+  it('maps the shared Modal chrome to both import-flow frames', () => {
     const ids = mapChangedFilesToViews([
-      'src/ui/svelte/components/ManagerModal.svelte',
+      'src/ui/svelte/components/Modal.svelte',
     ]).map(view => view.id);
     assert.ok(ids.includes('manager-import-report'));
     assert.ok(ids.includes('manager-import-folder-mapping'));
@@ -2043,9 +2061,9 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     // Issue 855: the interactive crafting-check roll prompt routes through
-    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot() as a
+    // answerRollPrompt(ctx, '<label>'), which forwards `label` to screenshot() as a
     // variable — so the literal lives in the helper CALL, not in a screenshot() call.
-    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*ctx\s*,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/answerRollPrompt\(\s*ctx\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     }
@@ -2620,6 +2638,377 @@ describe('UI PR screenshot evidence', () => {
       );
     } finally {
       rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('a Primitive Lab file is not a render file (issue 2382)', () => {
+  const PAGE_CSS = 'tests/view-lab/primitives/page.css';
+  const RENDER_FILE = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+  const listed = spawnSync(
+    'git',
+    ['ls-files', '--', 'tests/view-lab/primitives/', 'tests/view-lab/primitives.html'],
+    { cwd: new URL('..', import.meta.url), encoding: 'utf8' },
+  );
+  assert.equal(listed.status, 0, listed.stderr);
+  const primitiveLab = listed.stdout.split(/\r?\n/).filter(Boolean);
+  const viewIds = files => mapChangedFilesToViews(files).map(recipe => recipe.id);
+  const armedBy = files => [
+    hasUiChanges(files) && 'hasUiChanges',
+    viewIds(files).length > 0 && viewIds(files).join(', '),
+    smokeLabelsForChangedFiles(files).length > 0 && 'smoke labels',
+  ].filter(Boolean);
+
+  it('arms nothing and maps no view for any tracked Primitive Lab path', () => {
+    assert.ok(primitiveLab.length >= 10, `only ${primitiveLab.length} Primitive Lab paths are tracked`);
+    assert.ok(primitiveLab.includes('tests/view-lab/primitives.html'));
+    assert.ok(primitiveLab.includes(PAGE_CSS));
+    assert.ok(primitiveLab.some(file => file.endsWith('.svelte')));
+
+    const armed = primitiveLab
+      .map(file => [file, armedBy([file])])
+      .filter(([, reasons]) => reasons.length > 0)
+      .map(([file, reasons]) => `${file} → ${reasons.join('; ')}`);
+    assert.deepEqual(armed, []);
+    assert.equal(explainScreenshotEvidenceFailure(primitiveLab, ''), null);
+
+    for (const form of [`./${PAGE_CSS}`, String.raw`tests\view-lab\primitives\page.css`]) {
+      assert.deepEqual(armedBy([form]), [], form);
+    }
+  });
+
+  it('leaves a mixed set armed by its render file, with that file\'s views', () => {
+    const mixed = [...primitiveLab, RENDER_FILE];
+    assert.equal(hasUiChanges(mixed), true);
+    assert.deepEqual(viewIds(mixed), viewIds([RENDER_FILE]));
+    assert.deepEqual(armedBy([PAGE_CSS, 'lang/en.json']), []);
+  });
+
+  it('keeps a path only near the Primitive Lab armed', () => {
+    for (const file of [
+      'tests/view-lab/primitives.css',
+      'tests/view-lab/primitivesNobodyMadeYet.css',
+      'tests/view-lab/primitives-extra/a.css',
+    ]) {
+      assert.equal(hasUiChanges([file]), true, file);
+      assert.deepEqual(viewIds([file]), ['theme-or-global-ui'], file);
+    }
+    assert.equal(hasUiChanges(['tests/view-lab/cascade.css']), true);
+    assert.deepEqual(viewIds(['tests/view-lab/cascade.css']), ['theme-or-global-ui']);
+  });
+
+  it('check skips a Primitive Lab-only change before awaiting the capture', async () => {
+    const paths = writeGateCliInputs({ prefix: 'fabricate-primitive-lab-', changedFiles: primitiveLab });
+    const gh = makeGhFake({ runs: [workflowRun({ prNumber: 2382 })] });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          gateCheckArgv(paths, {
+            prNumber: 2382,
+            extra: [
+              '--repo', 'misterpotts/fabricate',
+              '--head-sha', 'a'.repeat(40),
+              '--await-capture',
+              '--capture-eligible', 'true',
+              '--capture-workflow', 'pr-screenshots.yml',
+            ],
+          }),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0, captured.error.join('\n'));
+      assert.ok(captured.log.includes('No UI files changed - screenshot check skipped.'), captured.log.join('\n'));
+      assert.equal(gh.calls.length, 0);
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('publishing design-library frames (issue 2413)', () => {
+  const PR = 2413;
+  const HEAD = 'deadbee';
+  const CONFIG = { bucket: 'b', baseUrl: 'https://b.example', prefix: 'pr-screenshots' };
+  const FRAME = Object.freeze({
+    id: '3-0-stepper',
+    label: 'Library · Stepper · formatted',
+    note: '`library.html` (left) · Primitive Lab (right) · 1 row(s) of `src/ui/svelte/components/Stepper.svelte`',
+    targets: ['row:controls/4'],
+    rows: 1,
+  });
+  const manifestOf = (overrides = {}) => ({
+    head: 'f00d',
+    foundryVersion: '14.365',
+    frames: [FRAME],
+    failures: [],
+    overflow: [],
+    labProblems: [],
+    timings: { bootMs: 1, perUnitMs: [1], totalMs: 2 },
+    ...overrides,
+  });
+
+  // Lays out an artifact, publishes it, and returns what reached S3 and the PR body. `library.files`
+  // are PNG names; `library.manifest` is an object, a raw string, or absent.
+  async function publishLibrary({ apps = [], library, targets = '', body = 'Body.', putObject } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-library-publish-'));
+    const appsDir = join(root, 'ui-screenshot-artifact/apps');
+    const libraryDir = join(root, 'ui-screenshot-artifact/library');
+    if (apps.length > 0) mkdirSync(appsDir, { recursive: true });
+    for (const name of apps) writeFileSync(join(appsDir, name), 'app');
+    if (library) {
+      mkdirSync(libraryDir, { recursive: true });
+      for (const name of library.files ?? []) writeFileSync(join(libraryDir, name), 'png');
+      if (library.manifest !== undefined) {
+        const raw = typeof library.manifest === 'string' ? library.manifest : JSON.stringify(library.manifest);
+        writeFileSync(join(libraryDir, 'manifest.json'), raw);
+      }
+    }
+    const puts = [];
+    const edits = [];
+    const runGh = (args) => {
+      if (args[0] === 'auth') return { status: 0, stdout: 'ok', stderr: '' };
+      if (args[1] === 'view') return { status: 0, stdout: body, stderr: '' };
+      if (args[1] === 'edit') {
+        edits.push(readFileSync(args[args.indexOf('--body-file') + 1], 'utf8'));
+        return { status: 0, stdout: '', stderr: '' };
+      }
+      return { status: 1, stdout: '', stderr: `unexpected ${args.join(' ')}` };
+    };
+    try {
+      const result = await publishScreenshotEvidence({
+        prNumber: PR,
+        headSha: HEAD,
+        root,
+        dir: 'ui-screenshot-artifact/apps',
+        libraryDir: 'ui-screenshot-artifact/library',
+        libraryTargets: targets,
+        runGh,
+        config: CONFIG,
+        putObject: putObject ?? (async (object) => { puts.push(object); }),
+      });
+      return { result, puts, written: edits.at(-1) ?? null, edits, appsDir };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  const librarySection = (written) => written.slice(written.indexOf('### Library'), written.indexOf('<!-- fabricate:screenshots:end -->'));
+
+  it('publishes a Library-only block when the apps directory is absent', async () => {
+    const { result, puts, written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.equal(result.skipped, false);
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+    assert.equal(puts[0].contentType, 'image/png');
+    assert.match(written, /## Screenshots\n\n### Library\n/);
+    assert.ok(written.includes(`![pr-${PR} Library · Stepper · formatted](https://b.example/pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png)`), written);
+    assert.ok(written.includes(`> ${FRAME.note}`), written);
+    assert.doesNotMatch(written, /Not captured/);
+  });
+
+  it('places the Library section after the app frames, inside one managed block', async () => {
+    const { puts, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.deepEqual(puts.map(put => put.key), [
+      `pr-screenshots/${PR}/${HEAD}/manager-tools.png`,
+      `pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`,
+    ]);
+    assert.ok(written.indexOf('manager-tools.png') < written.indexOf('### Library'), written);
+    assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
+  });
+
+  it('never writes the body file into the apps output directory', async () => {
+    const { result, appsDir } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+    });
+    assert.ok(!result.bodyFile.startsWith(appsDir), result.bodyFile);
+    assert.ok(!result.bodyFile.startsWith(result.destinationRoot), result.bodyFile);
+  });
+
+  it('still publishes library PNGs that arrive with no manifest, and says it could not reconcile', async () => {
+    const { puts, written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'] },
+      targets: 'row:controls/4,row:controls/5',
+    });
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+    assert.match(written, /!\[pr-2413 Library · 3-0-stepper\]/);
+    assert.match(librarySection(written), /\*\*Not captured\*\*\n\n- the library manifest is missing.*2 selected unit\(s\)/);
+  });
+
+  it('catches an unparseable manifest rather than failing the publish', async () => {
+    const { result, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: '{ not json' },
+      targets: 'row:controls/4',
+    });
+    assert.equal(result.skipped, false);
+    assert.match(written, /manager-tools\.png/);
+    assert.match(librarySection(written), /the library manifest is unreadable/);
+  });
+
+  it('rewrites the block when units were selected but no file arrived, so no stale Library frame survives', async () => {
+    const stale = upsertScreenshotsBlock(
+      'Body.',
+      `### Library\n\n![pr-${PR} Library · Old](https://b.example/pr-screenshots/${PR}/0ld/library/1-0-old.png)`,
+    );
+    const { result, puts, written } = await publishLibrary({ targets: 'row:controls/4', body: stale });
+    assert.equal(result.skipped, false);
+    assert.equal(puts.length, 0);
+    assert.doesNotMatch(written, /1-0-old/);
+    assert.match(librarySection(written), /library capture produced no frames; see the run log/);
+    assert.equal((written.match(/fabricate:screenshots:start/g) || []).length, 1);
+  });
+
+  it('skips only when there are no images and no selected units', async () => {
+    const { result, edits } = await publishLibrary({ library: { manifest: manifestOf({ frames: [] }) } });
+    assert.equal(result.skipped, true);
+    assert.equal(edits.length, 0);
+  });
+
+  it('keeps the app frames when every library upload throws', async () => {
+    const puts = [];
+    const putObject = async (object) => {
+      if (object.key.includes('/library/')) throw new Error('AccessDenied <boom>');
+      puts.push(object);
+    };
+    const { result, written } = await publishLibrary({
+      apps: ['manager-tools.png'],
+      library: { files: ['3-0-stepper.png'], manifest: manifestOf() },
+      targets: 'row:controls/4',
+      putObject,
+    });
+    assert.equal(result.skipped, false);
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/manager-tools.png`]);
+    assert.match(written, /!\[pr-2413 manager-tools\]\(https:\/\/b\.example\/pr-screenshots\/2413\/deadbee\/manager-tools\.png\)/);
+    const section = librarySection(written);
+    assert.match(section, /library capture produced no frames/);
+    assert.match(section, /- Library · Stepper · formatted: upload failed: AccessDenied &lt;boom&gt;/);
+  });
+
+  it('publishes a sibling library frame when one library object alone fails to upload', async () => {
+    const sibling = { ...FRAME, id: '5-0-chip', label: 'Library · Chip · filter', targets: ['unit:5.0'] };
+    const puts = [];
+    const putObject = async (object) => {
+      if (object.key.endsWith('/library/3-0-stepper.png')) throw new Error('SlowDown');
+      puts.push(object);
+    };
+    const manifest = manifestOf({ frames: [FRAME, sibling] });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png', '5-0-chip.png'], manifest },
+      targets: 'row:controls/4,unit:5.0',
+      putObject,
+    });
+    assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/5-0-chip.png`]);
+    const section = librarySection(written);
+    assert.ok(section.includes(`(https://b.example/pr-screenshots/${PR}/${HEAD}/library/5-0-chip.png)`), section);
+    assert.ok(!section.includes('3-0-stepper.png'), section);
+    assert.match(section, /- Library · Stepper · formatted: upload failed: SlowDown/);
+    assert.doesNotMatch(section, /library capture produced no frames/);
+  });
+
+  it('reconciles the selection against the manifest, naming every unit not captured', async () => {
+    const manifest = manifestOf({
+      frames: [FRAME, { ...FRAME, id: '4-1-missing', label: 'Library · Gone', targets: ['entry:4'] }],
+      failures: [{ id: 'unit:7.0', reason: 'heading mismatch' }, { id: 'unit:8.1', reason: 'deadline' }],
+      overflow: ['row:actions/2'],
+      labProblems: ['console error: boom'],
+    });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest },
+      targets: 'row:controls/4,entry:4,unit:7.0,unit:8.1,row:actions/2,row:actions/9,unlocated:openspec/specs/design-system/library.html:2',
+    });
+    const section = librarySection(written);
+    for (const line of [
+      '- could not locate 2 hunk(s) in openspec/specs/design-system/library.html; touched units may be missing',
+      '- unit:7.0: heading mismatch',
+      '- unit:8.1: deadline',
+      '- row:actions/2: over the library unit cap',
+      '- row:actions/9: no record in the library manifest',
+      '- Library · Gone: image missing from the artifact',
+      '- Primitive Lab reported: console error: boom',
+    ]) {
+      assert.ok(section.includes(line), `${line}\n---\n${section}`);
+    }
+    assert.ok(!section.includes('- row:controls/4'), 'a captured unit is not listed');
+    assert.ok(!section.includes('- entry:4:'), 'a unit whose frame was recorded is accounted for');
+  });
+
+  it('escapes and cuts every manifest-sourced string', async () => {
+    const hostile = String.raw`<script>x</script>](javascript:alert(1)) \ <!-- fabricate:screenshots:end -->` + 'y'.repeat(400);
+    const manifest = manifestOf({
+      frames: [{ ...FRAME, label: hostile, note: hostile }],
+      failures: [{ id: hostile, reason: hostile }],
+    });
+    const { written } = await publishLibrary({
+      library: { files: ['3-0-stepper.png'], manifest },
+      targets: 'row:controls/4',
+    });
+    assert.equal((written.match(/fabricate:screenshots:end/g) || []).length, 1, written);
+    const section = librarySection(written);
+    assert.doesNotMatch(section, /<script|<!--/);
+    assert.match(section, /&lt;script&gt;x&lt;\/script&gt;\\\]\(javascript:alert\(1\)\) \\\\ /);
+    assert.doesNotMatch(section, /y{201}/);
+    assert.match(section, /y{100}/);
+  });
+
+  it('lists at most 20 entries under Not captured, then points at the run log', async () => {
+    const failures = Array.from({ length: 30 }, (_, index) => ({ id: `unit:${index}.0`, reason: 'deadline' }));
+    const { written } = await publishLibrary({
+      library: { manifest: manifestOf({ frames: [], failures }) },
+      targets: failures.map(failure => failure.id).join(','),
+    });
+    const section = librarySection(written);
+    assert.equal((section.match(/^- unit:/gm) || []).length, 20);
+    assert.match(section, /^- and 10 more; see the run log$/m);
+  });
+
+  it('caps the Library section at 20,000 characters', async () => {
+    const frames = Array.from({ length: 60 }, (_, index) => ({
+      ...FRAME,
+      id: `${index}-0-wide`,
+      label: '<'.repeat(200),
+      note: '>'.repeat(200),
+      targets: [`entry:${index}`],
+    }));
+    const { written } = await publishLibrary({
+      library: { files: frames.map(frame => `${frame.id}.png`), manifest: manifestOf({ frames }) },
+      targets: frames.map(frame => frame.targets[0]).join(','),
+    });
+    const section = librarySection(written);
+    assert.ok(section.length <= 20_000, `the Library section is ${section.length} characters`);
+    assert.match(section, /\d+ more frame\(s\) omitted to keep this section under 20,000 characters; see the run log/);
+  });
+
+  it('wires --library-dir and --library-targets through the publish command', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-library-cli-'));
+    try {
+      const libraryDir = join(root, 'library');
+      mkdirSync(libraryDir, { recursive: true });
+      writeFileSync(join(libraryDir, '3-0-stepper.png'), 'png');
+      writeFileSync(join(libraryDir, 'manifest.json'), JSON.stringify(manifestOf()));
+      const puts = [];
+      const runGh = (args) => ({ status: 0, stdout: args[0] === 'auth' ? 'ok' : 'Body.', stderr: '' });
+      const lines = await captureLog(() => main(
+        ['publish', '--pr', String(PR), '--output-dir', join(root, 'apps'), '--head-sha', HEAD,
+          '--library-dir', libraryDir, '--library-targets', 'row:controls/4,row:controls/9'],
+        { runGh, putObject: async (object) => { puts.push(object); }, config: CONFIG },
+      ));
+      assert.deepEqual(puts.map(put => put.key), [`pr-screenshots/${PR}/${HEAD}/library/3-0-stepper.png`]);
+      assert.ok(lines.some(line => /library\/3-0-stepper\.png$/.test(line)), lines.join('\n'));
+      assert.ok(lines.includes('Library not captured: row:controls/9: no record in the library manifest'), lines.join('\n'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

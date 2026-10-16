@@ -60,6 +60,32 @@ const PRE_1936 = {
 };
 
 /**
+ * Table rows renamed by approved changes, with exactly one model identifier substitution each.
+ * Historical data stays frozen, so future model upgrades add explicit, count-pinned mappings
+ * rather than weakening the structural preservation test (#2494).
+ */
+const RENAMED_ROWS = [
+  {
+    before: '`small` | `haiku` | `gpt-5.6-luna` | `low`',
+    after: '`small` | `claude-haiku-5-5` | `gpt-5.6-luna` | `low`',
+    identifiers: [['`claude-haiku-5-5`', '`haiku`']],
+  },
+  {
+    before: '`medium` | `sonnet` | `gpt-5.6-terra` | `medium`',
+    after: '`medium` | `claude-sonnet-5-5` | `gpt-5.6-terra` | `medium`',
+    identifiers: [['`claude-sonnet-5-5`', '`sonnet`']],
+  },
+  {
+    before: '`large` | `opus` | `gpt-5.6-sol` | `high`',
+    after: '`large` | `claude-opus-5-5` | `gpt-5.6-sol` | `high`',
+    identifiers: [['`claude-opus-5-5`', '`opus`']],
+  },
+];
+
+/** Any added historical row exception must explicitly update this count. */
+const RENAMED_ROWS_COUNT = 3;
+
+/**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
  * nothing has moved yet.
  */
@@ -134,7 +160,7 @@ const DECOUNTED_COUNT = 4;
  * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
  * #2118, #2119). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287', '#2414']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -308,8 +334,9 @@ const SUPERSEDED_POLICY = [
     issue: '#2119',
     before:
       "The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    // Issue #2414 added the broad-signal override table to these inputs.
     after:
-      "The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+      "The patch-narrowed inputs — the case registry, the broad-signal override table, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
     survivesIn: 'CONTRIBUTING.md',
   },
   {
@@ -630,16 +657,61 @@ const SUPERSEDED_POLICY = [
       'part of `scripts/**`, for the reason below',
     survivesIn: 'CONTRIBUTING.md',
   },
+  // PR #2287: a supplied forward-port resolution turns the initial merge conflict into an
+  // expected intermediate state. Keep genuine failures annotated as errors.
+  {
+    issue: '#2287',
+    before:
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.",
+    after: [
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` and names each path that could not be combined.",
+      'When `resolution_ref` is supplied these are `::notice::` annotations: the initial conflict is expected, and only the following content gate may accept the resolution.',
+      'Without a resolution they are `::error::` annotations, followed by an actionable refusal; an invalid or unverifiable supplied resolution also produces a real error at its failure point.',
+    ],
+    survivesIn: '.github/workflows/README.md',
+  },
+  {
+    issue: '#2287',
+    before:
+      'Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    after:
+      'Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    survivesIn: '.github/workflows/README.md',
+  },
+  {
+    issue: '#2414',
+    before: 'Five inputs narrow below coverage.',
+    after: 'These inputs narrow below coverage.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2414',
+    before:
+      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
+    after: [
+      'A patch to a case file in `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
+      'A patch to `scripts/lib/view-lab-cases/broadSignals.js` selects only what the override entries it touches name, plus the representative set, when it is confined to `BROAD_SIGNAL_CASE_OVERRIDES`; an edit anywhere else in that file keeps the coverage default.',
+    ],
+    survivesIn: 'CONTRIBUTING.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 58;
+const SUPERSEDED_POLICY_COUNT = 62;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
  * #1761).
  */
 const RENAMED = [
+  // Issue #2381 deleted ProgressiveStageList; InteractableBrowserRoot is now the text(key, fallback) example.
+  {
+    before:
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.',
+    after:
+      'The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate\'s `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `InteractableBrowserRoot.svelte`) quietly renders its **hardcoded English fallback**.',
+    identifiers: [['InteractableBrowserRoot.svelte', 'ProgressiveStageList.svelte']],
+  },
   {
     before:
       "Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.",
@@ -662,17 +734,10 @@ const RENAMED = [
       '`getWorldItemOptions` in `src/ui/managerServices.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
     identifiers: [['src/ui/managerServices.js', 'src/ui/SvelteCraftingSystemManagerApp.svelte.js']],
   },
-  // Issue #1671 moved the cases into one file per surface, so these three sentences name the directory.
+  // Issue #1671 moved the cases into one file per surface, so this sentence names the directory.
   {
     before: 'Cases live in `scripts/lib/viewLabCases.js`.',
     after: 'Cases live in `scripts/lib/view-lab-cases/`.',
-    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
-  },
-  {
-    before:
-      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
-    after:
-      'A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
     identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
   },
   {
@@ -865,10 +930,47 @@ const RENAMED = [
       'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.',
     identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
   },
+  // Issue 1507 renamed the shared modal component's file.
+  {
+    before:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `ManagerModal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    after:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `Modal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    identifiers: [['`Modal.svelte`', '`ManagerModal.svelte`']],
+  },
+  // Issue 1521 folded `ExplainerCard.svelte` onto the callout, so the fenced-separator example
+  // names a component that still carries one.
+  {
+    before:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    after:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
+  {
+    before:
+      "The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    after:
+      "The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
+  // Issue 1721 moved the embedded-uuid gate out of the manager root.
+  {
+    before:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    after:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/dropUuidClassification.js` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    identifiers: [
+      [
+        '`src/ui/svelte/apps/manager/dropUuidClassification.js`',
+        '`src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`',
+      ],
+    ],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 30;
+const RENAMED_COUNT = 34;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
@@ -939,7 +1041,9 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
     // A verified rename or superseded policy excuses its sentence here too; each is checked below.
-    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
+    const excused = new Set(
+      [...RENAMED, ...SUPERSEDED_POLICY, ...RENAMED_ROWS].map(({ before: was }) => was)
+    );
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
       ({ sentence }) => !excused.has(sentence)
     );
@@ -947,6 +1051,38 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
       [],
       `these ${kind} predate issue #1936 in AGENTS.md and are in no DESTINATIONS file`
+    );
+  }
+});
+
+test('every renamed table row has exactly one verified model identifier replacement', () => {
+  assert.equal(
+    RENAMED_ROWS.length,
+    RENAMED_ROWS_COUNT,
+    'a historical table-row exception was added or removed without updating its pinned count'
+  );
+
+  const frozen = multiset(
+    structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8'))
+  );
+  const current = survivingLines(structuralLinesOf);
+  for (const { before, after, identifiers } of RENAMED_ROWS) {
+    assert.equal(frozen.get(before), 1, `retired model row was not in the fixture: ${before}`);
+    assert.equal(current.get(before) ?? 0, 0, `retired model row still survives: ${before}`);
+    assert.equal(current.get(after), 1, `pinned replacement row is absent or duplicated: ${after}`);
+
+    assert.equal(identifiers.length, 1, `a row rename must change exactly one identifier: ${before}`);
+    const [[replacement, original]] = identifiers;
+    assert.ok(original && replacement && original !== replacement, 'a model identifier must change');
+    assert.equal(
+      after.split(replacement).length,
+      2,
+      `replacement identifier must occur exactly once: ${replacement}`
+    );
+    assert.equal(
+      after.replace(replacement, original),
+      before,
+      `only the named model identifier may change: ${before}`
     );
   }
 });

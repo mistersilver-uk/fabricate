@@ -312,6 +312,16 @@ async function failed(invoke) {
   }
 }
 
+/** The message a synchronous call throws, or `null` when it returns. */
+function thrownMessage(invoke) {
+  try {
+    invoke();
+    return null;
+  } catch (error) {
+    return String(error?.message);
+  }
+}
+
 /**
  * Each probed member called through the facade and again through a detached reference. A method
  * written as an arrow instead of shorthand loses `this` on both, and an instance-bound copy keeps
@@ -427,12 +437,15 @@ async function measureBootContract({ init, ready, loadModule }) {
   const facade = globalThis.game.fabricate;
   const { FABRICATE_HOOKS } = await loadModule('/src/config/hooks.js');
   const { COMPANION_CONTRACT } = await loadModule('/src/systems/companionContract.js');
+  const { publishedComponentSeam } = await loadModule('/src/ui/publishedComponentSeam.js');
   const whenReady = await Promise.race([
     facade.whenReady().then(() => 'resolved'),
     new Promise((settle) => setTimeout(() => settle('pending'), 500)),
   ]);
   const runtime = await loadModule('/src/bootstrap/gatheringRuntime.js');
   const [socketListener] = socketListeners.get('module.fabricate') ?? [];
+  // M3, not M1's `not registered`: `main.js` imported the adapter, which registered the runtime.
+  const uiRefusal = thrownMessage(() => facade.api.ui.mount('\u{0}', {}));
 
   return {
     hookEventsAtYield,
@@ -449,6 +462,8 @@ async function measureBootContract({ init, ready, loadModule }) {
     references: {
       apiHooksIsFabricateHooks: facade.api.HOOKS === FABRICATE_HOOKS,
       apiCompanionIsCompanionContract: facade.api.companion === COMPANION_CONTRACT,
+      apiUiIsPublishedSeam: facade.api.ui === publishedComponentSeam.publicApi,
+      apiUiRegistered: uiRefusal?.endsWith('is not published') === true,
       facadeIsEntrySingleton: facade === instance,
       recipeManagerTookCurrencyStore:
         facade.recipeManager.currencyConfigStore === facade.currencyConfigStore,
@@ -673,6 +688,11 @@ test('the boot contract golden is not vacuous', () => {
     'get fabricate.gatheringConfig',
     'set fabricate.gatheringConfig {"probe":"gatheringConfig"}',
   ]);
+  assert.deepEqual(
+    golden.importerSeams.heldRecipeIds,
+    ['probe-held-recipe'],
+    'the prune asks the facade run manager which recipes active runs hold'
+  );
   assert.deepEqual(
     golden.importerSeams.admits,
     { activeGm: true, assistantGm: true, player: false },

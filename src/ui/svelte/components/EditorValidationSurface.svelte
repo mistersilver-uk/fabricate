@@ -37,7 +37,7 @@
 -->
 <script>
   import Chip from './Chip.svelte';
-  import ManagerButton from './ManagerButton.svelte';
+  import Button from './Button.svelte';
   import { localize } from '../util/foundryBridge.js';
 
   let {
@@ -203,7 +203,7 @@
                 >{/if}
             </div>
             {#if row.action || row.target || rowAddress(row)}
-              <ManagerButton
+              <Button
                 role="ghost"
                 class="manager-recipe-val-view"
                 aria-label={localize(VIEW_NAMED_LABEL, {
@@ -215,7 +215,7 @@
                   : undefined}
                 data-validation-row-action={row.action ? '' : undefined}
                 {...namedAttr(viewDataAttr, row.target)}
-                onclick={() => activateRow(row)}>{localize(rowVerb(row))}</ManagerButton
+                onclick={() => activateRow(row)}>{localize(rowVerb(row))}</Button
               >
               {#if row.action?.descriptionKey}<span
                   class="visually-hidden"

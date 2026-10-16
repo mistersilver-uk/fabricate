@@ -39,7 +39,7 @@ This means the version you install through Foundry has already passed the tests,
 
 ## Automated testing
 
-Fabricate ships with a large automated test suite, currently over three thousand seven hundred fast-running unit tests.
+Fabricate ships with a large automated test suite, currently over twenty thousand fast-running automated tests.
 These run on every proposed change and on every push to the main line of development.
 They cover the data models, the rules that read and repair stored data, the startup migrations, the parts that talk to your world settings, and the logic behind the interface.
 
@@ -70,7 +70,7 @@ A second check forbids stray, hard-coded colours in the interface code, so Fabri
 
 ---
 
-## Reversible data migrations
+## Fail-safe data migrations
 
 This is the safeguard that matters most when you are trusting a module with an existing world.
 
@@ -146,5 +146,5 @@ That deserves more than a closing paragraph, so it now has a page of its own.
 
 The short version belongs here, though.
 Whether a particular line of code was typed by me or drafted by an agent is not what keeps your data safe.
-What keeps it safe is everything above: the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the reversible migrations that refuse to corrupt your data.
+What keeps it safe is everything above: the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the migrations that restore a checkpoint rather than corrupt your data.
 On top of all of that, I review what ships and _I_ am **accountable** for it.

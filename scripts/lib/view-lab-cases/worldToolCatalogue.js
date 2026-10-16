@@ -2,7 +2,11 @@
  * World scope: the tool catalogue's list, its paging, its bulk set and its filter states.
  */
 
-import { WORLD_TOOL_SEARCH_MISS_TERM, WORLD_TOOL_SEARCH_TERM } from './caseConstants.js';
+import {
+  WORLD_SCOPE_MODEL_PATTERN,
+  WORLD_TOOL_SEARCH_MISS_TERM,
+  WORLD_TOOL_SEARCH_TERM,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 /** The resting catalogue's walk, shared by its wide frame and its stacked twin. */
@@ -82,10 +86,24 @@ export const CASES = Object.freeze([
       },
       // The fifth inspector card is gone, and nothing replaces it here.
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
+    // the search, the scope band and every row on one 12px gutter (issue 2373).
+    expectLayout: {
+      containerSelector: '.manager-scoped-list-column',
+      alignedLeft:
+        '.manager-scoped-list-toolbar .fabricate-search, [data-world-tool-break-mode], [data-scoped-list-row]',
+      controls: [
+        {
+          selector: '[data-scoped-tool-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone, and dropping it is not optional bookkeeping.
-    sourceMatches: CATALOGUE_SOURCES,
+    sourceMatches: [...CATALOGUE_SOURCES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'world-tool-catalogue-stacked',
@@ -132,6 +150,17 @@ export const CASES = Object.freeze([
         target: '[data-pagination-prev]',
       },
     ],
+    // The column runs edge to edge: toolbar, rows and pager share its edges and the pager its foot (issue 2373).
+    expectLayout: {
+      containerSelector: '.manager-scoped-list-layout',
+      gridSelector: '.manager-scoped-list-layout',
+      expectedTracks: 2,
+      fillSelector: '.manager-scoped-list-column > .fabricate-pagination',
+      alignedLeft:
+        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows, .manager-scoped-list-column > .fabricate-pagination',
+      alignedRight:
+        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows, .manager-scoped-list-column > .fabricate-pagination',
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
@@ -276,6 +305,15 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-state="filtered"]',
+    // A compact panel keeps its own padding when the hero's moves (issue 2257 D9).
+    expectLayout: {
+      controls: [
+        {
+          selector: '.manager-empty.is-compact[data-scoped-list-inspector-state]',
+          styles: 'padding: 16px 12px',
+        },
+      ],
+    },
     // The action, inside the panel.
     expectContained: [
       {

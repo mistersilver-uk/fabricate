@@ -8,27 +8,21 @@
  * runtime at `node_modules/svelte/src/index-client.js`, and a snippet built from a second copy of
  * that runtime is a different type the component refuses to render.
  */
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
 
-import {
-  createRawSnippet,
-  flushSync,
-} from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createRawSnippet, flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-sortable-list-',
-  rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/util/listReorderAnnouncement.js',
-  ],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, 'src/ui/svelte/util/listReorderAnnouncement.js'],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -112,7 +106,10 @@ describe('SortableList — the row is the shape the specimen draws', () => {
       'and the rocker follows it'
     );
 
-    assert.ok(Boolean(target.querySelector('[data-list-footer]')), 'the adder is the list`s footer');
+    assert.ok(
+      Boolean(target.querySelector('[data-list-footer]')),
+      'the adder is the list`s footer'
+    );
   });
 
   it('renders both affordances in EVERY mode, disabled at the ends rather than hidden', async () => {
@@ -132,7 +129,10 @@ describe('SortableList — the row is the shape the specimen draws', () => {
       const up = rows.map((row) => row.querySelector('[data-sortable-move="up"]'));
       const down = rows.map((row) => row.querySelector('[data-sortable-move="down"]'));
 
-      assert.ok(rows.every((row) => Boolean(gripOf(row))), `${mode.label}: every row grips`);
+      assert.ok(
+        rows.every((row) => Boolean(gripOf(row))),
+        `${mode.label}: every row grips`
+      );
       assert.ok(up.every(Boolean) && down.every(Boolean), `${mode.label}: every row rockers`);
       assert.ok(up[0].disabled, `${mode.label}: the first row cannot move up`);
       assert.ok(down[2].disabled, `${mode.label}: the last row cannot move down`);
@@ -305,7 +305,7 @@ describe('SortableList — a collapsed body is retained and inert (maintainer ru
   });
 
   it('declares `display: none` for the hidden body in the sheet, which the harness cannot load', () => {
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const start = sheet.indexOf('.fabricate-sortable-list-body[hidden] {');
     assert.notEqual(start, -1, 'the sheet no longer states what a hidden body draws');
     assert.match(
@@ -346,7 +346,9 @@ describe('SortableList — reorder answers both inputs', () => {
 
     assert.deepEqual(moves, [[2, 1]], 'ArrowUp moves the row one position');
     assert.deepEqual(
-      rowsOf(target).map((row) => row.querySelector('[data-sortable-grip]').getAttribute('data-sortable-grip')),
+      rowsOf(target).map((row) =>
+        row.querySelector('[data-sortable-grip]').getAttribute('data-sortable-grip')
+      ),
       ['a', 'c', 'b'],
       'and the caller`s round-tripped array is what the list renders'
     );
@@ -415,7 +417,11 @@ describe('SortableList — reorder answers both inputs', () => {
     press(gripOf(rowsOf(target)[0]), 'ArrowUp');
     press(gripOf(rowsOf(target)[2]), 'ArrowDown');
     press(gripOf(rowsOf(target)[1]), 'Enter');
-    assert.deepEqual(moves, [], 'a move that changes nothing, and a key that is not a move, write nothing');
+    assert.deepEqual(
+      moves,
+      [],
+      'a move that changes nothing, and a key that is not a move, write nothing'
+    );
   });
 
   it('writes the travelling state on the row being dragged', async () => {
@@ -429,16 +435,13 @@ describe('SortableList — reorder answers both inputs', () => {
     });
 
     const rows = rowsOf(target);
-    rows[2].dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
+    gripOf(rows[2]).dispatchEvent(new globalThis.Event('dragstart', { bubbles: true }));
     flushSync();
     assert.ok(
       rowsOf(target)[2].classList.contains('is-dragging'),
       'the row being dragged paints itself as travelling'
     );
-    assert.ok(
-      !rowsOf(target)[0].classList.contains('is-dragging'),
-      'and no other row does'
-    );
+    assert.ok(!rowsOf(target)[0].classList.contains('is-dragging'), 'and no other row does');
 
     rows[0].dispatchEvent(new globalThis.Event('drop', { bubbles: true, cancelable: true }));
     flushSync();
@@ -638,5 +641,216 @@ describe('SortableList — the list names itself and its drag source is the grip
     const [first] = rowsOf(target);
     assert.ok(!first.hasAttribute('draggable'), 'the row is not itself a drag source');
     assert.equal(gripOf(first).getAttribute('draggable'), 'true', 'the grip is');
+  });
+});
+
+describe('SortableList — the caller speaks through the list, and only the grip drags (issue 2381)', () => {
+  const regionOf = (target) => target.querySelector('[data-sortable-list-status]');
+  const spokenIn = (target) => regionOf(target).textContent.trim();
+
+  /** Row copy carrying art and bare text, the two drag origins a row's content offers. */
+  const artSnippet = createRawSnippet(() => ({
+    render: () => '<span data-row-copy><img data-row-art alt="" />copy</span>',
+  }));
+
+  function fire(node, type) {
+    node.dispatchEvent(new globalThis.Event(type, { bubbles: true, cancelable: true }));
+    flushSync();
+  }
+
+  it('never speaks the sentence it mounts with, speaks the next, and keeps it through an empty one', async () => {
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      announcement: 'Order reverted.',
+    });
+    assert.equal(spokenIn(target), '', 'the mount value counts as already heard');
+
+    await harness.setProps({ announcement: 'Order reset.' });
+    assert.equal(spokenIn(target), 'Order reset.', 'a new value after mount is spoken');
+
+    await harness.setProps({ announcement: '' });
+    assert.equal(spokenIn(target), 'Order reset.', 'an empty value never clears the region');
+  });
+
+  it('re-arms a repeated sentence after an empty one, even with a list move between', async () => {
+    let items = [...ITEMS];
+    const target = await harness.mount({
+      items,
+      itemLabel,
+      row: rowSnippet,
+      announcement: '',
+      onReorder: (from, to) => {
+        const next = [...items];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        items = next;
+      },
+    });
+    await harness.setProps({ announcement: 'R' });
+    assert.equal(spokenIn(target), 'R');
+
+    press(gripOf(rowsOf(target)[0]), 'ArrowDown');
+    await harness.setProps({ items });
+    flushSync();
+    assert.match(
+      spokenIn(target),
+      /ReorderedAnnouncement/u,
+      'the region now holds the move sentence'
+    );
+
+    await harness.setProps({ announcement: '' });
+    await harness.setProps({ announcement: 'R' });
+    assert.equal(spokenIn(target), 'R', 'the repeated sentence is spoken again');
+  });
+
+  it('arms no drag from a grip nested in a body, and drops nothing', async () => {
+    const moves = [];
+    const nested = createRawSnippet(() => ({
+      render: () => '<div><button type="button" data-sortable-grip="x">inner</button></div>',
+    }));
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      body: nested,
+      expandable: true,
+      expandedId: 'a',
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+    });
+    const rows = rowsOf(target);
+    const inner = bodyOf(rows[0]).querySelector('[data-sortable-grip="x"]');
+    assert.ok(Boolean(inner), 'the nested grip rendered');
+    fire(inner, 'dragstart');
+    assert.ok(
+      !rowsOf(target)[0].classList.contains('is-dragging'),
+      'the outer row does not travel'
+    );
+    fire(rows[1], 'drop');
+    assert.deepEqual(moves, [], 'and nothing moved');
+  });
+
+  it('settles once for a drop that moves a row, and never for a no-op drop, a key or a rocker', async () => {
+    const moves = [];
+    let settled = 0;
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+      onReorderSettled: () => {
+        settled += 1;
+      },
+    });
+    const rows = rowsOf(target);
+
+    fire(gripOf(rows[1]), 'dragstart');
+    fire(rows[1], 'drop');
+    press(gripOf(rows[1]), 'ArrowUp');
+    rows[0].querySelector('[data-sortable-move="down"]').click();
+    flushSync();
+    const keyThenRocker = [
+      [1, 0],
+      [0, 1],
+    ];
+    assert.deepEqual(moves, keyThenRocker, 'the key and rocker moved; the own-row drop did not');
+    assert.equal(settled, 0, 'and none of the three settled');
+
+    fire(gripOf(rows[2]), 'dragstart');
+    fire(rows[0], 'drop');
+    assert.deepEqual(moves.at(-1), [2, 0], 'the drop moved its row');
+    assert.equal(settled, 1, 'and settled exactly once');
+  });
+
+  it('arms no drag from the art or bare text in a row', async () => {
+    const moves = [];
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: artSnippet,
+      onReorder: (from, to) => {
+        moves.push([from, to]);
+      },
+    });
+    const rows = rowsOf(target);
+    const copy = rows[2].querySelector('[data-row-copy]');
+    // happy-dom swallows a throwing listener and reports it here, so a guard that calls
+    // `closest` on a Text node would otherwise pass by throwing.
+    const thrown = [];
+    const view = target.ownerDocument.defaultView;
+    const onError = (event) => {
+      thrown.push(event.message);
+    };
+    view.addEventListener('error', onError);
+
+    for (const origin of [copy.querySelector('[data-row-art]'), copy.lastChild]) {
+      fire(origin, 'dragstart');
+      assert.ok(!rowsOf(target)[2].classList.contains('is-dragging'), 'the row does not travel');
+      fire(rows[0], 'drop');
+    }
+    view.removeEventListener('error', onError);
+    assert.equal(copy.lastChild.nodeType, globalThis.Node.TEXT_NODE, 'the second origin was text');
+    assert.deepEqual(moves, [], 'and neither drop moved anything');
+    assert.deepEqual(thrown, [], 'and the guard read the Text node without throwing');
+  });
+
+  it('names each rocker control for its direction and for the record it moves', async () => {
+    const target = await harness.mount({ items: ITEMS, itemLabel, row: rowSnippet });
+    const row = rowsOf(target)[1];
+    const up = row.querySelector('[data-sortable-move="up"]').getAttribute('aria-label');
+    const down = row.querySelector('[data-sortable-move="down"]').getAttribute('aria-label');
+    assert.match(up, /^FABRICATE\.Common\.SortableList\.MoveUp:.*Fold and quench/u);
+    assert.match(down, /^FABRICATE\.Common\.SortableList\.MoveDown:.*Fold and quench/u);
+  });
+
+  it('falls back to a rocker name that still carries the record', async () => {
+    const { format } = globalThis.game.i18n;
+    globalThis.game.i18n.format = (key) => key;
+    try {
+      const target = await harness.mount({ items: ITEMS, itemLabel, row: rowSnippet });
+      const row = rowsOf(target)[1];
+      assert.equal(
+        row.querySelector('[data-sortable-move="up"]').getAttribute('aria-label'),
+        'Move Fold and quench up'
+      );
+      assert.equal(
+        row.querySelector('[data-sortable-move="down"]').getAttribute('aria-label'),
+        'Move Fold and quench down'
+      );
+    } finally {
+      globalThis.game.i18n.format = format;
+    }
+  });
+
+  it('keeps one present, empty region on a list that does not order', async () => {
+    // Characterization pin: already true before issue 2381.
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      reorderable: false,
+      row: rowSnippet,
+    });
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
+    assert.equal(spokenIn(target), '');
+  });
+
+  it('still speaks a caller sentence there, and toggling reorder never clears it', async () => {
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      reorderable: false,
+      row: rowSnippet,
+    });
+    await harness.setProps({ announcement: 'Order reset.' });
+    assert.equal(spokenIn(target), 'Order reset.', 'the fixed list speaks its caller');
+
+    await harness.setProps({ reorderable: true });
+    assert.equal(target.querySelectorAll('[data-sortable-list-status]').length, 1);
+    assert.equal(spokenIn(target), 'Order reset.', 'and the toggle neither remounts nor clears it');
   });
 });

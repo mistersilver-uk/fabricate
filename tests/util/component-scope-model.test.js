@@ -1,5 +1,6 @@
 /** The pure half of the world Component screens (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -12,6 +13,10 @@ import {
   componentScopeValidation,
   componentScopeValidationPresentation,
 } from '../../src/ui/model/componentScopeValidation.js';
+import {
+  COMPONENT_CATEGORY_FILTER_NONE,
+  componentCategoryFilter,
+} from '../../src/ui/svelte/apps/manager/scoped/componentCategoryFilter.js';
 import {
   componentAttributionNote,
   componentBulkEssenceCarried,
@@ -159,30 +164,64 @@ describe('the system-scope category note branches on the WORLD VALUE first', () 
 describe('the attribution sentence is clamped at zero', () => {
   // AC-13's pure half. The prototype's own `system` string is UNCLAMPED, so transcribing it
   // renders `shared with -1 other systems` for a component no system has adopted.
-  it('reads 0 other systems for a component with no membership record', () => {
-    for (const surface of ['list', 'editor']) {
-      const note = componentAttributionNote(
-        { surface, memberCount: 0, systemName: 'Forge' },
-        phrase
+  const noteFor = (surface, memberCount) =>
+    componentAttributionNote({ surface, memberCount, systemName: 'Forge' }, phrase);
+
+  it('states no sharing for a component held by one system, or by none', () => {
+    // Issue 2218: every imported component starts held by one system, so this is the default.
+    for (const memberCount of [1, 0]) {
+      assert.equal(
+        noteFor('list', memberCount),
+        'Name, art and description are authored in the world catalogue.'
       );
-      assert.match(note, /0 other systems/);
-      assert.ok(!note.includes('-1'), 'and never a negative count');
+      assert.equal(
+        noteFor('editor', memberCount),
+        'Name, image and description are authored in the world catalogue. Everything below belongs to Forge alone.'
+      );
     }
   });
 
   it('and 2 other systems for a component three systems hold', () => {
     // The positive control: with the count above zero the clamp is invisible, which is exactly
     // why the zero fixture is the criterion.
-    assert.match(
-      componentAttributionNote({ surface: 'list', memberCount: 3 }, phrase),
-      /2 other systems/
-    );
+    assert.match(noteFor('list', 3), /shared with 2 other systems\./);
+    assert.match(noteFor('editor', 3), /shared with 2 other systems\. .* belongs to Forge alone\./);
   });
 
   it('and pluralises the singular case rather than saying "1 other systems"', () => {
+    assert.match(noteFor('list', 2), /shared with 1 other system\./);
+    assert.match(noteFor('editor', 2), /shared with 1 other system\. .* belongs to Forge alone\./);
+  });
+
+  it('reads the same sentence from lang/en.json as from its fallback, on every surface and count', () => {
+    const lang = JSON.parse(readFileSync(new URL('../../lang/en.json', import.meta.url), 'utf8'));
+    const fill = (copy, data) =>
+      Object.entries(data ?? {}).reduce(
+        (text, [token, value]) => text.replaceAll(`{${token}}`, String(value)),
+        copy
+      );
+    const fromLang = (key, _fallback, data) =>
+      fill(
+        key.split('.').reduce((node, part) => node?.[part], lang),
+        data
+      );
+    for (const surface of ['editor', 'list', 'entry']) {
+      for (const memberCount of [0, 1, 2, 3, 5]) {
+        const args = { surface, memberCount, systemName: 'Forge' };
+        assert.equal(
+          componentAttributionNote(args, fromLang),
+          componentAttributionNote(args, phrase),
+          `${surface} at ${memberCount}`
+        );
+      }
+    }
+  });
+
+  it('and still counts the others past two', () => {
+    assert.match(noteFor('list', 5), /shared with 4 other systems\.$/);
     assert.match(
-      componentAttributionNote({ surface: 'list', memberCount: 2 }, phrase),
-      /1 other system\./
+      noteFor('editor', 5),
+      /shared with 4 other systems\. .* belongs to Forge alone\.$/
     );
   });
 
@@ -754,6 +793,68 @@ describe('the catalogue’s essence filter is the rules list’s, over the world
   it('is WITHHELD over an empty world essence catalogue', () => {
     assert.deepEqual(componentEssenceFilter({ essences: [], systems: ROSTER }, phrase), []);
     assert.deepEqual(componentEssenceFilter({ systems: ROSTER }, phrase), []);
+  });
+});
+
+describe('the catalogue’s category filter reads the trimmed `defaults.category` (#2440)', () => {
+  const entry = (id, category = '') => ({ id, defaults: { category } });
+  const ENTRIES = [
+    entry('a', 'Raw'),
+    entry('b', ' Refined '),
+    entry('c'),
+    entry('d', 'Zed'),
+    entry('e', 'Alpha'),
+  ];
+  const [filter] = componentCategoryFilter(
+    { categories: ['Raw', 'Refined'], entries: ENTRIES },
+    phrase
+  );
+
+  it('is one lead-row descriptor: all, none, the vocabulary, then strays by code point', () => {
+    assert.equal(filter.id, 'category');
+    assert.equal(filter.toolbarRow, 'lead');
+    assert.equal(filter.label, 'Category');
+    assert.deepEqual(
+      filter.options.map((option) => [option.value, option.label]),
+      [
+        ['all', 'All categories'],
+        [COMPONENT_CATEGORY_FILTER_NONE, 'No world category'],
+        ['Raw', 'Raw'],
+        ['Refined', 'Refined'],
+        ['Alpha', 'Alpha'],
+        ['Zed', 'Zed'],
+      ]
+    );
+  });
+
+  it('matches all, none and the exact stored trim', () => {
+    const passes = (value) => ENTRIES.filter((e) => filter.matches(e, value)).map((e) => e.id);
+    assert.deepEqual(passes('all'), ['a', 'b', 'c', 'd', 'e']);
+    assert.deepEqual(passes(COMPONENT_CATEGORY_FILTER_NONE), ['c']);
+    assert.deepEqual(passes('Raw'), ['a']);
+    assert.deepEqual(passes('Refined'), ['b'], 'the stored value is trimmed, nothing more');
+    assert.deepEqual(passes('raw'), [], 'no case folding');
+    assert.deepEqual(passes('ghost'), []);
+  });
+
+  it('trims the vocabulary so a padded value still matches and empties drop', () => {
+    const [padded] = componentCategoryFilter(
+      { categories: [' Raw ', '', '  '], entries: [entry('a', 'Raw')] },
+      phrase
+    );
+    assert.deepEqual(
+      padded.options.slice(2).map((option) => option.value),
+      ['Raw']
+    );
+    assert.ok(padded.matches(entry('a', 'Raw'), 'Raw'));
+  });
+
+  it('is withheld when no category exists anywhere', () => {
+    assert.deepEqual(
+      componentCategoryFilter({ categories: [], entries: [entry('c')] }, phrase),
+      []
+    );
+    assert.deepEqual(componentCategoryFilter({}, phrase), []);
   });
 });
 

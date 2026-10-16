@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PICKER_PATH = 'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte';
@@ -24,6 +27,7 @@ const harness = createMountedComponentHarness({
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // `ModifierPillSelect`'s add menu dismisses on an outside click.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -42,7 +46,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
     // the shared picker now, so this tree reaches all three; an omission does not fail this
     // suite, it cancels every test in it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Chip.svelte',

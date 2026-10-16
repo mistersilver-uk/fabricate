@@ -1,12 +1,22 @@
 /**
  * Pure interval lengths from a V13 world calendar (`game.time.calendar`, a
  * `foundry.data.CalendarData`); the caller does the lookup and injects the result, so a plain fake
- * calendar tests these. Minutes and hours are fixed; only days and weeks follow a custom calendar.
+ * calendar tests these. Regen and respawn minutes and hours are fixed; only days and weeks follow a
+ * custom calendar, and the calendar's own hours per day are read for the time-of-day bar alone.
  * The calendar fields each helper reads are listed in `.agents/docs/foundry-and-architecture.md`.
  */
 
 const EARTH_SECONDS_PER_DAY = 86_400;
 const EARTH_SECONDS_PER_WEEK = 604_800;
+const EARTH_HOURS_PER_DAY = 24;
+const EARTH_MINUTES_PER_HOUR = 60;
+const EARTH_SECONDS_PER_MINUTE = 60;
+
+/** `value` as a finite number above zero, else `null`. */
+function positiveOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
 
 /** One day measured by differencing `componentsToTime`, or 0 when unmeasurable; never throws. */
 function measureDaySeconds(calendar) {
@@ -63,4 +73,20 @@ export function secondsPerUnitFromCalendar(unit, calendar) {
   if (!calendar) return unit === 'weeks' ? EARTH_SECONDS_PER_WEEK : EARTH_SECONDS_PER_DAY;
   const secondsPerDay = secondsPerDayFromCalendar(calendar);
   return unit === 'weeks' ? secondsPerWeekFromCalendar(calendar, secondsPerDay) : secondsPerDay;
+}
+
+/** Minutes per calendar hour: `days.minutesPerHour`, else 60. */
+export function minutesPerHourFromCalendar(calendar) {
+  return positiveOrNull(calendar?.days?.minutesPerHour) ?? EARTH_MINUTES_PER_HOUR;
+}
+
+/** Calendar hours per day: `days.hoursPerDay`, else a measured day of whole hours, else 24. */
+export function hoursPerDayFromCalendar(calendar) {
+  const authored = positiveOrNull(calendar?.days?.hoursPerDay);
+  if (authored !== null) return authored;
+  const secondsPerMinute =
+    positiveOrNull(calendar?.days?.secondsPerMinute) ?? EARTH_SECONDS_PER_MINUTE;
+  const measured =
+    measureDaySeconds(calendar) / (minutesPerHourFromCalendar(calendar) * secondsPerMinute);
+  return Number.isInteger(measured) && measured > 0 ? measured : EARTH_HOURS_PER_DAY;
 }

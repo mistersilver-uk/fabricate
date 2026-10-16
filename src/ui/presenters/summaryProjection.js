@@ -359,6 +359,23 @@ function redactionOf(audience, access) {
 }
 
 /**
+ * The material term of a row's browse status once Tools are known: one set must hold both its
+ * Tools and its materials, as exact craftability requires, so a set whose Tools are missing
+ * cannot lend its materials to the row. No Tool-ready set is a shortfall, as the detail model
+ * reports it.
+ */
+function materialsWithTools({ availability, toolReadySets, snapshot, system }) {
+  if (!Array.isArray(toolReadySets)) return availability === null ? null : availability.available;
+  if (toolReadySets.length === 0) return false;
+  const narrowed = projectSummaryAvailability({
+    snapshot,
+    system,
+    recipe: { ingredientSets: toolReadySets },
+  });
+  return narrowed === null ? null : narrowed.available;
+}
+
+/**
  * Project ONE recipe into its canonical summary.
  *
  * ## Redaction: availability is WITHHELD, not blanked
@@ -409,6 +426,9 @@ function redactionOf(audience, access) {
  *   recomputed here — recipe-visibility/spec.md forbids a second candidate collection.
  *   Ignored for the GM audience, which bypasses the knowledge gate.
  * @param {boolean} [input.checkRefused] Whether the recipe's check refuses the acting character.
+ * @param {object[]|null} [input.toolReadySets] The first step's sets whose Tools are all
+ *   available, or `null` when Tools rule nothing out. The cheap rule consults no Tool, so the
+ *   caller asks the Tool owner; materials are then judged over these sets alone.
  * @param {boolean} [input.favourite] Whether this viewer has favourited the recipe, from
  *   the player's stored favourites. Ignored for the GM audience.
  * @param {Function|null} [input.localize] `(key) => string`, for `categoryLabel` alone —
@@ -425,6 +445,7 @@ export function projectRecipeSummary({
   snapshot = null,
   exhausted = false,
   checkRefused = false,
+  toolReadySets = null,
   favourite = false,
   localize = null,
 } = {}) {
@@ -442,7 +463,9 @@ export function projectRecipeSummary({
       reason: text(access?.reason),
       // `null` rather than `false` when nothing was asked, so a surface holding no
       // snapshot does not paint every row `missingMaterials`.
-      materialsAvailable: availability === null ? null : availability.available,
+      materialsAvailable: redaction.redacted
+        ? null
+        : materialsWithTools({ availability, toolReadySets, snapshot, system }),
       // `!isGM &&` here narrows the INPUT, not the shared rule: `deriveBrowseStatus`
       // itself takes no audience and never branches on one, matching
       // `CraftingListingBuilder`'s own gate (`!isGM && …`). A GM row is never `exhausted`

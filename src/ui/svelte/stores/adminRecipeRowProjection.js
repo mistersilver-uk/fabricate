@@ -183,12 +183,11 @@ function _isRecipeIncompleteByCounts(recipe) {
  * groups, whose result group is empty, whose resolution-mode cardinality is unmet or whose step
  * is missing a side. Both validators are pure; a coarse count-only check covers a plain JSON row.
  */
-function _isRecipeIncomplete(recipe) {
+function _isRecipeIncomplete(recipe, system) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine() };
+    const injected = { Roll: diceEngine(), progressive: system?.resolutionMode === 'progressive' };
     return (
-      recipe.validate(injected).valid === false &&
-      recipe.validateStructure(injected).valid === true
+      recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
   }
   return _isRecipeIncompleteByCounts(recipe);
@@ -430,7 +429,7 @@ function _buildRecipeRowDetail(recipe, executionSteps, summary, context) {
     // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
     // Two full model validators per row, and NOT a sort key — `attentionRank` reads
     // `enableBlocked`, deliberately (issue 1010) — so the cohort must not pay for it.
-    incomplete: _isRecipeIncomplete(recipe),
+    incomplete: _isRecipeIncomplete(recipe, context.system),
     toolCount: display.toolCount,
     structureKey: display.structureKey,
     structureLabel: display.structureLabel,
@@ -677,6 +676,7 @@ export function buildRecipeList(
     return {
       recipes: [],
       rosterRecipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -721,6 +721,9 @@ export function buildRecipeList(
     // resolve correctly without being told there was a choice, which is the shape this change
     // exists to reduce rather than duplicate.
     rosterRecipes,
+    // Its published RESOLUTION TABLE, `{ id, name, img }` alone so no reader takes it for rows: a
+    // knowledge result names its taught recipe from it, which a search must not hide (issue 1773).
+    recipeRoster: rosterRecipes.map(({ id, name, img }) => ({ id, name, img })),
     recipeCategories,
     // The recipe half of the Tags & Categories reference count, folded here off the RECIPE
     // MODELS (issue 1081). Its consumer is the manager's persistent left nav rail, which is
@@ -782,4 +785,3 @@ export function withoutDerivedRecipeProjectionFields(updates) {
   for (const field of DERIVED_RECIPE_PROJECTION_FIELDS) delete stripped[field];
   return stripped;
 }
-

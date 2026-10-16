@@ -4,7 +4,8 @@
   (`isRecipeItem`). It shows the book's access badge, its learning requirements,
   its flavour text, and the recipes it can teach — a single recipe inline, or
   several in a searchable, paginated accordion — each with a Learn button
-  (knowledge mode) or a Craft button (item mode).
+  (knowledge mode) or a Craft button (item mode). "Read & learn" every recipe is
+  the header's primary when the reader can learn the whole book.
 
   Extracted from the former double-duty `InventoryDetail.svelte` (issue 675).
   `InventoryDetail` remains the entry point that routes here, which is what keeps
@@ -17,15 +18,17 @@
   scrolling column, the identity header and the shared body leaves. It used to
   hand-roll all of those itself, at PRE-redesign values, so clicking component ->
   book silently changed the name face, the thumb size, the eyebrow and the
-  "N total" colour. It also reuses the shared `InventoryDetailPager` rather than
-  re-declaring one — the component inspector's five lists already page through it.
+  "N total" colour. Its recipe list pages through the shared `Pagination`, page-size choice
+  included, because a book's recipe list is browsed rather than walked.
 
   Prop-driven; learning routes back through the store seams.
 -->
 <script>
+  import SearchField from '../../../components/SearchField.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import Select from '../../../components/Select.svelte';
+  import Pagination from '../../../components/Pagination.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { disclosurePhraseKey } from '../../../util/disclosurePhrase.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -35,12 +38,10 @@
     countRecipePages,
     learnCapAdmitsWholeBook,
     matchRecipes,
-    recipePageSizeOptions,
     recipePageSlice,
     unlearnedRecipeIds,
   } from '../../../util/bookRecipeBrowse.js';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
-  import InventoryDetailPager from './InventoryDetailPager.svelte';
 
   let {
     item = null,
@@ -108,6 +109,22 @@
   function learnAll() {
     if (learningRecipeId == null && learnableIds.length > 0) onLearnAll?.(learnableIds);
   }
+  const headerPrimary = $derived(
+    canLearnAll
+      ? {
+          primaryLabel:
+            recipeTotal === 1
+              ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
+              : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', {
+                  total: recipeTotal,
+                }),
+          primaryIcon: 'fas fa-graduation-cap',
+          primaryDisabled: learningRecipeId != null,
+          primaryProps: { 'data-inventory-learn-all': '' },
+          onclick: learnAll,
+        }
+      : {}
+  );
   function craftRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
@@ -141,19 +158,12 @@
   function learnRecipe(recipeId) {
     if (recipeId && learningRecipeId == null) onLearn?.(recipeId);
   }
-  function onRecipeSearch(event) {
-    recipeSearch = event.currentTarget.value;
+  function onRecipeSearch(next) {
+    recipeSearch = next;
     recipePage = 0;
   }
-  // The caption the trigger is named by, per instance: two book inspectors can render in one
-  // document (the GM preview beside the player's), so the id is minted rather than fixed.
-  const instanceId = $props.id();
-  const pageSizeCaptionId = `${instanceId}-recipe-page-size`;
+  const recipesTitle = $derived(localize('FABRICATE.App.Inventory.Detail.RecipesTitle'));
 
-  const pageSizeOptions = recipePageSizeOptions();
-
-  // `Select` hands back the caller's OWN typed value, so this arrives as the number the option
-  // carried rather than as the string a `<select>`'s `value` gave the old handler to parse.
   function chooseRecipePageSize(size) {
     recipePageSize = RECIPE_PAGE_SIZES.includes(size) ? size : RECIPE_PAGE_SIZES[0];
     recipePage = 0;
@@ -219,6 +229,7 @@
     count: Number(item.totalQuantity ?? 0),
   })}
   chips={headerChips}
+  primary={headerPrimary}
 >
   <!-- Requirements + description span the FULL detail width below the header (not
        squeezed into the narrow heading column beside the thumbnail). -->
@@ -259,30 +270,8 @@
     <p class="inventory-detail-book-desc">{bookDescription}</p>
   {/if}
 
-  {#if canLearnAll}
-    <button
-      type="button"
-      data-keyboard-focus="true"
-      class="inventory-detail-read-learn"
-      data-inventory-learn-all
-      disabled={learningRecipeId != null}
-      onclick={learnAll}
-    >
-      <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-      <span
-        >{recipeTotal === 1
-          ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
-          : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', {
-              total: recipeTotal,
-            })}</span
-      >
-    </button>
-  {/if}
-
   <section class="inventory-detail-section" data-inventory-section="learn">
-    <p class="inventory-detail-section-title">
-      {localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
-    </p>
+    <Kicker>{localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}</Kicker>
     {#if bookRecipes.length === 0}
       <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.NoRecipes')} />
     {:else if bookRecipes.length === 1}
@@ -290,7 +279,7 @@
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
         <div class="inventory-detail-accordion-header">
           <span class="inventory-detail-book-recipe-static">
-            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+            <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
             <span class="inventory-detail-row-name">{recipe.name}</span>
           </span>
           {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(
@@ -305,17 +294,14 @@
       </div>
     {:else}
       {#if searchableRecipes}
-        <div class="inventory-detail-recipe-search">
-          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-          <input
-            type="text"
-            value={recipeSearch}
-            placeholder={localize('FABRICATE.App.Inventory.Detail.RecipeSearchPlaceholder')}
-            aria-label={localize('FABRICATE.App.Inventory.Detail.RecipeSearchLabel')}
-            oninput={onRecipeSearch}
-            data-inventory-recipe-search
-          />
-        </div>
+        <SearchField
+          class="inventory-detail-recipe-search"
+          value={recipeSearch}
+          onChange={onRecipeSearch}
+          placeholder={localize('FABRICATE.App.Inventory.Detail.RecipeSearchPlaceholder')}
+          ariaLabel={localize('FABRICATE.App.Inventory.Detail.RecipeSearchLabel')}
+          inputProps={{ 'data-inventory-recipe-search': '' }}
+        />
       {/if}
       {#if filteredRecipes.length === 0}
         <!-- `note`, not `filtered`, although a zero-result recipe SEARCH is a filtered empty:
@@ -340,7 +326,7 @@
                   aria-controls={expanded ? bodyId : undefined}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
-                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
+                  <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={38} />
                   <span class="inventory-detail-row-name">{recipe.name}</span>
                   <i
                     class="fas inventory-detail-accordion-caret"
@@ -376,33 +362,18 @@
           {/each}
         </ul>
         {#if filteredRecipes.length > RECIPE_PAGE_SIZES[0]}
-          <div class="inventory-detail-recipe-pager" data-inventory-recipe-pager>
-            <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511), for the reason the
-                 canonical rule states: a `<label>` forwards a caption click into the `<button>`
-                 the control now is, and with the panel open that click could only re-open the
-                 list its own mousedown had just dismissed. `showTick={false}` because this is
-                 the same page-size choice `Pagination` draws unticked - the trigger already
-                 states the value, and the three rows are digits rather than close cousins. -->
-            <span class="inventory-detail-recipe-pagesize">
-              <span id={pageSizeCaptionId}
-                >{localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}</span
-              >
-              <Select
-                size="inline"
-                showTick={false}
-                value={recipePageSize}
-                options={pageSizeOptions}
-                ariaLabelledBy={pageSizeCaptionId}
-                triggerData={{ 'data-inventory-page-size': '' }}
-                onChange={chooseRecipePageSize}
-              />
-            </span>
-            <InventoryDetailPager
-              list={filteredRecipes}
-              sectionKey="recipes"
-              page={Math.min(recipePage, recipePageCount - 1)}
+          <div data-inventory-recipe-pager>
+            <Pagination
+              totalCount={filteredRecipes.length}
               pageSize={recipePageSize}
-              onPage={(value) => (recipePage = value)}
+              pageSizeOptions={RECIPE_PAGE_SIZES}
+              pageIndex={Math.min(recipePage, recipePageCount - 1)}
+              persistent
+              density="compact"
+              ariaLabel={recipesTitle}
+              navLabel={recipesTitle}
+              onPageChange={(value) => (recipePage = value)}
+              onPageSizeChange={chooseRecipePageSize}
             />
           </div>
         {/if}
@@ -428,43 +399,6 @@
     overflow: hidden;
   }
 
-  /* The "Read & learn" (knowledge) / "Use" (item) call-to-action that expands the
-     recipe list — mirrors the GM "How players see it" preview CTA: a large, centered,
-     solid-accent button. */
-  .inventory-detail-read-learn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    width: 100%;
-    box-sizing: border-box;
-    padding: 13px 16px;
-    min-height: 48px;
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: center;
-  }
-
-  .inventory-detail-read-learn:hover {
-    filter: brightness(1.08);
-  }
-
-  .inventory-detail-read-learn:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-read-learn:disabled {
-    opacity: 0.5;
-    cursor: default;
-    filter: none;
-  }
-
   /* The static (non-toggle) headline for a single-recipe book, mirroring the
      accordion toggle's layout so both row types are identical. */
   .inventory-detail-book-recipe-static {
@@ -488,10 +422,10 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: var(--fab-space-chip);
+    padding: var(--fab-space-1) var(--fab-space-3);
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--fab-accent-soft);
     color: var(--fab-accent);
     font-size: 12px;
@@ -531,7 +465,7 @@
   .inventory-detail-requirements {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--fab-space-1);
     /* Full-width child of the scrolling flex column — keep its natural height
        (don't let the column squeeze the chip rows). */
     flex-shrink: 0;
@@ -563,29 +497,9 @@
     color: var(--fab-danger-text, var(--fab-text-muted));
   }
 
-  .inventory-detail-recipe-search {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .inventory-detail-recipe-search i {
-    position: absolute;
-    left: 10px;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    pointer-events: none;
-  }
-
-  .inventory-detail-recipe-search input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 10px 6px 28px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    font-size: 13px;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .inventory-detail-section > :global(.inventory-detail-recipe-search) {
+    flex: none;
   }
 
   .inventory-detail-accordion {
@@ -594,20 +508,19 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .inventory-detail-accordion-item {
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     overflow: hidden;
   }
 
-  /* The header carries the row height itself (54px + the item's 1px borders = the
-     56px of a standalone `.inventory-detail-row`), rather than stretching to fill
-     the item. That keeps the thumbnail + name fixed: expanding a row appends the
-     body BELOW the header instead of shrinking it, so nothing shifts up. */
+  /* The header carries the row height itself (54px + the item's 1px borders = 56px),
+     rather than stretching to fill the item. That keeps the thumbnail + name fixed:
+     expanding a row appends the body BELOW the header, so nothing shifts up. */
   .inventory-detail-accordion-header {
     box-sizing: border-box;
     min-height: 54px;
@@ -624,10 +537,10 @@
     align-items: center;
     gap: var(--fab-space-3);
     padding: 0;
-    /* Defuse Foundry's fixed global button height so the 40px thumb isn't clamped/misaligned
+    /* Defuse Foundry's fixed global button height so the 38px thumb isn't clamped/misaligned
        (matches the min-height the sibling recipe/read-learn buttons pin). */
     height: auto;
-    min-height: 40px;
+    min-height: 38px;
     border: none;
     background: none;
     color: var(--fab-text);
@@ -644,55 +557,12 @@
   .inventory-detail-accordion-toggle:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 9px;
   }
 
   .inventory-detail-accordion-body {
+    /* ratchet-exempt(design-system): an alignment, not a step: the header's 8px inset, its 38px thumb and the thumb's 12px gap */
     padding: 0 var(--fab-space-2) var(--fab-space-2)
-      calc(40px + var(--fab-space-2) + var(--fab-space-3));
-  }
-
-  .inventory-detail-recipe-pager {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding-top: 4px;
-  }
-
-  .inventory-detail-recipe-pagesize {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--fab-text-muted);
-  }
-
-  /* A WIDTH FLOOR AT THE WIDEST OPTION (issue 1511). The three values are 6, 9 and 12, so a
-     content-hugging `<button>` would be one digit narrower on two of them and would squeeze the
-     pager beside it every time the value changed - this row is `justify-content: space-between`
-     and declares no `flex-wrap`, so its risk is a squeezed sibling rather than a wrapped row.
-     The floor is the measured width of the trigger showing `12`, taken in both faces in
-     `tests/fixtures/player-select/` under Chromium and set at the next whole pixel above the
-     wider: 46.80px under the Arial fallback the repository's Chromium gates render against,
-     46.42px under Foundry's own Signika, both at the `inline` rung's 11.5px.
-
-     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 60px stood on a recorded pair of 58.30
-     and 56.48 that the fixture does not reproduce. The Arial figure was 11.50px - one whole rung
-     font-size - above what the control measures, as it was at both sibling floors, so it was
-     arithmetic rather than measurement. It was also unfalsifiable until now: the invariance
-     clause that guards it mounted the control twice on the SAME value, so a floor of any size
-     would have passed. It is driven through the option list now.
-
-     NO PANEL FLOOR HERE, and that is a measurement rather than an omission: the widest ROW label
-     is `12` at 13.36px, and this list is UNTICKED, so it spends 32px on chrome rather than a
-     ticked row's 52 and needs 45.36px against the `inline` rung's own 96px floor. The sibling
-     sort controls both needed one; see `Select.svelte`'s band docblock for when a caller does.
-
-     Everything else about the control - height, corner, fill, type, focus - is the `inline`
-     rung's, against the 6px corner and `--fab-surface` fill this block used to declare.
-     Ancestor-qualified, because a leading bare `:global()` reaches the whole document. */
-  .inventory-detail-recipe-pagesize :global(.fabricate-select-trigger) {
-    min-width: 47px;
+      calc(38px + var(--fab-space-2) + var(--fab-space-3));
   }
 </style>

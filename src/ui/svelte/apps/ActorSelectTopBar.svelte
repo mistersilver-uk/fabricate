@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(comment-share): deleting the low-comment ComponentEditorRoot (issue 1779) lifted this directory over the cap without adding a comment line; issue 2184 condenses the directory and removes this marker -->
 <!--
   ActorSelectTopBar is the shared, content-width actor-selection bar above all
   unified-window tabs. Its left side is a portrait + caret trigger that opens a
@@ -44,7 +45,7 @@
   } from '../util/gatheringConditionIcons.js';
   import ComponentSourcesBar from './crafting/ComponentSourcesBar.svelte';
   import SearchablePopover from '../components/SearchablePopover.svelte';
-  import FillBar from '../components/FillBar.svelte';
+  import Meter from '../components/Meter.svelte';
 
   let {
     store = null,
@@ -227,14 +228,14 @@
     triggerIcon={FALLBACK_PORTRAIT_ICON}
     triggerLabel={triggerName}
     triggerTitle={triggerName}
-    triggerAriaLabel={triggerName}
-    dialogAriaLabel={localize('FABRICATE.App.ActorBar.DialogLabel')}
+    ariaLabel={triggerName}
+    panelLabel={localize('FABRICATE.App.ActorBar.DialogLabel')}
     searchPlaceholder={localize('FABRICATE.App.ActorBar.SearchPlaceholder')}
-    searchAriaLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
+    searchLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
     emptyHint={pickerEmptyHint}
     emptyDetail={pickerEmptyDetail}
     noMatchesHint={pickerNoMatchesHint}
-    onChoose={chooseActor}
+    onSelect={chooseActor}
   />
 
   {#if hasRightContext}
@@ -261,14 +262,17 @@
             data-actor-bar-stamina
           >
             <i class="fas fa-bolt" aria-hidden="true"></i>
-            <!-- THE SHARED `FillBar` (issue 1514), with the 72px WIDTH pinned by this caller.
-                 The primitive declares `flex: 1 1 auto` on its own track, so dropped bare into
-                 this `inline-flex` row it would either stretch the bar or collapse it to
-                 nothing depending on what sits beside it — a column-width move either way. The
-                 element that used to BE the track survives as the pin: it declares the 72px and
-                 nothing else, and the bar inside it fills exactly that. -->
+            <!-- The 72px width is this caller's pin: the meter is `flex: 1 1 auto` and fills it. -->
             <span class="actor-bar-stamina-track">
-              <FillBar size="sm" value={staminaPct} tone="accent" />
+              <Meter
+                value={staminaPct}
+                segments={[{ tone: 'accent' }]}
+                label={localize('FABRICATE.App.ActorBar.Stamina')}
+                valueText={localize('FABRICATE.App.ActorBar.StaminaValue', {
+                  current: staminaPool.current,
+                  max: staminaPool.max,
+                })}
+              />
             </span>
             <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
           </span>
@@ -317,7 +321,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-4);
-    padding: 8px 12px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     min-height: 64px;
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
@@ -348,15 +352,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 10px;
+    gap: var(--fab-space-3);
     max-width: 260px;
     /* height:auto + min-height override Foundry's fixed global button height, so
        the 40px portrait is contained instead of overflowing a short button. */
     height: auto;
     min-height: 52px;
-    padding: 6px 12px;
+    padding: var(--fab-space-chip) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;
@@ -419,7 +423,7 @@
   .actor-bar-condition {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     min-width: 0;
     font-size: 13px;
     color: var(--fab-text-muted);
@@ -451,7 +455,7 @@
      takes the accent pill treatment so it reads as the active session context. */
   .actor-bar-tool-chip {
     flex: 0 1 auto;
-    padding: 3px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     color: var(--fab-accent);
     background: var(--fab-accent-soft);
     border: 1px solid var(--fab-accent);
@@ -466,28 +470,15 @@
   .actor-bar-stamina {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     flex: 0 0 auto;
     font-size: 13px;
     color: var(--fab-text-muted);
   }
 
-  /* THE WIDTH PIN ONLY. The track's own height, corner, ground and fill are `FillBar`'s now;
-     this element exists to give the bar the 72px it cannot ask for itself, because the
-     primitive is `flex: 1 1 auto` by design and a caller is what decides how wide a bar is.
-     The fill's `transition: width 0.2s ease` is lost with the rule: the primitive declares
-     none, and reaching into it with a `:global()` rule from here would be this file re-styling
-     a component it does not own.
-
-     UNPHOTOGRAPHABLE, and said here rather than left to a frame that cannot contain it. This
-     strip renders only when the gathering system is in STAMINA mode with an environment
-     selected, and the View Lab world declares no stamina-mode gathering system at all — every
-     gathering case measured draws no `data-actor-bar-stamina` element. So the 72x6 box is the
-     `width` on this rule against the primitive's own border-box `sm` height, not a lab
-     measurement, and `actor-select-top-bar-mounted` is what holds the conversion. The track
-     also gains a 1px `var(--fab-border)` hairline it did not draw and takes the primitive's own
-     ground in place of `var(--fab-surface-raised)`; neither changes the box, for the reason
-     `EssencePoolPanel` records at the same conversion. */
+  /* The width pin only: the meter is `flex: 1 1 auto`, so this caller decides how wide it is. No
+     frame can show the strip, because the View Lab world declares no stamina-mode gathering
+     system, so `actor-select-top-bar-mounted` holds its role and its 72px pin. */
   .actor-bar-stamina-track {
     display: flex;
     width: 72px;

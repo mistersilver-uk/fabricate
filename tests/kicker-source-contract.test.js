@@ -48,7 +48,7 @@ const contract = defineClosedTokenContract({
     'A site that needs a flex row, an ellipsis or a min-width keeps its OWN wrapper element ' +
     'and nests the kicker inside it, with the layout on the wrapper — see `Kicker.svelte`',
 
-  hookAdvice: 'Pass the hook as `dataAttr="data-x"` and leave `dataValue` at its default',
+  hookAdvice: 'Write the hook `data-x=""`, which rides the rest spread as written',
 });
 
 /** The clause that is this primitive's own: WHAT IT RENDERS, and that none of it is interactive. */

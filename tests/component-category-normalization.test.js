@@ -140,9 +140,8 @@ test('enabled survives normalization when at least one result group exists', () 
 // updateItem's shallow spread — the Scope-out assertion the delta requires
 
 test('a save payload that omits category preserves it (the REAL updateItem)', async () => {
-  // The component-editor screen (`ComponentEditorRoot.svelte`) does not author `category` and is
-  // deliberately out of scope for issue 676. It stays safe ONLY because `updateItem` spreads
-  // `{...existing, ...updates}`, so an omitted key is preserved rather than dropped.
+  // A component-editor draft (`saveComponentEditorDraft`) does not author `category`; it stays
+  // safe only because `updateItem` spreads `{...existing, ...updates}`, so an omitted key survives.
   const manager = makeLoadedManager([
     {
       id: 'sys1',
@@ -599,25 +598,6 @@ defineStructureContract(
   }
 );
 
-// Foundry integrator round 7, finding 2. Both are facts about the RENDER, and the window registers
-// no hooks — so anything re-derived at save time is a different world's answer.
-defineStructureContract(
-  '1371 r21: the editor root emits the seed’s two facts WITH the rows it drew',
-  { file: 'src/ui/svelte/apps/ComponentEditorRoot.svelte', fn: 'handleSave' },
-  {
-    contains: [
-      `onSave?.({
-        showTags: editorState.showTags,
-        showEssences: editorState.showEssences,
-        tagOptions: tagDraft,
-        essenceOptions: essenceDraft,
-        carriedEssences: editorState.carriedEssences,
-        baselineEssences: editorState.baselineEssences,
-      })`,
-    ],
-  }
-);
-
 // The BASELINE is a fact about the RENDER (issue 1371 r21-store4). Round 6 gave the rule a stated
 // baseline; round 7 found that both hops carrying it were unproven (quality N1 — every fixture's
 // baseline EQUALLED the resolved map, so unwiring either hop changed nothing) and that the app
@@ -625,11 +605,12 @@ defineStructureContract(
 // the moment a replicated `componentScope` write lands while the window is open.
 
 /**
- * The draft `ComponentEditorRoot.handleSave` emits from a rendered state, with one tag ticked.
+ * A `saveComponentEditorDraft` draft that carries the rendered state's `carriedEssences` and
+ * `baselineEssences` with its rows, with one tag ticked.
  *
  * @param {object} state the rendered editor state.
  */
-function rootEmittedDraft(state) {
+function seededDraft(state) {
   return {
     showTags: state.showTags,
     showEssences: state.showEssences,
@@ -672,8 +653,7 @@ test('1371 r21: a FRACTIONAL world quantity does not turn an untouched save into
 });
 
 test('1371 r21: a world edit landing WHILE the editor is open does not flip an untouched save', async () => {
-  // Foundry integrator finding 2. The window registers no hooks, so the GM is still looking at
-  // `{fire: 3}` when the world map becomes `{fire: 3, water: 4}`.
+  // The GM is still looking at `{fire: 3}` when the world map becomes `{fire: 3, water: 4}`.
   const { store, persisted } = makeInheritingScopeStore();
   const { manager, calls } = makeEditorManager(store);
   manager.updateSystem('sys1', { itemTags: ['bar'] });
@@ -692,9 +672,8 @@ test('1371 r21: a world edit landing WHILE the editor is open does not flip an u
   const atSaveTime = appEditorState(manager);
   assert.notDeepEqual(atSaveTime.baselineEssences, rendered.baselineEssences, 'the world moved');
 
-  // The app hands over what it can re-derive NOW; the draft carries what was DRAWN, and the draft
-  // wins. This is exactly the pair of arguments `_saveEditorState` supplies.
-  const saved = await saveComponentEditorDraft(rootEmittedDraft(rendered), {
+  // The context carries what is re-derived now and the draft carries what was drawn; the draft wins.
+  const saved = await saveComponentEditorDraft(seededDraft(rendered), {
     systemId: 'sys1',
     componentId: 'ingot',
     carriedEssences: atSaveTime.carriedEssences,

@@ -7,7 +7,7 @@
   Every prop is PRE-LOCALIZED; `onOpen()` navigates, because a page cannot route.
 -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Chip from '../../../components/Chip.svelte';
 
@@ -23,9 +23,13 @@
   } = $props();
 </script>
 
-<section class="manager-edit-card manager-scoped-shared-card" data-scoped-shared-definition>
+<section
+  class="manager-edit-card manager-scoped-shared-card"
+  data-scoped-shared-definition
+  data-tab-heading
+>
   <div class="manager-scoped-shared-head">
-    <Medallion {icon} {tint} size={40} glyph={20} />
+    <Medallion {icon} {tint} size={38} glyph={15} />
     <div class="manager-scoped-shared-copy">
       <div class="manager-scoped-shared-title-row">
         <h3 class="manager-card-title manager-scoped-entity-title" title={name}>{name}</h3>
@@ -36,10 +40,10 @@
       </p>
     </div>
     {#if onOpen}
-      <ManagerButton {disabled} data-scoped-shared-definition-open onclick={() => onOpen()}>
+      <Button {disabled} data-scoped-shared-definition-open onclick={() => onOpen()}>
         <span>{actionLabel}</span>
         <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </ManagerButton>
+      </Button>
     {/if}
   </div>
 </section>
@@ -96,7 +100,7 @@
 
   /* The exit never wraps and never shrinks: a two-line label turns a 34px control into a 48px one
      and pushes the card taller than every other card on the route. */
-  .manager-scoped-shared-head :global(.manager-button) {
+  .manager-scoped-shared-head :global(.fabricate-button) {
     flex: none;
     white-space: nowrap;
   }

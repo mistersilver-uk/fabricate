@@ -1,5 +1,5 @@
 /**
- * The manager shell's Foundry-facing service bag, composed from eight group factories.
+ * The manager shell's Foundry-facing service bag, composed from nine group factories.
  *
  * `io` carries the shell's own collaborators as call-time thunks, and the bag is rebuilt on every
  * `_buildServices()` call: `_adminStore` is null while the bag is built, so the store is reached
@@ -13,6 +13,7 @@ import { getSetting, setSetting } from '../config/settings.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { prepareForImport, validateImportData } from '../systems/CraftingSystemExporter.js';
+import { activeRunRecipeIds } from '../systems/runTerms.js';
 import { descriptionTextCandidate, plainTextDescription } from '../utils/plainTextDescription.js';
 
 import { choiceDialog, confirmDialog } from './foundryCompat.js';
@@ -496,6 +497,8 @@ async function runSystemImport({ file, conflictMode }) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
+      activeRunRecipeIds: () =>
+        activeRunRecipeIds(game.fabricate.getCraftingRunManager?.(), game.actors),
       // The importer fails closed on an absent seam, so a lazy lookup would make a broken
       // accessor present as a successful import that merged nothing (issue 1364).
       componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,
@@ -513,16 +516,27 @@ async function runSystemImport({ file, conflictMode }) {
 }
 
 /**
+ * Refresh the manager's store, resolved when the import lands rather than when it started: the GM
+ * can close the manager mid-import, and closing nulls the store. Answers whether it was still open.
+ */
+async function refreshOpenManager(io) {
+  const store = io.adminStore();
+  if (!store) return false;
+  await store.refresh();
+  return true;
+}
+
+/**
  * Announce one completed import and assemble the GM-readable report, or `null` for an
- * already-existing system that was skipped. The admin-store refresh is unguarded on purpose: it
- * sits outside the import's `try`, so a null store throws out of the service rather than being
- * reported as a failed import.
+ * already-existing system that was skipped or a manager closed while the import ran, whose
+ * announcement toast is then the GM's whole record. Outside the import's `try`, so nothing here
+ * is ever reported as a failed import.
  */
 async function reportSystemImport(summary, io) {
   if (summary.system.skipped) {
     // "already exists — skipped" stays a toast; it does not open the report.
     ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
-    await io.adminStore().refresh();
+    await refreshOpenManager(io);
     return null;
   }
 
@@ -536,13 +550,13 @@ async function reportSystemImport(summary, io) {
     ui.notifications.info(message);
   }
 
-  await io.adminStore().refresh();
+  if (!(await refreshOpenManager(io))) return null;
 
   const buildReport = io.importReportBuilder ?? buildImportReportContent;
   return buildReport(summary, (key, data) => localize(key, data));
 }
 
-/** The two import dialogs. Both refresh the admin store; only one does so inside its `try`. */
+/** The two import dialogs. Both refresh the manager's store, and only while it is still open. */
 function importServices(io) {
   return {
     renderImportDialog: async (systemId) => {
@@ -577,7 +591,7 @@ function importServices(io) {
         try {
           const data = JSON.parse(result.raw).map((r) => ({ ...r, craftingSystemId: systemId }));
           await game.fabricate.getRecipeManager().importRecipes(data, result.overwrite);
-          await io.adminStore().refresh();
+          await refreshOpenManager(io);
         } catch (error) {
           ui.notifications.error(`Import failed: ${error.message}`);
         }
@@ -611,6 +625,24 @@ function knowledgeServices(io) {
   };
 }
 
+/** The world clock's calendar components, called as a facade method so its default reads `this`. */
+function worldTimeServices() {
+  return {
+    getWorldTimeComponents: (worldTime) =>
+      game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
+  };
+}
+
+/** The bag keys `_prepareSvelteProps` forwards unchanged into the manager's Svelte services. */
+export const COMPONENT_SERVICE_KEYS = Object.freeze([
+  'pickImagePath',
+  'getSetting',
+  'setSetting',
+  'getWorldItemOptions',
+  'resolveToolSource',
+  'getWorldTimeComponents',
+]);
+
 /**
  * The manager's whole service bag.
  *
@@ -627,5 +659,6 @@ export function createManagerServices(io) {
     ...knowledgeServices(io),
     ...dialogServices(),
     ...importServices(io),
+    ...worldTimeServices(),
   };
 }

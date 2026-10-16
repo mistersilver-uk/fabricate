@@ -63,19 +63,25 @@ export function sliceSelection(cases, count) {
 }
 
 /**
- * The render matrix the capture workflow runs: none when the selection is not rendered, and the
- * chrome is verified by its own job either way.
+ * The render matrix the capture workflow runs: no app shard when the selection is not rendered,
+ * and one library leg beside them whenever design-library units are selected.
  *
  * @param {Array<{id: string, distinctEvidenceGroup?: string}>} cases The selection, in order.
  * @param {boolean} render Whether the capture renders the selection (`rendersCapture`).
- * @returns {Array<{shard: number, ids: string}>} One entry per shard, numbered from 1.
+ * @param {string} [libraryTargets] The selected library keys, comma-separated.
+ * @returns {Array<{shard: number|string, kind: string, ids?: string, targets?: string}>} App
+ *   shards numbered from 1, then the `library` leg.
  */
-export function renderMatrix(cases, render) {
+export function renderMatrix(cases, render, libraryTargets = '') {
   const count = render ? shardCountFor(cases.length) : 0;
-  return sliceSelection(cases, count).map((ids, index) => ({
+  const matrix = sliceSelection(cases, count).map((ids, index) => ({
     shard: index + 1,
+    kind: 'apps',
     ids: ids.join(','),
   }));
+  const targets = String(libraryTargets ?? '').trim();
+  if (targets !== '') matrix.push({ shard: 'library', kind: 'library', targets });
+  return matrix;
 }
 
 /**

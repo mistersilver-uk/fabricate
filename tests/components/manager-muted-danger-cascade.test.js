@@ -16,15 +16,13 @@
  * of a real Chromium and reads `getComputedStyle(...).color` back.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 
 import { chromium } from 'playwright';
 
-const repoRoot = resolve(import.meta.dirname, '../..');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
-const sheet = readFileSync(cssPath, 'utf8');
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+
+const sheet = readStylesheet();
 
 // THE RULE THIS FILE PINS, matched literally so the "before" fixture can drop exactly it and
 // nothing else — not a hand-copied re-typing of the rule that could silently drift from the real
@@ -47,7 +45,7 @@ const sheetWithoutDangerRule = sheet.replace(DANGER_RULE_PATTERN, '');
  *   `[data-manager-view="world-tool-entry"] .fabricate-manager` root with no intervening class
  *   the sheet keys on.
  * - `ToolBrowserInspector.svelte`'s validation `<p>` is a DIRECT CHILD of the `InspectorCard`
- *   `<section class="fabricate-card manager-inspector-card manager-tool-browser-inspector">`,
+ *   `<section class="fabricate-card manager-tool-browser-inspector">`,
  *   which is the shape the `>` combinator rule at issue targets.
  */
 function page(activeSheet) {
@@ -62,7 +60,7 @@ function page(activeSheet) {
     'This expression parses but cannot be rolled, so every attempt that consults it fails.</p>' +
     '</div>' +
     '<div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">' +
-    '<section class="fabricate-card manager-inspector-card manager-tool-browser-inspector">' +
+    '<section class="fabricate-card manager-tool-browser-inspector">' +
     '<p class="manager-muted" data-tool-inspector-description data-probe="tools-description">' +
     'No description has been added.</p>' +
     '<p class="manager-muted is-danger" data-probe="tools-tool-inspector-validation">' +

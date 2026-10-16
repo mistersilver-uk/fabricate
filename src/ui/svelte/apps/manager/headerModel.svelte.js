@@ -1,10 +1,11 @@
 /**
  * What the manager's page header says on one route: its eyebrow, title, lede, action-group name,
- * identity-heading variant and action family, one derivation each (issue 1720). Every input is a
- * thunk, so the shell's `$derived` values are read inside this module's own `$derived.by` rather
- * than captured once at construction.
+ * identity-heading variant, action family and whether the Premium advert shows, one derivation each
+ * (issue 1720). Every input is a thunk, so the shell's `$derived` values are read inside this
+ * module's own `$derived.by` rather than captured once at construction.
  */
 import { interpolate } from './checks/checksCopy.js';
+import { PREMIUM_ICONS_AD_DISMISSED_KEY, isPremiumIconsAdVisible } from './premiumIconsAdModel.js';
 import { componentListSubtitle } from './scoped/componentScoped.js';
 
 // A lookup over four whole keys rather than one template ending at the `Checks` segment.
@@ -428,6 +429,11 @@ function headerActionsLabel({
     return text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions');
   if (currentView === 'components' || currentView === 'component-edit')
     return text('FABRICATE.Admin.Manager.Component.Actions', 'Component actions');
+  if (currentView === 'world-components')
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueActions',
+      'Component catalogue actions'
+    );
   if (currentView === 'tags')
     return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
   if (currentView === 'essences' || currentView === 'essence-edit')
@@ -485,10 +491,17 @@ function headingVariantFor({
 }
 
 /**
- * Which group of routes owns this one's header actions, or `none` where the group renders empty.
+ * Which group of routes owns this one's header actions, or `none` where the group does not render.
  * This names a set of header controls, and is unrelated to the design system's Rail Marker Family.
+ * The gate is `ManagerHeaderActions.svelte`'s, term for term.
  */
-function actionsFamilyFor({ currentView, isChecksRoute, isWorldRulesRoute, isWorldScopedRoute }) {
+function actionsFamilyFor({
+  currentView,
+  isChecksRoute,
+  isWorldRulesRoute,
+  isWorldScopedRoute,
+  premiumIconsAdVisible,
+}) {
   const visible =
     (currentView !== 'tools' &&
       currentView !== 'tool-edit' &&
@@ -497,7 +510,8 @@ function actionsFamilyFor({ currentView, isChecksRoute, isWorldRulesRoute, isWor
     currentView === 'world-essences' ||
     currentView === 'world-essence-entry' ||
     currentView === 'world-tool-entry' ||
-    currentView === 'world-component-entry';
+    currentView === 'world-component-entry' ||
+    (currentView === 'world-components' && premiumIconsAdVisible);
   if (!visible) return 'none';
   if (isChecksRoute || CRAFTING_ACTION_VIEWS.includes(currentView)) return 'crafting';
   if (GATHERING_ACTION_VIEWS.includes(currentView)) return 'gathering';
@@ -507,8 +521,9 @@ function actionsFamilyFor({ currentView, isChecksRoute, isWorldRulesRoute, isWor
 /**
  * @param {object} seams
  * @param {object} seams.route Thunks for the route token, its predicates and its tab selections.
- * @param {object} seams.state Thunks for everything else the six answers read, the shell's own
- *   `text`, `format` and per-route subtitle helpers included.
+ * @param {object} seams.state Thunks for everything else the answers read, the shell's own
+ *   `text`, `format` and per-route subtitle helpers included; `services` is the settings seam the
+ *   Premium advert's dismissal is read from once, at construction, and written through.
  */
 export function createHeaderModel({ route, state } = {}) {
   // Read inside each `$derived.by`, so every answer depends on the caller's own sources directly.
@@ -516,12 +531,34 @@ export function createHeaderModel({ route, state } = {}) {
     Object.fromEntries(Object.entries(bag ?? {}).map(([name, thunk]) => [name, thunk()]));
   const inputs = () => ({ ...read(route), ...read(state) });
 
+  // The model outlives every route move, so a dismissal holds for the session even when the
+  // world write never settles or is refused.
+  let premiumIconsAdDismissed = $state(
+    state?.services?.()?.getSetting?.(PREMIUM_ICONS_AD_DISMISSED_KEY) === true
+  );
+  const premiumIconsAdVisible = $derived.by(() =>
+    isPremiumIconsAdVisible({ ...inputs(), dismissed: premiumIconsAdDismissed })
+  );
+
+  function dismissPremiumIconsAd() {
+    premiumIconsAdDismissed = true;
+    const warn = (error) =>
+      console.warn('Fabricate | The Premium advert dismissal was not saved', error);
+    try {
+      Promise.resolve(
+        state?.services?.()?.setSetting?.(PREMIUM_ICONS_AD_DISMISSED_KEY, true)
+      ).catch(warn);
+    } catch (error) {
+      warn(error);
+    }
+  }
+
   const kicker = $derived.by(() => viewKicker(inputs()));
   const title = $derived.by(() => viewTitle(inputs()));
   const subtitle = $derived.by(() => viewSubtitle(inputs()));
   const actionsLabel = $derived.by(() => headerActionsLabel(inputs()));
   const headingVariant = $derived.by(() => headingVariantFor(inputs()));
-  const actionsFamily = $derived.by(() => actionsFamilyFor(inputs()));
+  const actionsFamily = $derived.by(() => actionsFamilyFor({ ...inputs(), premiumIconsAdVisible }));
 
   return {
     get kicker() {
@@ -542,5 +579,9 @@ export function createHeaderModel({ route, state } = {}) {
     get actionsFamily() {
       return actionsFamily;
     },
+    get premiumIconsAdVisible() {
+      return premiumIconsAdVisible;
+    },
+    dismissPremiumIconsAd,
   };
 }

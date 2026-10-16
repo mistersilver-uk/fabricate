@@ -10,6 +10,27 @@ import {
   interactablesManagerCase,
 } from './caseFactories.js';
 
+/** The config panel opened on a seeded interactable with one state toggle pressed (issue 1625). */
+function stateToggleCase(pressed, unpressed, description) {
+  return configCase({
+    id: `interactables-config-${pressed}`,
+    label: `Interactable config — ${description}`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: pressed },
+    // The state row sits below the window's fold.
+    steps: [{ selector: `[data-interactable-state-toggle="${pressed}"]`, scroll: true }],
+    expectSelector:
+      `.fabricate-interactable-config:has([data-interactable-state-toggle="${unpressed}"][aria-pressed="false"]) ` +
+      `[data-interactable-state-toggle="${pressed}"][aria-pressed="true"]`,
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  });
+}
+
 export const CASES = Object.freeze([
   // Registered before the design-system adoption that re-skins them, and the ordering is not a preference.
   browserCase({
@@ -63,6 +84,29 @@ export const CASES = Object.freeze([
     ],
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
     expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
+  browserCase({
+    id: 'interactables-browser-no-matches',
+    label: 'Interactable browser — search matches no Tool',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      ...chooseSelectOption(
+        '[data-interactable-browser-system]',
+        'lab-smithing',
+        '.fabricate-interactable-browser-app'
+      ),
+      { selector: '[data-interactable-browser-search]', fill: 'zzzz' },
+    ],
+    // The search-empty note, which is not the system-has-no-tools note.
+    expectSelector:
+      '#fab-ib-panel-tools .manager-empty.is-note[data-interactable-browser-empty="no-matches"]',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '#fab-ib-panel-tools'],
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
@@ -132,6 +176,28 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  configCase({
+    id: 'interactables-config-tool',
+    label: 'Interactable config — tool-sourced interactable',
+    // `beyond`: the smoke never opens one of these panels, so there is no counterpart to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: 'tool' },
+    steps: [],
+    // The linked-source fact, which names the Tool by the shared display precedence.
+    expectSelector: '.fabricate-interactable-config .fab-ic-facts .fab-ic-fact-name',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
+  stateToggleCase('locked', 'disabled', 'a locked Tool interactable, Locked pressed'),
+  stateToggleCase(
+    'disabled',
+    'locked',
+    'a disabled Tool interactable whose marker is missing, Disabled pressed'
+  ),
   interactablesManagerCase({
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',
@@ -203,7 +269,8 @@ export const CASES = Object.freeze([
     // A world whose scene carries no `fabricate.interactable` behaviour at all.
     query: { noInteractables: '1' },
     steps: [],
-    expectSelector: '.fabricate-interactables-manager-body .fab-im-list-section .fab-im-empty',
+    expectSelector:
+      '.fabricate-interactables-manager-body .fab-im-list-section .manager-empty:not(.is-note):not(.is-filtered)[data-interactable-manager-empty]',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,

@@ -778,6 +778,7 @@
   clearAttr="data-recipe-bulk-clear"
   countAttr="data-recipe-bulk-count"
   applyAttr="data-recipe-bulk-apply"
+  dockFoot={deleteCard}
   {onClearSelection}
   {onApply}
 >
@@ -812,7 +813,7 @@
     fill={true}
     groupName="recipe-bulk-status"
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}
-    dataAttr="data-recipe-bulk-status"
+    data-recipe-bulk-status
     optionDataAttr="data-recipe-bulk-status-option"
     onChange={(value) => setStatus(value)}
   />
@@ -820,8 +821,7 @@
     <Callout
       tone="warning"
       text={blockedWarningText}
-      dataAttr="data-recipe-bulk-blocked-warning"
-      dataValue={String(blockedCount)}
+      data-recipe-bulk-blocked-warning={String(blockedCount) || true}
     />
   {/if}
 
@@ -832,7 +832,7 @@
     fill={true}
     groupName="recipe-bulk-lock"
     ariaLabel={text('FABRICATE.Admin.Manager.BulkEdit.Lock', 'Lock')}
-    dataAttr="data-recipe-bulk-lock"
+    data-recipe-bulk-lock
     optionDataAttr="data-recipe-bulk-lock-option"
     onChange={(value) => setLock(value)}
   />
@@ -860,8 +860,7 @@
     <Callout
       tone="info"
       text={checkTierMessage}
-      dataAttr="data-recipe-bulk-check-tier-unavailable"
-      dataValue={checkTierReason}
+      data-recipe-bulk-check-tier-unavailable={checkTierReason || true}
     />
   {/if}
 
@@ -897,7 +896,7 @@
           </span>
           <button
             type="button"
-            class="fab-bulk-book-pick-clear"
+            class="fab-bulk-book-pick-clear fab-hit-area"
             data-recipe-bulk-book-clear-pick
             aria-label={text(
               'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookClearPick',
@@ -944,24 +943,24 @@
         options={bookOptions}
         disabled={inert}
         pickerClass="fab-bulk-book-picker"
-        triggerClass="fabricate-button manager-button manager-travel-picker-trigger fab-bulk-book-trigger"
+        triggerClass="fabricate-button manager-travel-picker-trigger fab-bulk-book-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        triggerAriaLabel={text(
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        dialogAriaLabel={booksLabel}
+        panelLabel={booksLabel}
         searchPlaceholder={bookSearchPlaceholder}
-        searchAriaLabel={bookSearchPlaceholder}
+        searchLabel={bookSearchPlaceholder}
         emptyHint={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookNoMatch',
           'No book or scroll by that name.'
         )}
-        onChoose={(id) => pickBook(id)}
+        onSelect={(id) => pickBook(id)}
       />
     {/if}
     {#if stagedBooks.length > 0}
@@ -983,7 +982,7 @@
             </span>
             <button
               type="button"
-              class="fab-bulk-book-unstage"
+              class="fab-bulk-book-unstage fab-hit-area"
               data-recipe-bulk-book-unstage={entry.id}
               aria-label={entry.unstageLabel}
               disabled={inert}
@@ -999,45 +998,44 @@
 </BulkEditPanelShell>
 
 <!--
-  The DELETE block sits BELOW the shell: the shell's Apply is the panel's primary action, and a
-  destructive action in the same card would read as a second way of applying the staged edit. The
-  accepted consequence is that Apply's sticky dock clamps to the panel's own box — see
-  `BulkEditPanelShell`'s dock comment and `tests/components/bulk-edit-dock-pinning.test.js`.
-
-  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled`, because the card
-  must tell an in-flight write from an inert one to render its third face. `applying` still inerts
-  the control, since a staged apply and a delete must not race.
+  The DELETE card rides the dock under Apply (maintainer ruling 2026-10-14). `busy` is `deleting`,
+  kept out of `disabled` for the in-flight face; `applying` inerts it so apply and delete never race.
 -->
-<BulkDeleteCard
-  token="delete-recipes"
-  heading={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteHeading', 'Delete selected recipes')}
-  rows={deleteImpactRows}
-  standingHint={text(
-    'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteStandingHint',
-    'Deleting is permanent. A recipe you recreate is a new recipe.'
-  )}
-  idleLabel={deleteLabel}
-  armedLabel={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirm', 'Confirm delete')}
-  busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
-  idleAriaLabel={deleteAriaLabel}
-  armedAriaLabel={deleteArmedAriaLabel}
-  armedAnnouncement={deleteArmedAnnouncement}
-  disarmedAnnouncement={text(
-    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
-    'Delete cancelled. Nothing was deleted.'
-  )}
-  outcomeAnnouncement={deleteOutcome}
-  armed={deleteArmed === true}
-  busy={deleting === true}
-  disabled={impact.deletable === 0 || applying === true}
-  cardAttr="data-recipe-bulk-delete-card"
-  impactAttr="data-recipe-bulk-impact"
-  rowAttr="data-recipe-bulk-impact-row"
-  announceAttr="data-recipe-bulk-delete-announce"
-  onArm={onArmDelete}
-  onDisarm={onDisarmDelete}
-  onConfirm={() => onDelete(impact.deletableIds)}
-/>
+{#snippet deleteCard()}
+  <BulkDeleteCard
+    token="delete-recipes"
+    heading={text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteHeading',
+      'Delete selected recipes'
+    )}
+    rows={deleteImpactRows}
+    standingHint={text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteStandingHint',
+      'Deleting is permanent. A recipe you recreate is a new recipe.'
+    )}
+    idleLabel={deleteLabel}
+    armedLabel={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirm', 'Confirm delete')}
+    busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
+    idleAriaLabel={deleteAriaLabel}
+    armedAriaLabel={deleteArmedAriaLabel}
+    armedAnnouncement={deleteArmedAnnouncement}
+    disarmedAnnouncement={text(
+      'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+      'Delete cancelled. Nothing was deleted.'
+    )}
+    outcomeAnnouncement={deleteOutcome}
+    armed={deleteArmed === true}
+    busy={deleting === true}
+    disabled={impact.deletable === 0 || applying === true}
+    cardAttr="data-recipe-bulk-delete-card"
+    impactAttr="data-recipe-bulk-impact"
+    rowAttr="data-recipe-bulk-impact-row"
+    announceAttr="data-recipe-bulk-delete-announce"
+    onArm={onArmDelete}
+    onDisarm={onDisarmDelete}
+    onConfirm={() => onDelete(impact.deletableIds)}
+  />
+{/snippet}
 
 <style>
   /* THEME-ROOT tokens only: a scoped `<style>` may not reach an area-scoped `--fab-manager-*`
@@ -1052,7 +1050,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -1071,7 +1069,7 @@
     width: 26px;
     height: 26px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-accent);
     font-size: 0.68rem;
@@ -1122,7 +1120,7 @@
     height: 22px;
     padding: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
     background: transparent;
     color: var(--fab-text-muted);
     font-size: 0.68rem;
@@ -1151,7 +1149,7 @@
     min-height: 30px;
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font-size: 0.68rem;

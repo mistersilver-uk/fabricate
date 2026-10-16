@@ -1,6 +1,6 @@
 /**
  * A companion's interactive Standalone Check Roll, composed end to end (issue 2006): the facade's
- * own seams, the real prompt adapter and ManagerModal host on the standalone overlay, the player's
+ * own seams, the real prompt adapter and Modal host on the standalone overlay, the player's
  * answer, the posted Roll and the grade, for every published capability row and target source.
  */
 import assert from 'node:assert/strict';

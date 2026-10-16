@@ -2,7 +2,7 @@
 name: fabricate-domain-expert-large
 description: Audit and refine Fabricate's crafting domain model, ubiquitous language, and spec-to-code alignment. Use for naming decisions, DDD modelling, DOMAIN.md updates, spec or code audits, research into other crafting systems, or backlog tasks about domain fidelity. Use for a large audit of cross-cutting domain modelling, contested ubiquitous language, or canonical requirement text spanning multiple specs. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: opus
+model: claude-opus-5-5
 ---
 
 You are the Fabricate domain expert.

@@ -1,0 +1,800 @@
+/* THE VISUALLY-HIDDEN UTILITY, declared ONCE for the whole module (issue 1501). */
+.fabricate .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ONE RULE, MERGED. The first four declarations were written in a LIST shared with `.manager-section-header`, which is how the toolbar and the page header a view drew under it kept the same padding and rule line (issue 1515). */
+.fabricate-filter-bar.fabricate-filter-bar {
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border-bottom: 1px solid var(--fab-border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fab-space-2);
+  align-items: start;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-environments-toolbar {
+  max-height: 100px;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-task-toolbar {
+  max-height: 112px;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-toolbar-pills {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+}
+
+.fabricate-search.fabricate-search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 180px;
+}
+
+.fabricate-manager .manager-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* THE SHELL IS THE BOX (issue 1782, maintainer ruling 2): the library's form rung — 38 / radius 9 / `--fab-surface-soft` / 500 12.5px — with the glyph IN FLOW at the kit's 12px, 8px before a borderless input that stretches to the shell's height. `:not(.is-compact)` keeps every declaration off the four ruled compact sites, which keep their shipped box below. */
+.fabricate-search.fabricate-search:not(.is-compact) {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  height: 38px;
+  padding: 0 var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* THE LABELLED FORM'S SHELL sits in `Field`'s flex column, where the base rule's 260px basis would be its HEIGHT. */
+.fabricate-search-field > .fabricate-search.fabricate-search {
+  flex: none;
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) > i {
+  flex: none;
+  color: var(--fab-text-subtle);
+  font-size: 12px;
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) input {
+  appearance: none;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* `--fab-text-muted`, not the glyph's subtle tone: the placeholder is text and must clear 4.5:1 on the soft shell. `:not(:focus-visible)`, so the module rule that hides a focused field's placeholder still wins. */
+.fabricate-search.fabricate-search:not(.is-compact) input:not(:focus-visible)::placeholder {
+  color: var(--fab-text-muted);
+}
+
+/* A WRAPPER-DRAWN FIELD: the shell takes the full accent while its input holds focus, and the input draws no ring of its own (`design-system/spec.md`, the text-field ring variant). */
+.fabricate-search.fabricate-search:not(.is-compact):focus-within {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) input:focus-visible {
+  outline: none;
+}
+
+/* THE COMPACT EXCEPTION'S BOX, unchanged from the shipped pill: `:where()` keeps it at the (0,2,1) the base rule had. */
+.fabricate-search.fabricate-search:where(.is-compact) input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 34px;
+  border: 1px solid var(--fab-border);
+
+  /* ratchet-exempt(design-system): the compact search's ruled box, 34 at radius 6, the geometry requirement's named exception rather than a rung */
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+}
+
+/* THE SEARCH FAMILY'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus`: core's `input:focus` paints an orange outline and a 4px glow that the module reset removes inside every Fabricate window, and this family now renders in hosts that have no Fabricate root at all (issue 1508). */
+.fabricate-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE COMPACT SEARCH'S OWN KEYBOARD RING (the default shell lights its border instead). Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+.fabricate-search:where(.is-compact) input:focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+/* THE FILTERS' FLOOR (issue 1510). The trigger is sized to its VALUE, so without a floor each
+   bar re-measures as the GM chooses — 144 is the widest caption-to-chevron measurement, 92px of
+   label plus 48.4px of trigger chrome rounded up to the next multiple of 8, which pins all of them
+   and still resolves every panel to the `toolbar` band's own 160px floor. The `toolbar` rung paints
+   the box; the picker root is the bar's flex item and must be allowed to shrink. */
+.fabricate-manager .manager-filter .fabricate-select {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-filter .fabricate-select-trigger {
+  min-width: 144px;
+}
+
+/* THE TYPEAHEAD'S LIST (issue 1782), re-rooted at the class it writes from `.fabricate-manager .manager-tag-suggestions`, doubled to keep that (0,2,0). No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
+.fabricate-typeahead-list.fabricate-typeahead-list {
+  position: absolute;
+  z-index: 4000;
+  display: grid;
+  gap: var(--fab-space-2xs);
+  max-height: 148px;
+  padding: var(--fab-space-1);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 6px;
+  background: var(--fab-bg-2);
+  box-shadow: var(--fab-shadow-md);
+  overflow-y: auto;
+}
+
+.fabricate-typeahead-option.fabricate-typeahead-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  min-height: 28px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: transparent;
+  text-align: left;
+}
+
+.fabricate-typeahead-option.fabricate-typeahead-option:hover,
+.fabricate-typeahead-option.fabricate-typeahead-option:focus-visible {
+  background: var(--fab-surface-raised);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-typeahead-option.fabricate-typeahead-option[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+/* An empty list's note: one quiet line at the panel's own scale (`design-system/spec.md`). */
+.fabricate-typeahead-note {
+  padding: var(--fab-space-2);
+  color: var(--fab-text-subtle);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-selected-tag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Three classes, not two. `Chip.svelte` declares `padding`, `border` and `background` in a scoped block that compiles to `.manager-chip.svelte-<hash>` — also two classes — and is injected AFTER this sheet, so a two-class form here would tie and lose on source order (issue 883). */
+.fabricate-manager .manager-chip.manager-selected-tag-pill {
+  padding-right: var(--fab-space-1);
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-selected-tag-pill button {
+  position: relative;
+  overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-selected-tag-pill button:hover,
+.fabricate-manager .manager-selected-tag-pill button:focus-visible {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-search.fabricate-search:where(.is-compact) > i {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
+  color: var(--fab-text-muted);
+  pointer-events: none;
+}
+
+/* Chained onto `fab-manager-button` (0,4,0) in issue 1118, for the reason `.fabricate-button.fab-manager-button.manager-checks-card-head-link` gives verbatim: a bare `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control, which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its compact padding to the standard control's — six times over, in six browser toolbars. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters {
+  margin-left: auto;
+  padding: 0 var(--fab-space-2);
+  min-height: 30px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters:not(:disabled) {
+  color: var(--fab-text-muted);
+  background: transparent;
+}
+
+.fabricate-pagination.fabricate-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-overlay-light-03);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+}
+
+/* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's `a.button:focus, button:focus` paints an orange outline and a 4px glow that the module reset removes inside every Fabricate window, and this family now renders in hosts that have no Fabricate root at all. */
+.fabricate-pagination button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* THE PAGER'S OWN KEYBOARD RING. Now that this family is rooted at the class `Pagination.svelte` emits rather than at an application root, it renders in areas whose own bare-element ring it can no longer assume — `design-system/spec.md` puts that chrome on the primitive (issues 1502, 1501, 1511, 1510, 1357). */
+.fabricate-pagination button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-pagination .manager-pagination-summary {
+  white-space: nowrap;
+}
+
+.fabricate-pagination .manager-pagination-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-pagination .manager-pagination-page {
+  min-width: 96px;
+  text-align: center;
+  color: var(--fab-text);
+  font-weight: 700;
+}
+
+/* `Per page` IS TWO WORDS AND ONE LABEL. In a wrapping pager row it broke across two lines beside a 28px select, which set the bar's own height off its siblings' and read as a stray word (issue 1373). */
+.fabricate-pagination .manager-pagination-size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  white-space: nowrap;
+}
+
+/* THE PER-PAGE CONTROL'S ONLY REMAINING SHEET DECLARATION. The `<select>` this replaces was painted here at 28px / radius 6 / `--fab-bg-1` with a 64px floor; the control is a shared `<Select size="inline">` now, so its height, corner, fill and type come from the `.fabricate-select*` family and nothing about them is the pager's to say (issue 1504). */
+.fabricate-pagination .manager-pagination-size [data-pagination-size] {
+  min-width: 64px;
+}
+
+/* Compact rails opt in; the default browse pager keeps its full three-part layout. */
+.fabricate-pagination.fabricate-pagination.is-compact {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) 0 0;
+  background: transparent;
+  font-size: 9.5px;
+}
+
+/* A compact pager closing a pane section spans it and carries the section's inset itself (`design-system`, a compact pager closes a pane section). */
+.fabricate-pagination.fabricate-pagination.is-compact.is-edge {
+  padding: var(--fab-space-2) var(--fab-section-inset, var(--fab-space-2))
+    var(--fab-section-inset, var(--fab-space-2));
+}
+
+.fabricate-pagination.is-compact .manager-pagination-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-nav,
+.fabricate-pagination.is-compact .manager-pagination-size {
+  flex: 0 0 auto;
+}
+
+.fabricate-pagination.fabricate-pagination.is-compact .fabricate-icon-button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  border-radius: 7px;
+  flex: 0 0 26px;
+  font-size: 10px;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-size [data-pagination-size] {
+  min-width: 48px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0 var(--fab-space-2);
+  font-size: 10.5px;
+}
+
+.fabricate-pagination .manager-pagination-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ListRow dense: the library's inline image / name / quantity form, at the ListRow dense specimen's geometry (issue 1648). */
+.fabricate-list-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+}
+
+.fabricate-list-row .fabricate-list-row-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--fab-text);
+  font-family: var(--font-primary, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row .fabricate-list-row-quantity {
+  flex: 0 0 auto;
+  font-family: var(--fab-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-name,
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  flex: 0 1 50%;
+}
+
+.fabricate-list-row .fabricate-list-row-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row.is-positive {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-list-row.is-muted {
+  border-style: dashed;
+}
+
+.fabricate-list-row.is-muted .fabricate-list-row-name {
+  color: var(--fab-text-subtle);
+}
+
+/* ListRow's selectable form (issue 1778), on selectors the dense row never carries: one native button whose `::after` covers the row, `trailing` beside it and `aside` beneath it. At the dense density the form insets space-1/space-2 with a space-1 line gap. */
+.fabricate-list-row.is-form {
+  position: relative;
+  isolation: isolate;
+  flex-wrap: wrap;
+  row-gap: var(--fab-space-1);
+  padding: var(--fab-space-1) var(--fab-space-2);
+}
+
+/* `inset="row"`: a dense selectable row that stands beside read-only dense rows takes their inset, so both measure one height. */
+.fabricate-list-row.is-form.is-row-inset {
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+/* `detailAlign="end"`: the detail holds the trailing edge where a quantity would sit, ellipsizing within 40% of the row. */
+.fabricate-list-row.is-truncated.is-detail-end .fabricate-list-row-detail {
+  flex: 0 0 auto;
+  max-width: 40%;
+  text-align: end;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-list-row.is-default {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-radius: 11px;
+}
+
+/* One column, so one flex line: a wrapping column would size its line to the widest child and stretch the button past the card. */
+.fabricate-list-row.is-card {
+  flex-flow: column nowrap;
+  align-items: stretch;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-list-row > .fabricate-list-row-open {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  box-shadow: none;
+}
+
+.fabricate-list-row.is-card > .fabricate-list-row-open {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* A card's body takes the card's width: sized to its content, an unbroken name would widen it past the card rather than truncate. */
+.fabricate-list-row.is-card > .fabricate-list-row-open > .fabricate-list-row-body {
+  align-self: stretch;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:enabled {
+  cursor: pointer;
+}
+
+.fabricate-list-row > button.fabricate-list-row-open::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: 1;
+  border-radius: 9px;
+}
+
+.fabricate-list-row.is-default > button.fabricate-list-row-open::after,
+.fabricate-list-row.is-card > button.fabricate-list-row-open::after {
+  border-radius: 11px;
+}
+
+/* The control's own content and the trailing wrapper sit above the overlay, so a name's title, a glyph's tooltip and a trailing click reach their own element; Foundry core makes a button's children pointer-transparent, and that is undone here. The aside is its own stacking context beneath the overlay, so a click on it opens the row. */
+.fabricate-list-row > .fabricate-list-row-trailing,
+.fabricate-list-row > .fabricate-list-row-open > * {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:focus-visible {
+  outline: none;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:focus-visible::after {
+  inset: 0;
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+.fabricate-list-row .fabricate-list-row-leading,
+.fabricate-list-row .fabricate-list-row-trailing {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: inherit;
+}
+
+.fabricate-list-row .fabricate-list-row-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* `bodyBasis="fill"`: the body claims the free space rather than its text's width, so a reading set under the name wraps inside it and the row stays one flex line. */
+.fabricate-list-row.is-body-fill .fabricate-list-row-body {
+  flex: 1 1 0;
+}
+
+.fabricate-list-row .fabricate-list-row-head,
+.fabricate-list-row .fabricate-list-row-badges,
+.fabricate-list-row .fabricate-list-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-list-row .fabricate-list-row-children {
+  display: block;
+  min-width: 0;
+}
+
+.fabricate-list-row > .fabricate-list-row-aside {
+  position: relative;
+  z-index: 0;
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+/* A truncated row keeps its badges on the name's line, the name ellipsizing first, until the name would narrow past 6ch; then the badges wrap beneath it. */
+.fabricate-list-row.is-truncated .fabricate-list-row-head > .fabricate-list-row-name {
+  flex: 1 1 6ch;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-badges {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.fabricate-list-row.is-danger {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']) {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true']) {
+  box-shadow: inset 0 0 0 1px var(--fab-accent-border);
+}
+
+/* A selected row is a fill behind the edge, the multi-select rule; a danger row keeps its ground and takes the ring. */
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true']) {
+  background: var(--fab-surface-active);
+}
+
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-list-row:has(> .fabricate-list-row-open:disabled) {
+  opacity: 0.62;
+}
+
+/* THE DATA TABLE (issue 1782): records compared down columns, under a caption that states the heading and the count. Rooted at the class `DataTable.svelte` writes, so it paints in the manager and the player window alike; the drop rules card restates its frame through its own card class. */
+.fabricate-data-table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-data-table .fabricate-data-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* The table's own box, its head and its rows clear core's element rules for tables, which stripe rows and band the head; the doubled root out-ranks them wherever they are declared. */
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-table {
+  width: 100%;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background: transparent;
+}
+
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-table > thead {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-shadow: none;
+}
+
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-table > tbody > tr {
+  background: transparent;
+}
+
+.fabricate-data-table .fabricate-data-table-caption {
+  padding: var(--fab-space-3);
+  caption-side: top;
+  text-align: left;
+}
+
+.fabricate-data-table .fabricate-data-table-caption-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-data-table .fabricate-data-table-heading {
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fabricate-data-table .fabricate-data-table-count {
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-data-table .fabricate-data-table-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-left: auto;
+}
+
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-head {
+  padding: 0 var(--fab-space-3) var(--fab-space-2) 0;
+  color: var(--fab-text-subtle);
+  text-align: left;
+  vertical-align: middle;
+  font-family: var(--fab-font-mono);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-cell {
+  padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-2) 0;
+  border-top: 1px solid var(--fab-border);
+  color: var(--fab-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-head:first-child,
+.fabricate-data-table.fabricate-data-table .fabricate-data-table-cell:first-child {
+  padding-left: var(--fab-space-3);
+}
+
+.fabricate-data-table .fabricate-data-table-cell.is-mono {
+  font-family: var(--fab-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-data-table .fabricate-data-table-head.is-align-end,
+.fabricate-data-table .fabricate-data-table-cell.is-align-end {
+  text-align: end;
+}
+
+.fabricate-data-table .fabricate-data-table-head.is-align-center,
+.fabricate-data-table .fabricate-data-table-cell.is-align-center {
+  text-align: center;
+}
+
+.fabricate-data-table .fabricate-data-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.fabricate-data-table .fabricate-data-table-sort.is-sorted {
+  color: var(--fab-accent);
+}
+
+.fabricate-data-table.is-selectable .fabricate-data-table-row {
+  cursor: pointer;
+}
+
+.fabricate-data-table.is-selectable .fabricate-data-table-row:not(.is-selected):hover > .fabricate-data-table-cell {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell {
+  background: var(--fab-surface-active);
+}
+
+/* The selected row's accent bar, drawn by its first cell so the table's own geometry never moves. */
+.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell:first-child {
+  position: relative;
+}
+
+.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--fab-accent);
+}
+
+.fabricate-data-table .fabricate-data-table-status {
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+  color: var(--fab-text-muted);
+  font-size: 12px;
+}
+
+.fabricate-data-table .fabricate-data-table-status p {
+  margin: 0;
+}
+

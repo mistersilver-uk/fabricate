@@ -32,7 +32,7 @@ Scope:
 ### Run Monitoring
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
-- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface.
+- Active runs and history are shown across all four run types (crafting, alchemy, gathering, salvage) in one unified surface.
 Active rows retain title, run type, status pill, crafting progress and a time-remaining/countdown where a `timeGate` exists.
 The crafting progress reading MUST NOT be conditioned on that gate: a run whose current stage has not begun holds no gate, and its rail reads completed stages over total with the current stage at zero, because between the stages of a multi-step run the rail is the only thing on the row that says how far through the run is.
 A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
@@ -48,12 +48,18 @@ Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
 At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
 The stacked layout MUST remain usable at the real 1024px minimum application-window width; the container breakpoint describes inner content rather than the outer window.
-- One shared search and kind filter covers crafting, gathering, salvage and alchemy.
+- One shared search covers all four kinds, and the kind filter is the design system's multi-select picker directly beneath it at the search field's width, not a row of toggles (maintainer ruling 2026-10-05).
+Its trigger leads with a layers glyph, summarises the shown kinds in label order — "All run types" when every kind is shown and "No run types" when none is — and is named by the filter's label plus that summary.
+Its panel lists Crafting, Gathering, Salvage and Alchemy in that order, each option drawing a check box, the kind's glyph, its name and the count of that kind's runs across both lists before any filter, and it renders no query field, because four options need no search.
+Each choice applies as it is made, the panel stays open across choices, and its footer action "Show all run types" switches every hidden kind back on.
+The lists show the union of the kinds switched on; every kind starts on, the choice is not persisted, and any combination is valid, so a filter switched down to no kind shows the filtered empty state rather than an error.
 Active status filters are mutually exclusive All, Ready, In progress and Paused, and MUST use the same words as the badges, so that no tab names a badge the player is never shown and no badge names a tab that does not exist.
 The In progress tab selects BOTH merged statuses and counts them together; every active run MUST be reachable from exactly one tab, which a tab vocabulary omitting `inProgress` did not satisfy.
-Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
+Status counts use the union of the active kinds before search, active-status filtering, paging or selection.
+Toggling a kind returns both lists to their first page.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
+Each pager MUST be its list section's footer: its rule meets the browse column's edges, its content keeps the section's inline inset, and the next section's top rule, or the window's bottom edge for Finished, sits directly beneath it with no gap, at 1240×880 and the stacked 1024×880.
 At the populated wide layout, all four default Active and all four default Finished entries MUST fit visibly in their panes without undersizing shared primitives.
 Finished rows MUST be 44px border-box with a 24px-square dismiss control.
 Both pane allocations and footer bounds MUST remain stable across full, short-last, empty and restored pages at 1240×880 and the supported 1024×880 stacked layout.
@@ -117,9 +123,20 @@ That signal is carried BESIDE the run's status rather than in place of it, becau
 Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
 Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.
 
+#### Finishing a stage as time passes
+
+A crafting run that will finish its current stage as time passes MUST carry a bolt on its Active list row, before its status chip.
+It will finish its current stage as time passes only when the world-time scan takes it once its gate passes, and that stage carries no automatic blocker.
+The scan takes a run on the current lifecycle contract whose completion preference is `worldTime`, that is not paused, that is waiting on its stage's time gate, whose execution and award-choice journals, if any, are committed, and that owes no award pick with a claimable alternative.
+The automatic blocker is any input in the selected ingredient set, a stage or recipe tool, or a player check in the recipe's system.
+The projection MUST answer both from the predicates the engine itself uses, the scan's due rule (`worldTimeDueStep`) without its clock and the automatic-execute refusal (`automaticStageBlocker`), so the bolt never promises what the engine would refuse.
+The bolt speaks for the current stage only, because a later stage can still carry a blocker of its own.
+Gathering runs are out of scope for the bolt in this slice and never carry it, although versioned gathering may also complete automatically.
+The bolt is a glyph alone, so it MUST carry `role="img"` and one localized name, "Finishes this stage as time passes", as both its accessible name and its tooltip, and the row's own accessible name MUST include it.
+
 #### Ordinary closed history
 
-Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card.
+Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.
 Typed recorded evidence, never localized mode text or subsequently edited configuration, selects the history branch.
 Checked successful single-stage history MUST show Final check once, recorded materials/choices, actual Crafted, This run and closed guidance.
 Confirmed no-check history uses Resolution instead; missing check evidence is Not recorded, never proof of No check.
@@ -165,6 +182,7 @@ Its evidence band MUST be withheld entirely when it owns no rows — a multi-sta
 Stage recaps and d100 scales remain visible, and an unrelated notice MUST NOT suppress the selected account.
 Successful positive awards use: "A closed run.
 Its results are already in your inventory; the entry stays here as a record."
+That closed copy is not used while a choice is pending; the guidance reads "A reward is waiting for your choice."
 Failed final checks use: "This run failed its final check.
 Failed runs are kept so you can see what was attempted and when."
 Confirmed failed-no-output uses: "This run could not meet what it needed, so nothing was produced.
@@ -178,6 +196,23 @@ Truthful variants cover actual failure awards, legacy refunds, redaction and mis
 Recovery takes precedence over ordinary closed success or failure, and retains confirmed, uncertain and unstarted distinctions without claiming every planned result reached inventory.
 Versioned gathering awards MUST come from an applied createGatheredResults receipt rather than the terminal record's pre-effect plan.
 An uncertain effect MUST NOT replay or trigger automatic rollback; guidance directs manual reconciliation under the authority contract.
+
+#### A pending award choice is settled in the Journal
+
+A run holding an unsettled award choice (`data-models/spec.md` _CraftingRunStepState_) uses an award pending composition, ranked below Recovery precedence and above ordinary history: the requirement chooser's award face, one owed choice per slot, above the run's history.
+Until the choice is settled the run is counted by the badge and listed under Active with the `reward` attention, "Choose your reward", whatever its status.
+The face's confirm is the one primary allowed on that run, and the run is not dismissible.
+A later stage cannot begin until the choice is settled, and the pick is one `chooseAward` command, settled once.
+The owner of the crafting actor or a GM may settle it, and anyone else sees read-only tiles with no confirm.
+A viewer not entitled to the run's evidence sees no tiles, and the notice tells them the GM can choose the reward; the notice and attention ask only a viewer who can pick to choose.
+One settle runs at a time: while one is in flight another is refused and changes nothing.
+A settle interrupted before it applied anything is discarded when the GM reconciles it or Fabricate reloads, so the choice can be made again; one interrupted after it applied anything reads as recovery, which the run may then be dismissed from.
+
+##### Scenario: No GM is connected
+
+- **WHEN** a player opens a run owing a choice while no GM is connected
+- **THEN** the face states `active-gm-missing` through the reason map
+- **AND** the choice stays pending
 
 ### Run-Type-Aware Actions Panel
 

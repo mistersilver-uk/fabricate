@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { logicalStylesheetPath } from './stylesheetSource.js';
 import {
   BROAD_SIGNAL_CASE_OVERRIDES,
   BROAD_SIGNAL_PATTERN,
@@ -31,6 +32,7 @@ import { CASES as managerGatheringCases } from './view-lab-cases/managerGatherin
 import { CASES as managerKnowledgeCases } from './view-lab-cases/managerKnowledge.js';
 import { CASES as managerRecipeEditorCases } from './view-lab-cases/managerRecipeEditor.js';
 import { CASES as managerRecipesCases } from './view-lab-cases/managerRecipes.js';
+import { CASES as managerSpecimensCases } from './view-lab-cases/managerSpecimens.js';
 import { CASES as managerSystemsCases } from './view-lab-cases/managerSystems.js';
 import { CASES as managerSystemToolsCases } from './view-lab-cases/managerSystemTools.js';
 import { CASES as managerWorldPartiesAndDowntimeCases } from './view-lab-cases/managerWorldPartiesAndDowntime.js';
@@ -55,11 +57,15 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
- * the Foundry shim it renders against, its capture and layout-assertion helpers, this index and
- * the case files it reads.
+ * the Foundry shim it renders against, its capture, layout and census helpers and the radius
+ * ladder the census reads, this index and the case files it reads — but not the Primitive Lab
+ * below, which no app frame renders.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/(?:foundryChromeSpec|radiusLadder)\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
+
+/** The Primitive Lab's page and directory, which `npm run lab:check` verifies (issue 2377). */
+const PRIMITIVE_LAB_PATTERN = /^tests\/view-lab\/primitives(?:\/|\.html$)/;
 
 /** The helper that enforces the opt-in responsive layout contract. */
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
@@ -75,6 +81,9 @@ const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
 
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
+
+/** The broad-signal table, as a diff names it. Attributed by override entry — see below. */
+const BROAD_SIGNALS_PATH = 'scripts/lib/view-lab-cases/broadSignals.js';
 
 export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 
@@ -108,6 +117,7 @@ export const VIEW_LAB_CASE_FILES = Object.freeze([
   caseFile('managerWorldTravel', managerWorldTravelCases),
   caseFile('managerSystemTools', managerSystemToolsCases),
   caseFile('managerKnowledge', managerKnowledgeCases),
+  caseFile('managerSpecimens', managerSpecimensCases),
   caseFile('playerInventory', playerInventoryCases),
   caseFile('playerGatheringAndCrafting', playerGatheringAndCraftingCases),
   caseFile('playerJournal', playerJournalCases),
@@ -125,9 +135,22 @@ export function normalizePath(filePath) {
     .replace(/^\.\//, '');
 }
 
+/**
+ * A changed set in normalized form, each module-sheet partial standing as `styles/fabricate.css`
+ * by pattern (so a deleted or renamed one still maps), without repeats (issue 1711).
+ */
+function logicalPaths(files) {
+  return [...new Set(files.map((file) => logicalStylesheetPath(normalizePath(file))))];
+}
+
+/** Whether one path is the Primitive Lab's page or under its directory (issue 2382). */
+export function isPrimitiveLabPath(filePath) {
+  return PRIMITIVE_LAB_PATTERN.test(normalizePath(filePath));
+}
+
 /** Whether one path can change what a window looks like. */
 export function isUiFile(filePath) {
-  return UI_PATH_PATTERN.test(normalizePath(filePath));
+  return UI_PATH_PATTERN.test(normalizePath(filePath)) && !isPrimitiveLabPath(filePath);
 }
 
 /**
@@ -135,7 +158,7 @@ export function isUiFile(filePath) {
  * `lang/` change alongside a render file does, which is why this tests the whole set.
  */
 export function hasUiChanges(files = []) {
-  const normalized = files.map((file) => normalizePath(file));
+  const normalized = logicalPaths(files);
   if (normalized.some((file) => isUiFile(file) || file === LAYOUT_ASSERTION_PATH)) {
     return true;
   }
@@ -369,6 +392,9 @@ const mountSourceLines = memoized(() =>
 const runStateSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_RUN_STATES_PATH}`, import.meta.url))
 );
+const broadSignalSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${BROAD_SIGNALS_PATH}`, import.meta.url))
+);
 
 /** One case file's `CASES` array body, with the file line number its first line has. */
 function caseArrayBody(sourceLines) {
@@ -519,6 +545,7 @@ const MOUNT_REGIONS = Object.freeze({
   'mount-player-app': rendersInPlayerWindow,
   'canvas-mount-params': rendersInCanvasWindow,
   'mount-canvas-app': rendersInCanvasWindow,
+  'lab-specimens': (viewCase) => Boolean(viewCase.query?.specimen),
 });
 
 /** The line opening a marked region: `// view-lab-region:<key>`, at any indent. */
@@ -653,11 +680,105 @@ const runStateLineRegions = memoized(() => parseRunStateRegions(runStateSourceLi
  */
 const rendersRunState = (state) => (viewCase) => viewCase.query?.journalCaseState === state;
 
+const OVERRIDES_OPEN_LINE = 'export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({';
+const OVERRIDES_CLOSE_LINE = '});';
+
+/** Every shape a line inside `BROAD_SIGNAL_CASE_OVERRIDES` may take at Prettier's indents. */
+const OVERRIDE_LINE_SHAPES = Object.freeze([
+  ['open', /^ {2}'(?<key>[^']+)': Object\.freeze\(\[$/],
+  ['entry', /^ {2}'(?<key>[^']+)': Object\.freeze\(\['(?<id>[^']+)'\]\),$/],
+  ['id', /^ {4}'(?<id>[^']+)',$/],
+  ['close', /^ {2}\]\),$/],
+  ['inert', /^\s*(?:\/\/.*)?$/],
+]);
+
+/** The kinds that open, close or are a whole entry, rather than sit inside one. */
+const OVERRIDE_ENTRY_BOUNDS = new Set(['open', 'entry', 'close']);
+
+/** One table line's shape, or null when the line is outside the table's grammar. */
+function overrideLineShape(line) {
+  for (const [kind, pattern] of OVERRIDE_LINE_SHAPES) {
+    const match = pattern.exec(line);
+    if (match) return { kind, ...match.groups };
+  }
+  return null;
+}
+
+/** The 0-based lines opening and closing the table, or null when either is missing. */
+function overrideTableSpan(sourceLines) {
+  const open = sourceLines.indexOf(OVERRIDES_OPEN_LINE);
+  const close = open === -1 ? -1 : sourceLines.indexOf(OVERRIDES_CLOSE_LINE, open + 1);
+  return close === -1 ? null : { open, close };
+}
+
+/** Fold one table line into the walk; false when it breaks the grammar. */
+function consumeOverrideLine(walk, shape, lineNumber) {
+  if (shape.kind === 'inert') return true;
+  if (shape.kind === 'id' || shape.kind === 'close') {
+    if (!walk.open) return false;
+    if (shape.kind === 'id') {
+      walk.open.ids.push(shape.id);
+    } else {
+      walk.open.end = lineNumber;
+      walk.open = null;
+    }
+    return true;
+  }
+  if (walk.open) return false;
+  const ids = shape.id ? [shape.id] : [];
+  const entry = { key: shape.key, ids, start: lineNumber, end: lineNumber };
+  walk.entries.push(entry);
+  if (shape.kind === 'open') walk.open = entry;
+  return true;
+}
+
+/** Whether parsed entries are the table the selector loads: the same keys, order and ids. */
+function agreesWithOverrideTable(entries) {
+  const keys = Object.keys(BROAD_SIGNAL_CASE_OVERRIDES);
+  return (
+    entries.length === keys.length &&
+    entries.every(
+      ({ key, ids }, index) =>
+        key === keys[index] && ids.join('\n') === BROAD_SIGNAL_CASE_OVERRIDES[key].join('\n')
+    )
+  );
+}
+
+/**
+ * The 1-based, inclusive span of every entry in `BROAD_SIGNAL_CASE_OVERRIDES`, keyed by its file.
+ * Null unless every line fits the grammar and the parse equals the loaded table, so an entry the
+ * parser cannot read widens rather than selecting less.
+ */
+export function parseBroadSignalOverrideRegions(sourceLines) {
+  const span = overrideTableSpan(sourceLines);
+  if (!span) return null;
+  const walk = { entries: [], open: null };
+  for (let index = span.open + 1; index < span.close; index += 1) {
+    const shape = overrideLineShape(sourceLines[index]);
+    if (!shape || !consumeOverrideLine(walk, shape, index + 1)) return null;
+  }
+  if (walk.open || !agreesWithOverrideTable(walk.entries)) return null;
+  return walk.entries.map(({ key, start, end }) => ({ key, start, end }));
+}
+
+const broadSignalRegions = memoized(() =>
+  parseBroadSignalOverrideRegions(broadSignalSourceLines())
+);
+
+/**
+ * A broad signal's selection for some override ids, as `selectRenderFileCases` makes it: each id
+ * with its palette variants, and the representative pair without theirs.
+ */
+const selectsOverrideIds = (ids) => (viewCase) =>
+  ids.includes(viewCase.id) ||
+  ids.includes(viewCase.baseCaseId) ||
+  REPRESENTATIVE_CASE_IDS.includes(viewCase.id);
+
 /**
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
  */
-function isInertSourceLine(text) {
+export function isInertSourceLine(text) {
   return text.trim() === '' || INERT_LINE_PATTERN.test(text);
 }
 
@@ -665,7 +786,7 @@ function isInertSourceLine(text) {
  * @param {string} patch A unified diff.
  * @returns {string[]} Its lines, without the trailing blank a final newline produces.
  */
-function patchLines(patch) {
+export function patchLines(patch) {
   const lines = patch.split('\n');
   while (lines.length > 0 && lines.at(-1) === '') lines.pop();
   return lines;
@@ -705,12 +826,12 @@ function anchorOffsets(sourceLines, sequence) {
 }
 
 /** The regions one hunk touches, read from one candidate anchor. */
-function regionsTouchedAt(hunk, offset, regions) {
+function regionsTouchedAt(hunk, offset, regions, isInert) {
   const keys = new Set();
   let unattributable = false;
   let cursor = offset + 1;
   for (const { marker, text } of hunk) {
-    if (marker !== ' ' && !isInertSourceLine(text)) {
+    if (marker !== ' ' && !isInert(text)) {
       const region = regions.find((entry) => cursor >= entry.start && cursor <= entry.end);
       if (region) keys.add(region.key);
       else unattributable = true;
@@ -721,7 +842,7 @@ function regionsTouchedAt(hunk, offset, regions) {
 }
 
 /** The regions one hunk touches, located by content. */
-function regionsTouchedByHunk(hunk, sourceLines, regions) {
+function regionsTouchedByHunk(hunk, sourceLines, regions, isInert) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
   if (sequence.length === 0) return { keys: new Set(), unattributable: true };
 
@@ -730,7 +851,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   let anchored = false;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
     anchored = true;
-    const touched = regionsTouchedAt(hunk, offset, regions);
+    const touched = regionsTouchedAt(hunk, offset, regions, isInert);
     // A candidate that lands outside every region — a shared factory, a section banner, the
     // selection machinery itself — can move any frame, and the true edit may be that candidate, so
     // it has to widen.
@@ -741,25 +862,105 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   return { keys, unattributable: unattributable || !anchored };
 }
 
+/** A patch's hunks, or null when it is missing, empty or malformed. */
+export function parsePatch(patch) {
+  return typeof patch === 'string' && patch.trim() !== '' ? parseHunks(patch) : null;
+}
+
 /** The regions of one file a patch is confined to. */
 function touchedRegionKeys(patch, readSource, readRegions) {
-  const nothingLocated = { keys: new Set(), unattributable: true };
-  if (typeof patch !== 'string' || patch.trim() === '') return nothingLocated;
+  return touchedHunkRegionKeys(parsePatch(patch), readSource(), readRegions());
+}
 
-  const hunks = parseHunks(patch);
-  if (!hunks) return nothingLocated;
-  const regions = readRegions();
-  if (!regions) return nothingLocated;
-
-  const sourceLines = readSource();
+/**
+ * The regions a file's parsed hunks touch, or nothing located when either input is missing. Each
+ * region is `{key, start, end}` over 1-based lines; `isInert` says which changed lines cannot matter.
+ */
+export function touchedHunkRegionKeys(
+  hunks,
+  sourceLines,
+  regions,
+  { isInert = isInertSourceLine } = {}
+) {
+  if (!hunks || !regions) return { keys: new Set(), unattributable: true };
   const keys = new Set();
   let unattributable = false;
   for (const hunk of hunks) {
-    const touched = regionsTouchedByHunk(hunk, sourceLines, regions);
+    const touched = regionsTouchedByHunk(hunk, sourceLines, regions, isInert);
     unattributable ||= touched.unattributable;
     for (const key of touched.keys) keys.add(key);
   }
   return { keys, unattributable };
+}
+
+/** A hunk's `-` runs, each with its lines' shapes and how many kept lines precede it. */
+function removedRuns(hunk) {
+  const runs = [];
+  let kept = 0;
+  let run = null;
+  for (const { marker, text } of hunk) {
+    if (marker !== '-') {
+      kept += 1;
+      run = null;
+      continue;
+    }
+    if (!run) {
+      run = { follows: kept, shapes: [] };
+      runs.push(run);
+    }
+    run.shapes.push(overrideLineShape(text));
+  }
+  return runs;
+}
+
+/** Where each run is removed — the 0-based line after it — under every anchor of the kept lines. */
+function removalPoints(keptLines, runs, sourceLines) {
+  const kept = keptLines.map(({ text }) => text);
+  return anchorOffsets(sourceLines, kept).flatMap((offset) =>
+    runs.map((run) => ({ run, point: offset + run.follows }))
+  );
+}
+
+/**
+ * The entry a run was removed from: the one holding the line after it. A run carrying an opener or
+ * a close credits it only when that line is strictly inside, so an entry removed beside it does not.
+ */
+function entryAround({ run, point }, regions) {
+  const kinds = run.shapes.map((shape) => shape.kind);
+  if (kinds.every((kind) => kind === 'inert')) return null;
+  const tail = kinds.some((kind) => OVERRIDE_ENTRY_BOUNDS.has(kind)) ? 1 : 0;
+  return regions.find((region) => region.start <= point && point < region.end - tail)?.key ?? null;
+}
+
+/**
+ * Take a hunk's removed table lines out before it is located, since the loaded file no longer holds
+ * them, when every `-` line fits the grammar and every anchor puts each removal inside the table.
+ * A run with no line after it widens the hunk alone; any other hunk is located whole. Every path
+ * keeps the ids its `-` lines name.
+ */
+function splitOverrideRemovals(hunk, sourceLines, regions) {
+  const runs = removedRuns(hunk);
+  const ids = runs.flatMap((run) => run.shapes.map((shape) => shape?.id).filter(Boolean));
+  const whole = { hunk, ids, keys: [], widens: false };
+  if (runs.length === 0 || !regions) return whole;
+  const keptLines = hunk.filter(({ marker }) => marker !== '-');
+  if (runs.some((run) => run.follows === keptLines.length)) {
+    return { ...whole, hunk: keptLines, widens: true };
+  }
+  if (runs.some((run) => run.shapes.includes(null))) return whole;
+
+  const span = overrideTableSpan(sourceLines);
+  const points = removalPoints(keptLines, runs, sourceLines);
+  // The bound is inclusive at `});`: a removal just before it is the table's last line.
+  if (points.length === 0 || points.some(({ point }) => point <= span.open || point > span.close)) {
+    return whole;
+  }
+  return {
+    hunk: keptLines,
+    ids,
+    keys: points.map((removal) => entryAround(removal, regions)).filter(Boolean),
+    widens: false,
+  };
 }
 
 /**
@@ -770,6 +971,14 @@ function widenedByCoverage(ids, unattributable) {
   for (const id of LAB_SURFACE_CASE_IDS) ids.add(id);
   return ids;
 }
+
+const BROAD_SIGNAL_ATTRIBUTION = Object.freeze({
+  path: BROAD_SIGNALS_PATH,
+  sourceLines: broadSignalSourceLines,
+  regions: broadSignalRegions,
+  selectsRegion: (key) => selectsOverrideIds(BROAD_SIGNAL_CASE_OVERRIDES[key]),
+  readsRemovedLines: true,
+});
 
 /**
  * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
@@ -805,6 +1014,7 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     path: LAB_INTERACTABLES_PATH,
     selects: rendersInCanvasWindow,
   }),
+  BROAD_SIGNAL_ATTRIBUTION,
 ]);
 
 /**
@@ -831,12 +1041,45 @@ function casesFromCaseFilePatch(patch, attribution) {
 
 /** The cases a REGION-attributed lab input selects: the union of what each touched region feeds. */
 function casesFromRegionPatch(patch, attribution) {
-  const { keys, unattributable } = touchedRegionKeys(
-    patch,
-    attribution.sourceLines,
-    attribution.regions
-  );
+  const touched = touchedRegionKeys(patch, attribution.sourceLines, attribution.regions);
+  return casesFromTouchedRegions(touched, attribution);
+}
 
+/** The cases a change to `broadSignals.js` selects: its kept lines by entry, and its removed ids. */
+function casesFromOverridePatch(patch, attribution) {
+  const sourceLines = attribution.sourceLines();
+  const regions = attribution.regions();
+  const hunks = parsePatch(patch);
+  const splits = (hunks ?? []).map((hunk) => splitOverrideRemovals(hunk, sourceLines, regions));
+  const touched = touchedHunkRegionKeys(
+    hunks && splits.map((split) => split.hunk),
+    sourceLines,
+    regions
+  );
+  for (const split of splits) {
+    for (const key of split.keys) touched.keys.add(key);
+    touched.unattributable ||= split.widens;
+  }
+
+  const ids = casesFromTouchedRegions(touched, attribution);
+  const removedIds = splits.flatMap((split) => split.ids);
+  if (removedIds.length > 0) {
+    for (const id of casesSelecting(selectsOverrideIds(removedIds))) ids.add(id);
+  }
+  return ids;
+}
+
+/** What a `broadSignals.js` patch selects when read against these lines of it, in no order. */
+export function casesFromBroadSignalPatch(patch, sourceLines) {
+  return casesFromOverridePatch(patch, {
+    ...BROAD_SIGNAL_ATTRIBUTION,
+    sourceLines: () => sourceLines,
+    regions: () => parseBroadSignalOverrideRegions(sourceLines),
+  });
+}
+
+/** What each touched region feeds, widened when part of the patch could not be attributed. */
+function casesFromTouchedRegions({ keys, unattributable }, attribution) {
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
@@ -854,10 +1097,13 @@ function selectLabInputCases(file, patchByPath) {
   // The default, and the fail-safe: an input nobody has attributed — a new file under
   // `tests/view-lab/`, the fixture assembler, the Foundry shim, this index, a shared seam under
   // `view-lab-cases/` — reaches further than this registry can say, and resolves to surface
-  // coverage.
+  // coverage. The Primitive Lab never reaches here: it is not a lab input.
   if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.attributesByCase) {
     return casesFromCaseFilePatch(patchByPath.get(file), attribution);
+  }
+  if (attribution.readsRemovedLines) {
+    return casesFromOverridePatch(patchByPath.get(file), attribution);
   }
   if (attribution.regions) return casesFromRegionPatch(patchByPath.get(file), attribution);
   return casesSelecting(attribution.selects);
@@ -883,8 +1129,9 @@ function normalizePatches(patches) {
 }
 
 /** Whether one path is an input of the lab itself rather than of the product it renders. */
-function isLabInput(file) {
-  return LAB_INFRASTRUCTURE_PATTERN.test(file);
+export function isLabInput(file) {
+  const normalized = normalizePath(file);
+  return LAB_INFRASTRUCTURE_PATTERN.test(normalized) && !isPrimitiveLabPath(normalized);
 }
 
 /**
@@ -894,7 +1141,7 @@ function isLabInput(file) {
  */
 export function rendersCapture(files = []) {
   if (hasUiChanges(files)) return true;
-  const productFiles = files.map((file) => normalizePath(file)).filter((file) => !isLabInput(file));
+  const productFiles = logicalPaths(files).filter((file) => !isLabInput(file));
   return mapChangedFilesToCases(productFiles).length > 0;
 }
 
@@ -911,7 +1158,7 @@ function selectRenderAndLabCases(renderFiles, labInputs, patches) {
 
 /** Map a changed-file set onto the cases that should be captured. */
 export function mapChangedFilesToCases(files = [], { patches } = {}) {
-  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+  const normalized = logicalPaths(files).filter(Boolean);
   const labInputs = normalized.filter(isLabInput);
   // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
   // is both a lab input and a `.css` file, and it is the lab input rule that governs it.

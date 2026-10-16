@@ -1,7 +1,11 @@
+import { LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
+
 /** The counting pool's closure (issue 2006), for a suite mounting the Formula card on its own. */
 export const COUNT_POOL_RAW_MODULES = Object.freeze([
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/components/stepperLabels.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -29,12 +33,13 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
 export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   'src/ui/svelte/components/Stepper.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',

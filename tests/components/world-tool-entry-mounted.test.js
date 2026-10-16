@@ -1,14 +1,21 @@
 /** The world Tool entry, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { tick } from 'svelte';
 
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createLangBackedI18n } from '../helpers/langBackedI18n.js';
+import { settle } from '../helpers/listboxKeyboardDriver.js';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
@@ -19,9 +26,9 @@ import {
   TOOL_TREE_RAW_MODULES,
   WORLD_TOOL_SCOPE_RAW_MODULES,
 } from '../helpers/toolMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const LANG = createLangBackedI18n(repoRoot);
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -31,6 +38,9 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
+    ...CHOICE_GROUP_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into.
@@ -42,8 +52,7 @@ const harness = createMountedComponentHarness({
     // The LINKED-ITEM CARD's two leaves (issue 1373).
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    // The REQUIREMENTS TAB's two: the prerequisite one-line preview the checklist rows render,
-    // and the roll-data display/store conversion its bonus field is written through.
+    // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
     // THE BREAKAGE TAB'S REPAIR EDITOR (issue 1373, maintainer round 2). The world entry mounts
@@ -75,13 +84,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/components/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
@@ -102,8 +110,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    ...KIND_MENU_COMPILED_MODULES,
+    ...CHOICE_GROUP_COMPILED_MODULES,
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -190,6 +204,8 @@ async function mountTab({
   componentOptions = [],
   essenceOptions = [],
   itemTags = [],
+  // The repair tag adder's per-tag component counts (issue 2430); `null` supplies none.
+  tagComponentCounts = null,
   // THE WORLD CURRENCY LADDER (issue 1373, maintainer round 5). Units are world scope
   // (issue 1278) and the world Tool entry is a world-scope screen, so the repair set offers
   // a cost here exactly as the recipe editor does for a system that enables one.
@@ -211,6 +227,7 @@ async function mountTab({
     componentOptions,
     essenceOptions,
     itemTags,
+    tagComponentCounts,
     currencyUnits,
     onSourceDrop,
     onUnlinkSource,
@@ -766,7 +783,7 @@ describe('the world Tool entry (issue 1373)', () => {
       const linkedZone = linked.querySelector('[data-tool-source-card]');
       assert.ok(
         linkedZone.classList.contains('is-linked'),
-        'a resolved source is the LINKED face, which the solid filled tile keys on'
+        'a resolved source takes the link field`s linked face, which keys on `is-linked`'
       );
 
       const scope = scopeFor();
@@ -777,68 +794,30 @@ describe('the world Tool entry (issue 1373)', () => {
       const unlinkedZone = unlinked.querySelector('[data-tool-source-card]');
       assert.ok(
         !unlinkedZone.classList.contains('is-linked'),
-        'and an unlinked record is not, which is what the danger-dashed prompt keys on'
+        'and a record with no source item takes its empty face, the zone without `is-linked`'
       );
     });
 
-    // ── E5 ────────────────────────────────────────────────────────────────────────────────
-    // THE LINKED ITEM'S NAME IS SET IN THE DESIGN SERIF, AND THE RULE THAT DOES IT REACHES.
-    // A `:global()` rule addressing another component's markup can compile to a selector that
-    // matches NOTHING, silently and with no warning, so proving the declarations alone would
-    // prove nothing. This holds both halves: the three properties the design states, and the
-    // COMPILED selector run against the markup the primitive actually renders. Selector matching
-    // is what happy-dom can do; which declaration WINS is proved by the recaptured
-    // `world-tool-entry-overview` frame, because happy-dom cannot compute a cascade.
-    it('sets the LINKED source name in the design serif, in a rule that reaches the primitive', async () => {
-      const { css } = scopedComponentCss(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte')
-      );
-      // Comments are stripped first: a `{` inside one would split a rule at the wrong place and
-      // the gate would report a missing rule that is present.
-      const rules = [
-        ...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g),
-      ].map(([, selector, body]) => ({ selector: selector.trim().replaceAll(/\s+/g, ' '), body }));
-      const serif = rules.find(
-        ({ selector, body }) =>
-          selector.includes('.manager-item-drop-zone-copy strong') &&
-          /font-family:\s*var\(--fab-font-serif\)/.test(body)
-      );
-      assert.ok(
-        Boolean(serif),
-        'no rule gives the drop zone name `var(--fab-font-serif)`; `proto:2091` states the serif'
-      );
-      // 600, NOT the UA's bare-`<strong>` 700.
-      assert.match(serif.body, /font-weight:\s*600/, '`proto:2091` states weight 600');
-      assert.match(serif.body, /font-size:\s*0\.84rem/, '`proto:2091` states 13.5px = 0.84rem');
-
+    // This screen declares no rule on the zone, which `link-field-caller-placement.test.js` holds,
+    // so each face is the link field's own.
+    it('draws the source name through the link field in both faces', async () => {
       const linked = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
-      const card = linked.querySelector('[data-world-tool-entry-card="linked-item"]');
-      const name = card.querySelector('.manager-item-drop-zone-copy strong');
-      assert.ok(Boolean(name), 'the primitive still renders the name as a `<strong>`');
-      // The scoping hash is re-stamped from the LIVE element rather than trusted to match across
-      // two compiles, so this asserts the selector's SHAPE reaches - which is the half that rots
-      // when the primitive's markup moves.
-      const hash = [...card.classList].find((token) => token.startsWith('svelte-'));
-      assert.ok(Boolean(hash), "the card wrapper carries this component's scoping hash");
-      const selector = serif.selector.replaceAll(/svelte-[\da-z]+/g, hash);
-      assert.ok(
-        [...linked.querySelectorAll(selector)].includes(name),
-        `the compiled rule matches nothing the primitive renders: ${selector}`
+      const name = linked.querySelector(
+        '[data-world-tool-entry-card="linked-item"] .is-linked .manager-item-drop-zone-copy strong'
       );
+      assert.ok(Boolean(name), 'the linked face draws the name as the link field`s `<strong>`');
+      assert.match(name.textContent, /Mining Pick/);
 
       const scope = scopeFor();
       scope.entries[0].originItemUuid = '';
       scope.entries[0].registeredItemUuid = '';
       scope.entries[0].hasSourceLink = false;
-      const unlinked = await mountTab({ scope });
-      const prompt = unlinked.querySelector(
-        '[data-world-tool-entry-card="linked-item"] .manager-item-drop-zone-copy strong'
+      const empty = await mountTab({ scope });
+      const prompt = empty.querySelector(
+        '[data-world-tool-entry-card="linked-item"] .manager-item-drop-zone:not(.is-linked) strong'
       );
-      assert.ok(Boolean(prompt), 'the unlinked face still draws its own copy');
-      assert.ok(
-        ![...unlinked.querySelectorAll(selector)].includes(prompt),
-        "the serif is the LINKED tile's; `proto:2098` keeps the unlinked prompt in the sans"
-      );
+      assert.ok(Boolean(prompt), 'a record with no source item draws the empty face`s title');
+      assert.ok(prompt.textContent.trim().length > 0, 'and the title is not blank');
     });
 
     it('draws the display label as OPTIONAL, naming what a blank falls back to', async () => {
@@ -882,11 +861,51 @@ describe('the world Tool entry (issue 1373)', () => {
         loaded.querySelector('[data-tool-source-card]').dataset.itemDropState,
         'missing'
       );
+      assert.equal(
+        loaded.querySelector('[data-tool-source-drop-hint]').textContent.trim(),
+        LANG.lookup('FABRICATE.Admin.Manager.Scoped.Entry.SourceMissingDropHint'),
+        'a missing source says so in the hint, in the words `lang/en.json` ships'
+      );
 
       const unloaded = await mountTab({ scope: scopeFor(), worldItems: [] });
       assert.ok(
         !unloaded.querySelector('[data-tool-source-card]').hasAttribute('data-item-drop-state'),
         'an EMPTY roster is a roster that has not loaded, not a broken link'
+      );
+      assert.match(
+        unloaded.querySelector('[data-tool-source-drop-hint]').textContent,
+        /replace the linked source/,
+        'and it keeps the healthy link`s hint'
+      );
+    });
+
+    it('never marks a COMPENDIUM source missing, since the roster holds world Items only', async () => {
+      const scope = scopeFor();
+      const entry = scope.entries.find((candidate) => candidate.id === 'pick');
+      entry.entity = {
+        ...entry.entity,
+        originItemUuid: 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB',
+        registeredItemUuid: '',
+      };
+      const target = await mountTab({ scope, worldItems: [LINKED_ITEM] });
+      const zone = target.querySelector('[data-tool-source-card]');
+      assert.ok(
+        !zone.hasAttribute('data-item-drop-state'),
+        'a compendium source draws no drop state'
+      );
+      assert.match(
+        zone.querySelector('[data-tool-source-drop-hint]').textContent,
+        /replace the linked source/
+      );
+
+      const gone = await mountTab({
+        scope: scopeFor(),
+        worldItems: [{ uuid: 'Item.something-else', name: 'Other' }],
+      });
+      assert.equal(
+        gone.querySelector('[data-tool-source-card]').dataset.itemDropState,
+        'missing',
+        'while a world address absent from a loaded roster still draws missing'
       );
     });
   });
@@ -931,9 +950,12 @@ describe('the world Tool entry (issue 1373)', () => {
         ['identity', 'breakage', 'requirements', 'validation']
       );
       // THE VALIDATION BADGE STILL HOLDS. The strip grew a tab.
-      assert.ok(
-        Boolean(target.querySelector('[data-world-tool-entry-tab-badge="validation"]')),
-        'the Validation tab keeps its own count badge'
+      const badge = target.querySelector('[data-world-tool-entry-tab-badge="validation"]');
+      assert.ok(Boolean(badge), 'the Validation tab keeps its own count badge');
+      assert.deepEqual(
+        [badge.textContent.trim(), badge.dataset.badgeTone, badge.getAttribute('aria-label')],
+        ['✓', 'neutral', 'All checks pass'],
+        'a passing tick is neutral and named'
       );
     });
 
@@ -1064,7 +1086,7 @@ describe('the world Tool entry (issue 1373)', () => {
       });
 
       assert.ok(
-        !target.querySelector('[data-roll-data-expression="tool-bonus"]'),
+        !target.querySelector('.fab-expr-input'),
         'the world entry has no free-text bonus field either'
       );
       const rows = [...target.querySelectorAll('[data-tool-bonus-modifier]')];
@@ -1319,7 +1341,7 @@ describe('the world Tool entry (issue 1373)', () => {
         'the window is four rows deep in a 300px column'
       );
       assert.ok(
-        Boolean(region.querySelector('.manager-pagination')),
+        Boolean(region.querySelector('.fabricate-pagination')),
         'and the overflow is a pager rather than a sentence with nothing behind it'
       );
       assert.doesNotMatch(region.textContent, /more$/);
@@ -1472,6 +1494,20 @@ describe('the world Tool entry (issue 1373)', () => {
         !trigger.querySelector('.fa-chevron-down, .fa-chevron-up'),
         'a tile carries no select chevron'
       );
+    });
+
+    it('lights the replacement zone on dragover and clears it on an outside dragleave', async () => {
+      const target = await mountBreakage({ mode: 'replaceWith' });
+      const zone = target.querySelector('[data-tool-replacement-drop]');
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      zone.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'over');
+      assert.ok(zone.classList.contains('is-over'), 'the over accent is drawn');
+      zone.dispatchEvent(new Event('dragleave', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      assert.ok(!zone.classList.contains('is-over'), 'and cleared');
     });
 
     // THE DROP RESOLVES PURELY, against the option list the caller passed. Both Tool editors are
@@ -1641,6 +1677,96 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.equal(note.textContent.trim(), 'any one of these mends it');
     });
 
+    it('counts the world components carrying each tag in the repair tag adder (issue 2430)', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'tags', tags: ['wood'], tagMatch: 'any' } },
+                ],
+              },
+            ],
+          },
+          itemTags: ['oak', 'wood'],
+          tagComponentCounts: { oak: 1, wood: 2 },
+        }
+      );
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await tick();
+      await settle();
+      assert.deepEqual(
+        [
+          ...target.ownerDocument
+            .querySelector('.fabricate-picker-popover')
+            .querySelectorAll('[role="option"]'),
+        ].map((node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()),
+        ['oak 1 component', 'wood 2 components']
+      );
+    });
+
+    it('keeps the latest in-flight repair list until its own write settles, and reverts a refused one (issue 2430)', async () => {
+      const writes = [];
+      const groupOf = (tags) => [
+        { id: 'g1', options: [{ quantity: 1, match: { type: 'tags', tags, tagMatch: 'any' } }] },
+      ];
+      const publish = (groups) =>
+        harness.setProps({
+          scope: scopeFor({ onBreak: { mode: 'flagBroken' }, repairRequirements: groups }),
+        });
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: { repairRequirements: groupOf([]) },
+          itemTags: ['a', 'b', 'c'],
+          actions: {
+            setWorldRepairRequirements: (id, groups) =>
+              new Promise((resolve) => {
+                writes.push({ groups, resolve });
+              }),
+          },
+        }
+      );
+      const chips = () =>
+        [
+          ...target.querySelectorAll(':scope [data-tool-repair-requirements] [data-recipe-tag]'),
+        ].map((node) => node.dataset.recipeTag);
+      const settleAll = async () => {
+        await tick();
+        await settle();
+      };
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await settleAll();
+      const choose = async (tag) => {
+        target.ownerDocument
+          .querySelector(`.fabricate-picker-popover [role="option"][title="${tag}"]`)
+          .click();
+        await settleAll();
+      };
+      await choose('a');
+      await choose('b');
+      assert.deepEqual(chips(), ['a', 'b'], 'both picks show while in flight');
+      assert.match(
+        target.querySelector('[data-tool-repair-summary]').textContent,
+        /\bb\b/u,
+        'and the summary reads the in-flight list'
+      );
+      await publish(writes[0].groups);
+      writes[0].resolve(true);
+      await settleAll();
+      assert.deepEqual(chips(), ['a', 'b'], 'the first write settling does not drop the second');
+      await publish(writes[1].groups);
+      writes[1].resolve(true);
+      await settleAll();
+      await choose('c');
+      writes[2].resolve(false);
+      await settleAll();
+      assert.deepEqual(chips(), ['a', 'b'], 'a refused write falls back to the stored list');
+    });
+
     // IMMEDIATE, NOT BUFFERED, and that is forced rather than chosen.
     it('writes the repair route through its own action, immediately', async () => {
       const repairWrites = [];
@@ -1649,8 +1775,13 @@ describe('the world Tool entry (issue 1373)', () => {
         { mode: 'flagBroken' },
         {
           actions: {
-            setWorldRepairRequirements: (id, groups) => {
+            // Fed back as the world default the store holds once its `save` resolves.
+            setWorldRepairRequirements: async (id, groups) => {
               repairWrites.push([id, groups]);
+              await Promise.resolve();
+              harness.setProps({
+                scope: scopeFor({ onBreak: { mode: 'flagBroken' }, repairRequirements: groups }),
+              });
               return true;
             },
             updateWorldDefaultSection: (id, section, value) => {
@@ -1661,18 +1792,87 @@ describe('the world Tool entry (issue 1373)', () => {
         }
       );
       target
-        .querySelector('[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]')
+        .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]')
         .click();
       await tick();
+      assert.equal(repairWrites.length, 0, 'opening the Ingredient menu writes nothing');
+      target.ownerDocument
+        .querySelector(':scope .manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]')
+        .click();
+      await tick();
+      await settle();
 
-      assert.equal(repairWrites.length, 1, 'the seed action fires on change');
+      assert.equal(repairWrites.length, 1, 'the seed action fires once on change');
       assert.equal(repairWrites[0][0], 'pick');
       assert.equal(repairWrites[0][1].length, 1, 'and carries the new group');
+      assert.deepEqual(repairWrites[0][1][0].options, [
+        { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } },
+      ]);
       assert.deepEqual(
         sectionWrites,
         [],
         'the seed must not travel through the section write path, which would refuse its name'
       );
+      const addTag = target.querySelector(
+        ':scope [data-tool-repair-requirements] [data-recipe-add-tag]'
+      );
+      assert.ok(Boolean(addTag), 'the new tag row draws its + Tag');
+      assert.ok(target.ownerDocument.activeElement === addTag, 'and focus lands on it');
+    });
+
+    it('writes each edit to a seeded repair row: a name, an amount, then its removal', async () => {
+      const writes = [];
+      const seed = (repairRequirements) => ({
+        onBreak: { mode: 'flagBroken' },
+        repairRequirements,
+      });
+      const blank = { quantity: 1, match: { type: 'component', componentId: null } };
+      const second = {
+        id: 'g2',
+        options: [{ quantity: 3, match: { type: 'component', componentId: 'ingot' } }],
+      };
+      const target = await mountBreakage(null, {
+        worldDefault: seed([{ id: 'g1', options: [blank] }, second]),
+        actions: {
+          setWorldRepairRequirements: (id, groups) => {
+            writes.push([id, groups]);
+            return true;
+          },
+        },
+      });
+      const first = () =>
+        target.querySelector('[data-recipe-group-id="g1"]')?.querySelector('[data-recipe-option]');
+      /** The one write the page made, re-projected as the world default it now holds. */
+      async function written() {
+        await new Promise((done) => setTimeout(done, 0));
+        assert.equal(writes.length, 1, 'one edit makes one write');
+        const [id, groups] = writes.pop();
+        assert.equal(id, 'pick');
+        await harness.setProps({ scope: scopeFor(seed(groups)) });
+        return groups;
+      }
+
+      const search = first().querySelector('[data-recipe-option-search]');
+      search.focus();
+      search.value = 'glass';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+      target.ownerDocument.querySelector('[data-recipe-option-suggestion="shard"]').click();
+      const shard = { ...blank, match: { type: 'component', componentId: 'shard' } };
+      assert.deepEqual(await written(), [{ id: 'g1', options: [shard] }, second]);
+      assert.equal(first().querySelector('[data-recipe-option-chosen]').title, 'Glass Shard');
+
+      first().querySelector('[data-stepper-increment]').click();
+      assert.deepEqual(await written(), [
+        { id: 'g1', options: [{ ...shard, quantity: 2 }] },
+        second,
+      ]);
+      assert.equal(first().querySelector('[data-stepper-input]').value, '2');
+
+      first().querySelector('[data-recipe-remove="alternative"]').click();
+      assert.deepEqual(await written(), [second]);
+      assert.equal(target.querySelectorAll('[data-recipe-group]').length, 1);
+      assert.ok(!first(), 'the removed requirement is no longer drawn');
     });
 
     // ── CURRENCY IS WORLD SCOPE (issue 1373, maintainer round 5) ──────────────────────────
@@ -1687,10 +1887,18 @@ describe('the world Tool entry (issue 1373)', () => {
         { mode: 'flagBroken' },
         { currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }] }
       );
-      const editor = target.querySelector('[data-tool-repair-requirements]');
-      assert.ok(
-        Boolean(editor.querySelector('[data-recipe-add="cost"]')),
-        'the world repair set offers a cost, because the ladder it would spend is world scope'
+      target
+        .querySelector(':scope [data-tool-repair-requirements] [data-recipe-add="ingredient"]')
+        .click();
+      await tick();
+      assert.deepEqual(
+        [
+          ...target.ownerDocument.querySelectorAll(
+            ':scope .manager-recipe-ingredient-menu [role="menuitem"]'
+          ),
+        ].map((item) => item.getAttribute('data-recipe-add')),
+        ['ingredient-component', 'ingredient-tag', 'ingredient-currency'],
+        'the world repair set offers currency, because the ladder it would spend is world scope'
       );
     });
 

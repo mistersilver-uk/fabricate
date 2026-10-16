@@ -86,7 +86,6 @@ class TypeaheadCombobox {
     id: activeOptionId(this.#prefix, index),
     role: 'option',
     tabindex: -1,
-    'data-keyboard-focus': 'true',
     'aria-selected': String(this.#active === index),
     onclick: () => this.#choose(index),
   });

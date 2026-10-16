@@ -67,7 +67,7 @@ export default {
           // on it (not assertManagerLayoutStable, which requires table rows) so the
           // frame shows the onboarding state with the Create system button.
           await page
-            .locator('.fabricate-manager .manager-empty .manager-button.is-primary')
+            .locator('.fabricate-manager .manager-empty .fabricate-button.is-primary')
             .filter({ hasText: 'Create system' })
             .first()
             .waitFor({ state: 'visible', timeout: 10_000 });

@@ -14,3 +14,10 @@ export const FOUNDRY_BRIDGE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryNotify.js',
   'src/ui/svelte/util/foundryUser.js',
 ]);
+
+/** `util/localizeOr.js` and the two `src/utils/` leaves it binds; it reaches the bridge as well. */
+export const LOCALIZE_OR_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/localizeOr.js',
+  'src/utils/fillPlaceholders.js',
+  'src/utils/localizeWithFallback.js',
+]);

@@ -120,6 +120,22 @@ function producedSystem() {
   });
 }
 
+/** A rolled up-to choice group with repeats, so every group key is emitted (issue 1773). It is
+ *  authored before a plain result: the collapsed leaf paths keep the last value, and its carrier's
+ *  own `componentId` is null. */
+const choiceGroup = (id) => ({
+  id,
+  chooser: 'rolled',
+  awardStrategy: 'upTo',
+  awardCount: 2,
+  withReplacement: true,
+  selectionFormula: '1d6',
+  alternatives: [
+    { id: `${id}-a`, componentId: 'comp-1', quantity: 1, selectionRange: { from: 1, to: 3 } },
+    { id: `${id}-b`, componentId: 'comp-1', quantity: 1, selectionRange: { from: 4, to: 6 } },
+  ],
+});
+
 function producedRecipe() {
   const ingredientSet = {
     id: 'is-1',
@@ -144,7 +160,9 @@ function producedRecipe() {
       },
     ],
   };
-  const resultGroups = [{ id: 'rg-1', results: [{ componentId: 'comp-1', quantity: 1 }] }];
+  const resultGroups = [
+    { id: 'rg-1', results: [choiceGroup('choice-1'), { componentId: 'comp-1', quantity: 1 }] },
+  ];
   return new Recipe({
     id: 'recipe-1',
     craftingSystemId: 'sys-1',
@@ -158,7 +176,12 @@ function producedRecipe() {
         name: 'Step',
         toolIds: ['tool-1'],
         ingredientSets: [{ ...ingredientSet, id: 'sis-1' }],
-        resultGroups: [{ id: 'srg-1', results: [{ componentId: 'comp-1', quantity: 1 }] }],
+        resultGroups: [
+          {
+            id: 'srg-1',
+            results: [choiceGroup('choice-2'), { componentId: 'comp-1', quantity: 1 }],
+          },
+        ],
       },
     ],
   }).toJSON();
@@ -346,6 +369,11 @@ test('the derived corpus is genuinely maximal — the premise every assertion be
   assert.ok(touched.size > 0, 'the walk must have rewritten something');
   const roots = new Set([...allLeaves.keys()].map((path) => path.split(/[.[]/)[0]));
   assert.deepEqual([...roots].sort(), ['gatheringConfig', 'recipes', 'systems']);
+  // A result-side choice group's members name components too (issue 1773).
+  for (const prefix of ['recipes[].resultGroups[]', 'recipes[].steps[].resultGroups[]']) {
+    const site = `${prefix}.results[].alternatives[].componentId`;
+    assert.ok(allLeaves.has(site) && touched.has(site), site);
+  }
   // The essence leg has the same anti-vacuity premise, and one more: a corpus carrying no essence
   // option and no populated quantity map would make both essence closures pass by reading zero.
   assert.ok(essenceLeg.touched.size > 0, 'the essence leg must have rewritten a leaf value');
@@ -413,7 +441,9 @@ const NON_SITE_KEY_NAMES = new Set([
   'allowPlayerResultReorder',
   'amount',
   'author',
+  'awardCount',
   'awardMode',
+  'awardStrategy',
   'biomeModifierAggregation',
   'blindCandidateGate',
   'bonusExpression',
@@ -421,6 +451,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'categories',
   'category',
   'chatOutput',
+  'chooser',
   'checkBreakable',
   'checkTrigger',
   'cmp',
@@ -464,6 +495,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'extraDice',
   'failureResultPolicy',
   'formula',
+  'from',
   'gateMode',
   'gathering',
   'gatheringModifier',
@@ -505,6 +537,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'rollFormula',
   'salvage',
   'salvageResolutionMode',
+  'selectionFormula',
   'severity',
   'stageAwarded',
   'stageMissed',
@@ -515,12 +548,14 @@ const NON_SITE_KEY_NAMES = new Set([
   'thresholdMode',
   'tier',
   'timeRequirement',
+  'to',
   'toolBreakagePolicy',
   'type',
   'value',
   'version',
   'visibility',
   'visibilityMode',
+  'withReplacement',
 ]);
 
 /** The two leaf key names issue 1654 moved out of {@link NON_SITE_KEY_NAMES}. */

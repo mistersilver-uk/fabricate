@@ -9,26 +9,29 @@
     broken banner -> description -> essences -> sources -> used by -> produced by
 
   — plus, for a salvageable component, the `Info | Salvage` tab strip and the
-  salvage panel.
+  salvage panel, whose one-shot action is the header's primary while that tab is open.
 
   Extracted from the former double-duty `InventoryDetail.svelte` (issue 675),
-  which now routes here. Each list paginates independently through the shared
-  `InventoryDetailPager`.
+  which now routes here. Each cross-reference list draws through `XrefList` and
+  paginates independently through the shared `InventoryDetailPager`.
 
   Prop-driven; navigation routes back through the store seams.
 -->
 <script>
-  import Avatar from '../../../components/Avatar.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import Notice from '../../../components/Notice.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import XrefList from '../../../components/XrefList.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
+  import { withRollPromptOrigin } from '../../../util/rollPromptOrigin.js';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
   import InventorySalvagePanel from './InventorySalvagePanel.svelte';
   import InventorySystemSelector from './InventorySystemSelector.svelte';
+  import { salvageAction } from './salvage/salvageAction.js';
 
   let {
     item = null,
@@ -175,6 +178,69 @@
   function openRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
+  const openItem = (entry) => openRecipe(entry.recipeId);
+
+  // The cross-reference rows of the current page of each list, as `XrefList` items.
+  const sourceRows = $derived(
+    sliceOf(sources, 'sources').map((source) => ({
+      id: source.actorId,
+      name: source.actorName,
+      art: hasImg(source.actorImg) ? source.actorImg : '',
+      icon: 'fas fa-user',
+      quantity: `×${source.quantity}`,
+      attrs: { 'data-inventory-source': source.actorId },
+    }))
+  );
+  const contributorRows = $derived(
+    sliceOf(contributors, 'contributors').map((contributor) => ({
+      id: contributor.componentId,
+      name: contributor.name,
+      ...resolveCraftingArt(contributor.img ?? ''),
+      quantity: `×${contributor.quantity}`,
+      attrs: { 'data-inventory-contributor': contributor.componentId },
+    }))
+  );
+  const usedByRows = $derived(
+    sliceOf(usedBy, 'used').map((use) => ({
+      id: `${use.recipeId}:${use.role}`,
+      name: use.recipeName,
+      ...resolveCraftingArt(use.recipeImg ?? ''),
+      detail: roleLabel(use.role),
+      recipeId: use.recipeId,
+      attrs: { 'data-inventory-used-by': use.recipeId },
+    }))
+  );
+  // A recipe entry opens its recipe; a salvage or gathering entry is no control.
+  function kindRows(list, key, recipeHook, kindHook) {
+    return sliceOf(list, key).map((entry, index) => {
+      const opens = entry.kind === 'recipe' && Boolean(entry.recipeId);
+      return {
+        id: `${entry.kind}:${entry.recipeId ?? entry.name}:${index}`,
+        name: entry.name,
+        ...resolveCraftingArt(entry.img ?? ''),
+        detail: kindLabel(entry.kind),
+        recipeId: entry.recipeId,
+        opens,
+        attrs: opens ? { [recipeHook]: entry.recipeId } : { [kindHook]: entry.kind },
+      };
+    });
+  }
+  const requiredForRows = $derived(
+    kindRows(
+      requiredFor,
+      'required',
+      'data-inventory-required-for',
+      'data-inventory-required-for-kind'
+    )
+  );
+  const producedByRows = $derived(
+    kindRows(
+      producedBy,
+      'produced',
+      'data-inventory-produced-by',
+      'data-inventory-produced-by-kind'
+    )
+  );
 
   // --- Info | Salvage ---------------------------------------------------------
   // The strip renders only when the row is salvageable — INCLUDING when the item is a
@@ -204,8 +270,18 @@
   );
 
   const TABS = [
-    { id: 'info', icon: 'fas fa-circle-info', key: 'FABRICATE.App.Inventory.Detail.TabInfo' },
-    { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' },
+    {
+      id: 'info',
+      icon: 'fas fa-circle-info',
+      labelKey: 'FABRICATE.App.Inventory.Detail.TabInfo',
+      label: 'Info',
+    },
+    {
+      id: 'salvage',
+      icon: 'fas fa-recycle',
+      labelKey: 'FABRICATE.App.Inventory.Detail.TabSalvage',
+      label: 'Salvage',
+    },
   ];
   let activeTab = $state('info');
   // Tab routing is driven by two events, resolved in ONE effect so their ordering is
@@ -250,15 +326,25 @@
     }
   });
 
-  function onTabKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + TABS.length) % TABS.length;
-    activeTab = TABS[nextIndex].id;
-    const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
-    buttons?.[nextIndex]?.focus();
-  }
+  // The pane's one primary: the one-shot salvage, in the header and only while Salvage is open.
+  const action = $derived(
+    salvageAction({ salvage, busy: salvaging, depleted, result: salvageResult })
+  );
+  const headerPrimary = $derived(
+    salvageable && activeTab === 'salvage' && action.shown
+      ? {
+          primaryLabel: localize(action.labelKey),
+          primaryIcon: salvaging ? 'fas fa-spinner fa-spin' : 'fas fa-recycle',
+          primaryDisabled: action.disabled,
+          primaryProps: {
+            'data-inventory-salvage-action': '',
+            'aria-busy': salvaging,
+            'aria-describedby': action.toolBlocked ? 'salvage-footer-note' : undefined,
+          },
+          onclick: (event) => withRollPromptOrigin(event, () => onSalvage?.()),
+        }
+      : {}
+  );
 </script>
 
 <InventoryDetailHeader
@@ -269,6 +355,7 @@
   name={displayName}
   total={totalLabel}
   chips={headerChips}
+  primary={headerPrimary}
 >
   {#if multiSystem}
     <!-- FIRST in the header, before the Info|Salvage tablist: it re-scopes the WHOLE body
@@ -281,47 +368,17 @@
   {/if}
 
   {#if salvageable}
-    <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
-         role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
-         navigation. No tab bar at all when the item is not salvageable.
-
-         HAND-ROLLED, AND CORRECT AS BUILT (issue 1514). This looks like the shared
-         `SegmentedControl` — the same soft track carrying two rounded segments, and the kind
-         filter in `InventoryFilters` converted onto it in this same change — and it is not one.
-         `SegmentedControl` emits a RADIOGROUP: real radios, `aria-checked` by state, and no
-         `aria-controls` at all. This is a genuine tablist wired to two `role="tabpanel"`
-         regions, and the strip is the only thing that names them: converting it would drop
-         `aria-controls`, drop `aria-selected`, and leave two panels with nothing pointing at
-         them. A radiogroup is the right semantics for CHOOSING A VALUE; a tablist is the right
-         semantics for SWITCHING A VIEW, and these are two views of the same item. Its roving
-         `tabindex` is nine lines and its `activeTab` is also driven by a two-branch `$effect` a
-         radio `onChange` would have to reproduce, so the deletion is not a saving either.
-         Refused, and handed to nobody. -->
-    <div
-      class="inventory-detail-tabs"
-      role="tablist"
-      aria-label={localize('FABRICATE.App.Inventory.Detail.TabsLabel')}
-    >
-      {#each TABS as tab, index (tab.id)}
-        <button
-          type="button"
-          role="tab"
-          id={`inventory-detail-tab-${tab.id}`}
-          class="inventory-detail-tab"
-          class:is-active={activeTab === tab.id}
-          aria-selected={activeTab === tab.id}
-          aria-controls={`inventory-detail-panel-${tab.id}`}
-          tabindex={activeTab === tab.id ? 0 : -1}
-          data-keyboard-focus="true"
-          data-inventory-detail-tab={tab.id}
-          onclick={() => (activeTab = tab.id)}
-          onkeydown={(event) => onTabKeydown(event, index)}
-        >
-          <i class={tab.icon} aria-hidden="true"></i>
-          <span>{localize(tab.key)}</span>
-        </button>
-      {/each}
-    </div>
+    <!-- A real tablist, not a radiogroup: it switches between two views of one item and names
+         the panel it shows, which `SegmentedControl` has no `aria-controls` to do. -->
+    <EditorTabs
+      tabs={TABS}
+      {activeTab}
+      onSelect={(tabId) => (activeTab = tabId)}
+      ariaLabelKey="FABRICATE.App.Inventory.Detail.TabsLabel"
+      idStem="inventory-detail"
+      activePanelOnly
+      tabDataAttr="data-inventory-detail-tab"
+    />
   {/if}
 
   {#if salvageable && activeTab === 'salvage'}
@@ -334,10 +391,9 @@
       <InventorySalvagePanel
         {salvage}
         actingSystemName={multiSystem ? (active?.systemName ?? '') : ''}
-        busy={salvaging}
         {depleted}
         result={salvageResult}
-        {onSalvage}
+        toolBlocked={action.toolBlocked}
         onReset={onResetSalvage}
         stages={salvageStages}
         announcement={salvageAnnouncement}
@@ -374,7 +430,7 @@
           <Notice
             tone="danger"
             title={localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}
-            dataAttr="data-inventory-broken-banner"
+            data-inventory-broken-banner=""
           />
         </div>
       {/if}
@@ -385,9 +441,7 @@
 
       {#if essences.length > 0}
         <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}
-          </p>
+          <Kicker>{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</Kicker>
           <div class="inventory-detail-essences">
             {#each essences as essence (essence.id)}
               {@const tint = essenceTintToken(essence.colorToken)}
@@ -406,271 +460,86 @@
         </section>
       {/if}
 
-      <section class="inventory-detail-section">
-        <p class="inventory-detail-section-title">
-          {localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}
-        </p>
-        <ul class="inventory-detail-list">
-          {#each sliceOf(sources, 'sources') as source (source.actorId)}
-            <li class="inventory-detail-row">
-              <!-- THE SHARED `Avatar` (issue 1514), and `shape` is not optional here: the
-                   component defaults to `round`, which draws a 999px person mark, and this is a
-                   SOURCE ACTOR's portrait in a square 40px well beside six converted record
-                   tiles. `alt=""` because the actor's name is rendered as adjacent text on the
-                   next line, so alt text would be a second reading of the same word — the
-                   decision is taken rather than left silent, which is what
-                   `avatar-source-contract.test.js` polices. `name` is what makes the
-                   no-artwork state INITIALS rather than the `fa-user` glyph this markup drew:
-                   that is a content change, and it is the state the phase's frames record. -->
-              <Avatar
-                art={hasImg(source.actorImg) ? source.actorImg : ''}
-                name={source.actorName}
-                alt=""
-                shape="square"
-                size={40}
-              />
-              <span class="inventory-detail-row-name">{source.actorName}</span>
-              <span class="inventory-detail-row-qty" data-inventory-source-qty
-                >×{source.quantity}</span
-              >
-            </li>
-          {/each}
-        </ul>
-        <InventoryDetailPager
-          list={sources}
-          sectionKey="sources"
-          page={pageOf(sources, 'sources')}
-          pageSize={PAGE_SIZE}
-          onPage={(value) => setPage('sources', value)}
-        />
-      </section>
+      <!-- No empty note: a listed row is built from held documents, so it has a source. -->
+      {@render xrefSection(
+        'sources',
+        localize('FABRICATE.App.Inventory.Detail.SourcesTitle'),
+        sources,
+        sourceRows
+      )}
 
       {#if isEssence}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}
-          </p>
-          {#if contributors.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(contributors, 'contributors') as contributor (contributor.componentId)}
-                <li
-                  class="inventory-detail-row"
-                  data-inventory-contributor={contributor.componentId}
-                >
-                  <Medallion {...resolveCraftingArt(contributor.img ?? '')} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{contributor.name}</span>
-                  <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={contributors}
-              sectionKey="contributors"
-              page={pageOf(contributors, 'contributors')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('contributors', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'contributors',
+          localize('FABRICATE.App.Inventory.Detail.ContributingTitle'),
+          contributors,
+          contributorRows,
+          localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')
+        )}
       {/if}
 
       <!-- Omitted for a tool-only card: a tool is never consumed in that role, and
            "Not used by any known recipe" under a hammer six recipes require reads as a
            defect rather than as an empty state (issue 1119). -->
       {#if !isToolOnly}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
-          </p>
-          {#if usedBy.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
-                <li>
-                  <button
-                    type="button"
-                    class="inventory-detail-recipe"
-                    data-inventory-used-by={use.recipeId}
-                    onclick={() => openRecipe(use.recipeId)}
-                  >
-                    <Medallion {...resolveCraftingArt(use.recipeImg ?? '')} alt="" size={40} />
-                    <span class="inventory-detail-row-name">{use.recipeName}</span>
-                    <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={usedBy}
-              sectionKey="used"
-              page={pageOf(usedBy, 'used')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('used', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'used',
+          localize('FABRICATE.App.Inventory.Detail.UsedByTitle'),
+          usedBy,
+          usedByRows,
+          localize('FABRICATE.App.Inventory.Detail.UsedByEmpty'),
+          openItem
+        )}
       {/if}
 
       {#if isTool}
-        <section class="inventory-detail-section" data-inventory-section="required">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}
-          </p>
-          {#if requiredFor.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(requiredFor, 'required') as req, index (req.kind + ':' + (req.recipeId ?? req.name) + ':' + index)}
-                <li>
-                  {#if req.kind === 'recipe' && req.recipeId}
-                    <button
-                      type="button"
-                      class="inventory-detail-recipe"
-                      data-inventory-required-for={req.recipeId}
-                      onclick={() => openRecipe(req.recipeId)}
-                    >
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
-                      <span class="inventory-detail-row-name">{req.name}</span>
-                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
-                    </button>
-                  {:else}
-                    <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
-                      <Medallion {...resolveCraftingArt(req.img ?? '')} alt="" size={40} />
-                      <span class="inventory-detail-row-name">{req.name}</span>
-                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
-                    </div>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={requiredFor}
-              sectionKey="required"
-              page={pageOf(requiredFor, 'required')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('required', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'required',
+          localize('FABRICATE.App.Inventory.Detail.RequiredForTitle'),
+          requiredFor,
+          requiredForRows,
+          localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty'),
+          openItem
+        )}
       {/if}
 
       <!-- Also omitted for a tool-only card: nothing produces a tool IN ITS TOOL ROLE. -->
       {#if !isEssence && !isToolOnly}
-        <section class="inventory-detail-section">
-          <p class="inventory-detail-section-title">
-            {localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}
-          </p>
-          {#if producedBy.length > 0}
-            <ul class="inventory-detail-list">
-              {#each sliceOf(producedBy, 'produced') as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
-                <li>
-                  {#if producer.kind === 'recipe' && producer.recipeId}
-                    <button
-                      type="button"
-                      class="inventory-detail-recipe"
-                      data-inventory-produced-by={producer.recipeId}
-                      onclick={() => openRecipe(producer.recipeId)}
-                    >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
-                      <span class="inventory-detail-row-name">{producer.name}</span>
-                      <span class="inventory-chip inventory-chip-role"
-                        >{kindLabel(producer.kind)}</span
-                      >
-                    </button>
-                  {:else}
-                    <div
-                      class="inventory-detail-row"
-                      data-inventory-produced-by-kind={producer.kind}
-                    >
-                      <Medallion {...resolveCraftingArt(producer.img ?? '')} alt="" size={40} />
-                      <span class="inventory-detail-row-name">{producer.name}</span>
-                      <span class="inventory-chip inventory-chip-role"
-                        >{kindLabel(producer.kind)}</span
-                      >
-                    </div>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <InventoryDetailPager
-              list={producedBy}
-              sectionKey="produced"
-              page={pageOf(producedBy, 'produced')}
-              pageSize={PAGE_SIZE}
-              onPage={(value) => setPage('produced', value)}
-            />
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')} />
-          {/if}
-        </section>
+        {@render xrefSection(
+          'produced',
+          localize('FABRICATE.App.Inventory.Detail.ProducedByTitle'),
+          producedBy,
+          producedByRows,
+          localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty'),
+          openItem
+        )}
       {/if}
     </div>
   {/if}
 </InventoryDetailHeader>
 
+<!-- The page and pager key is the section id. The caller's empty note and pager sit after the
+     list, at the section's own gap. -->
+{#snippet xrefSection(section, label, list, items, emptyHint = '', onOpen = null)}
+  <section class="inventory-detail-section" data-inventory-section={section}>
+    <XrefList {label} {items} {onOpen} />
+    {#if list.length > 0}
+      <InventoryDetailPager
+        {list}
+        sectionKey={section}
+        ariaLabel={label}
+        page={pageOf(list, section)}
+        pageSize={PAGE_SIZE}
+        onPage={(value) => setPage(section, value)}
+      />
+    {:else if emptyHint}
+      <EmptyState note hint={emptyHint} />
+    {/if}
+  </section>
+{/snippet}
+
 <style>
-  /* Info | Salvage: the prototype's segmented control — a ruled, soft track carrying
-     two rounded-rect segments, the active one filled with the accent. (The ARIA on top
-     of it — tablist/roving tabindex/arrow keys — is ours; the prototype has none.) */
-  .inventory-detail-tabs {
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: flex;
-    align-items: stretch;
-    gap: 4px;
-    height: 38px;
-    padding: 3px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  /* Foundry's global `.app button` fixed height + centering would crop these; reset
-     the inherited box (the EnvironmentCard pattern). */
-  .inventory-detail-tab {
-    box-sizing: border-box;
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    margin: 0;
-    flex: 1 1 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 30px;
-    padding: 0 12px;
-    border: none;
-    border-radius: 7px;
-    background: none;
-    color: var(--fab-text-muted);
-    font: inherit;
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .inventory-detail-tab:hover {
-    color: var(--fab-text);
-  }
-
-  .inventory-detail-tab.is-active {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-weight: 700;
-  }
-
-  .inventory-detail-tab:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
-  }
-
-  /* The panel is a transparent pass-through: the sections keep the detail column's
-     own rhythm rather than nesting inside a second box. */
+  /* A transparent pass-through: the sections keep the detail column's rhythm, unboxed. */
   .inventory-detail-panel {
     display: flex;
     flex-direction: column;
@@ -680,6 +549,7 @@
 
   .inventory-chip-qty {
     font-family: var(--fab-font-mono);
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
   }
@@ -702,64 +572,10 @@
     flex-shrink: 0;
   }
 
-  .inventory-detail-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  /* Row height + padding mirror the Crafting browser's RecipeListRow so the
-     thumbnail sits framed with vertical breathing room rather than edge-to-edge. */
-  .inventory-detail-row,
-  .inventory-detail-recipe {
-    box-sizing: border-box;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2);
-    min-height: 56px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    text-align: left;
-  }
-
-  .inventory-detail-recipe {
-    cursor: pointer;
-  }
-
-  .inventory-detail-recipe:hover {
-    background: var(--fab-surface-raised);
-    border-color: var(--fab-accent-border);
-  }
-
-  .inventory-detail-recipe:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-row-qty {
-    flex: 0 0 auto;
-    font-family: var(--fab-font-mono);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: var(--fab-text);
-  }
-
-  .inventory-chip-role {
-    flex: 0 0 auto;
-  }
-
   .inventory-detail-essences {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .inventory-chip-essence i {

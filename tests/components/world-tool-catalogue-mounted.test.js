@@ -1,22 +1,25 @@
 /** The world Tools Catalogue, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertDockAtColumnFoot, measureInspectorDock } from '../helpers/inspectorDockGeometry.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
   TOOL_TREE_RAW_MODULES,
   WORLD_TOOL_SCOPE_RAW_MODULES,
 } from '../helpers/toolMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -27,6 +30,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`.
@@ -43,10 +47,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     // THE BULK PANEL AND THE SHARED CHROME IT COMPOSES (issue 1373, maintainer feedback round 2).
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/components/Callout.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
@@ -59,8 +63,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     // THE CARD SHELL the world break-mode card is now written as (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
@@ -103,6 +107,15 @@ function corpus({ toolBreakage = null } = {}) {
     ...(toolBreakage ? { toolBreakage } : {}),
   };
 }
+
+/** The components whose scoped CSS sizes the inspector column and the bulk panel inside it. */
+const INSPECTOR_CSS_PATHS = [
+  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Callout.svelte',
+];
 
 function scopeFor(options) {
   return projectWorldScopeEntity({
@@ -447,6 +460,8 @@ describe('world Tools Catalogue (issue 1373)', () => {
       systems: SYSTEMS,
       actions: {},
       onSelect: (id) => selected.push(id),
+      // The shipped page passes it, so every roster row is a Rules link rather than an Add.
+      onOpenSystemRules: () => {},
     });
     await harness.setProps({});
     assert.ok(
@@ -460,6 +475,10 @@ describe('world Tools Catalogue (issue 1373)', () => {
       /Smith Hammer/,
       'the inspector does not describe the auto-selected Tool'
     );
+    // Its one verb is a full-width primary `Button` (issue 1521).
+    assertInspectorVerbs(target.querySelector('[data-scoped-list-inspector]'), [
+      ['[data-scoped-tool-open-entry]', 'primary'],
+    ]);
   });
 
   it('states the TOOL verb at rest, not the page subtitle a second time', async () => {
@@ -530,6 +549,23 @@ describe('world Tools Catalogue (issue 1373)', () => {
         target.querySelector('[data-scoped-list-selection-count]').textContent,
         /2 selected/,
         'the toolbar and the panel disagree about how many rows are ticked'
+      );
+    });
+
+    // The maintainer's report (2026-10-14): the dock sat under the axes, inset from the column.
+    it("seats the dock on the inspector column's foot at its full width", async () => {
+      const target = await harness.mount({ scope: scopeFor({}), systems: SYSTEMS, actions: {} });
+      tick(target, 'hammer');
+      await harness.setProps({});
+      const aside = target.querySelector('[data-scoped-list-inspector]');
+      assert.ok(Boolean(aside?.querySelector('.fab-bulk-edit-dock')), 'no dock in the inspector');
+
+      assertDockAtColumnFoot(
+        await measureInspectorDock(aside.outerHTML, {
+          repoRoot,
+          componentPaths: INSPECTOR_CSS_PATHS,
+          view: 'world-tools',
+        })
       );
     });
 

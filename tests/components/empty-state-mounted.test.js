@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { underSheet } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -94,7 +95,7 @@ describe('1286 EmptyState — variant contract', () => {
   it('keeps the data hook and the context class a host container needs', async () => {
     const target = await harness.mount({
       contextClass: 'manager-task-required-tools-empty',
-      dataAttr: 'data-complications-empty',
+      'data-complications-empty': true,
     });
     const panel = panelOf(target);
     assert.ok(
@@ -127,7 +128,8 @@ describe('1286 EmptyState — variant contract', () => {
     await harness.setProps({ compact: true, fill: true, hint: 'No matching runs' });
     assert.ok(panelOf(target).classList.contains('is-fill'));
     assert.equal(panelOf(target).textContent.trim(), 'No matching runs');
-    for (const declaration of [/width:\s*100%/, /height:\s*100%/, /min-height:\s*0/]) assert.match(ruleBody('.manager-empty.is-fill'), declaration);
+    for (const declaration of [/width:\s*100%/, /height:\s*100%/, /min-height:\s*0/])
+      assert.match(ruleBody('.manager-empty.is-fill'), declaration);
     harness.remount();
   });
 
@@ -170,16 +172,8 @@ describe('1286 EmptyState — variant contract', () => {
     );
   });
 
-  /**
-   * THE TWO SMALL-TEXT VARIANTS INK AT THE MUTED TONE.
-   * Pinned on the SOURCE rather than computed: happy-dom resolves no cascade, and the whole
-   * failure mode here was that ONE palette read the subtle declaration as passing —
-   * `mythwright`, the only one of the seven that states `muted` and `subtle` as opaque hues,
-   * measures 5.28:1 from the subtle tone. Six fail and one passes, so the reference was set
-   * from the single outlier; the `filtered` variant's 2.66:1 had no outlier at all and failed
-   * in all seven. The variants are what carry it, so a caller cannot get it wrong and a revert
-   * cannot be silent — which is the point of pinning a figure no palette but one agrees with.
-   */
+  // The two small-text variants ink at the muted tone, pinned on the source because the figure is
+  // per palette: the subtle tone clears 4.5:1 in `mythwright` alone and fails in the other six.
   it('inks the note and filtered variants at the MUTED tone, not the reference`s subtle/disabled', () => {
     for (const selector of ['.manager-empty.is-note h3', '.manager-empty.is-note p']) {
       assert.match(
@@ -202,5 +196,32 @@ describe('1286 EmptyState — variant contract', () => {
       'and the disabled tone is gone from this component entirely, rather than left on one ' +
         'of the two rules the filtered variant declares'
     );
+  });
+
+  /** The note title's computed face, then its parent's, with `css` in the document. */
+  async function noteFaces(css) {
+    let faces;
+    await underSheet(css, async () => {
+      const target = await harness.mount({ note: true, title: 'No tags match' });
+      const heading = target.querySelector('h3');
+      faces = [heading, heading.parentElement].map((node) => getComputedStyle(node).fontFamily);
+      harness.remount();
+    });
+    return faces;
+  }
+
+  it('draws the note title in its parent face, not the serif the base heading states', async () => {
+    const [title, parent] = await noteFaces('body { font-family: ProbeBody; }');
+    assert.equal(parent, 'ProbeBody');
+    // happy-dom keeps the keyword rather than resolving it to the parent's value.
+    assert.equal(title, 'inherit', 'states the parent face, not the base heading serif');
+  });
+
+  it('keeps inheriting the parent face when :root also defines --font-primary', async () => {
+    const [title, parent] = await noteFaces(
+      'body { font-family: ProbeBody; } :root { --font-primary: ProbeFace; }'
+    );
+    assert.equal(parent, 'ProbeBody');
+    assert.equal(title, 'inherit', 'the note title reads no --font-primary');
   });
 });

@@ -5,9 +5,9 @@
   import Pagination from '../../components/Pagination.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import Button from '../../components/Button.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import Select from '../../components/Select.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
@@ -371,10 +371,10 @@
       name so band and control do not announce alike.
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
-      <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
-        <ManagerSearchField
+      <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
+        <SearchField
           value={searchTerm}
-          onInput={(next) => {
+          onChange={(next) => {
             ui.searchTerm = next;
             ui.pageIndex = 0;
           }}
@@ -392,7 +392,7 @@
           density="compact"
           tone="accent"
           groupName="tool-membership-filter"
-          dataAttr="data-tool-membership-filter"
+          data-tool-membership-filter
           optionDataAttr="data-tool-membership-option"
           ariaLabel={text(
             'FABRICATE.Admin.Manager.Tools.FilterLabel',
@@ -403,7 +403,7 @@
             ui.pageIndex = 0;
           }}
         />
-      </ManagerToolbar>
+      </FilterBar>
     </section>
 
     <!-- Sort and the result count on one row, the only place the count says something useful:
@@ -423,7 +423,7 @@
         showTick={false}
         minWidth={112}
         ariaLabel={text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}
-        triggerData={{ 'data-tool-sort-key': '' }}
+        triggerProps={{ 'data-tool-sort-key': '' }}
         onChange={(next) => {
           ui.sortKey = next;
           ui.pageIndex = 0;
@@ -462,11 +462,11 @@
               'FABRICATE.Admin.Manager.Tools.EmptyHintWorld',
               'Add a Tool from the world Tools Catalogue, where Tools are created.'
             )}
-            dataAttr="data-tool-library-empty"
+            data-tool-library-empty
           >
             <div class="manager-tools-empty-actions">
               {#if ghostRows.length > 0}
-                <ManagerButton
+                <Button
                   role="primary"
                   data-tool-empty-browse-world={String(ghostRows.length)}
                   onclick={() => {
@@ -481,9 +481,9 @@
                       'Show the {count} world Tools you can add'
                     ).replace('{count}', String(ghostRows.length))}</span
                   >
-                </ManagerButton>
+                </Button>
               {/if}
-              <ManagerButton data-tool-empty-open-catalogue onclick={onOpenWorldCatalogue}>
+              <Button data-tool-empty-open-catalogue onclick={onOpenWorldCatalogue}>
                 <i class="fas fa-globe" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -491,7 +491,7 @@
                     'Open the world Tools Catalogue'
                   )}</span
                 >
-              </ManagerButton>
+              </Button>
             </div>
           </EmptyState>
         {:else if filteredTools.length === 0}
@@ -504,7 +504,7 @@
               'FABRICATE.Admin.Manager.Tools.EmptyFiltered',
               'Nothing matches that filter.'
             )}
-            dataAttr="data-tool-library-filtered-empty"
+            data-tool-library-filtered-empty
           />
         {:else}
           <div class="manager-tools-library-list" role="list">
@@ -683,14 +683,14 @@
   }
 
   /* THE TOOLBAR: two rows, matching the prototype. Here rather than in `styles/fabricate.css` so
-     `VIEW_RECIPES` maps a change to the tool views alone. The first row's box is `ManagerToolbar`'s,
+     `VIEW_RECIPES` maps a change to the tool views alone. The first row's box is `FilterBar`'s,
      which states the wrap, centring and gap for every browse screen; what remains is the grow. */
 
-  /* `:global()` on the FIELD half only (issue 1039): `.manager-search` sits on a
-     `<ManagerSearchField>` tag rather than an element this component writes, so Svelte stamps no
+  /* `:global()` on the FIELD half only (issue 1039): `.fabricate-search` sits on a
+     `<SearchField>` tag rather than an element this component writes, so Svelte stamps no
      `svelte-<hash>` and prunes the whole selector, failing `lint:svelte:warnings`. The ANCESTOR half
      stays local, keeping the same three components of specificity. */
-  [data-manager-tools-search] :global(.manager-search) {
+  [data-manager-tools-search] :global(.fabricate-search) {
     flex: 1 1 150px;
     min-width: 0;
   }
@@ -713,7 +713,7 @@
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-size: 0.76rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
@@ -772,7 +772,7 @@
     min-height: 30px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-secondary);
     font-size: 11.5px;

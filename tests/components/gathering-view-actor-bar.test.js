@@ -12,11 +12,12 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
+  GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -138,6 +139,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
+    copyModule('src/ui/svelte/apps/gathering/linkedSceneImage.js');
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which imports the foundryCalendar helpers.
     copyModule('src/ui/svelte/util/formatDuration.js');
@@ -159,7 +161,13 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
-    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
+    // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
+    for (const rawModule of [
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+      'src/ui/svelte/util/rollPromptOrigin.js',
+      'src/ui/svelte/util/dropRateTier.js',
+    ]) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -171,22 +179,31 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
-    // primitive `ui-visual-style/spec.md` names. A hand-rolled harness that omits it HANGS
-    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
-    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+    // `ChanceBar` is a single-row `BandedBar` over the shared `FillBar` (issues 1096, 1782). A
+    // hand-rolled harness that omits either HANGS (# cancelled) rather than failing.
+    for (const instrument of [
+      'src/ui/svelte/components/FillBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      writeCompiledSvelte(instrument);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    for (const dropsModule of GATHERING_DROPS_COMPILED_MODULES) writeCompiledSvelte(dropsModule);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -634,6 +651,69 @@ describe('GatheringView ↔ actor bar wiring', () => {
         mounted = null;
         target?.remove();
       }
+    }
+  });
+
+  // Issue 2398: a dismissed d100 prompt leaves its run ready in the Journal, so the listing reloads.
+  it('reloads the listing and warns nothing when the roll prompt is dismissed', async () => {
+    const warns = [];
+    const notifications = {
+      warn: (msg) => {
+        warns.push(msg);
+      },
+    };
+    Object.defineProperty(globalThis, 'ui', {
+      value: { notifications },
+      configurable: true,
+      writable: true,
+    });
+    try {
+      let listings = 0;
+      const waiting = environment({
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Extract Ore',
+            attemptable: false,
+            blockedReasons: [{ code: 'DUPLICATE_ACTIVE_RUN', data: { taskId: 'task-1' } }],
+          },
+        ],
+      });
+      const services = {
+        listGatheringForActor: () => {
+          listings += 1;
+          return Promise.resolve(listing([listings === 1 ? attemptableEnv() : waiting], 'a1'));
+        },
+        startGatheringAttempt: () =>
+          Promise.resolve({ accepted: true, success: false, cancelled: true }),
+      };
+      const store = makeStore({
+        actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }],
+        seededId: 'a1',
+      });
+      store.loadSelectableActors();
+      flushSync();
+      services.actorBar = store;
+      await mountView(services);
+      assert.equal(listings, 1, 'the mount fetched once');
+      const attempt = () =>
+        target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]');
+      assert.equal(attempt().dataset.gatheringAttemptBlocked, 'false');
+
+      attempt().click();
+      await settle();
+
+      assert.equal(listings, 2, 'the dismissal refreshed task and run state');
+      assert.equal(
+        attempt().dataset.gatheringAttemptBlocked,
+        'true',
+        'the waiting run now blocks a second attempt'
+      );
+      assert.equal(attempt().disabled, true);
+      assert.ok(target.querySelector(':scope [data-gathering-attempt-reason]'), 'and says why');
+      assert.deepEqual(warns, [], 'a dismissal is not a refusal');
+    } finally {
+      delete globalThis.ui;
     }
   });
 

@@ -11,7 +11,7 @@
   import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
@@ -84,7 +84,7 @@
       <p class="manager-subtitle">
         {text(
           'FABRICATE.Admin.Manager.Scoped.Component.Entry.SourceSubtitle',
-          'How the world recognises this item on import, so two copies never become two entries.'
+          'How the world recognises this item on import, so two copies never become two entries. Replacing the source takes effect in every system at once.'
         )}
       </p>
     </div>
@@ -102,7 +102,7 @@
         <span class="manager-component-entry-uuid" data-scoped-entry-source-uuid>{sourceUuid}</span>
       </div>
       <div class="manager-component-entry-uuid-actions">
-        <ManagerButton
+        <Button
           class="manager-component-entry-mini-action"
           data-scoped-entry-source-copy
           onclick={copyUuid}
@@ -113,13 +113,13 @@
               ? text('FABRICATE.Admin.Manager.Scoped.Component.Copied', 'Copied')
               : text('FABRICATE.Admin.Manager.Scoped.Component.Copy', 'Copy')}</span
           >
-        </ManagerButton>
+        </Button>
         {#if onUnlinkSource}
           <!-- `Unlink`, AND THE SENTENCE MOVES TO THE TITLE (`proto:5419-5420`). The control sits
                in a 28px cluster beside `Copy`, where a two-word label pushes the uuid well's own
                value column narrower for no gain: the reference labels the act and explains it on
                hover, which is also where a GM asks. -->
-          <ManagerButton
+          <Button
             class="manager-component-entry-mini-action"
             title={text(
               'FABRICATE.Admin.Manager.Scoped.Component.UnlinkItemTitle',
@@ -130,7 +130,7 @@
           >
             <i class="fas fa-link-slash" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Scoped.Component.UnlinkItem', 'Unlink')}</span>
-          </ManagerButton>
+          </Button>
         {/if}
       </div>
     </div>
@@ -149,7 +149,7 @@
     )}
     hint={text(
       'FABRICATE.Admin.Manager.Scoped.Component.Entry.SourceDropNote',
-      'World item, compendium entry, or pack — the uuid, name, art and description come from it. Every system sees the change at once.'
+      'World item or compendium entry'
     )}
     onDrop={onSourceDrop}
   />
@@ -185,7 +185,7 @@
         onkeydown={onAliasKey}
       />
     </div>
-    <ManagerButton
+    <Button
       role="ghost"
       class="manager-component-entry-mini-action"
       disabled={aliasDraft.trim() === ''}
@@ -194,7 +194,7 @@
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Scoped.Component.AliasAdd', 'Add alias')}</span>
-    </ManagerButton>
+    </Button>
   </div>
 
   <div class="manager-component-entry-chips" data-scoped-entry-aliases={entryId}>
@@ -242,17 +242,17 @@
             : '{count} other catalogue entries name the same source item, so an import can create a second record for one item.',
           { count: duplicateCount }
         )}
-        dataAttr="data-scoped-entry-duplicate-source"
+        data-scoped-entry-duplicate-source
       />
       {#if onReviewDuplicates}
-        <ManagerButton
+        <Button
           role="warning"
           class="manager-component-entry-mini-action"
           data-scoped-entry-duplicate-review
           onclick={() => onReviewDuplicates()}
         >
           {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.DuplicateReview', 'Review & merge')}
-        </ManagerButton>
+        </Button>
       {/if}
     </div>
   {/if}

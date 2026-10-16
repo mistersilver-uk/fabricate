@@ -291,6 +291,15 @@ test('hasUnresolvedDirectives detects only what a reader actually sees raw', () 
   // A mixed description IS repairable — one label-less entry is enough.
   assert.equal(hasUnresolvedDirectives('@UUID[a]{Acid}, @UUID[b]'), true);
 
+  // V14 dnd5e spell-scroll descriptions share this INLINE EMBED. It cannot be resolved by
+  // Repair Item Data because the enricher intentionally uses embeds:false; do not nag the GM.
+  const spellScrollEmbed = '@Embed[Compendium.dnd5e.equipment24.Item.dmgSpellScroll00 inline]';
+  assert.equal(hasUnresolvedDirectives(spellScrollEmbed), false);
+  assert.equal(hasUnresolvedDirectives('@embed[Item.source inline]'), false);
+  assert.equal(hasUnresolvedDirectives('@Embed[Item.source]{Scroll text}'), false);
+  assert.equal(hasUnresolvedDirectives(spellScrollEmbed + ' @UUID[Item.missing]'), true);
+  assert.equal(hasUnresolvedDirectives('@UUID[Item.missing] ' + spellScrollEmbed), true);
+
   assert.equal(hasUnresolvedDirectives('Acid, Oil, Paper'), false);
   // Rolls are flattened deterministically at every read, so they are not a
   // repairable defect and must not trigger the GM notice.

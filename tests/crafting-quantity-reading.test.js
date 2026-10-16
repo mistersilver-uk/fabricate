@@ -2,11 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  countText,
-  haveOfNeedText,
-  stackCountText,
-} from '../src/ui/svelte/util/craftingQuantityReading.js';
+import { countText, haveOfNeedText } from '../src/ui/svelte/util/craftingQuantityReading.js';
 
 describe('1506 the crafting quantity readings — a count', () => {
   it('writes a real count as its own digits', () => {
@@ -47,16 +43,5 @@ describe('1506 the crafting quantity readings — held against needed', () => {
   it('is total on both sides, where the retired call site rendered `undefined/undefined`', () => {
     assert.equal(haveOfNeedText(undefined, undefined), '0/0');
     assert.equal(haveOfNeedText(null, 2), '0/2');
-  });
-});
-
-describe('1506 the crafting quantity readings — a held stack', () => {
-  it('writes the multiplication sign the stack chooser reads, not the letter x', () => {
-    assert.equal(stackCountText(3), '×3');
-    assert.ok(!stackCountText(3).includes('x'), 'the sign is U+00D7, which is what shipped');
-  });
-
-  it('is total, where the retired call site rendered `×undefined`', () => {
-    assert.equal(stackCountText(undefined), '×0');
   });
 });

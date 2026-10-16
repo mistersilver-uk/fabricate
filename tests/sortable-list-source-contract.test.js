@@ -21,7 +21,8 @@ const read = (file) => readFileSync(path.join(REPO_ROOT, file), 'utf8');
 
 /**
  * The amended published set, in the order the component destructures it. `handles` is retired
- * because `reorderable` subsumes it, and the library's API block is amended in the same commit.
+ * because `reorderable` subsumes it; `announcement` and `onReorderSettled` are issue 2381's. The
+ * library's API block is amended in the same commit as each change.
  */
 const DECLARED_PROPS = Object.freeze([
   'items',
@@ -41,9 +42,9 @@ const DECLARED_PROPS = Object.freeze([
   'rowClass',
   'rowData',
   'removeData',
-  'dataAttr',
-  'dataValue',
   'ariaLabel',
+  'announcement',
+  'onReorderSettled',
 ]);
 
 /** The component's `$props()` destructuring, comments stripped, in source order. */
@@ -80,7 +81,7 @@ function publishedProps() {
   const block = library.slice(apiStart, apiEnd);
   const names = new Set();
   // A `<b>` may carry several names on one line — the block writes `numbered · removable · onRemove`
-  // and `dataAttr / dataValue` that way — so each bold run is split on the two separators it uses.
+  // that way — so each bold run is split on the two separators it uses.
   for (const [, run] of block.matchAll(/<b>([^<]+)<\/b>/gu)) {
     for (const name of run.split(/[·/]/u)) {
       const trimmed = name.trim();
@@ -113,7 +114,8 @@ test('every published prop is one the component actually accepts', () => {
       'the clause below would pass over almost nothing.'
   );
 
-  const accepted = new Set(DECLARED_PROPS);
+  // `class` is declared as `class: extraClass`, a shape the destructure reader above does not list.
+  const accepted = new Set([...DECLARED_PROPS, 'class']);
   const unaccepted = [...published].filter(
     (name) => !accepted.has(name) && !['SHIPPED'].includes(name)
   );
@@ -193,7 +195,7 @@ test('focus lands before the live region is written, in the one place that can h
   const source = read(PRIMITIVE);
   const effect = source.slice(source.indexOf('$effect(() => {'));
   const focusAt = effect.indexOf('focusTarget?.focus?.();');
-  const announceAt = effect.indexOf('announcement = sentence;');
+  const announceAt = effect.indexOf('spoken = sentence;');
   assert.ok(focusAt !== -1 && announceAt !== -1, 'the effect still focuses and still announces');
   assert.ok(
     focusAt < announceAt,
@@ -208,7 +210,8 @@ test('the moved name is read BEFORE the caller round-trips the array', () => {
   // `items` does not change until the caller sets it. On a real surface the caller round-trips
   // through its store, so `items[index]` afterwards is a different record.
   const source = read(PRIMITIVE);
-  const move = source.slice(source.indexOf('function moveFrom('), source.indexOf('/** The keyboard'));
+  const start = source.indexOf('function moveFrom(');
+  const move = source.slice(start, source.indexOf('function moveAndFollow(', start));
   const nameAt = move.indexOf('reorderAnnouncementText(nameOf(list[index])');
   const emitAt = move.indexOf('onReorder(index, target);');
   assert.ok(nameAt !== -1 && emitAt !== -1, 'the move still names the record and still emits');

@@ -111,6 +111,12 @@
         min-height: 0;
         max-height: 64px;
       }
+
+      /* The page above the card, which the Overview cards drew before the task editor's tabs
+         (issue 1522): without it the field cannot be scrolled onto the stage's bottom edge. */
+      .fixture-above {
+        height: 100vh;
+      }
     </style>
   </head>
   <body class="vtt game theme-dark">

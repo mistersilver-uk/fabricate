@@ -42,12 +42,12 @@
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Select from '../../components/Select.svelte';
   import {
     buildCapOptions,
@@ -301,18 +301,18 @@
     </span>
   </section>
 
-  <ManagerToolbar
+  <FilterBar
     ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
   >
-    <ManagerSearchField
+    <SearchField
       value={searchTerm}
-      onInput={(next) => {
+      onChange={(next) => {
         searchTerm = next;
         pageIndex = 0;
       }}
       placeholder={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
       ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
-      inputAttrs={{ 'data-books-scrolls-search': '' }}
+      inputProps={{ 'data-books-scrolls-search': '' }}
     />
     <!-- Three `<span>`s rather than the `<label>`s they were: `Select.svelte`'s host invariant.
          The first two triggers keep the `aria-label` their select carried; the limits filter is
@@ -321,7 +321,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={statusFilter}
         options={statusSelectOptions}
         showTick={false}
@@ -329,21 +329,21 @@
           'FABRICATE.Admin.Manager.BooksScrolls.StatusFilterLabel',
           'Filter recipe items by status'
         )}
-        triggerData={{ 'data-books-scrolls-status-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-status-filter': '' }}
         onChange={(next) => (statusFilter = next)}
       />
     </span>
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.TypeFilter', 'Type')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={typeFilter}
         options={typeSelectOptions}
         ariaLabel={text(
           'FABRICATE.Admin.Manager.BooksScrolls.TypeFilterLabel',
           'Filter recipe items by type'
         )}
-        triggerData={{ 'data-books-scrolls-type-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-type-filter': '' }}
         onChange={(next) => (typeFilter = next)}
       />
     </span>
@@ -354,12 +354,12 @@
           : text('FABRICATE.Admin.Manager.BooksScrolls.LearningFilter', 'Learning')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={capFilter}
         options={capSelectOptions}
         showTick={false}
         ariaLabelledBy={capCaptionId}
-        triggerData={{ 'data-books-scrolls-cap-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-cap-filter': '' }}
         onChange={(next) => (capFilter = next)}
       />
     </span>
@@ -369,16 +369,16 @@
         .replace('{total}', (recipeItems || []).length)}</Chip
     >
     {#if filtersActive}
-      <ManagerButton
+      <Button
         class="manager-clear-filters"
         data-clear-filters="books-scrolls"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll manager-books-scrolls-scroll"
@@ -392,7 +392,7 @@
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyHint',
           'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.'
         )}
-        dataAttr="data-books-scrolls-empty"
+        data-books-scrolls-empty
       />
     {:else if filteredItems.length === 0}
       <EmptyState
@@ -405,10 +405,10 @@
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint',
           'Clear the filters to show every recipe item in this system.'
         )}
-        dataAttr="data-books-scrolls-empty-filtered"
+        data-books-scrolls-empty-filtered
       >
-        <ManagerButton onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}
@@ -570,11 +570,11 @@
     min-width: 0;
     /* Match the component-library drop-zone exactly (issue 844 follow-up): the
        surrounding `margin` gives it whitespace off the panel edges, and the
-       success-soft fill + 8px radius mirror `.manager-component-drop-zone`. */
+       success-soft fill + 9px radius mirror `.manager-component-drop-zone`. */
     margin: var(--fab-space-3);
-    padding: var(--fab-space-3) var(--fab-space-3);
+    padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border-strong);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-text);
     background: var(--fab-success-soft);
   }
@@ -596,7 +596,7 @@
     width: 34px;
     height: 34px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     color: var(--fab-accent);
     background: var(--fab-overlay-dark-16);
   }
@@ -678,7 +678,7 @@
 
   .manager-books-scrolls-listitem.is-selected {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-books-scrolls-listitem.is-disabled {
@@ -711,9 +711,9 @@
   }
 
   .manager-books-scrolls-thumb {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--fab-books-control-radius);
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
     object-fit: cover;
     flex: none;
   }

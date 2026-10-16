@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const segmentedSource = readFileSync(
@@ -16,7 +16,7 @@ const segmentedSource = readFileSync(
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-segmented-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: ['src/ui/svelte/components/SegmentedControl.svelte'],
   componentPath: 'src/ui/svelte/components/SegmentedControl.svelte'
 });
@@ -322,6 +322,25 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('keeps both the tone and the density class when a tag track takes a rung', async () => {
+    for (const density of ['inline', 'field']) {
+      const root = await harness.mount({
+        options: OPTIONS,
+        value: 'destroyed',
+        groupName: 'g',
+        tone: 'tag',
+        density
+      });
+      const track = root.querySelector('.manager-segmented');
+      assert.ok(
+        track.classList.contains('is-tag'),
+        `tone="tag" density="${density}" keeps is-tag`
+      );
+      assert.ok(track.classList.contains(`is-${density}`), `and is-${density}`);
+      harness.remount();
+    }
+  });
+
   // ── THE PILL SHAPE AND THE SOFT-ACCENT TONE (issue 1371) ───────────────────────────────
   // The reference draws its entry filter (`proto:5457`, `All / With rules / Without`) as a RUN
   // OF SEPARATE PILLS rather than as tiles inside a frame: no track fill, no track edge, radius
@@ -427,6 +446,17 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('draws the inline density as its own track class', async () => {
+    const root = await harness.mount({ options: OPTIONS, value: 'inert', density: 'inline' });
+    const track = root.querySelector('.manager-segmented');
+    assert.deepEqual(
+      [...track.classList].filter((name) => !name.startsWith('svelte-')),
+      ['manager-segmented', 'is-inline'],
+      'one density class, no other'
+    );
+    // Its rule exists by the mirror guard below; its 30px is measured in the View Lab, not here.
+  });
+
   it('paints every declared shape and tone in the scoped style block', () => {
     // The mirror guard, in both directions. A value accepted by the class builder but never
     // given a rule renders as the shipped track while the class assertions above still pass:
@@ -511,12 +541,12 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
-  it('stamps dataAttr and optionDataAttr hooks', async () => {
+  it('stamps the root hook and the optionDataAttr hook', async () => {
     const root = await harness.mount({
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      dataAttr: 'data-when-spent-control',
+      'data-when-spent-control': true,
       optionDataAttr: 'data-when-spent-option'
     });
     assert.ok(root.querySelector('[data-when-spent-control]'));

@@ -9,15 +9,16 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientSetCard from './RecipeIngredientSetCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     ingredientSets = [],
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     currencyUnits = [],
-    // Whether the system's currency feature is enabled, gating the "Add cost" affordances and
+    // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
     // the read-only rendering of existing currency requirements. Forwarded to every set card.
     currencyEnabled = true,
     showSetName = true,
@@ -107,21 +108,17 @@
         {componentOptions}
         {essenceOptions}
         {itemTags}
+        {tagComponentCounts}
         {currencyUnits}
         {currencyEnabled}
         onChange={(nextSet) => updateSimpleSet(nextSet)}
       />
     </div>
     {#if canAddSet}
-      <ManagerButton
-        role="dashed"
-        fullWidth
-        data-recipe-add="ingredient-set"
-        onclick={() => addSet()}
-      >
+      <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   {:else}
     <ul class="manager-recipe-ingredient-sets">
@@ -137,6 +134,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
             {showSetName}
@@ -148,14 +146,9 @@
         </li>
       {/each}
     </ul>
-    <ManagerButton
-      role="dashed"
-      fullWidth
-      data-recipe-add="ingredient-set"
-      onclick={() => addSet()}
-    >
+    <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
-    </ManagerButton>
+    </Button>
   {/if}
 </section>

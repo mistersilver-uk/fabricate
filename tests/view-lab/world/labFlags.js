@@ -78,7 +78,8 @@ export function expandObject(changes) {
 }
 
 /**
- * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, and `-=key` DELETES.
+ * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, `-=key` DELETES, and
+ * `==key` replaces wholesale (the companion-effect marker a currency credit writes, issue 1773).
  *
  * @param {object} target Object to mutate.
  * @param {object} changes Expanded change set.
@@ -88,6 +89,10 @@ export function applyUpdate(target, changes) {
   for (const [key, value] of Object.entries(changes)) {
     if (key.startsWith('-=')) {
       delete target[key.slice(2)];
+      continue;
+    }
+    if (key.startsWith('==')) {
+      target[key.slice(2)] = structuredClone(value);
       continue;
     }
     if (value && typeof value === 'object' && !Array.isArray(value)) {

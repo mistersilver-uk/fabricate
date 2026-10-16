@@ -653,7 +653,7 @@ export async function assertToolStudioEditorLayout(page, { stacked = false } = {
   }
   assertToolStudioTabContainment(report);
   assertToolStudioTypography(report, [
-    ['editorNameType', 20, 'Tool editor name'],
+    ['editorNameType', 22, 'Tool editor name'],
     ['previewNameType', 17, 'Tool preview name'],
   ]);
   if (!stacked) {

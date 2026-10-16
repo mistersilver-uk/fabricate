@@ -1,20 +1,22 @@
 /** The GM component library's group headers (issue 676). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
+import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   componentScopeFor,
   createComponentScopeHarness,
   createComponentsBrowserViewHarness,
 } from '../helpers/componentScopeMountModules.js';
-import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
-import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
-import { describeBrowserListState } from '../helpers/browserListStateCases.js';
-import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
@@ -789,6 +791,102 @@ describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
   });
 });
 
+describe('ComponentsBrowserView list region drop target (issue 2397)', () => {
+  const PAYLOAD = { type: 'Item', uuid: 'Item.x' };
+  const LIST = '[data-component-library] > .manager-table-scroll';
+
+  // `getDragEventData` reads `text/plain` with no `foundry` global, as a real Item drag carries it.
+  function fire(node, type, { data, relatedTarget } = {}) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    event.dataTransfer = { getData: () => (data === undefined ? '' : JSON.stringify(data)) };
+    if (relatedTarget !== undefined) event.relatedTarget = relatedTarget;
+    node.dispatchEvent(event);
+  }
+
+  async function mountLogged(props) {
+    const drops = [];
+    const onDropComponent = (data) => {
+      drops.push(data);
+    };
+    const root = await browser.mount({ onDropComponent, ...props });
+    return { root, drops };
+  }
+
+  it('hands a drop on the empty list, and on its empty state, to the import flow once', async () => {
+    for (const target of [LIST, `${LIST} .manager-empty`]) {
+      const { root, drops } = await mountLogged({ itemCards: [], dropEnabled: true });
+      const node = root.querySelector(target);
+      assert.ok(Boolean(node), `${target} renders`);
+      fire(node, 'drop', { data: PAYLOAD });
+      assert.deepEqual(drops, [PAYLOAD], `a drop on ${target} imports once`);
+      browser.remount();
+    }
+  });
+
+  it('takes a drop on a row once, and the head zone still once, so nothing fires twice', async () => {
+    for (const target of ['.manager-component-row', '.manager-component-drop-zone']) {
+      const { root, drops } = await mountLogged({ itemCards: manyGeneral(2), dropEnabled: true });
+      fire(root.querySelector(target), 'drop', { data: PAYLOAD });
+      assert.deepEqual(drops, [PAYLOAD], `a drop on ${target} imports exactly once`);
+      browser.remount();
+    }
+  });
+
+  it('ignores a drop while dropping is disabled, and on the toolbar', async () => {
+    const disabled = await mountLogged({ itemCards: [], dropEnabled: false });
+    fire(disabled.root.querySelector(LIST), 'drop', { data: PAYLOAD });
+    fire(disabled.root.querySelector(`${LIST} .manager-empty`), 'drop', { data: PAYLOAD });
+    assert.equal(disabled.drops.length, 0, 'a disabled list takes no drop');
+    browser.remount();
+
+    const enabled = await mountLogged({ itemCards: [], dropEnabled: true });
+    fire(enabled.root.querySelector('.manager-component-toolbar'), 'drop', { data: PAYLOAD });
+    assert.equal(enabled.drops.length, 0, 'the toolbar is not a drop target');
+  });
+
+  it('shows the drop-active state on the list alone, held across a move onto a row', async () => {
+    const { root } = await mountLogged({ itemCards: manyGeneral(2), dropEnabled: true });
+    const list = root.querySelector(LIST);
+    const head = root.querySelector('.manager-component-drop-zone');
+    fire(list, 'dragover');
+    assert.ok(list.classList.contains('is-drop-active'), 'the list shows the drop-active state');
+    assert.ok(!head.classList.contains('is-drop-active'), 'and the head zone does not');
+
+    fire(list, 'dragleave', { relatedTarget: list.querySelector('.manager-component-row') });
+    assert.ok(list.classList.contains('is-drop-active'), 'moving onto a row inside keeps it');
+    fire(list, 'dragleave', { relatedTarget: root.querySelector('.manager-component-toolbar') });
+    assert.ok(!list.classList.contains('is-drop-active'), 'leaving the list clears it');
+  });
+
+  it('takes no drop on the pager, so only the list and the head zone import', async () => {
+    const { root, drops } = await mountLogged({ itemCards: manyGeneral(30), dropEnabled: true });
+    const main = root.querySelector('.manager-main');
+    const pager = main.querySelector(':scope > .fabricate-pagination');
+    assert.ok(Boolean(pager), 'a paging list renders the pager');
+    fire(pager, 'drop', { data: PAYLOAD });
+    assert.equal(drops.length, 0, 'a drop on the pager imports nothing');
+  });
+
+  it("keeps `.manager-main`'s children to the head, toolbar, list and, when paging, the pager", async () => {
+    const TRACKS = [
+      'manager-component-head',
+      'manager-component-toolbar',
+      'manager-table-scroll',
+      'fabricate-pagination',
+    ];
+    const childClasses = (root) =>
+      [...root.querySelector('.manager-main').children].map((child) =>
+        TRACKS.find((name) => child.classList.contains(name))
+      );
+    const paged = await browser.mount({ itemCards: manyGeneral(30), dropEnabled: true });
+    assert.deepEqual(childClasses(paged), TRACKS, 'a paging list keeps four children');
+    browser.remount();
+
+    const empty = await browser.mount({ itemCards: [], dropEnabled: true });
+    assert.deepEqual(childClasses(empty), TRACKS.slice(0, 3), 'an empty list keeps three');
+  });
+});
+
 // ── C7. THE SYSTEM RULES LIST'S INSPECTOR (issue 1371, parity round 4) ────────────────────────
 const inspector = createComponentScopeHarness({
   repoRoot,
@@ -797,8 +895,8 @@ const inspector = createComponentScopeHarness({
   // The overlay closure the kebab binds, and the category vocabulary the `Category` block reads.
   rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
   compiledExtras: [
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   ],
 });
 
@@ -890,6 +988,22 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     assert.ok(
       Boolean(card.querySelector('[data-component-open-catalogue]')),
       'and it EXITS to the catalogue entry, which is where that identity is authored'
+    );
+  });
+
+  it('and the card states no sharing for a component this system alone holds', async () => {
+    // Issue 2218: `coal` is held by Forge alone, `ingot` by Forge and Alchemy.
+    const noteOf = (root) =>
+      root.querySelector('.manager-component-shared-identity-note').textContent.trim();
+
+    assert.equal(
+      noteOf(await mountCoal()),
+      'Name, art and description are authored in the world catalogue.'
+    );
+    inspector.remount();
+    assert.match(
+      noteOf(await mountCoal({ worldEntry: entry('ingot') })),
+      /shared with 1 other system\.$/
     );
   });
 
@@ -993,7 +1107,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     const warning = root.querySelector('[data-component-source-missing]');
     assert.ok(Boolean(warning), 'the remediation paragraph renders in the dangling-link state');
 
-    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const sheet = readStylesheet();
     const painted = [...warning.classList].filter((token) => sheet.includes(`.${token} {`));
     assert.deepEqual(
       painted,
@@ -1023,6 +1137,8 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     foot.querySelector('[data-component-edit-system-rules]').click();
     flushSync();
     assert.deepEqual(opened, [['coal']]);
+    // The pinned verb is a full-width primary `Button` (issue 1521).
+    assertInspectorVerbs(foot.closest('section'), [['[data-component-edit-system-rules]', 'primary']]);
 
     assert.ok(
       Boolean(root.querySelector('[data-component-inspector-menu]')),
@@ -1050,13 +1166,11 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
 
 describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
   /**
-   * The reference draws this bar's search field and both filter selects at 38px
-   * (`proto:1053-1055`). 38 is a published rung (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 /
-   * 44, with 32 / 36 / 40 retired); the field publishes it as a size prop, and the two filter
-   * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
+   * The search's row is one 38px shell (issue 1782): the field is 38 by default and both filter
+   * selects take `Select`'s `form` rung, the same box; the second row's sort keeps `toolbar`.
    */
-  const FIELD_SELECTOR = '.manager-search.is-size-38 input';
-  const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
+  const FIELD_SELECTOR = '.fabricate-search:not(.is-compact) input';
+  const SELECT_SELECTOR = '.manager-component-toolbar .fabricate-select-trigger-form';
 
   function metalWithFire() {
     return [
@@ -1070,7 +1184,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     ];
   }
 
-  it('opts the search field into the 38px rung, through the selector the sheet paints', async () => {
+  it('draws the search field at the 38px shell, through the selector the sheet paints', async () => {
     const root = await browser.mount({
       itemCards: metalWithFire(),
       categoryVocabulary: ['Metal', 'Herb'],
@@ -1082,7 +1196,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     assert.ok(
       // `:scope` here and not on the two constants above.
       field === root.querySelector(':scope [data-component-search] input'),
-      'and it is this bar’s own search input, not another field that happens to carry the rung'
+      'and it is this bar’s own search input, not another field the selector happens to reach'
     );
   });
 
@@ -1102,7 +1216,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       'the category and essence filters both reach the rung, in bar order'
     );
     assert.ok(
-      !root.querySelector('[data-component-sort]').closest('.is-size-38'),
+      root.querySelector('[data-component-sort]').classList.contains('fabricate-select-trigger-toolbar'),
       'and the sort trigger on the second row stays at the `toolbar` rung’s own 34'
     );
     for (const select of rung) {
@@ -1139,7 +1253,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     }
   });
 
-  it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
+  it('and the bar still wears `fabricate-filter-bar`, which is what makes that host real', async () => {
     // Non-vacuity for the selector above: it is two classes and an element.
     const root = await browser.mount({
       itemCards: metalWithFire(),
@@ -1149,7 +1263,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     const bar = root.querySelector('[data-component-toolbar]');
     assert.ok(Boolean(bar), 'the bar renders');
     assert.ok(
-      bar.classList.contains('manager-toolbar'),
+      bar.classList.contains('fabricate-filter-bar'),
       'the section carries the shared bar class the 38px select rule is scoped to'
     );
     assert.ok(
@@ -1257,13 +1371,14 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
       selectedSystemId: 'sys-1',
     });
     // Category names are distinct names and drop the tick; the essence and sort lists keep it.
-    for (const [hook, name, ticked] of [
-      [CATEGORY, 'Filter components by category', false],
-      [ESSENCE, 'Filter components by essence', true],
-      [SORT, 'Sort components', true],
+    // The two filters share the search's row and take its 38px `form` rung; the sort does not.
+    for (const [hook, name, ticked, size] of [
+      [CATEGORY, 'Filter components by category', false, 'form'],
+      [ESSENCE, 'Filter components by essence', true, 'form'],
+      [SORT, 'Sort components', true, 'toolbar'],
     ]) {
       assert.equal(assertSelectHasResolvedName(root, hook), name);
-      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), 'toolbar');
+      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), size);
       assert.equal(
         openSelectPanel(root, hook).classList.contains('fabricate-select-popover-ticked'),
         ticked,

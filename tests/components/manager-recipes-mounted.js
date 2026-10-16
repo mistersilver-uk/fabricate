@@ -240,10 +240,10 @@ export function registerRecipesCases() {
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Player visibility'));
     const enabledRecipeToggle = target.querySelector(
-      '[data-recipe-id="r1"] .manager-status-toggle'
+      '[data-recipe-id="r1"] .fabricate-toggle'
     );
     const disabledRecipeToggle = target.querySelector(
-      '[data-recipe-id="r2"] .manager-status-toggle'
+      '[data-recipe-id="r2"] .fabricate-toggle'
     );
     assert.ok(enabledRecipeToggle, 'enabled recipe row should render the shared status toggle');
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
@@ -280,7 +280,7 @@ export function registerRecipesCases() {
     );
 
     assert.equal(
-      target.querySelector('.manager-pagination'),
+      target.querySelector('.fabricate-pagination'),
       null,
       'pagination should hide while filtered row count is below the page size'
     );
@@ -337,10 +337,16 @@ export function registerRecipesCases() {
     );
     // The inspector is ONE column on the panel background, not five nested boxes.
     assert.equal(
-      target.querySelectorAll('.manager-recipe-browser-inspector .manager-inspector-card').length,
+      target.querySelectorAll('.manager-recipe-browser-inspector .fabricate-card').length,
       0,
       'the inspector sections are micro-labels on the panel, not nested cards'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const rail = target.ownerDocument.createElement('div');
+    rail.innerHTML = '<aside class="manager-recipe-browser-inspector"><section class="fabricate-card"></section></aside>';
+    assert.ok(Boolean(rail.querySelector(':scope .manager-recipe-browser-inspector .fabricate-card')), 'it can match');
     assert.equal(
       target.querySelector('[data-recipe-inspector]').textContent.includes('Recipe details'),
       false,
@@ -354,11 +360,11 @@ export function registerRecipesCases() {
       'recipe inspector hero should render the resolved recipe image, not only a glyph'
     );
 
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
+    const search = target.querySelector('.fabricate-filter-bar input[type="search"]');
     search.value = 'elixir';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
+    target.querySelector('[data-recipe-id="r2"] .fabricate-toggle').click();
 
     // Duplicate and Delete moved to the inspector (issue 643).
     target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
@@ -449,7 +455,7 @@ export function registerRecipesCases() {
     );
     // The recipe-edit header now follows the task/environment convention.
     const recipeEditButtons = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     );
     assert.ok(
       !recipeEditButtons.some((button) => button.textContent.includes('Cancel')),
@@ -526,7 +532,7 @@ export function registerRecipesCases() {
 
     // Return via Back to recipes.
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     assert.ok(backButton, 'the editor offers Back to recipes');
     backButton.click();
@@ -607,6 +613,10 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-pagination')),
+      'past one page the shared pager renders'
+    );
     chooseSelectOption(target, '[data-pagination-size]', 10);
     await tick();
     flushSync();
@@ -626,7 +636,7 @@ export function registerRecipesCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     backButton.click();
     await tick();
@@ -731,7 +741,7 @@ export function registerRecipesCases() {
     flushSync();
 
     const createButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Create recipe'));
     assert.ok(createButton, 'recipes header should offer a Create recipe control');
     createButton.click();
@@ -845,6 +855,113 @@ export function registerRecipesCases() {
     );
   });
 
+  it('saves a result’s typed rolled amount through the header Save, quantity untouched (issue 1516)', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, {
+      recipeOverrides: {
+        resultGroups: [
+          { id: 'g1', name: 'Primary', results: [{ id: 'res-1', componentId: 'c1', quantity: 3 }] },
+        ],
+      },
+    });
+    target.querySelector('#recipe-tab-results').click();
+    await tick();
+    flushSync();
+    const row = target.querySelector('[data-recipe-result-item]');
+    const rolled = row.querySelector(':scope [data-recipe-option-amount-mode="rolled"] input');
+    rolled.checked = true;
+    rolled.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    const field = row.querySelector('[data-recipe-option-formula]');
+    field.value = '1d4+1';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    headerSaveButton(target).click();
+    await tick();
+    flushSync();
+    const updateCalls = calls.filter((call) => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'Save fires exactly one store.updateRecipe');
+    assert.deepEqual(updateCalls[0][2].resultGroups[0].results, [
+      { id: 'res-1', componentId: 'c1', quantity: 3, quantityFormula: '1d4+1' },
+    ]);
+  });
+
+  // Issue 1773: the root hands the editor the system's recipes and its learning observability,
+  // so a knowledge result is offered exactly where a learned entry can become visible.
+  it('offers a knowledge result, naming the system’s recipes, only where learning is observable', async () => {
+    const resultKindsFor = async (visibilityMode) => {
+      const target = await openRecipeEditor([], {
+        selectedSystemOverrides: { resolutionMode: 'simple', visibilityMode },
+        selectedCurrency: { enabled: true, units: [{ id: 'gp', label: 'Gold' }] },
+      });
+      target.querySelector('#recipe-tab-results').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-recipe-add="result-item"]').click();
+      await tick();
+      flushSync();
+      const entries = [...target.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')];
+      return { target, kinds: entries.map((entry) => entry.getAttribute('data-recipe-add')) };
+    };
+    const { target, kinds } = await resultKindsFor('knowledge');
+    assert.deepEqual(kinds, ['result-component', 'result-currency', 'result-knowledge']);
+    target
+      .querySelector(':scope .manager-recipe-result-menu [data-recipe-add="result-knowledge"]')
+      .click();
+    await tick();
+    flushSync();
+    const rows = [...target.querySelectorAll('[data-recipe-result-item]')];
+    const field = rows.at(-1).querySelector('[data-recipe-option-search]');
+    field.focus();
+    field.value = 'heal';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(
+      document.querySelector('[data-recipe-option-suggestion="r1"]'),
+      'the taught recipe is searched from the system’s own recipes'
+    );
+    assert.deepEqual((await resultKindsFor('global')).kinds, [
+      'result-component',
+      'result-currency',
+    ]);
+  });
+
+  // The taught recipe resolves against the system's whole roster, never the library's searched rows,
+  // which a search term carries into the editor (issue 1462's class): `recipes` holds r1 and r2.
+  it('names a taught recipe from the system’s unfiltered roster, which a search does not narrow', async () => {
+    const target = await openRecipeEditor([], {
+      selectedSystemOverrides: { resolutionMode: 'simple', visibilityMode: 'knowledge' },
+      recipeOverrides: {
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'Primary',
+            results: [{ id: 'k1', kind: 'knowledge', recipeId: 'r-antidote', quantity: 1 }],
+          },
+        ],
+      },
+      recipeRoster: [
+        { id: 'r1', name: 'Healing Draught' },
+        { id: 'r2', name: 'Locked Elixir' },
+        { id: 'r-antidote', name: 'Antidote' },
+      ],
+    });
+    target.querySelector('#recipe-tab-results').click();
+    await tick();
+    flushSync();
+    const row = target.querySelector('[data-recipe-result-item]');
+    assert.equal(
+      row.querySelector('.manager-recipe-option-chosen-name')?.textContent,
+      'Antidote',
+      'the taught recipe is named though the searched rows do not hold it'
+    );
+    assert.ok(!row.querySelector('[data-recipe-option-missing]'), 'and is not read as missing');
+  });
+
   it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
     const calls = [];
     const target = await openRecipeEditor(calls, {
@@ -920,7 +1037,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -945,7 +1062,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -977,7 +1094,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -1006,7 +1123,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -1029,15 +1146,15 @@ export function registerRecipesCases() {
     const target = await openRecipeEditor(calls);
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const current = scopeSelect.value;
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== current);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
     assert.ok(other, 'a second crafting system is available to switch to');
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 
@@ -1059,13 +1176,14 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== scopeSelect.value);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 
@@ -1082,6 +1200,32 @@ export function registerRecipesCases() {
       !calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
       'the system is not switched when the discard is cancelled'
     );
+  });
+
+  // The shared Select reports a pick of the ticked row as a change, which the native select never
+  // did; choosing the system already in scope must stay a no-op (issue 1777).
+  it('leaves a dirty recipe editor alone when the GM picks the system already in scope', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+    editRecipeName(target, 'Dirty Draft');
+    await tick();
+    flushSync();
+
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    assert.ok(current, 'the scope select ticks the system in scope');
+    const before = calls.length;
+    chooseSelectOption(target, '[data-manager-scope-select]', current);
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      calls.slice(before).map((call) => call[0]),
+      [],
+      'no discard confirm and no system switch for the ticked system'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
   });
 
   // The Knowledge surface's ROOT wiring (issue 785). The surface's own behaviour is
@@ -1128,13 +1272,16 @@ export function registerRecipesCases() {
 
   // Navigate the mounted manager to the Books & Scrolls surface via the Crafting
   // group and return the surface root for querying.
-  async function openBooksScrolls(calls, storeOptions = {}, services = {}) {
+  async function openBooksScrolls(calls, storeOptions = {}, services = {}, storeMethods = {}) {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+        store: Object.assign(
+          createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+          storeMethods
+        ),
         services: { openCurrentAdmin: () => {}, ...services },
       },
     });
@@ -1343,6 +1490,90 @@ export function registerRecipesCases() {
       'cancelling the discard keeps the editor open'
     );
   });
+
+  // Issue 1721: the guard's discard is observable only where navigation then stops, so the
+  // refused system switch keeps the discarded editor mounted. A second definition shares ri1's
+  // link, so a preview read back off the definitions would name ri1 rather than this one.
+  it('restores the baseline and its linked-item preview when the exit guard discards', async () => {
+    const calls = [];
+    const replacement = { uuid: 'Compendium.mythwright.items.Item.guide', name: 'Guide', img: '' };
+    const reprint = {
+      ...booksScrollsFixtures[0],
+      id: 'ri3',
+      resolvedName: 'Second Printing',
+      resolvedImg: 'icons/sundries/books/book-red-exclamation.webp',
+    };
+    await openBooksScrolls(
+      calls,
+      { recipeItemDefinitions: [...booksScrollsFixtures, reprint] },
+      { resolveToolSource: async (uuid) => (uuid === replacement.uuid ? replacement : null) },
+      {
+        selectSystem: (id) => {
+          calls.push(['selectSystem', id]);
+          return false;
+        },
+      }
+    );
+    target.querySelector('[data-books-scrolls-edit="ri3"]').click();
+    await tick();
+    flushSync();
+    const enabled = () => target.querySelector('[data-recipe-item-enabled]');
+    const previewName = () => target.querySelector('[data-recipe-item-name]').textContent.trim();
+    assert.equal(previewName(), 'Second Printing');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'true');
+
+    enabled().click();
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: replacement.uuid }) },
+    });
+    target.querySelector('[data-item-drop-zone="recipe-item"]').dispatchEvent(drop);
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.equal(previewName(), 'Guide');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'false');
+    assert.ok(target.querySelector('[data-recipe-item-dirty]'));
+
+    await switchScopeSystemTo('smithing');
+    for (let settle = 0; settle < 5; settle += 1) await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'));
+    assert.ok(calls.some((call) => call[0] === 'selectSystem' && call[1] === 'smithing'));
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit',
+      'the refused switch leaves the discarded editor open'
+    );
+    assert.ok(!target.querySelector('[data-recipe-item-dirty]'), 'the draft is its baseline again');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'true');
+    assert.equal(previewName(), 'Second Printing', 'the preview is the baseline’s own link');
+  });
+
+  // Issue 1721: the inspector's quick limit is a live caps write shaped by the visibility mode.
+  for (const [visibilityMode, patch] of [
+    ['item', { item: { limitUses: true, maxUses: 1 } }],
+    ['knowledge', { learn: { limitLearning: false, learnScope: 'perInstance', learnsAllowed: 1 } }],
+  ]) {
+    it(`writes the ${visibilityMode}-mode caps patch from the inspector's quick limit`, async () => {
+      const calls = [];
+      await openBooksScrolls(calls, {
+        recipeItemDefinitions: booksScrollsFixtures,
+        selectedSystemOverrides: { visibilityMode },
+      });
+      target.querySelector('[data-books-scrolls-select="ri1"]').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-item-page-quick-limit-toggle]').click();
+      await tick();
+      flushSync();
+      assert.deepEqual(
+        calls.filter((call) => call[0] === 'updateRecipeItemCaps'),
+        [['updateRecipeItemCaps', 'ri1', patch]]
+      );
+    });
+  }
 
   it('creates a recipe item by dropping a world/compendium item and then opens its editor', async () => {
     const calls = [];

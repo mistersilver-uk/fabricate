@@ -3,7 +3,9 @@
   The world ESSENCE CATALOGUE (issue 1372, epic 1357): one definition per quality — name, icon,
   colour, description — and nothing about what an essence DOES, which is a per-system rule. It
   composes `EntityCatalogueShell` and supplies the row meta run, the world-default card copy, the
-  enabled roll-up card and the inspector's pinned foot action.
+  enabled roll-up card, the inspector's pinned foot action and its bulk face. The bulk face is
+  `EssenceCatalogueBulkPanel`; Apply writes `Icon`/`Colour` to each ticked essence in turn through
+  `actions.updateEntity`, then clears the selection and names any failures (three, then a count).
   AN ESSENCE HAS NO SOURCE ITEM, and that is structural; the shell reads it from
   `scope.sourceLinked` and `scope.hasColorToken`, never from a test of the entity type here. The
   per-system indicator has THREE states and the ROW states only their ROLL-UP. Declared props are
@@ -11,10 +13,11 @@
   to the bundle spread and subscribes every reader to an object new on every publish.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localize, notifyError } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
+  import EssenceCatalogueBulkPanel from './EssenceCatalogueBulkPanel.svelte';
   import Chip from '../../../components/Chip.svelte';
   import {
     essenceColourCaption,
@@ -55,6 +58,8 @@
   }
 
   let selectedId = $state('');
+  // One bulk run at a time: each write loads and saves the whole world essence setting.
+  let bulkApplying = $state(false);
 
   const title = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 
@@ -197,6 +202,88 @@
       }),
     };
   }
+
+  /** One world write; a refusal (`updateEntity` reports none) and a throw both count as failed. */
+  async function writeIdentity(failed, entityId, patch) {
+    try {
+      if ((await actions?.updateEntity?.(entityId, patch)) !== true) failed.push(entityId);
+    } catch {
+      failed.push(entityId);
+    }
+  }
+
+  /** The failed essences as the notice names them: three, then how many more. */
+  function failedNames(failed, names) {
+    const shown = failed.slice(0, 3).map((entityId) => names.get(entityId) ?? entityId);
+    const joined = shown.join(', ');
+    if (failed.length <= 3) return joined;
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedMore',
+      '{names}, and {more} more',
+      { names: joined, more: failed.length - 3 }
+    );
+  }
+
+  /** Names the essences that did not update; silent when every write landed. */
+  function reportIdentityFailures(failed, names, total) {
+    if (failed.length === 0) return;
+    const every = failed.length === total;
+    const single = failed.length === 1;
+    let message;
+    if (every && single) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedAllOne',
+        '{name} could not be updated.',
+        {
+          name: failedNames(failed, names),
+        }
+      );
+    } else if (every) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedAll',
+        'None of the {count} selected essences could be updated: {names}.',
+        { count: total, names: failedNames(failed, names) }
+      );
+    } else if (single) {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailedOne',
+        '{name} could not be updated. The other selected essences were updated.',
+        { name: failedNames(failed, names) }
+      );
+    } else {
+      message = format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.BulkEdit.WriteFailed',
+        '{count} essences could not be updated: {names}. The other selected essences were updated.',
+        { count: failed.length, names: failedNames(failed, names) }
+      );
+    }
+    notifyError(message);
+  }
+
+  /** Write the staged identity to each ticked essence in turn, then drop the selection. */
+  async function applyBulkIdentity(entityIds, edit, clearSelection) {
+    if (bulkApplying) return;
+    bulkApplying = true;
+    // `No colour` stages `null`; the world record's clear is `''`, as the entry's own clear writes.
+    const patch = Object.hasOwn(edit, 'colorToken')
+      ? { ...edit, colorToken: edit.colorToken ?? '' }
+      : { ...edit };
+    // Named now: an essence removed mid-run is no longer in `scope` when the notice is written.
+    const names = new Map(
+      entityIds.map((entityId) => [
+        entityId,
+        String(scope?.entries?.find((entry) => entry.id === entityId)?.entity?.name || entityId),
+      ])
+    );
+    const failed = [];
+    try {
+      for (const entityId of entityIds) await writeIdentity(failed, entityId, patch);
+    } finally {
+      bulkApplying = false;
+      clearSelection();
+      reportIdentityFailures(failed, names, entityIds.length);
+    }
+  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-essences" aria-label={title}>
@@ -234,6 +321,8 @@
       countUnit={text('FABRICATE.Admin.Manager.Scoped.Essence.CountUnit', 'essences')}
       membershipFilter={false}
       autoSelectFirst
+      flushBulkDock
+      bulk={essenceBulkEdit}
       selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.SelectAllShort', 'All')}
       searchPlaceholder={text(
         'FABRICATE.Admin.Manager.Scoped.Essence.SearchPlaceholder',
@@ -250,6 +339,17 @@
     />
   </div>
 </main>
+
+<!-- The inspector's bulk face: the frame swaps it in for the identity panel the moment a row is
+     ticked. `ctx.clearSelection` is the frame's own. -->
+{#snippet essenceBulkEdit(selectedIds, ctx)}
+  <EssenceCatalogueBulkPanel
+    count={selectedIds.length}
+    applying={bulkApplying}
+    onClearSelection={() => ctx?.clearSelection?.()}
+    onApply={(edit) => applyBulkIdentity(selectedIds, edit, () => ctx?.clearSelection?.())}
+  />
+{/snippet}
 
 <!--
   The row's meta run: the three prototype stats, the membership roll-up, and the per-system strip.
@@ -307,17 +407,18 @@
 
 <!--
   THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT rather than left below a system list of
-  arbitrary length. An `InspectorActionButton`, NOT a `ManagerButton`: `role="primary"` emits the
-  SUCCESS family, and the sheet declaring it is closed to this lane.
+  arbitrary length.
 -->
 {#snippet essenceInspectorFoot(entry)}
-  <InspectorActionButton
-    tone="primary"
-    icon="fas fa-arrow-up-right-from-square"
-    label={text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Open definition')}
+  <Button
+    role="primary"
+    fullWidth
     data-scoped-essence-open-entry
-    onClick={() => onOpenEntry(entry.id)}
-  />
+    onclick={() => onOpenEntry(entry.id)}
+  >
+    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+    <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Open definition')}</span>
+  </Button>
 {/snippet}
 
 <style>
@@ -352,7 +453,7 @@
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }

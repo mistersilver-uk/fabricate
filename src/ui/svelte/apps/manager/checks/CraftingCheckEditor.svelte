@@ -21,7 +21,7 @@
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { bandToneFor, bandsAreEditable, describeBandsUnavailable } from './checkBandModel.js';
   import { readonlyBandPicture } from './readonlyBandPicture.js';
@@ -478,7 +478,7 @@
   <!-- The tier list renders under BOTH DC modes: the macro takes the tier's DC as its anchor
          and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
-    <!-- `manager-checks-card`, not the bare `.manager-inspector-card` shell, which pads on TOP of
+    <!-- `manager-checks-card`, not the bare `.fabricate-card` shell, which pads on TOP of
              `CheckRecipeTiers`' own card-body padding and insets the tier rows past the cards above.
              `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both for that reason. -->
     <InspectorCard class="manager-checks-card" data-routed-tiers="">
@@ -521,7 +521,7 @@
           {/if}
         </div>
       </div>
-      <div class="manager-checks-card-body is-roomy">
+      <div class="manager-checks-card-body">
         {#if showPreviewAgainst}
           <div class="manager-checks-preview-against" data-preview-against>
             <span class="manager-checks-preview-against-label" id="checks-preview-against-label">
@@ -532,7 +532,7 @@
               value={selectedPreviewRecordId}
               options={previewAgainstOptions}
               ariaLabelledBy="checks-preview-against-label"
-              triggerData={{ 'data-preview-against-select': '' }}
+              triggerProps={{ 'data-preview-against-select': '' }}
               onChange={selectPreviewRecord}
             />
           </div>
@@ -548,7 +548,7 @@
             leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
-            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
             boundaryLabel={(band, nextBand) =>
               text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
@@ -557,7 +557,7 @@
                 .replace('{from}', band?.name || '')
                 .replace('{to}', nextBand?.name || '')}
             fallbackNote={bandsFallback}
-            dataAttr="data-outcome-band-strip"
+            data-outcome-band-strip
             onChange={applyBandStripChange}
           />
           {#if editableBands}
@@ -632,7 +632,7 @@
                      the empty sentence and NOTHING to press — the state every routed check starts in.
                      Placed BENEATH that sentence, as `CheckRecipeTiers` and `CheckTriggers` do, on the
                      list's own gap, so the populated state is pixel-unchanged. -->
-        <ManagerButton
+        <Button
           role="dashed"
           class="manager-checks-outcome-add"
           data-add-outcome-tier
@@ -645,7 +645,7 @@
               'Add outcome tier'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </InspectorCard>
   {/if}

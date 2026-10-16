@@ -81,8 +81,7 @@
     <EmptyState
       note
       hint={localize('FABRICATE.App.Gathering.Detail.NoRequirements')}
-      dataAttr="data-gathering-no-requirements"
-      dataValue=""
+      data-gathering-no-requirements
     />
   {:else}
     <div class="gathering-task-details-grid">
@@ -99,7 +98,7 @@
                 data-gathering-tool
                 data-tool-state={tool.state}
               >
-                <Medallion art={tool.img || DEFAULT_TOOL_IMG} alt="" size={40} />
+                <Medallion art={tool.img || DEFAULT_TOOL_IMG} alt="" size={38} />
                 <span class="gathering-task-tool-copy">
                   <span class="gathering-task-tool-name" title={tool.name}>{tool.name}</span>
                   <span class="gathering-task-tool-state">{toolStateLabel(tool.state)}</span>
@@ -141,10 +140,10 @@
   }
 
   .gathering-task-subheading {
-    margin: 0 0 6px;
+    margin: 0 0 var(--fab-space-chip);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-text);
@@ -165,7 +164,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -213,7 +212,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     font-size: 11px;
     color: var(--fab-warning-text);
   }
@@ -221,7 +220,7 @@
   .gathering-task-blocked li {
     display: flex;
     align-items: baseline;
-    gap: 5px;
+    gap: var(--fab-space-1);
   }
 
   .gathering-task-blocked i {

@@ -92,7 +92,7 @@ describe('the switch emits its family root on the rendered element, in every hos
     // while every re-rooted rule in the sheet keeps matching.
     assert.deepEqual(
       composedClasses(),
-      ['fabricate-toggle', 'manager-status-toggle'],
+      ['fabricate-toggle'],
       'the switch emits its family root and its hook class, in that order, before the expression ' +
         'the composed-class reader truncates at'
     );
@@ -107,9 +107,7 @@ describe('the switch emits its family root on the rendered element, in every hos
 
       // THE WHOLE ATTRIBUTE, by equality. `classList.contains(root)` cannot see a root that
       // arrived second, and the position is what the area-scope gate depends on.
-      const expected = ['fabricate-toggle', 'manager-status-toggle', hostClass(host.as), 'is-on']
-        .filter(Boolean)
-        .join(' ');
+      const expected = ['fabricate-toggle', hostClass(host.as), 'is-on'].filter(Boolean).join(' ');
       assert.equal(emittedClasses(node), expected);
     });
   }
@@ -119,10 +117,7 @@ describe('the switch emits its family root on the rendered element, in every hos
     assert.equal(hostClass('checkbox'), 'manager-tool-setting-toggle');
     const target = await harness.mount({ as: 'checkbox', on: false, ariaLabel: 'Inherit' });
     const label = target.querySelector('label');
-    assert.equal(
-      emittedClasses(label),
-      'fabricate-toggle manager-status-toggle manager-tool-setting-toggle is-off'
-    );
+    assert.equal(emittedClasses(label), 'fabricate-toggle manager-tool-setting-toggle is-off');
     const input = label.querySelector('input[type="checkbox"]');
     assert.ok(Boolean(input), 'the checkbox host renders the input the label is measured against');
     assert.equal(input.getAttribute('class'), 'manager-tool-setting-toggle-input');
@@ -136,7 +131,7 @@ describe('the switch emits its family root on the rendered element, in every hos
     });
     assert.equal(
       emittedClasses(target.querySelector('button')),
-      'fabricate-toggle manager-status-toggle manager-environment-override-toggle is-on'
+      'fabricate-toggle manager-environment-override-toggle is-on'
     );
   });
 
@@ -191,5 +186,17 @@ describe('the switch declares itself focused to Foundry, on the host that needs 
       'data-keyboard-focus': 'false',
     });
     assert.equal(target.querySelector('button').getAttribute('data-keyboard-focus'), 'false');
+  });
+
+  it('renders the label with the manager-status-toggle-label class when label prop is set', async () => {
+    const target = await harness.mount({
+      as: 'button',
+      on: false,
+      label: 'Override?',
+    });
+
+    const label = target.querySelector('.manager-status-toggle-label');
+    assert.ok(Boolean(label), 'the label element renders when a label prop is provided');
+    assert.equal(label.textContent, 'Override?', 'the label displays the provided text');
   });
 });

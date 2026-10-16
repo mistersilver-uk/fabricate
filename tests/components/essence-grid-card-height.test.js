@@ -6,16 +6,19 @@
  * content difference to explain it. A previous round answered "the cards are equal height"
  * by looking at that same image, which is how the defect survived a review.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import test from 'node:test';
+
 import { chromium } from 'playwright';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
-const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+const fabricateCss = readStylesheet();
 
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
@@ -84,8 +87,8 @@ function card(essence) {
   </button>
   <label class="fab-selection-checkbox"><input type="checkbox" class="fab-selection-input"><span class="fab-selection-check is-lg"><i class="fas fa-check"></i></span></label>
   <div class="fab-library-card-footer">
-    <button type="button" class="fabricate-toggle manager-status-toggle ${essence.off ? 'is-off' : 'is-on'}"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>
-    <span class="fab-library-card-footer-end"><button type="button" class="fabricate-icon-button manager-icon-button manager-essence-edit"><i class="fas fa-pen"></i></button></span>
+    <button type="button" class="fabricate-toggle ${essence.off ? 'is-off' : 'is-on'}"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>
+    <span class="fab-library-card-footer-end"><button type="button" class="fabricate-icon-button manager-essence-edit"><i class="fas fa-pen"></i></button></span>
   </div>
 </li>`;
 }

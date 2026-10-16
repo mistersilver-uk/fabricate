@@ -1,18 +1,22 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { describe, it, before, after, afterEach } from 'node:test';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
+import { chipToneOf } from '../helpers/chipTone.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
-import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
-import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readStylesheet());
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -102,9 +106,10 @@ describe('ShoppingList mounted behavior', () => {
     const rows = card.querySelectorAll('.crafting-shopping-acquire-row');
     assert.equal(rows.length, 1, 'only the unsatisfied component appears');
     assert.match(rows[0].textContent, /Spring Water/);
-    const chip = rows[0].querySelector('.crafting-shopping-chip.tone-danger');
-    assert.ok(chip, 'red owned chip');
+    const chip = rows[0].querySelector('[data-shopping-chip]');
+    assert.equal(chipToneOf(chip), 'danger', 'red owned chip');
     assert.match(chip.textContent, /Owned/, 'chip uses the owned localization key');
+    assert.equal(chipGroundAlpha(chip, THEMES), 1, 'the have/need chip stands on a solid ground');
   });
 
   it('hides the acquire-components card when nothing is missing', async () => {
@@ -143,7 +148,7 @@ describe('ShoppingList mounted behavior', () => {
     // face, so it is read by that tile's own hook rather than by a retired class.
     const thumb = card.querySelector('[data-medallion="glyph"]');
     assert.ok(thumb, 'essence icon tile rendered');
-    assert.match(thumb.getAttribute('style'), /28px/, 'shopping glyph keeps 28px geometry');
+    assert.match(thumb.getAttribute('style'), /width: 26px; height: 26px; --fab-medallion-glyph: 11px;/, 'the 26px rung and its 11px glyph');
     assert.ok(thumb.querySelector('i').classList.contains('fa-fire'));
     assert.match(card.textContent, /"have":0,"need":2/, 'have/need remains visible');
     assert.equal(summaryCount(target, 'components'), '1');
@@ -237,7 +242,10 @@ describe('ShoppingList mounted behavior', () => {
       onIncrement: (id) => inc.push(id)
     });
 
-    target.querySelector('.crafting-shopping-remove').click();
+    const remove = target.querySelector('.crafting-shopping-remove');
+    assert.ok(remove.classList.contains('fabricate-icon-button'), 'the shared icon button');
+    assert.match(remove.getAttribute('aria-label'), /Shopping\.Remove/);
+    remove.click();
     flushSync();
     assert.deepEqual(removed, ['recipe-1'], 'onRemove called with the recipe id');
     assert.deepEqual(
@@ -374,7 +382,7 @@ const CURRENCY_REASON =
   'Currency configuration is invalid: Currency unit "Gold" is missing an actor data path.';
 
 function chipIn(target) {
-  return target.querySelector('.crafting-shopping-acquire-row .crafting-shopping-chip');
+  return target.querySelector('.crafting-shopping-acquire-row [data-shopping-chip]');
 }
 
 describe('ShoppingList currency rows (issue 1493)', () => {
@@ -413,7 +421,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       `the chip must name neither the placeholder balance nor the price: "${chip.textContent}"`
     );
     assert.equal(chip.getAttribute('data-shopping-chip'), 'currency');
-    assert.ok(chip.classList.contains('tone-danger'), 'a real shortfall is a danger chip');
+    assert.equal(chipToneOf(chip), 'danger', 'a real shortfall is a danger chip');
     assert.ok(!row.querySelector('[data-shopping-chip="ratio"]'), 'and never the ratio chip');
   });
 
@@ -438,7 +446,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     const chip = chipIn(target);
     assert.equal(chip.textContent.trim(), '2 / 4 owned', 'a component row keeps its ratio');
     assert.equal(chip.getAttribute('data-shopping-chip'), 'ratio');
-    assert.ok(chip.classList.contains('tone-danger'));
+    assert.equal(chipToneOf(chip), 'danger');
   });
 
   // A cost refused for a CONFIGURATION reason (revision 3).
@@ -461,11 +469,11 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       !/afford/i.test(chip.textContent),
       `a solvent player must not be told they cannot pay: "${chip.textContent}"`
     );
-    assert.ok(
-      chip.classList.contains('tone-warning'),
+    assert.equal(
+      chipToneOf(chip),
+      'warning',
       'the world is misconfigured — that is not the player\'s fault, so it is not danger'
     );
-    assert.ok(!chip.classList.contains('tone-danger'));
     assert.equal(chip.getAttribute('data-shopping-chip'), 'currency-unavailable');
     assert.equal(chip.getAttribute('title'), CURRENCY_REASON, 'hovering names the reason');
   });
@@ -518,9 +526,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       !/afford/i.test(chip.textContent),
       `neither verdict was established, so neither may be shown: "${chip.textContent}"`
     );
-    assert.ok(chip.classList.contains('tone-neutral'));
-    assert.ok(!chip.classList.contains('tone-danger'));
-    assert.ok(!chip.classList.contains('tone-warning'));
+    assert.equal(chipToneOf(chip), 'neutral');
     assert.equal(chip.getAttribute('data-shopping-chip'), 'currency-unchecked');
     assert.equal(
       chip.getAttribute('title'),
@@ -642,6 +648,9 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       entries: [ENTRY],
     });
 
+    const cards = [...target.querySelectorAll('.crafting-shopping-card')];
+    assert.ok(cards.every((card) => card.matches('section.fabricate-card')));
+    assert.ok(target.querySelector('.crafting-shopping-clear.fab-manager-button.is-ghost'));
     const kickers = [...target.querySelectorAll('.crafting-shopping-card .fab-kicker')];
     assert.equal(
       kickers.length,

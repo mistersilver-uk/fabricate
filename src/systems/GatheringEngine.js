@@ -10,7 +10,6 @@ import { GatheringListingBuilder } from '../ui/presenters/GatheringListingBuilde
 import {
   buildInteractiveRollOptions,
   checkFlavorSuffix,
-  promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
@@ -20,7 +19,6 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import {
-  evaluateSituationalBonus,
   resolveCheckFormulaDisplay,
   resolveRolledFormula,
   runFormulaProgressive,
@@ -53,6 +51,12 @@ import {
   passThroughAttempt,
 } from './gatheringAttemptResolution.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
+import {
+  answeredD100Roll,
+  describeD100Check,
+  evaluatePreparedD100Check,
+  offersD100Prompt,
+} from './gatheringD100Check.js';
 import {
   actorMatchesId,
   blindWaitingTaskId,
@@ -469,7 +473,7 @@ export class GatheringEngine {
         'INVALID_COMPLETION_MODE'
       );
     }
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const retainedStart = this._findVersionedStartRun({
       actor,
       operationId: trusted.operationId,
@@ -531,7 +535,7 @@ export class GatheringEngine {
       },
       { requireOperationId: false }
     );
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
     this._assertVersionedRunExecutable(run, { requireReady: true });
     const resolvedRun = this._hydrateBlindWaitingRun(run);
@@ -542,10 +546,16 @@ export class GatheringEngine {
     ) {
       return { required: false };
     }
+    if (offersD100Prompt({ task: resolved.task, run })) {
+      return describeD100Check({ actor, run, ...resolved, localize: this.localize });
+    }
     return this._versionedCheckDescriptor({ actor, run, ...resolved });
   }
 
   evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {}, sender = null } = {}) {
+    if (privateEvaluation?.mode === 'd100') {
+      return evaluatePreparedD100Check({ actor, privateEvaluation, decision });
+    }
     const evaluate = this.versionedRunAuthority?.evaluatePreparedRunCheck;
     if (typeof evaluate !== 'function') {
       throw gatheringLifecycleError(
@@ -579,7 +589,7 @@ export class GatheringEngine {
       expectedRevision,
       requestId,
     });
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const anyRun = this.runManager?.getRun?.(actor, runId) ?? null;
     const committed = anyRun?.executionJournal
       ? getCommittedExecutionOutcome(anyRun.executionJournal, requestId)
@@ -679,7 +689,7 @@ export class GatheringEngine {
       expectedRevision,
       requestId,
     });
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
     this._assertVersionedRunExecutable(run, {
       expectedRevision,
@@ -3079,6 +3089,12 @@ export class GatheringEngine {
     interactive = false,
     resolvedCheckResult = null,
   }) {
+    if (sourceTask.resolutionMode !== 'd100' && resolvedCheckResult?.data?.d100) {
+      return misconfiguredOutcome({
+        code: 'CHECK_MODE_MISMATCH',
+        message: 'A d100 answer reached a non-d100 task',
+      });
+    }
     const task = { ...sourceTask, resultGroups: linkResultGroups(sourceTask.resultGroups) };
     let outcome;
     switch (task.resolutionMode) {
@@ -3091,7 +3107,8 @@ export class GatheringEngine {
         break;
       }
       case 'd100': {
-        return this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive });
+        const answer = answeredD100Roll(resolvedCheckResult);
+        return this._resolveD100Outcome({ viewer, actor, system, environment, task, ...answer });
       }
       case 'progressive': {
         return this._resolveProgressiveOutcome({
@@ -3898,7 +3915,15 @@ export class GatheringEngine {
     return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
-  async _resolveD100Outcome({ viewer, actor, system, environment, task, interactive = false }) {
+  async _resolveD100Outcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    attemptRoll = null,
+    extraModifier = 0,
+  }) {
     if (typeof this.richState?.resolveD100Attempt !== 'function') {
       return misconfiguredOutcome({
         code: 'MISSING_D100_RESOLVER',
@@ -3911,32 +3936,7 @@ export class GatheringEngine {
     const eventModifier = Number(
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
-
-    // An undisclosed blind draw is named to no one, neither in the roll prompt nor in the pooled
-    // `Nd100` flavour `toMessage` posts to the table. Resolved before the attempt, so a reveal
-    // this attempt earns names the task on the result card instead.
-    const identityHidden = this._isBlindIdentityHidden({ environment, viewer, actor, task });
-    const rollLabel = identityHidden
-      ? this.localize(BLIND_TASK_LABEL_KEY)
-      : (task?.name ?? 'Gathering');
-
-    // Interactive d100: each row and event is its own percentile check, so there is no DC; the
-    // prompt collects a flat situational modifier, and a dismissal is a zero-mutation cancel.
-    let extraModifier = 0;
-    if (checkRequest(interactive).interactive) {
-      const choice = await promptCheckRoll({
-        label: `${rollLabel} — Gathering`,
-        name: identityHidden ? rollLabel : task?.name,
-        actorName: actor?.name,
-        activity: 'Gathering',
-        img: identityHidden ? null : task?.img,
-      });
-      if (!choice || choice.confirmed === false) return cancelledOutcome();
-      // The bonus is free text, so a dice expression is rolled to a scalar rather than becoming
-      // NaN and then 0; each throw takes a flat modifier.
-      extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
-    }
-
+    // The answered face and bonus, else a silent roll with no bonus (a timed or unprompted run).
     const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
@@ -3945,12 +3945,8 @@ export class GatheringEngine {
       system,
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
-      // Dice So Nice and the bonus apply only to an interactive attempt.
-      animate: checkRequest(interactive).interactive,
+      attemptRoll,
       extraModifier,
-      rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
-      speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
-      flavor: `${rollLabel} — Gathering check`,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({

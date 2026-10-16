@@ -8,6 +8,7 @@ import { get } from 'svelte/store';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
+import { censusDelta, censusOf, writeCensus } from '../helpers/domCensus.js';
 import { shippedString, useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { downtimeProvider } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -16,12 +17,17 @@ import {
   settleDowntimeProvider,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { DOWNTIME_NAV_CENSUS } from './manager-downtime-nav-census.js';
 import {
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
+
+const DOWNTIME_NAV_CENSUS_FILE = resolve(import.meta.dirname, 'manager-downtime-nav-census.js');
+// The first state the census walks, and the one the others are pinned as a difference from.
+const DOWNTIME_NAV_CENSUS_BASE = 'the Core preview with its group opened off the route';
 
 let Component;
 let mounted;
@@ -276,7 +282,8 @@ export function registerDowntimeCases() {
       ['true', null, null, null]
     );
     assert.equal(
-      target.querySelectorAll('[aria-current="page"]').length,
+      // The rail's own: the breadcrumb trail's leaf is the current page of ITS nav (issue 1777).
+      target.querySelector('.manager-rail').querySelectorAll('[aria-current="page"]').length,
       1,
       'the route is current once — the children mark themselves within the set, not as pages'
     );
@@ -505,7 +512,7 @@ export function registerDowntimeCases() {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
-    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip.
+    // `[data-world-downtime-lock]` on the rail, not `.manager-editor-tab-lock` on the strip.
     assert.ok(
       !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
@@ -732,11 +739,13 @@ export function registerDowntimeCases() {
     const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
     await settleDowntimeProvider();
 
-    assert.equal(titlebarPremium().textContent.trim(), 'PREMIUM');
+    assert.equal(titlebarPremium().querySelector('[aria-hidden="true"]').textContent, 'PREMIUM');
     assert.equal(
-      titlebarPremium().getAttribute('aria-label'),
-      'Fabricate Premium is installed and connected'
+      titlebarPremium().querySelector('.visually-hidden')?.textContent,
+      'Fabricate Premium is installed and connected',
+      'the badge is named by visually hidden text, not aria-label (issue 2257 D4)'
     );
+    assert.ok(!titlebarPremium().hasAttribute('aria-label'), 'the badge carries no aria-label');
     assert.equal(
       titlebarPremium().getAttribute('title'),
       'Fabricate Premium is installed and connected'
@@ -778,7 +787,8 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
 
     assert.equal(
-      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      target.querySelector('[data-manager-titlebar-premium]')?.querySelector('[aria-hidden="true"]')
+        ?.textContent,
       'PREMIUM',
       'an unrecognised companion surface still proves the premium module is installed'
     );
@@ -819,7 +829,8 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
 
     assert.equal(
-      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      target.querySelector('[data-manager-titlebar-premium]')?.querySelector('[aria-hidden="true"]')
+        ?.textContent,
       'PREMIUM',
       'a player-window-only companion still proves the premium module is installed'
     );
@@ -1216,6 +1227,7 @@ export function registerDowntimeCases() {
     assert.ok(status.classList.contains('manager-chip'), 'a lookalike would be a second chip');
     assert.ok(status.classList.contains('is-warning'));
     assert.ok(status.classList.contains('is-truncated'), 'and truncates like Core’s own');
+    assert.ok(status.classList.contains('is-header'), 'at the header’s 38 rung (issue 2257 D10)');
     assert.equal(status.textContent.trim(), 'Unsaved');
     assert.equal(
       status.getAttribute('title'),
@@ -1223,7 +1235,11 @@ export function registerDowntimeCases() {
       'Core renders the string it is given — localization stays the companion’s'
     );
 
-    // Core's own Back / Delete / Save treatments, reachable through the seam at last.
+    // Core's own Back / Delete / Save treatments, reachable through the seam at last, on the
+    // 38 rung Core's own header actions stand on (issue 2257 D10).
+    for (const id of ['back', 'delete', 'save']) {
+      assert.ok(headerAction(id).classList.contains('is-size-38'), `${id} stands at 38`);
+    }
     assert.ok(headerAction('back').classList.contains('is-ghost'));
     assert.ok(Boolean(headerAction('back').querySelector('.fa-arrow-left')));
     assert.ok(headerAction('delete').classList.contains('is-danger'));
@@ -2507,6 +2523,78 @@ export function registerDowntimeCases() {
       assert.ok(!downtimeRollup(), 'Core does not summarise its own preview to itself');
       assert.equal(downtimePremiumState(), 'preview', 'and the loud gold sell is untouched');
     });
+  });
+
+  // The group's rendered DOM in each mode and disclosure state (issue 1777): the preview's padlocks
+  // and note, a companion's badges, rollup and names, and which row is current, by value.
+  it('emits the same Downtime group DOM, attribute for attribute, in each of its states', async () => {
+    const openCore = () =>
+      mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    const press = async (control) => {
+      control().click();
+      await settleRouteExit();
+    };
+    const openToggle = () => target.querySelector('[data-world-downtime-toggle]');
+    const states = {
+      [DOWNTIME_NAV_CENSUS_BASE]: async () => {
+        openCore();
+        await press(openToggle);
+      },
+      'the Core preview with its group closed': async () => openCore(),
+      'the Core preview on one of its own tabs': async () => {
+        openCore();
+        await press(() => worldNavItem('downtime'));
+      },
+      'a badged companion with its group closed': () => mountBadgedDowntimeManager(),
+      'a badged companion on one of its own tabs': async () => {
+        await mountBadgedDowntimeManager();
+        await press(() => worldNavItem('downtime'));
+      },
+      'the Core preview with its group open on a collapsed rail': async () => {
+        openCore();
+        await press(openToggle);
+        await press(railToggleControl);
+      },
+      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
+      'a badged companion with its group open on a collapsed rail': async () => {
+        await mountBadgedDowntimeManager();
+        await press(openToggle);
+        await press(railToggleControl);
+      },
+    };
+
+    const censuses = {};
+    for (const [state, open] of Object.entries(states)) {
+      useShippedLocalization();
+      await open();
+      const group = target.querySelector('[data-world-downtime-section]');
+      assert.ok(Boolean(group), `the Downtime group renders in "${state}"`);
+      censuses[state] = censusOf(group);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+    const base = censuses[DOWNTIME_NAV_CENSUS_BASE];
+    const observed = {
+      base,
+      deltas: Object.fromEntries(
+        Object.entries(censuses)
+          .filter(([state]) => state !== DOWNTIME_NAV_CENSUS_BASE)
+          .map(([state, census]) => [state, censusDelta(base, census)])
+      ),
+    };
+    if (process.env.UPDATE_DOWNTIME_NAV_CENSUS) {
+      writeCensus(DOWNTIME_NAV_CENSUS_FILE, 'downtime-nav', observed);
+      return;
+    }
+    assert.deepEqual(
+      observed,
+      DOWNTIME_NAV_CENSUS,
+      'the Downtime group’s emitted DOM moved. Re-derive the literal with ' +
+        'UPDATE_DOWNTIME_NAV_CENSUS=1 node --conditions=browser --test ' +
+        'tests/components/manager-mounted.test.js and say in the commit what moved and why.'
+    );
   });
 
   // AC-15, the reachable half. `manager-contract.test.js` counts the two badge render sites; this

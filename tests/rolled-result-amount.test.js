@@ -135,6 +135,34 @@ test('1645: the resolver rolls once against the actor, floors the total and clam
   assert.equal(calls.length, 3, 'one roll per call, never two');
 });
 
+test('1516: a roll whose total is not finite is a refused award, never 0 and never `quantity`', async () => {
+  // Seeded answers, standing in for core: a path resolving to a string totals a non-number, and a
+  // division by a zero-valued path totals Infinity.
+  const { Roll, calls } = seededRollClass({
+    totals: { '1d4 + @details.race': 'Elf', '1d4 / @bonus': Infinity },
+  });
+  const actor = { getRollData: () => ({ details: { race: 'Elf' }, bonus: 0 }) };
+  for (const quantityFormula of ['1d4 + @details.race', '1d4 / @bonus']) {
+    await assert.rejects(
+      () => resolveRolledAmount({ quantity: 3, quantityFormula }, actor, { Roll }),
+      (error) => error instanceof RangeError && error.message.includes(quantityFormula),
+      quantityFormula
+    );
+  }
+  assert.equal(calls.length, 2, 'each was rolled once before it was refused');
+
+  // Core throws on the string term during evaluation instead; that throw reaches the caller too.
+  class StringTermRoll extends Roll {
+    async evaluate() {
+      throw new Error('Unresolved StringTerm Elf requested for evaluation');
+    }
+  }
+  await assert.rejects(
+    () => resolveRolledAmount({ quantityFormula: '@details.race' }, actor, { Roll: StringTermRoll }),
+    /StringTerm/
+  );
+});
+
 test('1645: the resolver throws rather than falling back to an ambient Roll', async () => {
   const previous = globalThis.Roll;
   delete globalThis.Roll;

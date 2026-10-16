@@ -8,9 +8,13 @@
   | --- | --- | --- | --- |
   | `expanded` | boolean | `false` | Whether the controlled region is open. |
   | `controls` | element id | `''` | The region this discloses. Required for `aria-controls` to mean anything. |
-  | `label` | pre-localized string | `''` | The accessible name. It names the row, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. Emitted only when non-empty (issue 1512): an empty `aria-label` is a label of nothing, and it overrides the name the element would otherwise take from its content. |
-  | `side` / `disabled` / `dataAttr` / `dataValue` | `'trailing'` \| `'leading'` / boolean / strings | `'trailing'` / `false` / `''` | Which way the collapsed chevron points, whether the `<button>` is disabled, and an optional test/screenshot hook. |
+  | `ariaLabel` | pre-localized string | `''` | The accessible name. It names the row, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. Emitted only when non-empty (issue 1512): an empty `aria-label` is a label of nothing, and it overrides the name the element would otherwise take from its content. |
+  | `side` / `disabled` / `class` | `'trailing'` \| `'leading'` / boolean / class string | `'trailing'` / `false` / `''` | Which way the collapsed chevron points, whether the `<button>` is disabled, and an extra class appended to the primitive's own. |
   | `onToggle()` | function | no-op | The caller owns `expanded`. |
+
+  Rest spread:
+  - `{...rest}` lands on the `<button>`, written after `class` and before its `onclick`, and
+    carries a caller's `data-*` hook.
 
   Invariants:
   - It declares `data-keyboard-focus="true"` (issue 1512), or Foundry's `KeyboardManager#hasFocus`
@@ -23,15 +27,14 @@
   let {
     expanded = false,
     controls = '',
-    label = '',
+    ariaLabel = '',
     side = 'trailing',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     onToggle = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
 
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const collapsedIcon = $derived(
     side === 'leading' ? 'fas fa-chevron-right' : 'fas fa-chevron-down'
   );
@@ -40,14 +43,14 @@
 
 <button
   type="button"
-  class="fab-row-disclosure"
+  class={['fab-row-disclosure', extraClass]}
   class:is-expanded={expanded}
   aria-expanded={expanded}
   aria-controls={controls || undefined}
-  aria-label={label || undefined}
+  aria-label={ariaLabel || undefined}
   data-keyboard-focus="true"
   {disabled}
-  {...hookAttributes}
+  {...rest}
   onclick={() => onToggle(!expanded)}
 >
   <i class={icon} aria-hidden="true"></i>

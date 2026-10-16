@@ -1,9 +1,6 @@
 /** `styles/fabricate.css` may not carry a rule block that matches nothing (issue 1498). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   FOUNDRY_CORE_CLASSES,
@@ -12,9 +9,15 @@ import {
   declaredClasses,
   ruleBlocks,
 } from '../scripts/lib/stylesheetLiveClasses.js';
+import { locateStylesheetLine, readStylesheet } from '../scripts/lib/stylesheetSource.js';
 
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { physicalSite } from './helpers/logicalStylesheet.js';
+
 const SHEET = 'styles/fabricate.css';
+
+/** A block's `<partial>:<line>-<endLine>`, both ends counted in the partial that holds it. */
+const blockSite = (block) =>
+  `${physicalSite(SHEET, block.line)}-${locateStylesheetLine(block.endLine).line}`;
 
 /** The one exemption, and it is temporary (issue 1480). */
 const AVAILABILITY_MENU_PREFIX = 'manager-availability-';
@@ -22,7 +25,7 @@ const AVAILABILITY_MENU_PREFIX = 'manager-availability-';
 /** The chat-card block prefixes, whose every declared class must be live. See the file header. */
 const CHAT_CARD_PREFIXES = Object.freeze(['fabricate-craft-chat', 'fabricate-gather-chat']);
 
-const css = readFileSync(path.join(REPO_ROOT, SHEET), 'utf8');
+const css = readStylesheet();
 const live = buildLiveClassSet();
 const exempt = (name) => name.startsWith(AVAILABILITY_MENU_PREFIX);
 
@@ -35,7 +38,7 @@ test('the live-class scan is alive, so the assertions below cannot pass on an em
 test('styles/fabricate.css carries no rule block that matches nothing', () => {
   const dead = deadRuleBlocks(css, live, { exempt });
   const report = dead
-    .map((block) => `  ${SHEET}:${block.line}-${block.endLine}  ${block.selector}\n` +
+    .map((block) => `  ${blockSite(block)}  ${block.selector}\n` +
       `      no source emits: ${block.deadClasses.join(', ')}`)
     .join('\n');
 

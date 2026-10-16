@@ -208,7 +208,8 @@ const ROUTES = Object.freeze({
     kicker: '',
     title: 'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
     subtitle: 'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle',
-    actionsLabel: SYSTEM_ACTIONS,
+    // Named for the Premium advert, the one thing its group can hold (issue 2220).
+    actionsLabel: 'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueActions',
     actionsFamily: 'none',
   },
   'world-component-entry': {
@@ -384,6 +385,9 @@ describe('headerModel', () => {
         allSystems: [],
         selectedCharacterPrerequisites: [],
         selectedSystemModifiers: [],
+        experimentalFeaturesEnabled: false,
+        premiumInstalled: false,
+        services: null,
         ...overrides,
       })
     );
@@ -411,16 +415,19 @@ describe('headerModel', () => {
         downtimeHeaderArtwork: read('downtimeHeaderArtwork'),
         enabledPartyCount: read('enabledPartyCount'),
         essenceRulesMode: read('essenceRulesMode'),
+        experimentalFeaturesEnabled: read('experimentalFeaturesEnabled'),
         format: () => (key) => key,
         gatheringTabPageHint: read('gatheringTabPageHint'),
         gatheringTabPageTitle: read('gatheringTabPageTitle'),
         playerCharacterUuids: read('playerCharacterUuids'),
+        premiumInstalled: read('premiumInstalled'),
         recipeDraft: read('recipeDraft'),
         recipeEditSubtitle: () => () => RECIPE_SUBLINE,
         selectedCharacterPrerequisites: read('selectedCharacterPrerequisites'),
         selectedCurrencyUnits: read('selectedCurrencyUnits'),
         selectedSystem: read('selectedSystem'),
         selectedSystemModifiers: read('selectedSystemModifiers'),
+        services: read('services'),
         showEssenceSourceUi: read('showEssenceSourceUi'),
         text: () => (key) => key,
         travelParties: read('travelParties'),
@@ -587,6 +594,47 @@ describe('headerModel', () => {
     inputs.set('recipeDraft', null);
     flushSync();
     assert.equal(model.headingVariant, 'default', 'and closes again when the draft is dropped');
+  });
+
+  it('shows the Premium advert live, and once dismissed hides it for every route', () => {
+    const writes = [];
+    const services = {
+      getSetting: () => undefined,
+      setSetting: async (...args) => {
+        writes.push(args);
+      },
+    };
+    const { model, inputs } = openModel('world-components', {
+      experimentalFeaturesEnabled: true,
+      services,
+    });
+    assert.equal(model.premiumIconsAdVisible, true);
+    assert.equal(model.actionsFamily, 'world', 'the advert reopens the catalogue group');
+
+    inputs.set('premiumInstalled', true);
+    flushSync();
+    assert.equal(model.premiumIconsAdVisible, false, 'a Premium surface registered after mount');
+    assert.equal(model.actionsFamily, 'none');
+
+    inputs.set('premiumInstalled', false);
+    inputs.set('currentView', 'components');
+    flushSync();
+    assert.equal(model.premiumIconsAdVisible, true);
+
+    model.dismissPremiumIconsAd();
+    flushSync();
+    assert.deepEqual(writes, [['premiumIconsAdDismissed', true]]);
+    assert.equal(model.premiumIconsAdVisible, false);
+    inputs.set('currentView', 'world-components');
+    flushSync();
+    assert.equal(model.premiumIconsAdVisible, false, 'the dismissal holds across a route move');
+    assert.equal(model.actionsFamily, 'none');
+  });
+
+  it('starts dismissed in a world whose setting already says so', () => {
+    const services = { getSetting: (key) => key === 'premiumIconsAdDismissed' };
+    const { model } = openModel('components', { experimentalFeaturesEnabled: true, services });
+    assert.equal(model.premiumIconsAdVisible, false);
   });
 
   it('follows the essence source gate, which picks between two ledes on one route', () => {

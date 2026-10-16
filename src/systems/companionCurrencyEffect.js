@@ -59,16 +59,41 @@ async function readBalance(prepared) {
   }
 }
 
-/** Marker and value ride in one `actor.update`; the value path must already be on `_source`. */
-async function creditActorProperty(prepared, { marker, beforeWrite }) {
-  const { actor, unit, amount, profile } = prepared;
+/** Whether the inventory spender can read the balance now; a pending read is not a refusal. */
+function balanceReadable({ actor, unit, profile, spender }) {
+  try {
+    const read = spender.readCoins?.(actor, { profile, unit, units: profile.units });
+    return typeof read?.then === 'function' || read?.valid === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The checks a credit would fail at write time, made without writing: an `actorProperty` refund
+ * must build and every path it writes must already be on `_source`, and an `actorInventory`
+ * balance must be readable. Answers `{ reason, detail? }`, or `{ updates }` once they hold.
+ */
+export function creditPreconditions(prepared) {
+  const { actor, unit, amount, profile, strategy } = prepared;
+  if (strategy === 'actorInventory') {
+    return balanceReadable(prepared) ? {} : { reason: 'balanceUnreadable' };
+  }
+  if (strategy !== 'actorProperty') return {};
   const planned = buildCurrencyRefundUpdates(actor, { unit: unit.id, amount }, profile.units);
-  if (!planned.valid) return knownFailure(null, 'refundInvalid', planned.message ?? null);
+  if (!planned.valid) return { reason: 'refundInvalid', detail: planned.message ?? null };
   const paths = Object.keys(planned.updates ?? {});
   if (paths.length === 0 || paths.some((path) => getByPath(actor._source, path) == null)) {
-    return knownFailure(null, 'currencySourceMissing');
+    return { reason: 'currencySourceMissing' };
   }
-  const intent = intentOf(prepared, postValuesOf(planned.updates));
+  return { updates: planned.updates };
+}
+
+/** Marker and value ride in one `actor.update`; the value path must already be on `_source`. */
+async function creditActorProperty(prepared, { marker, beforeWrite }) {
+  const { reason, detail = null, updates } = creditPreconditions(prepared);
+  if (reason) return knownFailure(null, reason, detail);
+  const intent = intentOf(prepared, postValuesOf(updates));
   if ((await beforeWrite(intent)) !== true) return settled('notAttempted', intent, null, null);
   const ctx = { ...prepared.ctx, markerUpdate: markerUpdateFor(marker) };
   const { answer, result } = await refundOnce(prepared, intent, ctx);
@@ -162,6 +187,7 @@ export function createCurrencyCreditKind(seams) {
       target: { actorUuid: credit.actor.uuid },
       write: (context) => write(credit, context),
       probe: (subwrite, marker) => probeCredit(credit, subwrite, marker),
+      preconditions: () => creditPreconditions(credit),
     }));
     return { replayClass, units };
   }

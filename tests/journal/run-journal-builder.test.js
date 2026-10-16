@@ -2440,7 +2440,7 @@ test('an unbegun stage with no route chosen waits on the player rather than on t
   // Guidance, not an alarm: an unbegun stage is ordinary play.
   assert.equal(notice(run).tone, 'info');
   assert.equal(notice(run).blocking, false);
-  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+  assert.equal(notice(run).hooks['data-journal-awaiting-choice'], 'true');
   assert.equal(notice(run).title, 'FABRICATE.App.Journal.Notice.ChoiceTitle');
 });
 
@@ -2503,7 +2503,7 @@ test('an untimed stage keeps its choices open for its whole life and says so', (
   assert.equal(run.actions.setSelection, true);
   assert.equal(run.currentStep.selectionAvailability.essencePool.requirements[0].owned, 3);
   assert.equal(run.awaitingChoice, true, 'the pool is coverable; the allocation is what is missing');
-  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+  assert.equal(notice(run).hooks['data-journal-awaiting-choice'], 'true');
 
   // The ABSENT allocation, which is what the engine actually refuses: the resolver SUGGESTS
   // one and reports success, so only the persisted-plan question separates it from a ready
@@ -2546,8 +2546,7 @@ test('a known material shortfall reads as materials, never as a choice', () => {
   // `beginVersionedStage`'s own "Missing required items" refusal.
   assert.equal(run.actions.atStageStart, true);
   assert.equal(run.actions.beginStep, false);
-  assert.equal(notice(run).dataAttr, 'data-journal-action-blocker');
-  assert.equal(notice(run).dataValue, 'selectionRequired');
+  assert.equal(notice(run).hooks['data-journal-action-blocker'], 'selectionRequired');
   assert.equal(notice(run).title, 'FABRICATE.App.Journal.Actions.SelectionRequired');
 });
 
@@ -2563,7 +2562,7 @@ test('a shortfall choosing cannot repair is never reported as a choice', () => {
   assert.equal(shortEssence.actions.execute, false);
   assert.equal(shortEssence.actions.disabledReason, 'essenceRequired');
   assert.equal(runAttentionPresentation(shortEssence).kind, 'essences');
-  assert.equal(notice(shortEssence).dataValue, 'essenceRequired');
+  assert.equal(notice(shortEssence).hooks['data-journal-action-blocker'], 'essenceRequired');
 
   const currency = new IngredientSet({ id: 'coin', ingredientGroups: [{ id: 'fee',
     options: [{ match: { type: 'currency', unit: 'gp', amount: 10 } }] }] });
@@ -2574,7 +2573,7 @@ test('a shortfall choosing cannot repair is never reported as a choice', () => {
   assert.equal(unaffordable.actions.execute, false, 'a price the actor cannot pay refuses the stage');
   assert.equal(unaffordable.actions.disabledReason, 'currencyRequired');
   assert.equal(runAttentionPresentation(unaffordable).kind, 'currency');
-  assert.equal(notice(unaffordable).dataValue, 'currencyRequired');
+  assert.equal(notice(unaffordable).hooks['data-journal-action-blocker'], 'currencyRequired');
 });
 
 test('a started stage and a paused run hold the choices they already made', () => {
@@ -2596,7 +2595,7 @@ test('a started stage and a paused run hold the choices they already made', () =
   assert.equal(paused.currentStep.selectionAvailability.staleRoute, true, 'the stage plan itself is open');
   assert.equal(paused.awaitingChoice, false, 'a paused run waits on a resume, not on a pick');
   assert.equal(runAttentionPresentation(paused), null);
-  assert.equal(notice(paused).dataAttr, 'data-journal-paused');
+  assert.deepEqual(notice(paused).hooks, { 'data-journal-paused': 'true' });
 });
 
 // Issue 1648, M21. A started stage's materials are gone, so the held/needed probe that describes an
@@ -2727,7 +2726,7 @@ test('a started stage whose locked route is deleted reports the edit, not an imp
   assert.equal(orphaned.actions.execute, false, 'and the engine refuses the stage either way');
   assert.equal(orphaned.actions.disabledReason, 'routeUnavailable');
   assert.equal(orphaned.actions.cancel, true, 'cancel is the way out that actually exists');
-  assert.equal(notice(orphaned).dataValue, 'routeUnavailable');
+  assert.equal(notice(orphaned).hooks['data-journal-action-blocker'], 'routeUnavailable');
 });
 
 test('the projection reads a stage duration exactly as the run manager arms it', () => {
@@ -2901,6 +2900,36 @@ test('two stale singleton groups can be repaired incrementally without replacing
   assert.equal(contested.choices[0].options[0].available, false);
   assert.equal(contested.choices[0].options[0].candidates[0].available, false);
   assert.equal(contested.success, false);
+});
+
+test('a candidate is measured against the stage remainder the held stock can fund', () => {
+  const option = (id, quantity = 1) => ({ quantity, match: { type: 'component', componentId: id } });
+  const project = (groups, stock) => {
+    const set = new IngredientSet({ id: 'remainder', ingredientGroups: groups });
+    const actor = { ...ACTOR, isOwner: true, items: Object.entries(stock).map(([id, quantity]) => ({
+      id, uuid: `Actor.actor-1.Item.${id}`, name: id, system: { quantity },
+    })) };
+    const plan = { selectedIngredientSetId: set.id, ingredientOptionOverrides: { pick: { optionIndex: 0 } } };
+    const raw = activeSingleStepRun({ lifecycleVersion: 1, steps: [{ stepId: 's0', selectionPlan: plan }] });
+    const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', ingredientSets: [set] }] };
+    return makeBuilder({ active: [raw], recipe,
+      ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match.componentId === item.id,
+    }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep.selectionAvailability;
+  };
+  const fuel = { id: 'fuel', options: [option('coal', 2)] };
+
+  // The fixed rivet claims the only iron even though no coal is held at all.
+  const claimed = project([{ id: 'pick', options: [option('iron')] }, { id: 'rivet', options: [option('iron')] }, fuel], { iron: 1 });
+  assert.equal(claimed.success, false);
+  assert.deepEqual(claimed.choices[0].options[0].candidates.map(({ claimed: units, available }) => [units, available]), [[1, false]]);
+
+  // Another group that can take copper instead leaves the iron unclaimed, and the coal locks nothing.
+  const flexible = project([{ id: 'pick', options: [option('iron'), option('tin')] },
+    { id: 'metal', options: [option('iron'), option('copper')] }, fuel], { iron: 1, copper: 1 });
+  assert.equal(flexible.success, false);
+  const [iron, tin] = flexible.choices[0].options;
+  assert.deepEqual([iron.available, iron.held, iron.candidates[0].claimed, iron.candidates[0].available], [true, 1, 0, true]);
+  assert.deepEqual([tin.available, tin.held, tin.candidates], [false, 0, []], 'an unheld option reads none held');
 });
 
 test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
@@ -3211,7 +3240,7 @@ test('current-step availability delegates material choices and shared essence al
       system.components.find((component) => component.id === componentId) ?? null,
   }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
 
-  assert.equal(calls.length, 5, 'selected plan, three authored options and one pinned held-item candidate use the canonical resolver');
+  assert.equal(calls.length, 7, 'selected plan, one remainder per group, three authored options and one pinned held-item candidate use the canonical resolver');
   assert.equal(calls[0].items[0], held);
   assert.deepEqual(calls[0].options.essenceAllocation, { 'Item.ember': 2 });
   assert.equal(calls[0].options.resolveItemEssences(held).fire, 1);
@@ -3256,6 +3285,7 @@ test('current-step availability delegates material choices and shared essence al
                 available: true,
               },
             ],
+            held: 3,
           },
           {
             index: 1,
@@ -3268,6 +3298,7 @@ test('current-step availability delegates material choices and shared essence al
             need: 1,
             available: false,
             candidates: [],
+            held: 0,
           },
         ],
       },
@@ -3315,6 +3346,7 @@ test('current-step availability delegates material choices and shared essence al
           need: 2,
           available: true,
           candidates: [],
+          held: 0,
         },
       },
     ],

@@ -77,15 +77,15 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: calc(var(--fab-space-2xs) / 2);
+    gap: 1px;
     min-width: 0;
     box-sizing: border-box;
     height: 44px;
     min-height: 44px;
     margin: 0;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
+    border-radius: 11px;
     appearance: none;
     -webkit-appearance: none;
     background: var(--fab-bg-1);

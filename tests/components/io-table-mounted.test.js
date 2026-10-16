@@ -1,22 +1,25 @@
 /** IoTable (issue 917) as the requirement surface's COMPOSITION ROOT. */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
 
-import {
-  createMountedComponentHarness,
-  CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
   essenceChoiceCraftability,
   essenceCraftability,
   sharedEssenceCraftability,
 } from '../helpers/crafting-fixtures.js';
-import { chipToneOf } from '../helpers/chipTone.js';
+import {
+  createMountedComponentHarness,
+  CRAFTING_APP_RAW_MODULES,
+  CRAFTING_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readStylesheet());
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -53,6 +56,14 @@ function optionChoice(groupId, groupName) {
   };
 }
 
+/** The open panel's alternative tiles, and the pressable button each wraps. */
+function alternativesIn(root) {
+  return [...root.querySelectorAll('[data-requirement-alternative]')];
+}
+function alternativeButtons(root) {
+  return alternativesIn(root).map((tile) => tile.querySelector('button'));
+}
+
 function twoChoiceCraftability() {
   return craftability({
     canCraft: false,
@@ -80,6 +91,23 @@ describe('IoTable mounted behavior', () => {
     });
     assert.ok(!target.querySelector('[data-recipe-section="requirement-rail"]'));
     assert.ok(target.querySelector('[data-io-group="outputs"]'));
+  });
+
+  it('1773: previews a choice group as its caption over its alternatives', async () => {
+    const members = [
+      { name: 'Gem', img: null, qty: 2 },
+      { name: 'Gold', kind: 'currency', glyph: 'fa-solid fa-coins', qty: 3, amountText: '3 gp' },
+    ];
+    const target = await harness.mount({
+      craftability: null,
+      result: { items: [{ kind: 'group', name: 'You choose one of…', members }] },
+    });
+    const group = target.querySelector('[data-io-output="group"]');
+    assert.equal(group.querySelector('.fab-well').getAttribute('aria-label'), 'You choose one of…');
+    assert.deepEqual(
+      [...group.querySelectorAll('.crafting-io-output-name')].map((node) => node.textContent),
+      ['Gem', 'Gold']
+    );
   });
 
   it('always states the consumption plan alongside the rail', async () => {
@@ -110,25 +138,27 @@ describe('IoTable mounted behavior', () => {
       craftability: twoChoiceCraftability(),
       openSlotId: 'g-metal',
     });
-    const groups = [...target.querySelectorAll('[role="radiogroup"]')];
-    assert.equal(groups.length, 1, 'one focused group, not one per choice');
-    assert.equal(groups[0].getAttribute('data-alt-group'), 'g-metal');
+    const panels = [...target.querySelectorAll('[data-requirement-panel]')];
+    assert.equal(panels.length, 1, 'one focused group, not one per choice');
+    assert.equal(panels[0].getAttribute('data-requirement-panel'), 'g-metal');
+    assert.deepEqual(
+      alternativesIn(target).map((tile) => tile.textContent.trim().replaceAll(/\s+/g, ' ')),
+      ['1/1 Metal A', '0/1 Metal B']
+    );
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
-  it('preserves the alternatives roving-tabindex radio model inside the rail', async () => {
+  it('draws the open group’s options as pressable tiles, the chosen one pressed', async () => {
     const target = await harness.mount({
       craftability: twoChoiceCraftability(),
+      chosenGroupIds: ['g-herb'],
       openSlotId: 'g-herb',
     });
-    const radios = [...target.querySelectorAll('[role="radio"]')];
     assert.deepEqual(
-      radios.map((radio) => [radio.getAttribute('aria-checked'), radio.getAttribute('tabindex')]),
-      [
-        ['true', '0'],
-        ['false', '-1'],
-      ]
+      alternativeButtons(target).map((button) => button.getAttribute('aria-pressed')),
+      ['true', 'false']
     );
+    assert.ok(!target.querySelector('[role="radiogroup"]'), 'no option radios beside them');
   });
 
   it('routes the chosen option back through onChooseOption', async () => {
@@ -138,7 +168,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'g-herb',
       onChooseOption: (groupId, choice) => calls.push([groupId, choice]),
     });
-    target.querySelectorAll('[role="radio"]')[1].click();
+    alternativeButtons(target)[1].click();
     assert.deepEqual(calls.at(-1), ['g-herb', { optionIndex: 1 }]);
   });
 
@@ -148,7 +178,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'essence-pool',
     });
     assert.ok(target.querySelector('[data-recipe-section="essence-pool"]'));
-    assert.ok(!target.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(target).length, 0);
     assert.equal(
       target.querySelectorAll('[data-essence-meter]').length,
       2,
@@ -162,7 +192,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'essence-pool',
       idPrefix: 'fabricate-req-step-1',
     });
-    const panel = target.querySelector('[data-recipe-section="essence-pool"]');
+    const panel = target.querySelector('[data-recipe-section="essence-pool"]').closest('[role="region"]');
     const tile = target.querySelector('[data-slot-kind="essence"]');
     assert.equal(panel.getAttribute('id'), 'fabricate-req-step-1-panel');
     assert.equal(tile.getAttribute('aria-controls'), 'fabricate-req-step-1-panel');
@@ -175,7 +205,7 @@ describe('IoTable mounted behavior', () => {
       craftability: twoChoiceCraftability(),
       openSlotId: 'g-herb',
     });
-    const panel = target.querySelector('[role="radiogroup"]').closest('[aria-labelledby]');
+    const panel = alternativesIn(target)[0].closest('[aria-labelledby]');
     assert.equal(panel.getAttribute('role'), 'region');
     assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-herb');
   });
@@ -191,10 +221,8 @@ describe('IoTable mounted behavior', () => {
     const [region] = regions;
     assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
     assert.equal(region.getAttribute('aria-labelledby'), 'fabricate-slot-g-primal');
-    assert.equal(
-      region.querySelector('[role="radiogroup"]').getAttribute('data-alt-group'),
-      'g-primal'
-    );
+    assert.equal(region.getAttribute('data-requirement-panel'), 'g-primal');
+    assert.equal(alternativesIn(region).length, 2, 'the group’s alternatives come first');
     const pool = region.querySelector('[data-recipe-section="essence-pool"]');
     assert.ok(pool, 'the pool renders inside the alternatives region');
     assert.ok(!pool.hasAttribute('id'), 'only the region carries the panel id');
@@ -211,7 +239,7 @@ describe('IoTable mounted behavior', () => {
         calls.push([groupId, choice]);
       },
     });
-    target.querySelector('[role="region"]').querySelectorAll('[role="radio"]')[0].click();
+    alternativeButtons(target.querySelector('[role="region"]'))[0].click();
     assert.deepEqual(calls.at(-1), ['g-primal', { optionIndex: 0 }]);
   });
 
@@ -241,10 +269,10 @@ describe('IoTable mounted behavior', () => {
       },
     });
     const target = await harness.mount({ craftability: mixed, openSlotId: 'essence-pool' });
-    const pool = target.querySelector('[data-recipe-section="essence-pool"]');
-    assert.equal(pool.getAttribute('id'), 'fabricate-req-panel');
-    assert.equal(pool.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
-    assert.ok(!target.querySelector('[role="radiogroup"]'), 'no group was opened');
+    const panel = target.querySelector('[data-recipe-section="essence-pool"]').closest('[role="region"]');
+    assert.equal(panel.getAttribute('id'), 'fabricate-req-panel');
+    assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
+    assert.equal(alternativesIn(target).length, 0, 'no group was opened');
   });
 
   it('shows only the open group when two choice groups both chose an essence', async () => {
@@ -264,9 +292,10 @@ describe('IoTable mounted behavior', () => {
       }),
       openSlotId: 'g-ember',
     });
-    const groups = [...target.querySelectorAll('[role="radiogroup"]')];
     assert.deepEqual(
-      groups.map((group) => group.getAttribute('data-alt-group')),
+      [...target.querySelectorAll('[data-requirement-panel]')].map(
+        (panel) => panel.dataset.requirementPanel
+      ),
       ['g-ember']
     );
     assert.equal(target.querySelectorAll('[data-recipe-section="essence-pool"]').length, 1);
@@ -280,7 +309,7 @@ describe('IoTable mounted behavior', () => {
     });
     const region = target.querySelector('[role="region"]');
     assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
-    assert.ok(region.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(region).length, 2);
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
@@ -301,7 +330,7 @@ describe('IoTable mounted behavior', () => {
       readOnly: true,
     });
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
-    assert.ok(!target.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(target).length, 0);
     assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
   });
 
@@ -368,6 +397,154 @@ describe('IoTable mounted behavior', () => {
     // The word and the count stay two children.
     assert.equal(have.querySelectorAll('span').length, 2, 'the reading is a word and a count');
     assert.match(have.textContent.replaceAll(/\s+/g, ' ').trim(), /2$/, 'the count is the holding');
+    // Read over artwork of unknown colour, so both stand on an opaque ground.
+    assert.equal(chipGroundAlpha(have, THEMES), 1, 'the have chip is solid');
+    assert.equal(chipGroundAlpha(need, THEMES), 1, 'and so is the need chip');
+  });
+
+  it('states a pool overshoot in the consumption plan, one line per essence', async () => {
+    const base = essenceCraftability();
+    const [carrier] = base.essencePool.carriers;
+    const over = essenceCraftability({
+      essencePool: { ...base.essencePool, carriers: [{ ...carrier, allocatedUnits: 3 }] },
+    });
+    const target = await harness.mount({ craftability: over, openSlotId: 'essence-pool' });
+    const plan = target.querySelector('[data-recipe-section="consumption-plan"]');
+    const line = plan.querySelector('[data-consumption-overshoot="radiant"]');
+    // Three units of two against a need of four.
+    assert.match(line.textContent, /ConsumptionPlan\.Overshoot/);
+    assert.match(line.textContent, /"essence":"Radiant"/);
+    assert.match(line.textContent, /"amount":2/);
+
+    harness.remount();
+    const exact = await harness.mount({ craftability: base, openSlotId: 'essence-pool' });
+    assert.ok(!exact.querySelector('[data-consumption-overshoot]'), 'no surplus, no line');
+  });
+
+  it('flags a held stack short of the open slot\'s need, from the slot the rail opened', async () => {
+    const target = await harness.mount({
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [choiceState('g-wood', 'Hardwood', { need: 2, choiceCount: 0 })],
+        ingredientChoices: [
+          {
+            kind: 'stack',
+            groupId: 'g-wood',
+            groupName: 'Hardwood',
+            optionIndex: 0,
+            selectedHeldItemId: 'Item.oak',
+            stacks: [
+              { itemId: 'Item.oak', name: 'Oak Haft', img: null, have: 12 },
+              { itemId: 'Item.bog', name: 'Bog Oak', img: null, have: 1 },
+            ],
+          },
+        ],
+      }),
+      openSlotId: 'g-wood',
+    });
+    const [oak, bog] = target.querySelectorAll(':scope [data-alt-kind="stack"] [role="radio"]');
+    assert.ok(!oak.classList.contains('is-short'), 'twelve held against a need of two');
+    assert.ok(bog.classList.contains('is-short'), 'one held against a need of two');
+    const reading = target.querySelector(`[id="${bog.getAttribute('aria-describedby')}"]`);
+    assert.match(reading.textContent, /"have":1.*"need":2/);
+  });
+
+  it('opens the pool for an essence slot only, never beside a plain choice', async () => {
+    const pooled = essenceCraftability();
+    const target = await harness.mount({
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [choiceState('g-herb', 'Herb'), ...pooled.ingredientStates],
+        ingredientChoices: [optionChoice('g-herb', 'Herb')],
+        essencePool: pooled.essencePool,
+      }),
+      openSlotId: 'g-herb',
+    });
+    assert.equal(alternativesIn(target.querySelector('[data-requirement-panel="g-herb"]')).length, 2);
+    assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
+  });
+
+  // Issue 1782: the three groups are `DataTable`s, each headed, row-headed by its name column.
+  describe('the essence, tool and output tables', () => {
+    const IO = 'FABRICATE.App.Crafting.Io';
+    const groupOf = (target, name) => target.querySelector(`[data-io-group="${name}"]`);
+    const rowsOf = (target, name) => [
+      ...groupOf(target, name).querySelectorAll(':scope tbody tr.fabricate-data-table-row'),
+    ];
+    const mountAll = () =>
+      harness.mount({
+        craftability: craftability({
+          essenceStates: [
+            { type: 'aether', name: 'Aether', need: 1, have: 1, satisfied: true },
+            { type: 'ember', name: 'Ember', need: 3, have: 1, satisfied: false },
+          ],
+          toolStates: [
+            { componentId: 't1', name: 'Mortar', img: null, available: true },
+            { componentId: 't2', name: 'Tongs', img: null, available: false },
+          ],
+        }),
+        result: {
+          items: [
+            { name: 'Potion', img: null, qty: 2 },
+            { name: 'Gold', kind: 'currency', qty: 3, amountText: '3 gp' },
+            { kind: 'group', name: 'You choose one of…', members: [{ name: 'Gem', qty: 1 }] },
+          ],
+        },
+      });
+
+    it('heads each group and puts every row`s name in a row-scoped th', async () => {
+      const target = await mountAll();
+      for (const [name, heading] of [
+        ['essences', `${IO}.Essences`],
+        ['tools', `${IO}.Tools`],
+        ['outputs', `${IO}.Output`],
+      ]) {
+        assert.equal(
+          groupOf(target, name).querySelector('.fabricate-data-table-heading').textContent,
+          heading
+        );
+        for (const row of rowsOf(target, name)) {
+          assert.equal(row.children[0].tagName, 'TH', `a ${name} row is headed by its name`);
+          assert.equal(row.children[0].getAttribute('scope'), 'row');
+        }
+      }
+    });
+
+    it('marks each essence and tool row met or unmet, and states a tool`s status', async () => {
+      const target = await mountAll();
+      const met = (name) => rowsOf(target, name).map((row) => row.dataset.ioSatisfied);
+      assert.deepEqual(met('essences'), ['true', 'false']);
+      assert.deepEqual(met('tools'), ['true', 'false']);
+      assert.deepEqual(
+        rowsOf(target, 'tools').map((row) => row.children[1].textContent.trim()),
+        [`${IO}.Available`, `${IO}.Unavailable`]
+      );
+    });
+
+    it('right-aligns each output amount in mono, and a choice group states none', async () => {
+      const target = await mountAll();
+      const amounts = rowsOf(target, 'outputs').map((row) => row.children[1]);
+      assert.deepEqual(
+        amounts.map((cell) => cell.textContent.trim()),
+        ['×2', '3 gp', '—']
+      );
+      for (const cell of amounts) {
+        assert.ok(cell.classList.contains('is-align-end') && cell.classList.contains('is-mono'));
+      }
+      assert.ok(
+        Boolean(amounts[2].querySelector('.crafting-io-output-none')),
+        'the group’s dash is the muted none mark, not an amount'
+      );
+    });
+
+    it('draws no essence or tool table for a set that needs neither', async () => {
+      const target = await harness.mount({
+        craftability: craftability(),
+        result: { items: [{ name: 'Potion', img: null, qty: 1 }] },
+      });
+      assert.ok(!groupOf(target, 'essences') && !groupOf(target, 'tools'));
+      assert.ok(Boolean(groupOf(target, 'outputs')), 'precondition: the outputs table draws');
+    });
   });
 
   it('draws an unavailable tool as a danger chip with its own glyph', async () => {

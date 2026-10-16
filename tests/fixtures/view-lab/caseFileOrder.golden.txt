@@ -13,6 +13,7 @@ scripts/lib/view-lab-cases/managerWorldPartiesAndDowntime.js
 scripts/lib/view-lab-cases/managerWorldTravel.js
 scripts/lib/view-lab-cases/managerSystemTools.js
 scripts/lib/view-lab-cases/managerKnowledge.js
+scripts/lib/view-lab-cases/managerSpecimens.js
 scripts/lib/view-lab-cases/playerInventory.js
 scripts/lib/view-lab-cases/playerGatheringAndCrafting.js
 scripts/lib/view-lab-cases/playerJournal.js

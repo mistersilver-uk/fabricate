@@ -13,7 +13,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
+  import { TOOL_BREAKAGE_TRACK, toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -35,6 +36,7 @@
     authority = 'toolSpecific',
     componentOptions = [],
     itemTags = [],
+    tagComponentCounts = null,
     essenceOptions = [],
     currencyUnits = [],
     currencyEnabled = false,
@@ -96,14 +98,7 @@
       : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific');
   }
 
-  function formattedText(key, data, fallback) {
-    const template = localize(key);
-    if (template && template !== key) return localize(key, data);
-    return Object.entries(data).reduce(
-      (copy, [name, value]) => copy.replace(`{${name}}`, String(value)),
-      fallback
-    );
-  }
+  const formattedText = (key, data, fallback) => localizeOr(key, fallback, data);
 
   // WHERE THE MODE CAME FROM: `default` means this system follows the world's answer and the line
   // names it, which is the `World default` chip the rules list wears.
@@ -341,7 +336,7 @@
         selectedValue={breakageChoice}
         groupName="tool-breakage-mode"
         columns={2}
-        dataGroup="tool-breakage-mode"
+        data-radio-card-group="tool-breakage-mode"
         optionDataAttr="data-tool-breakage-choice"
         onChange={changeMode}
       />
@@ -410,7 +405,7 @@
             )}
             rangeLabel={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
             resolveColor={toolBreakageChanceColor}
-            trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+            trackGradient={TOOL_BREAKAGE_TRACK}
             controlClass="manager-tool-breakage-chance-control"
             numberInputProps={{
               'data-tool-breakage-chance-input': '',
@@ -463,7 +458,7 @@
         selectedValue={tool?.checkBreakable === false ? 'immune' : 'breakable'}
         groupName="tool-check-breakable"
         columns={2}
-        dataGroup="tool-breakability"
+        data-radio-card-group="tool-breakability"
         optionDataAttr="data-tool-breakability-choice"
         onChange={(value) => onPatch({ checkBreakable: value === 'breakable' })}
       />
@@ -512,7 +507,7 @@
         groupName="tool-on-break"
         columns={3}
         disabled={immune}
-        dataGroup="tool-on-break"
+        data-radio-card-group="tool-on-break"
         optionDataAttr="data-tool-on-break-choice"
         onChange={setOnBreakMode}
       />
@@ -542,6 +537,7 @@
           groups={tool?.repairRequirements || []}
           {componentOptions}
           {itemTags}
+          {tagComponentCounts}
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}

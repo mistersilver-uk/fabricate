@@ -16,6 +16,7 @@ import {
   createManagerMutation,
   installCraftingJournalRunAuthority,
 } from '../systems/journalRunCommands.js';
+import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { engineWithStationPresence } from '../systems/stationPresence.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
@@ -469,6 +470,26 @@ function buildStageOperations(fabricate) {
   };
 }
 
+/** The award-choice leg: settle a pending reward pick under its own `chooseAward` grant, on an
+ *  active or terminal run (issue 1773). */
+function buildAwardChoiceOperations(fabricate) {
+  return {
+    chooseAward: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const settle = fabricate.craftingEngine?.settleAwardChoice;
+      if (typeof settle !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return settle.call(fabricate.craftingEngine, {
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+        choiceId: payload.choiceId,
+        picks: payload.picks,
+      });
+    },
+  };
+}
+
 /** The run-manager mutations, each taken inside the authority claim. */
 function buildRunMutationOperations(fabricate, managerMutation) {
   return {
@@ -494,7 +515,7 @@ function buildRunMutationOperations(fabricate, managerMutation) {
         )
       ),
     setSelection: (args) => {
-      const recipe = fabricate.recipeManager?.getRecipe?.(args.run.recipeId);
+      const recipe = resolveRunRecipe(args.run, fabricate.recipeManager);
       const step = recipe?.getExecutionSteps?.()?.[args.payload.stepIndex];
       const selection = args.payload.selectionPlan ?? {};
       const selectedId = String(selection.selectedIngredientSetId ?? '').trim();
@@ -548,6 +569,7 @@ function createCraftingJournalOperations(fabricate, getService) {
     ...buildRunStartOperations(fabricate),
     ...buildCheckOperations(fabricate, authorizeRollHandoff),
     ...buildStageOperations(fabricate),
+    ...buildAwardChoiceOperations(fabricate),
     ...buildRunMutationOperations(fabricate, managerMutation),
     authorizeRollHandoff,
   };

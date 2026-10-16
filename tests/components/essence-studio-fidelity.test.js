@@ -1,16 +1,27 @@
 /** The GM Essence Studio's PROTOTYPE-FIDELITY contract (issue 1036). */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
+import { renderedNodes } from '../helpers/structureShapes.js';
+import {
+  attributeValue,
+  declaresAttribute,
+  importsModule,
+  passesProp,
+  propNone,
+} from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-const colourPopoverSource = read('src/ui/svelte/components/ManagerColorPopover.svelte');
+const colourPopoverSource = read('src/ui/svelte/components/TintPicker.svelte');
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
 // The GRID card's anatomy and look now live in the shared studio-library primitive.
@@ -24,12 +35,15 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 // that matches nothing.
 const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
-const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
+const INSPECTOR = 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte';
+const BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const VIEW_TOGGLE = 'src/ui/svelte/components/ViewToggle.svelte';
+const inspectorSource = read(INSPECTOR);
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
 const segmentedControlSource = read('src/ui/svelte/components/SegmentedControl.svelte');
-const globalCss = read('styles/fabricate.css');
+const globalCss = readStylesheet();
 
 // The scoped `<style>` block of a component.
 function styleBlock(source) {
@@ -210,10 +224,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'and the min-width without which overflow never engages on a flex item'
     );
     // The full name stays reachable. Truncation that loses text is a defect, not a fix.
-    assert.ok(
-      rowSource.includes('nameTitle={essence.name}'),
-      'the whole name survives as a title'
-    );
+    assert.ok(rowSource.includes('nameTitle={essence.name}'), 'the whole name survives as a title');
     // LIST rows are untouched: a 76px row beside a clamped description has the width.
     assert.equal(
       /\.manager-system-name \{/.test(styleBlock(rowSource)),
@@ -222,66 +233,63 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
-  it('renders every inspector action through the shared point-of-arrival button', () => {
-    // The rendered symptom: chunky rail buttons at the app's inherited body size beside a
-    // Tool Studio whose header buttons are 0.72rem, and a PRIMARY painted in the success
-    // family — `Edit essence` was green where the design's primary, and the recipe and
-    // component inspectors one click away, are the accent.
+  it('renders every inspector action through the Button primitive at full width (issue 1521)', () => {
+    // Each verb takes the role its verb names; a manager primary is the success family
+    // (library.html section 16).
+    const inspector = componentAstOf(INSPECTOR);
     assert.ok(
-      inspectorSource.includes(
-        "import InspectorActionButton from '../InspectorActionButton.svelte';"
-      ),
-      'the inspector imports the shared button'
+      importsModule(inspector, '../../../components/Button.svelte'),
+      'the inspector imports the button primitive'
     );
-    // TOKEN-AWARE, not a prefix (issue 1502). The family is rooted at the class the primitive
-    // emits, so a hand-rolled site now spells `class="fabricate-button manager-button …"` — and
-    // `class="manager-button` no longer matches it. The probe would have gone quietly blind at
-    // exactly the moment the spelling it guards against changed, which is the failure mode this
-    // whole family of guards exists to prevent. Bounded to one `<tag …>` span so that a message
-    // literal or a JS string mentioning the class cannot pose as fixture markup: this file holds
-    // a `'<BulkEditSection'` string whose unterminated attribute run would otherwise swallow the
-    // prose below it.
+    const roles = Object.fromEntries(
+      renderedNodes(inspector, 'Button').map((node) => {
+        assert.ok(declaresAttribute(node, 'fullWidth'), 'every rail verb spans the rail');
+        return [attributeValue(node, 'data-essence-action'), attributeValue(node, 'role')];
+      })
+    );
+    assert.deepEqual(roles, {
+      edit: 'primary',
+      delete: 'danger',
+      'copy-source': 'ghost',
+      'unlink-source': 'warning',
+    });
+    // TOKEN-AWARE, not a prefix (issue 1502), and bounded to one `<tag …>` span so that a message
+    // literal mentioning the class cannot pose as fixture markup.
     const handRolled = [...inspectorSource.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)]
       .flatMap((tag) => [...tag[0].matchAll(/class="([^"]*)"/g)].map(([, value]) => value))
-      .filter((value) => value.split(/\s+/).includes('manager-button'));
+      .filter((value) => value.split(/\s+/).includes('fabricate-button'));
     assert.deepEqual(handRolled, [], 'and hand-rolls no manager button of its own');
-    const primitive = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/InspectorActionButton.svelte'),
-      'utf8'
-    );
-    const styles = styleBlock(primitive);
-    assert.ok(
-      /\.fab-inspector-action \{[^}]*font-size: 0\.72rem;/s.test(styles),
+
+    // The paint is the global sheet's, so the rail and every other manager cluster agree.
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.fab-manager-button \{[^}]*font-size: 0\.72rem;/,
       'at the Tool Studio header label size, which is the treatment the maintainer named'
     );
-    assert.ok(
-      /\.fab-inspector-action\.is-primary \{[^}]*background: var\(--fab-accent\);/s.test(styles),
-      'with the primary in the ACCENT family'
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.is-primary:not\(:disabled\) \{[^}]*background: var\(--fab-success\);/,
+      'with the primary in the SUCCESS family'
     );
-    assert.ok(
-      /\.fab-inspector-action\.is-danger \{[^}]*color: var\(--fab-danger-text\);/s.test(styles),
-      'and the danger treatment preserved on delete'
+    // The quiet verb stays unfilled (issue 1372, maintainer parity round 6): Copy is `ghost`,
+    // whose manager rule sits on the pane. Delete is `danger`, whose rule states only its ink and
+    // edge, so it wears the family's resting fill like every other manager danger verb.
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.fab-manager-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
+      'the ghost verb sits ON the pane, bounded by --fab-border'
     );
-    // THE TWO UNFILLED TONES STAY UNFILLED (issue 1372, maintainer parity round 6).
-    for (const [selector, pattern] of [
-      ['neutral', /\.fab-inspector-action \{[^}]*background: transparent;/s],
-      ['danger', /\.fab-inspector-action\.is-danger \{[^}]*background: transparent;/s],
-    ]) {
-      assert.ok(
-        pattern.test(styles),
-        `the ${selector} tone must sit ON the pane, not a rung above it — an unfilled button ` +
-          'bounded by --fab-border is what the rail and the prototype both already use'
+    const danger =
+      /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
+        globalCss
       );
-    }
-    // It must beat Foundry's host button geometry itself.
-    for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {
-      assert.ok(styles.includes(declaration), `the Foundry button reset states ${declaration}`);
-    }
-    // Its CSS is co-located, never in the global sheet.
+    assert.ok(danger, 'the danger role still has its resting rule');
+    assert.match(danger[1], /color: var\(--fab-danger-text\);/, 'in danger text');
+    assert.doesNotMatch(danger[1], /background/, 'and no fill of its own');
     assert.equal(
       globalCss.includes('fab-inspector-action'),
       false,
-      'the primitive owns its appearance in its own scoped block'
+      'the retired rail button left no rule behind'
     );
   });
 
@@ -289,14 +297,14 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // The rendered symptom (maintainer feedback).
     const styles = styleBlock(bulkDeleteCardSource);
     assert.ok(
-      /:global\(\.manager-inspector-card\.fab-bulk-delete-card \.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
+      /:global\(\.fabricate-card\.fab-bulk-delete-card \.fabricate-button\) \{[^}]*font-size: 0\.72rem;/s.test(
         styles
       ),
       'the delete card scopes its button to the shared inspector-action label size'
     );
     // Scoped to the delete card only.
     assert.equal(
-      styles.includes('.manager-button.is-danger'),
+      styles.includes('.fabricate-button.is-danger'),
       false,
       'the colour treatment is not re-declared here, only the type scale'
     );
@@ -339,9 +347,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'so the picker + reset row beneath fills the tile width instead of sizing itself'
     );
     assert.ok(
-      globalCss.includes(
-        'grid-template-columns: 124px minmax(0, 1fr);'
-      ),
+      globalCss.includes('grid-template-columns: 124px minmax(0, 1fr);'),
       'in a column narrowed to the square tile width so the controls sit under it'
     );
     // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.
@@ -419,7 +425,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${hook} must render in its section's trailing slot, not as a full-width button below it`
       );
     }
-    // This used to pin the ABSENCE of `class="manager-button" data-essence-bulk-`.
+    // This used to pin the ABSENCE of a hand-written button class beside `data-essence-bulk-`.
     for (const hook of ['data-essence-bulk-icon-reset', 'data-essence-bulk-colour-reset']) {
       const start = bulkPanelSource.lastIndexOf('<', bulkPanelSource.indexOf(hook));
       // The tag ends at the first `>` that is not the tail of an `=>`.
@@ -436,7 +442,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
           'second stacked button under the control'
       );
       assert.equal(
-        /\bmanager-button\b/.test(tag),
+        /\bfabricate-button\b/.test(tag),
         false,
         `${hook} must not be a manager button at all; it is a Chip`
       );
@@ -509,9 +515,9 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     const actionsBody = identityTabSource.slice(actionsOpen, actionsClose);
     assert.ok(actionsOpen > 0 && actionsClose > actionsOpen, 'the actions row is found intact');
     assert.equal(
-      actionsBody.includes('manager-icon-button'),
+      actionsBody.includes('fabricate-icon-button'),
       false,
-      'no manager-icon-button remains beside the picker in the actions row'
+      'no fabricate-icon-button remains beside the picker in the actions row'
     );
     assert.ok(
       /\.fabricate-manager \.manager-essence-icon-actions \{[^}]*display: flex;/s.test(globalCss),
@@ -576,22 +582,20 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   it('compacts the presentation toggle to glyph tiles without losing its name', () => {
     // The rendered symptom: the prototype draws list/grid as two compact glyph tiles
     // (~86px for the pair); the shipped toggle spelled out "List" and "Grid" and measured
-    // ~135px, which made a presentation switch shout as loudly as the status FILTER beside
-    // it and pushed row one to the edge of the 1280px capture.
-    const viewControl = browserSource.slice(browserSource.indexOf('options={viewModeOptions}'));
+    // ~135px, which pushed row one to the edge of the 1280px capture.
+    const browser = componentAstOf(BROWSER);
     assert.ok(
-      /^[^/]*?\biconOnly\b/s.test(viewControl.slice(0, viewControl.indexOf('/>'))),
-      'the view-mode segmented control opts into the compact variant'
+      importsModule(browser, '../../components/ViewToggle.svelte') &&
+        renderedNodes(browser, 'ViewToggle').length === 1,
+      'the browser switches its arrangement through ViewToggle'
     );
-    // Opt-IN, so the status filter one line above must not have been swept along.
-    const statusControl = browserSource.slice(
-      browserSource.indexOf('options={statusOptions}'),
-      browserSource.indexOf('options={viewModeOptions}')
+    assert.ok(
+      passesProp(componentAstOf(VIEW_TOGGLE), 'SegmentedControl', 'iconOnly'),
+      'which is the segmented control at its compact glyph form'
     );
-    assert.equal(
-      /\biconOnly\b/.test(statusControl),
-      false,
-      'the status filter keeps its words — its options are not glyphs'
+    assert.ok(
+      propNone(browser, 'SegmentedControl', 'iconOnly'),
+      'the membership filter keeps its words'
     );
 
     // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name.

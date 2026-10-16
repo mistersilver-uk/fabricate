@@ -64,7 +64,7 @@ function normalizeComponentEssences(essences) {
 }
 
 /** The admin store's `_buildRecipeList` projection, from `toJSON()`, plus `incomplete`. */
-function projectRecipe(recipe) {
+function projectRecipe(recipe, system) {
   const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
   return {
     id: raw.id,
@@ -75,7 +75,7 @@ function projectRecipe(recipe) {
     resultGroups: asArray(raw.resultGroups),
     resultSelection: raw.resultSelection || null,
     toolIds: asArray(raw.toolIds),
-    incomplete: isRecipeIncomplete(recipe, raw),
+    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode === 'progressive'),
     structureKey: raw.structureKey,
   };
 }
@@ -84,9 +84,9 @@ function projectRecipe(recipe) {
  * A persistable but uncraftable shell, per the model's `validate()` and `validateStructure()` when
  * present, else a count-only fallback (the admin store's `_isRecipeIncomplete`).
  */
-function isRecipeIncomplete(recipe, raw) {
+function isRecipeIncomplete(recipe, raw, progressive) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine() };
+    const injected = { Roll: diceEngine(), progressive };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
@@ -111,6 +111,18 @@ const READINESS_ISSUE_MESSAGES = {
   requirementOverlap: 'Two ingredient requirements can be satisfied by the same component.',
   unroutedResultGroup: 'A result group is not routed to any crafting-check outcome.',
   unproducedOutcomeTier: 'A crafting-check outcome tier produces no result group.',
+  missingTaughtRecipe: 'A result teaches a recipe that is no longer in this system.',
+  choiceGroupInProgressive:
+    'A result set holds a choice of rewards, which a progressive system cannot award.',
+  choiceGroupTooFew: 'A choice of rewards holds fewer than two alternatives.',
+  choiceGroupSettings:
+    'A choice of rewards names a chooser or an award rule Fabricate does not recognise.',
+  choiceGroupSelection: 'A rolled choice of rewards has no selection roll that can be rolled.',
+  choiceGroupRanges:
+    'A rolled choice of rewards has a missing, backwards, fractional or overlapping range.',
+  choiceGroupCount: 'An up-to choice of rewards does not say how many it awards.',
+  alchemyResultSelection: 'An alchemy recipe does not resolve to exactly one result set.',
+  signatureCollision: 'The recipe shares its ingredient signature with another recipe.',
   disabledIncomplete: 'Recipe is disabled and cannot be enabled until its gaps are fixed.',
   noAvailableTasks: 'Environment has no available gathering tasks.',
   activeNoComposition: 'Environment is active but composes no available tasks.',
@@ -177,7 +189,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
   const mode = system?.resolutionMode || 'simple';
   const issues = [];
   for (const recipe of asArray(recipes)) {
-    const projected = projectRecipe(recipe);
+    const projected = projectRecipe(recipe, system);
     // The routing basis is the system MODE: `routedByCheck`, and alchemy with a tiered
     // `alchemy.checkMode`, route by the check; every other mode routes by neither.
     let routingProvider = null;
@@ -190,6 +202,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
       systemComponents,
       routingProvider,
       routedOutcomeTierOptions,
+      progressive: mode === 'progressive',
     });
     for (const issue of recipeIssues) {
       issues.push(tagRecipeIssue(issue, projected));

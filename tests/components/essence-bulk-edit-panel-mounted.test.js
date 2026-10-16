@@ -19,7 +19,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/ui/model/essenceBulkEditModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
@@ -60,11 +61,12 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
@@ -118,7 +120,7 @@ const impactRowEl = (root, name) => root.querySelector(`[data-essence-bulk-impac
 const impactRow = (root, name) => impactRowEl(root, name).textContent.trim();
 
 const deleteButton = (root) =>
-  root.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+  root.querySelector('[data-essence-bulk-delete-card] .fabricate-button.is-danger');
 
 const applyButton = (root) => root.querySelector('[data-essence-bulk-apply]');
 
@@ -393,7 +395,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
   it('sits inside the delete card that scopes it to the inspector-action label size', async () => {
     // happy-dom cannot compute the cascade (see essence-studio-fidelity.test.js for the
     // source-level font-size pin), but it CAN prove the structural half of that fix: the
-    // button the scoped `.fab-bulk-delete-card :global(.manager-button)` rule targets is
+    // button the scoped `.fab-bulk-delete-card :global(.fabricate-button)` rule targets is
     // actually a descendant of that card, in both the idle and armed states.
     const root = await harness.mount(props(SELECTION));
     assert.ok(
@@ -404,6 +406,21 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     assert.ok(
       deleteButton(root).closest('.fab-bulk-delete-card'),
       'the armed confirm button stays inside it too'
+    );
+    harness.remount();
+  });
+
+  it("rides the shell's dock under Apply (maintainer ruling 2026-10-14)", async () => {
+    const root = await harness.mount(props(SELECTION));
+    const dock = root.querySelector(':scope [data-essence-bulk-panel] .fab-bulk-edit-dock');
+    assert.ok(Boolean(dock), 'the shell renders no dock');
+    const [first, second] = dock.querySelectorAll(
+      '[data-essence-bulk-apply], [data-essence-bulk-delete-card]'
+    );
+    assert.ok(Boolean(first?.matches('[data-essence-bulk-apply]')), 'Apply leads the dock');
+    assert.ok(
+      Boolean(second?.matches('[data-essence-bulk-delete-card]')),
+      'and the delete card follows it inside the dock'
     );
     harness.remount();
   });

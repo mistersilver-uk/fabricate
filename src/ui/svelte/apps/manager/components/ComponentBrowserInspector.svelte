@@ -21,7 +21,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EssenceChip from './EssenceChip.svelte';
   import ActionMenu from '../../../components/ActionMenu.svelte';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import { getComponentCategoryLabel } from '../../../../../utils/componentCategories.js';
@@ -169,12 +169,12 @@
         {#if menuItems.length > 0}
           <ActionMenu
             items={menuItems}
-            triggerLabel={text(
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Component.MoreActions',
               'More component actions'
             )}
-            triggerData={{ 'data-component-inspector-menu': '' }}
-            menuAriaLabel={text(
+            triggerProps={{ 'data-component-inspector-menu': '' }}
+            panelLabel={text(
               'FABRICATE.Admin.Manager.Component.MoreActions',
               'More component actions'
             )}
@@ -188,7 +188,7 @@
           art={selectedComponent.img}
           alt=""
           icon="fas fa-cube"
-          size={40}
+          size={38}
           tint={selectedComponent.color || ''}
         />
         <div class="manager-component-inspector-identity-copy">
@@ -346,12 +346,14 @@
 
     <!-- THE PINNED FOOT. One action, and it is the act this whole screen exists to reach. -->
     <div class="manager-component-inspector-foot" data-component-inspector-foot>
-      <InspectorActionButton
-        tone="primary"
-        label={text('FABRICATE.Admin.Manager.Component.EditSystemRules', 'Edit system rules')}
+      <Button
+        role="primary"
+        fullWidth
         data-component-edit-system-rules=""
-        onClick={() => onEditSystemRules(selectedComponent?.id)}
-      />
+        onclick={() => onEditSystemRules(selectedComponent?.id)}
+      >
+        {text('FABRICATE.Admin.Manager.Component.EditSystemRules', 'Edit system rules')}
+      </Button>
     </div>
   </section>
 {/if}

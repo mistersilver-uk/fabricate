@@ -1,0 +1,2429 @@
+.fabricate-manager .manager-checks-page {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-editor {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+/* Non-alchemy crafting sub-tab: stack the per-mode editor above the failure consumption policy card (issue 712). */
+.fabricate-manager .manager-checks-editor-stack {
+  display: grid;
+  gap: var(--fab-space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+/* Stacked list of ToggleCards inside a check card (the alchemy behaviour flags). */
+.fabricate-manager .manager-checks-flag-list {
+  display: grid;
+  gap: var(--fab-space-2);
+  margin-top: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* On failure's two flags are TOP-LEVEL cards, not a list inside one, so this wrapper paints and offsets nothing: it takes the stack's own gutter, and the four things on that screen — two flag cards and the closing note — sit at one even rhythm (issue 1096). */
+.fabricate-manager .manager-checks-flag-list[data-failure-consumption] {
+  gap: var(--fab-space-3);
+  margin-top: 0;
+}
+
+.fabricate-manager .manager-checks-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-2);
+}
+
+/* ══ Checks Studio visual parity with the standalone prototype ══ Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json` records the prototype's computed styles per named region (issue 1096). */
+.fabricate-card.fabricate-card.manager-checks-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-card > .manager-checks-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: var(--fab-space-4) var(--fab-space-4) 0;
+}
+
+.fabricate-manager .manager-checks-card-body {
+  padding: var(--fab-space-4);
+}
+
+/* The Formula card's head keeps the prototype's tighter lead-to-control gap. */
+.fabricate-manager .manager-checks-card[data-roll-formula-card] > .manager-checks-card-body {
+  padding-top: var(--fab-space-3);
+}
+
+/* A body whose whole content is a LIST plus the dashed control that extends it. */
+.fabricate-manager .manager-checks-card-body.is-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-3) var(--fab-space-4);
+}
+
+/* SENTENCE CASE, in the display face, at full text ink. The manager's `.manager-card-title` is an uppercase micro-label at muted ink — correct for the rail's flat section headings and wrong for a card that carries a title AND a description line. */
+.fabricate-manager h2.manager-checks-card-title,
+.fabricate-manager .manager-checks-card-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-card-description {
+  max-width: 640px;
+  margin: var(--fab-space-1) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+/* A head whose TITLE ROW carries an action at its right. The prototype puts a card's one action beside its title, not under its body, and the description runs the full head width beneath both (issue 1096). */
+.fabricate-manager .manager-checks-card-head-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-card-heading {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+/* The head's action, LINK-STYLED. `Button` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  height: auto;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+
+  /* `normal`, not a ratio. The prototype states this link's type as a `font:` shorthand, which resets `line-height` to `normal` — 13px for the manager's face at 10.5px — and the link's own box IS that line box. */
+  line-height: normal;
+  white-space: nowrap;
+}
+
+/* The INK is split out and qualified, and the split states which of the declarations above are a RESET and which is paint (issue 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+  color: var(--fab-accent);
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link > i {
+  font-size: 9px;
+}
+
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+  color: var(--fab-text);
+  background: none;
+  text-decoration: underline;
+}
+
+/* A label for a block INSIDE a card body — the pick cap's, and the only one left on this screen. */
+.fabricate-manager .manager-checks-card-subheading {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The PANE heading — the studio's section title, above the cards. It was missing entirely, so the Outcomes screen opened on a card with no statement of what the screen is for. */
+.fabricate-manager .manager-checks-pane-head {
+  margin: 0 0 var(--fab-space-4);
+}
+
+.fabricate-manager .manager-checks-pane-title {
+  margin: 0 0 var(--fab-space-1);
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-pane-lead {
+  max-width: 600px;
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-transform: none;
+}
+
+/* ── WHAT THIS MODE DOES: the roll section's opening callout ── The prototype opens The roll with a titled explanation of the resolution mode: a glyph in a rounded tile, the mode's name, one paragraph, and a row of three facts (issues 1096, 1505, 1521). */
+.fabricate-manager .manager-checks-mode-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  margin: 0 0 var(--fab-space-4);
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 11px;
+  background: var(--fab-info-soft);
+}
+
+/* A DORMANT mode (gathering's routed and progressive, disabled pending issue 683) is not an explanation of a live configuration, so it takes the warning edge the rest of the studio uses for "this reaches nothing". */
+.fabricate-manager .manager-checks-mode-callout.is-dormant {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-mode-callout-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--fab-info);
+  background: var(--fab-bg-1);
+  font-size: 14px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-icon {
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-checks-mode-callout-body {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-mode-callout-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-lead {
+  margin: var(--fab-space-chip) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-mode-callout-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-4);
+  margin: var(--fab-space-chip) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > i {
+  color: var(--fab-info);
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-fact > i {
+  color: var(--fab-warning);
+}
+
+/* The prototype separates a fact's LABEL from its VALUE with a middle dot. */
+.fabricate-manager .manager-checks-mode-callout-fact > b::before {
+  margin-right: var(--fab-space-chip);
+  content: "·";
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > b {
+  color: var(--fab-text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* ── DIFFICULTY: `BASE DC` and `COMPARISON` ── The two fields the prototype draws under the DC-source chooser (issue 1096). */
+.fabricate-manager .manager-checks-difficulty-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* A chooser above the fields; without one the fields are the card's whole body and the margin would be dead space at its top. */
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card
+  + .manager-checks-difficulty-fields {
+  margin-top: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-checks-difficulty-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-dc {
+  flex: 0 0 auto;
+
+  /* The shared `Stepper` takes its height from the layout context: the 30px field rung, at the width of two 26px adjuncts round a 42px value. */
+  --fab-stepper-fill-height: 30px;
+
+  width: 96px;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-comparison {
+  flex: 1 1 auto;
+}
+
+/* The prototype's micro-label: uppercase, tracked, at the studio's subtle ink. */
+.fabricate-manager .manager-checks-difficulty-label {
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: normal;
+}
+
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own face is restated, at (0,4,0). Gap, padding, radius, radio and legend are the primitive's: the studio's 11px gap snapped to the primitive's own 12 (issue 1523). */
+.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
+  border: 1px solid var(--fab-border);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: var(--fab-surface-active);
+  font-size: 11px;
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active
+  .manager-resolution-option-icon {
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-card .manager-resolution-option-name {
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-option.is-active
+  .manager-resolution-option-name {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-card .manager-resolution-option-desc {
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── The bands card's own "Preview against" control ── The rail's `Preview as` is a DIFFERENT control with a different subject (issue 1097). */
+.fabricate-manager .manager-checks-preview-against {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-checks-preview-against-label {
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The record control's slot, on the shared `<Select>`'s ROOT since issue 1510: the picker is the row's flex child and the trigger fills it. The `inline` rung paints the box — 30px, radius 7, 11.5px, weight 500 — so what stays here is the growing-but-capped column the row owes it. Left hugging, the row would re-flow every time the GM previewed against a longer record name. */
+.fabricate-manager .manager-checks-preview-against .fabricate-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.fabricate-manager .manager-checks-preview-against .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The simple editor's half of the same control, a stacked `.fabricate-field` column rather than an inline row, so the full width is stated on the trigger the `toolbar` rung leaves hugging (issue 1510). `.fabricate-field.fabricate-field select` supplied it until the conversion and is element-typed, so it reaches no `<button>`. */
+.fabricate-manager .manager-checks-band-record .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* ── The tier list ── A FLEX ROW, not a subgrid table. */
+.fabricate-manager .manager-checks-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. */
+.fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+/* The outcome list's column captions, for the eye alone, aligned over the row's own tracks. */
+.fabricate-manager .manager-checks-tier-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  margin: var(--fab-space-4) 0 var(--fab-space-chip);
+  padding: 0 var(--fab-space-3);
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-swatch {
+  flex: 0 0 9px;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-threshold {
+  flex: 0 0 calc(63px + 4rem);
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-range {
+  flex: 0 0 84px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-success {
+  flex: 0 0 158px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-break {
+  flex: 0 0 76px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-remove {
+  flex: 0 0 26px;
+}
+
+/* The outcome list's own append action, which lives outside that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
+.fabricate-button.fabricate-button.manager-checks-outcome-add {
+  width: 100%;
+  margin-top: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-checks-tier-row.is-invalid {
+  border-color: var(--fab-danger-border);
+}
+
+/* The preset row. Each preset is the dashed ADD role, because that is what it does — it appends a row to the list below — and the row wraps rather than scrolling, so a narrow pane stacks them instead of hiding the second one. */
+.fabricate-manager .manager-checks-trigger-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* (0,4,0), which is what it takes to beat `.fabricate-button.fab-manager-button.is-dashed`'s 34px height (issue 1118). */
+.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fab-manager-button.is-dashed {
+  flex: 0 1 auto;
+  height: 30px;
+  min-height: 0;
+  padding: 0 var(--fab-space-3);
+  border-radius: 7px;
+}
+
+/* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). */
+.fabricate-manager
+  .manager-checks-trigger-presets
+  .fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
+  background: var(--fab-bg-0);
+}
+
+/* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather than a control, so it takes the sentence's own ink at its own size (issue 1096). */
+
+/* Colour and size come from the same measurement, and both were drifting while only the margin was being argued about. */
+.fabricate-manager [data-outcome-bands] [data-outcome-band-strip-hint] {
+  margin-bottom: var(--fab-space-5);
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+}
+
+.fabricate-manager [data-outcome-band-strip-hint] > i {
+  margin-right: var(--fab-space-chip);
+  font-size: 9px;
+}
+
+/* A 9px circle, the prototype's tier key. */
+.fabricate-manager .manager-checks-tier-swatch {
+  display: block;
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fab-outcome-swatch, var(--fab-surface-active));
+}
+
+/* The name field, STYLED AS A STEPPER PILL on the maintainer's instruction. */
+.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 28px;
+  min-height: 0;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name:focus-visible {
+  text-overflow: clip;
+}
+
+/* The number's label, in the ROW rather than in a column header — which is where the prototype puts it, and what lets the recipe-tier list drop its header row entirely. */
+.fabricate-manager .manager-checks-tier-unit {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-tier-stepper {
+  flex: 0 0 auto;
+
+  /* The shared `Stepper` takes its HEIGHT from the layout context, which the design system permits; its border, radius, background and type stay the primitive's own. */
+  --fab-stepper-fill-height: 28px;
+
+  /* 54px of fill chrome (two 1px borders, two 2px paddings, two 2px gaps, two 22px adjunct margin-boxes), then the endpoint label (9 mono glyphs at 0.74rem = 3.996rem), its input's 4px of inline padding, and up to 4.5px of glyph rounding; 63px + 4rem leaves the rest as headroom. */
+  width: calc(63px + 4rem);
+}
+
+.fabricate-manager .manager-checks-tier-stepper.is-narrow {
+  width: 84px;
+}
+
+/* ── The Success / Failure segmented toggle ── ONE control with two options and a lit segment, not a button that swaps its own label on click. */
+.fabricate-manager .manager-checks-tier-row .manager-segmented {
+  flex: 0 0 auto;
+  width: 158px;
+}
+
+/* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.fabricate-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
+.fabricate-rule-row .fabricate-rule-row-head .fabricate-rule-row-remove {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 7px;
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* THE PANE'S OWN SURFACE. `.manager-main` paints `--fab-bg-2` for the whole manager, which is the CARD shade in the prototype — so the studio's cards were sitting on their own colour and every border between them disappeared (issue 1096). */
+.fabricate-manager[data-manager-view^="checks"]
+  .manager-environment-edit-view[data-checks-editor] {
+  gap: 0;
+  background: var(--fab-bg-1);
+}
+
+/* ── The studio's own gutters (issue 1096, maintainer parity round 2) ── THREE separate insets were stacking into dead space the prototype does not have: the shared editor shell's 12px padding, the workspace grid's 12px gap, and the tab panel's own 12px scrollbar buffer. */
+.fabricate-manager .manager-environment-editor-shell[data-checks-shell] {
+  padding: 0;
+}
+
+.fabricate-manager [data-checks-editor] .manager-environment-workspace {
+  gap: 0;
+}
+
+.fabricate-manager [data-checks-editor] .manager-environment-tab-panel {
+  /* The 12px `padding-right` this replaces was a scrollbar buffer. It is no longer needed: the scroller is styled from tokens below and `scrollbar-gutter: stable` still reserves its own track, so the pane's 24px inset is doing that job with room to spare. */
+  padding: var(--fab-space-5) var(--fab-space-6) var(--fab-space-6);
+}
+
+/* The section strip runs edge to edge, with its tabs on the pane's own inset — the prototype's header carries `padding: 14px 22px 0` (the 22 snapped to 24) and the strip sits inside it. */
+.fabricate-manager [data-checks-editor] .manager-environment-tabs {
+  padding-right: var(--fab-space-6);
+  padding-left: var(--fab-space-6);
+}
+
+/* ── The right inspector ── TWO authorities, and they do not overlap. */
+.fabricate-manager .manager-environment-workspace .manager-inspector.manager-checks-rail {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4) var(--fab-space-4) var(--fab-space-5);
+  border: 0;
+  border-left: 1px solid var(--fab-border);
+  border-radius: 0;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-rail .fabricate-card {
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-checks-rail .manager-kicker {
+  margin: 0;
+  min-width: 0;
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* THE HEADING ROW. The Tool Studio owns where it sits — flat, above its card — and the prototype owns what it is made of: a leading glyph at the kicker's own ink, and an optional adjunct pushed hard right (the odds panel's die domain, the digest's status chip). */
+.fabricate-manager .manager-checks-rail-head {
+  display: flex;
+  gap: var(--fab-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-head-icon {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-rail-head-note {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-rail-head > :last-child:not(.manager-kicker, .manager-checks-rail-head-note) {
+  margin-left: auto;
+}
+
+/* The documentation / quickstart pair the prototype opens the rail with. */
+.fabricate-manager .manager-checks-rail-links {
+  display: flex;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-rail-link {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: var(--fab-bg-1);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fabricate-manager .manager-checks-rail-link:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+}
+
+/* ── The activation card ── The prototype gives this section NO heading: the card is the statement, so it carries the state in its own surface. */
+.fabricate-manager .manager-checks-rail .manager-checks-active-card {
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
+}
+
+.fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+/* The switch in this card is a full-width ROW, live or locked. The shared control caps itself at 78px because it normally sits at the end of a list row beside its own label, and a card whose whole content is the switch and its reading is not that: at 78px the card's sentence ellipsised to `Che…`, which is what the cap is for everywhere else and a defect here. */
+.fabricate-manager .manager-checks-active-card .fabricate-toggle {
+  width: 100%;
+  max-width: none;
+}
+
+/* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same drawing — and adds only that there is nothing to press. */
+.fabricate-toggle.fabricate-toggle.is-locked {
+  cursor: default;
+}
+
+.fabricate-manager .manager-checks-active-lock {
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The reading beside the switch is the CARD's own sentence, not a control label, so it takes the prototype's card type rather than the manager switch's 0.74rem/700 badge type. */
+.fabricate-manager .manager-checks-active-card .manager-status-toggle-label {
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* The rail's PANEL COPY. Two treatments: a panel's hint is the library's `k-hint` (10.5px at 1.5, subtle ink), and the activation card's hint — which qualifies a control right above it — keeps its tighter leading in the muted ink. */
+.fabricate-manager .manager-checks-rail .manager-muted {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.fabricate-manager .manager-checks-active-card .manager-muted {
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+/* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
+.fabricate-manager .manager-checks-rail .fabricate-card.is-rail-list {
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-checks-rail-row {
+  /* Foundry's `button` rule sets a fixed height and its own border, and a row is neither. */
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+
+  /* `height: auto` is the load-bearing half of this reset, not `min-height`. */
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--fab-space-2);
+  border: 0;
+  border-radius: 7px;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, so the row's own ink — which `border: 0` still resolves its border colour from — would be the browser's default rather than the rail's. */
+  color: var(--fab-text);
+  background: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.fabricate-manager button.manager-checks-rail-row {
+  cursor: pointer;
+}
+
+/* The row itself keeps the rail's own ink, and the muted reading lives on the TEXT — which is how the prototype builds it, and it is not cosmetic here: with `border: 0` the row's border colour still computes to its `color`, so tinting the row would have moved a recorded value nothing draws. */
+.fabricate-manager button.manager-checks-rail-row:hover .manager-checks-rail-row-text {
+  color: var(--fab-text);
+}
+
+.fabricate-manager button.manager-checks-rail-row:hover {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-manager button.manager-checks-rail-row:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+/* A row whose subject the GM has authored reports it in the success family — the prototype's green tick on a fact that is set. */
+.fabricate-manager .manager-checks-rail-row > i:first-child {
+  flex: 0 0 12px;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-rail-row.is-set > i:first-child {
+  color: var(--fab-success);
+}
+
+.fabricate-manager .manager-checks-rail-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-row-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: inherit;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A row that carries a second line is the Validation rail's: its first line names the check rather than reporting a fact, so it takes the prototype's heavier row title. */
+.fabricate-manager .manager-checks-rail-row.is-detailed {
+  padding: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-checks-rail-row.is-detailed .manager-checks-rail-row-text {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-rail-row-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `--fab-text-disabled` is this theme's 42% ink and the exact value the prototype draws the chevron at. */
+.fabricate-manager .manager-checks-rail-row-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-disabled);
+  font-size: 8px;
+}
+
+/* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.fabricate-field` control takes that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
+.fabricate-manager .manager-checks-rail .fabricate-field input {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The record control is the shared `<Select>` since issue 1510, so the rule above no longer reaches it: the `toolbar` rung states its type and fill, and what stays here is the rail column's full width, which a trigger deliberately never declares. */
+.fabricate-manager .manager-checks-preview-record-select .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The "Preview as" ACTOR PICKER is a `SearchablePopover` rather than a native `<select>` (issue 1097 follow-up), because the list is a world's player characters and a flat native list of them is unusable past a handful. */
+.fabricate-button.fabricate-button.manager-checks-preview-actor-trigger {
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The simulator's roll action. It renders through `Button`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-simulator-roll {
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  min-height: 34px;
+}
+
+/* ── The Modifiers screen's entry rows ── ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own, its gap and padding (10, 9/11) snapped to the spacing scale (issue 1523) — recorded by the `modifier-entry-row` region and its parts in the parity fixture, so the next parity run shows a change here as a drift in that region and property (issues 1096, 1373). */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-row,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-row,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+/* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row scannable by icon, not to grade it (issue 1373). */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--fab-accent);
+
+  /* ONE RUNG ABOVE THE ROW, NOT THREE. `proto:2362` fills this tile `--bg2` over a `--bg1` row, which is our `--fab-bg-1` over the `--fab-bg-0` the block above gives every row that draws it (issue 1373). */
+  border: 1px solid var(--fab-border);
+  background: var(--fab-bg-1);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-label,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-label,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds chip and the eligibility control against the row's right edge with no auto margin anywhere — exactly how the prototype lays the row out. It gives way only past twelve characters, sharing the shrink with the name, so a counting die stays whole and neither cell can push the control out (issue 2044). */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-expression,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-expression,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-expression {
+  flex: 1 1 auto;
+  min-width: 12ch;
+  overflow: hidden;
+  color: var(--fab-text-secondary);
+  background: none;
+  font-family: var(--fab-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── THE ROW'S TWO DECLARED VARIANTS (issue 1373, maintainer round 6) ── The reference draws this row twice on the Tool Requirements tab with ONE geometry string and two anatomies. */
+
+/* `proto:2332`: a bare 11px accent glyph, with no box of any kind. The tile is what makes the glyph a row's LEADING ANCHOR, and a row that leads with a control already has one — which is why this follows `controlPlacement` rather than taking a prop of its own. */
+.fabricate-manager .manager-modifier-readonly-row.is-control-leading > .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--fab-accent);
+  font-size: 11px;
+}
+
+/* `proto:2333`: `<div style="min-width:0">` holding the name over the expression. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > .manager-modifier-readonly-text {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The expression cell is `flex: 1 1 auto` in the inline row, which is what puts a trailing control against the row's right edge with no auto margin anywhere. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked .manager-modifier-readonly-expression {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
+}
+
+/* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is an OWNERSHIP fact, not merely a cascade one (issue 883). */
+
+/* THE ELIGIBILITY CONTROL, and the pill IS it. It was a `SelectionCheckbox` with an inert `StatusPill` beside it, on a second line of the row (issue 1096). */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* The state DOT. Colour is never the only carrier — the word beside it changes too — but the dot is what makes the state legible without reading, and an unlit one is a different SHAPE of statement from a lit one at a glance down a column of rows. */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-modifier-eligibility.is-on
+  .manager-modifier-eligibility-dot {
+  background: var(--fab-accent);
+}
+
+/* THE NOTE THAT CLOSES THE CARD. Quiet on purpose: the surface fill and the ordinary border, with the glyph carrying the only colour, because it points at another screen rather than reporting a hazard. */
+.fabricate-manager .manager-checks-card .manager-modifier-library-note {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: flex-start;
+  margin: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-library-note > i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+/* THE PICK CAP, as the row the prototype draws: its label and hint on the left, the Stepper on the right, inside the studio's own row box. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks {
+  display: flex;
+  gap: var(--fab-space-4);
+  align-items: center;
+  margin-top: var(--fab-space-4);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Stated on the ELEMENT, not inherited from `.manager-muted`. That class sets `margin: … 0 0` as a shorthand at the same specificity a longhand here would tie with, and the later of two tied declarations wins — which is how a neighbouring hint on this studio's Outcomes screen computed a `margin-bottom` of `0px` while its own rule said otherwise. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-hint {
+  margin: var(--fab-space-1) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── The On failure screen's flag cards ── `ToggleCard` is the manager's shared status card and the recipe editor's Overview uses it too, so this restates the studio's own metrics through the flag list rather than moving the primitive: the accent tint on the ON state, the 28px icon tile, and the prototype's type. */
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  border-radius: 11px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-icon {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-1);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-title {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
+  font-size: 11px;
+}
+
+/* ── The Validation screen ── `EditorValidationSurface` is the ONE implementation of the validation arrangement (issue 1444 closed it onto seven renderers), so every rule here is scoped to the checks route: same primitive, this studio's metrics (issue 1373). */
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
+  gap: var(--fab-space-4);
+  padding: var(--fab-space-5);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-count {
+  height: 34px;
+  padding: 0 var(--fab-space-3);
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-group-label {
+  font-size: 9px;
+  letter-spacing: 0.11em;
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-rows {
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-row {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-4);
+}
+
+/* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive, so they carry the `manager-resolution-mode-card is-config-cards` contract rather than a bespoke grid of their own (issue 855). */
+
+/* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050. */
+
+/* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ── A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition title, effect sentence, result chip, chevron, delete — and hides its controls until that head is clicked. The head, the body and the sentence are `RuleRow`'s, rooted at it (issue 1782); the card's frame is the caller's class. */
+.fabricate-manager .manager-checks-trigger-route {
+  display: grid;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-trigger-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-breakage-trigger {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+/* The card being EDITED takes the stronger edge, which is the prototype's own distinction between a card being read and a card being authored. */
+.fabricate-manager .manager-checks-breakage-trigger.is-expanded {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-rule-row .fabricate-rule-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+}
+
+/* THE WHOLE HEAD IS THE DISCLOSURE. Foundry's core `button` rule sets a fixed height and its own border, and a card head is neither — the same reset the rail's digest rows take, and for the same reason: `min-height: 0` does not cancel a fixed `height`, so a two-line head would draw on top of itself. */
+.fabricate-rule-row .fabricate-rule-row-disclosure {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, and `border: 0` still resolves the border colour from `color`. */
+  color: var(--fab-text);
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.fabricate-rule-row button.fabricate-rule-row-disclosure {
+  cursor: pointer;
+}
+
+/* The effect's glyph tile. Its family is the effect's own — a step up reads info, a step down reads warning — so a list of triggers is scannable by colour before it is read. */
+.fabricate-rule-row .fabricate-rule-row-glyph {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.fabricate-rule-row .fabricate-rule-row-glyph.is-info {
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-glyph.is-warning {
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-glyph.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-glyph.is-danger {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-glyph.is-neutral {
+  color: var(--fab-text-subtle);
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-headline {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A `<span>`, not a heading: it sits inside the disclosure `<button>`, where a heading is not permitted content. */
+.fabricate-rule-row .fabricate-rule-row-title {
+  display: block;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-rule-row .fabricate-rule-row-lead {
+  display: block;
+  margin-top: var(--fab-space-1);
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* The result chip: the effect in two words, at the right of the head. Same family as the glyph tile, so the pair reads as one statement. */
+.fabricate-rule-row .fabricate-rule-row-chip {
+  flex: 0 0 auto;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fabricate-rule-row .fabricate-rule-row-chip.is-info {
+  color: var(--fab-info-text);
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-chip.is-warning {
+  color: var(--fab-warning-text);
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-chip.is-success {
+  color: var(--fab-success-text);
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-chip.is-danger {
+  color: var(--fab-danger-text);
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-rule-row .fabricate-rule-row-chevron {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The expanded body: a darker inset under a hairline, as the prototype draws it, holding the condition, the two effect groups, the break-tools card and the closing quotation. */
+.fabricate-rule-row .fabricate-rule-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-bg-0);
+}
+
+/* `CONDITION` — the body's own section heading, above the row of fields. */
+.fabricate-rule-row .fabricate-rule-row-legend {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.68px;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-breakage-condition {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+/* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide `.fabricate-field` — the same move `.manager-checks-flag-list` and the Validation route already make with their own shared surfaces. */
+.fabricate-rule-row .fabricate-rule-row-body .fabricate-field > span {
+  color: var(--fab-text-subtle);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.64px;
+  text-transform: uppercase;
+}
+
+.fabricate-rule-row .fabricate-rule-row-body .fabricate-field {
+  gap: var(--fab-space-1);
+}
+
+.fabricate-rule-row
+  .fabricate-rule-row-body
+  .fabricate-field
+  input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
+  height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The threshold is the one number on this row a GM reads back, so it takes the heavier reading the prototype gives it. */
+.fabricate-manager .manager-checks-trigger-value input {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-trigger-value {
+  flex: 0 0 129px;
+}
+
+/* The effect groups. Each is a labelled field beside its operand, and the row wraps as a unit rather than squeezing a four-segment control narrower than its labels. */
+.fabricate-manager .manager-checks-trigger-effect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-5);
+}
+
+/* The break-tools card inside a trigger: the shared `ToggleCard` at this studio's metrics, the same restatement the On failure screen's flag list makes. */
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-card {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-title {
+  font-size: 11.5px;
+}
+
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-sub {
+  font-size: 10px;
+}
+
+/* The closing restatement, quotation-marked: the controls above are the parts and this is what they add up to. */
+.fabricate-rule-row .fabricate-rule-row-quote {
+  display: flex;
+  gap: var(--fab-space-2);
+  margin: 0;
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.fabricate-rule-row .fabricate-rule-row-quote > i {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The standing explanation of why this trigger has no break-tools card. */
+.fabricate-manager .manager-checks-trigger-hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* The three-way Outcome toggle's own track and segment rules are gone; the trigger card renders the shipped `SegmentedControl`, whose track, segments and per-option tints live in that component's scoped styles. */
+
+/* The four-segment mode control hugs its content and wraps as a unit rather than being squeezed narrower than its labels. */
+.fabricate-manager .manager-checks-trigger-step-mode {
+  flex: 0 0 auto;
+}
+
+/* The operand slot is pinned so the control under the pointer does not move when the mode changes. */
+.fabricate-manager .manager-checks-trigger-step-operand {
+  flex: 0 0 160px;
+}
+
+/* The tier control is the shared `<Select>` since issue 1510, and a trigger hugs its value, so the pinned slot is stated on it: measured, the box shrank 160px → 106px → 67px as the GM chose a tier. WIDTH ONLY: the slot's own 32px is a retired control height, so the height stays the `inline` rung's 30, which is the ladder's nearest rung. */
+.fabricate-manager .manager-checks-trigger-step-operand .fabricate-select-trigger {
+  width: 100%;
+}
+
+.fabricate-manager .manager-checks-trigger-step-operand input:disabled {
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-04);
+  cursor: default;
+  opacity: 0.62;
+}
+
+/* The no-tiers cue takes the row's remaining width rather than the 160px slot. */
+.fabricate-manager .manager-checks-trigger-step-hint {
+  flex: 1 1 200px;
+  margin: 0;
+}
+
+/* ── The FORMULA card ── Stacked parts: the expression field in a field shell, with its row of tokens and the `avg` line beneath, then the `WHAT ACTUALLY GETS ROLLED` inset (issues 1096, 2465). */
+.fabricate-manager .manager-checks-formula {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A wrapper-drawn field lights the wrapper: the borderless input inside draws no ring of its own. */
+.fabricate-manager :is(.manager-prerequisite-path-input, .manager-component-entry-alias-field):focus-within {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager :is(.manager-prerequisite-path-input, .manager-component-entry-alias-field) input:focus-visible {
+  outline: none;
+}
+
+/* The reading, not a control: no border, no fill, and quiet enough that it never competes with the expression it qualifies. */
+.fabricate-manager .manager-checks-formula-average {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-checks-formula-average-value {
+  font-family: var(--fab-font-mono);
+}
+
+/* WHAT ACTUALLY GETS ROLLED. The INFO family, because it is a standing explanation of how the surface behaves rather than a hazard — the same reason the mode callout above the cards is info. */
+.fabricate-manager .manager-checks-formula-resolved {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  margin-top: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-info-border);
+  border-radius: 9px;
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-formula-resolved > i {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-formula-resolved-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-formula-kicker {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-formula-expression {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin: var(--fab-space-chip) 0 0;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-formula-base {
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-checks-formula-join,
+.fabricate-manager .manager-checks-formula-sep {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-formula-join {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-formula-sep {
+  color: var(--fab-text-subtle);
+}
+
+/* An applied modifier, as a chip. The ACCENT family: these are the terms the engine adds that the GM did not write, so they are the one thing in the expression that is not the text above it. */
+.fabricate-manager .manager-checks-formula-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 999px;
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+}
+
+.fabricate-manager .manager-checks-formula-chip > i {
+  font-size: 9px;
+}
+
+.fabricate-manager .manager-checks-formula-rule {
+  margin: var(--fab-space-chip) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Tier state controls are red/green pills that flip on click: the label shows the current state (Success/Failure, Break/Don't break) and the colour reflects its valence (green = success / keeps tools, red = failure / breaks tools). */
+.fabricate-manager .manager-checks-state-pill {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-04);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-state-pill.is-positive {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-state-pill.is-negative {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-recipe-edit-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-4);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
+}
+
+/* ONE right-hand-panel surface for the whole manager (issues 881, 643). */
+.fabricate-manager .manager-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border-left: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
+  overflow-y: auto;
+  max-height: 100%;
+  min-height: 0;
+
+  /* See the tab panel's block: the thumb colour inherits, the thickness does not. */
+  scrollbar-width: thin;
+}
+
+.fabricate-manager .manager-character-modifier-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-character-modifier-card-header {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  gap: var(--fab-space-4);
+}
+
+.fabricate-manager .manager-character-modifier-card-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60ch;
+}
+
+.fabricate-manager .manager-character-modifier-card-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* Character prerequisites accordion (issue 544) */
+.fabricate-manager .manager-prerequisite-empty {
+  font-style: italic;
+}
+
+.fabricate-manager .manager-prerequisite-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-prerequisite-item {
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-bg-2);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-prerequisite-item.is-open {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-manager .manager-prerequisite-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+.fabricate-manager .manager-prerequisite-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.fabricate-manager .manager-prerequisite-chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-prerequisite-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-prerequisite-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+/* Name row: icon picker (issue 544) to the left of the name input */
+.fabricate-manager .manager-prerequisite-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-icon-field {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-prerequisite-name-row .manager-prerequisite-name-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-prerequisite-condition-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-prerequisite-condition {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-prerequisite-path {
+  flex: 2 1 200px;
+}
+
+.fabricate-manager .manager-prerequisite-operator {
+  flex: 1 1 160px;
+}
+
+.fabricate-manager .manager-prerequisite-value {
+  flex: 0 1 110px;
+}
+
+.fabricate-manager .manager-prerequisite-path-input {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  padding-left: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-prerequisite-path-input input {
+  border: 0;
+  background: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-prerequisite-at {
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-prerequisite-note {
+  font-size: 0.75rem;
+}
+
+.fabricate-manager .manager-character-modifier-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-character-modifier-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-character-modifier-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager .manager-character-modifier-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+
+/* Character-modifier accordion (issue 768): a compact summary row (chevron + icon + label + inline @-stripped expression + row actions) that expands to the Icon/Label/Expression editor, mirroring the character-prerequisite accordion. */
+.fabricate-manager .manager-modifier-item {
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-bg-2);
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-modifier-item.is-open {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-manager .manager-modifier-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+/* A NEW ENTRY'S NAME SAT IN THE MIDDLE OF THE ROW, and the cause is the host, not this rule. */
+.fabricate-manager .manager-modifier-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--fab-space-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.fabricate-manager .manager-modifier-chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--fab-text-muted);
+}
+
+.fabricate-manager .manager-modifier-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-modifier-label {
+  flex: 0 1 auto;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-modifier-expression {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-modifier-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+/* ── Icon · Label · Minimum · Maximum, on ONE line ── The bounds pair used to sit on its own row below the expression, as two full-width stepper rows (issue 1096). */
+.fabricate-manager .manager-modifier-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fab-space-2);
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-modifier-icon-field {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-modifier-name-row .manager-modifier-label-field {
+  flex: 1 1 22ch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bounds-row {
+  display: flex;
+  gap: var(--fab-space-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A FIXED track, wide enough for the longest thing a bound can hold. 148px is measured rather than chosen: the stepper spends ~58px of its box on the two adjuncts, padding and borders, and `Unbounded` needs ~59px of the remainder at this font, so 148px leaves real headroom for a longer translation while still handing every other pixel of the row to the label. */
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bound-field {
+  flex: 0 1 148px;
+  min-width: 0;
+}
+
+/* Three classes since issue 883: the roll tag is a `Chip`, whose scoped block also sits at two classes and is injected after this sheet, so the two-class form would tie and lose on source order. */
+.fabricate-manager .manager-chip.manager-character-modifier-roll-tag {
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-character-modifier-stale-warning {
+  color: var(--fab-danger);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager .manager-character-modifier-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-actions {
+  display: flex;
+  gap: var(--fab-space-chip);
+  justify-content: flex-end;
+}
+
+/* World > Currency page body (issue 1278). */
+
+/* The two Rules & Resources siblings share the currency page's block (issue 1311): one authored library, scrolling in its own right, with the same padding and rhythm. */
+.fabricate-manager .manager-world-currency,
+.fabricate-manager .manager-world-prerequisites,
+.fabricate-manager .manager-world-modifiers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fabricate-manager .manager-currency-unit-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-subunit-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--fab-space-2);
+  align-items: end;
+}
+
+/* Warning callout shown in place of the add-sub-unit control when no unit is eligible. */
+.fabricate-manager .manager-currency-subunit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-warning-border);
+  border-left: 3px solid var(--fab-warning);
+  border-radius: 6px;
+  background: var(--fab-warning-soft);
+  color: var(--fab-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-currency-subunit-warning i {
+  margin-top: var(--fab-space-2xs);
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-currency-subunit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-currency-subunit-heading {
+  margin: 0;
+}
+
+/* The sub-unit AMOUNT, which is not a chip and never was: a number a GM can change is an editable control, so it keeps its own box inside the membership token that carries it (issue 1515). */
+.fabricate-manager .manager-currency-subunit-amount {
+  width: 56px;
+  min-width: 0;
+  height: 25px;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Provider-managed (read-only) currency: the selected inventory provider owns the denomination ladder, so units render as a compact static display with no edit/delete/add controls. */
+.fabricate-manager .manager-currency-provider-managed-callout {
+  margin-bottom: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-currency-provider-managed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
+.fabricate-manager .manager-currency-provider-managed-list {
+  gap: var(--fab-space-2);
+}
+
+/* Provider-managed denominations (e.g. pf2e cp/sp/gp/pp) read better as a compact two-column grid that stacks into a couple of rows rather than a full-width single column, collapsing to one column on narrow widths. */
+.fabricate-manager .manager-currency-provider-managed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fab-space-3);
+}
+
+@container fabricate-manager (max-width: 680px) {
+  .fabricate-manager .manager-currency-provider-managed-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fabricate-manager .manager-currency-provider-managed-summary {
+  display: flex;
+  gap: var(--fab-space-3);
+  align-items: center;
+}
+
+/* Read-only provider/macro units present label, abbreviation, and denomination as static field/value pairs, mirroring how Label and Abbreviation are shown in the editable form. */
+.fabricate-manager .manager-currency-readonly-fields {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2) var(--fab-space-4);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-currency-readonly-label {
+  color: var(--fab-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-currency-readonly-value {
+  color: var(--fab-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-drop-inspector-stack {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.fabricate-manager[data-manager-view="gathering-task-edit"] .manager-inspector {
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-drop-inspector-divider {
+  width: calc(100% + 24px);
+  height: 1px;
+  margin: var(--fab-space-3) calc(-1 * var(--fab-space-3)) 0;
+  background: var(--fab-border);
+}
+
+.fabricate-manager .manager-drop-inspector-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding-top: var(--fab-space-3);
+  overflow: hidden auto;
+}
+
+.fabricate-manager .manager-drop-editor-header-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-row-card,
+.fabricate-manager .manager-drop-editor-condition-modifier-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-row-card-header {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-character-modifier-row-card-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 36ch;
+}
+
+.fabricate-manager .manager-character-modifier-add-search-row {
+  display: block;
+}
+
+.fabricate-manager .manager-character-modifier-add-search {
+  width: 100%;
+}
+
+.fabricate-manager .fabricate-typeahead-option.manager-character-modifier-add-suggestion {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-height: 30px;
+  padding: var(--fab-space-1) var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-add-suggestion > i {
+  text-align: center;
+}
+
+.fabricate-manager .manager-character-modifier-row-list,
+.fabricate-manager .manager-condition-modifier-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-character-modifier-row-reference,
+.fabricate-manager .manager-condition-modifier-row-reference {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 6px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-character-modifier-row-reference-header {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex-wrap: wrap;
+}
+
+/* A rule that does not collapse lays its head, its field chain and its remove on one line (issue 1782). */
+.fabricate-rule-row .fabricate-rule-row-line {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex-wrap: nowrap;
+}
+
+.fabricate-rule-row .fabricate-rule-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-rule-row .fabricate-rule-row-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.fabricate-rule-row-line .fabricate-rule-row-remove {
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-condition-modifier-row-reference.is-positive {
+  border-color: var(--fab-success-border);
+  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-bg-2));
+}
+
+.fabricate-manager .manager-condition-modifier-row-reference.is-negative {
+  border-color: var(--fab-danger-border);
+  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-bg-2));
+}
+
+.fabricate-manager .manager-condition-modifier-row-reference.is-zero {
+  border-color: var(--fab-border);
+}
+
+.fabricate-manager .manager-condition-modifier-value {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-condition-modifier-value input {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 28px;
+  min-height: 28px;
+  padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
+  text-align: center;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  box-shadow: none;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-condition-modifier-value > span[aria-hidden="true"] {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--fab-text-muted, var(--fab-text));
+}
+
+.fabricate-manager .manager-condition-modifier-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--fab-space-2);
+  align-items: center;
+}
+
+.fabricate-manager .manager-condition-modifier-picker {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-character-modifier-row-reference-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+  min-width: 0;
+}
+
+/* The operator is an `inline` `<Select>` whose trigger carries the sign's tone as its border and text; keyboard focus repaints that border in the accent, so the tone never hides the ring (issue 1777). */
+.fabricate-manager .manager-character-modifier-operator-select {
+  flex: none;
+}
+
+.fabricate-manager .manager-character-modifier-operator-select.is-positive .fabricate-select-trigger {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-character-modifier-operator-select .fabricate-select-trigger:focus-visible {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-manager .manager-character-modifier-row-reference-delete {
+  margin-left: auto;
+}
+
+.fabricate-manager .manager-character-modifier-row-bounds .fabricate-field {
+  flex: 1 1 80px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-character-modifier-override-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-character-modifier-override-row .fabricate-toggle {
+  max-width: 100px;
+}
+
+.fabricate-manager .manager-character-modifier-override-hint {
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
