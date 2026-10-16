@@ -65,14 +65,13 @@ export class GatheringRunManager {
     this._baseline = new Map();
   }
 
-  invalidateCache(actorId = null) {
-    if (actorId) {
-      this._cache.delete(actorId);
-      this._baseline.delete(actorId);
-      return;
+  /** Drops one actor's entry, by document or uuid-first key, or every entry when nullish. */
+  invalidateCache(actorOrKey = null) {
+    const key = typeof actorOrKey === 'string' ? actorOrKey : actorKey(actorOrKey);
+    for (const entries of [this._cache, this._baseline]) {
+      if (actorOrKey == null) entries.clear();
+      else entries.delete(key);
     }
-    this._cache.clear();
-    this._baseline.clear();
   }
 
   getActiveRuns(actor) {
