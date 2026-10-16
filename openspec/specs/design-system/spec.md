@@ -710,10 +710,13 @@ The surround of a filled control is not its surface, and the outline's shortfall
 `tests/components/control-outline-contrast.test.js` holds the single declaration, the 3:1 floor on `--fab-bg-0`, `--fab-bg-1` and `--fab-bg-2` in all seven palettes, every outline site, and the padding-box clip on every filled one.
 
 The recessive tones `secondary`, `neutral`, `subtle` and `muted` are a FOUR-RANK ORDERED ink ladder routed by MEANING: `secondary` names the rule the GM is reading, `neutral` a fact that is merely present, `subtle` a quiet non-actionable state, and `muted` unavailable.
-Each is measurably weaker than the last in every theme, and the ORDER is the invariant rather than any percentage: five of the seven roots express the ladder as one opaque hue at 74%, 56% and 42% of itself, `mythwright` states the first three as three DIFFERENT opaque hues plus one alpha, and `foundry-native` uses 78% and 60% over a different base triple at 50%.
+Each is measurably weaker than the last in every theme, and the ORDER is the invariant rather than any percentage: `fabricate` and `sovereign` express the ladder as one opaque hue at 74%, 56% and 42% of itself, `ironblood-forge`, `hearth-herb` and `starglass-arcana` as one opaque hue at 80%, 56% and 42% of itself, `mythwright` states the first three as three DIFFERENT opaque hues plus one alpha, and `foundry-native` uses 80% and 60% of its secondary triple, then a different base triple at 50%.
 So the ordering quantity is composited CONTRAST and never an alpha or a channel — an alpha comparison ties three of the four in `mythwright`.
 A caller routes by MEANING and never by matching a tone name to a token name: `muted` inks with `--fab-text-disabled` and `neutral` with `--fab-text-muted`, so only `subtle` and `secondary` are spelled like the token they use.
 `secondary` is the rank that already carries the compliant surface named above.
+`--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
+`--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
+`tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
 And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the seven themes — they are equal only in `mythwright` and `foundry-native` — so a ground swap between them is MEASURED per theme and never reasoned: it is why the chip's `neutral` tone, which inherits the base overlay rather than the raised surface, is a stated move for a converted caller that took the raised surface before.
 
@@ -755,6 +758,11 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 - **WHEN** a change reads a `--fab-shadow-*` token in the sheet or a Svelte scoped block at a file and selector the pinned allow-list does not name
 - **THEN** `design-system-debt-ratchets` fails it until the site is listed with the reason it floats, and the review of that listing decides whether it floats or sits
+
+#### Scenario: A palette edit drops the muted ink under its floor
+
+- **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its five named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
+- **THEN** `text-muted-ground-contrast` fails and names the palette, the ground and the ratio
 
 ### Requirement: The token namespace is one generation and names its purpose
 
@@ -993,7 +1001,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
-An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, because muted measures under 4.5:1 on the raised hover ground; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
+An entry's time MUST be set in the mono face at 9.5px and weight 400 in `--fab-text-muted`, and in `--fab-text-secondary` while an open, unselected entry is hovered, and each ink clears 4.5:1 on the ground it is drawn on; it is ellipsized on overflow with the whole time as its `title` (ruling 2026-10-07; issue 2257 D13).
 A cross-reference list (`XrefList`) is a `list` named by its own visible label; a row that opens is a button named by its text, the item's name followed by its detail and quantity, and is never pressed, and a row that does not open holds nothing focusable.
 A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`, and each of its two glyph options is a radio named by its own label prop, `listLabel` or `gridLabel`, and never by its glyph; each option is titled with the same word, the pointer half of that name.
 A tier track is an ordered list with an explicit `role="list"`, named by its required `ariaLabel`; its current tier carries `aria-current="step"` and its `currentLabel`, every other tier its visually hidden `reachedLabel` or `aheadLabel`; chevrons, dots and the current tier's glyph are decorative.

@@ -276,7 +276,7 @@
   --fab-border-strong: rgb(200 177 163 / 32%);
   --fab-text: #F0E2D4;
   --fab-text-secondary: #C8B1A3;
-  --fab-text-muted: rgb(200 177 163 / 74%);
+  --fab-text-muted: rgb(200 177 163 / 80%);
   --fab-text-subtle: rgb(200 177 163 / 56%);
   --fab-text-disabled: rgb(200 177 163 / 42%);
   --fab-accent: #C58B5A;
@@ -372,7 +372,7 @@
   --fab-border-strong: rgb(213 198 168 / 32%);
   --fab-text: #F1E9D8;
   --fab-text-secondary: #D5C6A8;
-  --fab-text-muted: rgb(213 198 168 / 74%);
+  --fab-text-muted: rgb(213 198 168 / 80%);
   --fab-text-subtle: rgb(213 198 168 / 56%);
   --fab-text-disabled: rgb(213 198 168 / 42%);
   --fab-accent: #C8A36E;
@@ -468,7 +468,7 @@
   --fab-border-strong: rgb(203 191 236 / 32%);
   --fab-text: #F2ECFF;
   --fab-text-secondary: #CBBFEC;
-  --fab-text-muted: rgb(203 191 236 / 74%);
+  --fab-text-muted: rgb(203 191 236 / 80%);
   --fab-text-subtle: rgb(203 191 236 / 56%);
   --fab-text-disabled: rgb(203 191 236 / 42%);
   --fab-accent: #9FC5E8;
@@ -564,7 +564,7 @@
   --fab-border-strong: rgb(188 137 99 / 32%);
   --fab-text: #F3F3F5;
   --fab-text-secondary: #B6B4B2;
-  --fab-text-muted: rgb(182 180 178 / 78%);
+  --fab-text-muted: rgb(182 180 178 / 80%);
   --fab-text-subtle: rgb(182 180 178 / 60%);
   --fab-text-disabled: rgb(148 143 144 / 50%);
 
