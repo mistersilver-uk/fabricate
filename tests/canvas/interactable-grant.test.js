@@ -399,6 +399,30 @@ sealed('a gathering grant falls back to its context scope and tolerates a reject
   assert.deepEqual(rejected, ['gathering']);
 });
 
+sealed('a rejected crafting show does not escape openGrant as an unhandled rejection', async () => {
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const { deps } = collaborators({
+      getAppClass: () => ({ show: () => Promise.reject(new Error('crafting show exploded')) }),
+    });
+    const activeCanvasTool = { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: '' };
+
+    assert.doesNotThrow(() =>
+      openGrant({ grant: { interactableType: 'tool', actorId: 'a7', context: { activeCanvasTool } } }, deps)
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(
+      unhandled.map((reason) => reason.message),
+      [],
+      'a rejected crafting show must be caught by openGrant'
+    );
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
 sealed('a denial notifies the requesting client and emits to every other', () => {
   const local = collaborators({ currentUserId: () => 'u-1' });
   routeActivationDenied('u-1', 'LOCKED', local.deps);
