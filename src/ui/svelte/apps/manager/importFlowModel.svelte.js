@@ -1,3 +1,11 @@
+import { localize, notifyWarn } from '../../util/foundryBridge.js';
+
+// A drop import that throws reaches no other handler, so it is logged and the GM is told here.
+function reportDropImportFailure(error) {
+  console.error('Fabricate | Component drop import failed:', error);
+  notifyWarn(localize('FABRICATE.Admin.Items.DropImportFailed'));
+}
+
 /**
  * The system import report and the folder-aware component drop that opens the mapping modal
  * before anything is imported (issues 771 and 877). `store`, `services` and `selectedSystemId`
@@ -16,22 +24,30 @@ export function createImportFlowModel({ store, services, selectedSystemId } = {}
   }
 
   async function dropComponent(data) {
-    const plan = (await services?.()?.collectImportFolderGroups?.(data)) || null;
-    if (plan?.groups?.length) {
-      importMappingFolders = plan.groups;
-      importMappingOpen = true;
-      return;
+    try {
+      const plan = (await services?.()?.collectImportFolderGroups?.(data)) || null;
+      if (plan?.groups?.length) {
+        importMappingFolders = plan.groups;
+        importMappingOpen = true;
+        return;
+      }
+      // `handled` means the collector already notified (e.g. a compendium-directory folder groups
+      // packs, not items) and there is nothing to import, so it never falls through to onDropItem.
+      if (plan?.handled) return;
+      await services?.()?.onDropItem?.(data);
+    } catch (error) {
+      reportDropImportFailure(error);
     }
-    // `handled` means the collector already notified (e.g. a compendium-directory folder groups
-    // packs, not items) and there is nothing to import, so it never falls through to onDropItem.
-    if (plan?.handled) return;
-    services?.()?.onDropItem?.(data);
   }
 
   async function commitImportFolderMapping(decisions) {
     importMappingOpen = false;
     if (!Array.isArray(decisions) || decisions.length === 0) return;
-    await services?.()?.commitImportFolderMapping?.(selectedSystemId?.(), decisions);
+    try {
+      await services?.()?.commitImportFolderMapping?.(selectedSystemId?.(), decisions);
+    } catch (error) {
+      reportDropImportFailure(error);
+    }
   }
 
   return {

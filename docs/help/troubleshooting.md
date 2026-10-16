@@ -687,7 +687,7 @@ Ask your GM to clear that actor's crafting run history (this removes the run his
 
 ## Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
 
-**Symptom:** Dragging something onto the **Items** tab drop zone in the Crafting Admin panel produces a warning notification such as "Only Item documents can be added as crafting components" or "Folder contains no Item documents", and nothing is added.
+**Symptom:** Dragging something onto the **Items** tab drop zone in the Crafting Admin panel produces a warning notification such as "Only Item documents can be added as crafting components" or a message that the folder contains no Item documents, and nothing is added.
 
 **Cause:**
 
@@ -706,8 +706,9 @@ If the folder holds no Items (for example, it contains only Actors), a notificat
 | Notification | Meaning |
 |:-------------|:--------|
 | "Only Item documents can be added as crafting components. Dropped: Actor." | You dragged a character or NPC sheet onto the drop zone. Use an Item from the sidebar or a compendium instead. |
-| "Folder contains no Item documents." | The folder you dropped holds no Items. It may contain Actors, JournalEntries, or other document types. |
+| Folder "{name}" contains no Item documents. | The folder you dropped holds no Items. It may contain Actors, JournalEntries, or other document types. |
 | "Drop an Item document from sidebar or compendium." | The drag data could not be resolved to any UUID. This can happen when dragging something that does not emit standard Foundry drag data. |
+| "Fabricate could not finish importing that drop, so some items may not have been added. Details are in the console (F12)." | A compendium or folder import failed partway through. Some items may not have been added. Check the console (F12) for the details, then drop again. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -735,6 +736,12 @@ The item is not added, no error or notification appears from Fabricate, and in s
 
 In some Foundry versions and environments, Fabricate could not read the drag-and-drop data at the moment of the drop, so it silently ignored the dropped item.
 Control then returned to Foundry, which produced the generic error message.
+
+On the Component Rules page, an earlier version accepted drops only on the drop zone at the top of the page.
+A drop anywhere else on the page was silently ignored.
+Now the whole components list accepts drops, including the empty "No components yet" area.
+The toolbar above the list and the page controls below it still do not.
+If a drop on the list still does nothing, make sure a crafting system is selected; with none selected the page ignores drops.
 
 **Fix:** This is resolved in the current version, which reads the drag data more robustly across Foundry versions.
 Make sure Fabricate is up to date.

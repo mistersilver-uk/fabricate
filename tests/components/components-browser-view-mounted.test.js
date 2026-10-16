@@ -791,6 +791,102 @@ describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
   });
 });
 
+describe('ComponentsBrowserView list region drop target (issue 2397)', () => {
+  const PAYLOAD = { type: 'Item', uuid: 'Item.x' };
+  const LIST = '[data-component-library] > .manager-table-scroll';
+
+  // `getDragEventData` reads `text/plain` with no `foundry` global, as a real Item drag carries it.
+  function fire(node, type, { data, relatedTarget } = {}) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    event.dataTransfer = { getData: () => (data === undefined ? '' : JSON.stringify(data)) };
+    if (relatedTarget !== undefined) event.relatedTarget = relatedTarget;
+    node.dispatchEvent(event);
+  }
+
+  async function mountLogged(props) {
+    const drops = [];
+    const onDropComponent = (data) => {
+      drops.push(data);
+    };
+    const root = await browser.mount({ onDropComponent, ...props });
+    return { root, drops };
+  }
+
+  it('hands a drop on the empty list, and on its empty state, to the import flow once', async () => {
+    for (const target of [LIST, `${LIST} .manager-empty`]) {
+      const { root, drops } = await mountLogged({ itemCards: [], dropEnabled: true });
+      const node = root.querySelector(target);
+      assert.ok(Boolean(node), `${target} renders`);
+      fire(node, 'drop', { data: PAYLOAD });
+      assert.deepEqual(drops, [PAYLOAD], `a drop on ${target} imports once`);
+      browser.remount();
+    }
+  });
+
+  it('takes a drop on a row once, and the head zone still once, so nothing fires twice', async () => {
+    for (const target of ['.manager-component-row', '.manager-component-drop-zone']) {
+      const { root, drops } = await mountLogged({ itemCards: manyGeneral(2), dropEnabled: true });
+      fire(root.querySelector(target), 'drop', { data: PAYLOAD });
+      assert.deepEqual(drops, [PAYLOAD], `a drop on ${target} imports exactly once`);
+      browser.remount();
+    }
+  });
+
+  it('ignores a drop while dropping is disabled, and on the toolbar', async () => {
+    const disabled = await mountLogged({ itemCards: [], dropEnabled: false });
+    fire(disabled.root.querySelector(LIST), 'drop', { data: PAYLOAD });
+    fire(disabled.root.querySelector(`${LIST} .manager-empty`), 'drop', { data: PAYLOAD });
+    assert.equal(disabled.drops.length, 0, 'a disabled list takes no drop');
+    browser.remount();
+
+    const enabled = await mountLogged({ itemCards: [], dropEnabled: true });
+    fire(enabled.root.querySelector('.manager-component-toolbar'), 'drop', { data: PAYLOAD });
+    assert.equal(enabled.drops.length, 0, 'the toolbar is not a drop target');
+  });
+
+  it('shows the drop-active state on the list alone, held across a move onto a row', async () => {
+    const { root } = await mountLogged({ itemCards: manyGeneral(2), dropEnabled: true });
+    const list = root.querySelector(LIST);
+    const head = root.querySelector('.manager-component-drop-zone');
+    fire(list, 'dragover');
+    assert.ok(list.classList.contains('is-drop-active'), 'the list shows the drop-active state');
+    assert.ok(!head.classList.contains('is-drop-active'), 'and the head zone does not');
+
+    fire(list, 'dragleave', { relatedTarget: list.querySelector('.manager-component-row') });
+    assert.ok(list.classList.contains('is-drop-active'), 'moving onto a row inside keeps it');
+    fire(list, 'dragleave', { relatedTarget: root.querySelector('.manager-component-toolbar') });
+    assert.ok(!list.classList.contains('is-drop-active'), 'leaving the list clears it');
+  });
+
+  it('takes no drop on the pager, so only the list and the head zone import', async () => {
+    const { root, drops } = await mountLogged({ itemCards: manyGeneral(30), dropEnabled: true });
+    const main = root.querySelector('.manager-main');
+    const pager = main.querySelector(':scope > .fabricate-pagination');
+    assert.ok(Boolean(pager), 'a paging list renders the pager');
+    fire(pager, 'drop', { data: PAYLOAD });
+    assert.equal(drops.length, 0, 'a drop on the pager imports nothing');
+  });
+
+  it("keeps `.manager-main`'s children to the head, toolbar, list and, when paging, the pager", async () => {
+    const TRACKS = [
+      'manager-component-head',
+      'manager-component-toolbar',
+      'manager-table-scroll',
+      'fabricate-pagination',
+    ];
+    const childClasses = (root) =>
+      [...root.querySelector('.manager-main').children].map((child) =>
+        TRACKS.find((name) => child.classList.contains(name))
+      );
+    const paged = await browser.mount({ itemCards: manyGeneral(30), dropEnabled: true });
+    assert.deepEqual(childClasses(paged), TRACKS, 'a paging list keeps four children');
+    browser.remount();
+
+    const empty = await browser.mount({ itemCards: [], dropEnabled: true });
+    assert.deepEqual(childClasses(empty), TRACKS.slice(0, 3), 'an empty list keeps three');
+  });
+});
+
 // ── C7. THE SYSTEM RULES LIST'S INSPECTOR (issue 1371, parity round 4) ────────────────────────
 const inspector = createComponentScopeHarness({
   repoRoot,

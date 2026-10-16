@@ -681,6 +681,8 @@ Capabilities:
   drops are accepted from both the world Items directory and a compendium directory, and expand to
   every contained Item including nested subfolders; a compendium folder's items are resolved from
   the pack index entries.
+- On the Component Rules route, the list region beneath the toolbar, including its empty state, accepts every drop the import zone accepts and hands it to the same import flow.
+  The toolbar and pager do not accept a drop, and the list region shows the drop-active state while a drag is over it.
 - Folder-aware categorization on bulk import: a folder drop, an in-pack-folder drop, or a
   whole-compendium drop that contains at least one item-bearing folder opens a mapping step before
   the import commits.
@@ -714,6 +716,7 @@ Component import warnings:
 - When a single component import or replace-source operation falls back because the dropped Item's recorded canonical source UUID no longer resolves, the GM manager UI warns that the original source link is broken and that Fabricate used the live dropped Item UUID instead, naming the affected item and UUIDs.
 - When a folder or compendium pack import falls back for one or more Items, the GM manager UI emits one summary warning with the number of affected Items, rather than one warning per Item.
 - When an import's World Component registration could not be written, the single-item drop, the pack drop, the folder drop, the mapping commit and the Compendium Directory action each emit one warning per import run, saying that the items were imported, that the world Component catalogue could not be updated, and that importing them again adds them to it (`data-models/spec.md` `## Component` requirement 12c).
+- When a pack drop, a folder drop or a folder-mapping commit fails with an error, the GM manager UI emits one warning that the import could not finish, in addition to any catalogue-registration warning, and logs the error to the console, so such a drop never fails without a notice.
 
 ## Essences Tab
 

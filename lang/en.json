@@ -3665,7 +3665,7 @@
           "Table": "Components table",
           "TableShort": "Components",
           "EmptyTitle": "No components yet",
-          "EmptyHint": "Drop Foundry items into this page to add components to the selected system.",
+          "EmptyHint": "Drop Foundry items here to add components to the selected system.",
           "EmptySearchTitle": "No components match these filters.",
           "EmptySearchHint": "Clear search and filters to show all components in this system.",
           "Source": "Source",
@@ -8590,6 +8590,7 @@
         "FolderEmpty": "Folder \"{name}\" contains no Item documents.",
         "FolderNotResolved": "Could not find the dropped folder. Try dragging it from the Items sidebar again.",
         "DropNoSystemSelected": "Select a crafting system first before dropping items.",
+        "DropImportFailed": "Fabricate could not finish importing that drop, so some items may not have been added. Details are in the console (F12).",
         "ImportMapping": {
           "Title": "Categorize imported folders",
           "Subtitle": "Assign a category and tags to each detected folder, or skip it.",
