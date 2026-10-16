@@ -74,27 +74,34 @@ function claimsAny(definition, uuids) {
   return uuids.some((uuid) => held.includes(uuid));
 }
 
-// Whether a durable id naming `named` is an inherited marker (issue 2217): `named` claims none of
-// the uuids in `own`, and the source is a clone, or a derivative (its compendium source is one
-// `snapshot` leaves out) whose stored name `named` does not carry. A clone's name is not read.
+/** A snapshot's registered and origin uuids: the claims a find-existing may match, since an alias
+ * it records is a compendium source that does not resolve (issue 2246). */
+function primaryClaims(snapshot) {
+  return [snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean);
+}
+
+// Whether a durable id naming `named` is an inherited marker (issues 2217, 2246): `named` claims
+// none of the uuids in `own`, and the source is a clone, or its compendium source is not one of
+// `snapshot`'s primary claims (a derivative, or a source that does not resolve) and `named` does
+// not carry its stored name. A clone's name is not read.
 function isInheritedMarker(named, source, snapshot, own) {
   if (claimsAny(named, own)) return false;
   if (getDuplicateSourceUuid(source)) return true;
   const compendiumUuid = getCompendiumSourceUuid(source);
-  if (!compendiumUuid || getItemMatchUuids(snapshot).includes(compendiumUuid)) return false;
+  if (!compendiumUuid || primaryClaims(snapshot).includes(compendiumUuid)) return false;
   const name = storedMatchName(source);
   return !name || name !== normalizeMatchName(named.name);
 }
 
 /** The definition a registration source already has (issue 2217): a durable id its flags carry,
- * then a claim on its own uuid, then any reference in `claimed`, by default all `snapshot` claims.
- * A durable id is skipped when `isInheritedMarker` holds for the definition it names. */
+ * then a claim on its own uuid, then any reference in `claimed`, by default `snapshot`'s registered
+ * and origin uuids. A durable id is skipped when `isInheritedMarker` holds for the one it names. */
 export function findRegisteredDefinition(
   definitions,
   snapshot,
   source,
   durableIds = [],
-  claimed = getItemMatchUuids(snapshot)
+  claimed = primaryClaims(snapshot)
 ) {
   const own = getOwnSourceUuids(snapshot?.registeredItemUuid, source);
   for (const id of durableIds) {

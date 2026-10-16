@@ -2,11 +2,11 @@
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
  * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) keys on the
- * source's own uuid plus its compendium source, the latter dropped for a clone or a derivative;
- * the metadata refresh (`refreshComponentMetadataForUpdatedItem`) keys on the own uuid alone.
+ * source's own uuid plus its compendium source, dropped for a clone or a derivative and never
+ * matched when it does not resolve; the metadata refresh keys on the own uuid alone.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
-import { isEmbeddedItemUuid } from '../../utils/sourceReferenceUnion.js';
+import { isEmbeddedItemUuid, sourceReferenceKey } from '../../utils/sourceReferenceUnion.js';
 import {
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
@@ -402,6 +402,21 @@ function adoptedIdentity(io, system, registrations, record) {
   return id ? { id } : {};
 }
 
+/** The aliases a new record keeps (issue 2246): each one that no component of its system, and no
+ * World Component other than `adoptedId`, claims, compared by `sourceReferenceKey`. */
+function unclaimedAliases(io, system, aliases, adoptedId) {
+  if (aliases.length === 0) return aliases;
+  const worldComponents = (io.componentScopeStore()?.listEntities() ?? []).filter(
+    (entity) => entity?.id !== adoptedId
+  );
+  const claimed = new Set(
+    [...componentRowsOf(io)(system.id), ...worldComponents].flatMap((record) =>
+      getItemMatchUuids(record).map(sourceReferenceKey)
+    )
+  );
+  return aliases.filter((alias) => !claimed.has(sourceReferenceKey(alias)));
+}
+
 function withRegistrationError(result, flushed) {
   return flushed?.error ? { ...result, worldRegistrationError: flushed.error } : result;
 }
@@ -445,10 +460,13 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
   // The component claiming the source's own uuid wins over one claiming only its compendium
-  // source (issue 2217).
+  // source (issue 2217), which is no find key when it does not resolve (issue 2246).
   const existing =
     io.findComponentBySourceReferences(system, getOwnSourceUuids(itemUuid, source)) ||
-    io.findComponentBySourceReferences(system, nextSourceData.references);
+    io.findComponentBySourceReferences(
+      system,
+      nextSourceData.references.filter((ref) => !nextSourceData.aliasItemUuids.includes(ref))
+    );
   const nextSnapshot = settleCompendiumClaim(
     await io.buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData),
     existing,
@@ -491,10 +509,15 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   }
 
   // No match: create a new component. A `_normalizeSystem` bypass site (issue 1359): same basis,
-  // same helper, `Set|null`; see `_scopeBasis`.
+  // same helper, `Set|null`; see `_scopeBasis`. An alias adopts nothing (issue 2246).
   const { essenceIds: validEssenceIds } = io.scopeBasis(system);
+  const adopted = adoptedIdentity(io, system, registrations, {
+    ...nextSnapshot,
+    aliasItemUuids: [],
+  });
+  const aliasItemUuids = unclaimedAliases(io, system, nextSnapshot.aliasItemUuids, adopted.id);
   const item = io.normalizeComponent(
-    { ...nextSnapshot, ...adoptedIdentity(io, system, registrations, nextSnapshot) },
+    { ...nextSnapshot, aliasItemUuids, ...adopted },
     { validEssenceIds, ...io.salvageNormalizationContext(system) }
   );
 

@@ -973,3 +973,63 @@ describe('the three scrolls built from one template entry', () => {
     );
   });
 });
+
+describe('siblings sharing a template entry that no longer resolves', () => {
+  /** Two world Items built from the template while it resolved. */
+  function siblings() {
+    return ['fire', 'frost'].map((id) =>
+      worldItem(`scroll-${id}`, {
+        name: `Scroll of ${id}`,
+        _stats: { compendiumSource: TEMPLATE_UUID },
+      })
+    );
+  }
+
+  it('imported into two systems they are two World Components, and the first adopted again keeps the entry', async () => {
+    const [fire, frost] = siblings();
+    const { manager, entityIds, membershipKeys } = world({
+      systems: [{ id: FORGE }, { id: KITCHEN }],
+    });
+
+    const first = await manager.addItemFromUuid(FORGE, fire.uuid);
+    const second = await manager.addItemFromUuid(KITCHEN, frost.uuid);
+
+    assert.notEqual(second.item.id, first.item.id);
+    assert.deepEqual(entityIds(), [first.item.id, second.item.id]);
+    assert.deepEqual(first.item.aliasItemUuids, [TEMPLATE_UUID]);
+    assert.deepEqual(second.item.aliasItemUuids, [], "the first's World Component claims it");
+
+    const adopted = await manager.addItemFromUuid(KITCHEN, fire.uuid);
+
+    assert.equal(adopted.item.id, first.item.id);
+    assert.deepEqual(adopted.item.aliasItemUuids, [TEMPLATE_UUID]);
+    assert.deepEqual(entityIds(), [first.item.id, second.item.id]);
+    assert.deepEqual(membershipKeys(), [
+      `${first.item.id}|${FORGE}`,
+      `${second.item.id}|${KITCHEN}`,
+      `${first.item.id}|${KITCHEN}`,
+    ]);
+  });
+
+  it('a World Component claiming the entry type-less still withholds it from a sibling recording it four-part', async () => {
+    const [fire, frost] = siblings();
+    const typelessEntry = 'Compendium.kit.templates.blank';
+    const { manager, entityIds } = world({
+      scope: scopeOf({
+        entities: [worldEntity('world-fire', fire.uuid, { originItemUuid: typelessEntry })],
+        membership: [['world-fire', FORGE]],
+      }),
+      systems: [{ id: FORGE }, { id: KITCHEN }],
+    });
+
+    const sibling = await manager.addItemFromUuid(KITCHEN, frost.uuid);
+
+    assert.notEqual(sibling.item.id, 'world-fire');
+    assert.deepEqual(entityIds(), ['world-fire', sibling.item.id]);
+    assert.deepEqual(
+      sibling.item.aliasItemUuids,
+      [],
+      'the type-less claim covers the four-part one'
+    );
+  });
+});

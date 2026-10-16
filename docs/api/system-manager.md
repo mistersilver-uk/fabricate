@@ -329,8 +329,15 @@ The method resolves the dropped item's live UUID and, when the item is a copy of
 An item that was built from a compendium entry and given a different name is its own item: its compendium source is not used to find or claim a component, and it creates a separate component.
 A copy that keeps the entry's name still matches the component registered from that entry.
 A sidebar duplicate is likewise matched only by its own UUID.
-If the compendium source does not resolve, the name cannot be compared and items sharing that source still merge until the pack is restored.
-If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`.
+If the compendium source does not resolve, the name cannot be compared, so the source is not used to find or claim a component.
+Items that share such a source register as separate components, and adding one again finds its component by its own UUID.
+The source does not resolve when its pack is missing (the module or system that provides it is disabled or uninstalled), its entry was deleted, or the lookup failed.
+The split is permanent once made.
+Restoring the entry does not rejoin the components.
+To remove an unwanted split, delete the extra component, then either restore the entry and import the item again, or use replace-source to link the original component to the item.
+A component that already absorbed several such items stays merged, so delete it and import the items again.
+If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`, unless another component of the system, or a World Component other than the one the import adopts, already claims it.
+The first import still reports its `sourceFallbacks` entry when the alias is withheld.
 Adding again an Item whose own UUID a component already claims adds no alias and reports no fallback.
 A component can claim a full source-reference chain through `registeredItemUuid`, `originItemUuid`, and `aliasItemUuids`.
 
@@ -493,7 +500,8 @@ GM only.
 
 The Item does not need to be imported as a component first.
 Tool registration follows the same name-based rule as components: an item built from a compendium entry and renamed becomes its own tool instead of updating one registered from the same entry.
-Unlike a component, a tool is not matched through a compendium source that does not resolve, so items sharing a missing entry do not merge into one tool.
+As with a component, a tool is not matched through a compendium source that does not resolve, so items sharing a missing entry register as separate tools.
+The split is permanent once made, and the recovery is to delete the extra tool, restore the entry, and import the item again.
 The new tool carries its own source references and a name/image display snapshot captured from the Item, and `componentId` is `null`.
 The method stamps the durable tool identity flag (`flags.fabricate.roles[systemId].toolId`) on the source Item so future copies are recognised.
 An Item that is already a managed component can also be registered as a tool this way, in which case the Item carries both the component and tool role flags.

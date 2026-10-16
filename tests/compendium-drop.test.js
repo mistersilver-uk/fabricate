@@ -583,7 +583,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   globalThis.fromUuid = async () => null;
 });
 
-test('addItemFromUuid — updates existing component through broken canonical source reference', async () => {
+test('addItemFromUuid — adds a component beside one claiming its broken canonical source reference', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -609,15 +609,19 @@ test('addItemFromUuid — updates existing component through broken canonical so
     return null;
   };
 
+  // A source that does not resolve matches only a component claiming its own uuid (issue 2246).
+  const before = structuredClone(mgr.getSystem('sys1').components[0]);
+
   const result = await mgr.addItemFromUuid('sys1', 'Item.world-azuryt');
 
-  assert.equal(result.action, 'updated');
-  assert.equal(result.item.id, 'comp-1');
+  assert.equal(result.action, 'added');
+  assert.notEqual(result.item.id, 'comp-1');
   assert.equal(result.item.name, 'Azuryt');
   assert.equal(result.item.registeredItemUuid, 'Item.world-azuryt');
   assert.equal(result.item.originItemUuid, 'Item.world-azuryt');
-  assert.ok(result.item.aliasItemUuids.includes('Compendium.crafting.items.Item.missing-azuryt'));
-  assert.equal(mgr.getSystem('sys1').components.length, 1);
+  assert.deepEqual(result.item.aliasItemUuids, [], 'comp-1 already claims the broken source');
+  assert.equal(mgr.getSystem('sys1').components.length, 2);
+  assert.deepEqual(mgr.getSystem('sys1').components[0], before);
   assert.equal(result.sourceFallbacks.length, 1);
 
   globalThis.fromUuid = async () => null;
