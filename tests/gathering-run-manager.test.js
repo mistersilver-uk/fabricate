@@ -901,6 +901,68 @@ test('GatheringRunManager cleanup by system, environment, and task removes match
   assert.equal(runs.getActiveRun(actor, keep.id)?.taskId, 'task-keep');
 });
 
+/** Empties the actor's persisted active runs behind the manager, as another client's write would. */
+function dropActiveRunsOutOfBand(actor) {
+  const flags = actor.flags.fabricate;
+  flags.gatheringRuns = { ...clonePlain(flags.gatheringRuns), active: {} };
+}
+
+async function cachedActorWithRun(name) {
+  const actor = new FakeActor(name);
+  const runs = manager();
+  await runs.createRun(actor, runData());
+  dropActiveRunsOutOfBand(actor);
+  assert.equal(runs.getActiveRuns(actor).length, 1, 'the cache still holds the run');
+  return { actor, runs };
+}
+
+test('GatheringRunManager invalidates by the actor or its uuid-first key, never by a bare id', async () => {
+  const { actor, runs } = await cachedActorWithRun('Gatherer');
+  assert.notEqual(actor.id, actor.uuid);
+
+  runs.invalidateCache(actor.id);
+  assert.equal(runs.getActiveRuns(actor).length, 1, 'a bare id misses the uuid-first key');
+  runs.invalidateCache(actor);
+  assert.deepEqual(runs.getActiveRuns(actor), []);
+
+  const byKey = await cachedActorWithRun('Keyed');
+  byKey.runs.invalidateCache(byKey.actor.uuid);
+  assert.deepEqual(byKey.runs.getActiveRuns(byKey.actor), []);
+});
+
+test('GatheringRunManager clears every entry only for a nullish argument', async () => {
+  const first = new FakeActor('First');
+  const second = new FakeActor('Second');
+  const runs = manager();
+  await runs.createRun(first, runData());
+  await runs.createRun(second, runData());
+  dropActiveRunsOutOfBand(first);
+  dropActiveRunsOutOfBand(second);
+
+  const cachedCounts = () => [runs.getActiveRuns(first).length, runs.getActiveRuns(second).length];
+  runs.invalidateCache({ name: 'Keyless' });
+  assert.deepEqual(cachedCounts(), [1, 1], 'a keyless actor clears nothing');
+  runs.invalidateCache('');
+  assert.deepEqual(cachedCounts(), [1, 1], 'an empty key clears nothing');
+  runs.invalidateCache(null);
+  assert.deepEqual(runs.getActiveRuns(first), []);
+  assert.deepEqual(runs.getActiveRuns(second), []);
+});
+
+test('GatheringRunManager invalidating a token actor leaves its world actor cached', async () => {
+  const world = await cachedActorWithRun('A');
+  const token = new FakeActor('A');
+  token.uuid = 'Scene.s.Token.t.Actor.a';
+  await world.runs.createRun(token, runData());
+  dropActiveRunsOutOfBand(token);
+  assert.equal(world.actor.id, token.id);
+
+  world.runs.invalidateCache(token);
+  assert.deepEqual(world.runs.getActiveRuns(token), []);
+  const worldRuns = world.runs.getActiveRuns(world.actor);
+  assert.equal(worldRuns.length, 1, 'the world actor entry is untouched');
+});
+
 function mergeObjects(previous, next) {
   if (!next || typeof next !== 'object' || Array.isArray(next)) {
     return clonePlain(next);

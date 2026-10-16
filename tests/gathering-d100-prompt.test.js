@@ -228,14 +228,14 @@ function engineWorld({ fixture = herbFixture(), viewer = PLAYER, rolls = [1] } =
   return { engine, actor, runManager, clock, system, environment, taskId, viewer };
 }
 
-/** A ready versioned run started under a permissive grant, and its check descriptor. */
-async function describeStartedRun(world, { completionMode = 'manual' } = {}) {
+/** A versioned start under a permissive grant whose operation id is its request id. */
+function startVersioned(world, { completionMode = 'manual' } = {}) {
   world.engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
       operationId: `operation-${context.requestId}`,
     }),
   });
-  const started = await world.engine.startVersionedRun({
+  return world.engine.startVersionedRun({
     actor: world.actor,
     viewer: world.viewer,
     environmentId: world.environment.id,
@@ -244,6 +244,11 @@ async function describeStartedRun(world, { completionMode = 'manual' } = {}) {
     requestId: 'start',
     executionGrant: 'grant',
   });
+}
+
+/** A ready versioned run started under a permissive grant, and its check descriptor. */
+async function describeStartedRun(world, options = {}) {
+  const started = await startVersioned(world, options);
   const run = world.runManager.getActiveRuns(world.actor)[0];
   assert.ok(run, `the run started: ${JSON.stringify(started)}`);
   return world.engine.describeVersionedStageCheck({
@@ -932,6 +937,72 @@ test('a stale revision at answer time executes nothing', async () => {
   assert.ok(world.activeRun(), 'the run is still active');
 });
 
+// Versioned operations read the actor afresh, not a cache another client's write went behind.
+
+const persistedRuns = (world) => world.actor.getFlag('fabricate', 'gatheringRuns');
+
+/** Restores `record` to the flag, caches it, then deletes it from the flag behind the cache. */
+function cacheThenDeleteBehind(world, record) {
+  persistedRuns(world).active[record.id] = record;
+  world.runManager.invalidateCache(world.actor.uuid);
+  assert.equal(world.runManager.getActiveRuns(world.actor).length, 1, 'the cache holds the run');
+  delete persistedRuns(world).active[record.id];
+}
+
+test('a versioned describe, execute or cancel treats a run deleted behind the cache as gone', async () => {
+  stubDice({ faces: [50] });
+  const world = engineWorld();
+  await describeStartedRun(world);
+  const record = structuredClone(world.runManager.getActiveRuns(world.actor)[0]);
+  const target = { actor: world.actor, runId: record.id, expectedRevision: record.runRevision };
+  const operations = {
+    describe: () => world.engine.describeVersionedStageCheck({ ...target, preparationGrant: 'g' }),
+    execute: () => world.engine.executeVersionedStage({ ...target, executionGrant: 'g' }),
+    cancel: () => world.engine.cancelVersionedRun({ ...target, executionGrant: 'g' }),
+  };
+  for (const [name, operate] of Object.entries(operations)) {
+    cacheThenDeleteBehind(world, record);
+    await assert.rejects(operate(), { code: 'RUN_NOT_FOUND' }, name);
+  }
+  assert.deepEqual(world.actor.items, []);
+});
+
+test('a replayed versioned start finds its committed run when the cache never saw it', async () => {
+  const world = engineWorld();
+  const started = await startVersioned(world);
+  const record = structuredClone(world.runManager.getActiveRuns(world.actor)[0]);
+  delete persistedRuns(world).active[record.id];
+  world.runManager.invalidateCache(world.actor.uuid);
+  assert.deepEqual(world.runManager.getActiveRuns(world.actor), [], 'the cache holds no run');
+  persistedRuns(world).active[record.id] = record;
+
+  const replayed = await startVersioned(world);
+  assert.equal(replayed.runId, started.runId, JSON.stringify(replayed));
+  world.runManager.invalidateCache(world.actor.uuid);
+  assert.deepEqual(
+    world.runManager.getActiveRuns(world.actor).map((run) => run.id),
+    [record.id]
+  );
+});
+
+test('a Journal execute of a run deleted behind the cache reports it not found', async () => {
+  stubDice({ faces: [50] });
+  const world = commandWorld({
+    fixture: herbFixture({ timeRequirement: { minutes: 1 } }),
+    rolls: [90],
+  });
+  await world.gather({ completionMode: 'worldTime' });
+  const waiting = world.activeRun();
+  assert.ok(waiting?.timeGate, 'the run waits on its time gate');
+  delete persistedRuns(world).active[waiting.id];
+  world.clock.worldTime += 120;
+
+  const result = await world.execute(waiting, { trigger: 'worldTime' });
+  assert.equal(result.reason, 'run-not-found', JSON.stringify(result));
+  assert.deepEqual(world.actor.items, []);
+  assert.deepEqual(persistedRuns(world).history ?? [], []);
+});
+
 // Timed d100 runs are not player checks.
 
 test('a timed d100 run cleared of its time requirement mid-wait completes at world time unprompted', async () => {
@@ -949,7 +1020,6 @@ test('a timed d100 run cleared of its time requirement mid-wait completes at wor
   const snapshotTask = persisted.economyEvidence.runtimeSnapshot.task;
   assert.ok(snapshotTask.timeRequirement, 'the snapshot carried the time requirement');
   snapshotTask.timeRequirement = null;
-  world.runManager.invalidateCache(world.actor.uuid);
   world.clock.worldTime += 120;
 
   const result = await world.execute(waiting, { trigger: 'worldTime' });
