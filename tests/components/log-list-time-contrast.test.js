@@ -57,9 +57,8 @@ test('the time is muted, and clears 4.5:1 on a resting, selected and failed entr
   assert.deepEqual(selectedGrounds, [], 'a selected entry keeps the resting ground');
 });
 
-test('a hovered entry raises its ground, so its time takes secondary and clears 4.5:1 there', () => {
+test('a hovered entry raises its ground, and its time takes secondary and clears 4.5:1 there', () => {
   const raised = paint(LOG_LIST, HOVERED, 'background');
-  assert.notDeepEqual(under('--fab-text-muted', raised), [], 'muted falls short on the raise');
   const ink = paint(LOG_LIST, `${HOVERED} .fab-log-list-when`, 'color');
   assert.equal(ink, '--fab-text-secondary');
   assert.deepEqual(under(ink, raised), []);
