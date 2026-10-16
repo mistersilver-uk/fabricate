@@ -37,7 +37,9 @@ test(`secondary ink reads at least ${STEP}:1 above muted on the soft well in eve
     const step =
       contrast(tokens.get('--fab-text-secondary'), ground) /
       contrast(tokens.get('--fab-text-muted'), ground);
-    return step < STEP ? [`${theme}: secondary over muted ${step.toFixed(2)}:1`] : [];
+    return step < STEP
+      ? [`${theme}: secondary over muted on ${SOFT.join(' over ')} ${step.toFixed(2)}:1`]
+      : [];
   });
   assert.deepEqual(collapsed, []);
 });
