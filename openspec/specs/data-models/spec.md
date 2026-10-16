@@ -1455,7 +1455,9 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    9d.
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
-11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
+11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids` unless another component of its system claims it (an import withholds it, replace-source refuses) or a World Component other than the one the import adopts claims it (an import withholds it).
+    The broken canonical source UUID is never a find-existing or adoption reference.
+    A first import that withholds it still reports the fallback it took.
     The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
@@ -1827,15 +1829,19 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
 - Find-existing prefers the definition that claims the source's own uuid over one that claims only its compendium source.
   A pack Item's own uuid is read in both spellings, with and without the document-type segment.
   Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
-  For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
-- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  For every kind, find-existing does not match through a compendium source that does not resolve: the registration records it only as an alias, and the source matches only a definition claiming its own uuid.
+  So Items sharing such an entry register separately, and importing one again finds its definition by its own uuid.
+  A component records that alias only when no other component of its system, and no World Component other than the one it adopts, claims it, compared without a pack uuid's document-type segment.
+  A source does not resolve when its pack is missing (its module or system disabled or uninstalled, or held back by a core compatibility gate), its entry was deleted, or the server lookup failed; the split it makes is permanent, the first import still reports its fallback, and the recovery is to delete the split definition, restore the entry and import again.
+- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or, when the named definition does not carry its stored name, for a derivative or a source whose compendium source does not resolve, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
   A component's find-existing reads no durable leaf: it keys on the source references alone, and registration overwrites whatever leaf a world source carries.
   A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
-- The derivative gate never un-merges.
-  A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
-- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; neither reaches the runtime matcher.
+- Neither the derivative gate nor the unresolvable-source rule un-merges.
+  A component that absorbed derivatives, or Items sharing an unresolvable entry, keeps their uuids in `aliasItemUuids`, and the recovery is to delete it and import the Items again.
+- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; the unresolvable-source rule is a registration rule; none reaches the runtime matcher.
   Source repair applies the clone gate and own-uuid precedence only, so an unregistered derivative whose compendium source a definition still claims is stamped with that definition's id.
   An actor-owned drag copy may carry `_stats.duplicateSource`, depending on the core build, and its `compendiumSource` is legitimate provenance there either way (tier 3).
+  An owned copy with no leaf, whose only source reference is an unresolvable compendium source, resolves to the first definition claiming it.
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
   A derivative's `_stats.compendiumSource` is left on the Item.
 - Existing stored `originItemUuid` values are never recomputed.
@@ -1843,6 +1849,7 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
 
 Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: both copies carry the compendium entry's name, so the second registration is neither a clone nor a derivative, its `compendiumSource` still matches, and find-existing dedups.
 It is distinguished from a clone by the absence of `_stats.duplicateSource` and from a derivative by that name.
+It holds only while the entry resolves; a copy imported while it does not registers separately, stays split once it resolves, and rejoins only by deleting its definition and importing it again.
 
 ### Repair and Auto-Stamp
 
@@ -2624,7 +2631,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    For a record the run added, a category other than the reserved `general` that differs from an authored world category is written as an override, and every other section inherits, as it does for a component added from the catalogue.
    A World Component the import itself creates carries no world default, so its record inherits every section and resolves the in-system record's own values until a world default is authored.
    6b.
-   An imported Item that shares a source reference with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
+   An imported Item that shares a source reference, other than a compendium source that does not resolve, with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
    The new record keeps the identity the import read from its Item and the entity keeps its stored one, so the two can differ from the start; `## Scoped Entity Definitions` requirement 15 answers the in-system record's and names the pair in its drift report.
    The match is made before the new record's id is minted and takes the first sharing entity in roster order.
    It reads the World Component's stored source link, which is not refreshed when a system re-points its own record.
@@ -2634,6 +2641,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    6d.
    The exception to 6c is a component whose source reference a World Component under a different id already shares: it is left unregistered, because binding it would re-key a component that recipes, salvage results, gathering drop rows, tool links and owned-item identity flags may name, and an import re-keys nothing.
    Its recovery is to delete the other World Component where no system holds it, then import again.
+   An import does not leave a new record unregistered through such a source when the World Component claiming it is already flushed, because it withholds that alias there.
 
 ### Essence scope
 
