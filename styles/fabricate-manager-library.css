@@ -2000,6 +2000,13 @@
   background: var(--fab-success-soft);
 }
 
+/* The list's drop face is an inset outline in the 12px gutter, so it never resizes a track. */
+.fabricate-manager[data-manager-view="components"] .manager-table-scroll.is-drop-active {
+  outline: 2px dashed var(--fab-success-border);
+  outline-offset: -2px;
+  background: var(--fab-success-soft);
+}
+
 .fabricate-manager .manager-component-drop-zone i {
   display: inline-flex;
   align-items: center;

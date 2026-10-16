@@ -3,7 +3,7 @@
  * component drop. The selected system is a `SvelteMap` behind its thunk, as the shell's
  * `$derived` is, so the commit is shown to read the id at call time rather than at construction.
  */
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -140,5 +140,108 @@ describe('importFlowModel', () => {
 
     assert.equal(model.importMappingOpen, false);
     assert.equal(model.importReportContent, null);
+  });
+
+  describe('a drop import that throws (issue 2397)', () => {
+    const FAILED_KEY = 'FABRICATE.Admin.Items.DropImportFailed';
+    const PREFIX = 'Fabricate | Component drop import failed:';
+    let savedUi;
+    let savedError;
+    let warnings;
+    let errors;
+
+    beforeEach(() => {
+      savedUi = globalThis.ui;
+      savedError = console.error;
+      warnings = [];
+      errors = [];
+      const warn = (message) => {
+        warnings.push(message);
+      };
+      Reflect.set(globalThis, 'ui', { notifications: { warn } });
+      console.error = (...args) => {
+        errors.push(args);
+      };
+    });
+
+    afterEach(() => {
+      Reflect.set(globalThis, 'ui', savedUi);
+      console.error = savedError;
+    });
+
+    function assertWarnedOnce(label) {
+      assert.deepEqual(warnings, [FAILED_KEY], `${label}: one import-failed warning`);
+      assert.equal(errors.length, 1, `${label}: one console error`);
+      assert.equal(errors[0][0], PREFIX, `${label}: under the drop-import prefix`);
+      assert.ok(errors[0][1] instanceof Error, `${label}: carrying the error`);
+    }
+
+    /** A model whose named service throws the way `fail` says. */
+    function failingModel(name, fail) {
+      const calls = [];
+      const services = {
+        collectImportFolderGroups: async () => null,
+        onDropItem: (data) => {
+          calls.push(['onDropItem', data]);
+        },
+        commitImportFolderMapping: async () => {},
+        [name]: fail,
+      };
+      const model = createImportFlowModel({
+        services: () => services,
+        selectedSystemId: () => 'alchemy',
+      });
+      return { model, calls };
+    }
+
+    it('warns once when onDropItem rejects or throws synchronously', async () => {
+      const rejecting = failingModel('onDropItem', async () => {
+        throw new Error('pack import failed');
+      });
+      await rejecting.model.dropComponent({ type: 'Compendium', id: 'world.items' });
+      assertWarnedOnce('a rejecting onDropItem');
+
+      warnings.length = 0;
+      errors.length = 0;
+      const throwing = failingModel('onDropItem', () => {
+        throw new Error('folder import failed');
+      });
+      await throwing.model.dropComponent({ type: 'Folder', uuid: 'Folder.f1' });
+      assertWarnedOnce('a throwing onDropItem');
+    });
+
+    it('warns once and imports nothing when the folder collector rejects', async () => {
+      const { model, calls } = failingModel('collectImportFolderGroups', async () => {
+        throw new Error('folder lookup failed');
+      });
+      await model.dropComponent({ type: 'Folder', uuid: 'Folder.f1' });
+      assertWarnedOnce('a rejecting collector');
+      assert.ok(
+        calls.every(([name]) => name !== 'onDropItem'),
+        'and onDropItem is never called'
+      );
+    });
+
+    it('warns once when the folder-mapping commit rejects', async () => {
+      const { model } = failingModel('commitImportFolderMapping', async () => {
+        throw new Error('mapping commit failed');
+      });
+      await model.commitImportFolderMapping([{ folderId: 'f1', category: 'Reagent' }]);
+      assertWarnedOnce('a rejecting commit');
+      assert.equal(model.importMappingOpen, false, 'the modal is still closed');
+    });
+
+    it('warns nothing when the import resolves', async () => {
+      const { model, calls } = openModel({ plan: null });
+      await model.dropComponent({ type: 'Item', uuid: 'Item.ok' });
+      await model.commitImportFolderMapping([{ folderId: 'f1', category: 'Reagent' }]);
+
+      assert.ok(
+        calls.some(([name]) => name === 'onDropItem'),
+        'the drop reached the import'
+      );
+      assert.deepEqual(warnings, [], 'a resolving import warns nothing');
+      assert.deepEqual(errors, [], 'and logs nothing');
+    });
   });
 });

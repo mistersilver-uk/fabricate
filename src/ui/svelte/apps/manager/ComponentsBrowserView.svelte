@@ -68,6 +68,13 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
+  // The head zone and the list take one option set, so both hand a drop to the same import flow.
+  const dropOptions = $derived({
+    onDrop: onDropComponent,
+    disabled: !dropEnabled,
+    activeClass: 'is-drop-active',
+  });
+
   // The filters name a vocabulary the new system does not share; sort and grouping are kept.
   const list = createBrowserListState({
     state: () => ui,
@@ -486,21 +493,12 @@
   data-component-library
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
-  <!--
-    ONE HEAD, AND THE CHILD COUNT IS THE POINT. `.manager-main` on this route is a four-track grid
-    for four children: this head, the toolbar, the list and the pager. A fifth DIRECT child pushes
-    every child down one track and the toolbar lands in a `minmax(0, 1fr)` track that collapses. The
-    `SharedDefinitionCallout` that used to head this pane is gone — its content is the inspector's
-    `Shared identity` card — and the drop zone stays under maintainer ruling M2.
-  -->
+  <!-- `.manager-main` here is a four-track grid for this head, the toolbar, the list and the pager,
+    so a fifth direct child collapses the toolbar's track. The drop zone stays under ruling M2. -->
   <div class="manager-component-head">
     <section
       class="manager-component-drop-zone"
-      use:dragDrop={{
-        onDrop: onDropComponent,
-        disabled: !dropEnabled,
-        activeClass: 'is-drop-active',
-      }}
+      use:dragDrop={dropOptions}
       aria-label={text(
         'FABRICATE.Admin.Manager.Component.DropZoneLabel',
         'Drop Foundry items to add components'
@@ -690,8 +688,10 @@
     </div>
   </FilterBar>
 
+  <!-- The head zone's sibling, never its ancestor, so a drop on either imports once. -->
   <section
     class="manager-table-scroll"
+    use:dragDrop={dropOptions}
     aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
   >
     <!-- THE ZERO STATE IS GATED ON THE COHORT, never on the raw prop: an empty system under `All
@@ -703,7 +703,7 @@
         title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
         hint={text(
           'FABRICATE.Admin.Manager.Component.EmptyHint',
-          'Drop Foundry items into this page to add components to the selected system.'
+          'Drop Foundry items here to add components to the selected system.'
         )}
       />
     {:else if filteredComponents.length === 0 && visibleGhostRows.length === 0}
