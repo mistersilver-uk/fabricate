@@ -755,18 +755,11 @@ describe('a durable leaf at find-existing', () => {
   ];
 
   for (const { kind, library, register, role } of LEAVES) {
-    const entryDefinition = {
-      id: 'def-entry',
-      name: ENTRY_NAME,
-      registeredItemUuid: ENTRY_UUID,
-      originItemUuid: ENTRY_UUID,
-    };
-
     it(`a derivative whose inherited leaf names the entry's ${kind} registers as a new one`, async () => {
       const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
       const { manager, system } = world({
         documents: [entry(), scroll],
-        [library]: [entryDefinition],
+        [library]: [ENTRY_DEFINITION],
       });
 
       const result = await register(manager, scroll.uuid);
@@ -789,7 +782,7 @@ describe('a durable leaf at find-existing', () => {
       });
       const { manager, system } = world({
         documents: [entry(), clone],
-        [library]: [entryDefinition],
+        [library]: [ENTRY_DEFINITION],
       });
 
       const result = await register(manager, clone.uuid);
@@ -823,7 +816,7 @@ describe('a durable leaf at find-existing', () => {
 
     it(`a source whose entry no longer resolves, with a leaf naming a ${kind} of another name, registers as a new one`, async () => {
       const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
-      const { manager, system } = world({ documents: [scroll], [library]: [entryDefinition] });
+      const { manager, system } = world({ documents: [scroll], [library]: [ENTRY_DEFINITION] });
 
       const result = await register(manager, scroll.uuid);
 
@@ -936,7 +929,7 @@ describe('a durable leaf at find-existing', () => {
       const { manager, system } = world({
         documents: [entry(), scroll],
         [library]: [
-          entryDefinition,
+          ENTRY_DEFINITION,
           {
             id: 'def-fire',
             name: scroll.name,

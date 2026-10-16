@@ -1010,4 +1010,26 @@ describe('siblings sharing a template entry that no longer resolves', () => {
       `${first.item.id}|${KITCHEN}`,
     ]);
   });
+
+  it('a World Component claiming the entry type-less still withholds it from a sibling recording it four-part', async () => {
+    const [fire, frost] = siblings();
+    const typelessEntry = 'Compendium.kit.templates.blank';
+    const { manager, entityIds } = world({
+      scope: scopeOf({
+        entities: [worldEntity('world-fire', fire.uuid, { originItemUuid: typelessEntry })],
+        membership: [['world-fire', FORGE]],
+      }),
+      systems: [{ id: FORGE }, { id: KITCHEN }],
+    });
+
+    const sibling = await manager.addItemFromUuid(KITCHEN, frost.uuid);
+
+    assert.notEqual(sibling.item.id, 'world-fire');
+    assert.deepEqual(entityIds(), ['world-fire', sibling.item.id]);
+    assert.deepEqual(
+      sibling.item.aliasItemUuids,
+      [],
+      'the type-less claim covers the four-part one'
+    );
+  });
 });
