@@ -504,7 +504,7 @@ export function createGatheringJournalRunOperations({
   };
   return {
     getRun: ({ actor, runId }) => {
-      runManager?.invalidateCache?.(actor?.id);
+      runManager?.invalidateCache?.(actor);
       return runManager?.getRun?.(actor, runId) ?? runManager?.getActiveRun?.(actor, runId) ?? null;
     },
     start: ({ actor, payload, executionGrant, requestId, senderId }) => {

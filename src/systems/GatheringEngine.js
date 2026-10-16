@@ -473,7 +473,7 @@ export class GatheringEngine {
         'INVALID_COMPLETION_MODE'
       );
     }
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const retainedStart = this._findVersionedStartRun({
       actor,
       operationId: trusted.operationId,
@@ -535,7 +535,7 @@ export class GatheringEngine {
       },
       { requireOperationId: false }
     );
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
     this._assertVersionedRunExecutable(run, { requireReady: true });
     const resolvedRun = this._hydrateBlindWaitingRun(run);
@@ -589,7 +589,7 @@ export class GatheringEngine {
       expectedRevision,
       requestId,
     });
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const anyRun = this.runManager?.getRun?.(actor, runId) ?? null;
     const committed = anyRun?.executionJournal
       ? getCommittedExecutionOutcome(anyRun.executionJournal, requestId)
@@ -689,7 +689,7 @@ export class GatheringEngine {
       expectedRevision,
       requestId,
     });
-    this.runManager?.invalidateCache?.(idOf(actor));
+    this.runManager?.invalidateCache?.(actor);
     const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
     this._assertVersionedRunExecutable(run, {
       expectedRevision,
