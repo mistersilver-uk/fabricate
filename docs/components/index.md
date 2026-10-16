@@ -301,7 +301,7 @@ You can add items one at a time or import an entire compendium pack at once.
 Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the Component Rules page.
 
 1. Open the Items sidebar or the compendium browser
-2. Drag the item onto the drop strip at the top of the page, or anywhere on the components list below it
+2. Drag the item onto the drop zone at the top of the page, or anywhere on the components list below it
 3. The item appears in the list of components
 
 The list accepts a drop wherever you release it, including the empty "No components yet" area.

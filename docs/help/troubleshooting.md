@@ -737,11 +737,11 @@ The item is not added, no error or notification appears from Fabricate, and in s
 In some Foundry versions and environments, Fabricate could not read the drag-and-drop data at the moment of the drop, so it silently ignored the dropped item.
 Control then returned to Foundry, which produced the generic error message.
 
-On the Component Rules page, an earlier version accepted drops only on the drop strip at the top of the page.
+On the Component Rules page, an earlier version accepted drops only on the drop zone at the top of the page.
 A drop anywhere else on the page was silently ignored.
 Now the whole components list accepts drops, including the empty "No components yet" area.
 The toolbar above the list and the page controls below it still do not.
-If a drop on the list does nothing, make sure a crafting system is selected and that you are dropping an Item, not an Actor or a folder with no Items in it.
+If a drop on the list still does nothing, make sure a crafting system is selected; with none selected the page ignores drops.
 
 **Fix:** This is resolved in the current version, which reads the drag data more robustly across Foundry versions.
 Make sure Fabricate is up to date.
