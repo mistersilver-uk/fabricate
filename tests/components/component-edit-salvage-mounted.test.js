@@ -531,11 +531,11 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       found[0].matches('ul.fabricate-sortable-list'),
       'the complications are a list of the shared list’s own rows'
     );
-    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the list is in the row');
+    assert.ok(found[0].closest('.manager-progressive-stage-row') === row, 'the list is in the row');
     assert.ok(
       [...list.querySelectorAll(':scope > li')].every(
         (child) =>
-          child.matches('.manager-salvage-stage-row') || child.matches('.manager-salvage-stage-add')
+          child.matches('.manager-progressive-stage-row') || child.matches('.manager-salvage-stage-add')
       ),
       'and the outer list holds nothing but stage rows and its own footer'
     );

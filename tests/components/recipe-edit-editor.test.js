@@ -51,6 +51,7 @@ const COMPONENT_EDIT = `${MANAGER}/ComponentEditView.svelte`;
 const ESSENCE_EDIT = `${MANAGER}/EssenceEditView.svelte`;
 const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
 const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
+const PROGRESSIVE_STAGE_LIST = `${MANAGER}/ProgressiveStageList.svelte`;
 
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const css = readStylesheet();
@@ -427,15 +428,25 @@ describe('the progressive reorder announcement', () => {
   // Both halves moved into the shared ordered list at issue 1512, and both are asserted where they
   // live now: `tests/sortable-list-source-contract.test.js` holds the read-the-name-first ordering
   // against `SortableList.svelte`, and `tests/components/sortable-list-mounted.test.js` reads the
-  // sentence out of the rendered live region. What this card still owns is the array move.
+  // sentence out of the rendered live region. What this card still owns is the array move, which
+  // reaches the shared list through the progressive stage list (issue 2511).
   defineStructureContract(
-    'hands the shared list the move and keeps no announcement of its own',
+    'hands the stage list the move and keeps no announcement of its own',
     RESULT_GROUP_CARD,
+    {
+      renders: ['ProgressiveStageList'],
+      passesProps: [['ProgressiveStageList', 'onReorder']],
+      namesNo: ['moveItem'],
+      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
+    }
+  );
+
+  defineStructureContract(
+    'and the stage list hands the move to the shared list',
+    PROGRESSIVE_STAGE_LIST,
     {
       renders: ['SortableList'],
       passesProps: [['SortableList', 'onReorder']],
-      namesNo: ['moveItem'],
-      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
     }
   );
 

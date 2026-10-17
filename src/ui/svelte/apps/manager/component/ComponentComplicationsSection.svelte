@@ -1289,7 +1289,7 @@
   }
 
   /* The browse trigger, in the macro card's HEAD. Its type is copied from the manager's existing
-     compact in-header control, `.manager-salvage-stage-edit`, rather than invented, so the two read
+     compact in-header control, `.manager-progressive-stage-edit`, rather than invented, so the two read
      as one treatment: `fabricate-button`'s default is sized for a footer action and wrapped "Browse
      macros" onto two lines. `white-space: nowrap` is what fixes the wrap; the rest keeps it from
      looking like a different button once it no longer does. */

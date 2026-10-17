@@ -364,6 +364,7 @@ const gatheringHarness = createMountedComponentHarness({
     // complication band through it.
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+    'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',

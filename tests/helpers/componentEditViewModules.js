@@ -145,6 +145,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   // The GM read-only stage complication list a salvage stage row's body renders (issue 2445).
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.

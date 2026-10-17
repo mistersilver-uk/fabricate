@@ -9,6 +9,7 @@ import {
   COMPONENT_EDITOR_MATCHES,
   PREMIUM_ICONS_AD_PATTERN,
   REQUIREMENT_SUGGESTION,
+  PROGRESSIVE_STAGE_LIST_MATCH,
   STAGE_COMPLICATION_LIST_MATCH,
   TYPEAHEAD_COMBOBOX_SOURCE,
   WORLD_SCOPE_MODEL_PATTERN,
@@ -779,7 +780,11 @@ export const CASES = Object.freeze([
     expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
+    ],
   }),
   // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
   managerCase({
@@ -800,7 +805,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-salvage-result-groups] [data-component-edit-section="difficulty"]',
     kinds: ['manager', 'components'],
-    sourceMatches: COMPONENT_EDITOR_MATCHES,
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, PROGRESSIVE_STAGE_LIST_MATCH],
   }),
   // A stage's read-only complication list at the declared floor (issues 1522, 2445).
   managerCase({
@@ -822,7 +827,11 @@ export const CASES = Object.freeze([
       '.fabricate-manager .fabricate-sortable-list-row.has-band [data-stage-complications]',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
+    ],
     // Rows on a stage card share `--fab-bg-1`, parted by the border alone: judged on a second palette.
     themeVariants: ['hearth-herb'],
   }),
@@ -1135,6 +1144,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
       STAGE_COMPLICATION_LIST_MATCH,
       ...COMPONENT_EDITOR_MATCHES,
+      PROGRESSIVE_STAGE_LIST_MATCH,
     ],
   }),
   managerCase({
@@ -1158,6 +1168,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
       STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
     ],
   }),
   overrideCase({
