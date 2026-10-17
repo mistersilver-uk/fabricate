@@ -20,7 +20,7 @@ import {
   withSelection,
   withStrategy,
   withoutAlternative,
-} from '../src/ui/svelte/apps/manager/recipe/resultGroupEdits.js';
+} from '../src/ui/svelte/components/resultGroupEdits.js';
 import { rangeProblems } from '../src/utils/choiceGroupShape.js';
 
 import { scriptedFormulaRoll } from './helpers/scriptedFormulaRoll.js';

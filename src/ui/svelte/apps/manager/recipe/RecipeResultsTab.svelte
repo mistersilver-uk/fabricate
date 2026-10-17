@@ -16,7 +16,7 @@
   import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
-  import { recipeResultKinds } from './resultRows.js';
+  import { recipeResultKinds } from '../../../components/resultRows.js';
 
   let {
     // The resolution-mode callout, rendered in this tab's heading block (issue 1522).

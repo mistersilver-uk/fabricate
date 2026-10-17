@@ -10,8 +10,8 @@
   | `heading` / `hint` | localized strings | `''` | The panel's eyebrow, which also names the trigger, and the trigger's tooltip; empty reads the ingredient side's "Accept instead" and its hint, and a result row passes "Add an alternative". |
 -->
 <script>
-  import ActionMenu from '../../../components/ActionMenu.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import ActionMenu from './ActionMenu.svelte';
+  import { localize } from '../util/foundryBridge.js';
   import { kindMenuItems } from './pickerRowKinds.js';
 
   let { kinds = [], disabled = false, heading = '', hint = '', onSelect = () => {} } = $props();

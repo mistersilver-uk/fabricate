@@ -13,8 +13,8 @@
 <script>
   import Button from '../../../components/Button.svelte';
   import SortableList from '../../../components/SortableList.svelte';
-  import PickerRow from '../recipe/PickerRow.svelte';
-  import { toValue } from '../recipe/pickerRowKinds.js';
+  import PickerRow from '../../../components/PickerRow.svelte';
+  import { toValue } from '../../../components/pickerRowKinds.js';
   // The GM read-only complication list, shared with the Recipe Studio's stage rows (issue 2445).
   import StageComplicationList from '../StageComplicationList.svelte';
 

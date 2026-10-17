@@ -5,7 +5,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from 'svelte';
 
-import { componentCatalogue } from '../../src/ui/svelte/apps/manager/recipe/resultRows.js';
+import { componentCatalogue } from '../../src/ui/svelte/components/resultRows.js';
 import {
   callRecorder,
   cardText,

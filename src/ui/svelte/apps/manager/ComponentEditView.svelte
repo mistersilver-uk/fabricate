@@ -15,8 +15,8 @@
   // The progressive-complications section (issue 1286). It owns its own visibility gate, so it is
   // placed unconditionally rather than behind a second predicate that could drift out of step.
   import ComponentComplicationsSection from './component/ComponentComplicationsSection.svelte';
-  import { fromValue } from './recipe/pickerRowKinds.js';
-  import { withAddedResult } from './recipe/resultRows.js';
+  import { fromValue } from '../../components/pickerRowKinds.js';
+  import { withAddedResult } from '../../components/resultRows.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,

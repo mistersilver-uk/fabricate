@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { measureImporters } from '../scripts/lib/componentImporters.js';
+import { importGraph, measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -531,6 +531,31 @@ test('every ruled-out verdict is from the closed set, and a merged name points a
   }
 });
 
+/**
+ * What contradicts a `manager-only` scope on `file`, read transitively over `graph`: the walk passes
+ * through importers under the primitive directory, every other importer it reaches must lie under
+ * the manager, and at least one must, or no application reaches the row at all.
+ * @param {{ importersOf: (file: string) => string[] }} graph an `importGraph` result
+ * @param {string} file the row's path
+ * @returns {string[]} one line per contradiction, empty when the scope holds
+ */
+function managerOnlyContradictions(graph, file) {
+  const visited = new Set([file]);
+  const pending = [file];
+  const reached = [];
+  while (pending.length > 0) {
+    for (const importer of graph.importersOf(pending.pop())) {
+      if (visited.has(importer)) continue;
+      visited.add(importer);
+      if (importer.startsWith(PRIMITIVE_DIRECTORY)) pending.push(importer);
+      else reached.push(importer);
+    }
+  }
+  const outside = reached.filter((importer) => !importer.startsWith(MANAGER_DIRECTORY));
+  const unreached = reached.length === outside.length ? [`no file under ${MANAGER_DIRECTORY}`] : [];
+  return [...outside.sort(byCodePoint).map((importer) => `reached from ${importer}`), ...unreached];
+}
+
 test('a manager-only row states its reason, and no caller outside the manager contradicts it', () => {
   const scoped = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.scope === 'manager-only');
   assert.ok(scoped.length > 0, 'no row is manager-only, so both clauses below are vacuous');
@@ -548,20 +573,50 @@ test('a manager-only row states its reason, and no caller outside the manager co
       `${row.path} is scoped manager-only and its \`why\` never says so. The value is a decision, ` +
         'and a decision whose reason is unwritten is indistinguishable from a default.'
     );
-
-    const outside = graph
-      .importersOf(row.path)
-      .filter((importer) => !importer.startsWith(MANAGER_DIRECTORY));
     assert.deepEqual(
-      outside,
+      managerOnlyContradictions(graph, row.path),
       [],
-      `${row.path} is scoped manager-only and is imported from outside ${MANAGER_DIRECTORY}. ` +
-        'The scope is then a false claim about a component another application already renders, ' +
-        'which is worse than no claim: the register would be recording a decision the tree has ' +
-        'already overruled. Either the scope is `shared` and the path is the debt, or the ' +
+      `${row.path} is scoped manager-only, and read through the primitive directory it is ` +
+        `reached from outside ${MANAGER_DIRECTORY}, or from no application at all. The scope is ` +
+        'then a false claim about a component another application already renders, which is ' +
+        'worse than no claim. Either the scope is `shared` and the path is the debt, or the ' +
         'importer is the defect.'
     );
   }
+});
+
+test('the manager-only walk fails each way a scope can be contradicted', () => {
+  const app = (name) => `src/ui/svelte/apps/${name}`;
+  const leaf = `${PRIMITIVE_DIRECTORY}Leaf.svelte`;
+  const middle = `${PRIMITIVE_DIRECTORY}Middle.svelte`;
+  const importing = (target) => `<script>import X from '${target}';</script>\n`;
+  const contradictionsOver = (tree) =>
+    managerOnlyContradictions(
+      importGraph(Object.keys(tree), (file) => tree[file]),
+      leaf
+    );
+  const chain = { [leaf]: '<div></div>\n', [middle]: importing('./Leaf.svelte') };
+  const managed = {
+    ...chain,
+    [app('manager/Editor.svelte')]: importing('../../components/Middle.svelte'),
+  };
+
+  assert.deepEqual(contradictionsOver(managed), [], 'the control tree is itself contradicted');
+  assert.deepEqual(
+    contradictionsOver({
+      ...managed,
+      [app('crafting/Body.svelte')]: importing('../../components/Middle.svelte'),
+    }),
+    [`reached from ${app('crafting/Body.svelte')}`]
+  );
+  assert.deepEqual(
+    contradictionsOver({
+      ...managed,
+      'src/ui/svelte/util/reader.js': "import '../components/Leaf.svelte';\n",
+    }),
+    ['reached from src/ui/svelte/util/reader.js']
+  );
+  assert.deepEqual(contradictionsOver(chain), [`no file under ${MANAGER_DIRECTORY}`]);
 });
 
 test('every re-rooted family carries a shared scope and an entry in the gate that proves it', () => {
@@ -798,11 +853,20 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 2510: KindAdder and PickerRowAmount are members at `target`; ChoiceGroupAwardHeader and
+  // the other four PickerRow* parts below each have one caller.
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
   // Issue 2431: the range bar's single-caller marker; `<RangeBar>` specifies its parent.
   'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',

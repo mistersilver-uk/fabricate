@@ -554,7 +554,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_TASK_EDITOR_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/(Recipe(ResultGroupCard|ResultsSection)|PickerRow|PickerRowAmount)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
   ...['selector', 'straight', 'routed'].map((mode) =>

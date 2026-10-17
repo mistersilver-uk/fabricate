@@ -22,8 +22,8 @@
     the closing line. Pinned by `tests/components/picker-row-reward-mounted.test.js`.
 -->
 <script>
-  import Field from '../../../components/Field.svelte';
-  import { localizeOr } from '../../../util/localizeOr.js';
+  import Field from './Field.svelte';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     kind = 'currency',

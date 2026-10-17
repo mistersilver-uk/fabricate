@@ -14,11 +14,14 @@
   // No essence offer projection here: the adder creates an unnamed row and the choice group
   // applies the offer to the row's catalogue. The adder gates on the unfiltered roster, because a
   // system whose essences are all disabled must keep the match type.
-  import ChoiceGroup from './ChoiceGroup.svelte';
-  import KindAdder from './KindAdder.svelte';
+  import ChoiceGroup from '../../../components/ChoiceGroup.svelte';
+  import KindAdder from '../../../components/KindAdder.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
-  import { emptyIngredientOption, offeredIngredientKinds } from './pickerRowKinds.js';
+  import {
+    emptyIngredientOption,
+    offeredIngredientKinds,
+  } from '../../../components/pickerRowKinds.js';
 
   let {
     set = {},

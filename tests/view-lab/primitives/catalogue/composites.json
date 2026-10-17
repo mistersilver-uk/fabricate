@@ -26,7 +26,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "empty — where every row starts",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "PickerRowSearchOpen",
     "slot": { "width": 620, "height": 163 },
     "data": { "typed": "ingot" },
@@ -63,7 +63,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -87,7 +87,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "tags",
@@ -117,7 +117,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(3)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "essence",
@@ -141,7 +141,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(4)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "currency",
@@ -168,7 +168,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result side — the same row, a different offered set",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "note": "A result row, offering the result kinds.",
     "props": {
       "value": {
@@ -193,7 +193,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result side — the same row, a different offered set",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "currency",
@@ -222,7 +222,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result quantity — fixed, or rolled",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -248,7 +248,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result quantity — fixed, or rolled",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -274,7 +274,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "adding a tag — the adder opens the catalogue",
     "draws": ":scope > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "TagAdderOpen",
     "slot": { "width": 745, "height": 287 },
     "data": { "typed": "wood" },
@@ -309,7 +309,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the only route in — a standalone result row’s inline convert control",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -336,7 +336,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a currency reward — the body is open because a value is picked",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "note": "A reward row, so a named currency opens its naming body beneath it.",
     "props": {
       "value": {
@@ -369,7 +369,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: `KindAdder` renders them for `RecipeResultGroupCard`, which no library entry names, so a row for them would stand outside its entry. The adder's menu is drawn in the kind menu's inks, which carry its #2368 debt.",
     "props": {
       "value": {
@@ -397,7 +397,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -423,7 +423,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "choice group — what “or…” produces",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "note": "An ingredient group of the three drawn alternatives, its pill's note in the drawing's words.",
     "props": {
       "group": {
@@ -475,7 +475,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "player chooses — the alternatives are an offer",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "note": "A result group, so its header and help line are the shipped group's own words.",
     "props": {
       "side": "result",
@@ -521,7 +521,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "rolled — the same alternatives, decided by an expression",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -576,7 +576,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "up to N, player chooses — a ceiling on a subset, N fixed",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -620,7 +620,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "up to N, by roll — the one cell where repeats are a setting",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -675,7 +675,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the kind menu — one menu, two triggers",
     "draws": ":scope > div > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "KindMenuOpen",
     "slot": { "width": 515, "height": 197 },
     "undrawn": {
@@ -695,7 +695,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the kind menu — one menu, two triggers",
     "draws": ":scope > div > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "fixture": "KindMenuOpen",
     "slot": { "width": 630, "height": 375 },
     "undrawn": {

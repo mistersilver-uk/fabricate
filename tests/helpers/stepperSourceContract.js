@@ -202,7 +202,7 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
     spinnerSuppressed: false,
   }),
   Object.freeze({
-    path: 'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+    path: 'src/ui/svelte/components/PickerRowRangeCell.svelte',
     register: 'R4',
     reason:
       'a rolled choice group member\'s two range bounds (issue 1773): roll values are typed, and '
