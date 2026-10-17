@@ -279,16 +279,10 @@ const scopedRule = (component, selector) => `src/ui/svelte/apps/manager/${compon
 /** The reviewed cascade list. */
 const REVIEWED = [
   // ── RECHAIN: the three that live in a component's own <style> block ───────────────────
-  // It did NOT re-chain in one piece, and the reason is worth keeping: a third control inside
-  // that row is `RecipeRoutingAssignment`'s "Add tag", a `SearchablePopover` trigger rendered
-  // from a class STRING. It is population B, it never gains `fab-manager-button`, and a single
-  // chained selector would have snapped it back to the default 34px beside the two 28px
-  // controls it sits with — the same stranding hazard as `.manager-knowledge-row-actions
-  // .fabricate-button` below, found in a second place. The rule split in three: the two
-  // converted buttons by the primitive's class, the trigger by its own, and a (0,5,0) restate
-  // for `InlineVocabularyAdd`'s `role="primary"` Add, whose padding the `is-primary` companion
-  // would otherwise have taken at a tie. The trigger half is EXCLUDE below; the other two key
-  // on `fab-manager-button` and are PRIMITIVE rules here rather than candidates.
+  // The mapping row's rule keys on `fab-manager-button`, plus a (0,5,0) restate for
+  // `InlineVocabularyAdd`'s `role="primary"` Add, whose padding the `is-primary` companion would
+  // otherwise take at a tie; both are PRIMITIVE rules here rather than candidates. Its "Add tag"
+  // is `SetPicker`'s dashed `Button` since issue 2512, so it carries the primitive's class too.
 
   // ── INTENDED: the primitive is designed to supersede these ────────────────────────────
   {
@@ -560,29 +554,6 @@ const REVIEWED = [
       'population narrowed to `ArmedDangerButton`. The hover half of the entry above.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.is-subtle'),
-    disposition: 'EXCLUDE',
-    why:
-      'MOVED NO_CONFLICT -> EXCLUDE by task 9, and it is the delta`s worked example for a ' +
-      'PASS-THROUGH class rather than a seventh role. Its two literal sites converted and ' +
-      'carry `is-subtle` through the primitive`s appending `class` prop; the four left are ' +
-      'population-B triggers, which is what makes it EXCLUDE.',
-  },
-  {
-    id: scopedRule(
-      'ImportFolderMappingModal.svelte',
-      '.manager-import-mapping-row .fabricate-button.manager-recipe-routing-add-trigger'
-    ),
-    disposition: 'EXCLUDE',
-    why:
-      'NOT IN THE REVIEWED LIST BEFORE — task 9 wrote it. It is the half of the discharged ' +
-      'mapping-row rule that must NOT key on the primitive: the row`s "Add tag" is a ' +
-      '`SearchablePopover` trigger rendered from `RecipeRoutingAssignment``s `triggerClass` ' +
-      'string, so naming it by its own trigger class is the only way it keeps the row`s 28px ' +
-      'scale beside the two converted controls it sits with.',
-  },
-
-  {
     id: scopedRule(
       'scoped/SystemRulesRoster.svelte',
       '.manager-scoped-roster-system .fabricate-button.is-danger'
@@ -816,6 +787,16 @@ const REVIEWED = [
   },
 
   // ── DEAD: real rules, zero call sites ─────────────────────────────────────────────────
+  {
+    id: globalRule('.fabricate-button.fabricate-button.is-subtle'),
+    disposition: 'DEAD',
+    why:
+      'MOVED NO_CONFLICT -> EXCLUDE by task 9, the delta`s worked example for a PASS-THROUGH ' +
+      'class rather than a seventh role, and EXCLUDE -> DEAD at issue 2512. Its two literal ' +
+      'sites converted and carry `is-subtle` through the primitive`s appending `class` prop; ' +
+      'the one population-B trigger it still reached, the routing assignment`s add trigger, ' +
+      'left the product with its component, so the instrument sees no call site at all.',
+  },
 ];
 
 const idsWith = (...dispositions) =>
@@ -1172,10 +1153,13 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // writing no `fabricate-button` class at all.
   // AND ONE LEFT AT ISSUE 1516, taking the count to 10: the salvage yield picker's trigger, both
   // salvage rows now naming their component through the requirement row.
+  // AND ONE LEFT AT ISSUE 2512, taking the count to 9: the routing assignment's add trigger, whose
+  // component was deleted when result sets moved onto `RouteSources` and import tags onto
+  // `SetPicker`.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    10,
-    'plus the 10 SearchablePopover triggerClass sites still named as debt'
+    9,
+    'plus the 9 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');

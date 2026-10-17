@@ -5,7 +5,10 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -14,6 +17,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-mapping-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/model/matchFolderVocabulary.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -37,7 +41,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/Modal.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: each row's tags are the set picker's token run.
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/Avatar.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
