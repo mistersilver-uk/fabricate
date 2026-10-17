@@ -318,7 +318,8 @@ function tierStepTargetReadiness(check, outcomes) {
  * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that no tier
  * claims. `findRangeConflicts` sees only OVERLAP and `start > end`, so nothing else reports it,
  * and a fixed routed check has no `clampToNearest` rescue: the attempt is rolled but unrouted.
- * SPAN-INTERIOR ONLY, a set not covering every value a die can roll being a deliberate window.
+ * Interior to the set's span only, a set not covering every value a die can roll being a
+ * deliberate window.
  */
 function fixedRangesHaveGap(outcomes, excluded) {
   return fixedRangeGaps(outcomes, excluded).length > 0;

@@ -17,7 +17,7 @@
   import Button from '../../../components/Button.svelte';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
   import { buildRoutingModel } from './recipeRoutingModel.js';
-  import { addResultGroup, withResultSlot } from './recipeRoutingEdits.js';
+  import { addResultGroup, alchemySlots, withResultSlot } from './recipeRoutingEdits.js';
 
   let {
     resultGroups = [],
@@ -60,7 +60,7 @@
   }
 
   // Each group's routing options: a set routes to at most one group, and a tier assigned to
-  // another (by INDEX, which an unsaved id-less group still has) is disabled.
+  // another (by index, which an unsaved id-less group still has) is disabled.
   const routing = $derived(
     buildRoutingModel({
       provider: routingProvider,
@@ -87,15 +87,9 @@
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
   }
 
-  // Alchemy Simple two-slot view: the success set is the first non-failure group and the failure
-  // set the reserved `role: 'failure'` one, synthesized empty when absent. Either card's edit
-  // reconstructs both slots, spreading to preserve id and name — persist-on-first-edit.
-  const alchemySuccessGroup = $derived(
-    groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] }
-  );
-  const alchemyFailureGroup = $derived(
-    groups.find((group) => group?.role === 'failure') || { role: 'failure', results: [] }
-  );
+  // Alchemy Simple two-slot view. Either card's edit reconstructs both slots, spreading to preserve
+  // id and name — persist-on-first-edit.
+  const alchemy = $derived(alchemySlots(groups));
 
   function updateAlchemyPair(slot, nextGroup) {
     onChange(withResultSlot(groups, slot, nextGroup));
@@ -115,7 +109,7 @@
     <!-- Alchemy Simple: two labeled result sets, no add-set and no remove on either. -->
     <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
       <RecipeResultGroupCard
-        group={alchemySuccessGroup}
+        group={alchemy.success}
         {componentOptions}
         {surface}
         {resultKinds}
@@ -125,7 +119,7 @@
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
       <RecipeResultGroupCard
-        group={alchemyFailureGroup}
+        group={alchemy.failure}
         {componentOptions}
         {surface}
         {resultKinds}

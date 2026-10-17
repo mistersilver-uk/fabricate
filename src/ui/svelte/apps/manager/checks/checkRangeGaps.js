@@ -1,5 +1,5 @@
 /**
- * The roll values inside a FIXED outcome set's own span that no tier claims, as inclusive
+ * The roll values inside a fixed outcome set's own span that no tier claims, as inclusive
  * `{ from, to }` spans in rising order. Ranges are inclusive on both ends, so adjacency is
  * `next.start === reach + 1`, `reach` being the highest end so far. `excluded` holds the indices
  * already reported invalid or overlapping, which a `start > end` range would otherwise turn into

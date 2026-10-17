@@ -41,16 +41,22 @@ export function addIngredientSet(sets, mintId = newDraftId) {
 }
 
 /**
- * Alchemy Simple's `[success, failure]` pair with `nextGroup` written into `slot`: the success set
- * is the first non-failure group and the failure set the reserved `role: 'failure'` one, each
- * synthesized when absent and spread so its id and name survive.
+ * Alchemy Simple's two slots: the success set is the first non-failure group and the failure set
+ * the reserved `role: 'failure'` one, each synthesized empty when absent.
+ */
+export function alchemySlots(groups) {
+  return {
+    success: groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] },
+    failure: groups.find((group) => group?.role === 'failure') || { role: 'failure', results: [] },
+  };
+}
+
+/**
+ * Alchemy Simple's `[success, failure]` pair with `nextGroup` written into `slot`, each slot read
+ * by `alchemySlots` and spread so its id and name survive.
  */
 export function withResultSlot(groups, slot, nextGroup, mintId = newDraftId) {
-  const success = groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] };
-  const failure = groups.find((group) => group?.role === 'failure') || {
-    role: 'failure',
-    results: [],
-  };
+  const { success, failure } = alchemySlots(groups);
   const write = (current, edit) => ({
     ...current,
     ...edit,

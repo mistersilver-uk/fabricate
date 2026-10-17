@@ -124,12 +124,14 @@ describe('withSoleEntry', () => {
   });
 
   it('mints an id when neither carries one, including with no entry at all', () => {
-    assert.deepEqual(withSoleEntry([], { results: [] }, () => 'minted'), [
-      { id: 'minted', results: [] },
-    ]);
-    assert.deepEqual(withSoleEntry(undefined, { ingredientGroups: [] }, () => 'minted'), [
-      { id: 'minted', ingredientGroups: [] },
-    ]);
+    assert.deepEqual(
+      withSoleEntry([], { results: [] }, () => 'minted'),
+      [{ id: 'minted', results: [] }]
+    );
+    assert.deepEqual(
+      withSoleEntry(undefined, { ingredientGroups: [] }, () => 'minted'),
+      [{ id: 'minted', ingredientGroups: [] }]
+    );
   });
 
   it('writes only the first entry', () => {

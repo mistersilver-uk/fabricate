@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import {
   addIngredientSet,
   addResultGroup,
+  alchemySlots,
   resultsProjection,
   routeSet,
   scopeTarget,
@@ -32,7 +33,12 @@ describe('scopeTarget', () => {
 });
 
 describe('resultsProjection', () => {
-  const recipe = { id: 'r1', name: 'Blade', resultGroups: [], resultSelection: { provider: 'check' } };
+  const recipe = {
+    id: 'r1',
+    name: 'Blade',
+    resultGroups: [],
+    resultSelection: { provider: 'check' },
+  };
 
   it('is the recipe itself with no final step', () => {
     assert.equal(resultsProjection(recipe, null), recipe);
@@ -89,14 +95,34 @@ describe('routeSet', () => {
 
 describe('adding a result set or an ingredient set', () => {
   it('appends an empty result set under a minted id', () => {
-    assert.deepEqual(addResultGroup([{ id: 'g1' }], () => 'g2'), [
-      { id: 'g1' },
-      { id: 'g2', name: '', checkOutcomeIds: [], results: [] },
-    ]);
+    assert.deepEqual(
+      addResultGroup([{ id: 'g1' }], () => 'g2'),
+      [{ id: 'g1' }, { id: 'g2', name: '', checkOutcomeIds: [], results: [] }]
+    );
   });
 
   it('appends an empty ingredient set under a minted id', () => {
-    assert.deepEqual(addIngredientSet([], () => 's1'), [{ id: 's1', name: '', ingredientGroups: [] }]);
+    assert.deepEqual(
+      addIngredientSet([], () => 's1'),
+      [{ id: 's1', name: '', ingredientGroups: [] }]
+    );
+  });
+});
+
+describe('alchemySlots', () => {
+  it('reads the first non-failure group and the reserved failure one, unedited', () => {
+    const success = { id: 'gs', results: [] };
+    const failure = { id: 'gf', role: 'failure', results: [] };
+    const slots = alchemySlots([failure, success]);
+    assert.equal(slots.success, success);
+    assert.equal(slots.failure, failure);
+  });
+
+  it('synthesizes each absent slot empty', () => {
+    assert.deepEqual(alchemySlots([]), {
+      success: { results: [] },
+      failure: { role: 'failure', results: [] },
+    });
   });
 });
 
@@ -113,7 +139,10 @@ describe('withResultSlot', () => {
   });
 
   it('writes the failure slot, holding its role whatever the edit says', () => {
-    const next = withResultSlot([success, failure], 'failure', { role: 'other', results: [{ id: 'r2' }] });
+    const next = withResultSlot([success, failure], 'failure', {
+      role: 'other',
+      results: [{ id: 'r2' }],
+    });
     assert.deepEqual(next[1], { id: 'gf', role: 'failure', name: 'Ruin', results: [{ id: 'r2' }] });
     assert.equal(next[0].id, 'gs');
   });
@@ -127,7 +156,12 @@ describe('withResultSlot', () => {
   });
 
   it("takes the edit's id for an id-less slot, and the only group when every group is a failure", () => {
-    const next = withResultSlot([{ ...failure, id: '' }], 'success', { id: 'e1', results: [] }, () => 'm');
+    const next = withResultSlot(
+      [{ ...failure, id: '' }],
+      'success',
+      { id: 'e1', results: [] },
+      () => 'm'
+    );
     assert.deepEqual(next, [
       { id: 'e1', role: 'failure', name: 'Ruin', results: [] },
       { id: 'm', role: 'failure', name: 'Ruin', results: [] },

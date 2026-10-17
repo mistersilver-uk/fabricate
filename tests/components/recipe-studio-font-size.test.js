@@ -66,10 +66,10 @@ const FIXTURE = `
           </span>
         </div>
         <!-- The progressive stage row (issue 676). It is the SAME surface as the
-             progressive SALVAGE stage row, drawn by the one ProgressiveStageList under one
+             progressive salvage stage row, drawn by the one ProgressiveStageList under one
              class family (issue 2511), so these roles are pinned to the numbers
              component-studio-font-size.js already commits for the salvage row — the design
-             source — NOT read off this markup. If the two ever disagree, the sharing has broken. -->
+             source, not read off this markup. If the two ever disagree, the sharing has broken. -->
         <div class="fabricate-sortable-list">
          <div class="fabricate-sortable-list-row manager-progressive-stage-row">
           <div class="fabricate-sortable-list-line">

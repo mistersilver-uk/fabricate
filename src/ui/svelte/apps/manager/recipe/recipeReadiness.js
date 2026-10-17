@@ -295,7 +295,7 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   // A single result group needs no outcome mapping: it is produced on any non-failure outcome.
   const isMultiGroupStep = (step) => step.resultGroups.length > 1;
 
-  // The FIRST group claiming no valid tier, by index, because a null entry claims none either.
+  // The first group claiming no valid tier, by index, because a null entry claims none either.
   let hasUnroutedGroup = false;
   for (const [index, step] of executionSteps.entries()) {
     const [unroutedIndex] = models[index].unassigned;
@@ -310,8 +310,8 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
     });
   }
 
-  // An offered tier no step lists, required only where a step has MULTIPLE groups: a single-group
-  // recipe routes on the exemption and needs no tiers produced.
+  // An offered tier no step lists, required only where a step has more than one group: a
+  // single-group recipe routes on the exemption and needs no tiers produced.
   const producedTierIds = new Set(
     models
       .flatMap(({ sources }) => sources.filter(({ how }) => how === 'explicit'))

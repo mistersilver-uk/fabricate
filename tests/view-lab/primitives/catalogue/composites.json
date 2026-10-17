@@ -1193,7 +1193,7 @@
       "No difficulty": "the DC's unset copy, which a stage whose component carries a DC never shows",
       "Edit difficulty and complications on the component": "the Edit link's tooltip, which a static drawing cannot hover"
     },
-    "note": "Mounts the shipped `ProgressiveStageList` as the Recipe Studio wires it: one numbered, reorderable stage row naming its component, its read-only DC and Edit link in the row's trailing controls, and the component's crafting complications in the shipped `StageComplicationList` in the row's `body`."
+    "note": "Mounts the shipped `ProgressiveStageList` with the recipe hooks and the salvage Edit name: one numbered, reorderable stage row naming its component, its read-only DC and Edit link in the row's trailing controls, and the component's crafting complications in the shipped `StageComplicationList` in the row's `body`."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",

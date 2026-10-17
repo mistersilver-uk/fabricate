@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { classifyCheckTotal } from '../src/systems/checkRouting.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { buildRoutingModel } from '../src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js';
 import { setDisplayName } from '../src/ui/svelte/apps/manager/recipe/setDrafts.js';
@@ -17,9 +18,15 @@ const FINE = { id: 't-fine', name: 'Fine', success: true };
 const GREAT = { id: 't-great', name: 'Great', success: true };
 const BOTCH = { id: 't-botch', name: 'Botch', success: false };
 
-const byHow = (model) => model.sources.map(({ id, how, blockedReason }) => [id, how, blockedReason]);
+const byHow = (model) =>
+  model.sources.map(({ id, how, blockedReason }) => [id, how, blockedReason]);
 const setModel = (ingredientSets, resultGroups) =>
-  buildRoutingModel({ provider: 'ingredientSet', ingredientSets, resultGroups, setName: setDisplayName });
+  buildRoutingModel({
+    provider: 'ingredientSet',
+    ingredientSets,
+    resultGroups,
+    setName: setDisplayName,
+  });
 const tierModel = (resultGroups, tiers = [FINE, GREAT, BOTCH], extra = {}) =>
   buildRoutingModel({ provider: 'check', resultGroups, tiers, ...extra });
 
@@ -54,11 +61,10 @@ describe('set sources', () => {
 
   it('a resultMapping matching nothing is blocked rather than taking the first group', () => {
     const [source] = setModel([{ id: 's1', resultMapping: ['nope'] }], groups).sources;
-    assert.deepEqual([source.how, source.targets, source.blockedReason], [
-      'fallback',
-      [],
-      'missing-target',
-    ]);
+    assert.deepEqual(
+      [source.how, source.targets, source.blockedReason],
+      ['fallback', [], 'missing-target']
+    );
   });
 
   it('a set with neither falls back to the first group, or is blocked with none', () => {
@@ -135,7 +141,11 @@ describe('tier sources', () => {
 
   it('several groups route by normalized name, first match winning, else no match', () => {
     const model = tierModel(
-      [{ id: 'g1', name: 'Other' }, { id: 'g2', name: ' fine ' }, { id: 'g3', name: 'FINE' }],
+      [
+        { id: 'g1', name: 'Other' },
+        { id: 'g2', name: ' fine ' },
+        { id: 'g3', name: 'FINE' },
+      ],
       [FINE, GREAT]
     );
     assert.deepEqual(byHow(model), [
@@ -194,10 +204,16 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
 
   it('counts a multi-target fallback by its largest target', () => {
     const model = setModel(
-      [{ id: 's1', resultMapping: ['g1', 'g2'] }, { id: 's2', resultGroupId: 'g2' }],
+      [
+        { id: 's1', resultMapping: ['g1', 'g2'] },
+        { id: 's2', resultGroupId: 'g2' },
+      ],
       [{ id: 'g1' }, { id: 'g2' }]
     );
-    assert.deepEqual(model.sources.map(({ sharedCount }) => sharedCount), [2, 2]);
+    assert.deepEqual(
+      model.sources.map(({ sharedCount }) => sharedCount),
+      [2, 2]
+    );
   });
 
   it('lists every non-failure group as unreachable under ingredientSet with no sets', () => {
@@ -206,7 +222,10 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
   });
 
   it('claims an id-less group only by a set naming it, never by an undefined resultGroupId', () => {
-    const model = setModel([{ id: 's1' }, { id: 's2', resultGroupId: 'g1' }], [{ name: 'Draft' }, { id: 'g1' }]);
+    const model = setModel(
+      [{ id: 's1' }, { id: 's2', resultGroupId: 'g1' }],
+      [{ name: 'Draft' }, { id: 'g1' }]
+    );
     assert.deepEqual(model.unassigned, [0]);
   });
 
@@ -220,9 +239,18 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
   });
 
   it('routes nothing without a provider', () => {
-    const model = buildRoutingModel({ resultGroups: [{ id: 'g1' }], ingredientSets: [{ id: 's1' }] });
+    const model = buildRoutingModel({
+      resultGroups: [{ id: 'g1' }],
+      ingredientSets: [{ id: 's1' }],
+    });
     assert.deepEqual(
-      [model.sources, model.inbound, model.unreachable, model.unassigned, model.routingOptionsFor(0)],
+      [
+        model.sources,
+        model.inbound,
+        model.unreachable,
+        model.unassigned,
+        model.routingOptionsFor(0),
+      ],
       [[], [[]], [], [], []]
     );
   });
@@ -261,7 +289,11 @@ describe('routingOptionsFor', () => {
 
   it('gives each group today’s tier options: a tier listed by another index is disabled', () => {
     const model = tierModel(
-      [{ id: 'g1', checkOutcomeIds: ['t-fine'] }, { name: 'Draft', checkOutcomeIds: ['t-great'] }, null],
+      [
+        { id: 'g1', checkOutcomeIds: ['t-fine'] },
+        { name: 'Draft', checkOutcomeIds: ['t-great'] },
+        null,
+      ],
       [FINE, GREAT]
     );
     assert.deepEqual(model.routingOptionsFor(0), [
@@ -280,8 +312,6 @@ describe('routingOptionsFor', () => {
 });
 
 // ── parity with the engine ──────────────────────────────────────────────────────────────
-const FAILURE_AWARD_DISPOSITIONS = ['fail', 'failure'];
-
 /** The groups a craft awards, as `CraftingEngine` decides: a pass, else a permitted failure. */
 function awardedIndexes(service, system, { recipe, step, ingredientSet, checkResult }) {
   const candidates = service._allResultGroups({ recipe, step });
@@ -297,7 +327,7 @@ function awardedIndexes(service, system, { recipe, step, ingredientSet, checkRes
   const failureAward =
     !succeeded &&
     activityPermitsFailureResults(system, 'crafting') &&
-    FAILURE_AWARD_DISPOSITIONS.includes(resolved?.meta?.disposition);
+    CraftingEngine.prototype._isFailureAwardDisposition(resolved?.meta?.disposition);
   if (!succeeded && !failureAward) return [];
   return resolved.groups.map((group) => candidates.indexOf(group));
 }
@@ -342,7 +372,12 @@ function assertParity({ system, recipe, step = null, mode, expected }) {
     const model = setModel(scope.ingredientSets, resultGroups);
     for (const [index, set] of scope.ingredientSets.entries()) {
       const checkResult = { success: true };
-      const awarded = awardedIndexes(service, system, { recipe, step, ingredientSet: set, checkResult });
+      const awarded = awardedIndexes(service, system, {
+        recipe,
+        step,
+        ingredientSet: set,
+        checkResult,
+      });
       assert.deepEqual(model.sources[index].targets, awarded, `set ${set.id}`);
     }
     if (expected) assert.deepEqual(byHow(model), expected);
@@ -351,7 +386,10 @@ function assertParity({ system, recipe, step = null, mode, expected }) {
   const routed = system.craftingCheck.routed;
   const outcomes = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   const offered = routedTierOptionsForPolicy(routed, system.craftingCheck.failureResultPolicy);
-  const tiers = offered.map((tier) => ({ ...tier, start: outcomes.find((o) => o.id === tier.id).start }));
+  const tiers = offered.map((tier) => ({
+    ...tier,
+    start: outcomes.find((o) => o.id === tier.id).start,
+  }));
   const model = buildRoutingModel({
     provider: 'check',
     ingredientSets: scope.ingredientSets,
@@ -381,7 +419,11 @@ const recipeOf = (resultGroups, ingredientSets = [{ id: 's1' }], extra = {}) => 
 
 describe('parity: routedByIngredients', () => {
   const system = { id: 'sys', resolutionMode: 'routedByIngredients' };
-  const groups = [{ id: 'g1', name: 'A' }, { id: 'g2', name: 'B' }, { id: 'g3', name: 'C' }];
+  const groups = [
+    { id: 'g1', name: 'A' },
+    { id: 'g2', name: 'B' },
+    { id: 'g3', name: 'C' },
+  ];
   const check = (ingredientSets, resultGroups, expected = undefined) =>
     assertParity({
       system,
@@ -392,7 +434,10 @@ describe('parity: routedByIngredients', () => {
 
   it('explicit and dangling', () => {
     check(
-      [{ id: 's1', resultGroupId: 'g2' }, { id: 's2', resultGroupId: 'gone' }],
+      [
+        { id: 's1', resultGroupId: 'g2' },
+        { id: 's2', resultGroupId: 'gone' },
+      ],
       groups,
       [
         ['s1', 'explicit', null],
@@ -429,10 +474,16 @@ describe('parity: routedByIngredients', () => {
 
   it('two sets sharing one group', () => {
     const model = check(
-      [{ id: 's1', resultGroupId: 'g1' }, { id: 's2', resultGroupId: 'g1' }],
+      [
+        { id: 's1', resultGroupId: 'g1' },
+        { id: 's2', resultGroupId: 'g1' },
+      ],
       groups
     );
-    assert.deepEqual(model.sources.map(({ sharedCount }) => sharedCount), [2, 2]);
+    assert.deepEqual(
+      model.sources.map(({ sharedCount }) => sharedCount),
+      [2, 2]
+    );
   });
 });
 
@@ -453,7 +504,11 @@ for (const policy of ['never', 'perRecord']) {
 
     it('a partial tier list across several groups', () => {
       check(
-        [{ id: 'g1', checkOutcomeIds: ['t-fine'] }, { id: 'g2', checkOutcomeIds: [] }, { id: 'g3' }],
+        [
+          { id: 'g1', checkOutcomeIds: ['t-fine'] },
+          { id: 'g2', checkOutcomeIds: [] },
+          { id: 'g3' },
+        ],
         [
           ['t-fine', 'explicit', null],
           ['t-great', null, 'unrouted-tier'],
@@ -486,7 +541,11 @@ for (const policy of ['never', 'perRecord']) {
 
     it('a name match, no match, and duplicate group names', () => {
       check(
-        [{ id: 'g1', name: 'Other' }, { id: 'g2', name: 'fine' }, { id: 'g3', name: 'Fine' }],
+        [
+          { id: 'g1', name: 'Other' },
+          { id: 'g2', name: 'fine' },
+          { id: 'g3', name: 'Fine' },
+        ],
         [
           ['t-fine', 'name', null],
           ['t-great', null, 'no-name-match'],
@@ -512,7 +571,10 @@ for (const policy of ['never', 'perRecord']) {
 
     it('stale or forbidden ids alone still claim tier routing', () => {
       check(
-        [{ id: 'g1', checkOutcomeIds: ['t-deleted'] }, { id: 'g2', name: 'Fine' }],
+        [
+          { id: 'g1', checkOutcomeIds: ['t-deleted'] },
+          { id: 'g2', name: 'Fine' },
+        ],
         [
           ['t-fine', null, 'unrouted-tier'],
           ['t-great', null, 'unrouted-tier'],
@@ -520,7 +582,10 @@ for (const policy of ['never', 'perRecord']) {
         ]
       );
       check(
-        [{ id: 'g1', checkOutcomeIds: ['t-botch'] }, { id: 'g2', name: 'Fine' }],
+        [
+          { id: 'g1', checkOutcomeIds: ['t-botch'] },
+          { id: 'g2', name: 'Fine' },
+        ],
         policy === 'never'
           ? [
               ['t-fine', null, 'unrouted-tier'],
@@ -541,7 +606,12 @@ for (const policy of ['never', 'perRecord']) {
         outcomes: [FINE, { id: 't-fail', name: 'Fail', success: false }],
         policy,
       });
-      assertParity({ system: failNamed, recipe: recipeOf([{ id: 'g1' }]), mode: 'routedByCheck' });
+      assertParity({
+        system: failNamed,
+        recipe: recipeOf([{ id: 'g1' }]),
+        mode: 'routedByCheck',
+        expected: [['t-fine', 'single', null], ...botch(['t-fail', null, 'failure-unassigned'])],
+      });
     });
 
     it('reserved tier names, single- and multi-group, a hazard keyword included', () => {
@@ -568,18 +638,24 @@ for (const policy of ['never', 'perRecord']) {
       });
       assertParity({
         system: reserved,
-        recipe: recipeOf([{ id: 'g1', name: 'Miss' }, { id: 'g2', name: 'Fine' }]),
+        recipe: recipeOf([
+          { id: 'g1', name: 'Miss' },
+          { id: 'g2', name: 'Fine' },
+        ]),
         mode: 'routedByCheck',
         expected: expected(['t-fine', 'name', null]),
       });
     });
 
     it('no groups', () => {
-      check([], [
-        ['t-fine', null, 'no-name-match'],
-        ['t-great', null, 'no-name-match'],
-        ...botch(['t-botch', null, 'failure-unassigned']),
-      ]);
+      check(
+        [],
+        [
+          ['t-fine', null, 'no-name-match'],
+          ['t-great', null, 'no-name-match'],
+          ...botch(['t-botch', null, 'failure-unassigned']),
+        ]
+      );
     });
   });
 }
@@ -608,7 +684,10 @@ describe('parity: routedByCheck, fixed tiers', () => {
     const model = assertParity({
       system,
       recipe: recipeOf(
-        [{ id: 'g1', checkOutcomeIds: ['t-botch', 't-fine'] }, { id: 'g2', checkOutcomeIds: ['t-great'] }],
+        [
+          { id: 'g1', checkOutcomeIds: ['t-botch', 't-fine'] },
+          { id: 'g2', checkOutcomeIds: ['t-great'] },
+        ],
         [{ id: 's1' }],
         { minSuccessOutcomeId: 't-great' }
       ),
@@ -641,7 +720,10 @@ describe('parity: a multi-step step scope', () => {
   const step = {
     id: 'step-2',
     ingredientSets: [{ id: 's2' }],
-    resultGroups: [{ id: 'sg1', checkOutcomeIds: ['t-great'] }, { id: 'sg2', name: 'Fine' }],
+    resultGroups: [
+      { id: 'sg1', checkOutcomeIds: ['t-great'] },
+      { id: 'sg2', name: 'Fine' },
+    ],
   };
   const recipe = recipeOf([{ id: 'rg1', name: 'Fine' }], [{ id: 's1' }], {
     steps: [{ id: 'step-1' }, step],

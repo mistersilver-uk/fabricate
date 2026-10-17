@@ -143,7 +143,7 @@
   const collapsed = $derived(!multiStepEnabled && steps.length > 1);
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
-  // The recipe view the Results tab edits while collapsed. Writes route back to the FINAL step.
+  // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
   const resultsRecipe = $derived(resultsProjection(recipe, finalStep));
 
   // Check-mode routed recipes route by the crafting-check outcome, so ingredient sets are nameless

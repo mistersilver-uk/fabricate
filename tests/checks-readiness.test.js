@@ -962,6 +962,23 @@ describe('rangeGap', () => {
     assert.equal(issues.find((issue) => issue.id === 'rangeGap'), undefined);
   });
 
+  it('reads no gap from a start > end range already reported invalid', () => {
+    const { issues } = evaluateCheckReadiness(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: 'A', start: 1, end: 9, success: false },
+          { id: 'b', name: 'B', start: 30, end: 2, success: true },
+          { id: 'c', name: 'C', start: 10, end: 20, success: true },
+        ],
+      },
+      { mode: 'routed' }
+    );
+    assert.ok(issues.some((issue) => issue.id === 'rangeInvalid'));
+    assert.equal(issues.find((issue) => issue.id === 'rangeGap'), undefined);
+  });
+
   it('measures the set’s own span, so a deliberate window is not a gap', () => {
     // `2d20` rolls 2-40 and a GM who authors 7-34 has authored a window, not a mistake.
     // Only a hole BETWEEN two authored tiers is reported.

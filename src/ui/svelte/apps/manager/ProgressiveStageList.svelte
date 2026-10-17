@@ -15,7 +15,7 @@
   | `recipeItemHook` | boolean | `false` | writes `data-recipe-result-item` on every row's `PickerRow` |
   | `disabled` | boolean | `false` | the saving state: no reorder, and every picker, delete and Edit disabled |
   | `rowData(item, index)` / `removeData(item)` | functions | `() => ({})` | `SortableList`'s own, `index` being `items.indexOf(item)` |
-  | `difficultyDataAttr` / `editDataAttr` | attribute names | — | written on the DC with its value (`''` unset) and on Edit with the component id |
+  | `difficultyDataAttr` / `editDataAttr` | attribute names | required | written on the DC with its value (`''` unset) and on Edit with the component id |
   | `itemLabel(item)` / `ownerIdOf(item)` | functions | — / `componentId \|\| ''` | a stage's name, and its complication list's `ownerId` |
   | `dcLabel` / `dcUnsetLabel` / `editLabel` / `editTitle` | strings | `''` | the caller's own copy |
   | `editAriaLabel(item)` | function | `() => ''` | the Edit link's accessible name |
@@ -30,12 +30,15 @@
   - `onReorder(from, to)` / `onRemove(item)` — the list's move and delete.
   - `onOpenComponent(componentId)` — Edit, which routes to the component's own editor.
 
-  Invariants:
-  - The root is `SortableList`'s own `<ul>`; `has-band` is set exactly when the activity-filtered
-    complication list the body draws is non-empty — pinned by
-    `tests/components/progressive-stage-list-mounted.test.js`.
-  - Edit keeps `data-keyboard-focus="true"` and renders only for a stage whose component resolves.
-  - Each caller's hooks stay on the row `<li>`, the delete, the DC, Edit and the `PickerRow` root.
+  Invariants, each pinned by the named case in
+  `tests/components/progressive-stage-list-mounted.test.js`:
+  - The root is `SortableList`'s own `<ul>` ("the recipe hooks land on …").
+  - `has-band` is set exactly when the activity-filtered complication list the body draws is
+    non-empty ("has-band and the body follow the activity filter").
+  - Edit keeps `data-keyboard-focus="true"` ("the recipe hooks land on …") and renders only for a
+    stage whose component resolves ("hides Edit for a stage whose component resolves to no option").
+  - Each caller's hooks stay on the row `<li>`, the delete, the DC, Edit and the `PickerRow` root
+    ("the recipe hooks land on …", "the salvage hooks land on the same elements …").
 -->
 <script>
   import PickerRow from '../../components/PickerRow.svelte';
