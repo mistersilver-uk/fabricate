@@ -32,6 +32,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...RESULT_ROW_RAW_MODULES,
     'src/ui/model/complicationSummary.js',
+    'src/ui/svelte/apps/manager/recipe/setDrafts.js',
   ],
   runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
@@ -44,7 +45,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/StageComplicationList.svelte',
     'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: the set card and the routing line every result set draws.
+    'src/ui/svelte/components/SetCard.svelte',
+    'src/ui/svelte/components/RouteSources.svelte',
     CARD_PATH,
   ],
   componentPath: CARD_PATH,
@@ -556,7 +559,7 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
   it('a failed check’s reserved set converts on the same terms as any other set', async () => {
     const { target, groups } = await mountGroup(
       { id: 'f1', componentId: 'cmp-water', quantity: 1 },
-      { reserved: true, staticLabel: 'On a failed check', hideRemove: true }
+      { reservedRole: 'failure', staticLabel: 'On a failed check' }
     );
     rows(target)[0].querySelector('.manager-recipe-or-trigger').click();
     await settle();

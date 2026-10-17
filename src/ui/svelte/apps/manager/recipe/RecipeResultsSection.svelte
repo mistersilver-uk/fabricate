@@ -17,7 +17,8 @@
   import Button from '../../../components/Button.svelte';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
   import { buildRoutingModel } from './recipeRoutingModel.js';
-  import { addResultGroup, alchemySlots, withResultSlot } from './recipeRoutingEdits.js';
+  import { assignCandidates, inboundChips } from './resultSetSources.js';
+  import { addResultGroup, alchemySlots, routeTier, withResultSlot } from './recipeRoutingEdits.js';
 
   let {
     resultGroups = [],
@@ -29,11 +30,13 @@
     // forwarded to every group card; a gathering task passes neither.
     surface = 'gathering',
     resultKinds = null,
-    // Result routing (routed systems only): `ingredientSets` builds the per-result-set options
-    // and assignments, `outcomeTierOptions` is the system's routed-check tiers.
+    // Result routing (routed systems only): `ingredientSets` are the sets that route, and
+    // `outcomeTierOptions` the routed-check tiers the failure-result policy offers, out of
+    // `routedOutcomeTiers`, every tier the system defines, which names a tier that does not route.
     routingProvider = null,
     ingredientSets = [],
     outcomeTierOptions = [],
+    routedOutcomeTiers = [],
     outcomeTiersDefined = false,
     // Forwarded to each group card's third empty hint. A tab prop not ALSO forwarded here
     // silently defaults, which is why the whole chain is spelled out.
@@ -55,12 +58,10 @@
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
 
-  function assignedSetIdsFor(group) {
-    return sets.filter((set) => set.resultGroupId === group.id).map((set) => set.id);
-  }
+  // Result routing lives in the group HEAD, which only renders when the group is chromed, so a
+  // routed system always needs chrome or it loses its routing control.
+  const isRouted = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
 
-  // Each group's routing options: a set routes to at most one group, and a tier assigned to
-  // another (by index, which an unsaved id-less group still has) is disabled.
   const routing = $derived(
     buildRoutingModel({
       provider: routingProvider,
@@ -70,10 +71,73 @@
       setName: setDisplayName,
     })
   );
+  const tierNames = $derived(
+    new Map(
+      (Array.isArray(routedOutcomeTiers) ? routedOutcomeTiers : []).map((t) => [t.id, t.name])
+    )
+  );
+  const defaultHint = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingDefault', 'default')
+  );
+  const deletedTier = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingDeletedTier', 'Deleted outcome tier')
+  );
+  // Assigning the first tier ends routing by name for every other tier (`tierRoute`).
+  const assignNote = $derived(
+    routingProvider === 'check' && !groups.some((group) => group?.checkOutcomeIds?.length > 0)
+      ? localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.RoutingAssignNote',
+          'Assigning a tier stops the other tiers routing by name.'
+        )
+      : ''
+  );
+  const FALLBACK_HOWS = new Set(['fallback', 'single', 'name']);
 
-  // Result routing lives in the group HEAD, which only renders when the group is chromed, so a
-  // routed system always needs chrome or it loses its routing control.
-  const isRouted = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
+  /** The group at `index`'s `RouteSources` rows: what reaches it, and what Assign offers. */
+  function routeRows(group, index) {
+    const model = routing;
+    const chips = inboundChips({ model, index, group, provider: routingProvider, tierNames });
+    return {
+      sources: chips.map((chip) => ({
+        id: chip.id,
+        label: chip.name ?? deletedTier,
+        removable: chip.explicit || chip.nonRouting,
+        hint: FALLBACK_HOWS.has(chip.how) ? defaultHint : undefined,
+        nonRouting: chip.nonRouting,
+      })),
+      candidates: assignCandidates({ model, index, groups, groupName: setDisplayName }).map(
+        (candidate) => ({ id: candidate.id, label: candidate.name, routedTo: candidate.routedTo })
+      ),
+      assigned: chips.filter((chip) => chip.explicit).map((chip) => chip.id),
+      sharedCount: model.inbound[index]?.length ?? 0,
+      unreachable: model.unreachable.includes(index),
+    };
+  }
+
+  const NOT_ROUTED = {
+    sources: [],
+    candidates: [],
+    assigned: [],
+    sharedCount: 0,
+    unreachable: false,
+  };
+  const rows = $derived(groups.map((group, i) => (isRouted ? routeRows(group, i) : NOT_ROUTED)));
+
+  // An ingredient set routes by its own `resultGroupId`; a tier is listed by one group alone, so
+  // an add moves it here and writes nothing when this group is already its only lister.
+  function route(group, index, id, add) {
+    if (routingProvider === 'ingredientSet') {
+      onAssignIngredientSet(group?.id || null, id, add);
+      return;
+    }
+    if (add) {
+      const next = routeTier(groups, id, index);
+      if (next !== groups) onChange(next);
+      return;
+    }
+    const listed = Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : [];
+    updateGroup(index, { ...group, checkOutcomeIds: listed.filter((tierId) => tierId !== id) });
+  }
 
   // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: several
   // groups get the set chrome, a single NON-routed group renders chromeless, and a routed mode
@@ -104,7 +168,11 @@
   }
 </script>
 
-<section class="manager-recipe-results-section" data-recipe-section={`${idPrefix}results`}>
+<section
+  class="manager-recipe-results-section"
+  data-recipe-section={`${idPrefix}results`}
+  data-set-card-scope
+>
   {#if alchemySimple}
     <!-- Alchemy Simple: two labeled result sets, no add-set and no remove on either. -->
     <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
@@ -114,7 +182,7 @@
         {surface}
         {resultKinds}
         {onOpenComponent}
-        hideRemove={true}
+        reservedRole="success"
         staticLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
@@ -124,9 +192,7 @@
         {surface}
         {resultKinds}
         {onOpenComponent}
-        reserved={true}
-        hideRemove={true}
-        roleAccent="warning"
+        reservedRole="failure"
         staticLabel={localizeOr(
           'FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure',
           'On a failed check'
@@ -173,6 +239,7 @@
         <li class="manager-recipe-result-group-item">
           <RecipeResultGroupCard
             {group}
+            setIndex={index}
             {componentOptions}
             {surface}
             {resultKinds}
@@ -180,22 +247,28 @@
             {progressive}
             {isTerminalStep}
             {onOpenComponent}
-            ingredientSetOptions={routingProvider === 'ingredientSet'
-              ? routing.routingOptionsFor(index)
-              : []}
-            assignedIngredientSetIds={assignedSetIdsFor(group)}
-            outcomeTierOptions={routingProvider === 'check' ? routing.routingOptionsFor(index) : []}
+            sources={rows[index].sources}
+            candidates={rows[index].candidates}
+            assigned={rows[index].assigned}
+            sharedCount={rows[index].sharedCount}
+            unreachable={rows[index].unreachable}
+            {assignNote}
             {outcomeTiersDefined}
             {failureResultsAllowed}
-            onAssignIngredientSet={(setId, assigned) =>
-              onAssignIngredientSet(group?.id || null, setId, assigned)}
+            onRoute={(id, add) => route(group, index, id, add)}
             onChange={(nextGroup) => updateGroup(index, nextGroup)}
             onRemove={() => removeGroup(index)}
           />
         </li>
       {/each}
     </ul>
-    <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
+    <Button
+      role="dashed"
+      fullWidth
+      data-recipe-add="result-set"
+      data-set-card-remove-fallback
+      onclick={() => addGroup()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </Button>

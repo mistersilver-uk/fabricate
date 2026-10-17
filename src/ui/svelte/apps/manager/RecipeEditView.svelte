@@ -74,11 +74,10 @@
     // Category lives on the Overview tab.
     categories = [],
     onSetCategory = () => {},
-    // Result routing (routed systems): the per-recipe routing mode and the system's routed-check
-    // outcome tiers for the result-set assignment controls.
+    // Result routing: the mode, the tiers the policy offers, and every tier the system defines.
     routingProvider = null,
     routedOutcomeTierOptions = [],
-    routedOutcomeTiersDefined = false,
+    routedOutcomeTiers = [],
     // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
     // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
@@ -522,7 +521,8 @@
             {progressive}
             {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
-            outcomeTiersDefined={routedOutcomeTiersDefined}
+            {routedOutcomeTiers}
+            outcomeTiersDefined={routedOutcomeTiers.length > 0}
             failureResultsAllowed={routedFailureResultsAllowed}
             onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}

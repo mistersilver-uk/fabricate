@@ -38,10 +38,11 @@
     currencyEnabled = false,
     recipeOptions = [],
     knowledgeObservable = false,
-    // Result routing: the provider and the system's outcome tiers feed the per-result-set
-    // assignment controls.
+    // Result routing: the provider, the outcome tiers the policy offers, and every tier the system
+    // defines, feed each result set's routing line.
     routingProvider = null,
     outcomeTierOptions = [],
+    routedOutcomeTiers = [],
     outcomeTiersDefined = false,
     // Issue 1098: threaded on to the section and the single-step group card alike.
     failureResultsAllowed = false,
@@ -209,6 +210,7 @@
             {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
+            {routedOutcomeTiers}
             {outcomeTiersDefined}
             {failureResultsAllowed}
             onAssignIngredientSet={(groupId, setId, assigned) =>
@@ -230,6 +232,7 @@
       {onOpenComponent}
       {ingredientSets}
       {outcomeTierOptions}
+      {routedOutcomeTiers}
       {outcomeTiersDefined}
       {failureResultsAllowed}
       onAssignIngredientSet={(groupId, setId, assigned) =>

@@ -346,6 +346,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/setDrafts.js',
     'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
     'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
+    'src/ui/svelte/apps/manager/recipe/resultSetSources.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/failureResultPolicy.js',
   ],
@@ -367,7 +368,9 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: the set card and the routing line every result set draws.
+    'src/ui/svelte/components/SetCard.svelte',
+    'src/ui/svelte/components/RouteSources.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconButton.svelte',

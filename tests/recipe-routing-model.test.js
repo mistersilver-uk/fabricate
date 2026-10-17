@@ -244,70 +244,9 @@ describe('inbound, sharedCount, unreachable and unassigned', () => {
       ingredientSets: [{ id: 's1' }],
     });
     assert.deepEqual(
-      [
-        model.sources,
-        model.inbound,
-        model.unreachable,
-        model.unassigned,
-        model.routingOptionsFor(0),
-      ],
-      [[], [[]], [], [], []]
+      [model.sources, model.inbound, model.unreachable, model.unassigned],
+      [[], [[]], [], []]
     );
-  });
-});
-
-describe('routingOptionsFor', () => {
-  it('gives each group today’s set options: a set routed elsewhere is disabled', () => {
-    const model = setModel(
-      [
-        { id: 's1', name: '  Ore  ' },
-        { id: 's2', name: '' },
-        { id: 's3', resultGroupId: 'g2' },
-        { id: 's4', resultGroupId: 'g1' },
-      ],
-      [{ id: 'g1' }, { name: 'Draft' }, { id: 'g2' }]
-    );
-    assert.deepEqual(model.routingOptionsFor(0), [
-      { id: 's1', name: 'Ore', disabled: false },
-      { id: 's2', name: 'Set 2', disabled: false },
-      { id: 's3', name: 'Set 3', disabled: true },
-      { id: 's4', name: 'Set 4', disabled: false },
-    ]);
-    assert.deepEqual(model.routingOptionsFor(1), [
-      { id: 's1', name: 'Ore', disabled: false },
-      { id: 's2', name: 'Set 2', disabled: false },
-      { id: 's3', name: 'Set 3', disabled: true },
-      { id: 's4', name: 'Set 4', disabled: true },
-    ]);
-    assert.deepEqual(model.routingOptionsFor(2), [
-      { id: 's1', name: 'Ore', disabled: false },
-      { id: 's2', name: 'Set 2', disabled: false },
-      { id: 's3', name: 'Set 3', disabled: false },
-      { id: 's4', name: 'Set 4', disabled: true },
-    ]);
-  });
-
-  it('gives each group today’s tier options: a tier listed by another index is disabled', () => {
-    const model = tierModel(
-      [
-        { id: 'g1', checkOutcomeIds: ['t-fine'] },
-        { name: 'Draft', checkOutcomeIds: ['t-great'] },
-        null,
-      ],
-      [FINE, GREAT]
-    );
-    assert.deepEqual(model.routingOptionsFor(0), [
-      { id: 't-fine', name: 'Fine', disabled: false },
-      { id: 't-great', name: 'Great', disabled: true },
-    ]);
-    assert.deepEqual(model.routingOptionsFor(1), [
-      { id: 't-fine', name: 'Fine', disabled: true },
-      { id: 't-great', name: 'Great', disabled: false },
-    ]);
-    assert.deepEqual(model.routingOptionsFor(2), [
-      { id: 't-fine', name: 'Fine', disabled: true },
-      { id: 't-great', name: 'Great', disabled: true },
-    ]);
   });
 });
 
