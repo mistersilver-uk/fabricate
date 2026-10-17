@@ -18,6 +18,7 @@ import {
   buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
 } from '../src/systems/checkModifierResolver.js';
+import { fixedRangeGaps } from '../src/ui/svelte/apps/manager/checks/checkRangeGaps.js';
 import {
   CHECK_ISSUE_LABELS,
   CHECK_ISSUE_TITLES,
@@ -1561,5 +1562,50 @@ describe('readinessModeForSlot', () => {
     for (const mode of CHECK_READINESS_MODES) {
       assert.doesNotThrow(() => evaluateCheckReadiness({}, { mode }));
     }
+  });
+});
+
+// ── the gap spans `rangeGap` reads (issue 2511) ──
+describe('fixedRangeGaps', () => {
+  const tier = (start, end) => ({ start, end });
+
+  it('reports no gap for adjacent inclusive ranges', () => {
+    assert.deepEqual(fixedRangeGaps([tier(1, 9), tier(10, 17), tier(18, 20)]), []);
+  });
+
+  it('reports each interior hole as an inclusive span', () => {
+    assert.deepEqual(fixedRangeGaps([tier(1, 9), tier(11, 17), tier(20, 25)]), [
+      { from: 10, to: 10 },
+      { from: 18, to: 19 },
+    ]);
+  });
+
+  it('drops excluded indices, so an overlapping range reported elsewhere leaves its hole', () => {
+    const outcomes = [tier(1, 9), tier(5, 15), tier(16, 20)];
+    assert.deepEqual(fixedRangeGaps(outcomes), []);
+    assert.deepEqual(fixedRangeGaps(outcomes, new Set([1])), [{ from: 10, to: 15 }]);
+  });
+
+  it('reads no phantom gap from an excluded start > end range', () => {
+    const outcomes = [tier(1, 9), tier(30, 2), tier(10, 20)];
+    assert.deepEqual(fixedRangeGaps(outcomes, new Set([1])), []);
+  });
+
+  it('takes reach as the highest end so far, so an enclosed range hides no hole', () => {
+    assert.deepEqual(fixedRangeGaps([tier(12, 20), tier(1, 15), tier(3, 4)]), []);
+    assert.deepEqual(fixedRangeGaps([tier(18, 20), tier(1, 10), tier(2, 3)]), [
+      { from: 11, to: 17 },
+    ]);
+  });
+
+  it('applies the literal start > reach + 1 test to fractional bounds', () => {
+    assert.deepEqual(fixedRangeGaps([tier(1, 5.5), tier(6.5, 10)]), []);
+    assert.deepEqual(fixedRangeGaps([tier(1, 5.5), tier(7, 10)]), [{ from: 6.5, to: 6 }]);
+  });
+
+  it('ignores non-finite bounds and needs two ranges to find a hole', () => {
+    assert.deepEqual(fixedRangeGaps([tier(1, 5), tier(NaN, 9), tier('x', 12)]), []);
+    assert.deepEqual(fixedRangeGaps([tier(1, 5)]), []);
+    assert.deepEqual(fixedRangeGaps(undefined), []);
   });
 });
