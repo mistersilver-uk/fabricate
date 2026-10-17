@@ -427,6 +427,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-depleted-image-filled',
     'manager-gathering-task-depleted-image-empty',
   ]),
+  // The routing line (issue 2512): a routed result set in each routed mode, and Assign open.
+  'src/ui/svelte/components/RouteSources.svelte': Object.freeze([
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-failure-tier',
+  ]),
   // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
   // reserved pair and a salvage group.
   'src/ui/svelte/components/SetCard.svelte': Object.freeze([

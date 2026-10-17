@@ -115,3 +115,68 @@
   font-size: 11px;
   line-height: 1.5;
 }
+
+/* The line naming what routes into a set (library §12 "Routed by ingredients"), rooted at the class `RouteSources` emits; its chips are `Chip` at the row density. */
+.fabricate-route-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-route-sources .fabricate-route-sources-label,
+.fabricate-route-sources .fabricate-route-sources-empty {
+  flex: none;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+.fabricate-route-sources .fabricate-route-sources-implicit {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.fabricate-route-sources .fabricate-route-sources-hint {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* Dashed at the 22px rung, its 24px hit area the module's `fab-hit-area`. */
+.fabricate-route-sources .fabricate-route-sources-assign {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  height: 22px;
+  min-height: 22px;
+  margin: 0;
+  padding: 0 var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 6px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-route-sources .fabricate-route-sources-assign:hover:enabled {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+}
+
+.fabricate-route-sources .fabricate-route-sources-assign:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fabricate-route-sources-popover .fabricate-route-sources-note {
+  margin: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  color: var(--fab-warning-text);
+  font-size: 11px;
+  line-height: 1.4;
+}

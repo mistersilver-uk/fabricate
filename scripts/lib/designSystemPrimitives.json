@@ -800,6 +800,15 @@
       "why": "Issue 2420 builds the manager's title band: the PREMIUM mark while a companion is installed, then a caller's status caption. ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, the call site that formats the summary from the shell's mode label and outcome-tier count, so it is below the two-importer membership bar on the `LogList`, `StageNav` and `XrefList` precedent. It keeps the `.fabricate-manager`-rooted `manager-titlebar` family, and the player window renders none, because it carries no premium signal. Its library specimen reads `shipped`, and its broad-signal override names the seven frames `ManagerTitleBar`'s cases draw; this record replaces #1777 decision E1, which held the entry at `target` until a second host existed."
     },
     {
+      "path": "src/ui/svelte/components/RouteSources.svelte",
+      "library": "<RouteSources>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte"
+      ],
+      "why": "Issue 2512 builds library §12's routing line: a routed result set's effective sources as positive row chips, the assignments still stored that do not route struck and removable, \"Nothing — unreachable\" when nothing reaches the set, a reserved role's implicit words, and a dashed Assign over `SearchablePopover`'s `multiple` panel whose options say where each source routes today. ONE importer, `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte`, the routed result set's card, which hands it as `SetCard`'s `sources`, so it is below the two-importer membership bar on the `AppTitleBar`, `LogList` and `XrefList` precedent. Its family is rooted at `fabricate-route-sources`, and its portalled panel at `fabricate-route-sources-popover`, in `styles/fabricate-manager-sets-routing.css`. Its library specimen reads `shipped`, and its broad-signal override names the frames that draw a routed result set in each routed mode and the open Assign panel."
+    },
+    {
       "path": "src/ui/svelte/components/TintPickerButton.svelte",
       "library": null,
       "evidence": "broad",

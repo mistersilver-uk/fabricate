@@ -145,6 +145,9 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
   // The requirement row's tag adder (issue 2430): each choice writes one add or one remove at
   // once, so its held tags are announced selected through `multiple` rather than `SetPicker`.
   'src/ui/svelte/components/PickerRow.svelte',
+  // The routing line's Assign (issue 2512): each choice assigns or unassigns one source at once,
+  // so a set's assigned sources are announced selected through `multiple`.
+  'src/ui/svelte/components/RouteSources.svelte',
 ]);
 
 // The reader is probed rather than trusted: a pattern matching nothing makes the set-equality
@@ -244,11 +247,11 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
   assert.equal(
     snippetSites.length,
-    3,
-    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
-      "`IconPicker`, `EssenceSourceSelector` and `ComponentSalvageCard`'s salvage adder (issue " +
-      '1516). A different number means the route has gained or lost a caller and the figures in ' +
-      'this file need re-measuring.'
+    4,
+    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; four do — ` +
+      "`IconPicker`, `EssenceSourceSelector`, `ComponentSalvageCard`'s salvage adder (issue " +
+      "1516) and `RouteSources`' Assign (issue 2512). A different number means the route has " +
+      'gained or lost a caller and the figures in this file need re-measuring.'
   );
   const setPickerSnippetSites = setPickerSites.filter((site) => site.snippetSource('trigger'));
   assert.deepEqual(

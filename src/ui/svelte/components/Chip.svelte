@@ -240,6 +240,12 @@
     list-style: none;
   }
 
+  /* The row density's ground and ink sit above the tones, so a tone composes with it. */
+  .manager-chip.is-row {
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-2);
+  }
+
   .manager-chip.is-active,
   .manager-chip.is-positive {
     border-color: var(--fab-success-border);
@@ -310,8 +316,6 @@
     min-height: 22px;
     padding: 0 var(--fab-space-2);
     border-radius: 999px;
-    color: var(--fab-text-secondary);
-    background: var(--fab-bg-2);
     font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
