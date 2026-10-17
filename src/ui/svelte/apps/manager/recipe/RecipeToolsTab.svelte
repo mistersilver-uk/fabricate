@@ -8,13 +8,17 @@
   section (scoped via `idPrefix`). Deleting a step here removes the whole step (its
   ingredients and results too), so the parent confirms. The shell owns the
   add/remove patching; recipe-level tools patch the recipe, per-step tools patch
-  the step.
+  the step. Each named routed-by-ingredients set gets a `SetCard` with its own tools, renamed in place
+  through `onUpdateIngredientSets(stepId, nextSets)`; an empty name is refused, since an unnamed
+  set's Tool references are inert.
 -->
 <script>
   import { ingredientSetToolsAreActive } from '../../../../../systems/toolCheckBonus.js';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeToolsSection from './RecipeToolsSection.svelte';
+  import SetCard from '../../../components/SetCard.svelte';
+  import { localizeOr } from '../../../util/localizeOr.js';
 
   let {
     // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
@@ -28,6 +32,7 @@
     toolIds = [],
     toolsLibrary = [],
     routingProvider = null,
+    onUpdateIngredientSets = () => {},
     onAddTool = () => {},
     onRemoveTool = () => {},
     onAddStepTool = () => {},
@@ -56,6 +61,22 @@
     return Array.isArray(set?.toolIds) ? set.toolIds : [];
   }
 
+  // The sets whose empty rename was refused, keyed by id, until a rename lands.
+  let refused = $state({});
+
+  function renameSet(stepId, scope, set, name) {
+    if (!String(name).trim()) {
+      refused = { ...refused, [set.id]: true };
+      return false;
+    }
+    refused = { ...refused, [set.id]: false };
+    const sets = ingredientSets(scope).map((entry) =>
+      entry.id === set.id ? { ...entry, name } : entry
+    );
+    onUpdateIngredientSets(stepId, sets);
+    return true;
+  }
+
   function toolEligibleIngredientSets(scope) {
     const system = {
       resolutionMode: routingProvider === 'ingredientSet' ? 'routedByIngredients' : null,
@@ -63,6 +84,39 @@
     return ingredientSets(scope).filter((set) => ingredientSetToolsAreActive(system, set));
   }
 </script>
+
+{#snippet setTools(stepId, scope, set, idPrefix)}
+  <SetCard
+    kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.IngredientSet', 'Ingredient set')}
+    name={set.name}
+    nameLabel={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+    nameProps={{ 'data-recipe-tools-set-field': 'name' }}
+    onRename={(name) => renameSet(stepId, scope, set, name)}
+    note={refused[set.id] ? unnamedNote : undefined}
+    data-recipe-tools-ingredient-set={set.id}
+  >
+    <RecipeToolsSection
+      {idPrefix}
+      toolIds={setToolIds(set)}
+      {toolsLibrary}
+      emptyLabel={text(
+        'FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet',
+        'No tools needed for this ingredient set.'
+      )}
+      onAddTool={(toolId) => onAddIngredientSetTool(stepId, set.id, toolId)}
+      onRemoveTool={(toolId) => onRemoveIngredientSetTool(stepId, set.id, toolId)}
+    />
+  </SetCard>
+{/snippet}
+
+{#snippet unnamedNote()}
+  <span role="status" data-recipe-tools-set-note
+    >{localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.ToolsSetNameRequired',
+      'An ingredient set needs a name to carry Tools. An unnamed set’s Tool references are inert: they stay saved, and apply again once it is named.'
+    )}</span
+  >
+{/snippet}
 
 <section
   class="manager-recipe-tab manager-recipe-tools-tab"
@@ -140,27 +194,7 @@
           onRemoveTool={(toolId) => onRemoveStepTool(step.id, toolId)}
         />
         {#each toolEligibleIngredientSets(step) as set (set.id)}
-          <div
-            class="manager-recipe-ingredient-set manager-recipe-tools-ingredient-set"
-            data-recipe-tools-ingredient-set={set.id}
-          >
-            <div class="manager-recipe-ingredient-set-head">
-              <div class="manager-recipe-result-set-static-label" data-recipe-tool-set-label>
-                <span>{set.name}</span>
-              </div>
-            </div>
-            <RecipeToolsSection
-              idPrefix={`step-${step.id}-set-${set.id}-`}
-              toolIds={setToolIds(set)}
-              {toolsLibrary}
-              emptyLabel={text(
-                'FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet',
-                'No tools needed for this ingredient set.'
-              )}
-              onAddTool={(toolId) => onAddIngredientSetTool(step.id, set.id, toolId)}
-              onRemoveTool={(toolId) => onRemoveIngredientSetTool(step.id, set.id, toolId)}
-            />
-          </div>
+          {@render setTools(step.id, step, set, `step-${step.id}-set-${set.id}-`)}
         {/each}
       {/snippet}
     </RecipeStepAccordion>
@@ -173,27 +207,7 @@
       {onRemoveTool}
     />
     {#each toolEligibleIngredientSets(recipe) as set (set.id)}
-      <div
-        class="manager-recipe-ingredient-set manager-recipe-tools-ingredient-set"
-        data-recipe-tools-ingredient-set={set.id}
-      >
-        <div class="manager-recipe-ingredient-set-head">
-          <div class="manager-recipe-result-set-static-label" data-recipe-tool-set-label>
-            <span>{set.name}</span>
-          </div>
-        </div>
-        <RecipeToolsSection
-          idPrefix={`set-${set.id}-`}
-          toolIds={setToolIds(set)}
-          {toolsLibrary}
-          emptyLabel={text(
-            'FABRICATE.Admin.Manager.Recipe.ToolsEmptyIngredientSet',
-            'No tools needed for this ingredient set.'
-          )}
-          onAddTool={(toolId) => onAddIngredientSetTool(null, set.id, toolId)}
-          onRemoveTool={(toolId) => onRemoveIngredientSetTool(null, set.id, toolId)}
-        />
-      </div>
+      {@render setTools(null, recipe, set, `set-${set.id}-`)}
     {/each}
   {/if}
 </section>

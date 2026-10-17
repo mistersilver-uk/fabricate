@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One ingredient set. A recipe is satisfied by ANY one set; a set requires EVERY requirement plus
-  its per-set essence amounts. This renders the set name, its requirements, the one dashed
-  `Ingredient` adder over the kind menu, the per-set essence editor and a remove-set button.
+  One ingredient set in `SetCard`. A recipe is satisfied by ANY one set; a set requires EVERY
+  requirement plus its per-set essence amounts. This renders the set name, its requirements, the
+  one dashed `Ingredient` adder over the kind menu, and Duplicate and Remove behind the kebab.
 
   THE ADDER CREATES A KIND AND NOTHING ELSE, appending a row that carries its kind and an empty
   ref for the ROW's own field to name, clear and re-name, and focus moves to that field. It emits
@@ -16,7 +16,7 @@
   // system whose essences are all disabled must keep the match type.
   import ChoiceGroup from '../../../components/ChoiceGroup.svelte';
   import KindAdder from '../../../components/KindAdder.svelte';
-  import IconButton from '../../../components/IconButton.svelte';
+  import SetCard from '../../../components/SetCard.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
   import { newDraftId as newId } from '../../../util/draftId.js';
   import { createPendingFocus } from '../../../util/pendingFocus.js';
@@ -36,9 +36,7 @@
     // Whether the system's currency feature is enabled. Preset units are seeded even for a
     // disabled system, so the Currency kind gates on this flag and not on unit presence.
     currencyEnabled = true,
-    // Routed check-mode recipes route by the check outcome, so the set name is hidden there.
-    showSetName = true,
-    // The default display name for an unnamed set, read-only in check mode.
+    // The display name of an unnamed set, "Set N".
     defaultName = '',
     // Threaded straight through to every choice group: the note beside its `Any one of` pill, and
     // empty everywhere but the Tool repair set.
@@ -102,6 +100,22 @@
     onChange({ ...set, name });
   }
 
+  const actions = $derived([
+    {
+      id: 'duplicate',
+      label: text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set'),
+      icon: 'fas fa-clone',
+      data: { 'data-recipe-duplicate': 'ingredient-set' },
+    },
+    {
+      id: 'remove',
+      label: text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set'),
+      icon: 'fas fa-trash',
+      danger: true,
+      data: { 'data-recipe-remove': 'ingredient-set' },
+    },
+  ]);
+
   function updateGroup(index, nextGroup) {
     onChange({
       ...set,
@@ -118,47 +132,23 @@
   // `duplicateRequirement` issue — the honest place for a check the adder cannot make.
 </script>
 
-<div
-  bind:this={root}
-  class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`}
+<SetCard
+  bind:element={root}
+  variant={chromeless ? 'bare' : 'default'}
+  kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.IngredientSet', 'Ingredient set')}
+  name={displayName}
+  namePlaceholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
+  nameLabel={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+  nameProps={{ 'data-recipe-set-field': 'name' }}
+  onRename={setName}
+  {actions}
+  onAction={(id) => {
+    if (id === 'duplicate') onDuplicate();
+    else if (id === 'remove') onRemove();
+  }}
   data-recipe-set
   data-recipe-set-id={set?.id || ''}
 >
-  {#if !chromeless}
-    <div class="manager-recipe-ingredient-set-head">
-      {#if showSetName}
-        <input
-          type="text"
-          class="manager-recipe-ingredient-set-name"
-          data-recipe-set-field="name"
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
-          value={displayName}
-          onchange={(e) => setName(e.target.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
-        />
-      {:else}
-        <!-- Check mode: the set name is irrelevant to routing, so the neutral default shows
-             read-only rather than a user-set value. -->
-        <span class="manager-recipe-ingredient-set-name is-readonly" data-recipe-set-default-name
-          >{defaultName}</span
-        >
-      {/if}
-      <IconButton
-        data-recipe-duplicate="ingredient-set"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
-        title={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
-        onclick={() => onDuplicate()}><i class="fas fa-clone" aria-hidden="true"></i></IconButton
-      >
-      <IconButton
-        class="is-danger"
-        data-recipe-remove="ingredient-set"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-        title={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-        onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
-      >
-    </div>
-  {/if}
-
   {#if groups.length === 0}
     <p class="manager-muted manager-recipe-ingredient-set-empty">
       {text(
@@ -186,8 +176,7 @@
       {/each}
     </div>
   {/if}
-
-  <div class="manager-recipe-ingredient-set-add">
+  {#snippet adder()}
     <KindAdder
       {kinds}
       word={localizeOr('FABRICATE.Admin.Manager.Recipe.IngredientAdder', 'Ingredient')}
@@ -198,5 +187,5 @@
       menuClass="manager-recipe-or-menu manager-recipe-ingredient-menu"
       onAdd={addRequirement}
     />
-  </div>
-</div>
+  {/snippet}
+</SetCard>

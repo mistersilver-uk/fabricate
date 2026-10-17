@@ -139,7 +139,6 @@
     <RecipeIngredientSetCard
       set={repairSet}
       chromeless
-      showSetName={false}
       {componentOptions}
       {itemTags}
       {tagComponentCounts}

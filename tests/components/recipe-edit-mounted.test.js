@@ -2076,7 +2076,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('hides the ingredient-set name in check mode but shows it in ingredient mode', async () => {
+  it('names every ingredient set in its card, in check mode as in ingredient mode', async () => {
     const ingredientSets = [
       { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },
       { id: 'iset-2', name: 'Beta', ingredientGroups: [] },
@@ -2092,15 +2092,13 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(checkTarget, 'ingredients');
     await flushRender();
+    const checkName = checkTarget.querySelector('[data-recipe-set-field="name"]');
+    assert.ok(checkName, 'check mode draws an editable ingredient-set name');
+    assert.equal(checkName.value, 'Alpha', 'it shows the stored name, not a default');
     assert.equal(
-      checkTarget.querySelector('[data-recipe-set-field="name"]'),
-      null,
-      'no editable ingredient-set name input in check mode'
+      checkName.closest('[data-recipe-set]').querySelector('.fab-kicker').textContent.trim(),
+      'Ingredient set'
     );
-    // The set still shows a read-only DEFAULT name (not the stored 'Alpha').
-    const readonlyName = checkTarget.querySelector('[data-recipe-set-default-name]');
-    assert.ok(readonlyName, 'check mode shows the read-only default name');
-    assert.equal(readonlyName.textContent.trim(), 'Set 1');
     editHarness.remount();
 
     const ingredientTarget = await editHarness.mount(
@@ -2116,6 +2114,79 @@ describe('RecipeEditView (mounted)', () => {
     const nameInput = ingredientTarget.querySelector('[data-recipe-set-field="name"]');
     assert.ok(nameInput, 'ingredient-set name shown in ingredient mode');
     assert.equal(nameInput.value, 'Alpha', 'shows the explicit name');
+    editHarness.remount();
+  });
+
+  it('renames an ingredient set in check mode', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        routingProvider: 'check',
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [
+            { id: 'iset-1', name: '', ingredientGroups: [] },
+            { id: 'iset-2', name: 'Beta', ingredientGroups: [] },
+          ],
+        },
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const name = target.querySelector(
+      '[data-recipe-set-id="iset-1"] [data-recipe-set-field="name"]'
+    );
+    assert.equal(name.value, 'Set 1', 'an unnamed set shows its default');
+    name.value = 'Ore';
+    name.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(patches.length, 0, 'typing alone writes nothing');
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1).ingredientSets.map((set) => set.name),
+      ['Ore', 'Beta']
+    );
+    editHarness.remount();
+  });
+
+  it('moves focus to the neighbouring set’s name when a set is removed from its kebab', async () => {
+    let recipe = {
+      ...RECIPE,
+      ingredientSets: ['a', 'b', 'c'].map((key) => ({
+        id: `iset-${key}`,
+        name: key.toUpperCase(),
+        ingredientGroups: [],
+      })),
+    };
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        canAddSet: true,
+        recipe,
+        onUpdateRecipe: async (patch) => {
+          recipe = { ...recipe, ...patch };
+          await editHarness.setProps({ recipe });
+        },
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    await chooseSetCardAction(
+      target.querySelector('[data-recipe-set-id="iset-b"]'),
+      '[data-recipe-remove="ingredient-set"]'
+    );
+    await flushRender();
+    assert.deepEqual(
+      recipe.ingredientSets.map((set) => set.id),
+      ['iset-a', 'iset-c']
+    );
+    const focused = document.activeElement;
+    assert.ok(focused?.matches('[data-recipe-set-field="name"]'), 'focus lands on a set name');
+    assert.equal(focused.closest('[data-recipe-set]').getAttribute('data-recipe-set-id'), 'iset-c');
     editHarness.remount();
   });
 
@@ -2563,7 +2634,7 @@ describe('RecipeEditView (mounted)', () => {
       'ingredients section renders'
     );
     assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      target.querySelector('[data-recipe-set-id].fabricate-set-card.is-bare'),
       'the single set renders chromeless (no Set 1 box)'
     );
     assert.ok(
@@ -2613,7 +2684,7 @@ describe('RecipeEditView (mounted)', () => {
       'no OR separator in Simple mode'
     );
     assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      target.querySelector('[data-recipe-set-id].fabricate-set-card.is-bare'),
       'the single set renders chromeless'
     );
     editHarness.remount();
@@ -2807,9 +2878,10 @@ describe('RecipeEditView (mounted)', () => {
     clickTab(target, 'ingredients');
     await flushRender();
     // Duplicate the FIRST set (its card carries data-recipe-set-id="set-1").
-    target
-      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-duplicate="ingredient-set"]')
-      .click();
+    await chooseSetCardAction(
+      target.querySelector('[data-recipe-set-id="set-1"]'),
+      '[data-recipe-duplicate="ingredient-set"]'
+    );
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const nextSets = patches[0].ingredientSets;
     assert.equal(nextSets.length, 3, 'the ingredient set array grew by one');
@@ -3987,9 +4059,7 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const foot = target.querySelector(
-      '[data-recipe-set-id="set-1"] .manager-recipe-ingredient-set-add'
-    );
+    const foot = target.querySelector('[data-recipe-set-id="set-1"] .fabricate-set-card-adder');
     const buttons = [...foot.querySelectorAll('button')];
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('data-recipe-add')),
@@ -6162,12 +6232,47 @@ describe('RecipeEditView (mounted)', () => {
     const cards = target.querySelectorAll('[data-recipe-tools-ingredient-set]');
     assert.equal(cards.length, 1, 'only the named eligible set gets Tool authoring');
     assert.equal(cards[0].dataset.recipeToolsIngredientSet, 'set-a');
-    const label = cards[0].querySelector('[data-recipe-tool-set-label]');
-    assert.equal(label.textContent.trim(), 'Hot forge');
+    const name = cards[0].querySelector('[data-recipe-tools-set-field="name"]');
+    assert.equal(name.value, 'Hot forge');
     assert.ok(
-      label.closest('.manager-recipe-ingredient-set-head'),
-      'the Tool scope reuses the Results card header hierarchy'
+      name.closest('.fabricate-set-card-head'),
+      'the Tool scope is the set card the Results tab draws'
     );
+    editHarness.remount();
+  });
+
+  it('renames a set on the Tools tab, and refuses an empty name with a note', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [{ id: 'set-a', name: 'Hot forge', toolIds: [], ingredientGroups: [] }],
+        },
+        toolsLibrary: TOOLS_LIBRARY,
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    const card = target.querySelector('[data-recipe-tools-ingredient-set="set-a"]');
+    const name = card.querySelector('[data-recipe-tools-set-field="name"]');
+    name.value = 'Cold forge';
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.at(-1).ingredientSets[0].name, 'Cold forge', 'a rename writes the name');
+
+    name.value = ' '.repeat(3);
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.length, 1, 'an empty name writes nothing');
+    assert.equal(name.value, 'Hot forge', 'the field restores the set’s name');
+    const note = card.querySelector('[data-recipe-tools-set-note]');
+    assert.equal(note.getAttribute('role'), 'status');
+    assert.match(note.textContent, /needs a name to carry Tools/);
     editHarness.remount();
   });
 

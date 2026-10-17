@@ -19,10 +19,10 @@
   import Callout from '../../../components/Callout.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import Button from '../../../components/Button.svelte';
-  import IconButton from '../../../components/IconButton.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Select from '../../../components/Select.svelte';
+  import SetCard from '../../../components/SetCard.svelte';
   import SubjectModifierPicker from '../SubjectModifierPicker.svelte';
   import PickerRow from '../../../components/PickerRow.svelte';
   import { toValue } from '../../../components/pickerRowKinds.js';
@@ -211,6 +211,7 @@
   <Field
     as="div"
     data-salvage-result-groups=""
+    data-set-card-scope=""
     data-validation-target="component-salvage-results"
     aria-labelledby={`${instanceId}-salvage-title`}
     tabindex="-1"
@@ -258,126 +259,126 @@
       {#if salvageDraft.resultGroups.length > 0}
         <ul class="manager-recipe-ingredient-sets">
           {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
-            <!-- One `--fab-bg-1` card per result group behind a hairline, headed by the
-             group's name and its count in the mono face. THE HEAD KEEPS ITS NAME INPUT AND
-             THE BODY KEEPS ITS ROWS: the reference's read-only pill run cannot author a
-             quantity, choose a component or rename a group. -->
-            <li class="manager-salvage-group-card" data-salvage-group={group.id}>
-              <div class="manager-salvage-group-header">
-                <input
-                  type="text"
-                  class="manager-input"
-                  value={group.name}
-                  placeholder={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
-                    'Set {n}'
-                  ).replace('{n}', String(groupIndex + 1))}
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName',
-                    'Result set name'
-                  )}
-                  data-salvage-group-name
-                  oninput={(event) => onUpdateGroup(group.id, { name: event.currentTarget.value })}
-                  disabled={saving}
-                />
-                <!-- The group's own count, in the mono face at weight 500 — the face
-                 ships 400 and 500 only, so the reference's 700 lands on 500. -->
-                <span class="manager-salvage-group-count" data-salvage-group-count
-                  >{(group.results || []).length}</span
-                >
-                <IconButton
-                  class="is-danger"
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
-                    'Remove result set'
-                  )}
-                  data-remove-salvage-group=""
-                  onclick={() => onRemoveGroup(group.id)}
-                  disabled={saving}
-                >
-                  <i class="fas fa-xmark" aria-hidden="true"></i>
-                </IconButton>
-              </div>
-
-              {#if (group.results || []).length > 0}
-                <div class="manager-recipe-ingredient-set-groups">
-                  {#each group.results as result (result.id)}
-                    <!-- The quantity STAYS in simple and routed: these modes award the
-                         whole group as authored. Only progressive drops it. -->
-                    <PickerRow
-                      value={toValue(result)}
-                      kinds={SALVAGE_RESULT_KINDS}
-                      catalogue={salvageCatalogue}
-                      amount={SALVAGE_AMOUNT}
-                      rollable
-                      clearable={false}
-                      removeHook="salvage-result"
-                      invalid={resultAmountInvalid(result, text)}
-                      disabled={saving}
-                      nameProps={SALVAGE_NAME_HOOK}
-                      removeProps={{ 'data-remove-salvage-result': '' }}
-                      class="is-result"
-                      data-salvage-result={result.id}
-                      onChange={(value) => onUpdateResult(group.id, result, value)}
-                      onRemove={() => onRemoveResult(group.id, result.id)}
-                    />
-                  {/each}
-                </div>
-              {:else}
-                <p class="manager-muted">
-                  {text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.NoResults',
-                    'No results in this set yet.'
-                  )}
-                </p>
-              {/if}
-
-              <!-- Adding a component the set already produces raises that row's
-                   quantity, unless that row is rolled (`withAddedResult`). -->
-              <SearchablePopover
-                options={salvageAdderOptions}
-                panelLabel={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
-                  'Result component'
+            <!-- The name writes on input, so Save enables as the GM types. -->
+            <li>
+              <SetCard
+                kicker={text('FABRICATE.Common.SetCard.Kicker.ResultSet', 'Result set')}
+                name={group.name}
+                namePlaceholder={text(
+                  'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
+                  'Set {n}'
+                ).replace('{n}', String(groupIndex + 1))}
+                nameLabel={text(
+                  'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName',
+                  'Result set name'
                 )}
-                searchPlaceholder={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                  'Search components...'
-                )}
-                searchLabel={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                  'Search components...'
-                )}
-                emptyHint={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
-                  'No components defined'
-                )}
+                nameProps={{ 'data-salvage-group-name': '' }}
+                renameOn="input"
+                onRename={(name) => onUpdateGroup(group.id, { name })}
+                actions={[
+                  {
+                    id: 'remove',
+                    label: text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
+                      'Remove result set'
+                    ),
+                    icon: 'fas fa-trash',
+                    danger: true,
+                    data: { 'data-remove-salvage-group': '' },
+                  },
+                ]}
+                onAction={(id) => {
+                  if (id === 'remove') onRemoveGroup(group.id);
+                }}
                 disabled={saving}
-                onSelect={(id) => onAddResult(group.id, id)}
+                data-salvage-group={group.id}
               >
-                {#snippet trigger({ attributes })}
-                  <!-- ratchet-exempt(design-system): the spread is the popover's own trigger contract (type, ARIA state, handlers, element attachment), never a caller's name -->
-                  <Button
-                    role="dashed"
-                    fullWidth
-                    data-add-salvage-result
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                      'Add result'
+                {#snippet meta()}
+                  <span class="manager-salvage-group-count" data-salvage-group-count
+                    >{(group.results || []).length}</span
+                  >
+                {/snippet}
+                {#if (group.results || []).length > 0}
+                  <div class="manager-recipe-ingredient-set-groups">
+                    {#each group.results as result (result.id)}
+                      <!-- The quantity STAYS in simple and routed: these modes award the
+                           whole group as authored. Only progressive drops it. -->
+                      <PickerRow
+                        value={toValue(result)}
+                        kinds={SALVAGE_RESULT_KINDS}
+                        catalogue={salvageCatalogue}
+                        amount={SALVAGE_AMOUNT}
+                        rollable
+                        clearable={false}
+                        removeHook="salvage-result"
+                        invalid={resultAmountInvalid(result, text)}
+                        disabled={saving}
+                        nameProps={SALVAGE_NAME_HOOK}
+                        removeProps={{ 'data-remove-salvage-result': '' }}
+                        class="is-result"
+                        data-salvage-result={result.id}
+                        onChange={(value) => onUpdateResult(group.id, result, value)}
+                        onRemove={() => onRemoveResult(group.id, result.id)}
+                      />
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="manager-muted">
+                    {text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.NoResults',
+                      'No results in this set yet.'
+                    )}
+                  </p>
+                {/if}
+                {#snippet adder()}
+                  <!-- Adding a component the set already produces raises that row's
+                       quantity, unless that row is rolled (`withAddedResult`). -->
+                  <SearchablePopover
+                    options={salvageAdderOptions}
+                    panelLabel={text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
+                      'Result component'
+                    )}
+                    searchPlaceholder={text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
+                      'Search components...'
+                    )}
+                    searchLabel={text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
+                      'Search components...'
+                    )}
+                    emptyHint={text(
+                      'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
+                      'No components defined'
                     )}
                     disabled={saving}
-                    {...attributes}
+                    onSelect={(id) => onAddResult(group.id, id)}
                   >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span
-                      >{text(
-                        'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                        'Add result'
-                      )}</span
-                    >
-                  </Button>
+                    {#snippet trigger({ attributes })}
+                      <!-- ratchet-exempt(design-system): the spread is the popover's own trigger contract (type, ARIA state, handlers, element attachment), never a caller's name -->
+                      <Button
+                        role="dashed"
+                        fullWidth
+                        data-add-salvage-result
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
+                          'Add result'
+                        )}
+                        disabled={saving}
+                        {...attributes}
+                      >
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span
+                          >{text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
+                            'Add result'
+                          )}</span
+                        >
+                      </Button>
+                    {/snippet}
+                  </SearchablePopover>
                 {/snippet}
-              </SearchablePopover>
+              </SetCard>
             </li>
           {/each}
         </ul>
@@ -393,6 +394,7 @@
           role="dashed"
           fullWidth
           data-add-salvage-group
+          data-set-card-remove-fallback
           onclick={() => onAddGroup()}
           disabled={saving}
         >

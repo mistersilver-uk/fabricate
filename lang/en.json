@@ -23,7 +23,8 @@
         "ReservedRole": "reserved role",
         "Actions": "Actions for {name}",
         "Kicker": {
-          "ResultSet": "Result set"
+          "ResultSet": "Result set",
+          "IngredientSet": "Ingredient set"
         }
       },
       "RouteSources": {
@@ -3312,6 +3313,7 @@
           "ToolsEmptyStep": "No tools needed for this step.",
           "ToolsEmptyGlobal": "No global tools — add one that every step needs.",
           "ToolsEmptyIngredientSet": "No tools needed for this ingredient set.",
+          "ToolsSetNameRequired": "An ingredient set needs a name to carry Tools. An unnamed set’s Tool references are inert: they stay saved, and apply again once it is named.",
           "GlobalTools": "Global tools",
           "GlobalToolsHint": "required for every step",
           "AddGlobalTool": "Add global tool",

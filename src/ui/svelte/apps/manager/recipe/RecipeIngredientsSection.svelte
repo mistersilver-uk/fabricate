@@ -28,7 +28,6 @@
     // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
     // the read-only rendering of existing currency requirements. Forwarded to every set card.
     currencyEnabled = true,
-    showSetName = true,
     // Whether this system's mode allows more than one ingredient set — not simple/progressive,
     // which are structurally 1×1, and not alchemy, which forces one. It gates the "Add ingredient
     // set" affordance, the ONLY promotion path to a multi-set recipe.
@@ -73,7 +72,11 @@
   }
 </script>
 
-<section class="manager-recipe-ingredients-section" data-recipe-section={`${idPrefix}ingredients`}>
+<section
+  class="manager-recipe-ingredients-section"
+  data-recipe-section={`${idPrefix}ingredients`}
+  data-set-card-scope
+>
   {#if !effectiveComplex}
     <!-- A single set, or none yet, renders CHROMELESS. The "Add ingredient set" button below
          is the only promotion path, so it shows only where the mode allows more than one. -->
@@ -113,7 +116,6 @@
             {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
-            {showSetName}
             defaultName={defaultSetName(index)}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
@@ -122,7 +124,13 @@
         </li>
       {/each}
     </ul>
-    <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    <Button
+      role="dashed"
+      fullWidth
+      data-recipe-add="ingredient-set"
+      data-set-card-remove-fallback
+      onclick={() => addSet()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
     </Button>

@@ -145,10 +145,6 @@
   // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
   const resultsRecipe = $derived(resultsProjection(recipe, finalStep));
 
-  // Check-mode routed recipes route by the crafting-check outcome, so ingredient sets are nameless
-  // there; ingredient mode and non-routed systems keep names.
-  const showSetName = $derived(routingProvider !== 'check');
-
   function stepById(stepId) {
     return steps.find((step) => step.id === stepId) || null;
   }
@@ -499,7 +495,6 @@
             {essenceOptions}
             {itemTags}
             {componentTagOptions}
-            {showSetName}
             {routingProvider}
             onUpdateIngredientSets={updateIngredientSets}
             onDeleteStep={deleteStepFrom('ingredients')}
@@ -538,6 +533,7 @@
             {toolIds}
             {toolsLibrary}
             {routingProvider}
+            onUpdateIngredientSets={updateIngredientSets}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}

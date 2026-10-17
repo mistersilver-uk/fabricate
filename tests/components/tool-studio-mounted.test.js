@@ -126,6 +126,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
     ...CHOICE_GROUP_COMPILED_MODULES,
+    // Issue 2512: every ingredient set is drawn in the set card.
+    'src/ui/svelte/components/SetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
