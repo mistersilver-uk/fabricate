@@ -178,6 +178,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
   // Issue 2512: the routing line, on a routed result set in each mode and its open Assign panel.
   'src/ui/svelte/components/RouteSources.svelte',
+  // Issue 2513: the routing overview, on the salvage well's outcome routing.
+  'src/ui/svelte/components/RoutingOverview.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.

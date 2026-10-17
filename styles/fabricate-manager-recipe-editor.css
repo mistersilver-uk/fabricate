@@ -1904,3 +1904,114 @@
   font-size: 11px;
   line-height: 1.4;
 }
+
+/* The routing overview (library §12 "<RoutingOverview>"), rooted at the class `RoutingOverview` emits; its badges are `Chip` at the row density and its targets `Select` at the inline rung. */
+.fabricate-routing-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-source {
+  flex: none;
+  justify-content: center;
+  min-width: 64px;
+  max-width: 140px;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-connector {
+  flex: none;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+/* The select slot and the marker column are fixed, so every row's select starts at one x. */
+.fabricate-routing-overview .fabricate-routing-overview-target {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 170px;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-target .fabricate-select,
+.fabricate-routing-overview .fabricate-routing-overview-target .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The per-site skin `Select` licenses, held off a read-only or disabled trigger; focus repaints the border in the accent, so the tone never hides the ring (issue 1777). */
+.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled) {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone='warning']:not([aria-disabled='true']):not(:disabled) {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-markers {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 84px;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating. */
+.fabricate-routing-overview .fabricate-routing-overview-blocked {
+  flex: none;
+  width: calc(170px + var(--fab-space-2) + 84px);
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}

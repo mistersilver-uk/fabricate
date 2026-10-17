@@ -41,6 +41,11 @@
         "Remove": "Remove {name}",
         "Summary": "{label} {sources}"
       },
+      "RoutingOverview": {
+        "Produces": "produces",
+        "Default": "default",
+        "Shared": "shared · {count}"
+      },
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"

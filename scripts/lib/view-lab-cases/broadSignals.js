@@ -442,6 +442,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-routed-check-stale',
     'manager-recipe-edit-results-routed-check-policy-hint-narrow',
   ]),
+  // The routing overview (issue 2513): the salvage well's outcome routing.
+  'src/ui/svelte/components/RoutingOverview.svelte': Object.freeze([
+    'manager-component-edit-salvage',
+  ]),
   // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
   // reserved pair and a salvage group.
   'src/ui/svelte/components/SetCard.svelte': Object.freeze([

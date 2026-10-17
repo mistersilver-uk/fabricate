@@ -248,5 +248,463 @@
       "assigned": [],
       "assignNote": "Assigning a tier stops the other tiers routing by name."
     }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "routed by ingredients — a shared target and a default",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "partial": "adders without their glyphs",
+    "undrawn": {
+      "Routing": "the list's accessible name; the card's heading names the scope"
+    },
+    "props": {
+      "label": "Routing",
+      "rows": [
+        {
+          "key": "Set A",
+          "kind": "source",
+          "source": "Set A",
+          "tone": "neutral",
+          "summary": "Steel Ingot ×2 · Oak Haft ×1",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            },
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ]
+        },
+        {
+          "key": "Set B",
+          "kind": "source",
+          "source": "Set B",
+          "tone": "neutral",
+          "summary": "Iron Ingot ×2 · Oak Haft ×1",
+          "value": "Plain blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            },
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ],
+          "shared": 2
+        },
+        {
+          "key": "Set C",
+          "kind": "source",
+          "source": "Set C",
+          "tone": "neutral",
+          "summary": "Scrap ×4",
+          "value": "Plain blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            },
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ],
+          "fallback": true,
+          "shared": 2
+        }
+      ]
+    },
+    "data": {
+      "adders": [
+        {
+          "role": "dashed",
+          "label": "Ingredient set"
+        },
+        {
+          "role": "dashed",
+          "label": "Result set"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "routed by check — a policy block, a below-minimum tier and a gap",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "partial": "buttons without their glyphs",
+    "undrawn": {
+      "Routing": "the list's accessible name; the card's heading names the scope"
+    },
+    "props": {
+      "label": "Routing",
+      "rows": [
+        {
+          "key": "Masterwork",
+          "kind": "source",
+          "source": "Masterwork",
+          "tone": "positive",
+          "summary": "18–20",
+          "value": "Masterwork blade",
+          "options": [
+            {
+              "value": "Masterwork blade",
+              "label": "Masterwork blade"
+            },
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ]
+        },
+        {
+          "key": "Fine",
+          "kind": "source",
+          "source": "Fine",
+          "tone": "positive",
+          "summary": "16–17",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Masterwork blade",
+              "label": "Masterwork blade"
+            },
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ],
+          "shared": 2
+        },
+        {
+          "key": "gap:15",
+          "kind": "gap",
+          "source": "Gap",
+          "tone": "warning",
+          "summary": "15 — no tier claims this value",
+          "action": true
+        },
+        {
+          "key": "Standard",
+          "kind": "source",
+          "source": "Standard",
+          "tone": "positive",
+          "summary": "12–14",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Masterwork blade",
+              "label": "Masterwork blade"
+            },
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ],
+          "shared": 2
+        },
+        {
+          "key": "Rough",
+          "kind": "blocked",
+          "source": "Rough",
+          "tone": "positive",
+          "summary": "8–11",
+          "blocked": "below this recipe’s minimum success tier"
+        },
+        {
+          "key": "Ruined",
+          "kind": "blocked",
+          "source": "Ruined",
+          "tone": "danger",
+          "summary": "1–7",
+          "blocked": "routing not permitted by this system"
+        }
+      ]
+    },
+    "data": {
+      "actionLabel": "Edit outcome tiers",
+      "adders": [
+        {
+          "role": "dashed",
+          "label": "Result set"
+        },
+        {
+          "role": "ghost",
+          "label": "Edit outcome tiers"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "a permitted failure tier — only on a forced failure",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "undrawn": {
+      "Routing": "the list's accessible name; the card's heading names the scope"
+    },
+    "props": {
+      "label": "Routing",
+      "rows": [
+        {
+          "key": "Standard",
+          "kind": "source",
+          "source": "Standard",
+          "tone": "positive",
+          "summary": "12–20",
+          "value": "Plain blade",
+          "options": [
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ]
+        },
+        {
+          "key": "Ruined",
+          "kind": "source",
+          "source": "Ruined",
+          "tone": "danger",
+          "summary": "1–11",
+          "value": "",
+          "options": [
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ],
+          "placeholder": "Awards nothing",
+          "hint": "only on a forced failure"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "the fallback note — before any tier is assigned",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "undrawn": {
+      "Routing": "the list's accessible name; the card's heading names the scope"
+    },
+    "props": {
+      "label": "Routing",
+      "rows": [
+        {
+          "key": "Fine",
+          "kind": "source",
+          "source": "Fine",
+          "tone": "positive",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ],
+          "fallback": true,
+          "shared": 2
+        },
+        {
+          "key": "Great",
+          "kind": "source",
+          "source": "Great",
+          "tone": "positive",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ],
+          "fallback": true,
+          "shared": 2
+        }
+      ]
+    },
+    "data": {
+      "scopeNote": {
+        "tone": "warning",
+        "title": "Routed by default",
+        "text": "Assigning a tier stops the other tiers reaching a result set by default."
+      }
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "a borrowed scope — read-only",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "partial": "the adder without its glyph",
+    "undrawn": {
+      "Routing": "the list's accessible name; the card's heading names the scope"
+    },
+    "props": {
+      "label": "Routing",
+      "rows": [
+        {
+          "key": "Set A",
+          "kind": "source",
+          "source": "Set A",
+          "tone": "neutral",
+          "summary": "Steel Ingot ×2",
+          "value": "Fine blade",
+          "options": [
+            {
+              "value": "Fine blade",
+              "label": "Fine blade"
+            }
+          ],
+          "fallback": true,
+          "readonly": true
+        }
+      ]
+    },
+    "data": {
+      "scopeNote": {
+        "tone": "neutral",
+        "text": "This step has no result sets of its own, so the recipe can’t be enabled. Until it has one, it falls back to the recipe’s."
+      },
+      "adders": [
+        {
+          "role": "dashed",
+          "label": "Result set"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "a multi-step pair — one overview per step",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "partial": "each list without its step heading",
+    "props": {
+      "label": "Smelt the billet",
+      "rows": [
+        {
+          "key": "Set A",
+          "kind": "source",
+          "source": "Set A",
+          "tone": "neutral",
+          "summary": "Iron Ore ×3",
+          "value": "Billet",
+          "options": [
+            {
+              "value": "Billet",
+              "label": "Billet"
+            }
+          ]
+        }
+      ]
+    },
+    "note": "The step heading is the card's own, so each row draws one step's list, named by that heading."
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "a multi-step pair — one overview per step",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "partial": "each list without its step heading",
+    "props": {
+      "label": "Forge the blade",
+      "rows": [
+        {
+          "key": "Set A",
+          "kind": "source",
+          "source": "Set A",
+          "tone": "neutral",
+          "summary": "Billet ×1",
+          "value": "Plain blade",
+          "options": [
+            {
+              "value": "Plain blade",
+              "label": "Plain blade"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RoutingOverview>",
+    "cap": "salvage outcome routing",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RoutingOverview.svelte",
+    "fixture": "RoutingOverviewStates",
+    "undrawn": {
+      "Outcome routing": "the list's accessible name; the salvage well's micro-label names it"
+    },
+    "props": {
+      "label": "Outcome routing",
+      "rows": [
+        {
+          "key": "Fine",
+          "kind": "source",
+          "source": "Fine",
+          "tone": "neutral",
+          "value": "Gem shards",
+          "options": [
+            {
+              "value": "",
+              "label": "Unrouted"
+            },
+            {
+              "value": "Gem shards",
+              "label": "Gem shards"
+            }
+          ],
+          "shared": 2
+        },
+        {
+          "key": "Masterwork",
+          "kind": "source",
+          "source": "Masterwork",
+          "tone": "neutral",
+          "value": "Gem shards",
+          "options": [
+            {
+              "value": "",
+              "label": "Unrouted"
+            },
+            {
+              "value": "Gem shards",
+              "label": "Gem shards"
+            }
+          ],
+          "shared": 2
+        },
+        {
+          "key": "Ruined",
+          "kind": "source",
+          "source": "Ruined",
+          "tone": "neutral",
+          "value": "",
+          "options": [
+            {
+              "value": "",
+              "label": "Unrouted"
+            },
+            {
+              "value": "Gem shards",
+              "label": "Gem shards"
+            }
+          ]
+        }
+      ]
+    }
   }
 ]
