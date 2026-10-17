@@ -165,8 +165,9 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 
 1. Open the recipe in the recipe editor and go to the **Validation** tab.
    Look for the warning that a result set is not assigned to any check outcome, and the warning that a check success outcome produces no result set.
-2. On the **Results** tab, check each result set's **Produced on outcome** assignment.
-   Make sure every success outcome tier you expect to use is assigned to a result set, and that every result set is assigned to an outcome that still exists.
+2. On the **Results** tab, check each result set's **Produced by** line.
+   Make sure every success outcome tier you expect to use is assigned to a result set, and that no result set shows **Nothing — unreachable**.
+   A struck-through tier on the line no longer routes, so remove it or assign a current tier.
 3. If you removed an outcome tier from the routed crafting check, Fabricate strips that tier from any recipe result set that referenced it and posts a notification saying how many result sets were updated.
    Re-open the affected recipes and assign the result sets to a current outcome tier.
 4. If you rely on name matching instead of explicit assignment, confirm each result set name matches the outcome tier name once case and surrounding spaces are ignored.
@@ -213,7 +214,7 @@ never used to.
    panel.
 4. In **Routed by check** mode, set the check route's **Produce a result on a failed check** to
    **Decided per recipe** or **Always** first — the failure-marked tiers only appear in a result set's
-   **Produced on outcome** picker while failure results are permitted — then assign a result set to the
+   **Assign** list on a result set's **Produced by** line while failure results are permitted — then assign a result set to the
    failing tier.
    Nothing you have already assigned is deleted when you set it back to **Never**; those assignments
    simply stop being offered and stop routing, and they come back when you permit failure results again.

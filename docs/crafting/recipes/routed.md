@@ -48,6 +48,28 @@ A player sees which materials lead to which result before committing to the craf
 
 {% include screenshot.html case="player-crafting-ingredient-routed" %}
 
+### Tying ingredient sets to result sets
+
+In the recipe editor, every ingredient set and every result set is a card.
+Each card is headed by a small label for its kind, **Ingredient set** or **Result set**, and a name you can edit in place.
+An ingredient set card has a menu at the end of its heading with **Duplicate set** and **Remove set**.
+A result set card's menu has **Remove result set**.
+
+A result set's **Produced by** line names the ingredient sets that lead to it.
+Choose **Assign** to open a searchable list of every ingredient set in the recipe.
+A set that already leads to another result set shows where it goes today, for example "now → Plain blade".
+Choosing it moves it to this result set, and a set leads to one result set at a time.
+Choosing a set that is already listed takes it off.
+
+An ingredient set you have not assigned anywhere still reaches a result set, and the line marks it **default**.
+A default set has no remove button, because there is nothing assigned to remove.
+When more than one ingredient set leads to a result set, a note on the card says how many.
+Editing that result set's results changes what each of those ingredient sets awards.
+
+A result set that no ingredient set leads to shows **Nothing — unreachable** on its line, and its border turns to a warning color.
+It is never produced until you assign an ingredient set to it.
+If the recipe has no ingredient sets yet, the line asks you to add one first.
+
 ---
 
 ## Routed by check
@@ -86,11 +108,22 @@ See [System Overview]({% link crafting-systems/system-overview.md %}).
 ### How outcomes match results
 
 You can tie each result set to a specific outcome tier.
-In the recipe editor, the result set's **Produced on outcome** control lists the outcome tiers from the routed crafting check that can route.
+In the recipe editor, the result set's **Produced by** line names the outcome tiers that lead to it.
+**Assign** opens a searchable list of the outcome tiers from the routed crafting check that can route.
 The success tiers are always listed.
 A tier you have marked as a failure is listed too, but only while the check's **Produce a result on a failed check** setting permits results on a failed check.
-When that setting is **Never**, the failure tiers are not offered, and an assignment you already made to one stays saved but stops routing.
 See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
+
+A tier that another result set already uses shows where it goes today, for example "now → Plain blade".
+Choosing it moves it to this result set, and a tier leads to one result set at a time.
+Choosing a tier that is already listed takes it off.
+Until any result set lists a tier, the list warns that assigning one stops the other tiers routing by name.
+
+A tier you have marked as a failure while the setting is **Never** is not offered.
+An assignment you already made to one stays saved but stops routing.
+Fabricate keeps showing such an assignment on the line, struck through, with a note that it does not route and a button to remove it.
+The same happens to a tier that another result set lists first, and a tier that was deleted from the check, which reads **Deleted outcome tier**.
+Result sets and ingredient sets can be renamed on their cards in this mode too.
 When a result set is assigned to an outcome tier this way, a craft that rolls that tier produces that result set.
 This explicit assignment takes priority over name matching.
 
@@ -146,6 +179,7 @@ When a recipe is in Routed by check mode and has more than one result set, the r
   It will never be produced, so a check that succeeds can silently make nothing.
   Assign the result set to an outcome tier, or give it a name that matches an outcome.
   This warning also appears when a result set is only assigned to an outcome tier that has since been deleted.
+  That tier shows struck through as **Deleted outcome tier** on the result set's **Produced by** line, where you can remove it.
 - A success outcome tier that no result set produces.
   A craft that rolls that tier resolves to nothing.
   Add a result set for that outcome, or remove the tier from the routed crafting check if you no longer need it.

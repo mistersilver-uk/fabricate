@@ -77,6 +77,8 @@ The panel tells you which of the two states you are in, so you are never left gu
 
 {% include screenshot.html case="manager-component-edit-salvage" caption="The salvage section of the component editor." %}
 
+Each result set under **Result sets** is a card headed by a **Result set** label and a name field, with a menu at the end of its heading that offers **Remove result set**.
+An unnamed set shows its position, such as "Set 2", in the field.
 Removing a component's last result set turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.

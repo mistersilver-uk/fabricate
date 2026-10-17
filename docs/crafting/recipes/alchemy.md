@@ -73,6 +73,9 @@ A combination that matches nothing still fizzles without a roll, whatever the Al
 With the check switched **off**, each alchemy recipe has one result set, and a match always produces it.
 
 With a **Simple check**, each recipe has two result sets, shown in the recipe editor as **On success** and **On a failed check**.
+Both are reserved sets, drawn with a lock, a **reserved role** badge, and a **Produced by** line that reads "a passed check — no assignment" or "a failed check — no assignment".
+You cannot rename them or assign anything to them, because the check picks them by role.
+The failure set has a danger-colored border.
 A passed roll produces the success set.
 A failed roll produces the failure set.
 A failed check is still a genuine outcome, not a fizzle, so the components are consumed and the recipe can still be learned.
