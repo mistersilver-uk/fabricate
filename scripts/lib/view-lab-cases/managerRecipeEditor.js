@@ -1095,6 +1095,8 @@ export const CASES = Object.freeze([
         { selector: `${RESULT_ROW(4)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
         // A click on the selected tab moves focus off the field without changing the screen.
         { selector: '#recipe-tab-results' },
+        // The reserved success set's routing line pushes the fourth row to the floor's fold.
+        { selector: hit, scroll: true },
       ],
       expectView: 'recipe-edit',
       // The first row Fixed, the next three on Rolled, and only the fourth marked invalid.
