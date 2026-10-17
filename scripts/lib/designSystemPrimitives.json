@@ -121,12 +121,12 @@
       "why": "The complication summary row (4 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1509` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`. Scoped `shared` DESPITE its `apps/manager/` path, for the reason the first sentence already measures: two of its four callers are the player crafting and inventory applications."
     },
     {
-      "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
+      "path": "src/ui/svelte/apps/manager/ProgressiveStageList.svelte",
       "library": "<SortableList>",
       "status": "shipped",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The GM read-only complication list a progressive stage row's body renders (issue 2445): a muted `Kicker` over a nested, non-reorderable, unnumbered `SortableList` of `ComplicationSummaryRow`'s `readonly-gm` rows, drawing no band, tile or control. Two independent callers, measured by `componentImporters.js`: `component/ComponentSalvageStages` (the Component Studio's progressive salvage stages) and `recipe/RecipeResultGroupCard` (the Recipe Studio's progressive stages), which until this change drew the same meaning twice. The `<SortableList>` entry's read-only unit draws it, so `library` names that entry and `status` is `shipped`. Targeted: `manager-component-edit-salvage-narrow`, `manager-component-edit-salvage-stages-narrow`, `manager-component-complications-salvage-stage-strip`, `manager-recipe-complications-stage-strip`, `manager-recipe-edit-results-progressive` and `manager-recipe-edit-results-narrow` claim it by `sourceMatches`. Scoped `manager-only`: both callers are manager studios, and the list reads the GM's unredacted authored complications, which no player surface may show."
+      "why": "The ordered progressive stage list (issue 2511): a numbered, always-open, removable `SortableList` whose every row is a quantity-less `PickerRow` ending in the stage component's read-only DC and an Edit deep link, over that component's `StageComplicationList` for one activity, crafting or salvage. Two independent callers, measured by `componentImporters.js`: `recipe/RecipeResultGroupCard` (the Recipe Studio's progressive stages) and `component/ComponentSalvageStages` (the Component Studio's progressive salvage stages), which until this change drew the same surface twice under two class families. The `<SortableList>` entry's read-only unit \"read-only — a GM stage’s complications\" draws exactly this composition, so `library` names that entry and `status` is `shipped`. Targeted: the eight progressive recipe and salvage frames claim it by `sourceMatches`, led by `manager-recipe-edit-results-progressive` and `manager-component-edit-salvage-narrow`. Scoped `manager-only`: both callers are manager studios, and its rows read the GM's unredacted authored complications, which no player surface may show."
     },
     {
       "path": "src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte",
@@ -542,7 +542,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "manager-only",
-      "why": "Promoted at issue 1516 on its second independent importer: `src/ui/svelte/components/ChoiceGroup.svelte` draws the recipe ingredient list, the Tool repair set at both scopes, and a recipe's and a gathering task's flat result rows, and `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte` draws a progressive set's stages, as `src/ui/svelte/apps/manager/ComponentEditView.svelte` draws a component's salvage results. Shipped at issue 1773, which built the specimen's remaining result side: the Fixed | Rolled toggle on a currency row, the `knowledge` kind, the `Result` adder, and the convert control on a reward row, headed \"Add an alternative\". It is manager-only because its amount slot, `PickerRowAmount.svelte`, imports `src/ui/svelte/components/RollDataExpressionInput.svelte`, itself scoped `manager-only`, and its `manager-recipe-option-*` class family is rooted in the manager sheet; the flip of that field's scope, together with re-rooting that family, is the change that would make it shared. Broad: the components path selects broad evidence, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the cases that draw it."
+      "why": "Promoted at issue 1516 on its second independent importer: `src/ui/svelte/components/ChoiceGroup.svelte` draws the recipe ingredient list, the Tool repair set at both scopes, and a recipe's and a gathering task's flat result rows, and `src/ui/svelte/apps/manager/ProgressiveStageList.svelte` draws every progressive stage, a recipe's and a salvage's alike (issue 2511), as `src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte` draws a component's simple salvage results. Shipped at issue 1773, which built the specimen's remaining result side: the Fixed | Rolled toggle on a currency row, the `knowledge` kind, the `Result` adder, and the convert control on a reward row, headed \"Add an alternative\". It is manager-only because its amount slot, `PickerRowAmount.svelte`, imports `src/ui/svelte/components/RollDataExpressionInput.svelte`, itself scoped `manager-only`, and its `manager-recipe-option-*` class family is rooted in the manager sheet; the flip of that field's scope, together with re-rooting that family, is the change that would make it shared. Broad: the components path selects broad evidence, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the cases that draw it."
     },
     {
       "path": "src/ui/svelte/components/ChoiceGroup.svelte",
@@ -988,6 +988,15 @@
         "src/ui/svelte/components/ChoiceGroup.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/components/ChoiceGroup.svelte`, whose result-side box this heads: the chooser, the strategy and a rolled group's selection. It names no library entry, since `<ChoiceGroup>` specifies its parent, and it moved into the primitive directory with the group at issue 2510. Broad: the components path selects broad evidence, and its `BROAD_SIGNAL_CASE_OVERRIDES` entry names the cases that draw it."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/ProgressiveStageList.svelte"
+      ],
+      "why": "ONE caller, `ProgressiveStageList.svelte`, whose stage body this is; it names no library entry, since the `<SortableList>` unit \"read-only — a GM stage’s complications\" specifies its parent. It was a member from issue 2445, on two independent callers, the recipe result card and the progressive salvage stages, until issue 2511 converged both on that one list. The GM read-only complication list: a muted `Kicker` over a nested, non-reorderable, unnumbered `SortableList` of `ComplicationSummaryRow`'s `readonly-gm` rows, drawing no band, tile or control."
     }
   ],
   "ruledOut": [

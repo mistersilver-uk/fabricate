@@ -27,6 +27,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The fixed-range gap spans the readiness gap check reads (issue 2511).
+  'src/ui/svelte/apps/manager/checks/checkRangeGaps.js',
   // The count rules and the free-text Convert the evaluator delegates to (issue 2006).
   'src/ui/svelte/apps/manager/checks/countReadiness.js',
   'src/ui/svelte/apps/manager/checks/countFormulaConversion.js',

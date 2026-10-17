@@ -655,18 +655,15 @@
   text-align: left;
 }
 
-/* The two progressive stage rows are the same surface — an ordered, quantity-less list of single results whose position is the authored data — and `fabricate-sortable-list-row` draws that surface for both as of issue 1512, so the box they shared here is retired rather than restated behind two caller classes. */
+/* The progressive stage row — an ordered, quantity-less list of single results whose position is the authored data — is `ProgressiveStageList`'s, which the recipe and salvage editors share (issue 2511); `fabricate-sortable-list-row` draws its box (issue 1512), and the `manager-progressive-stage-*` family below adds only what that list draws inside it. */
 
-/* Extra separation between the trailing controls, on top of the row's 12px gap: a read-only fact, a deep link and a delete packed at 8px read as one undifferentiated clump (issue 1286). The reorder rocker left both rows at issue 1512, so its two selectors went with it. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row > .fabricate-icon-button,
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-stage-edit {
+/* Extra separation between the trailing controls, on top of the row's 12px gap: a read-only fact and a deep link packed at 8px read as one undifferentiated clump (issue 1286). */
+.fabricate-manager .manager-progressive-stage-row .manager-progressive-stage-edit {
   margin-left: var(--fab-space-1);
 }
 
 /* A stage row's trailing controls sit in the requirement row's `.manager-recipe-option-controls`, right-aligned, on a recipe and a salvage stage alike (issue 1516). */
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls,
-.fabricate-manager .manager-salvage-stage-row .manager-recipe-option-controls {
+.fabricate-manager .manager-progressive-stage-row .manager-recipe-option-controls {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
@@ -675,8 +672,7 @@
 }
 
 /* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to change the DC shown beside it (the DC belongs to the yield component, whose own editor owns its save lifecycle), so it has to read as a legible link rather than a 0.56rem speck — it was smaller than the caption text next to it. */
-.fabricate-manager .manager-salvage-stage-edit,
-.fabricate-manager .manager-recipe-stage-edit {
+.fabricate-manager .manager-progressive-stage-edit {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -698,19 +694,16 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-salvage-stage-edit i,
-.fabricate-manager .manager-recipe-stage-edit i {
+.fabricate-manager .manager-progressive-stage-edit i {
   font-size: 0.72rem;
 }
 
-.fabricate-manager .manager-salvage-stage-edit:hover:not(:disabled),
-.fabricate-manager .manager-recipe-stage-edit:hover:not(:disabled) {
+.fabricate-manager .manager-progressive-stage-edit:hover:not(:disabled) {
   border-color: var(--fab-accent);
 }
 
-/* Read-only DC on a progressive salvage row. Mono + `--fab-info`, matching the roll budget banner it belongs to; never shrinks, so a long component name cannot squeeze the number out of view. */
-.fabricate-manager .manager-salvage-result-difficulty,
-.fabricate-manager .manager-recipe-stage-dc {
+/* Read-only DC on a progressive stage row. Mono + `--fab-info`, matching the roll budget banner it belongs to; never shrinks, so a long component name cannot squeeze the number out of view. */
+.fabricate-manager .manager-progressive-stage-dc {
   flex: 0 0 auto;
   color: var(--fab-info);
   font-family: var(--fab-font-mono);
@@ -935,8 +928,7 @@
 
 
 /* A progressive stage IS the shared list's row, so the item row inside it drops its own border / fill / padding — no double box (issues 643, 676). It wraps where the name would fall under its minimum: the DC and Edit first, then the name (issue 1516). */
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-ingredient-option-row,
-.fabricate-manager .manager-salvage-stage-row .manager-recipe-ingredient-option-row {
+.fabricate-manager .manager-progressive-stage-row .manager-recipe-ingredient-option-row {
   flex: 1 1 auto;
   flex-wrap: wrap;
 

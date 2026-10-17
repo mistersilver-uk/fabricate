@@ -13,6 +13,7 @@
   import Notice from '../../../components/Notice.svelte';
   import RecipeResultGroupCard from '../recipe/RecipeResultGroupCard.svelte';
   import RecipeResultsSection from '../recipe/RecipeResultsSection.svelte';
+  import { newDraftId } from '../../../util/draftId.js';
   import GatheringTaskCard from './GatheringTaskCard.svelte';
   import GatheringTaskComponentBrowserCard from './GatheringTaskComponentBrowserCard.svelte';
   import GatheringTaskDropsCard from './GatheringTaskDropsCard.svelte';
@@ -67,13 +68,6 @@
       };
     })
   );
-  function newResultGroupId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function'
-      ? random()
-      : `gathering-group-${Math.random().toString(36).slice(2, 12)}`;
-  }
-
   function updateResultGroups(nextGroups) {
     onUpdateTask({ resultGroups: nextGroups });
   }
@@ -85,7 +79,7 @@
   }
 
   function addRoutedResultGroup() {
-    updateResultGroups([...resultGroups, { id: newResultGroupId(), name: '', results: [] }]);
+    updateResultGroups([...resultGroups, { id: newDraftId(), name: '', results: [] }]);
   }
 
   function removeRoutedResultGroup(index) {

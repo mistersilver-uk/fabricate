@@ -22,6 +22,7 @@ import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 import { isBonusExpression } from './checkAdvantageCopy.js';
 import { invalidOverrideRecords, overrideEntriesFor } from './checkOverrideReadiness.js';
+import { fixedRangeGaps } from './checkRangeGaps.js';
 import { missingTargetPaths, targetExpressionFault } from './checkTargetStatus.js';
 import { formulaCountsSuccesses, planCountConversion } from './countFormulaConversion.js';
 import { countReadiness, countRequiredReadiness as countRequiredRows } from './countReadiness.js';
@@ -317,28 +318,11 @@ function tierStepTargetReadiness(check, outcomes) {
  * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that no tier
  * claims. `findRangeConflicts` sees only OVERLAP and `start > end`, so nothing else reports it,
  * and a fixed routed check has no `clampToNearest` rescue: the attempt is rolled but unrouted.
- * SPAN-INTERIOR ONLY, a set not covering every value a die can roll being a deliberate window,
- * and invalid and overlapping ranges are excluded first, a `start > end` range otherwise
- * manufacturing a phantom gap.
- * @param {object[]} outcomes The active FIXED outcome-tier list.
- * @param {Set<number>} excluded Indices already reported invalid or overlapping.
- * @returns {boolean} */
+ * Interior to the set's span only, a set not covering every value a die can roll being a
+ * deliberate window.
+ */
 function fixedRangesHaveGap(outcomes, excluded) {
-  const spans = outcomes
-    .map((outcome, index) => ({ index, start: Number(outcome?.start), end: Number(outcome?.end) }))
-    .filter(
-      (span) =>
-        !excluded.has(span.index) && Number.isFinite(span.start) && Number.isFinite(span.end)
-    )
-    .sort((a, b) => a.start - b.start);
-  if (spans.length < 2) return false;
-  // Ranges are INCLUSIVE on both ends, so adjacency is `next.start === previous.end + 1`.
-  let reach = spans[0].end;
-  for (const span of spans.slice(1)) {
-    if (span.start > reach + 1) return true;
-    reach = Math.max(reach, span.end);
-  }
-  return false;
+  return fixedRangeGaps(outcomes, excluded).length > 0;
 }
 
 /**

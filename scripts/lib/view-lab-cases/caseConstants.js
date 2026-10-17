@@ -76,6 +76,10 @@ export const COMPONENT_EDITOR_MATCHES = [
 export const STAGE_COMPLICATION_LIST_MATCH =
   /^src\/ui\/svelte\/apps\/manager\/StageComplicationList\.svelte$/;
 
+/** The ordered progressive stage list the recipe and salvage editors share (issue 2511). */
+export const PROGRESSIVE_STAGE_LIST_MATCH =
+  /^src\/ui\/svelte\/apps\/manager\/ProgressiveStageList\.svelte$/;
+
 /** The trigger set every system Tool rules editor frame shares (issue 1373). */
 export const TOOL_EDITOR_SHELL_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,

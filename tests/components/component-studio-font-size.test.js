@@ -287,7 +287,7 @@ const FIXTURE = `
             <div class="fabricate-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="fabricate-sortable-list">
-                <li class="fabricate-sortable-list-row manager-salvage-stage-row">
+                <li class="fabricate-sortable-list-row manager-progressive-stage-row">
                  <div class="fabricate-sortable-list-line">
                   <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
                   <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
@@ -301,8 +301,8 @@ const FIXTURE = `
                       </span>
                     </span>
                     <div class="manager-recipe-option-controls">
-                      <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
-                      <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                      <span class="manager-progressive-stage-dc" data-m="stage-dc">DC 8</span>
+                      <button class="manager-progressive-stage-edit" data-m="stage-edit"><span>Edit</span></button>
                     </div>
                   </div>
                   <span class="fabricate-sortable-list-rocker">

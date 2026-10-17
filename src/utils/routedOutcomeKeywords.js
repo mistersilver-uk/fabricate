@@ -51,22 +51,22 @@ export function matchResultGroupsByName(outcome, groups, { firstOnly = false } =
   return firstOnly ? matched.slice(0, 1) : matched;
 }
 
-/** The recipe editor's check-mode result-set options. */
+/** The recipe editor's check-mode result-set options, each `{ id, name, success }`. */
 export function routedSuccessTierOptions(routed) {
   if (!routed) return [];
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   return (Array.isArray(tiers) ? tiers : [])
     .filter((tier) => tier?.id && tier.success === true)
-    .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id, success: true }));
 }
 
-/** Success and failure tiers, in authored order. */
+/** Success and failure tiers, in authored order, each `{ id, name, success }`. */
 export function routedOutcomeTierOptions(routed) {
   if (!routed) return [];
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
   return (Array.isArray(tiers) ? tiers : [])
     .filter((tier) => tier?.id)
-    .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+    .map((tier) => ({ id: tier.id, name: tier.name || tier.id, success: tier.success === true }));
 }
 
 /** Chosen by the activity's failure-result policy (issue 1098, decision 7). */

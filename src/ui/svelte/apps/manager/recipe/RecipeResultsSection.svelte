@@ -15,6 +15,9 @@
   import { localizeOr } from '../../../util/localizeOr.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
+  import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
+  import { buildRoutingModel } from './recipeRoutingModel.js';
+  import { addResultGroup, alchemySlots, withResultSlot } from './recipeRoutingEdits.js';
 
   let {
     resultGroups = [],
@@ -48,50 +51,25 @@
     idPrefix = '',
   } = $props();
 
-  // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
-  // result set is immediately routable.
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
   const groups = $derived(Array.isArray(resultGroups) ? resultGroups : []);
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
-
-  function setDisplayName(set, index) {
-    const name = String(set?.name || '').trim();
-    return name || `${localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
-  }
-
-  // Ingredient-set options for one group: a set routes to at most one, so an already-routed
-  // set is disabled.
-  function ingredientOptionsFor(group) {
-    return sets.map((set, index) => ({
-      id: set.id,
-      name: setDisplayName(set, index),
-      disabled: !!set.resultGroupId && set.resultGroupId !== group.id,
-    }));
-  }
 
   function assignedSetIdsFor(group) {
     return sets.filter((set) => set.resultGroupId === group.id).map((set) => set.id);
   }
 
-  // Outcome-tier options for one group: a tier assigned to another (by INDEX, which an
-  // unsaved id-less group still has) is disabled.
-  function tierOptionsFor(index) {
-    const elsewhere = new Set(
-      groups
-        .filter((_, i) => i !== index)
-        .flatMap((group) => (Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []))
-    );
-    return tierOptions.map((tier) => ({
-      id: tier.id,
-      name: tier.name,
-      disabled: elsewhere.has(tier.id),
-    }));
-  }
+  // Each group's routing options: a set routes to at most one group, and a tier assigned to
+  // another (by index, which an unsaved id-less group still has) is disabled.
+  const routing = $derived(
+    buildRoutingModel({
+      provider: routingProvider,
+      ingredientSets: sets,
+      resultGroups: groups,
+      tiers: tierOptions,
+      setName: setDisplayName,
+    })
+  );
 
   // Result routing lives in the group HEAD, which only renders when the group is chromed, so a
   // routed system always needs chrome or it loses its routing control.
@@ -100,58 +78,25 @@
   // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: several
   // groups get the set chrome, a single NON-routed group renders chromeless, and a routed mode
   // keeps chrome whatever the count so its routing head stays available.
-  const effectiveComplex = $derived(groups.length > 1 || isRouted);
+  const effectiveComplex = $derived(!rendersBare(groups.length, { routed: isRouted }));
 
   // Simple mode binds one chromeless group to the first, synthesizing an empty one if absent.
   const simpleGroup = $derived(groups[0] || { results: [] });
-
-  // Spread the existing group under the edit so its routing-referenced id and name survive, and
-  // synthesize a fresh one ONLY when none exists.
-  function updateSimpleGroup(nextGroup) {
-    if (groups.length > 0) {
-      onChange([{ ...groups[0], ...nextGroup, id: groups[0].id || nextGroup?.id || newId() }]);
-      return;
-    }
-    onChange([{ ...nextGroup, id: nextGroup?.id || newId() }]);
-  }
 
   function updateGroup(index, nextGroup) {
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
   }
 
-  // Alchemy Simple two-slot view: the success set is the first non-failure group and the failure
-  // set the reserved `role: 'failure'` one, synthesized empty when absent. Either card's edit
-  // reconstructs both slots, spreading to preserve id and name — persist-on-first-edit.
-  const alchemySuccessGroup = $derived(
-    groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] }
-  );
-  const alchemyFailureGroup = $derived(
-    groups.find((group) => group?.role === 'failure') || { role: 'failure', results: [] }
-  );
+  // Alchemy Simple two-slot view. Either card's edit reconstructs both slots, spreading to preserve
+  // id and name — persist-on-first-edit.
+  const alchemy = $derived(alchemySlots(groups));
 
   function updateAlchemyPair(slot, nextGroup) {
-    const success =
-      slot === 'success'
-        ? {
-            ...alchemySuccessGroup,
-            ...nextGroup,
-            id: alchemySuccessGroup.id || nextGroup?.id || newId(),
-          }
-        : { ...alchemySuccessGroup, id: alchemySuccessGroup.id || newId() };
-    const failure =
-      slot === 'failure'
-        ? {
-            ...alchemyFailureGroup,
-            ...nextGroup,
-            role: 'failure',
-            id: alchemyFailureGroup.id || nextGroup?.id || newId(),
-          }
-        : { ...alchemyFailureGroup, role: 'failure', id: alchemyFailureGroup.id || newId() };
-    onChange([success, failure]);
+    onChange(withResultSlot(groups, slot, nextGroup));
   }
 
   function addGroup() {
-    onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
+    onChange(addResultGroup(groups));
   }
 
   function removeGroup(index) {
@@ -164,7 +109,7 @@
     <!-- Alchemy Simple: two labeled result sets, no add-set and no remove on either. -->
     <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
       <RecipeResultGroupCard
-        group={alchemySuccessGroup}
+        group={alchemy.success}
         {componentOptions}
         {surface}
         {resultKinds}
@@ -174,7 +119,7 @@
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
       <RecipeResultGroupCard
-        group={alchemyFailureGroup}
+        group={alchemy.failure}
         {componentOptions}
         {surface}
         {resultKinds}
@@ -201,7 +146,7 @@
         {progressive}
         {isTerminalStep}
         {onOpenComponent}
-        onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
+        onChange={(nextGroup) => onChange(withSoleEntry(groups, nextGroup))}
       />
     </div>
   {:else if groups.length === 0}
@@ -235,9 +180,11 @@
             {progressive}
             {isTerminalStep}
             {onOpenComponent}
-            ingredientSetOptions={ingredientOptionsFor(group)}
+            ingredientSetOptions={routingProvider === 'ingredientSet'
+              ? routing.routingOptionsFor(index)
+              : []}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
-            outcomeTierOptions={tierOptionsFor(index)}
+            outcomeTierOptions={routingProvider === 'check' ? routing.routingOptionsFor(index) : []}
             {outcomeTiersDefined}
             {failureResultsAllowed}
             onAssignIngredientSet={(setId, assigned) =>

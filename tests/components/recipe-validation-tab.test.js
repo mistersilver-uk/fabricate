@@ -20,8 +20,13 @@ const harness = createMountedComponentHarness({
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // …which reads the routed warnings off the routing model (issue 2511).
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+    'src/utils/routedOutcomeKeywords.js',
+    'src/utils/failureResultPolicy.js',
     // …which reads a result choice group's problems through its edits (issue 1773).
     'src/ui/svelte/components/resultGroupEdits.js',
+    'src/ui/svelte/util/draftId.js',
     'src/ui/svelte/components/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
     'src/utils/rollFormulaRollability.js',

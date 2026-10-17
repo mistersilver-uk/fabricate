@@ -342,6 +342,12 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
     ...RESULT_ROW_RAW_MODULES,
+    // Issue 2511: the recipe results section's set drafts, routing model and routing edits.
+    'src/ui/svelte/apps/manager/recipe/setDrafts.js',
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
+    'src/utils/routedOutcomeKeywords.js',
+    'src/utils/failureResultPolicy.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
@@ -358,6 +364,7 @@ const gatheringHarness = createMountedComponentHarness({
     // complication band through it.
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+    'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',

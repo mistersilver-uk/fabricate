@@ -18,6 +18,8 @@
   import KindAdder from '../../../components/KindAdder.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
+  import { newDraftId as newId } from '../../../util/draftId.js';
+  import { createPendingFocus } from '../../../util/pendingFocus.js';
   import {
     emptyIngredientOption,
     offeredIngredientKinds,
@@ -51,11 +53,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
   // The explicit name or the default when unset, so an unnamed set is not a placeholder.
   const displayName = $derived(set?.name?.trim() ? set.name : defaultName);
 
@@ -70,7 +67,7 @@
   // set that does not hold it disarms it, so a refused write never moves focus. Rooted at the card
   // because the groups container does not exist while the set is empty.
   let root = $state(null);
-  let pendingFocus = null;
+  const pendingFocus = createPendingFocus();
 
   /**
    * Append a requirement of one kind, holding no value. The requirement carries an eager id
@@ -78,25 +75,23 @@
    */
   function addRequirement(kind) {
     const id = newId();
-    pendingFocus = id;
+    pendingFocus.arm(id);
     onChange({
       ...set,
       ingredientGroups: [...groups, { id, options: [emptyIngredientOption(kind)] }],
     });
   }
 
-  // A task, so the focus lands after `ActionMenu` hands focus back to the adder.
   $effect(() => {
-    const id = pendingFocus;
-    const held = groups.some((group) => group?.id === id);
-    pendingFocus = null;
-    if (!id || !held) return;
-    setTimeout(() => {
-      root
-        ?.querySelector(`[data-recipe-group-id="${id}"]`)
-        ?.querySelector('[data-recipe-option-search], [data-recipe-add-tag]')
-        ?.focus();
-    }, 0);
+    const held = groups;
+    pendingFocus.settle(
+      (id) => held.some((group) => group?.id === id),
+      (id) =>
+        root
+          ?.querySelector(`[data-recipe-group-id="${id}"]`)
+          ?.querySelector('[data-recipe-option-search], [data-recipe-add-tag]')
+          ?.focus()
+    );
   });
 
   const addAnIngredient = $derived(

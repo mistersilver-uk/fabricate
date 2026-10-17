@@ -25,6 +25,7 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
+  import { resultsProjection, routeSet, scopeTarget } from './recipe/recipeRoutingEdits.js';
   import {
     blocksEnable,
     countRecipeReadiness,
@@ -142,19 +143,8 @@
   const collapsed = $derived(!multiStepEnabled && steps.length > 1);
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
-  // The recipe view the Results tab edits while collapsed: a single-step projection whose result
-  // groups, ingredient sets and routing come from the FINAL step. Writes route back to that step.
-  const resultsRecipe = $derived(
-    collapsed && finalStep
-      ? {
-          ...recipe,
-          resultGroups: Array.isArray(finalStep.resultGroups) ? finalStep.resultGroups : [],
-          ingredientSets: Array.isArray(finalStep.ingredientSets) ? finalStep.ingredientSets : [],
-          resultSelection: finalStep.resultSelection ?? recipe?.resultSelection ?? null,
-          outcomeRouting: finalStep.outcomeRouting ?? recipe?.outcomeRouting ?? null,
-        }
-      : recipe
-  );
+  // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
+  const resultsRecipe = $derived(resultsProjection(recipe, finalStep));
 
   // Check-mode routed recipes route by the crafting-check outcome, so ingredient sets are nameless
   // there; ingredient mode and non-routed systems keep names.
@@ -170,13 +160,10 @@
     if (!setId || (assigned && !groupId)) return;
     // Collapsed chain (issue 710): the Results tab renders single-step (stepId null) over the
     // FINAL step's data, so a routing assignment writes through to that step.
-    const scopeStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
+    const scopeStepId = scopeTarget(stepId, finalStep);
     const scopeSets =
       scopeStepId == null ? ingredientSets : stepById(scopeStepId)?.ingredientSets || [];
-    const nextSets = scopeSets.map((set) =>
-      set.id === setId ? { ...set, resultGroupId: assigned ? groupId : null } : set
-    );
-    updateIngredientSets(scopeStepId, nextSets);
+    updateIngredientSets(scopeStepId, routeSet(scopeSets, setId, assigned ? groupId : null));
   }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
@@ -193,7 +180,7 @@
   function updateResultGroups(stepId, nextGroups) {
     // Collapsed chain WRITE-THROUGH (issue 710): a null stepId edits the FINAL step's result
     // groups, and recipe-level `resultGroups` stay empty, so re-enabling is lossless.
-    const targetStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
+    const targetStepId = scopeTarget(stepId, finalStep);
     if (targetStepId == null) {
       onUpdateRecipe({ resultGroups: nextGroups });
       return;

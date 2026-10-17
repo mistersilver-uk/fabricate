@@ -66,12 +66,12 @@ const FIXTURE = `
           </span>
         </div>
         <!-- The progressive stage row (issue 676). It is the SAME surface as the
-             progressive SALVAGE stage row and shares its rules by joining their selector
-             lists, so these roles are pinned to the numbers component-studio-font-size.js
-             already commits for the salvage row — the design source — NOT read off this
-             markup. If the two ever disagree, the sharing has broken. -->
+             progressive salvage stage row, drawn by the one ProgressiveStageList under one
+             class family (issue 2511), so these roles are pinned to the numbers
+             component-studio-font-size.js already commits for the salvage row — the design
+             source, not read off this markup. If the two ever disagree, the sharing has broken. -->
         <div class="fabricate-sortable-list">
-         <div class="fabricate-sortable-list-row manager-recipe-stage-row">
+         <div class="fabricate-sortable-list-row manager-progressive-stage-row">
           <div class="fabricate-sortable-list-line">
           <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
           <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
@@ -83,8 +83,8 @@ const FIXTURE = `
               </span>
             </span>
             <div class="manager-recipe-option-controls">
-              <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
-              <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
+              <span class="manager-progressive-stage-dc" data-m="stage-dc">DC 12</span>
+              <button class="manager-progressive-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
             </div>
           </div>
           <span class="fabricate-sortable-list-rocker">

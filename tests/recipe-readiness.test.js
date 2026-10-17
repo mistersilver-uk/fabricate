@@ -820,3 +820,100 @@ describe('evaluateRecipeReadiness: result choice groups', () => {
     assert.equal(check(checks, 'taughtRecipesResolve').satisfied, false);
   });
 });
+
+// Issue 2511: the routed warnings read the routing model; these pin the edges it had to keep.
+describe('evaluateRecipeReadiness routed check-mode warnings over the routing model', () => {
+  const tiers = [
+    { id: 't-good', name: 'Good', success: true },
+    { id: 't-great', name: 'Great', success: true },
+    { id: 't-botch', name: 'Botch', success: false }
+  ];
+  const routedIssues = (recipe) =>
+    evaluateRecipeReadiness(
+      { name: 'Routed', enabled: true, ingredientSets: [{ id: 's1' }], ...recipe },
+      { routingProvider: 'check', routedOutcomeTierOptions: tiers }
+    ).issues.filter(issue => issue.id === 'unroutedResultGroup' || issue.id === 'unproducedOutcomeTier');
+
+  it('reports a null group entry as unrouted, with no control to focus', () => {
+    const issues = routedIssues({
+      resultGroups: [{ id: 'g1', checkOutcomeIds: ['t-good', 't-great', 't-botch'] }, null]
+    });
+    assert.deepEqual(issues, [{ id: 'unroutedResultGroup', severity: 'warning', target: 'results' }]);
+  });
+
+  it('addresses the first unrouted group, and an id-less one gets no focusTarget key', () => {
+    const issues = routedIssues({
+      resultGroups: [
+        { id: 'g1', checkOutcomeIds: ['t-good', 't-great', 't-botch'] },
+        { name: 'Draft', checkOutcomeIds: [] },
+        { id: 'g3', checkOutcomeIds: [] }
+      ]
+    });
+    assert.deepEqual(issues, [{ id: 'unroutedResultGroup', severity: 'warning', target: 'results' }]);
+  });
+
+  it('tags a multi-step issue with its step, and counts a tier produced in another step', () => {
+    const issues = routedIssues({
+      steps: [
+        { id: 'st1', name: 'Smelt', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'a', checkOutcomeIds: ['t-great', 't-botch'] }] },
+        {
+          id: 'st2',
+          name: 'Temper',
+          ingredientSets: [{ id: 's2' }],
+          resultGroups: [{ id: 'b', checkOutcomeIds: ['t-good'] }, { id: 'c', checkOutcomeIds: [] }]
+        }
+      ]
+    });
+    assert.deepEqual(issues, [
+      {
+        id: 'unroutedResultGroup',
+        severity: 'warning',
+        target: 'results',
+        focusTarget: 'result-group-c',
+        stepId: 'st2',
+        stepName: 'Temper'
+      }
+    ]);
+  });
+
+  it('reads a step listing only stale ids as unrouted and unproducing', () => {
+    const issues = routedIssues({
+      resultGroups: [
+        { id: 'g1', checkOutcomeIds: ['t-deleted'] },
+        { id: 'g2', checkOutcomeIds: ['t-gone'] }
+      ]
+    });
+    assert.deepEqual(issues, [
+      { id: 'unroutedResultGroup', severity: 'warning', target: 'results', focusTarget: 'result-group-g1' },
+      { id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' }
+    ]);
+  });
+
+  it('counts only a listed tier as produced, never a single-group default in another step', () => {
+    const issues = routedIssues({
+      steps: [
+        { id: 'st1', name: 'Smelt', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'a' }] },
+        {
+          id: 'st2',
+          name: 'Temper',
+          ingredientSets: [{ id: 's2' }],
+          resultGroups: [{ id: 'b', checkOutcomeIds: ['t-botch'] }, { id: 'c', checkOutcomeIds: [] }]
+        }
+      ]
+    });
+    assert.deepEqual(issues.map(issue => issue.id), ['unroutedResultGroup', 'unproducedOutcomeTier']);
+  });
+
+  it('counts a failure-role group like any other group', () => {
+    const issues = routedIssues({
+      resultGroups: [
+        { id: 'g1', checkOutcomeIds: ['t-good', 't-great'] },
+        { id: 'gf', role: 'failure', checkOutcomeIds: [] }
+      ]
+    });
+    assert.deepEqual(issues, [
+      { id: 'unroutedResultGroup', severity: 'warning', target: 'results', focusTarget: 'result-group-gf' },
+      { id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' }
+    ]);
+  });
+});

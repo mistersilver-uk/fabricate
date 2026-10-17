@@ -2,7 +2,7 @@
 <!--
   One result group, each item a `PickerRow` naming a component, a currency or a taught recipe, with
   a fixed or rolled amount, drawn through the result-side `ChoiceGroup`, which also draws a choice
-  group's box; or on a progressive stage a component with a DC and an Edit link in its `trailing`.
+  group's box; or on a progressive set, `ProgressiveStageList`'s stages.
   Emitted as a shallow-updated copy through `onChange(nextGroup)`. On a recipe every item it
   creates carries an id and its kind's empty subject (`KindAdder`), and focus moves to its
   name field; on a gathering task it names the picked component. An empty group or an unnamed item
@@ -18,16 +18,15 @@
   import { localizeOr } from '../../../util/localizeOr.js';
   import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
   import ChoiceGroup from '../../../components/ChoiceGroup.svelte';
-  import PickerRow from '../../../components/PickerRow.svelte';
-  import { emptyResult, fromValue, toValue } from '../../../components/pickerRowKinds.js';
-  import { newDraftId as newId } from '../../../components/resultGroupEdits.js';
+  import { emptyResult, fromValue } from '../../../components/pickerRowKinds.js';
+  import { newDraftId as newId } from '../../../util/draftId.js';
+  import { createPendingFocus } from '../../../util/pendingFocus.js';
   import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
-  import SortableList from '../../../components/SortableList.svelte';
-  import StageComplicationList from '../StageComplicationList.svelte';
+  import ProgressiveStageList from '../ProgressiveStageList.svelte';
 
   let {
     group = {},
@@ -95,21 +94,14 @@
 
   // Both halves of reorder are the list's now (issue 1512), and so are the read-the-name-first
   // rule this file established, the focus move and the polite live region.
-  function componentNameFor(item) {
-    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
-    return match?.name || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
-  }
+  const componentOf = (item) =>
+    (componentOptions || []).find((option) => option.id === item?.componentId);
 
-  // The list's content, decided here because the same filter decides whether the row draws a body
-  // at all (issue 1512): `alwaysOpen` renders the body snippet for every row, so a stage whose
-  // component authors no crafting complication would otherwise draw an empty padded box. The
-  // unredacted authored list off the projection the difficulty badge reads, filtered to crafting
-  // because a salvage-only complication says nothing about a recipe stage.
-  function stageComplicationsFor(item) {
-    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
-    return Array.isArray(match?.complications)
-      ? match.complications.filter((complication) => complication?.activities?.crafting === true)
-      : [];
+  function componentNameFor(item) {
+    return (
+      componentOf(item)?.name ||
+      localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result')
+    );
   }
 
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
@@ -140,16 +132,6 @@
     (componentOptions || []).map(({ id, name, img }) => ({ id, label: name, img }))
   );
 
-  function componentFor(item) {
-    return (componentOptions || []).find((option) => option.id === item?.componentId) || null;
-  }
-
-  // `difficulty` is projected onto the component options; one never given reads as unset, not 0.
-  function difficultyOf(component) {
-    const difficulty = Number(component?.difficulty);
-    return component && Number.isFinite(difficulty) ? difficulty : null;
-  }
-
   // A stage's delete names its component, as a flat row's remove does.
   const removeNameFor = (item) =>
     localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}', {
@@ -163,14 +145,15 @@
 
   let root = $state(null);
   // The control focus moves to once the row at `at` renders: `at` -1 is the set's adder.
-  let pendingFocus = null;
+  const pendingFocus = createPendingFocus({ keepUntilHeld: true });
   const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
+  const ROWS = '[data-recipe-result-item], [data-recipe-result-group]';
 
   // An unwrapped group remounts as its last alternative under that alternative's id, taking the
   // focused remove with it, so focus moves to the survivor's `or…`.
   function updateItem(index, nextItem) {
     if (isChoiceGroup(results[index]) && !isChoiceGroup(nextItem)) {
-      pendingFocus = { at: index, selector: '.manager-recipe-or-trigger' };
+      pendingFocus.arm({ at: index, selector: '.manager-recipe-or-trigger' });
     }
     onChange({ ...group, results: results.map((item, i) => (i === index ? nextItem : item)) });
   }
@@ -178,12 +161,18 @@
   // A removed row's focus moves to the row taking its place, else the one before, else the adder.
   function removeItem(index) {
     const at = Math.min(index, results.length - 2);
-    pendingFocus = { at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL };
+    pendingFocus.arm({ at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL });
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
   const addAResult = $derived(
     localizeOr('FABRICATE.Admin.Manager.Recipe.AddAResult', 'Add a result')
+  );
+  const openComponentHint = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
+      'Edit difficulty and complications on the component'
+    )
   );
   const stageLabel = $derived(
     localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
@@ -193,23 +182,20 @@
   // progressive award loop ignores `quantity`, so repeating a component asks for more of it.
   function addItem(kind) {
     const added = progressive ? { id: newId(), componentId: null } : emptyResult(kind, newId());
-    pendingFocus = { at: results.length, selector: '[data-recipe-option-search]' };
+    pendingFocus.arm({ at: results.length, selector: '[data-recipe-option-search]' });
     onChange({ ...group, results: [...results, added] });
   }
 
   // The card holds the pending focus because the control that asked for it may not survive the
   // edit: a progressive set's first stage moves the adder into the list's footer, a new instance.
-  // `results` is read first so the effect tracks every edit; the focus is a task, so it lands
-  // after a menu hands focus back to its trigger.
+  // `results` and `root` are read first so the effect tracks every edit.
   $effect(() => {
-    const count = results.length;
-    if (!root || !pendingFocus || count <= pendingFocus.at) return;
-    const { at, selector } = pendingFocus;
-    pendingFocus = null;
-    setTimeout(() => {
-      const rows = root?.querySelectorAll('[data-recipe-result-item], [data-recipe-result-group]');
-      (at < 0 ? root : rows?.[at])?.querySelector(selector)?.focus();
-    }, 0);
+    const [count, host] = [results.length, root];
+    pendingFocus.settle(
+      ({ at }) => host && count > at,
+      ({ at, selector }) =>
+        (at < 0 ? root : root?.querySelectorAll(ROWS)[at])?.querySelector(selector)?.focus()
+    );
   });
 
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
@@ -344,56 +330,37 @@
     </div>
   {:else}
     {#if progressive}
-      <!-- Progressive is an ordered list, so it is the shared one (issue 1512). `alwaysOpen` shows
-           each stage's read-only complication list in its body with no disclosure (issue 2445).
-           The delete is the list's own; `removeData` keeps `data-recipe-remove="result-item"`,
-           the hook the mounted suites and the smoke harness address a stage's delete by. -->
-      <SortableList
+      <!-- Progressive is the shared ordered stage list (issues 1512, 2511). `removeData` keeps
+           `data-recipe-remove="result-item"`, the hook the mounted suites and the smoke harness
+           address a stage's delete by. -->
+      <ProgressiveStageList
         items={results}
-        itemLabel={componentNameFor}
-        numbered
-        alwaysOpen
-        removable
-        onReorder={(from, to) => reorderItem(from, to)}
-        onRemove={(item) => removeItem(results.indexOf(item))}
+        {componentOptions}
+        activity="crafting"
+        {kinds}
+        catalogue={offer.catalogue}
+        recipeItemHook
+        rowData={() => ({ 'data-recipe-result-row': '' })}
         removeData={(item) => ({
           'data-recipe-remove': 'result-item',
           ariaLabel: removeNameFor(item),
           title: removeNameFor(item),
         })}
-        rowClass={(item) =>
-          stageComplicationsFor(item).length > 0
-            ? 'manager-recipe-stage-row has-band'
-            : 'manager-recipe-stage-row'}
-        rowData={() => ({ 'data-recipe-result-row': '' })}
-      >
-        {#snippet row(item, index)}
-          <PickerRow
-            value={toValue(item)}
-            {kinds}
-            catalogue={offer.catalogue}
-            amount={false}
-            removable={false}
-            class="is-result"
-            data-recipe-result-item=""
-            onChange={(value) => updateItem(index, fromValue(item, value))}
-          >
-            {#snippet trailing()}
-              {@render stageControls(item)}
-            {/snippet}
-          </PickerRow>
-        {/snippet}
-        {#snippet body(item)}
-          <StageComplicationList
-            complications={stageComplicationsFor(item)}
-            ownerId={item?.componentId || ''}
-            ownerName={componentNameFor(item)}
-          />
-        {/snippet}
-        {#snippet footer()}
-          <li class="manager-recipe-ingredient-set-add">{@render resultAdder()}</li>
-        {/snippet}
-      </SortableList>
+        difficultyDataAttr="data-recipe-result-difficulty"
+        editDataAttr="data-recipe-result-edit"
+        itemLabel={componentNameFor}
+        dcLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')}
+        dcUnsetLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')}
+        editLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}
+        editTitle={openComponentHint}
+        editAriaLabel={(item) => `${openComponentHint} — ${componentOf(item)?.name}`}
+        adderClass="manager-recipe-ingredient-set-add"
+        onItemChange={(item, index, value) => updateItem(index, fromValue(item, value))}
+        onReorder={(from, to) => reorderItem(from, to)}
+        onRemove={(item) => removeItem(results.indexOf(item))}
+        adder={resultAdder}
+        {onOpenComponent}
+      />
     {:else}
       <div class="manager-recipe-ingredient-set-groups">
         {#each results as item, index (item?.id || index)}
@@ -416,37 +383,6 @@
     <div class="manager-recipe-ingredient-set-add">{@render resultAdder()}</div>
   {/if}
 </div>
-
-<!-- A stage's read-only `DC n` and its separate Edit deep link: the component editor's Difficulty
-     card owns `component.difficulty`, so the link is the only route to changing it. -->
-{#snippet stageControls(item)}
-  {@const component = componentFor(item)}
-  {@const difficulty = difficultyOf(component)}
-  <span
-    class="manager-recipe-stage-dc"
-    data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
-    >{difficulty === null
-      ? localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-      : `${localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span
-  >
-  {#if component}
-    <button
-      type="button"
-      data-keyboard-focus="true"
-      class="manager-recipe-stage-edit"
-      data-recipe-result-edit={item.componentId}
-      aria-label={`${localizeOr('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty and complications on the component')} — ${component.name}`}
-      title={localizeOr(
-        'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
-        'Edit difficulty and complications on the component'
-      )}
-      onclick={() => onOpenComponent(item.componentId)}
-    >
-      <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
-      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </button>
-  {/if}
-{/snippet}
 
 {#snippet resultAdder()}
   {#if recipeSurface}

@@ -100,6 +100,10 @@ const RAW_MODULES = [
   'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  // Issue 2511: the set drafts and routing edits the sections write through, and the routing model.
+  'src/ui/svelte/apps/manager/recipe/setDrafts.js',
+  'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+  'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
   // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
   // so omitting it throws a named "add it to rawModules" error rather than hanging.
@@ -233,6 +237,7 @@ const RECIPE_COMPILED = [
   // The read-only stage complication list's muted label (issue 2445).
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
