@@ -230,6 +230,22 @@ function seedRoutedCheckStale(content) {
   );
 }
 
+/** `routed-check-no-success`: no Runework tier is a Success and failed checks produce nothing, so
+ *  no tier can be offered and each result set states the policy hint where Assign would be. */
+function seedRoutedCheckNoSuccess(content) {
+  const { system } = recipeAndSystem(content, 'rw-r-blade', 'routed-check-no-success');
+  const { craftingCheck } = system;
+  const routed = craftingCheck.routed;
+  system.craftingCheck = {
+    ...craftingCheck,
+    failureResultPolicy: 'never',
+    routed: {
+      ...routed,
+      relativeOutcomes: routed.relativeOutcomes.map((tier) => ({ ...tier, success: false })),
+    },
+  };
+}
+
 /** `check-two-sets`: the Runeblade gains a second, unnamed ingredient set. */
 function seedCheckTwoSets(content) {
   const { recipe } = recipeAndSystem(content, 'rw-r-blade', 'check-two-sets');
@@ -257,6 +273,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'routed-unreachable': seedRoutedUnreachable,
   'routed-default': seedRoutedDefault,
   'routed-check-stale': seedRoutedCheckStale,
+  'routed-check-no-success': seedRoutedCheckNoSuccess,
   'check-two-sets': seedCheckTwoSets,
 });
 
@@ -760,7 +777,7 @@ function stripAuthoredWorldComponents(content) {
  *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
  *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
- *   `routed-default`, `routed-check-stale` or `check-two-sets`.
+ *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.

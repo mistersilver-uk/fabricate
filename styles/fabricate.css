@@ -21,7 +21,6 @@
 /* The recipe editor after its Overview tab: steps and requirements, the duration chip, the Tools tab, ingredient and option rows, the Results tab (result, reward, award and range rows), routing and stages, and the row's tag and or-affordances; then the component editor's salvage stages and the system editor's feature tiles, and last the set card (fabricate-set-card: head, serif name field, kebab, the reserved and bare forms, tone edges) and the line naming what routes into a set (fabricate-route-sources, with its portalled Assign panel, fabricate-route-sources-popover). Shared family kept here: the editor validation surface (fabricate-validation). Strays: the button's dashed and subtle forms, and the result rows' two container rungs. */
 @import url("fabricate-manager-recipe-editor.css");
 
-
 /* The manager's nav rail (fabricate-nav, the World group, the premium relic art) and the gathering screens: the gathering panel and events, the danger tags, the task editor (core card, components, availability, required tools), the drop rows and drop editor, the condition panels and pills, the rule copy and the setup card. Shared families kept here: the base button and icon button (fabricate-button, fabricate-icon-button), the base card (fabricate-card), the fact cards, the editor tab strip's count and dot, the pill select, the slider and the colour picker. */
 @import url("fabricate-manager-rail-gathering.css");
 

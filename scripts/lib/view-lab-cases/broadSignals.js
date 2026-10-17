@@ -428,7 +428,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-depleted-image-empty',
   ]),
   // The routing line (issue 2512): a routed result set in each routed mode, Assign open, and each
-  // state it draws — shared, long and truncated, unreachable, by default, and struck tiers.
+  // state it draws — shared, long and truncated, unreachable, by default, struck tiers, and the
+  // longest hint at the floor.
   'src/ui/svelte/components/RouteSources.svelte': Object.freeze([
     'coverage-mode-routed-ingredients-results',
     'coverage-mode-routed-check-results',
@@ -439,6 +440,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-routed-default',
     'manager-recipe-edit-results-routed-assign',
     'manager-recipe-edit-results-routed-check-stale',
+    'manager-recipe-edit-results-routed-check-policy-hint-narrow',
   ]),
   // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
   // reserved pair and a salvage group.
@@ -797,8 +799,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   // Every module-sheet partial stands as this key (issue 1711), so issue 2512's four name one frame
-  // each: the set card's partial, the recipe editor's set chrome, the single bare set, and the
-  // salvage group card.
+  // each: the set card's rules in the recipe-editor sheet, the recipe editor's set chrome, the
+  // single bare set, and the salvage group card.
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-world-downtime-tracking',

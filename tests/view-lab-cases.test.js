@@ -3156,7 +3156,8 @@ test('changed files map to the windows they affect', () => {
   assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
     'fabricate-app-shell',
     // Issue 2512: one frame for each partial whose set rules it moved, since a partial stands as
-    // the sheet — the salvage group card, the bare set, the set chrome and the set card's own.
+    // the sheet — the salvage group card, the bare set, the set chrome, and the set card's own
+    // rules in the recipe-editor sheet.
     'manager-component-edit-salvage',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',

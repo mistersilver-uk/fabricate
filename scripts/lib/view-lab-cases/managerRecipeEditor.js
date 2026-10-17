@@ -1694,7 +1694,8 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     // Two claims a closed-state frame fails: the panel is portaled onto the manager frame, and its
     // rows say where each set routes today.
-    expectSelector: '.fabricate-manager > .fabricate-route-sources-popover [role="option"]',
+    expectSelector:
+      '.fabricate-manager > .fabricate-route-sources-popover [role="option"] .manager-travel-option-meta',
     expectContained: [
       { container: '.fabricate-manager', target: '.fabricate-route-sources-popover' },
     ],
@@ -1709,8 +1710,22 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     ...ROUTED_RESULTS('lab-runework', 'rw-r-blade', 'routed-check-stale'),
     expectView: 'recipe-edit',
-    expectSelector: `${RESULT_SET('rw-grp-standard')} [data-route-sources-chip="rw-retired"][data-route-sources-struck]`,
+    expectSelector: `${RESULT_SET('rw-grp-standard')}:has([data-route-sources-chip="rw-retired"][data-route-sources-struck]) [data-route-sources-chip="rw-ruined"][data-route-sources-struck][title="Ruined, does not route"]`,
     kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // No tier is a Success and failed checks produce nothing: the longest hint wraps inside its line.
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-check-policy-hint-narrow',
+    label: 'Manager — Recipe edit results, the failure-policy hint at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-runework', 'rw-r-blade', 'routed-check-no-success'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('rw-grp-standard')} [data-route-sources-hint]`,
+    expectNoHorizontalOverflow: `${RESULT_SET('rw-grp-standard')} [data-route-sources-line]`,
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
     sourceMatches: [...SET_SOURCES],
   }),
   // A result set's kebab open: its Remove, portaled onto the manager frame and on top.

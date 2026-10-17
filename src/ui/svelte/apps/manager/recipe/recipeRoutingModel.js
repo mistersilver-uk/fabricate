@@ -1,7 +1,8 @@
 /**
  * The recipe editor's one reading of result routing, mirroring `ResolutionModeService`: each
  * offered source with the groups it effectively awards, and the sources reaching each group.
- * Groups are addressed by index, because an id-less draft group is still a target. Pinned against the engine by `tests/recipe-routing-model.test.js`.
+ * Groups are addressed by index, because an id-less draft group is still a target.
+ * Pinned against the engine by `tests/recipe-routing-model.test.js`.
  */
 import {
   isFailKeyword,
