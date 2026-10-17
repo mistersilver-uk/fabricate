@@ -1,6 +1,6 @@
 /**
- * The recipe editor's routing and result-set edits (issue 2511): the scope a write lands on, the
- * collapsed results projection, and the set, group and alchemy-slot writes.
+ * The recipe editor's routing and result-set edits (issues 2511, 2512): the scope a write lands on,
+ * the collapsed results projection, and the set, tier, group and alchemy-slot writes.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -11,6 +11,7 @@ import {
   alchemySlots,
   resultsProjection,
   routeSet,
+  routeTier,
   scopeTarget,
   withResultSlot,
 } from '../src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js';
@@ -166,5 +167,48 @@ describe('withResultSlot', () => {
       { id: 'e1', role: 'failure', name: 'Ruin', results: [] },
       { id: 'm', role: 'failure', name: 'Ruin', results: [] },
     ]);
+  });
+});
+
+describe('routeTier', () => {
+  const claimants = (groups, tierId) =>
+    groups.flatMap((group, index) => (group.checkOutcomeIds?.includes(tierId) ? [index] : []));
+
+  it('moves a tier from the group listing it to the chosen one, appended last', () => {
+    const groups = [
+      { id: 'g1', checkOutcomeIds: ['t-fine', 't-great'] },
+      { id: 'g2', checkOutcomeIds: ['t-botch'] },
+    ];
+    const next = routeTier(groups, 't-fine', 1);
+    assert.deepEqual(next, [
+      { id: 'g1', checkOutcomeIds: ['t-great'] },
+      { id: 'g2', checkOutcomeIds: ['t-botch', 't-fine'] },
+    ]);
+    assert.deepEqual(groups[0].checkOutcomeIds, ['t-fine', 't-great'], 'the input is not mutated');
+  });
+
+  it('leaves exactly one claimant when the tier is listed twice on disk', () => {
+    const groups = [
+      { id: 'g1', checkOutcomeIds: ['t-fine'] },
+      { id: 'g2', checkOutcomeIds: ['t-fine', 't-fine'] },
+      { id: 'g3' },
+    ];
+    const next = routeTier(groups, 't-fine', 2);
+    assert.deepEqual(claimants(next, 't-fine'), [2]);
+    assert.deepEqual(next[2].checkOutcomeIds, ['t-fine']);
+    assert.deepEqual(routeTier(groups, 't-fine', 1)[1].checkOutcomeIds, ['t-fine']);
+  });
+
+  it('returns the same groups when the chosen group is already the only one listing it', () => {
+    const groups = [{ id: 'g1', checkOutcomeIds: ['t-fine'] }, { id: 'g2' }];
+    assert.equal(routeTier(groups, 't-fine', 0), groups);
+  });
+
+  it('keeps every group the edit does not touch by reference', () => {
+    const groups = [{ id: 'g1' }, { id: 'g2', checkOutcomeIds: ['t-fine'] }, { id: 'g3' }];
+    const next = routeTier(groups, 't-fine', 2);
+    assert.equal(next[0], groups[0]);
+    assert.deepEqual(next[1], { id: 'g2', checkOutcomeIds: [] });
+    assert.deepEqual(next[2], { id: 'g3', checkOutcomeIds: ['t-fine'] });
   });
 });
