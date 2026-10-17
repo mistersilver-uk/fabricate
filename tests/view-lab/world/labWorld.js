@@ -203,12 +203,14 @@ function seedRoutedSharedLong(content) {
   );
 }
 
-/** `routed-unreachable`: a third result set, the Brooch, that no ingredient set names. */
+/** `routed-unreachable`: a third result set, the Brooch, that no ingredient set names. It is the
+ *  first card, so a frame shows it above the fold; both sets name their result set, so the first
+ *  card's default route reaches nothing. */
 function seedRoutedUnreachable(content) {
   const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-unreachable');
   recipe.resultGroups = [
-    ...recipe.resultGroups,
     { id: 'jw-grp-brooch', name: 'Brooch', results: [{ componentId: 'jw-ring', quantity: 1 }] },
+    ...recipe.resultGroups,
   ];
 }
 

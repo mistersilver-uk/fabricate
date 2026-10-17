@@ -1689,7 +1689,8 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry', resultRowState: 'routed-unreachable' },
     steps: [
       ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', null).steps,
-      { selector: `${RESULT_SET('jw-grp-brooch')} [data-route-sources-assign]`, scroll: true },
+      // The seed puts the unreachable Brooch first, so the portaled panel opens inside the frame.
+      { selector: `${RESULT_SET('jw-grp-brooch')} [data-route-sources-assign]` },
     ],
     expectView: 'recipe-edit',
     // Two claims a closed-state frame fails: the panel is portaled onto the manager frame, and its
@@ -1745,7 +1746,8 @@ export const CASES = Object.freeze([
       query: { system: 'lab-jewelry' },
       steps: [
         ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', null).steps,
-        { selector: `${RESULT_SET('jw-grp-amulet')} [data-set-card-actions]`, scroll: true },
+        // The first card, so the portaled menu opens inside the frame rather than off a card below the fold.
+        { selector: `${RESULT_SET('jw-grp-ring')} [data-set-card-actions]` },
       ],
       expectView: 'recipe-edit',
       expectSelector:
