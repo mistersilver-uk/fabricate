@@ -18,7 +18,10 @@ import {
   buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
 } from '../src/systems/checkModifierResolver.js';
-import { fixedRangeGaps } from '../src/ui/svelte/apps/manager/checks/checkRangeGaps.js';
+import {
+  fixedRangeGaps,
+  fixedTierGaps,
+} from '../src/ui/svelte/apps/manager/checks/checkRangeGaps.js';
 import {
   CHECK_ISSUE_LABELS,
   CHECK_ISSUE_TITLES,
@@ -1624,5 +1627,30 @@ describe('fixedRangeGaps', () => {
     assert.deepEqual(fixedRangeGaps([tier(1, 5), tier(NaN, 9), tier('x', 12)]), []);
     assert.deepEqual(fixedRangeGaps([tier(1, 5)]), []);
     assert.deepEqual(fixedRangeGaps(undefined), []);
+  });
+});
+
+// ── the gaps the routing overview draws (issue 2513) ──
+describe('fixedTierGaps', () => {
+  const tier = (start, end, id = `t${start}`) => ({ id, start, end });
+
+  it('reports no gap where an overlapping pair spans an interior hole', () => {
+    const outcomes = [tier(1, 5), tier(6, 10), tier(8, 12), tier(13, 20)];
+    assert.deepEqual(fixedTierGaps(outcomes), []);
+  });
+
+  it('excludes an invalid range, which would otherwise read as a phantom gap', () => {
+    assert.deepEqual(fixedTierGaps([tier(1, 9), tier(30, 10), tier(16, 20)]), [
+      { from: 10, to: 15 },
+    ]);
+  });
+
+  it('lets an id-less tier claim its range', () => {
+    const outcomes = [tier(1, 9), { start: 10, end: 15 }, tier(16, 20)];
+    assert.deepEqual(fixedTierGaps(outcomes), []);
+  });
+
+  it('reads a non-array as no tiers', () => {
+    assert.deepEqual(fixedTierGaps(undefined), []);
   });
 });

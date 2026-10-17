@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 const {
   routedSuccessTierOptions,
   routedOutcomeTierOptions,
+  routedOutcomeTierRows,
   routedHasOutcomeTiers,
   routedOutcomeTierNames
 } = await import('../src/utils/routedOutcomeKeywords.js');
@@ -172,4 +173,49 @@ test('a tier whose success is anything but true reads as a failure option', () =
     { id: 't2', name: 'Truthy', success: false },
   ]);
   assert.deepEqual(routedSuccessTierOptions(routed), []);
+});
+
+// routedOutcomeTierRows — every id-bearing tier with its fixed bounds, for the routing overview.
+
+test('tier rows — a fixed check carries finite raw bounds and nulls the rest', () => {
+  const routed = {
+    type: 'fixed',
+    fixedOutcomes: [
+      { id: 'f1', name: 'Fine', success: true, start: 16, end: 20 },
+      { id: 'f2', name: 'Rough', success: true, start: '8', end: null },
+      { id: 'f3', success: false, start: undefined, end: NaN },
+      { name: 'NoId', success: true, start: 1, end: 7 },
+    ],
+  };
+  assert.deepEqual(routedOutcomeTierRows(routed), [
+    { id: 'f1', name: 'Fine', success: true, start: 16, end: 20 },
+    { id: 'f2', name: 'Rough', success: true, start: null, end: null },
+    { id: 'f3', name: 'f3', success: false, start: null, end: null },
+  ]);
+});
+
+test('tier rows — a relative check has no bounds', () => {
+  const routed = {
+    type: 'relative',
+    relativeOutcomes: [{ id: 'r1', name: 'Fine', success: true, start: 3, end: 9 }],
+  };
+  assert.deepEqual(routedOutcomeTierRows(routed), [
+    { id: 'r1', name: 'Fine', success: true, start: null, end: null },
+  ]);
+  assert.deepEqual(routedOutcomeTierRows(null), []);
+});
+
+test('tier rows — their id, name and success are exactly the outcome-tier options', () => {
+  for (const routed of [
+    {
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'f1', success: true, start: 1, end: 5 }, null, { id: 'f2', name: 'B' }],
+    },
+    { type: 'relative', relativeOutcomes: [{ id: 'r1', name: 'A', success: 'yes' }, { id: '' }] },
+  ]) {
+    assert.deepEqual(
+      routedOutcomeTierRows(routed).map(({ id, name, success }) => ({ id, name, success })),
+      routedOutcomeTierOptions(routed)
+    );
+  }
 });

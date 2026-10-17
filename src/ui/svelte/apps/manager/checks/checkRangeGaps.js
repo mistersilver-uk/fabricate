@@ -1,3 +1,5 @@
+import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
+
 /**
  * The roll values inside a fixed outcome set's own span that no tier claims, as inclusive
  * `{ from, to }` spans in rising order. Ranges are inclusive on both ends, so adjacency is
@@ -20,4 +22,12 @@ export function fixedRangeGaps(outcomes, excluded = new Set()) {
     reach = Math.max(reach, span.end);
   }
   return gaps;
+}
+
+/**
+ * A fixed check's gaps as the routing overview draws them: only `start > end` ranges are
+ * excluded, because the max-reach walk already absorbs overlap.
+ */
+export function fixedTierGaps(outcomes) {
+  return fixedRangeGaps(outcomes, findRangeConflicts(outcomes).invalid);
 }
