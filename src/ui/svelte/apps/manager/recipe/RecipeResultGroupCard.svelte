@@ -21,6 +21,7 @@
   import PickerRow from '../../../components/PickerRow.svelte';
   import { emptyResult, fromValue, toValue } from '../../../components/pickerRowKinds.js';
   import { newDraftId as newId } from '../../../util/draftId.js';
+  import { createPendingFocus } from '../../../util/pendingFocus.js';
   import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
@@ -163,14 +164,15 @@
 
   let root = $state(null);
   // The control focus moves to once the row at `at` renders: `at` -1 is the set's adder.
-  let pendingFocus = null;
+  const pendingFocus = createPendingFocus({ keepUntilHeld: true });
   const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
+  const ROWS = '[data-recipe-result-item], [data-recipe-result-group]';
 
   // An unwrapped group remounts as its last alternative under that alternative's id, taking the
   // focused remove with it, so focus moves to the survivor's `or…`.
   function updateItem(index, nextItem) {
     if (isChoiceGroup(results[index]) && !isChoiceGroup(nextItem)) {
-      pendingFocus = { at: index, selector: '.manager-recipe-or-trigger' };
+      pendingFocus.arm({ at: index, selector: '.manager-recipe-or-trigger' });
     }
     onChange({ ...group, results: results.map((item, i) => (i === index ? nextItem : item)) });
   }
@@ -178,7 +180,7 @@
   // A removed row's focus moves to the row taking its place, else the one before, else the adder.
   function removeItem(index) {
     const at = Math.min(index, results.length - 2);
-    pendingFocus = { at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL };
+    pendingFocus.arm({ at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL });
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
@@ -193,23 +195,20 @@
   // progressive award loop ignores `quantity`, so repeating a component asks for more of it.
   function addItem(kind) {
     const added = progressive ? { id: newId(), componentId: null } : emptyResult(kind, newId());
-    pendingFocus = { at: results.length, selector: '[data-recipe-option-search]' };
+    pendingFocus.arm({ at: results.length, selector: '[data-recipe-option-search]' });
     onChange({ ...group, results: [...results, added] });
   }
 
   // The card holds the pending focus because the control that asked for it may not survive the
   // edit: a progressive set's first stage moves the adder into the list's footer, a new instance.
-  // `results` is read first so the effect tracks every edit; the focus is a task, so it lands
-  // after a menu hands focus back to its trigger.
+  // `results` and `root` are read first so the effect tracks every edit.
   $effect(() => {
-    const count = results.length;
-    if (!root || !pendingFocus || count <= pendingFocus.at) return;
-    const { at, selector } = pendingFocus;
-    pendingFocus = null;
-    setTimeout(() => {
-      const rows = root?.querySelectorAll('[data-recipe-result-item], [data-recipe-result-group]');
-      (at < 0 ? root : rows?.[at])?.querySelector(selector)?.focus();
-    }, 0);
+    const [count, host] = [results.length, root];
+    pendingFocus.settle(
+      ({ at }) => host && count > at,
+      ({ at, selector }) =>
+        (at < 0 ? root : root?.querySelectorAll(ROWS)[at])?.querySelector(selector)?.focus()
+    );
   });
 
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the

@@ -32,6 +32,7 @@
   } from './pickerRowKinds.js';
   import { isChoiceGroup, rangeProblems } from '../../../utils/choiceGroupShape.js';
   import { localizeOr } from '../util/localizeOr.js';
+  import { createPendingFocus } from '../util/pendingFocus.js';
   import ChoiceGroupAwardHeader from './ChoiceGroupAwardHeader.svelte';
   import PickerRowRangeCell from './PickerRowRangeCell.svelte';
   import {
@@ -149,10 +150,10 @@
   // its place, else the one before. The next group that does not hold the entry disarms the focus,
   // so a refused write never moves it.
   let root = $state(null);
-  let pendingFocus = null;
+  const pendingFocus = createPendingFocus();
   const NAME_FIELD = '[data-recipe-option-search], [data-recipe-add-tag]';
   const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
-  const focusOn = (at, entry, selector = NAME_FIELD) => (pendingFocus = { at, entry, selector });
+  const focusOn = (at, entry, selector = NAME_FIELD) => pendingFocus.arm({ at, entry, selector });
 
   // Whether `entries[at]` is `entry`: the same id where it carries one (a result member), else the
   // same unnamed subject (an id-less ingredient option).
@@ -172,17 +173,16 @@
 
   const members = $derived(isChoiceGroup(group) ? group.alternatives : []);
 
-  // Runs once per group the caller hands back. The focus is a task, so it lands after
-  // `ActionMenu` hands focus back to the adder that stays.
+  // Runs once per group the caller hands back.
   $effect(() => {
     const entries = side === 'result' ? members : options;
-    const pending = pendingFocus;
-    pendingFocus = null;
-    if (!pending || !holds(entries, pending.at, pending.entry)) return;
-    setTimeout(() => {
-      const row = root?.querySelectorAll('[data-recipe-option]')[pending.at];
-      row?.querySelector(pending.selector)?.focus();
-    }, 0);
+    pendingFocus.settle(
+      ({ at, entry }) => holds(entries, at, entry),
+      ({ at, selector }) => {
+        const row = root?.querySelectorAll('[data-recipe-option]')[at];
+        row?.querySelector(selector)?.focus();
+      }
+    );
   });
 
   const rolled = $derived(chooserOf(group) === 'rolled');
