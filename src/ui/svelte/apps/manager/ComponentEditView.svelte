@@ -6,6 +6,7 @@
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { newDraftId as newId } from '../../util/draftId.js';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import ComponentCategoryTagsCards from './component/ComponentCategoryTagsCards.svelte';
   import ComponentEssencesCard from './component/ComponentEssencesCard.svelte';
@@ -547,11 +548,6 @@
       enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
-  }
-
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
   // Deep clone the persisted salvage shape into an editable draft. Authoring touches only

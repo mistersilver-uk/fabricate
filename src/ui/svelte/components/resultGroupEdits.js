@@ -12,6 +12,7 @@ import {
   ladderProblems,
 } from '../../../utils/choiceGroupShape.js';
 import { diceEngine, quantityFormulaErrors } from '../../../utils/rollFormulaRollability.js';
+import { newDraftId } from '../util/draftId.js';
 
 import { emptyResult } from './pickerRowKinds.js';
 
@@ -20,13 +21,6 @@ export const MIN_AWARD_COUNT = 2;
 
 export const chooserOf = (group) => (group?.chooser === 'rolled' ? 'rolled' : 'playerChooses');
 export const strategyOf = (group) => (group?.awardStrategy === 'upTo' ? 'upTo' : 'anyOne');
-
-/** A fresh id for a draft entry: Foundry's own where it is loaded. */
-export function newDraftId() {
-  const random = globalThis.foundry?.utils?.randomID;
-  if (typeof random === 'function') return random();
-  return globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 16);
-}
 
 /** `entry` without the selecting range only a rolled group's member reads. */
 function withoutRange(entry) {

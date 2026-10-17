@@ -18,6 +18,7 @@
   import KindAdder from '../../../components/KindAdder.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
+  import { newDraftId as newId } from '../../../util/draftId.js';
   import {
     emptyIngredientOption,
     offeredIngredientKinds,
@@ -49,11 +50,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
   // The explicit name or the default when unset, so an unnamed set is not a placeholder.

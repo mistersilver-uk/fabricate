@@ -342,6 +342,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
     ...RESULT_ROW_RAW_MODULES,
+    // Issue 2511: the recipe results section's set drafts.
+    'src/ui/svelte/apps/manager/recipe/setDrafts.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
