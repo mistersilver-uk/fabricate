@@ -19,6 +19,10 @@
         "More": "+{count} more",
         "MoreName": "and {count} more"
       },
+      "SetCard": {
+        "ReservedRole": "reserved role",
+        "Actions": "Actions for {name}"
+      },
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"

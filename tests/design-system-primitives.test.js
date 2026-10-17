@@ -203,6 +203,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 2512: the set card, on the frames that draw each kind of set.
+  'src/ui/svelte/components/SetCard.svelte',
   // Issue 1782: the set picker, in its session form and its staged form's four states.
   'src/ui/svelte/components/SetPicker.svelte',
   // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because this

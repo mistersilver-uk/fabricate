@@ -1,0 +1,117 @@
+/* The set card (library §12 "The two sets"), rooted at the class `SetCard` emits. */
+.fabricate-set-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-set-card.is-warning {
+  border-color: var(--fab-warning-border);
+}
+
+.fabricate-set-card.is-danger {
+  border-color: var(--fab-danger-border);
+}
+
+/* One set needs no box: its rows sit on the tab itself. */
+.fabricate-set-card.is-bare {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fabricate-set-card .fabricate-set-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* Written with its element so it outranks the manager's (0,2,1) text-field baseline. */
+.fabricate-set-card input.fabricate-set-card-name {
+  box-sizing: border-box;
+  flex: 0 1 240px;
+  min-width: 130px;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fabricate-set-card input.fabricate-set-card-name:hover:enabled {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-set-card input.fabricate-set-card-name:focus-visible {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-set-card .fabricate-set-card-name.is-static {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fabricate-set-card .fabricate-set-card-name.is-static > i {
+  font-size: 11px;
+}
+
+.fabricate-set-card.is-success .fabricate-set-card-name.is-static {
+  color: var(--fab-success-text);
+}
+
+.fabricate-set-card.is-warning .fabricate-set-card-name.is-static {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-set-card.is-danger .fabricate-set-card-name.is-static {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-set-card .fabricate-set-card-meta {
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+/* The kebab closes the head at its end edge, wherever the name leaves it. */
+.fabricate-set-card .fabricate-set-card-actions {
+  margin-left: auto;
+}
+
+.fabricate-set-card .fabricate-set-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-set-card .fabricate-set-card-adder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-set-card .fabricate-set-card-note {
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}

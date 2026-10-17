@@ -427,6 +427,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-depleted-image-filled',
     'manager-gathering-task-depleted-image-empty',
   ]),
+  // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
+  // reserved pair and a salvage group.
+  'src/ui/svelte/components/SetCard.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients-sets',
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-alchemy',
+    'manager-component-edit-salvage',
+  ]),
   // The set picker (issue 1782): the session form, and the staged form closed, open, staged and over its bound.
   'src/ui/svelte/components/SetPicker.svelte': Object.freeze([
     'player-crafting-sources-picker',

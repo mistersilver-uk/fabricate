@@ -697,6 +697,14 @@
       "why": "Issue 1782 builds the specified set-membership picker over `SearchablePopover`'s `multiple` panel, which gained an async `source`, `loading` and `error` for it: a token run bounded at `maxTokens`, a `+N more` button named \"and N more\", a dashed Add, and a panel counting matched-of-total. Two importers, one per form of \"Set membership is edited through a bounded, staged picker\": `apps/manager/recipe-item/RecipeItemContentsTab.svelte` is one record's membership and takes the default `staged` commit, buffering choices for Apply and discarding them on Escape or an outside press; `apps/crafting/ComponentSourcesBar.svelte` is the session control and takes `commit=\"choose\"`, writing each choice and drawing no token run, its portrait row and its `+` trigger staying its own markup. Scoped `shared`: one importer is a manager tab and the other the player window's crafting bar. Its broad-signal override names the sources picker, the contents tab and its picker, staged and over its bound."
     },
     {
+      "path": "src/ui/svelte/components/SetCard.svelte",
+      "library": "<SetCard>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "manager-only",
+      "why": "Issue 2512 builds library §12's set card: a kicker, a 28px serif name field, an optional line naming what routes into the set, the rows, an adder and a note, with the set's verbs behind one `ActionMenu` kebab, plus a `reserved` form (a lock, a static name and a reserved-role chip, with no field and no kebab) and a `bare` form for a single set. Four manager surfaces draw it: the recipe editor's ingredient and result set cards (`apps/manager/recipe/RecipeIngredientSetCard.svelte`, `apps/manager/recipe/RecipeResultGroupCard.svelte`), the recipe Tools tab's per-set cards (`apps/manager/recipe/RecipeToolsTab.svelte`) and the component editor's salvage group head (`apps/manager/component/ComponentSalvageCard.svelte`). Scoped `manager-only`: every caller is a manager editor, and a set is authored nowhere else. Its family is rooted at `fabricate-set-card` in `styles/fabricate-manager-sets-routing.css`, and its broad-signal override names the frames that draw an ingredient set, a routed result set, the reserved pair and a salvage group."
+    },
+    {
       "path": "src/ui/svelte/components/RequirementChooser.svelte",
       "library": "<RequirementChooser>",
       "status": "shipped",
