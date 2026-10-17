@@ -10,7 +10,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { tick } from 'svelte';
 
-import { recipeResultKinds } from '../../src/ui/svelte/apps/manager/recipe/resultRows.js';
+import { recipeResultKinds } from '../../src/ui/svelte/components/resultRows.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 import { seededRollClass, withRoll } from '../helpers/seededRoll.js';
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';

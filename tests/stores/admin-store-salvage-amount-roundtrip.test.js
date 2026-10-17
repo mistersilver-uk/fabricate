@@ -12,7 +12,7 @@ import { get } from 'svelte/store';
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
 import { resolveRolledAmount } from '../../src/systems/rolledAmountResolver.js';
-import { fromValue, toValue } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { fromValue, toValue } from '../../src/ui/svelte/components/pickerRowKinds.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices } from '../helpers/adminStoreServices.js';
 import { seededRollClass } from '../helpers/seededRoll.js';

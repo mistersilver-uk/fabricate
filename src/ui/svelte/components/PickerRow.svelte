@@ -49,11 +49,11 @@
 </script>
 
 <script>
-  import Chip from '../../../components/Chip.svelte';
-  import { localizeOr } from '../../../util/localizeOr.js';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import Select from '../../../components/Select.svelte';
-  import SegmentedControl from '../../../components/SegmentedControl.svelte';
+  import Chip from './Chip.svelte';
+  import { localizeOr } from '../util/localizeOr.js';
+  import SearchablePopover from './SearchablePopover.svelte';
+  import Select from './Select.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
   import PickerRowAmount from './PickerRowAmount.svelte';
   import PickerRowKindMenu from './PickerRowKindMenu.svelte';
   import PickerRowNameField from './PickerRowNameField.svelte';

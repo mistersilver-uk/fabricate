@@ -8,10 +8,7 @@ import test from 'node:test';
 
 import { isLearnedKnowledgeObservable } from '../src/systems/learnedKnowledgeObservability.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
-import {
-  recipeResultKinds,
-  resultAmountInvalid,
-} from '../src/ui/svelte/apps/manager/recipe/resultRows.js';
+import { recipeResultKinds, resultAmountInvalid } from '../src/ui/svelte/components/resultRows.js';
 
 const UNITS = Object.freeze([
   { id: 'gp', label: 'Gold', icon: 'fa-solid fa-sun' },

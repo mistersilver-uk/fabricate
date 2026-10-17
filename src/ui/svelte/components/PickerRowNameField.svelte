@@ -23,9 +23,9 @@
     never the raw string. Pinned by `tests/components/picker-row-matrix-mounted.test.js`.
 -->
 <script>
-  import { localizeOr } from '../../../util/localizeOr.js';
-  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
-  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
+  import { localizeOr } from '../util/localizeOr.js';
+  import { typeaheadPanel } from '../actions/typeaheadPanel.js';
+  import { createTypeaheadCombobox } from '../util/typeaheadCombobox.svelte.js';
 
   // How many suggestions the list offers, and the height of that many rows with the panel's own
   // padding and border, so a full list never slices its last row.
@@ -133,7 +133,7 @@
           class="manager-recipe-option-clear"
           data-recipe-option-clear
           data-keyboard-focus="true"
-          aria-label={clearName}
+          aria-label={clearName || undefined}
           title={localizeOr('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
           {disabled}
           onclick={() => choose('')}><i class="fa-solid fa-xmark" aria-hidden="true"></i></button

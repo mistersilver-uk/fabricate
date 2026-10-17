@@ -126,7 +126,7 @@ const CONVERTED_BATCHES = Object.freeze([
       // Issue 2367 merged the choice group's adder and the ingredient set's four adders into
       // KindAdder's two Button sites.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+        file: 'src/ui/svelte/components/KindAdder.svelte',
         sites: 2,
       }),
       Object.freeze({

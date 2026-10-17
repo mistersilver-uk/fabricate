@@ -19,8 +19,8 @@
 <script>
   // The add-new essence offer reaches a row as its catalogue's `offered` flag. `essenceOptions`
   // itself stays unfiltered, because `hasEssences` gates the whole essence match type on it.
-  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
-  import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
+  import { visibleEssenceOptions } from '../../model/essenceValidation.js';
+  import { currencyUnitIcon, currencyUnitLabel } from '../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
   import KindAdder from './KindAdder.svelte';
   import {
@@ -30,8 +30,8 @@
     subjectName,
     toValue,
   } from './pickerRowKinds.js';
-  import { isChoiceGroup, rangeProblems } from '../../../../../utils/choiceGroupShape.js';
-  import { localizeOr } from '../../../util/localizeOr.js';
+  import { isChoiceGroup, rangeProblems } from '../../../utils/choiceGroupShape.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import ChoiceGroupAwardHeader from './ChoiceGroupAwardHeader.svelte';
   import PickerRowRangeCell from './PickerRowRangeCell.svelte';
   import {
@@ -271,7 +271,8 @@
     removeHook={member ? 'result-alternative' : 'result-item'}
     invalid={resultAmountInvalid(entry, localizeOr)}
     class={reward ? 'is-result is-reward' : 'is-result'}
-    {...member ? { 'data-recipe-result-member': '' } : { 'data-recipe-result-item': '' }}
+    data-recipe-result-member={member ? '' : undefined}
+    data-recipe-result-item={member ? undefined : ''}
     allowAny={reward && !member}
     {menuHeading}
     menuHint={localizeOr(

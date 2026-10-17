@@ -21,8 +21,8 @@ const harness = createMountedComponentHarness({
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
     // …which reads a result choice group's problems through its edits (issue 1773).
-    'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/resultGroupEdits.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
     'src/utils/rollFormulaRollability.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).

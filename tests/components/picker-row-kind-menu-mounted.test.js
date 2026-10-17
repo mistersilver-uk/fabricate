@@ -19,10 +19,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...KIND_MENU_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
   ],
   compiledModules: KIND_MENU_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
+  componentPath: 'src/ui/svelte/components/PickerRowKindMenu.svelte',
 });
 
 const settle = () => new Promise((done) => setTimeout(done, 0));

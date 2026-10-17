@@ -172,6 +172,18 @@ const EXCEPTIONS = Object.freeze([
     reason: 'an internal part with one caller, handed the name its parent already derived',
   },
   {
+    component: 'PickerRowNameField',
+    name: 'describedBy',
+    fault: 'is a retired spelling',
+    reason: 'an internal part with one caller, handed the id its parent already derived',
+  },
+  {
+    component: 'PickerRowNameField',
+    name: 'onChoose',
+    fault: REGISTER_ONLY,
+    reason: 'a typeahead commits one suggestion per choice, the callback its holder contract names',
+  },
+  {
     component: 'EditorTabs',
     name: REST,
     fault: NO_CLASS,

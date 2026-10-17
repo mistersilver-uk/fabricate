@@ -4,9 +4,9 @@
  * set holds once one is added. Recipe results, gathering task results and salvage share them; only
  * a recipe's result set offers kinds beyond `component` (`recipeResultKinds`).
  */
-import { normalizeQuantityFormula, quantityFormulaErrors } from '../../../../../models/Result.js';
-import { diceEngine, maximisedTotal } from '../../../../../utils/rollFormulaRollability.js';
-import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
+import { normalizeQuantityFormula, quantityFormulaErrors } from '../../../models/Result.js';
+import { diceEngine, maximisedTotal } from '../../../utils/rollFormulaRollability.js';
+import { currencyUnitIcon, currencyUnitLabel } from '../util/recipeCurrency.js';
 
 import { KIND_META, shownAmount } from './pickerRowKinds.js';
 

@@ -517,10 +517,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The repair set is `PickerRow` rows at system scope, and only this frame photographs them there.
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/ChoiceGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
       // The summary sentence's own module, claimed by name since the list cases stopped swallowing `tools/`.
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,

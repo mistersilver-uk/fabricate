@@ -10,8 +10,8 @@ import {
   countProblem,
   knownSetting,
   ladderProblems,
-} from '../../../../../utils/choiceGroupShape.js';
-import { diceEngine, quantityFormulaErrors } from '../../../../../utils/rollFormulaRollability.js';
+} from '../../../utils/choiceGroupShape.js';
+import { diceEngine, quantityFormulaErrors } from '../../../utils/rollFormulaRollability.js';
 
 import { emptyResult } from './pickerRowKinds.js';
 
