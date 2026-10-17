@@ -532,7 +532,7 @@ test('every ruled-out verdict is from the closed set, and a merged name points a
 });
 
 /**
- * What contradicts a `manager-only` scope on `file`, read TRANSITIVELY over `graph`: the walk passes
+ * What contradicts a `manager-only` scope on `file`, read transitively over `graph`: the walk passes
  * through importers under the primitive directory, every other importer it reaches must lie under
  * the manager, and at least one must, or no application reaches the row at all.
  * @param {{ importersOf: (file: string) => string[] }} graph an `importGraph` result
@@ -853,7 +853,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
-  // Issue 2510's requirement-row parts: two members at `target` and five one-caller parts.
+  // Issue 2510: KindAdder and PickerRowAmount are members at `target`; ChoiceGroupAwardHeader and
+  // the other four PickerRow* parts below each have one caller.
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',

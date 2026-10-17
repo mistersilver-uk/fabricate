@@ -632,6 +632,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-editor-straight-rolled',
     'manager-tool-stress-repair',
     'world-tool-entry-on-break-repair',
+    'world-tool-entry-on-break-repair-empty-tag',
+    'world-tool-entry-on-break-repair-suggestions',
+    'manager-component-edit-salvage-suggestions',
   ]),
   'src/ui/svelte/components/PickerRowNameField.svelte': Object.freeze([
     'manager-recipe-edit-ingredients',
@@ -645,6 +648,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-group-player-upto',
     'manager-recipe-edit-results-group-rolled-anyone',
     'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-component-edit-salvage-suggestions',
+    'manager-component-edit-salvage-narrow',
+    'manager-gathering-task-editor-straight-rolled',
+    'world-tool-entry-on-break-repair-suggestions',
+    'manager-tool-stress-repair',
   ]),
   'src/ui/svelte/components/PickerRowAmount.svelte': Object.freeze([
     'manager-recipe-edit-ingredients',
@@ -662,6 +670,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-group-rolled-upto-repeats',
     'manager-component-edit-salvage-rolled-narrow',
     'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
   ]),
   'src/ui/svelte/components/PickerRowKindMenu.svelte': Object.freeze([
     'manager-recipe-edit-ingredients',
@@ -671,6 +681,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results',
     'manager-recipe-edit-results-kinds',
     'manager-recipe-edit-results-group-player-anyone',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
   ]),
   'src/ui/svelte/components/PickerRowRewardBody.svelte': Object.freeze([
     'manager-recipe-edit-results-kinds',
@@ -704,6 +716,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-group-failure-role',
     'manager-tool-stress-repair',
     'world-tool-entry-on-break-repair',
+    'manager-gathering-task-editor-straight-rolled',
   ]),
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte': Object.freeze([
     'manager-recipe-edit-results-group-player-anyone',

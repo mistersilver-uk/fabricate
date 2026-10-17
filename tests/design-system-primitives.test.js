@@ -1025,6 +1025,60 @@ test("the expression field's claim fails when an importer's override drops a cas
   ]);
 });
 
+/** Issue 2510's coverage floor: per moved part, a frame of each surface that draws it. */
+const REQUIREMENT_ROW_FLOOR = {
+  PickerRow: [
+    'manager-component-edit-salvage',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ],
+  PickerRowNameField: [
+    'manager-component-edit-salvage-suggestions',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair-suggestions',
+  ],
+  PickerRowAmount: [
+    'manager-component-edit-salvage-rolled-narrow',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ],
+  PickerRowKindMenu: [
+    'manager-recipe-edit-ingredients-kind-list',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ],
+  PickerRowRewardBody: ['manager-recipe-edit-results-kinds'],
+  PickerRowRangeCell: ['manager-recipe-edit-results-group-rolled-anyone'],
+  ChoiceGroup: [
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ],
+  ChoiceGroupAwardHeader: ['manager-recipe-edit-results-group-player-anyone'],
+  // Gathering draws its adder with SearchablePopover, so no gathering frame belongs here.
+  KindAdder: [
+    'manager-recipe-edit-ingredients-adder-menu',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair-empty-tag',
+  ],
+};
+
+test("each requirement-row part's override names a frame of every surface that draws it", () => {
+  for (const [name, floor] of Object.entries(REQUIREMENT_ROW_FLOOR)) {
+    const file = `src/ui/svelte/components/${name}.svelte`;
+    const named = BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [];
+    const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+    for (const id of floor) {
+      assert.ok(named.includes(id), `${file}'s override does not name ${id}`);
+      assert.ok(selected.has(id), `a change to ${file} does not select ${id}`);
+    }
+  }
+});
+
 test('(d) every recorded non-member names exactly the callers it has', () => {
   // THE CLAUSE THE REGISTER WAS MISSING, AND THE THREE SHAPES IT CATCHES.
   //
@@ -1469,5 +1523,23 @@ test('(g) no tracked file under scripts, src, openspec, tests or docs names a mo
     [],
     `these name a file where it stood before issues 2465 and 2510 moved it into ${PRIMITIVE_DIRECTORY}; ` +
       'point them at the new path, including any prose that names it'
+  );
+
+  // An alternation spells no needle, so each pattern is also run on every old path. A probe in the
+  // same directory spares a directory-wide pattern, which names no one file.
+  const namesOldPath = VIEW_LAB_CASES.flatMap((viewCase) =>
+    viewCase.sourceMatches.flatMap((pattern) =>
+      recipeNeedles
+        .filter((needle) => {
+          const probe = `${APP_DIRECTORY}manager/recipe/Zzprobe${path.extname(needle)}`;
+          return pattern.test(`${APP_DIRECTORY}manager/${needle}`) && !pattern.test(probe);
+        })
+        .map((needle) => `${viewCase.id}: ${pattern} matches ${needle}`)
+    )
+  );
+  assert.deepEqual(
+    namesOldPath,
+    [],
+    'a sourceMatches pattern still names a moved file by its old path; point it at the new path'
   );
 });
