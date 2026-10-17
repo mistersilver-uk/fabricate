@@ -65,12 +65,8 @@ const SALVAGE_STAGE_GEOMETRY = Object.freeze({
   },
 });
 
-/** The salvage rows' sources: the editor and the requirement row it draws them with. */
-const SALVAGE_ROW_SOURCES = Object.freeze([
-  ...COMPONENT_EDITOR_MATCHES,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(PickerRow|PickerRowAmount)\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
-]);
+/** The salvage rows' sources: the editor that draws them. */
+const SALVAGE_ROW_SOURCES = Object.freeze([...COMPONENT_EDITOR_MATCHES]);
 
 /** Component Rules' header group, led by the Premium advert until it is dismissed. */
 const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';

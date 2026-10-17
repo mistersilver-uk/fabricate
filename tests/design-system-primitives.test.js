@@ -110,6 +110,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
   'src/ui/svelte/components/Chip.svelte',
+  // Issue 2510: the requirement row family, each part on the states that draw it.
+  'src/ui/svelte/components/ChoiceGroup.svelte',
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
@@ -134,6 +137,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ItemDropZone.svelte',
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/ListRow.svelte',
   // Issue 1782: the log list, on the journal's Finished list with a failed and a selected entry.
   'src/ui/svelte/components/LogList.svelte',
@@ -157,6 +161,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/PageHeader.svelte',
   // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
   'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   // Issue 1782: the inspector rail section, on a frame of each of its three inspectors.
   'src/ui/svelte/components/Rail.svelte',
@@ -229,6 +239,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // essence's Contributing.
   'src/ui/svelte/components/XrefList.svelte',
   'src/ui/svelte/components/YieldScale.svelte',
+  'src/ui/svelte/components/pickerRowKinds.js',
+  'src/ui/svelte/components/resultGroupEdits.js',
+  'src/ui/svelte/components/resultRows.js',
   'styles/fabricate.css',
 ];
 
@@ -962,21 +975,54 @@ const EXPRESSION_FIELD_CASES = [
   'manager-recipe-edit-results-group-failure-role',
 ];
 
+/**
+ * The ids in `ids` that claim no importer of `field`. A case claims an importer by its own
+ * `sourceMatches` or by appearing in that importer's own entry in `overrides`; the field's own
+ * entry never counts, since it is the claim being checked.
+ */
+function unclaimedFieldCases(field, ids, overrides) {
+  const importers = IMPORTERS.importersOf(field);
+  const claims = (id, file) =>
+    (overrides[file] ?? []).includes(id) ||
+    (VIEW_LAB_CASES.find((viewCase) => viewCase.id === id).sourceMatches ?? []).some((pattern) =>
+      pattern.test(file)
+    );
+  return ids.filter((id) => importers.every((file) => !claims(id, file)));
+}
+
 test("the expression field's override names the cases that draw it, each claiming an importer", () => {
   assert.deepEqual(BROAD_SIGNAL_CASE_OVERRIDES[EXPRESSION_FIELD], EXPRESSION_FIELD_CASES);
   const selected = new Set(
     mapChangedFilesToCases([EXPRESSION_FIELD]).map((viewCase) => viewCase.id)
   );
-  const importers = IMPORTERS.importersOf(EXPRESSION_FIELD);
-  assert.ok(importers.length > 0, 'the field has no measured importer, so no case can claim one');
+  assert.ok(
+    IMPORTERS.importersOf(EXPRESSION_FIELD).length > 0,
+    'the field has no measured importer, so no case can claim one'
+  );
   for (const id of EXPRESSION_FIELD_CASES) {
     assert.ok(selected.has(id), `a change to the field does not select ${id}`);
-    const patterns = VIEW_LAB_CASES.find((viewCase) => viewCase.id === id).sourceMatches ?? [];
-    assert.ok(
-      importers.some((file) => patterns.some((pattern) => pattern.test(file))),
-      `${id} claims no importer of the field by sourceMatches, so nothing says it draws one`
-    );
   }
+  assert.deepEqual(
+    unclaimedFieldCases(EXPRESSION_FIELD, EXPRESSION_FIELD_CASES, BROAD_SIGNAL_CASE_OVERRIDES),
+    [],
+    'these cases claim no importer of the field, by sourceMatches or by its override, so nothing ' +
+      'says they draw one'
+  );
+});
+
+test("the expression field's claim fails when an importer's override drops a case", () => {
+  const AMOUNT = 'src/ui/svelte/components/PickerRowAmount.svelte';
+  const dropped = 'manager-recipe-edit-results-rolled';
+  assert.ok(BROAD_SIGNAL_CASE_OVERRIDES[AMOUNT].includes(dropped), `${AMOUNT} no longer names it`);
+  const overrides = {
+    ...BROAD_SIGNAL_CASE_OVERRIDES,
+    [AMOUNT]: BROAD_SIGNAL_CASE_OVERRIDES[AMOUNT].filter((id) => id !== dropped),
+    // The field's own entry never claims, whatever it names.
+    [EXPRESSION_FIELD]: [dropped],
+  };
+  assert.deepEqual(unclaimedFieldCases(EXPRESSION_FIELD, EXPRESSION_FIELD_CASES, overrides), [
+    dropped,
+  ]);
 });
 
 test('(d) every recorded non-member names exactly the callers it has', () => {
@@ -1380,9 +1426,31 @@ test('(f) no file under components/ imports from the application tree', () => {
   );
 });
 
-test('(g) no tracked file under scripts, src, openspec, tests or docs names the field by its old path', () => {
-  // The needle is built from parts so this clause's own file does not hold it.
-  const needle = ['apps/manager', 'RollDataExpressionInput'].join('/');
+/** The twelve files issue 2510 moved out of the manager recipe directory, by basename. */
+const MOVED_FROM_RECIPE = [
+  'PickerRow.svelte',
+  'PickerRowNameField.svelte',
+  'PickerRowAmount.svelte',
+  'PickerRowKindMenu.svelte',
+  'PickerRowRewardBody.svelte',
+  'PickerRowRangeCell.svelte',
+  'ChoiceGroup.svelte',
+  'ChoiceGroupAwardHeader.svelte',
+  'KindAdder.svelte',
+  'pickerRowKinds.js',
+  'resultGroupEdits.js',
+  'resultRows.js',
+];
+
+test('(g) no tracked file under scripts, src, openspec, tests or docs names a moved file by its old path', () => {
+  // Each needle is built from parts so this clause's own file does not hold it, and each moved
+  // basename is searched both as written and regex-escaped, as a `sourceMatches` pattern spells it.
+  const recipeNeedles = MOVED_FROM_RECIPE.map((base) => ['recipe', base].join('/'));
+  const needles = [
+    ['apps/manager', 'RollDataExpressionInput'].join('/'),
+    ...recipeNeedles,
+    ...recipeNeedles.map((needle) => needle.replaceAll(/[/.]/g, (char) => `\\${char}`)),
+  ];
   const tracked = execFileSync(
     'git',
     ['ls-files', '-z', '--', 'scripts', 'src', 'openspec', 'tests', 'docs'],
@@ -1392,11 +1460,14 @@ test('(g) no tracked file under scripts, src, openspec, tests or docs names the 
     .filter(Boolean);
   assert.ok(tracked.length > 1000, `only ${tracked.length} tracked files walked`);
 
-  const stale = tracked.filter((file) => readFileSync(path.join(REPO_ROOT, file)).includes(needle));
+  const stale = tracked.flatMap((file) => {
+    const text = readFileSync(path.join(REPO_ROOT, file));
+    return needles.filter((needle) => text.includes(needle)).map((needle) => `${file}: ${needle}`);
+  });
   assert.deepEqual(
     stale,
     [],
-    `${needle} is where the field stood before issue 2465 moved it into ${PRIMITIVE_DIRECTORY}; ` +
-      'point these at the new path, including any prose that names it'
+    `these name a file where it stood before issues 2465 and 2510 moved it into ${PRIMITIVE_DIRECTORY}; ` +
+      'point them at the new path, including any prose that names it'
   );
 });

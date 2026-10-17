@@ -227,7 +227,7 @@ export const KIND_MENU_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte'
+  'src/ui/svelte/components/PickerRowKindMenu.svelte'
 ]);
 
 // The result rows beyond `<Select>` (issue 1516): the requirement row, its amount slot, its kind
@@ -239,8 +239,8 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
   // Issue 1521: the card and the requirement row localize through `localizeOr`.
   ...LOCALIZE_OR_RAW_MODULES,
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
+  'src/ui/svelte/components/resultRows.js',
   'src/ui/svelte/util/recipeCurrency.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
@@ -251,7 +251,7 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/utils/rollFormulaRollability.js',
   // Issue 1773: a recipe result renders through the result-side `ChoiceGroup`, whose edits and
   // essence offer (read by its ingredient form) it imports.
-  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+  'src/ui/svelte/components/resultGroupEdits.js',
   'src/ui/model/essenceValidation.js'
 ]);
 
@@ -259,24 +259,24 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/PickerRowKindMenu.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
   // Issue 1773: a recipe result set's one adder, the shared kind adder since issue 2367.
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   // …and its choice group, with the award header, the range cell and the progressive statement.
   'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte'
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
+  'src/ui/svelte/components/ChoiceGroup.svelte'
 ]);
 
 // Issue 1773: what `ChoiceGroup`'s result-side form adds to every tree compiling the group — its
@@ -284,9 +284,9 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
 // literals, because the harness guard follows a nested spread one level only.
 export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
-  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/components/resultGroupEdits.js',
+  'src/ui/svelte/components/resultRows.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
   'src/ui/svelte/util/recipeCurrency.js',
   'src/utils/choiceGroupShape.js',
   'src/models/Result.js',
@@ -299,15 +299,15 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
 
 export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte'
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS

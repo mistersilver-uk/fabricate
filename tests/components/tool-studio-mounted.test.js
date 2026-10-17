@@ -76,7 +76,7 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // The ONE ingredient-kind table (issue 1373, round 8).
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -118,11 +118,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
-    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/ChoiceGroup.svelte',
+    'src/ui/svelte/components/PickerRow.svelte',
+    'src/ui/svelte/components/PickerRowAmount.svelte',
+    'src/ui/svelte/components/PickerRowNameField.svelte',
+    'src/ui/svelte/components/PickerRowRewardBody.svelte',
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
     ...CHOICE_GROUP_COMPILED_MODULES,

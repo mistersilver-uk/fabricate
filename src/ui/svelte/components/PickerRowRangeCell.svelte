@@ -28,8 +28,8 @@
 </script>
 
 <script>
-  import Field from '../../../components/Field.svelte';
-  import { localizeOr } from '../../../util/localizeOr.js';
+  import Field from './Field.svelte';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     range = null,

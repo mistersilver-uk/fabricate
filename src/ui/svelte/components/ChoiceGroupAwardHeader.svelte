@@ -26,11 +26,11 @@
 </script>
 
 <script>
-  import Button from '../../../components/Button.svelte';
-  import SegmentedControl from '../../../components/SegmentedControl.svelte';
-  import Select from '../../../components/Select.svelte';
-  import { localizeOr } from '../../../util/localizeOr.js';
-  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
+  import Button from './Button.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
+  import Select from './Select.svelte';
+  import { localizeOr } from '../util/localizeOr.js';
+  import RollDataExpressionInput from './RollDataExpressionInput.svelte';
   import PickerRowAmount from './PickerRowAmount.svelte';
   import {
     MIN_AWARD_COUNT,

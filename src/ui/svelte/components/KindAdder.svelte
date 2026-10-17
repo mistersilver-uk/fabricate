@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): the composition licence of "The primitive set is a closed, versioned vocabulary" — this is the kind menu's adder, wholly the members `ActionMenu` and `Button`, so its callers owe it no manifest row -->
+<!-- ratchet-exempt(design-system): KindAdder is a new manager-only member at target, because ChoiceGroup, RecipeIngredientSetCard and RecipeResultGroupCard all render it as the kind menu's adder; its specimen is owed to issue 2515 (issue 2510) -->
 <!--
   One dashed adder over the shared kind menu: a `Button role="dashed"` trigger over `ActionMenu`,
   headed by the caller and listing the offered kinds from the button's start edge, or appending
@@ -19,9 +19,9 @@
   - `onAdd(kind)` — append an empty entry of `kind`; the caller moves focus to its name field.
 -->
 <script>
-  import ActionMenu from '../../../components/ActionMenu.svelte';
-  import Button from '../../../components/Button.svelte';
-  import { localizeOr } from '../../../util/localizeOr.js';
+  import ActionMenu from './ActionMenu.svelte';
+  import Button from './Button.svelte';
+  import { localizeOr } from '../util/localizeOr.js';
   import { kindMenuItems } from './pickerRowKinds.js';
 
   let {
@@ -43,7 +43,12 @@
     <ActionMenu {items} {heading} align="start" {menuClass} onSelect={(kind) => onAdd(kind)}>
       {#snippet trigger({ attributes })}
         <!-- ratchet-exempt(design-system): the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), never a caller's name -->
-        <Button role="dashed" data-recipe-add={triggerHook} aria-label={name} {...attributes}>
+        <Button
+          role="dashed"
+          data-recipe-add={triggerHook}
+          aria-label={name || undefined}
+          {...attributes}
+        >
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{word}</span>
         </Button>
@@ -53,7 +58,7 @@
     <Button
       role="dashed"
       data-recipe-add={triggerHook}
-      aria-label={name}
+      aria-label={name || undefined}
       onclick={() => onAdd(kinds[0] ?? 'component')}
     >
       <i class="fas fa-plus" aria-hidden="true"></i>

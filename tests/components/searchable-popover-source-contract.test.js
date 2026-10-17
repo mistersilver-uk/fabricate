@@ -144,7 +144,7 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
   'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
   // The requirement row's tag adder (issue 2430): each choice writes one add or one remove at
   // once, so its held tags are announced selected through `multiple` rather than `SetPicker`.
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
 ]);
 
 // The reader is probed rather than trusted: a pattern matching nothing makes the set-equality

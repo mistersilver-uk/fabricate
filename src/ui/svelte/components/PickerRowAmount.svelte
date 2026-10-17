@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): the composition licence of "The primitive set is a closed, versioned vocabulary" — this is `PickerRow`'s amount slot, wholly the members `SegmentedControl`, `Stepper` and `RollDataExpressionInput`, so its second caller, the result choice group header's N (issue 1773), owes it no manifest row -->
+<!-- ratchet-exempt(design-system): PickerRowAmount is a new manager-only member at target, because PickerRow and ChoiceGroupAwardHeader both render it as the amount slot; its specimen is owed to issue 2515 (issue 2510) -->
 <!--
   The amount slot of a `PickerRow`: a stepper, or behind a Fixed | Rolled toggle a roll expression.
   It renders a fragment into the row's trailing controls and owns no wrapper element.
@@ -32,10 +32,10 @@
 </script>
 
 <script>
-  import SegmentedControl from '../../../components/SegmentedControl.svelte';
-  import Stepper from '../../../components/Stepper.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
-  import RollDataExpressionInput from '../../../components/RollDataExpressionInput.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
+  import Stepper from './Stepper.svelte';
+  import { localizeOr as text } from '../util/localizeOr.js';
+  import RollDataExpressionInput from './RollDataExpressionInput.svelte';
   import { shownAmount } from './pickerRowKinds.js';
 
   amountSeq += 1;
@@ -58,11 +58,6 @@
     invalid = '',
     onChange = () => {},
   } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   const shown = $derived(shownAmount(value?.quantity));
   const togglable = $derived(
