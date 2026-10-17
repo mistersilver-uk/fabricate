@@ -166,7 +166,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 1. Open the recipe in the recipe editor and go to the **Validation** tab.
    Look for the warning that a result set is not assigned to any check outcome, and the warning that a check success outcome produces no result set.
 2. On the **Results** tab, check each result set's **Produced by** line.
-   Make sure every success outcome tier you expect to use is assigned to a result set, and that no result set shows **Nothing — unreachable**.
+   Make sure every success outcome tier you expect to use is assigned to a result set, and that no result set shows **Nothing — unreachable** (a reserved failure set never shows it).
    A struck-through tier on the line no longer routes, so remove it or assign a current tier.
 3. If you removed an outcome tier from the routed crafting check, Fabricate strips that tier from any recipe result set that referenced it and posts a notification saying how many result sets were updated.
    Re-open the affected recipes and assign the result sets to a current outcome tier.

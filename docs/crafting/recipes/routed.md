@@ -59,9 +59,9 @@ A result set's **Produced by** line names the ingredient sets that lead to it.
 Choose **Assign** to open a searchable list of every ingredient set in the recipe.
 A set that already leads to another result set shows where it goes today, for example "now → Plain blade".
 Choosing it moves it to this result set, and a set leads to one result set at a time.
-Choosing a set that is already listed takes it off.
+Choosing a set you have already assigned to this result set takes it off.
 
-An ingredient set you have not assigned anywhere still reaches a result set, and the line marks it **default**.
+An ingredient set you have not assigned anywhere still reaches the recipe's first result set, and the line marks it **default**.
 A default set has no remove button, because there is nothing assigned to remove.
 When more than one ingredient set leads to a result set, a note on the card says how many.
 Editing that result set's results changes what each of those ingredient sets awards.
@@ -114,9 +114,10 @@ The success tiers are always listed.
 A tier you have marked as a failure is listed too, but only while the check's **Produce a result on a failed check** setting permits results on a failed check.
 See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
 
-A tier that another result set already uses shows where it goes today, for example "now → Plain blade".
+A tier that already leads to another result set, by assignment or by name, shows where it goes today, for example "now → Plain blade".
 Choosing it moves it to this result set, and a tier leads to one result set at a time.
-Choosing a tier that is already listed takes it off.
+Choosing a tier you have already assigned to this result set takes it off.
+A tier that reaches a result set by name, or because it is the recipe's only result set, shows on the line marked **default** and has no remove button, because there is nothing assigned to remove.
 Until any result set lists a tier, the list warns that assigning one stops the other tiers routing by name.
 
 A tier you have marked as a failure while the setting is **Never** is not offered.
