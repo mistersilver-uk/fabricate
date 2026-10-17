@@ -564,7 +564,7 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result set editor
+- One result set editor, and, with the crafting check enabled, the reserved failure result set on the terms Alchemy Simple states below
 
 ### Routed UI
 
@@ -578,7 +578,7 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
-    The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
+    The `checkOutcomeIds` assignment picker offers the tiers the system's `craftingCheck.failureResultPolicy` lets route: success tiers only (`success === true`) under `never`, and failure-marked tiers as well where the policy permits results on failure, as `ui-system-studio` § Routed result-group authoring is policy-conditional specifies.
   - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 
@@ -620,7 +620,10 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
   Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
-  - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
+  - **Simple** → a labeled "On success" result set, and a reserved, static-labeled ("On a failed check", warning/danger accent) failure result set present only while the recipe carries a `role: 'failure'` group; `Recipe.validate` tolerates its absence.
+    An "Award results on a failed check" toggle adds that group empty and removes it, the editor never synthesizes the set, and an edit to the success set never creates it.
+    Under a failure-result policy of `never` the toggle cannot add the group, states why and links to the Checks studio, and a group already present stays drawn with that reason and can still be removed.
+    NOT SHIPPED here yet, issue 2514: the editor still synthesizes an undeletable failure set in the derived view, and an edit to either slot persists it.
     No "add result set" beyond the two.
   - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
