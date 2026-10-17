@@ -342,9 +342,10 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
     ...RESULT_ROW_RAW_MODULES,
-    // Issue 2511: the recipe results section's set drafts and routing model.
+    // Issue 2511: the recipe results section's set drafts, routing model and routing edits.
     'src/ui/svelte/apps/manager/recipe/setDrafts.js',
     'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/failureResultPolicy.js',
   ],

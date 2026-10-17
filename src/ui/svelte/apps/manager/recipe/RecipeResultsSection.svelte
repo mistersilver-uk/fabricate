@@ -13,11 +13,11 @@
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
-  import { newDraftId as newId } from '../../../util/draftId.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
   import { buildRoutingModel } from './recipeRoutingModel.js';
+  import { addResultGroup, withResultSlot } from './recipeRoutingEdits.js';
 
   let {
     resultGroups = [],
@@ -98,30 +98,11 @@
   );
 
   function updateAlchemyPair(slot, nextGroup) {
-    const success =
-      slot === 'success'
-        ? {
-            ...alchemySuccessGroup,
-            ...nextGroup,
-            id: alchemySuccessGroup.id || nextGroup?.id || newId(),
-          }
-        : { ...alchemySuccessGroup, id: alchemySuccessGroup.id || newId() };
-    const failure =
-      slot === 'failure'
-        ? {
-            ...alchemyFailureGroup,
-            ...nextGroup,
-            role: 'failure',
-            id: alchemyFailureGroup.id || nextGroup?.id || newId(),
-          }
-        : { ...alchemyFailureGroup, role: 'failure', id: alchemyFailureGroup.id || newId() };
-    onChange([success, failure]);
+    onChange(withResultSlot(groups, slot, nextGroup));
   }
 
-  // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
-  // result set is immediately routable.
   function addGroup() {
-    onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
+    onChange(addResultGroup(groups));
   }
 
   function removeGroup(index) {

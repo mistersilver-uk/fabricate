@@ -8,7 +8,6 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { newDraftId } from '../../../util/draftId.js';
   import RecipeIngredientSetCard from './RecipeIngredientSetCard.svelte';
   import Button from '../../../components/Button.svelte';
   import {
@@ -17,6 +16,7 @@
     rendersBare,
     withSoleEntry,
   } from './setDrafts.js';
+  import { addIngredientSet } from './recipeRoutingEdits.js';
 
   let {
     ingredientSets = [],
@@ -56,9 +56,8 @@
     onChange(sets.map((set, i) => (i === index ? nextSet : set)));
   }
 
-  // An id eagerly at add time, so a new set is immediately routable in the Results tab.
   function addSet() {
-    onChange([...sets, { id: newDraftId(), name: '', ingredientGroups: [] }]);
+    onChange(addIngredientSet(sets));
   }
 
   function removeSet(index) {
