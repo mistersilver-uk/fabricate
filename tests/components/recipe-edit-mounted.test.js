@@ -100,6 +100,8 @@ const RAW_MODULES = [
   'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  // Issue 2511: the set drafts both sections write through.
+  'src/ui/svelte/apps/manager/recipe/setDrafts.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
   // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
   // so omitting it throws a named "add it to rawModules" error rather than hanging.

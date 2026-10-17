@@ -20,7 +20,7 @@
   import ChoiceGroup from '../../../components/ChoiceGroup.svelte';
   import PickerRow from '../../../components/PickerRow.svelte';
   import { emptyResult, fromValue, toValue } from '../../../components/pickerRowKinds.js';
-  import { newDraftId as newId } from '../../../components/resultGroupEdits.js';
+  import { newDraftId as newId } from '../../../util/draftId.js';
   import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';

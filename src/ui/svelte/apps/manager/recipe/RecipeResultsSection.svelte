@@ -13,8 +13,10 @@
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
+  import { newDraftId as newId } from '../../../util/draftId.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
+  import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
 
   let {
     resultGroups = [],
@@ -48,21 +50,9 @@
     idPrefix = '',
   } = $props();
 
-  // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
-  // result set is immediately routable.
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
   const groups = $derived(Array.isArray(resultGroups) ? resultGroups : []);
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
-
-  function setDisplayName(set, index) {
-    const name = String(set?.name || '').trim();
-    return name || `${localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
-  }
 
   // Ingredient-set options for one group: a set routes to at most one, so an already-routed
   // set is disabled.
@@ -100,20 +90,10 @@
   // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: several
   // groups get the set chrome, a single NON-routed group renders chromeless, and a routed mode
   // keeps chrome whatever the count so its routing head stays available.
-  const effectiveComplex = $derived(groups.length > 1 || isRouted);
+  const effectiveComplex = $derived(!rendersBare(groups.length, { routed: isRouted }));
 
   // Simple mode binds one chromeless group to the first, synthesizing an empty one if absent.
   const simpleGroup = $derived(groups[0] || { results: [] });
-
-  // Spread the existing group under the edit so its routing-referenced id and name survive, and
-  // synthesize a fresh one ONLY when none exists.
-  function updateSimpleGroup(nextGroup) {
-    if (groups.length > 0) {
-      onChange([{ ...groups[0], ...nextGroup, id: groups[0].id || nextGroup?.id || newId() }]);
-      return;
-    }
-    onChange([{ ...nextGroup, id: nextGroup?.id || newId() }]);
-  }
 
   function updateGroup(index, nextGroup) {
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
@@ -150,6 +130,8 @@
     onChange([success, failure]);
   }
 
+  // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
+  // result set is immediately routable.
   function addGroup() {
     onChange([...groups, { id: newId(), name: '', checkOutcomeIds: [], results: [] }]);
   }
@@ -201,7 +183,7 @@
         {progressive}
         {isTerminalStep}
         {onOpenComponent}
-        onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
+        onChange={(nextGroup) => onChange(withSoleEntry(groups, nextGroup))}
       />
     </div>
   {:else if groups.length === 0}
