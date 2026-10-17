@@ -1266,6 +1266,20 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(pillIds.includes('manager-recipe-edit-normal'));
   });
 
+  it('maps the issue-2510 requirement-row family, and only that family, to the recipe-edit frames', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+    for (const base of [
+      'PickerRow', 'PickerRowNameField', 'PickerRowAmount', 'PickerRowKindMenu', 'PickerRowRewardBody',
+      'PickerRowRangeCell', 'ChoiceGroup', 'ChoiceGroupAwardHeader', 'KindAdder',
+    ]) {
+      const file = `src/ui/svelte/components/${base}.svelte`;
+      assert.ok(idsFor(file).includes('manager-recipe-edit-normal'), `${file} selects no recipe-edit frame`);
+    }
+    // The family's pattern stops at its own names: a neighbouring Choice* primitive selects none.
+    const tabStripIds = idsFor('src/ui/svelte/components/ChoiceOptionList.svelte');
+    assert.deepEqual(tabStripIds.filter(id => id.startsWith('manager-recipe-edit')), []);
+  });
+
   it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
     const changedFiles = ['src/ui/svelte/apps/manager/RecipeEditView.svelte'];
     withScreenshotFixtures(
