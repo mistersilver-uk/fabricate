@@ -590,6 +590,7 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers routing by name.
   A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, or no longer defined — shows struck, says it does not route, and stays removable.
   NOT SHIPPED here yet, issue 2513: the card does not read the recipe's minimum success tier, so a tier below it still shows as routing.
+  NOT SHIPPED here yet, issue 2513: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
 
 ### Alchemy check-mode selector (issue 554)
 

@@ -22,6 +22,7 @@
   Invariants:
   - The root keeps the literal `manager-chip` class — pinned by `manager-layout.test.js`, the mounted suites and `scripts/foundry-test-run.mjs`.
   - Four of the thirteen tones are one recessive ladder a caller routes by meaning, per "Every interactive primitive declares its full state set" in `openspec/specs/design-system/spec.md`; the names do not track the tokens (`muted` inks `--fab-text-disabled`, `neutral` inks `--fab-text-muted`).
+  - `density="row"` composes with a tone: its ground and ink sit above the tone rules, so a tone paints a row chip as it paints every other density.
   - `emphasis="bare"` is the one emphasis that does not compose with `struck`, because its `border` shorthand resets the dashed `border-style` that prop states.
   - `iconOnly` emits `role="img"` on a non-interactive host only, before the rest spread so a caller's own `role` wins, because `aria-label` on a bare `span` is dropped; seven square sides are published, one per density, and `is-list` has no `min-height` to read.
   - `removable` throws rather than drops on `tag="button"`/`"a"`, a missing `removeLabel` and a missing `onRemove`; `removeLabel` names the member it takes out and defaults to `undefined`, never `''` — pinned by `tests/design-system-required-names.test.js`.
