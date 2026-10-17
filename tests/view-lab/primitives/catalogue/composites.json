@@ -1140,39 +1140,60 @@
     "spec": "<SortableList>",
     "cap": "read-only — a GM stage’s complications, nested and fixed",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
-    "fixture": "SortableListGmComplications",
-    "partial": "no DC or Edit link",
+    "path": "src/ui/svelte/apps/manager/ProgressiveStageList.svelte",
+    "fixture": "SortableListProgressiveStages",
     "props": {
-      "ownerName": "Ground Reagent",
-      "complications": [
+      "items": [{ "id": "reagent", "componentId": "ground-reagent" }],
+      "componentOptions": [
         {
-          "id": "dust-cloud",
-          "name": "Choking dust",
-          "severity": "severe",
-          "visibility": "visible",
-          "when": { "stageMissed": true },
-          "effectRoll": { "enabled": true, "expr": "1d4" }
-        },
-        {
-          "id": "dust-spoiled",
-          "name": "Spoiled batch",
-          "severity": "minor",
-          "visibility": "gmOnly",
-          "when": { "stagePartial": true }
+          "id": "ground-reagent",
+          "name": "Ground Reagent",
+          "difficulty": 2,
+          "complications": [
+            {
+              "id": "dust-cloud",
+              "name": "Choking dust",
+              "severity": "severe",
+              "visibility": "visible",
+              "activities": { "crafting": true },
+              "when": { "stageMissed": true },
+              "effectRoll": { "enabled": true, "expr": "1d4" }
+            },
+            {
+              "id": "dust-spoiled",
+              "name": "Spoiled batch",
+              "severity": "minor",
+              "visibility": "gmOnly",
+              "activities": { "crafting": true },
+              "when": { "stagePartial": true }
+            }
+          ]
         }
-      ]
+      ],
+      "catalogue": {
+        "component": [{ "id": "ground-reagent", "label": "Ground Reagent", "icon": "fas fa-cube" }]
+      },
+      "difficultyDataAttr": "data-recipe-result-difficulty",
+      "editDataAttr": "data-recipe-result-edit",
+      "dcLabel": "DC",
+      "dcUnsetLabel": "No difficulty",
+      "editLabel": "Edit",
+      "editTitle": "Edit difficulty and complications on the component"
     },
     "data": {
-      "stages": [{ "id": "reagent", "name": "Ground Reagent" }]
+      "editAriaKey": "FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult"
     },
     "undrawn": {
       "severe": "the first complication's severity value, drawn as its label",
       "minor": "the second complication's severity value, drawn as its label",
       "visible": "the first complication's visibility value, drawn as its Player chip",
-      "gmOnly": "the second complication's visibility value, drawn as the absence of a Player chip"
+      "gmOnly": "the second complication's visibility value, drawn as the absence of a Player chip",
+      "data-recipe-result-difficulty": "the attribute name the list writes the stage's DC under, a hook rather than a word",
+      "data-recipe-result-edit": "the attribute name the list writes the Edit link's component id under, a hook rather than a word",
+      "No difficulty": "the DC's unset copy, which a stage whose component carries a DC never shows",
+      "Edit difficulty and complications on the component": "the Edit link's tooltip, which a static drawing cannot hover"
     },
-    "note": "Wired as `ComponentSalvageStages` wires its stage list: one numbered, reorderable stage row naming its component, with the shipped `StageComplicationList` in the row's `body`. The stage's DC and Edit link are the caller's own scoped markup and stay drawn."
+    "note": "Mounts the shipped `ProgressiveStageList` as the Recipe Studio wires it: one numbered, reorderable stage row naming its component, its read-only DC and Edit link in the row's trailing controls, and the component's crafting complications in the shipped `StageComplicationList` in the row's `body`."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",

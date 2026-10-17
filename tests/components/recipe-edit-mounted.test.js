@@ -237,6 +237,7 @@ const RECIPE_COMPILED = [
   // The read-only stage complication list's muted label (issue 2445).
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',

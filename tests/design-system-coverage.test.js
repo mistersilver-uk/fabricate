@@ -825,6 +825,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+  // Issue 2511's single-caller stage body; `<SortableList>`'s read-only unit specifies its parent.
+  'src/ui/svelte/apps/manager/StageComplicationList.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no

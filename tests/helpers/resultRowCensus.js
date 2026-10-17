@@ -13,8 +13,8 @@ export const RESULT_ROW_CENSUS = Object.freeze({
   stage: Object.freeze([
     '[data-recipe-option]',
     '[data-recipe-result-item]',
-    '.manager-recipe-stage-dc[data-recipe-result-difficulty]',
-    '.manager-recipe-stage-edit[data-recipe-result-edit][data-keyboard-focus="true"]',
+    '.manager-progressive-stage-dc[data-recipe-result-difficulty]',
+    '.manager-progressive-stage-edit[data-recipe-result-edit][data-keyboard-focus="true"]',
   ]),
   salvageFlat: Object.freeze([
     '[data-salvage-result]',

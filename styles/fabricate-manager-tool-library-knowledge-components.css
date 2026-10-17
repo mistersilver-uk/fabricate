@@ -2528,12 +2528,12 @@
   display: none;
 }
 
-/* A stage whose component authors no crafting complication renders nothing into the band, so its
-   body box is dropped rather than drawing 12px of dead height on every row of an always-open list
-   (issue 1512). Keyed on the callers' own family classes: a bare `:not(.has-band)` would hide the
+/* A stage whose component authors no complication for the list's activity renders nothing into
+   the band, so its body box is dropped rather than drawing 12px of dead height on every row of an
+   always-open list (issue 1512). Keyed on the two stage lists' own family classes, the manager's
+   `ProgressiveStageList` and the player's stage row: a bare `:not(.has-band)` would hide the
    editing body of every other caller, which is a body the caller always fills. */
-.fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
-.fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
+.fabricate-sortable-list-row.manager-progressive-stage-row:not(.has-band)
   .fabricate-sortable-list-body,
 .fabricate-sortable-list-row.progressive-stage-row:not(.has-band) .fabricate-sortable-list-body {
   display: none;

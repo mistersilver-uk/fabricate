@@ -43,6 +43,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+    'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     CARD_PATH,
   ],

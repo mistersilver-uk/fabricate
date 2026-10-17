@@ -30,12 +30,10 @@ const CONSUMERS = Object.freeze([
 
 /** Importers of `PickerRow.svelte` that hand it no essence catalogue: path to the reason. */
 const ROW_CALLERS_WITHOUT_ESSENCES = Object.freeze({
-  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte':
-    'A result names a component, a currency or a taught recipe, so its catalogue has no essence kind.',
   'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte':
     'A salvage result names a component and nothing else, so its catalogue has no essence kind.',
-  'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte':
-    'A salvage stage names a component and nothing else, so its catalogue has no essence kind.',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte':
+    'A progressive stage names a component and nothing else, so its catalogue has no essence kind.',
 });
 
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is
