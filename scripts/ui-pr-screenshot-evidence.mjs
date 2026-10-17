@@ -40,6 +40,8 @@ const RECIPE_EDIT_MATCHES = [
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770); a change to it republishes the recipe-editor frames it appears in.
   /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
+  // The requirement row family, moved out of `recipe/` at issue 2510.
+  /^src\/ui\/svelte\/components\/(?:PickerRow\w*|ChoiceGroup\w*|KindAdder)\.svelte$/,
 ];
 
 // Every recipe-editor frame maps one same-named smoke label to the shared RECIPE_EDIT_MATCHES glob.

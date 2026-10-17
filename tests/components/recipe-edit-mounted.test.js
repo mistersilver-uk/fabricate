@@ -93,9 +93,9 @@ const RAW_MODULES = [
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
   // The result rows' catalogue, amount error and add rule (issue 1516).
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/components/resultRows.js',
   // Surplus: nothing this tree renders imports the copy module (issue 2465).
   'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
@@ -186,12 +186,12 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/ChoiceGroup.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/components/RollDataExpressionInput.svelte',

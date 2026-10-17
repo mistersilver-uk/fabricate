@@ -504,10 +504,6 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The row itself, because this is the only frame photographing a tag requirement inside a Tool inspector.
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/ChoiceGroup\.svelte$/,
     ],
   }),
   managerCase({
@@ -543,7 +539,6 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
     ],
   }),
   managerCase({
@@ -584,9 +579,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
     ],
   }),
   managerCase({
@@ -621,7 +614,6 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -652,7 +644,6 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
       TYPEAHEAD_COMBOBOX_SOURCE,
       ...ANCHORED_POPOVER_SOURCES,
     ],

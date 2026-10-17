@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { fromValue, toValue } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { fromValue, toValue } from '../../src/ui/svelte/components/pickerRowKinds.js';
 import {
   createMountedComponentHarness,
   RESULT_ROW_COMPILED_MODULES,
@@ -19,7 +19,7 @@ import {
   TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
-const ROW_PATH = 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
+const ROW_PATH = 'src/ui/svelte/components/PickerRow.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot: resolve(import.meta.dirname, '../..'),

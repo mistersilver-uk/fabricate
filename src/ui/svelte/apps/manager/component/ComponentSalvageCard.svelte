@@ -24,9 +24,9 @@
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Select from '../../../components/Select.svelte';
   import SubjectModifierPicker from '../SubjectModifierPicker.svelte';
-  import PickerRow from '../recipe/PickerRow.svelte';
-  import { toValue } from '../recipe/pickerRowKinds.js';
-  import { componentCatalogue, resultAmountInvalid } from '../recipe/resultRows.js';
+  import PickerRow from '../../../components/PickerRow.svelte';
+  import { toValue } from '../../../components/pickerRowKinds.js';
+  import { componentCatalogue, resultAmountInvalid } from '../../../components/resultRows.js';
   // The salvage check override (issue 2005): the DC or the character-value adjustment.
   import CheckOverrideField from './CheckOverrideField.svelte';
   import ComponentSalvageStages from './ComponentSalvageStages.svelte';

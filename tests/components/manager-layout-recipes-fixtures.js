@@ -101,10 +101,7 @@ export function assertOneTrackPerGridChild({
 
 // ── THE "or…" MENU (issue 1373, maintainer round 8) ──────────────────────────────────────
 // The panel a requirement row opens to accept a different KIND of ingredient in its place.
-const orMenuPath = resolve(
-  __dirname,
-  '../../src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte'
-);
+const orMenuPath = resolve(__dirname, '../../src/ui/svelte/components/PickerRowKindMenu.svelte');
 export const orMenuSource = readFileSync(orMenuPath, 'utf8');
 
 export const OR_MENU_KINDS = ['component', 'tag', 'essence', 'currency'];

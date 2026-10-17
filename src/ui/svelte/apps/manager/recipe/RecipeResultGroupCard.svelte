@@ -17,12 +17,12 @@
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
   import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
-  import ChoiceGroup from './ChoiceGroup.svelte';
-  import PickerRow from './PickerRow.svelte';
-  import { emptyResult, fromValue, toValue } from './pickerRowKinds.js';
-  import { newDraftId as newId } from './resultGroupEdits.js';
-  import { componentCatalogue, withAddedResult } from './resultRows.js';
-  import KindAdder from './KindAdder.svelte';
+  import ChoiceGroup from '../../../components/ChoiceGroup.svelte';
+  import PickerRow from '../../../components/PickerRow.svelte';
+  import { emptyResult, fromValue, toValue } from '../../../components/pickerRowKinds.js';
+  import { newDraftId as newId } from '../../../components/resultGroupEdits.js';
+  import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
+  import KindAdder from '../../../components/KindAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';

@@ -65,13 +65,6 @@ const SALVAGE_STAGE_GEOMETRY = Object.freeze({
   },
 });
 
-/** The salvage rows' sources: the editor and the requirement row it draws them with. */
-const SALVAGE_ROW_SOURCES = Object.freeze([
-  ...COMPONENT_EDITOR_MATCHES,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(PickerRow|PickerRowAmount)\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
-]);
-
 /** Component Rules' header group, led by the Premium advert until it is dismissed. */
 const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
 
@@ -760,7 +753,7 @@ export const CASES = Object.freeze([
     },
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-narrow',
@@ -786,7 +779,7 @@ export const CASES = Object.freeze([
     expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, STAGE_COMPLICATION_LIST_MATCH],
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
   }),
   // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
   managerCase({
@@ -918,7 +911,7 @@ export const CASES = Object.freeze([
     expectNoHorizontalOverflow: SALVAGE_LIST,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // A cleared stage searches again in place (issue 1516): its suggestion list opens beneath it,
   // inside the editor's form, and its last suggestion must own its pointer target.
@@ -940,7 +933,11 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
     kinds: ['manager', 'components'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, TYPEAHEAD_COMBOBOX_SOURCE, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   // A salvage row's kind select, open (issue 1516): one option, Component, ticked.
   managerCase({
@@ -961,7 +958,7 @@ export const CASES = Object.freeze([
     expectCenterHit:
       '.fabricate-manager > .fabricate-select-popover [data-popover-option="component"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
 
   // Five frames, all on `lab-herbalism`: the section gates on progressive resolution, which only herbalism has.

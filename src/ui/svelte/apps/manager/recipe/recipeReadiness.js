@@ -25,8 +25,7 @@
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
 import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
-
-import { groupProblems } from './resultGroupEdits.js';
+import { groupProblems } from '../../../components/resultGroupEdits.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];

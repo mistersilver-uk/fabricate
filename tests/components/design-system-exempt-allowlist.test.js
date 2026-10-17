@@ -145,17 +145,16 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte': 1 },
   ],
   [
-    'the composition licence of "The primitive set is a closed, versioned vocabulary" — this ' +
-      "is `PickerRow`'s amount slot, wholly the members `SegmentedControl`, `Stepper` and " +
-      "`RollDataExpressionInput`, so its second caller, the result choice group header's N " +
-      '(issue 1773), owes it no manifest row',
-    { 'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte': 1 },
+    'PickerRowAmount is a new manager-only member at target, because PickerRow and ' +
+      'ChoiceGroupAwardHeader both render it as the amount slot; its specimen is owed to issue ' +
+      '2515 (issue 2510)',
+    { 'src/ui/svelte/components/PickerRowAmount.svelte': 1 },
   ],
   [
-    'the composition licence of "The primitive set is a closed, versioned vocabulary" — this ' +
-      "is the kind menu's adder, wholly the members `ActionMenu` and `Button`, so its callers " +
-      'owe it no manifest row',
-    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
+    'KindAdder is a new manager-only member at target, because ChoiceGroup, ' +
+      "RecipeIngredientSetCard and RecipeResultGroupCard all render it as the kind menu's adder; " +
+      'its specimen is owed to issue 2515 (issue 2510)',
+    { 'src/ui/svelte/components/KindAdder.svelte': 1 },
   ],
   [
     STEPPER_LABELS,
@@ -185,7 +184,7 @@ const ALLOWLIST = Object.freeze([
   [
     "the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), " +
       "never a caller's name",
-    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
+    { 'src/ui/svelte/components/KindAdder.svelte': 1 },
   ],
   [
     "the spread is the popover's own trigger contract (type, ARIA state, handlers, element " +

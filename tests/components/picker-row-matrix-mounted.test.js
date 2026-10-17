@@ -14,7 +14,7 @@ import {
   KIND_ORDER,
   fromValue,
   toValue,
-} from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+} from '../../src/ui/svelte/components/pickerRowKinds.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
@@ -37,7 +37,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     'src/ui/svelte/util/announceAfterFocus.js',
     // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -51,13 +51,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/components/PickerRowAmount.svelte',
+    'src/ui/svelte/components/PickerRowNameField.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/components/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/PickerRow.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  componentPath: 'src/ui/svelte/components/PickerRow.svelte',
 });
 
 /**
