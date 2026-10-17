@@ -112,11 +112,23 @@ function unassignedIndexes(provider, sets, groups, tiers) {
 }
 
 /**
- * `tiers` are the policy-offered `{ id, name, success, start? }` tiers, `start` read only under a
- * `minSuccessOutcomeId` in the fixed check's `direction`. Returns `sources`, `inbound` (each
- * group's effective sources), `unreachable` (non-failure groups no source reaches), `unassigned`
- * and `routingOptionsFor(index)`. A set's `targetId` is its claimed `resultGroupId`, else the id of
- * its first target.
+ * `provider` is `'ingredientSet'`, `'check'` or `null`, and `tiers` the policy-offered
+ * `{ id, name, success }` options. `minSuccessOutcomeId` blocks fixed tiers below it, which needs
+ * `start` on the tiers and the check's `direction` (`'over'` or `'under'`).
+ *
+ * - `sources`: one per set or offered tier, each `{ id, kind, name, targets, targetId, how,
+ *   blockedReason, sharedCount }`. `targets` are group indexes, `how` is `explicit`, `fallback`,
+ *   `single` or `name`, and a source awarding nothing has `how: null` or an empty `targets` with a
+ *   `blockedReason`. A set's `targetId` is its claimed `resultGroupId` (even a dangling one) and
+ *   null otherwise, and a tier's is its first target's id.
+ * - `sharedCount`: the sources reaching the source's target, itself included, taking the largest
+ *   across several targets and `0` with none. It is shared when above 1.
+ * - `inbound`: each group's effective sources, parallel to `resultGroups`.
+ * - `unreachable`: the non-`failure`-role groups no source reaches, defined only for a routed
+ *   provider, so it is empty under `null`.
+ * - `unassigned`: the groups that claim no offered source, failure-role ones included.
+ * - `routingOptionsFor(index)`: the picker options of the group at `index`, which a
+ *   failure-role group keeps because the engine still awards it. They are `[]` under `null`.
  */
 export function buildRoutingModel({
   provider = null,
