@@ -86,7 +86,11 @@ See [System Overview]({% link crafting-systems/system-overview.md %}).
 ### How outcomes match results
 
 You can tie each result set to a specific outcome tier.
-In the recipe editor, the result set's **Produced on outcome** control lists the success tiers from the routed crafting check.
+In the recipe editor, the result set's **Produced on outcome** control lists the outcome tiers from the routed crafting check that can route.
+The success tiers are always listed.
+A tier you have marked as a failure is listed too, but only while the check's **Produce a result on a failed check** setting permits results on a failed check.
+When that setting is **Never**, the failure tiers are not offered, and an assignment you already made to one stays saved but stops routing.
+See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
 When a result set is assigned to an outcome tier this way, a craft that rolls that tier produces that result set.
 This explicit assignment takes priority over name matching.
 
