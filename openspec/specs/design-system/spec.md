@@ -1771,6 +1771,12 @@ Naming the adders after the kinds would state the menu's own list twice.
 `simple` and alchemy-simple do not route: one ingredient set, one success result set, and nothing to assign.
 They MAY carry a second result set selected BY ROLE — the results a failed check awards — and it is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
 
+The GM opts in through one toggle, "Award results on a failed check", wherever the recipe's check can fail: `simple` with the crafting check enabled, and alchemy's simple check mode.
+The opt-in IS the presence of the `role: 'failure'` group, so the persisted shape gains nothing: turning the toggle on adds that group empty, and turning it off removes it, with any results it holds, from the draft as removing any set does.
+The surface MUST NOT draw or synthesize the failure set while the group is absent, and an edit to the success set MUST NOT create it.
+Where the system's failure-result policy forbids results on failure, the toggle cannot add the group: it is disabled while off, states why and links to the Checks Studio, because only the policy can make the set award anything.
+A group already present under such a policy stays drawn with that reason and awards nothing, and the toggle still removes it.
+
 A role-selected set carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
 It is also NOT RENAMEABLE: nothing refers to it by name, so a rename would change nothing, and offering the control would imply a reference that does not exist.
 The surface marks which sets those are — rather than shipping a name field that silently does nothing — so a GM can tell a role-selected set from an authored one at a glance.
@@ -1782,9 +1788,15 @@ An AUTHORED result set name MUST NOT be a reserved failure keyword, because the 
 
 #### Scenario: A GM allows results on a failed craft
 
-- **WHEN** a simple or alchemy recipe is set to award results on failure
-- **THEN** a second result set appears, marked as filled by role rather than by assignment
+- **WHEN** a GM turns on "Award results on a failed check" on a simple or alchemy recipe
+- **THEN** a `role: 'failure'` group is added and its set appears, marked as filled by role rather than by assignment
 - **AND** it offers no source list and no rename, because nothing routes to it and nothing refers to it by name
+
+#### Scenario: A recipe has not opted into failure results
+
+- **WHEN** a simple or alchemy recipe carries no `role: 'failure'` group
+- **THEN** the surface draws no failure set and the toggle reads off
+- **AND** an edit to the success set leaves the recipe without the group
 
 ### Requirement: Sets and groups are the container layer above the row
 
@@ -1819,7 +1831,8 @@ A surface that assumes single selection everywhere renders progressive wrongly.
 Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
 A set MUST NOT name more than one group: the engine would have no basis to choose between them.
 Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
-Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
+A failure-marked tier is offered for assignment only where the system's failure-result policy permits results on failure, as `ui-system-studio` specifies.
+Where the policy forbids it, the tier is not offered, an assignment already authored stays on disk and stops routing, and the overview's row for that tier reads "routing not permitted by this system" in place of its select.
 
 A result set is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
 Wherever a group appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
@@ -1831,9 +1844,20 @@ Without the inbound direction a GM editing a group cannot tell what reaches it, 
 Where several sources share a group, each source says the target is shared and how many sources hold it.
 A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
 
+Each source MUST show the set a craft EFFECTIVELY awards, not only an explicit assignment.
+Where nothing names its target explicitly, the target is the mode's fallback and the source marks it with a "default" hint, so an inherited target reads differently from a chosen one.
+Under `routedByIngredients` the fallback is the result sets the set's legacy `resultMapping` names where it carries one, else the scope's first result set.
+Under `routedByCheck` a fallback exists only where no result set in the scope carries a tier assignment: the target is then the scope's only result set or, among several, the result set whose name matches the tier, and a tier named by a reserved failure keyword reaches nothing.
+Where any result set in the scope carries a tier assignment there is no fallback, and a success tier that no result set lists is unrouted rather than defaulted.
+A failure-marked tier never takes a fallback, because a failed check awards only through an explicit assignment the policy permits.
+The shared marker, its count and the unreachable state MUST be computed from that effective routing, so a set a fallback reaches is never reported unreachable.
+A set's own source list names a source that reaches it by fallback too, with the same hint, so the two directions agree.
+
 The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
-A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
-A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
+A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading.
+The overview draws a gap in place as a blocked row naming the unclaimed values, with no target select and with the "Edit outcome tiers" action, because the fix belongs to the system's tiers rather than to the recipe.
+Its blocking severity is owned by the Checks Studio, which reports it as the readiness issue `rangeGap` that `resolution-modes` specifies, and recipe readiness MUST NOT raise it a second time.
+A group that no set and no tier reaches, explicitly or by fallback, is UNREACHABLE: authored, valid, and never producible.
 
 The routing is authored in TWO surfaces, and neither is a copy of the other.
 
@@ -1843,7 +1867,7 @@ Both write the same field, and assignment therefore works from either end.
 
 An overview row reserves a fixed trailing column for its shared-target marker, so the control naming the set sits at one position down the list and a marker on one row does not move the control on another.
 Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
-Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves elsewhere.
+Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves in the Checks Studio, which an "Edit outcome tiers" action beside the list opens.
 
 A mode change that would reduce the permitted cardinality MUST state what it will delete before the switch rather than reporting it afterwards.
 
@@ -1861,7 +1885,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 #### Scenario: A result set has no inbound route
 
-- **WHEN** a result set is named by no ingredient set and no outcome tier
+- **WHEN** a result set is reached by no ingredient set and no outcome tier, explicitly or by fallback
 - **THEN** the group states that it is unreachable, in place
 - **AND** it offers the action that routes something to it
 
@@ -1870,6 +1894,18 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result set
 - **AND** the group is not duplicated to serve them
+
+#### Scenario: An ingredient set names no result set
+
+- **WHEN** a recipe routed by ingredients holds an ingredient set that names no result set
+- **THEN** its overview row shows the result set resolution would award, with a "default" hint
+- **AND** that result set is not reported unreachable
+
+#### Scenario: Fixed tiers leave a gap
+
+- **WHEN** the system's fixed outcome tiers leave a value between two tiers unclaimed
+- **THEN** the overview draws a blocked row for it with no target select and the "Edit outcome tiers" action
+- **AND** recipe readiness raises no issue for it, the Checks Studio's `rangeGap` being its report
 
 ### Requirement: A result-side choice group states who chooses and how many it awards
 
