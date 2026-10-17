@@ -1857,7 +1857,7 @@ The routing surface MUST surface two authoring hazards rather than leaving them 
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading.
 The overview draws a gap in place as a blocked row naming the unclaimed values, with no target select and with the "Edit outcome tiers" action, because the fix belongs to the system's tiers rather than to the recipe.
 Its blocking severity is owned by the Checks Studio, which reports it as the readiness issue `rangeGap` that `resolution-modes` specifies, and recipe readiness MUST NOT raise it a second time.
-A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
+A group that no set and no tier reaches, explicitly or by fallback, is UNREACHABLE: authored, valid, and never producible.
 
 The routing is authored in TWO surfaces, and neither is a copy of the other.
 
@@ -1885,7 +1885,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 #### Scenario: A result set has no inbound route
 
-- **WHEN** a result set is named by no ingredient set and no outcome tier
+- **WHEN** a result set is reached by no ingredient set and no outcome tier, explicitly or by fallback
 - **THEN** the group states that it is unreachable, in place
 - **AND** it offers the action that routes something to it
 

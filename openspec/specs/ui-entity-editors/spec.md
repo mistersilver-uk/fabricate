@@ -564,7 +564,8 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result set editor, and, with the crafting check enabled, the reserved failure result set on the terms Alchemy Simple states below
+- One result set editor, and, with the crafting check enabled, the reserved failure result set on the terms Alchemy Simple states below.
+  NOT SHIPPED here yet, issue 2514: the Simple editor offers no "Award results on a failed check" toggle and draws no reserved failure set.
 
 ### Routed UI
 
