@@ -253,8 +253,9 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   // essence offer (read by its ingredient form) it imports.
   'src/ui/svelte/components/resultGroupEdits.js',
   'src/ui/model/essenceValidation.js',
-  // Issue 2511: the shared draft-id mint the edits and the result card read.
-  'src/ui/svelte/util/draftId.js'
+  // Issue 2511: the shared draft-id mint and pending focus the card and the group read.
+  'src/ui/svelte/util/draftId.js',
+  'src/ui/svelte/util/pendingFocus.js'
 ]);
 
 export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
@@ -297,7 +298,8 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
-  'src/ui/svelte/util/draftId.js'
+  'src/ui/svelte/util/draftId.js',
+  'src/ui/svelte/util/pendingFocus.js'
 ]);
 
 export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
