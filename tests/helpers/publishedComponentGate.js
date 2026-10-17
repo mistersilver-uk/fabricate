@@ -960,7 +960,7 @@ export function everyStylesheet() {
     file,
     componentAstOf(file).css,
   ]);
-  assert.equal(sheets.length, 15, 'the fifteen partials');
+  assert.equal(sheets.length, 14, 'the fourteen partials');
   assert.ok(blocks.length > 400, 'every component under src/ui/svelte');
   stylesheets = [...sheets, ...blocks];
   return stylesheets;

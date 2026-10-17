@@ -6724,7 +6724,7 @@ describe('RecipeEditView (mounted)', () => {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: TIER_OPTIONS,
-        routedOutcomeTiersDefined: true,
+        routedOutcomeTiers: TIER_OPTIONS,
       },
     });
     assert.ok(
