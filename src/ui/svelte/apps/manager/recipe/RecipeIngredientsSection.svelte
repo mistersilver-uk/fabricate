@@ -94,7 +94,13 @@
       />
     </div>
     {#if canAddSet}
-      <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
+      <Button
+        role="dashed"
+        fullWidth
+        data-recipe-add="ingredient-set"
+        data-set-card-remove-fallback
+        onclick={() => addSet()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
       </Button>

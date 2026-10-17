@@ -244,10 +244,6 @@
   kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.ResultSet', 'Result set')}
   name={staticLabel || group?.name || ''}
   {namePlaceholder}
-  nameLabel={localizeOr(
-    'FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder',
-    'Result set name'
-  )}
   nameProps={staticLabel
     ? { 'data-recipe-result-set-static-label': '' }
     : { 'data-recipe-result-set-field': 'name' }}
@@ -341,7 +337,11 @@
     {candidates}
     {assigned}
     implicitLabel={implicitLine}
+    unreachable={routed && unreachable}
     emptyLabel={emptyHint}
+    assignLabel={localizeOr('FABRICATE.Common.RouteSources.AssignTo', 'Assign to {name}', {
+      name: group?.name || namePlaceholder,
+    })}
     {assignNote}
     onAssign={(id) => onRoute(id, true)}
     onRemove={(id) => onRoute(id, false)}

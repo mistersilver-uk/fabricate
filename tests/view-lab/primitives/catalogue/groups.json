@@ -185,7 +185,8 @@
           "label": "Critical"
         }
       ],
-      "assigned": ["Critical"]
+      "assigned": ["Critical"],
+      "unreachable": true
     }
   },
   {
@@ -204,7 +205,8 @@
     "path": "src/ui/svelte/components/RouteSources.svelte",
     "props": {
       "sources": [],
-      "candidates": []
+      "candidates": [],
+      "unreachable": true
     }
   },
   {

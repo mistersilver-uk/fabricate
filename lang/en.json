@@ -22,6 +22,7 @@
       "SetCard": {
         "ReservedRole": "reserved role",
         "Actions": "Actions for {name}",
+        "NameLabel": "{kicker} name",
         "Kicker": {
           "ResultSet": "Result set",
           "IngredientSet": "Ingredient set"
@@ -32,6 +33,7 @@
         "Unreachable": "Nothing — unreachable",
         "Empty": "Add an ingredient set first.",
         "Assign": "Assign",
+        "AssignTo": "Assign to {name}",
         "Search": "Search…",
         "RoutedTo": "now → {name}",
         "NotRouting": "does not route",
@@ -3832,7 +3834,6 @@
             "Hint": "What this component yields when it is broken down in {system}.",
             "ResultGroups": "Result sets",
             "SimpleSingleGroupHint": "Simple mode uses a single result set.",
-            "GroupName": "Result set name",
             "GroupNamePlaceholder": "Set {n}",
             "RemoveGroup": "Remove result set",
             "ResultComponent": "Result component",

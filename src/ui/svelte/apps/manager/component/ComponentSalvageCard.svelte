@@ -268,10 +268,7 @@
                   'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
                   'Set {n}'
                 ).replace('{n}', String(groupIndex + 1))}
-                nameLabel={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName',
-                  'Result set name'
-                )}
+                surface="inset"
                 nameProps={{ 'data-salvage-group-name': '' }}
                 renameOn="input"
                 onRename={(name) => onUpdateGroup(group.id, { name })}

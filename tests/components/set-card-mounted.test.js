@@ -106,6 +106,26 @@ describe('SetCard: the name field', () => {
     assert.equal(field.getAttribute('data-recipe-set-field'), 'name');
   });
 
+  it('names the field for its kicker by default, and titles it with the full name', async () => {
+    let target = await harness.mount({ kicker: 'Result set', name: 'A very long blade name' });
+    let field = target.querySelector('input.fabricate-set-card-name');
+    assert.equal(field.getAttribute('aria-label'), 'Result set name');
+    assert.equal(field.getAttribute('title'), 'A very long blade name');
+    harness.remount();
+    target = await harness.mount({ kicker: 'Ingredient set', namePlaceholder: 'Set 2' });
+    field = target.querySelector('input.fabricate-set-card-name');
+    assert.equal(field.getAttribute('aria-label'), 'Ingredient set name');
+    assert.ok(!field.hasAttribute('title'), 'an unnamed set has no title to repeat');
+  });
+
+  it("draws a step lower under surface 'inset'", async () => {
+    const target = await harness.mount({ name: 'Gold', surface: 'inset' });
+    assert.ok(target.querySelector('.fabricate-set-card').classList.contains('is-inset'));
+    harness.remount();
+    const plain = await harness.mount({ name: 'Gold' });
+    assert.ok(!plain.querySelector('.fabricate-set-card').classList.contains('is-inset'));
+  });
+
   it("renames on change, and an input event alone emits nothing under 'change'", async () => {
     const renamed = [];
     const target = await harness.mount({
@@ -352,6 +372,33 @@ describe('SetCard: focus after a removal', () => {
     const target = await listHarness.mount({ names: ['Gold', 'Silver', 'Ruin'], reservedAt: 2 });
     await remove(target, 's1');
     assert.ok(focused(cardOf(target, 's0').querySelector('input')), 'past the reserved card');
+  });
+
+  it('re-finds the scope’s fallback when the removal re-renders the list bare', async () => {
+    const target = await listHarness.mount({ names: ['Gold', 'Silver'], collapse: 'fallback' });
+    await remove(target, 's0');
+    assert.ok(cardOf(target, 's1').classList.contains('is-bare'), 'the survivor is drawn bare');
+    assert.ok(
+      document.activeElement.hasAttribute('data-host-bare-add'),
+      'the bare branch’s own Add, not the body'
+    );
+  });
+
+  it('falls back to the scope’s first adder when the bare branch stamps no fallback', async () => {
+    const target = await listHarness.mount({ names: ['Gold', 'Silver'], collapse: 'adder' });
+    await remove(target, 's1');
+    assert.ok(document.activeElement.matches('[data-recipe-add="item"]'), 'the bare set’s adder');
+  });
+
+  it('leaves focus to the menu after an item that is not danger', async () => {
+    const target = await listHarness.mount({ names: ['Gold', 'Silver'] });
+    await openMenu(cardOf(target, 's1'));
+    menuItem(target, 'Duplicate').click();
+    await settle();
+    assert.ok(
+      focused(cardOf(target, 's1').querySelector('[data-set-card-actions]')),
+      'Duplicate keeps no card from the document, so the menu returns focus to its trigger'
+    );
   });
 
   it('leaves focus to the menu when the caller keeps the card', async () => {

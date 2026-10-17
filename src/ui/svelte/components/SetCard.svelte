@@ -6,10 +6,11 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `kicker` / `name` / `namePlaceholder` | localized strings | `''` | The micro-label over the name, the set's name, and the field's placeholder while it has none. |
-  | `nameLabel` / `nameProps` | localized string / attribute object | none / `{}` | The name field's accessible name, which the caller must pass; and hooks spread first on the field, or on the static name in the reserved form. |
+  | `nameLabel` / `nameProps` | localized string / attribute object | `Common.SetCard.NameLabel` / `{}` | The name field's accessible name, "{kicker} name" by default; and hooks spread first on the field, or on the static name in the reserved form. |
   | `renameOn` | `'change'` \| `'input'` | `'change'` | The event that emits `onRename`; under `'change'` an input event alone emits nothing. |
   | `variant` | `'default'` \| `'reserved'` \| `'bare'` | `'default'` | `reserved` draws a lock, a static name inked by `tone`, `sources` and a reserved-role chip, with no field and no kebab; `bare` draws only `children` and `adder`. |
   | `tone` | `''` \| `'warning'` \| `'success'` \| `'danger'` | `''` | `is-<tone>`: a warning or danger edge, and the static name's ink. |
+  | `surface` | `'default'` \| `'inset'` | `'default'` | `is-inset` draws the card a step lower, for a set inside a raised card. |
   | `reservedLabel` | localized string | `Common.SetCard.ReservedRole` | The reserved-role chip's text. |
   | `actions` / `actionsLabel` | `[{ id, label, icon?, danger?, data? }]` / localized string | `[]` / `Common.SetCard.Actions` | The kebab's items, in `ActionMenu`'s shape, and the kebab's name; no kebab while `actions` is empty. |
   | `disabled` / `element` / `class` | boolean / bindable node / class string | `false` / `null` / `''` | Inerts the field and the kebab; the root node; an extra root class. |
@@ -29,8 +30,9 @@
   Invariants:
   - Before a `danger` action is emitted the card picks, inside its closest `[data-set-card-scope]`,
     the next card's name field, else the previous card's, else `[data-set-card-remove-fallback]`, and
-    focuses it after the menu's `tick()` once the card has left the document — pinned by
-    `tests/components/set-card-mounted.test.js`.
+    focuses it after the menu's `tick()` once the card has left the document; when the removal
+    re-renders the scope and drops that control, it takes the scope's first name field or fallback,
+    else its first `[data-recipe-add]` — pinned by `tests/components/set-card-mounted.test.js`.
 -->
 <script>
   import { tick } from 'svelte';
@@ -43,12 +45,13 @@
     kicker = '',
     name = '',
     namePlaceholder = '',
-    nameLabel,
+    nameLabel = '',
     nameProps = {},
     renameOn = 'change',
     onRename = undefined,
     variant = 'default',
     tone = '',
+    surface = 'default',
     reservedLabel = '',
     actions = [],
     actionsLabel = '',
@@ -75,6 +78,9 @@
         name: name || namePlaceholder,
       })
   );
+  const fieldName = $derived(
+    nameLabel || localizeOr('FABRICATE.Common.SetCard.NameLabel', '{kicker} name', { kicker })
+  );
   const reservedText = $derived(
     reservedLabel || localizeOr('FABRICATE.Common.SetCard.ReservedRole', 'reserved role')
   );
@@ -86,9 +92,7 @@
 
   const nameFieldOf = (card) => card?.querySelector('input.fabricate-set-card-name') ?? null;
 
-  function removalDestination() {
-    const scope = element?.closest('[data-set-card-scope]');
-    if (!scope) return null;
+  function removalDestination(scope) {
     const cards = [...scope.querySelectorAll('.fabricate-set-card')].filter(
       (card) => card.closest('[data-set-card-scope]') === scope
     );
@@ -100,13 +104,21 @@
     );
   }
 
+  const REFOCUS = 'input.fabricate-set-card-name, [data-set-card-remove-fallback]';
+
   function choose(id) {
     const card = element;
-    const destination = items.find((item) => item.id === id)?.danger ? removalDestination() : null;
+    const danger = items.find((item) => item.id === id)?.danger;
+    const scope = danger ? element?.closest('[data-set-card-scope]') : null;
+    const destination = scope ? removalDestination(scope) : null;
     onAction(id);
-    if (!destination) return;
+    if (!scope) return;
     tick().then(() => {
-      if (destination.isConnected && !card?.isConnected) destination.focus();
+      if (card?.isConnected || !scope.isConnected) return;
+      const target = destination?.isConnected
+        ? destination
+        : scope.querySelector(REFOCUS) || scope.querySelector('[data-recipe-add]');
+      target?.focus();
     });
   }
 </script>
@@ -117,6 +129,7 @@
     'fabricate-set-card',
     reserved && 'is-reserved',
     bare && 'is-bare',
+    surface === 'inset' && 'is-inset',
     TONES.has(tone) && `is-${tone}`,
     extraClass,
   ]}
@@ -136,7 +149,8 @@
           class="fabricate-set-card-name"
           value={name}
           placeholder={namePlaceholder || undefined}
-          aria-label={nameLabel}
+          title={name || undefined}
+          aria-label={fieldName}
           {disabled}
           onchange={renameOn === 'change' ? rename : undefined}
           oninput={renameOn === 'input' ? rename : undefined}

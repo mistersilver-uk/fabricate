@@ -226,7 +226,13 @@
       )}
       contextClass="manager-recipe-tab-empty"
     >
-      <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
+      <Button
+        role="dashed"
+        fullWidth
+        data-recipe-add="result-set"
+        data-set-card-remove-fallback
+        onclick={() => addGroup()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </Button>

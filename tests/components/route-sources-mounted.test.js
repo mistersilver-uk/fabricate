@@ -120,7 +120,8 @@ describe('RouteSources: the chips', () => {
   it('strikes a source that does not route, with no tick, a hidden suffix and a remove control', async () => {
     const view = await mountLine({ sources: [GOLD, PARTIAL] });
     const struck = view.chip('t-partial');
-    assert.ok(struck.classList.contains('is-struck') && struck.classList.contains('is-muted'));
+    // Neutral, not muted: its ink is the muted text token, which clears 4.5:1 on every theme.
+    assert.ok(struck.classList.contains('is-struck') && struck.classList.contains('is-neutral'));
     assert.ok(!struck.querySelector('i.fa-check'), 'a struck source carries no tick');
     assert.equal(struck.querySelector('.visually-hidden').textContent, ', does not route');
     assert.equal(struck.getAttribute('title'), 'Partial, does not route');
@@ -135,13 +136,18 @@ describe('RouteSources: the chips', () => {
     assert.deepEqual(view.calls, [['remove', 't-partial']]);
   });
 
-  it('draws the unreachable badge ahead of any struck source when nothing reaches the set', async () => {
-    const view = await mountLine({ sources: [PARTIAL] });
+  it('draws the unreachable badge ahead of any struck source when the caller says nothing reaches the set', async () => {
+    const view = await mountLine({ sources: [PARTIAL], unreachable: true });
     assert.deepEqual(view.chipIds(), ['unreachable', 't-partial']);
     const badge = view.line.querySelector('[data-route-sources-unreachable]');
     assert.ok(badge.classList.contains('is-warning'));
     assert.equal(badge.textContent, 'Nothing — unreachable');
     assert.ok(!badge.querySelector('[data-chip-remove]'), 'the badge removes nothing');
+  });
+
+  it('draws no badge for a set with no source that the caller does not flag', async () => {
+    const view = await mountLine({ sources: [PARTIAL] });
+    assert.deepEqual(view.chipIds(), ['t-partial'], 'the badge follows the flag, not the count');
   });
 
   it('announces the effective sources, or that nothing reaches the set, in a polite summary', async () => {
@@ -150,7 +156,7 @@ describe('RouteSources: the chips', () => {
     assert.ok(live.classList.contains('visually-hidden'));
     assert.equal(view.summary(), 'Produced by Gold, Silver');
     harness.remount();
-    view = await mountLine({ sources: [] });
+    view = await mountLine({ sources: [], unreachable: true });
     assert.equal(view.summary(), 'Produced by Nothing — unreachable');
   });
 });
@@ -175,6 +181,10 @@ describe('RouteSources: the line in every state', () => {
     let view = await mountLine({ sources: [], candidates: [] });
     assertLineHook(view.line, 'no candidates');
     assert.ok(!view.assign());
+    assert.ok(
+      view.line.hasAttribute('data-chip-remove-fallback'),
+      'with no Assign, a removed chip falls back to its own line'
+    );
     assert.equal(
       view.line.querySelector('[data-route-sources-hint]').textContent,
       'Add an ingredient set first.'
@@ -197,6 +207,20 @@ describe('RouteSources: the line in every state', () => {
     assert.equal(assign.getAttribute('data-keyboard-focus'), 'true');
     assert.equal(assign.getAttribute('aria-label'), 'Assign');
     assert.equal(assign.textContent.trim(), 'Assign');
+    assert.ok(!view.line.hasAttribute('data-chip-remove-fallback'), 'Assign is the fallback');
+  });
+
+  it('names Assign for its set while its visible word stays "Assign"', async () => {
+    const view = await mountLine({ sources: [GOLD], assignLabel: 'Assign to Ring' });
+    assert.equal(view.assign().getAttribute('aria-label'), 'Assign to Ring');
+    assert.equal(view.assign().textContent.trim(), 'Assign');
+  });
+
+  it('moves a removed chip’s focus to the line when there is no Assign', async () => {
+    const view = await mountLine({ sources: [GOLD], candidates: [] });
+    view.chip('s1').querySelector('[data-chip-remove]').click();
+    await settle();
+    assert.ok(document.activeElement === view.line, 'focus stays on this set’s line');
   });
 
   it('inerts the chips and Assign when disabled', async () => {

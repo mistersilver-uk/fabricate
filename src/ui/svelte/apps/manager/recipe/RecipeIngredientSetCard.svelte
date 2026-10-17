@@ -138,7 +138,6 @@
   kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.IngredientSet', 'Ingredient set')}
   name={displayName}
   namePlaceholder={text('FABRICATE.Admin.Manager.Recipe.SetNamePlaceholder', 'Set name')}
-  nameLabel={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
   nameProps={{ 'data-recipe-set-field': 'name' }}
   onRename={setName}
   {actions}

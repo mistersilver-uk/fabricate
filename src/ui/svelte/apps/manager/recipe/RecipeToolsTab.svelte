@@ -10,9 +10,10 @@
   add/remove patching; recipe-level tools patch the recipe, per-step tools patch
   the step. Each named routed-by-ingredients set gets a `SetCard` with its own tools, renamed in place
   through `onUpdateIngredientSets(stepId, nextSets)`; an empty name is refused, since an unnamed
-  set's Tool references are inert.
+  set's Tool references are inert, and the tab's one persistent status region announces why.
 -->
 <script>
+  import { tick } from 'svelte';
   import { ingredientSetToolsAreActive } from '../../../../../systems/toolCheckBonus.js';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
@@ -63,13 +64,30 @@
 
   // The sets whose empty rename was refused, keyed by id, until a rename lands.
   let refused = $state({});
+  let announced = $state('');
+  const unnamedText = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.ToolsSetNameRequired',
+      'An ingredient set needs a name to carry Tools. An unnamed set’s Tool references are inert: they stay saved, and apply again once it is named.'
+    )
+  );
+
+  // Cleared first, so a second refusal is a change the region announces again.
+  function announceRefusal() {
+    announced = '';
+    tick().then(() => {
+      announced = unnamedText;
+    });
+  }
 
   function renameSet(stepId, scope, set, name) {
     if (!String(name).trim()) {
       refused = { ...refused, [set.id]: true };
+      announceRefusal();
       return false;
     }
     refused = { ...refused, [set.id]: false };
+    announced = '';
     const sets = ingredientSets(scope).map((entry) =>
       entry.id === set.id ? { ...entry, name } : entry
     );
@@ -89,7 +107,6 @@
   <SetCard
     kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.IngredientSet', 'Ingredient set')}
     name={set.name}
-    nameLabel={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
     nameProps={{ 'data-recipe-tools-set-field': 'name' }}
     onRename={(name) => renameSet(stepId, scope, set, name)}
     note={refused[set.id] ? unnamedNote : undefined}
@@ -110,12 +127,7 @@
 {/snippet}
 
 {#snippet unnamedNote()}
-  <span role="status" data-recipe-tools-set-note
-    >{localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.ToolsSetNameRequired',
-      'An ingredient set needs a name to carry Tools. An unnamed set’s Tool references are inert: they stay saved, and apply again once it is named.'
-    )}</span
-  >
+  <span data-recipe-tools-set-note>{unnamedText}</span>
 {/snippet}
 
 <section
@@ -123,6 +135,7 @@
   data-recipe-tab="tools"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Tools', 'Tools')}
 >
+  <span class="visually-hidden" role="status" data-recipe-tools-set-status>{announced}</span>
   <div class="fab-stack" data-gap="3" data-tab-heading>
     <div class="manager-recipe-tab-intro">
       <h2 class="manager-recipe-tab-title">

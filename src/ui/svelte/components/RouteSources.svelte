@@ -1,7 +1,7 @@
 <!--
   The line naming what routes into a set: each effective source as a chip, each source still on disk
-  that does not route as a struck one, a warning when nothing reaches the set, and an Assign picker
-  over every source the scope offers (library §12 "Routed by ingredients").
+  that does not route as a struck one, a warning the caller raises when nothing reaches the set, and
+  an Assign picker over every source the scope offers (library §12 "Routed by ingredients").
 
   Props:
   | prop | values | default | contract |
@@ -10,7 +10,8 @@
   | `sources` | `[{ id, label, removable, hint?, nonRouting? }]` | `[]` | The effective sources, then the `nonRouting` ones; `hint` is a word drawn after a source's name, such as "default". |
   | `candidates` / `assigned` | `[{ id, label, routedTo? }]` / id[] | `[]` | Assign's options, each with the set it routes to today, and the ids it marks chosen. |
   | `implicitLabel` | localized string | `''` | A reserved role's words; while set they replace the chips and Assign. |
-  | `unreachableLabel` / `emptyLabel` / `assignLabel` | localized strings | `Common.RouteSources.*` | The badge with no effective source, the hint that replaces Assign with no candidate, and Assign's name. |
+  | `unreachable` | boolean | `false` | Draws the warning badge, from the same flag as the card's warning edge, so the two agree. |
+  | `unreachableLabel` / `emptyLabel` / `assignLabel` | localized strings | `Common.RouteSources.*` | The badge, the hint that replaces Assign with no candidate, and Assign's accessible name, which starts with its visible word "Assign". |
   | `assignNote` / `disabled` | localized string / boolean | `''` / `false` | A line atop Assign's panel; and an inert line. |
 
   Callbacks:
@@ -22,7 +23,8 @@
     `data-route-sources-line` in every state, beside a visually hidden polite summary of its
     effective sources — pinned by `tests/components/route-sources-mounted.test.js`.
   - Assign is a raw 22px button, because `Button` publishes only the 34 and 38 rungs; it carries
-    `data-chip-remove-fallback`, so a removed chip's focus lands on it.
+    `data-chip-remove-fallback`, so a removed chip's focus lands on it, and with no Assign the line
+    carries it.
 -->
 <script>
   import Chip from './Chip.svelte';
@@ -35,6 +37,7 @@
     candidates = [],
     assigned = [],
     implicitLabel = '',
+    unreachable = false,
     unreachableLabel = '',
     emptyLabel = '',
     assignLabel = '',
@@ -56,9 +59,8 @@
   const emptyText = $derived(
     emptyLabel || localizeOr('FABRICATE.Common.RouteSources.Empty', 'Add an ingredient set first.')
   );
-  const assignText = $derived(
-    assignLabel || localizeOr('FABRICATE.Common.RouteSources.Assign', 'Assign')
-  );
+  const assignText = $derived(localizeOr('FABRICATE.Common.RouteSources.Assign', 'Assign'));
+  const assignName = $derived(assignLabel || assignText);
   const separator = $derived(localizeOr('FABRICATE.Common.RouteSources.Separator', ', '));
   const notRouting = $derived(
     localizeOr('FABRICATE.Common.RouteSources.NotRouting', 'does not route')
@@ -86,7 +88,9 @@
         implicitLabel ||
         (effective.length > 0
           ? effective.map((source) => source.label).join(separator)
-          : unreachableText),
+          : unreachable
+            ? unreachableText
+            : ''),
     })
   );
 
@@ -110,13 +114,14 @@
   tabindex="-1"
   data-keyboard-focus="true"
   data-route-sources-line
+  data-chip-remove-fallback={options.length === 0 ? '' : undefined}
 >
   <span class="fabricate-route-sources-label" id={labelId}>{lineLabel}</span>
   {#if implicitLabel}
     <span class="fabricate-route-sources-implicit" data-route-sources-implicit>{implicitLabel}</span
     >
   {:else}
-    {#if effective.length === 0}
+    {#if unreachable}
       <Chip tone="warning" density="row" data-route-sources-unreachable="">{unreachableText}</Chip>
     {/if}
     {#each effective as source, index (source.id ?? `effective-${index}`)}
@@ -138,7 +143,7 @@
     {/each}
     {#each struck as source, index (source.id ?? `struck-${index}`)}
       <Chip
-        tone="muted"
+        tone="neutral"
         density="row"
         struck
         truncate
@@ -160,7 +165,7 @@
         value={chosen}
         {options}
         {disabled}
-        panelLabel={assignText}
+        panelLabel={assignName}
         searchLabel={localizeOr('FABRICATE.Common.RouteSources.Search', 'Search…')}
         searchPlaceholder={localizeOr('FABRICATE.Common.RouteSources.Search', 'Search…')}
         popoverClass="fabricate-route-sources-popover"
@@ -175,7 +180,7 @@
             data-route-sources-assign
             data-chip-remove-fallback
             data-keyboard-focus="true"
-            aria-label={assignText}
+            aria-label={assignName}
             {disabled}
             {...attributes}><i class="fas fa-plus" aria-hidden="true"></i>{assignText}</button
           >
