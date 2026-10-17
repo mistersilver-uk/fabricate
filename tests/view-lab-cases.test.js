@@ -3155,10 +3155,16 @@ test('changed files map to the windows they affect', () => {
   // A shared primitive or a global stylesheet can change every screen (issue 1515).
   assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
     'fabricate-app-shell',
+    // Issue 2512: one frame for each partial whose set rules it moved, since a partial stands as
+    // the sheet — the salvage group card, the bare set, the set chrome and the set card's own.
+    'manager-component-edit-salvage',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
     // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
     'manager-gathering-task-editor-normal-hearth-herb',
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-sets',
+    'manager-recipe-edit-results-routed-shared',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -3230,7 +3236,8 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
-// floor the call site raises above its rung's.
+// floor the call site raises above its rung's. Issue 2512's three are a result set's open Assign
+// panel and its open kebab, at the default window and at the declared floor.
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -3257,6 +3264,9 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',
   'manager-recipe-edit-results-adder-menu',
+  'manager-recipe-edit-results-routed-assign',
+  'manager-recipe-edit-results-set-menu',
+  'manager-recipe-edit-results-set-menu-narrow',
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',

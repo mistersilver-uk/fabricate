@@ -47,7 +47,7 @@ const FIXTURE = `
           <span class="manager-nav-label" data-m="nav-label">Recipes</span>
           <span class="manager-nav-count" data-m="nav-count">105</span>
         </div></div>
-        <div class="manager-recipe-ingredient-set-add">
+        <div class="fabricate-set-card-adder">
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed
                size. -->

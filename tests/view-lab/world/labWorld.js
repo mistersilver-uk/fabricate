@@ -185,6 +185,65 @@ function seedJustResolvedRewards(content) {
   });
 }
 
+/** `routed-shared` (issue 2512): the gold route also routes to the Ring, so two sets share it and
+ *  nothing reaches the Amulet. */
+function seedRoutedShared(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-shared');
+  recipe.ingredientSets = recipe.ingredientSets.map((set) =>
+    set.id === 'jw-set-gold' ? { ...set, resultGroupId: 'jw-grp-ring' } : set
+  );
+}
+
+/** `routed-shared-long`: the shared Ring with a silver route named at about forty characters. */
+function seedRoutedSharedLong(content) {
+  seedRoutedShared(content);
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-shared-long');
+  recipe.ingredientSets = recipe.ingredientSets.map((set) =>
+    set.id === 'jw-set-silver' ? { ...set, name: 'Silver route through the lost-wax mould' } : set
+  );
+}
+
+/** `routed-unreachable`: a third result set, the Brooch, that no ingredient set names. */
+function seedRoutedUnreachable(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-unreachable');
+  recipe.resultGroups = [
+    ...recipe.resultGroups,
+    { id: 'jw-grp-brooch', name: 'Brooch', results: [{ componentId: 'jw-ring', quantity: 1 }] },
+  ];
+}
+
+/** `routed-default`: neither set names a result set, so both reach the Ring by default. */
+function seedRoutedDefault(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-default');
+  recipe.ingredientSets = recipe.ingredientSets.map(({ resultGroupId: _routed, ...set }) => set);
+}
+
+/** `routed-check-stale`: Runework stops offering a failed tier, and the Standard Blade still lists
+ *  it beside a tier id the check no longer defines. */
+function seedRoutedCheckStale(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routed-check-stale');
+  system.craftingCheck = { ...system.craftingCheck, failureResultPolicy: 'never' };
+  recipe.resultGroups = recipe.resultGroups.map((group) =>
+    group.id === 'rw-grp-standard'
+      ? { ...group, checkOutcomeIds: ['rw-standard', 'rw-ruined', 'rw-retired'] }
+      : group
+  );
+}
+
+/** `check-two-sets`: the Runeblade gains a second, unnamed ingredient set. */
+function seedCheckTwoSets(content) {
+  const { recipe } = recipeAndSystem(content, 'rw-r-blade', 'check-two-sets');
+  const [stock] = recipe.ingredientSets;
+  recipe.ingredientSets = [
+    ...recipe.ingredientSets,
+    {
+      id: 'rw-set-salvaged',
+      name: '',
+      ingredientGroups: [{ ...stock.ingredientGroups[0], id: 'rw-set-salvaged-g1' }],
+    },
+  ];
+}
+
 const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
@@ -193,6 +252,12 @@ const RESULT_ROW_STATES = Object.freeze({
   'reward-group': seedRewardGroup,
   'reward-group-rolled': seedRewardGroupRolled,
   'reward-tiers': seedRewardTiers,
+  'routed-shared': seedRoutedShared,
+  'routed-shared-long': seedRoutedSharedLong,
+  'routed-unreachable': seedRoutedUnreachable,
+  'routed-default': seedRoutedDefault,
+  'routed-check-stale': seedRoutedCheckStale,
+  'check-two-sets': seedCheckTwoSets,
 });
 
 function seedResultRowState(content, state) {
@@ -693,7 +758,9 @@ function stripAuthoredWorldComponents(content) {
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
  *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
- *   for two groups drawn by roll, or `reward-tiers` for a Runeblade tier paying a commission.
+ *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
+ *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
+ *   `routed-default`, `routed-check-stale` or `check-two-sets`.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.

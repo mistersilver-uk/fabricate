@@ -835,9 +835,12 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
-      { selector: '[data-recipe-add="routing-option"]' },
+      { selector: '[data-route-sources-assign]' },
     ],
     expectView: 'recipe-edit',
+    // Only the open Assign panel satisfies it: the failed tier is offered beside the passing ones.
+    expectSelector:
+      '.fabricate-manager > .fabricate-route-sources-popover [role="option"][title="Ruined"]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,

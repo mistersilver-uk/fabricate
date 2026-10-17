@@ -325,7 +325,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-manager .manager-recipe-name-row .manager-system-name',
     // The rail's selected system is the scope Select's own value, not a static span.
     '.fabricate-manager .manager-scope-select .fabricate-select-trigger',
-    '.fabricate-manager .manager-recipe-ingredient-set-name',
+    // A set's name field (issue 2512), in `SetCard`'s partial.
+    '.fabricate-set-card input.fabricate-set-card-name',
     '.fabricate-manager input[data-recipe-field="name"]',
   ];
   for (const selector of SERIF) {

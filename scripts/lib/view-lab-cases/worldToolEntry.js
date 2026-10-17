@@ -571,7 +571,7 @@ export const CASES = Object.freeze([
       {
         container: '[data-tool-repair-requirements] [data-recipe-set]',
         target:
-          '[data-tool-repair-requirements] .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
+          '[data-tool-repair-requirements] .fabricate-set-card-adder:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
       },
     ],
     position: { width: 1280, height: 900 },

@@ -534,7 +534,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/gathering-task/GatheringTaskResultsTab.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry; each result is a `PickerRow` (issue 1516). The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/gathering-task/GatheringTaskResultsTab.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry; each result is a `PickerRow` (issue 1516). Since issue 2512 it draws its set in `SetCard` — the kicker, the name field, Remove behind the kebab, and the reserved form for the two-slot editor — and a routed set's sources in `RouteSources`, so its own geometry is the rows inside the card. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition, not a new library contract."
     },
     {
       "path": "src/ui/svelte/components/PickerRow.svelte",

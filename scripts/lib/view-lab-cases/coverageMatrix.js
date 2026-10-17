@@ -29,6 +29,8 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // Each result set names the ingredient set routing into it (issue 2512).
+    expectSelector: '[data-recipe-result-set-id] [data-route-sources-chip]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -47,6 +49,8 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // Each result set names the outcome tier routing into it (issue 2512).
+    expectSelector: '[data-recipe-result-set-id] [data-route-sources-chip]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
