@@ -272,10 +272,18 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
 }
 
 /**
- * Routed check-mode authoring warnings, for the routed `check` provider and only for steps with
- * MULTIPLE result groups, a single group needing no mapping. Two soft misconfigurations: a group
- * listing no VALID outcome tier, and an authored success tier no group produces. Both deep-link
- * to the results tab rather than blocking enable. Both read the routing model, one per step.
+ * Whether a step routes by tier, as the engine's `recipeUsesTierRouting` reads it: more than one
+ * result group, or any group listing a tier id. Only a single group listing none is exempt.
+ */
+const usesTierRouting = (step) =>
+  step.resultGroups.length > 1 ||
+  step.resultGroups.some((group) => asArray(group?.checkOutcomeIds).length > 0);
+
+/**
+ * Routed check-mode authoring warnings, for the routed `check` provider and only for steps that
+ * {@link usesTierRouting}. Two soft misconfigurations: a group listing no VALID outcome tier, and
+ * an authored success tier no group produces. Both deep-link to the results tab rather than
+ * blocking enable. Both read the routing model, one per step.
  *
  * `routedOutcomeTierOptions` is POLICY-CONDITIONAL and is passed in rather than derived here, so
  * this validator and the editor's picker read ONE set and a tier the editor offers can never be
@@ -292,14 +300,11 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   );
   const issues = [];
 
-  // A single result group needs no outcome mapping: it is produced on any non-failure outcome.
-  const isMultiGroupStep = (step) => step.resultGroups.length > 1;
-
   // The first group claiming no valid tier, by index, because a null entry claims none either.
   let hasUnroutedGroup = false;
   for (const [index, step] of executionSteps.entries()) {
     const [unroutedIndex] = models[index].unassigned;
-    if (!isMultiGroupStep(step) || unroutedIndex === undefined) continue;
+    if (!usesTierRouting(step) || unroutedIndex === undefined) continue;
     hasUnroutedGroup = true;
     issues.push({
       id: 'unroutedResultGroup',
@@ -310,15 +315,15 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
     });
   }
 
-  // An offered tier no step lists, required only where a step has more than one group: a
-  // single-group recipe routes on the exemption and needs no tiers produced.
+  // An offered tier no step lists, required only where a step routes by tier: a single group
+  // listing no tier routes on the exemption and needs no tiers produced.
   const producedTierIds = new Set(
     models
       .flatMap(({ sources }) => sources.filter(({ how }) => how === 'explicit'))
       .map(({ id }) => id)
   );
   const hasUnproducedTier =
-    executionSteps.some(isMultiGroupStep) &&
+    executionSteps.some(usesTierRouting) &&
     models[0].sources.some(({ id }) => !producedTierIds.has(id));
   if (hasUnproducedTier) {
     issues.push({ id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' });
@@ -330,6 +335,34 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   ];
 
   return { issues, checks };
+}
+
+/**
+ * Under ingredient routing, the first result group per step that no set reaches by effective
+ * routing, whatever its role: a soft warning on the results tab.
+ */
+function collectUnreachableGroupIssues(executionSteps, isMultiStep) {
+  const issues = [];
+  for (const step of executionSteps) {
+    const { inbound } = buildRoutingModel({
+      provider: 'ingredientSet',
+      ingredientSets: step.ingredientSets,
+      resultGroups: step.resultGroups,
+    });
+    const index = inbound.findIndex((sources) => sources.length === 0);
+    if (index === -1) continue;
+    issues.push({
+      id: 'unreachableResultGroup',
+      severity: 'warning',
+      target: 'results',
+      ...focusTag(resultGroupTarget(step.resultGroups[index])),
+      ...stepTag(step, isMultiStep),
+    });
+  }
+  return {
+    issues,
+    checks: [{ id: 'routedResultGroupsReachable', satisfied: issues.length === 0 }],
+  };
 }
 
 /** A set's awardable rows: each flat result, and each choice group's alternatives (issue 1773). */
@@ -465,7 +498,8 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
 /**
  * Every check and issue for one projected recipe. `options` carries `systemComponents`, whose
  * absence no-ops overlap detection; `systemRecipes`, whose absence or emptiness no-ops the taught
- * recipe check; `routingProvider`, which gates the routed warnings on `check`;
+ * recipe check; `routingProvider`, which gates the routed warnings on `check` and the unreachable
+ * one on `ingredientSet`;
  * `routedOutcomeTierOptions`, the system's policy-conditional tiers; `progressive`, the system's
  * mode, under which a set may hold no choice group; and `alchemy` with
  * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
@@ -530,6 +564,10 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     const routed = collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions);
     issues.push(...routed.issues);
     checks.push(...routed.checks);
+  } else if (routingProvider === 'ingredientSet') {
+    const unreachable = collectUnreachableGroupIssues(executionSteps, isMultiStep);
+    issues.push(...unreachable.issues);
+    checks.push(...unreachable.checks);
   }
 
   // A recipe is always in its own system's roster, so an empty one was never supplied.
@@ -590,6 +628,7 @@ export const CHECK_TO_ISSUES = Object.freeze({
   noRequirementOverlap: ['requirementOverlap'],
   routedResultGroupsRouted: ['unroutedResultGroup'],
   routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
+  routedResultGroupsReachable: ['unreachableResultGroup'],
   taughtRecipesResolve: ['missingTaughtRecipe'],
   choiceGroupsValid: Object.values(CHOICE_GROUP_ISSUES),
   alchemyResultSelection: ['alchemyResultSelection'],
