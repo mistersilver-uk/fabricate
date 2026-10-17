@@ -225,6 +225,40 @@ describe('evaluateSystemValidation — composition', () => {
     );
   });
 
+  // Issue 2511: the routed warnings read the routing model over the policy-offered tiers.
+  it('reads a failure-tier assignment as routed only where the policy offers that tier', () => {
+    const recipe = makeRecipe({
+      id: 'r-failure-tier',
+      routedCheck: true,
+      resultGroups: [
+        { id: 'rg-hit', name: 'Hit', checkOutcomeIds: ['tier-hit'], results: [] },
+        { id: 'rg-ruin', name: 'Ruin', checkOutcomeIds: ['tier-botch'], results: [] },
+      ],
+    });
+    const codesUnder = (failureResultPolicy) =>
+      evaluateSystemValidation(
+        makeSystem({
+          resolutionMode: 'routedByCheck',
+          craftingCheck: {
+            failureResultPolicy,
+            routed: {
+              type: 'relative',
+              rollFormula: '1d20',
+              relativeOutcomes: [
+                { id: 'tier-hit', name: 'Hit', success: true },
+                { id: 'tier-botch', name: 'Botch', success: false },
+              ],
+            },
+          },
+        }),
+        { recipes: [recipe] }
+      )
+        .issues.map((issue) => issue.code)
+        .filter((code) => code === 'unroutedResultGroup' || code === 'unproducedOutcomeTier');
+    assert.deepEqual(codesUnder('never'), ['unroutedResultGroup']);
+    assert.deepEqual(codesUnder('always'), []);
+  });
+
   it('composes salvage issues for an invalid component salvage config', () => {
     const component = {
       id: 'comp-1',

@@ -19,13 +19,15 @@
  *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', focusTarget?: string, stepId?: string, stepName?: string }} ReadinessIssue
- * @typedef {{ id: string, name: string }} RoutedOutcomeTier
+ * @typedef {{ id: string, name: string, success?: boolean }} RoutedOutcomeTier
  */
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
 import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 import { groupProblems } from '../../../components/resultGroupEdits.js';
+
+import { buildRoutingModel } from './recipeRoutingModel.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -273,57 +275,51 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
  * Routed check-mode authoring warnings, for the routed `check` provider and only for steps with
  * MULTIPLE result groups, a single group needing no mapping. Two soft misconfigurations: a group
  * listing no VALID outcome tier, and an authored success tier no group produces. Both deep-link
- * to the results tab rather than blocking enable.
+ * to the results tab rather than blocking enable. Both read the routing model, one per step.
  *
  * `routedOutcomeTierOptions` is POLICY-CONDITIONAL and is passed in rather than derived here, so
  * this validator and the editor's picker read ONE set and a tier the editor offers can never be
  * one this function calls unroutable.
  */
 function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions) {
-  const validTierIds = new Set(
-    routedOutcomeTierOptions.map((tier) => tier?.id).filter((id) => typeof id === 'string' && id)
+  const models = executionSteps.map((step) =>
+    buildRoutingModel({
+      provider: 'check',
+      ingredientSets: step.ingredientSets,
+      resultGroups: step.resultGroups,
+      tiers: routedOutcomeTierOptions,
+    })
   );
   const issues = [];
 
   // A single result group needs no outcome mapping: it is produced on any non-failure outcome.
-  const isMultiGroupStep = (step) => asArray(step.resultGroups).length > 1;
+  const isMultiGroupStep = (step) => step.resultGroups.length > 1;
 
-  // A group whose `checkOutcomeIds` holds no currently-valid tier id, in a multi-group step.
+  // The FIRST group claiming no valid tier, by index, because a null entry claims none either.
   let hasUnroutedGroup = false;
-  for (const step of executionSteps) {
-    if (!isMultiGroupStep(step)) continue;
-    // `findIndex` rather than `some`, so the issue addresses the FIRST unrouted group; the INDEX
-    // rather than the group, because a null entry is unrouted too and `find` would report absent.
-    const stepResultGroups = asArray(step.resultGroups);
-    const unroutedIndex = stepResultGroups.findIndex((group) => {
-      const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
-      return assigned.length === 0;
+  for (const [index, step] of executionSteps.entries()) {
+    const [unroutedIndex] = models[index].unassigned;
+    if (!isMultiGroupStep(step) || unroutedIndex === undefined) continue;
+    hasUnroutedGroup = true;
+    issues.push({
+      id: 'unroutedResultGroup',
+      severity: 'warning',
+      target: 'results',
+      ...focusTag(resultGroupTarget(step.resultGroups[unroutedIndex])),
+      ...stepTag(step, isMultiStep),
     });
-    if (unroutedIndex >= 0) {
-      hasUnroutedGroup = true;
-      issues.push({
-        id: 'unroutedResultGroup',
-        severity: 'warning',
-        target: 'results',
-        ...focusTag(resultGroupTarget(stepResultGroups[unroutedIndex])),
-        ...stepTag(step, isMultiStep),
-      });
-    }
   }
 
-  // An authored success tier no result group lists, required only where a step has MULTIPLE
-  // groups: a single-group recipe routes on the exemption and needs no tiers produced.
-  const producedTierIds = new Set();
-  for (const step of executionSteps) {
-    for (const group of asArray(step.resultGroups)) {
-      for (const id of asArray(group?.checkOutcomeIds)) {
-        if (validTierIds.has(id)) producedTierIds.add(id);
-      }
-    }
-  }
-  const hasMultiGroupStep = executionSteps.some(isMultiGroupStep);
+  // An offered tier no step lists, required only where a step has MULTIPLE groups: a single-group
+  // recipe routes on the exemption and needs no tiers produced.
+  const producedTierIds = new Set(
+    models
+      .flatMap(({ sources }) => sources.filter(({ how }) => how === 'explicit'))
+      .map(({ id }) => id)
+  );
   const hasUnproducedTier =
-    hasMultiGroupStep && [...validTierIds].some((id) => !producedTierIds.has(id));
+    executionSteps.some(isMultiGroupStep) &&
+    models[0].sources.some(({ id }) => !producedTierIds.has(id));
   if (hasUnproducedTier) {
     issues.push({ id: 'unproducedOutcomeTier', severity: 'warning', target: 'results' });
   }

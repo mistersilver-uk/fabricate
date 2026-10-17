@@ -17,6 +17,7 @@
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
+  import { buildRoutingModel } from './recipeRoutingModel.js';
 
   let {
     resultGroups = [],
@@ -54,34 +55,21 @@
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
   const tierOptions = $derived(Array.isArray(outcomeTierOptions) ? outcomeTierOptions : []);
 
-  // Ingredient-set options for one group: a set routes to at most one, so an already-routed
-  // set is disabled.
-  function ingredientOptionsFor(group) {
-    return sets.map((set, index) => ({
-      id: set.id,
-      name: setDisplayName(set, index),
-      disabled: !!set.resultGroupId && set.resultGroupId !== group.id,
-    }));
-  }
-
   function assignedSetIdsFor(group) {
     return sets.filter((set) => set.resultGroupId === group.id).map((set) => set.id);
   }
 
-  // Outcome-tier options for one group: a tier assigned to another (by INDEX, which an
-  // unsaved id-less group still has) is disabled.
-  function tierOptionsFor(index) {
-    const elsewhere = new Set(
-      groups
-        .filter((_, i) => i !== index)
-        .flatMap((group) => (Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []))
-    );
-    return tierOptions.map((tier) => ({
-      id: tier.id,
-      name: tier.name,
-      disabled: elsewhere.has(tier.id),
-    }));
-  }
+  // Each group's routing options: a set routes to at most one group, and a tier assigned to
+  // another (by INDEX, which an unsaved id-less group still has) is disabled.
+  const routing = $derived(
+    buildRoutingModel({
+      provider: routingProvider,
+      ingredientSets: sets,
+      resultGroups: groups,
+      tiers: tierOptions,
+      setName: setDisplayName,
+    })
+  );
 
   // Result routing lives in the group HEAD, which only renders when the group is chromed, so a
   // routed system always needs chrome or it loses its routing control.
@@ -217,9 +205,11 @@
             {progressive}
             {isTerminalStep}
             {onOpenComponent}
-            ingredientSetOptions={ingredientOptionsFor(group)}
+            ingredientSetOptions={routingProvider === 'ingredientSet'
+              ? routing.routingOptionsFor(index)
+              : []}
             assignedIngredientSetIds={assignedSetIdsFor(group)}
-            outcomeTierOptions={tierOptionsFor(index)}
+            outcomeTierOptions={routingProvider === 'check' ? routing.routingOptionsFor(index) : []}
             {outcomeTiersDefined}
             {failureResultsAllowed}
             onAssignIngredientSet={(setId, assigned) =>
