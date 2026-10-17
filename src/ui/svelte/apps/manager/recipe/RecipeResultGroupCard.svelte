@@ -121,13 +121,13 @@
     if (reservedRole === 'failure') {
       return localizeOr(
         'FABRICATE.Admin.Manager.Recipe.RoutingImplicitFailure',
-        'Produced by a failed check — no assignment'
+        'a failed check — no assignment'
       );
     }
     if (reservedRole !== 'success') return '';
     return localizeOr(
       'FABRICATE.Admin.Manager.Recipe.RoutingImplicitSuccess',
-      'Produced by a passed check — no assignment'
+      'a passed check — no assignment'
     );
   });
 

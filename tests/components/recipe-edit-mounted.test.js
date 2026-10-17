@@ -2027,9 +2027,29 @@ describe('RecipeEditView (mounted)', () => {
         'reserved role'
       );
     }
+    // The line's label already says "Produced by", so the role's words, the line and its summary
+    // each state it once.
+    const lineOf = (card) => card.querySelector('[data-route-sources-line]');
+    const visibleText = (line) =>
+      [...line.children]
+        .filter((child) => !child.classList.contains('visually-hidden'))
+        .map((child) => child.textContent.trim())
+        .join(' ');
     assert.deepEqual(
       cards.map((card) => card.querySelector('[data-route-sources-implicit]').textContent),
-      ['Produced by a passed check — no assignment', 'Produced by a failed check — no assignment']
+      ['a passed check — no assignment', 'a failed check — no assignment']
+    );
+    assert.deepEqual(cards.map((card) => visibleText(lineOf(card))), [
+      'Produced by a passed check — no assignment',
+      'Produced by a failed check — no assignment',
+    ]);
+    for (const card of cards) {
+      const summary = lineOf(card).querySelector('[data-route-sources-summary]').textContent;
+      assert.equal(summary.match(/Produced by/g)?.length, 1, `"${summary}" says it once`);
+    }
+    assert.equal(
+      lineOf(success).querySelector('[data-route-sources-summary]').textContent,
+      'Produced by a passed check — no assignment'
     );
 
     // Neither set is removable, and there is no "Add result set" affordance.
