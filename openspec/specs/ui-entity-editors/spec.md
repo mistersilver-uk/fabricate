@@ -367,7 +367,7 @@ No adder chooses a subject, so none can dedupe against a requirement the set alr
 
 A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through ONE kind menu with two triggers.
 A bare requirement carries the **"or…"** control; a requirement holding two or more alternatives carries one dashed **`Alternative`** adder at the foot of its box instead, named "Add an alternative", and no row inside the box draws the `or…` control.
-A choice group draws no separator between its alternatives, on either side: its header, each alternative and its 28px adder stand 8px apart, so a result group awarding up to N of them is not misread as exclusive.
+A choice group draws no separator between its alternatives, on either side: its header, each alternative and its 28px adder stand 8px apart, so a result-side choice group awarding up to N of them is not misread as exclusive.
 Both triggers open the SAME menu — a single flat **"Accept instead"** list of the ingredient match types the system can honour, Component, Tag, Essence and Currency in that order — and choosing one appends a new OR alternative of that kind for the row's own field to name.
 The adder's menu opens from the button's start edge.
 A result-side box carries the same one `Alternative` adder, its menu headed **"Add an alternative"** as a standalone result row's convert menu is, offering its set's kinds, and appending directly where the set offers one kind.
