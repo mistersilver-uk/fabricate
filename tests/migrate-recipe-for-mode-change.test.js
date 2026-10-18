@@ -4,7 +4,12 @@ import assert from 'node:assert/strict';
 import {
   migrateRecipeForModeChange,
   classifyModeChange,
+  summarizeModeChange,
 } from '../src/systems/migrateRecipeForModeChange.js';
+
+globalThis.foundry ??= { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}` } };
+globalThis.game ??= { user: { name: 'GM' } };
+const { Recipe } = await import('../src/models/Recipe.js');
 
 const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
 const ROUTED_MODES = ['routedByIngredients', 'routedByCheck'];
@@ -254,4 +259,178 @@ test('every from→to mode pair returns a valid outcome', () => {
       );
     }
   }
+});
+
+// --- The reserved failure group (issue 2514) ----------------------------------
+
+const SUCCESS = { id: 'g-ok', name: 'Default', results: [] };
+const FAILURE = { id: 'g-fail', name: '', role: 'failure', results: [] };
+const hasFailure = (recipe) => (recipe?.resultGroups ?? []).some((group) => group.role === 'failure');
+
+for (const from of MODES) {
+  for (const to of MODES.filter((mode) => mode !== from)) {
+    test(`${from} → ${to} never deletes a 1×1 recipe for its failure group, and drops it only into progressive`, () => {
+      const recipe = oneByOne({ resultGroups: [{ ...SUCCESS }, { ...FAILURE }] });
+      const result = migrateRecipeForModeChange(recipe, from, to, SYSTEM_NO_CHECK);
+      assert.notEqual(result.outcome, 'delete');
+      assert.equal(hasFailure(result.recipe), to !== 'progressive');
+    });
+  }
+}
+
+test('the progressive drop goes by role, not position', () => {
+  const result = migrateRecipeForModeChange(
+    oneByOne({ resultGroups: [{ ...FAILURE }, { ...SUCCESS }] }),
+    'simple',
+    'progressive',
+    SYSTEM_NO_CHECK
+  );
+  assert.equal(result.outcome, 'cleared');
+  assert.deepEqual(
+    result.recipe.resultGroups.map((group) => group.id),
+    ['g-ok']
+  );
+});
+
+test('a failure-only recipe migrated into progressive keeps no result group', () => {
+  const result = migrateRecipeForModeChange(
+    oneByOne({ resultGroups: [{ ...FAILURE }] }),
+    'alchemy',
+    'progressive',
+    SYSTEM_NO_CHECK
+  );
+  assert.equal(result.outcome, 'cleared');
+  assert.deepEqual(result.recipe.resultGroups, []);
+  assert.deepEqual(result.reasons, ['dropped the failure result set for progressive mode']);
+});
+
+test('into progressive, a resultSelection and a failure group are both cleared and both reported', () => {
+  const result = migrateRecipeForModeChange(
+    oneByOne({ resultSelection: { provider: 'check' }, resultGroups: [{ ...SUCCESS }, { ...FAILURE }] }),
+    'alchemy',
+    'progressive',
+    SYSTEM_NO_CHECK
+  );
+  assert.equal(result.outcome, 'cleared');
+  assert.equal(result.recipe.resultSelection, null);
+  assert.equal(hasFailure(result.recipe), false);
+  assert.deepEqual(result.reasons, [
+    'cleared resultSelection for progressive mode',
+    'dropped the failure result set for progressive mode',
+  ]);
+});
+
+for (const from of ROUTED_MODES) {
+  test(`${from} → simple keeps a recipe with one success group and a failure group`, () => {
+    const result = migrateRecipeForModeChange(
+      oneByOne({ resultGroups: [{ id: 'g-a', name: 'A' }, { ...FAILURE }] }),
+      from,
+      'simple',
+      SYSTEM_NO_CHECK
+    );
+    assert.notEqual(result.outcome, 'delete');
+    assert.equal(hasFailure(result.recipe), true);
+  });
+
+  test(`${from} → simple still deletes two success groups beside a failure group`, () => {
+    const result = migrateRecipeForModeChange(
+      oneByOne({ resultGroups: [{ id: 'g-a', name: 'A' }, { id: 'g-b', name: 'B' }, { ...FAILURE }] }),
+      from,
+      'simple',
+      SYSTEM_NO_CHECK
+    );
+    assert.equal(result.outcome, 'delete');
+  });
+}
+
+// --- summarizeModeChange ------------------------------------------------------
+
+function recipeJSON(data) {
+  return new Recipe({ craftingSystemId: 'sys-1', ...data }).toJSON();
+}
+
+test('summarizeModeChange of no recipes is empty', () => {
+  assert.deepEqual(summarizeModeChange([], 'simple', 'alchemy'), {
+    migrated: 0,
+    deleted: [],
+    droppedIngredientSets: [],
+    droppedFailureSets: [],
+  });
+});
+
+test('summarizeModeChange counts, names the deleted, and lists dropped ingredient and failure sets', () => {
+  const collapsed = recipeJSON({
+    id: 'r-a',
+    name: 'Recipe A',
+    ingredientSets: [
+      { id: 'set-1', name: 'Iron route' },
+      { id: 'set-2', name: 'Gold route' },
+      { id: 'set-3' },
+    ],
+    resultGroups: [{ ...SUCCESS }],
+  });
+  const kept = recipeJSON({ id: 'r-b', name: 'Recipe B', ingredientSets: [{ id: 'set-1' }] });
+  assert.equal('name' in collapsed.ingredientSets[2], false, 'an unnamed set has no name key');
+
+  const summary = summarizeModeChange([collapsed, kept], 'simple', 'alchemy');
+
+  assert.equal(summary.migrated, 2);
+  assert.deepEqual(summary.deleted, []);
+  assert.deepEqual(summary.droppedIngredientSets, [
+    {
+      recipe: 'Recipe A',
+      sets: [
+        { name: 'Gold route', index: 1 },
+        { name: undefined, index: 2 },
+      ],
+    },
+  ]);
+  assert.deepEqual(summary.droppedFailureSets, []);
+});
+
+test('summarizeModeChange lists recipes losing their failure set into progressive', () => {
+  const withFailure = recipeJSON({
+    id: 'r-f',
+    name: 'Fizzle Draught',
+    ingredientSets: [{ id: 'set-1' }],
+    resultGroups: [{ ...SUCCESS }, { ...FAILURE }],
+  });
+  const plain = recipeJSON({ id: 'r-p', name: 'Plain', ingredientSets: [{ id: 'set-1' }] });
+
+  const summary = summarizeModeChange([withFailure, plain], 'simple', 'progressive');
+
+  assert.equal(summary.migrated, 2);
+  assert.deepEqual(summary.droppedFailureSets, ['Fizzle Draught']);
+  assert.deepEqual(summarizeModeChange([withFailure], 'simple', 'alchemy').droppedFailureSets, []);
+});
+
+test('a deleted recipe adds nothing to the dropped-set lists', () => {
+  const doomed = recipeJSON({
+    id: 'r-x',
+    name: 'Doomed',
+    ingredientSets: [{ id: 'set-1', name: 'One' }, { id: 'set-2', name: 'Two' }],
+    resultGroups: [{ ...SUCCESS }, { ...FAILURE }],
+  });
+
+  const summary = summarizeModeChange([doomed], 'routedByIngredients', 'progressive');
+
+  assert.equal(summary.migrated, 0);
+  assert.deepEqual(summary.deleted, ['Doomed']);
+  assert.deepEqual(summary.droppedIngredientSets, []);
+  assert.deepEqual(summary.droppedFailureSets, []);
+});
+
+test('summarizeModeChange reads toJSON(), falls back to the id, and never mutates its input', () => {
+  const plainObject = { id: 'r-anon', ingredientSets: [{ id: 's-1' }, { id: 's-2' }], resultGroups: [] };
+  const model = new Recipe({ id: 'r-m', name: 'Model', ingredientSets: [{ id: 's-1' }], resultGroups: [{ ...SUCCESS }, { ...FAILURE }] });
+  const snapshot = JSON.stringify(plainObject);
+  const modelSnapshot = JSON.stringify(model.toJSON());
+
+  const summary = summarizeModeChange([plainObject, model], 'simple', 'alchemy');
+
+  assert.deepEqual(summary.droppedIngredientSets, [{ recipe: 'r-anon', sets: [{ name: undefined, index: 1 }] }]);
+  assert.equal(JSON.stringify(plainObject), snapshot);
+  assert.equal(JSON.stringify(model.toJSON()), modelSnapshot);
+  assert.deepEqual(summarizeModeChange([model], 'simple', 'progressive').droppedFailureSets, ['Model']);
+  assert.equal(JSON.stringify(model.toJSON()), modelSnapshot);
 });
