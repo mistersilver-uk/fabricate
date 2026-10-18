@@ -1,6 +1,7 @@
 /**
  * The recipe editor's routing and result-set edits, as pure functions over the draft: which scope
- * a write targets, the collapsed results projection, and the set, group and alchemy-slot writes.
+ * a write targets, the collapsed results projection, and the set, tier, group and alchemy-slot
+ * writes.
  * `mintId` is injected so tests fix the ids.
  */
 import { newDraftId } from '../../../util/draftId.js';
@@ -28,6 +29,22 @@ export function resultsProjection(recipe, finalStep) {
 /** `sets` with the set `setId` routed to `groupId`, or unrouted when `groupId` is null. */
 export function routeSet(sets, setId, groupId) {
   return sets.map((set) => (set.id === setId ? { ...set, resultGroupId: groupId ?? null } : set));
+}
+
+/**
+ * `groups` with `tierId` listed by `groups[index]` alone, appended last and stripped from every
+ * other list; `groups` itself when that group is already its only lister, so a no-op writes nothing.
+ */
+export function routeTier(groups, tierId, index) {
+  const listsIt = (group) =>
+    Array.isArray(group?.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId);
+  const listers = groups.flatMap((group, i) => (listsIt(group) ? [i] : []));
+  if (listers.length === 1 && listers[0] === index) return groups;
+  return groups.map((group, i) => {
+    const kept = (group?.checkOutcomeIds ?? []).filter((id) => id !== tierId);
+    if (i === index) return { ...group, checkOutcomeIds: [...kept, tierId] };
+    return listsIt(group) ? { ...group, checkOutcomeIds: kept } : group;
+  });
 }
 
 /** `groups` with an empty result set appended under an eager id, so it is routable at once. */

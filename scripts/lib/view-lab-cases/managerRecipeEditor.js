@@ -68,6 +68,25 @@ const GROUP_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\//,
 ]);
 
+/** The two-slot editor's failed-check set (issue 2512): both reserved slots are `is-reserved`. */
+const FAILURE_SET = '[data-recipe-set-role="failure"]';
+
+/** A routed recipe's Results tab, with the lab world seeded into `state` (issue 2512). */
+const ROUTED_RESULTS = (system, recipeId, state) => ({
+  query: state ? { system, resultRowState: state } : { system },
+  steps: [
+    'Crafting',
+    { selector: `[data-recipe-edit="${recipeId}"]` },
+    { selector: '#recipe-tab-results' },
+  ],
+});
+/** A result set's card in the editor, by its result set id. */
+const RESULT_SET = (id) => `[data-recipe-result-set-id="${id}"]`;
+const SET_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+]);
+
 /** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
 const STAGE_ROWS = '[data-recipe-result-row] [data-recipe-result-item]';
 const STAGE_RESULT_GEOMETRY = Object.freeze({
@@ -472,7 +491,7 @@ export const CASES = Object.freeze([
       {
         container: '[data-recipe-set]',
         target:
-          '[data-recipe-set] .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
+          '[data-recipe-set] .fabricate-set-card-adder:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
       },
     ],
     kinds: ['manager', 'recipes'],
@@ -810,7 +829,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipe-edit',
     expectSelector:
-      '.manager-recipe-ingredient-sets .manager-recipe-ingredient-set-add:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
+      '.manager-recipe-ingredient-sets .fabricate-set-card-adder:has(> :only-child [data-recipe-add="ingredient"][aria-haspopup="menu"])',
     expectCenterHit:
       '.manager-recipe-ingredient-set-item:last-child [data-recipe-add="ingredient"]',
     kinds: ['manager', 'recipes'],
@@ -818,6 +837,41 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
+  }),
+  // Routed by check (issue 2512): every ingredient set is named in its card, the unnamed one "Set 2".
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-check-rename',
+    label: 'Manager — Recipe edit ingredients, two sets named in a recipe routed by check',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework', resultRowState: 'check-two-sets' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="rw-r-blade"]' },
+      { selector: '#recipe-tab-ingredients' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: '[data-recipe-set-id="rw-set-salvaged"] input[data-recipe-set-field="name"]',
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // The Tools tab's per-set cards: each named route is a set card renamed in place.
+  managerCase({
+    id: 'manager-recipe-edit-tools-ingredient-sets',
+    label: 'Manager — Recipe edit tools, a set card per routed ingredient set',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="jw-r-cast"]' },
+      { selector: '#recipe-tab-tools' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-tools-ingredient-set="jw-set-gold"] input[data-recipe-tools-set-field="name"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...SET_SOURCES],
   }),
   managerCase({
     id: 'manager-recipe-edit-validation',
@@ -1041,6 +1095,8 @@ export const CASES = Object.freeze([
         { selector: `${RESULT_ROW(4)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
         // A click on the selected tab moves focus off the field without changing the screen.
         { selector: '#recipe-tab-results' },
+        // The reserved success set's routing line pushes the fourth row to the floor's fold.
+        { selector: hit, scroll: true },
       ],
       expectView: 'recipe-edit',
       // The first row Fixed, the next three on Rolled, and only the fourth marked invalid.
@@ -1368,13 +1424,12 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '[data-recipe-edit="al-r-elixir"]' },
       { selector: '#recipe-tab-results' },
-      ...CONVERT_ROW('[data-recipe-set].is-reserved', 1, 'component'),
-      { selector: '[data-recipe-set].is-reserved [data-recipe-group-chooser="rolled"]' },
+      ...CONVERT_ROW(FAILURE_SET, 1, 'component'),
+      { selector: `${FAILURE_SET} [data-recipe-group-chooser="rolled"]` },
     ],
     expectView: 'recipe-edit',
-    expectSelector:
-      '[data-recipe-set].is-reserved [data-recipe-result-group] [data-recipe-range-cell]',
-    expectNoHorizontalOverflow: '[data-recipe-set].is-reserved',
+    expectSelector: `${FAILURE_SET} [data-recipe-result-group] [data-recipe-range-cell]`,
+    expectNoHorizontalOverflow: FAILURE_SET,
     kinds: ['manager', 'recipes'],
     sourceMatches: [...GROUP_SOURCES],
   }),
@@ -1557,6 +1612,154 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // The two-slot editor at the declared floor (issue 2512): both reserved slots, neither overflowing.
+  managerCase({
+    id: 'manager-recipe-edit-results-alchemy-narrow',
+    label: 'Manager — Recipe edit results alchemy, the reserved pair at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-alchemy', 'al-r-elixir', null),
+    expectView: 'recipe-edit',
+    expectSelector: `${FAILURE_SET}.is-danger [data-set-card-reserved]`,
+    expectNoHorizontalOverflow: '[data-recipe-result-alchemy-simple]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // Routed by ingredients (issue 2512): the gold route also reaches the Ring, so the Ring names two
+  // sources and says it is shared, and nothing reaches the Amulet.
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-shared',
+    label: 'Manager — Recipe edit results, a result set two ingredient sets share',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', 'routed-shared'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('jw-grp-ring')}:has([data-route-sources-chip="jw-set-gold"]) .fabricate-set-card-note`,
+    expectContained: [
+      {
+        container: RESULT_SET('jw-grp-amulet'),
+        target: `${RESULT_SET('jw-grp-amulet')} [data-route-sources-unreachable]`,
+      },
+    ],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-shared-narrow',
+    label:
+      'Manager — Recipe edit results, a shared result set at the declared floor with a long source',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', 'routed-shared-long'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('jw-grp-ring')} [data-route-sources-chip="jw-set-silver"][title]`,
+    expectNoHorizontalOverflow: '[data-recipe-tab="results"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-unreachable',
+    label: 'Manager — Recipe edit results, a result set nothing routes to',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', 'routed-unreachable'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('jw-grp-brooch')}.is-warning [data-route-sources-unreachable]`,
+    expectCenterHit: `${RESULT_SET('jw-grp-brooch')} [data-route-sources-assign]`,
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-default',
+    label: 'Manager — Recipe edit results, two ingredient sets reaching a result set by default',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', 'routed-default'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('jw-grp-ring')} [data-route-sources-chip="jw-set-gold"] .fabricate-route-sources-hint`,
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // Assign open over every ingredient set, each saying where it routes today.
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-assign',
+    label: 'Manager — Recipe edit results, Assign open on a result set nothing routes to',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-jewelry', resultRowState: 'routed-unreachable' },
+    steps: [
+      ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', null).steps,
+      // The seed puts the unreachable Brooch first, so the portaled panel opens inside the frame.
+      { selector: `${RESULT_SET('jw-grp-brooch')} [data-route-sources-assign]` },
+    ],
+    expectView: 'recipe-edit',
+    // Two claims a closed-state frame fails: the panel is portaled onto the manager frame, and its
+    // rows say where each set routes today.
+    expectSelector:
+      '.fabricate-manager > .fabricate-route-sources-popover [role="option"] .manager-travel-option-meta',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-route-sources-popover' },
+    ],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // Routed by check: a set still lists a tier the policy no longer offers and one no longer defined.
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-check-stale',
+    label: 'Manager — Recipe edit results, listed tiers that do not route, struck',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-runework', 'rw-r-blade', 'routed-check-stale'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('rw-grp-standard')}:has([data-route-sources-chip="rw-retired"][data-route-sources-struck]) [data-route-sources-chip="rw-ruined"][data-route-sources-struck][title="Ruined, does not route"]`,
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // No tier is a Success and failed checks produce nothing: the longest hint wraps inside its line.
+  managerCase({
+    id: 'manager-recipe-edit-results-routed-check-policy-hint-narrow',
+    label: 'Manager — Recipe edit results, the failure-policy hint at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTED_RESULTS('lab-runework', 'rw-r-blade', 'routed-check-no-success'),
+    expectView: 'recipe-edit',
+    expectSelector: `${RESULT_SET('rw-grp-standard')} [data-route-sources-hint]`,
+    expectNoHorizontalOverflow: `${RESULT_SET('rw-grp-standard')} [data-route-sources-line]`,
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // A result set's kebab open: its Remove, portaled onto the manager frame and on top.
+  ...[
+    ['manager-recipe-edit-results-set-menu', 'a result set’s menu open', undefined],
+    [
+      'manager-recipe-edit-results-set-menu-narrow',
+      'a result set’s menu open at the declared floor',
+      { width: 1024, height: 640 },
+    ],
+  ].map(([id, what, position]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit results, ${what}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-jewelry' },
+      steps: [
+        ...ROUTED_RESULTS('lab-jewelry', 'jw-r-cast', null).steps,
+        // The first card, so the portaled menu opens inside the frame rather than off a card below the fold.
+        { selector: `${RESULT_SET('jw-grp-ring')} [data-set-card-actions]` },
+      ],
+      expectView: 'recipe-edit',
+      expectSelector:
+        '.fabricate-manager > .fabricate-action-menu-panel [data-recipe-remove="result-set"]',
+      expectCenterHit: '.fabricate-action-menu-panel [data-recipe-remove="result-set"]',
+      ...(position && { position }),
+      kinds: position ? ['manager', 'recipes', 'responsive'] : ['manager', 'recipes'],
+      sourceMatches: [...SET_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+    })
+  ),
   managerCase({
     id: 'manager-recipe-edit-access-rail',
     label: 'Manager — Recipe edit access rail',

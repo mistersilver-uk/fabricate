@@ -109,6 +109,8 @@ const harness = createMountedComponentHarness({
     // The Breakage tab's two mode-argument controls.
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    // Issue 2512: every ingredient set is drawn in the set card.
+    'src/ui/svelte/components/SetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     'src/ui/svelte/components/ChoiceGroup.svelte',
     'src/ui/svelte/components/PickerRow.svelte',

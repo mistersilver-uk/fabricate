@@ -176,6 +176,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/RequirementChooser.svelte',
   // Issue 2465: the expression field, on the seventeen frames that draw it.
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
+  // Issue 2512: the routing line, on a routed result set in each mode and its open Assign panel.
+  'src/ui/svelte/components/RouteSources.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
@@ -203,6 +205,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 2512: the set card, on the frames that draw each kind of set.
+  'src/ui/svelte/components/SetCard.svelte',
   // Issue 1782: the set picker, in its session form and its staged form's four states.
   'src/ui/svelte/components/SetPicker.svelte',
   // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because this

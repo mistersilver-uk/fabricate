@@ -2554,16 +2554,6 @@
 
 /* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */
 
-/* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
-.fabricate-manager .manager-salvage-group-card {
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  list-style: none;
-}
-
 /* `proto:1405`: the group's count in the mono face. Weight 500, because the face ships 400 and 500 only and the reference's 700 has nowhere to land. */
 .fabricate-manager .manager-salvage-group-count {
   flex: 0 0 auto;

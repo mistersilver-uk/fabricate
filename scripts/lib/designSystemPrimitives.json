@@ -534,7 +534,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/gathering-task/GatheringTaskResultsTab.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry; each result is a `PickerRow` (issue 1516). The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/gathering-task/GatheringTaskResultsTab.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry; each result is a `PickerRow` (issue 1516). Since issue 2512 it draws its set in `SetCard` — the kicker, the name field, Remove behind the kebab, and the reserved form for the two-slot editor — and a routed set's sources in `RouteSources`, so its own geometry is the rows inside the card. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition, not a new library contract."
     },
     {
       "path": "src/ui/svelte/components/PickerRow.svelte",
@@ -697,6 +697,14 @@
       "why": "Issue 1782 builds the specified set-membership picker over `SearchablePopover`'s `multiple` panel, which gained an async `source`, `loading` and `error` for it: a token run bounded at `maxTokens`, a `+N more` button named \"and N more\", a dashed Add, and a panel counting matched-of-total. Two importers, one per form of \"Set membership is edited through a bounded, staged picker\": `apps/manager/recipe-item/RecipeItemContentsTab.svelte` is one record's membership and takes the default `staged` commit, buffering choices for Apply and discarding them on Escape or an outside press; `apps/crafting/ComponentSourcesBar.svelte` is the session control and takes `commit=\"choose\"`, writing each choice and drawing no token run, its portrait row and its `+` trigger staying its own markup. Scoped `shared`: one importer is a manager tab and the other the player window's crafting bar. Its broad-signal override names the sources picker, the contents tab and its picker, staged and over its bound."
     },
     {
+      "path": "src/ui/svelte/components/SetCard.svelte",
+      "library": "<SetCard>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "manager-only",
+      "why": "Issue 2512 builds library §12's set card: a kicker, a 28px serif name field, an optional line naming what routes into the set, the rows, an adder and a note, with the set's verbs behind one `ActionMenu` kebab, plus a `reserved` form (a lock, a static name and a reserved-role chip, with no field and no kebab) and a `bare` form for a single set. Four manager surfaces draw it: the recipe editor's ingredient and result set cards (`apps/manager/recipe/RecipeIngredientSetCard.svelte`, `apps/manager/recipe/RecipeResultGroupCard.svelte`), the recipe Tools tab's per-set cards (`apps/manager/recipe/RecipeToolsTab.svelte`) and the component editor's salvage group head (`apps/manager/component/ComponentSalvageCard.svelte`). Scoped `manager-only`: every caller is a manager editor, and a set is authored nowhere else. Its family is rooted at `fabricate-set-card` in `styles/fabricate-manager-recipe-editor.css`, and its broad-signal override names the frames that draw an ingredient set, a routed result set, the reserved pair and a salvage group."
+    },
+    {
       "path": "src/ui/svelte/components/RequirementChooser.svelte",
       "library": "<RequirementChooser>",
       "status": "shipped",
@@ -790,6 +798,15 @@
         "src/ui/svelte/apps/manager/ManagerTitleBar.svelte"
       ],
       "why": "Issue 2420 builds the manager's title band: the PREMIUM mark while a companion is installed, then a caller's status caption. ONE importer, `src/ui/svelte/apps/manager/ManagerTitleBar.svelte`, the call site that formats the summary from the shell's mode label and outcome-tier count, so it is below the two-importer membership bar on the `LogList`, `StageNav` and `XrefList` precedent. It keeps the `.fabricate-manager`-rooted `manager-titlebar` family, and the player window renders none, because it carries no premium signal. Its library specimen reads `shipped`, and its broad-signal override names the seven frames `ManagerTitleBar`'s cases draw; this record replaces #1777 decision E1, which held the entry at `target` until a second host existed."
+    },
+    {
+      "path": "src/ui/svelte/components/RouteSources.svelte",
+      "library": "<RouteSources>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte"
+      ],
+      "why": "Issue 2512 builds library §12's routing line: a routed result set's effective sources as positive row chips, the assignments still stored that do not route struck and removable, \"Nothing — unreachable\" when nothing reaches the set, a reserved role's implicit words, and a dashed Assign over `SearchablePopover`'s `multiple` panel whose options say where each source routes today. ONE importer, `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte`, the routed result set's card, which hands it as `SetCard`'s `sources`, so it is below the two-importer membership bar on the `AppTitleBar`, `LogList` and `XrefList` precedent. Its family is rooted at `fabricate-route-sources`, and its portalled panel at `fabricate-route-sources-popover`, in `styles/fabricate-manager-recipe-editor.css`. Its library specimen reads `shipped`, and its broad-signal override names the frames that draw a routed result set in each routed mode and the open Assign panel."
     },
     {
       "path": "src/ui/svelte/components/TintPickerButton.svelte",

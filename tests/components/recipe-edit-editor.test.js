@@ -49,7 +49,6 @@ const ICONS = 'src/ui/svelte/util/recipeImageIcons.js';
 const MODE_CALLOUT = `${MANAGER}/recipe/RecipeModeCallout.svelte`;
 const COMPONENT_EDIT = `${MANAGER}/ComponentEditView.svelte`;
 const ESSENCE_EDIT = `${MANAGER}/EssenceEditView.svelte`;
-const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
 const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
 const PROGRESSIVE_STAGE_LIST = `${MANAGER}/ProgressiveStageList.svelte`;
 
@@ -1013,36 +1012,18 @@ describe('RecipeEditView keeps the recipe image always editable', () => {
   });
 });
 
-describe('routed result-set head anchors the add-trigger to the right (issue 643 CHANGE 4)', () => {
-  it('pushes the routing add-trigger to the far right of the chip row via an auto margin', () => {
-    assert.ok(
-      /\.manager-recipe-routing-assignment-chips \.manager-recipe-routing-picker\s*\{[^}]*margin-left:\s*auto/.test(
-        css
-      ),
-      'the routing add-trigger (picker) is anchored right with margin-left: auto so it sits by the delete button'
-    );
-  });
-
+describe('a result set states its name and what routes into it (issue 2512)', () => {
   defineStructureContract(
-    'keeps the reusable routing hooks intact on both routed heads',
-    ROUTING_ASSIGNMENT,
-    {
-      passesValues: [['SearchablePopover', 'triggerAddMarker', 'routing-option']],
-      writes: ['data-routing-chip'],
-      spells: ['manager-recipe-routing-picker'],
-      // The trigger is the last flow child, so the auto margin pushes only it right.
-      rendersBefore: [['EachBlock', 'SearchablePopover']],
-    }
-  );
-
-  defineStructureContract(
-    'places the delete button immediately after the routing head in the result-set head',
+    'draws the set in SetCard, its routing line as RouteSources, and Remove behind the kebab',
     RESULT_GROUP_CARD,
     {
-      writes: ['data-recipe-remove'],
-      rendersBefore: [
-        ['RecipeRoutingAssignment', { attribute: ['data-recipe-remove', 'result-set'] }],
+      names: ['SetCard', 'RouteSources'],
+      namesNo: ['RecipeRoutingAssignment', 'IconButton'],
+      passesProps: [
+        ['SetCard', 'sources'],
+        ['SetCard', 'actions'],
       ],
+      property: [['data-recipe-remove', 'result-set']],
     }
   );
 });

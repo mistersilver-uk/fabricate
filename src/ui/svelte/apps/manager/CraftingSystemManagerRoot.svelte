@@ -10,7 +10,6 @@
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
     routedOutcomeTierNamesForPolicy,
-    routedHasOutcomeTiers,
     routedOutcomeTierCount,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
@@ -559,10 +558,6 @@
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
   const recipeAllOutcomeTierOptions = $derived.by(() =>
     routedOutcomeTierOptions(selectedSystem?.craftingCheck?.routed)
-  );
-  // Whether ANY outcome tier is defined (even failure-only).
-  const recipeRoutedHasOutcomeTiers = $derived.by(() =>
-    routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
   // Whether this system's crafting failure-result policy permits results on a failed check (issue
   // 1098).
@@ -4948,7 +4943,7 @@
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
-        routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedOutcomeTiers={recipeAllOutcomeTierOptions}
         routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}

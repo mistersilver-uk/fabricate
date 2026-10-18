@@ -74,11 +74,10 @@
     // Category lives on the Overview tab.
     categories = [],
     onSetCategory = () => {},
-    // Result routing (routed systems): the per-recipe routing mode and the system's routed-check
-    // outcome tiers for the result-set assignment controls.
+    // Result routing: the mode, the tiers the policy offers, and every tier the system defines.
     routingProvider = null,
     routedOutcomeTierOptions = [],
-    routedOutcomeTiersDefined = false,
+    routedOutcomeTiers = [],
     // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
     // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
@@ -145,10 +144,6 @@
 
   // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
   const resultsRecipe = $derived(resultsProjection(recipe, finalStep));
-
-  // Check-mode routed recipes route by the crafting-check outcome, so ingredient sets are nameless
-  // there; ingredient mode and non-routed systems keep names.
-  const showSetName = $derived(routingProvider !== 'check');
 
   function stepById(stepId) {
     return steps.find((step) => step.id === stepId) || null;
@@ -500,7 +495,6 @@
             {essenceOptions}
             {itemTags}
             {componentTagOptions}
-            {showSetName}
             {routingProvider}
             onUpdateIngredientSets={updateIngredientSets}
             onDeleteStep={deleteStepFrom('ingredients')}
@@ -522,7 +516,8 @@
             {progressive}
             {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
-            outcomeTiersDefined={routedOutcomeTiersDefined}
+            {routedOutcomeTiers}
+            outcomeTiersDefined={routedOutcomeTiers.length > 0}
             failureResultsAllowed={routedFailureResultsAllowed}
             onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}
@@ -538,6 +533,7 @@
             {toolIds}
             {toolsLibrary}
             {routingProvider}
+            onUpdateIngredientSets={updateIngredientSets}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}

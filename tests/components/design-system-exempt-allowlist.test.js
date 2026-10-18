@@ -66,6 +66,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/SlotTile.svelte': 1 },
   ],
   [
+    'library §12 "Routed by ingredients" draws Assign as a dashed 22px button, a rung Button does ' +
+      'not publish',
+    { 'src/ui/svelte/components/RouteSources.svelte': 1 },
+  ],
+  [
     "the compact search's 32, the one exception to the retired 32 the geometry requirement names",
     { 'styles/fabricate.css': 1 },
   ],

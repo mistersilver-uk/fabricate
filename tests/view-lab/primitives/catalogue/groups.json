@@ -1,0 +1,252 @@
+[
+  {
+    "spec": "<SetCard>",
+    "cap": "as authored — a result set routed by ingredients",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/SetCard.svelte",
+    "fixture": "SetCardStates",
+    "partial": "head and note only",
+    "props": {
+      "kicker": "Result set",
+      "name": "Plain blade",
+      "nameLabel": "Result set name",
+      "actions": [
+        {
+          "id": "duplicate",
+          "label": "Duplicate",
+          "icon": "fas fa-clone"
+        },
+        {
+          "id": "remove",
+          "label": "Remove",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ]
+    },
+    "data": {
+      "note": "Two sets route here, so editing these results changes what both award."
+    },
+    "note": "The Produced-by line, the rows and the adder are the caller's snippets, and the line is `RouteSources`, a single-importer composition a fixture may not compose, so the live card draws its head and the caller's note."
+  },
+  {
+    "spec": "<SetCard>",
+    "cap": "unreachable — the warning edge",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/SetCard.svelte",
+    "fixture": "SetCardStates",
+    "partial": "head and edge only",
+    "undrawn": {
+      "Remove": "a kebab item, drawn only while its menu is open"
+    },
+    "props": {
+      "tone": "warning",
+      "kicker": "Result set",
+      "name": "Ruined blade",
+      "nameLabel": "Result set name",
+      "actions": [
+        {
+          "id": "remove",
+          "label": "Remove",
+          "icon": "fas fa-trash",
+          "danger": true
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<SetCard>",
+    "cap": "reserved — selected by role, never renamed",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/SetCard.svelte",
+    "fixture": "SetCardStates",
+    "partial": "head and badge only",
+    "undrawn": {
+      "Result set name": "the name field's accessible name; the reserved form draws no field"
+    },
+    "props": {
+      "variant": "reserved",
+      "tone": "danger",
+      "kicker": "Result set",
+      "name": "On a failed check",
+      "nameLabel": "Result set name"
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "effective sources — explicit, and a default",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "props": {
+      "sources": [
+        {
+          "id": "Set B",
+          "label": "Set B",
+          "removable": true
+        },
+        {
+          "id": "Set A",
+          "label": "Set A",
+          "removable": false,
+          "hint": "default"
+        }
+      ],
+      "candidates": [
+        {
+          "id": "Set A",
+          "label": "Set A"
+        },
+        {
+          "id": "Set B",
+          "label": "Set B"
+        }
+      ],
+      "assigned": ["Set B"]
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "non-routing — listed on disk, struck",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "props": {
+      "sources": [
+        {
+          "id": "Success",
+          "label": "Success",
+          "removable": true
+        },
+        {
+          "id": "Partial",
+          "label": "Partial",
+          "removable": true,
+          "nonRouting": true
+        }
+      ],
+      "candidates": [
+        {
+          "id": "Success",
+          "label": "Success"
+        },
+        {
+          "id": "Partial",
+          "label": "Partial"
+        }
+      ],
+      "assigned": ["Success", "Partial"]
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "a deleted tier",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "note": "The card names a tier id the system no longer defines, so the row passes the card's words as the struck chip's label.",
+    "props": {
+      "sources": [
+        {
+          "id": "Success",
+          "label": "Success",
+          "removable": true
+        },
+        {
+          "id": "Deleted outcome tier",
+          "label": "Deleted outcome tier",
+          "removable": true,
+          "nonRouting": true
+        }
+      ],
+      "candidates": [
+        {
+          "id": "Success",
+          "label": "Success"
+        }
+      ],
+      "assigned": ["Success", "Deleted outcome tier"]
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "unreachable — nothing reaches the set",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "props": {
+      "sources": [
+        {
+          "id": "Critical",
+          "label": "Critical",
+          "removable": true,
+          "nonRouting": true
+        }
+      ],
+      "candidates": [
+        {
+          "id": "Critical",
+          "label": "Critical"
+        }
+      ],
+      "assigned": ["Critical"],
+      "unreachable": true
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "implicit — a reserved role",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "props": {
+      "implicitLabel": "a passed check — no assignment"
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "no candidates — the hint",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "props": {
+      "sources": [],
+      "candidates": [],
+      "unreachable": true
+    }
+  },
+  {
+    "spec": "<RouteSources>",
+    "cap": "Assign open — where each source routes today",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RouteSources.svelte",
+    "fixture": "RouteSourcesAssignOpen",
+    "slot": {
+      "width": 520,
+      "height": 300
+    },
+    "note": "A boxed slot, because the Assign panel is portalled to the window beneath the line; the act presses Assign and nothing more, so no option is chosen and Success still reaches the set by name.",
+    "props": {
+      "sources": [
+        {
+          "id": "Success",
+          "label": "Success",
+          "removable": false,
+          "hint": "default"
+        }
+      ],
+      "candidates": [
+        {
+          "id": "Success",
+          "label": "Success"
+        },
+        {
+          "id": "Partial",
+          "label": "Partial",
+          "routedTo": "Plain blade"
+        },
+        {
+          "id": "Critical",
+          "label": "Critical",
+          "routedTo": "Masterwork blade"
+        }
+      ],
+      "assigned": [],
+      "assignNote": "Assigning a tier stops the other tiers routing by name."
+    }
+  }
+]

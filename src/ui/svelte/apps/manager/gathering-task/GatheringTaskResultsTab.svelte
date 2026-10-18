@@ -129,6 +129,7 @@
       'Name each result set after a gathering-check tier. Matching ignores surrounding spaces and letter case.'
     )}
     data-gathering-task-results="routed"
+    data-set-card-scope
   >
     {#if routedTierMatches.length > 0}
       <ul class="manager-gathering-routed-tier-list" data-gathering-routed-tier-list>
@@ -174,6 +175,7 @@
           role="dashed"
           fullWidth
           data-gathering-add-result-set="empty"
+          data-set-card-remove-fallback
           onclick={addRoutedResultGroup}
         >
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -202,6 +204,7 @@
         role="dashed"
         fullWidth
         data-gathering-add-result-set="footer"
+        data-set-card-remove-fallback
         onclick={addRoutedResultGroup}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>

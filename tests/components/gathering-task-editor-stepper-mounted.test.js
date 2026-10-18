@@ -27,6 +27,7 @@ import {
   GATHERING_TASK_EDITOR_COMPILED_MODULES,
   GATHERING_TASK_EDITOR_RAW_MODULES,
 } from '../helpers/gatheringTaskEditorModules.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
 const { normalizeGatheringResultGroups } = await import(
@@ -97,6 +98,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/setDrafts.js',
     'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
     'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
+    'src/ui/svelte/apps/manager/recipe/resultSetSources.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/failureResultPolicy.js',
   ],
@@ -118,7 +120,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: the set card and the routing line every result set draws.
+    'src/ui/svelte/components/SetCard.svelte',
+    'src/ui/svelte/components/RouteSources.svelte',
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
@@ -1298,7 +1302,8 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
       view.task().resultGroups.map((group) => group.name),
       ['', 'Rich']
     );
-    view.root.querySelectorAll('[data-recipe-remove="result-set"]')[0].click();
+    const firstCard = view.root.querySelectorAll('[data-recipe-result-set-id]')[0];
+    await chooseSetCardAction(firstCard, '[data-recipe-remove="result-set"]');
     await view.sync();
     assert.deepEqual(
       view.task().resultGroups.map((group) => group.id),

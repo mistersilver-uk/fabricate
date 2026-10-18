@@ -262,7 +262,8 @@ A cap of exactly **1 takes its own singular sentence**, never "up to 1 check mod
 The recipe editor's Tools tab authors Tool references only.
 Recipe-wide Tools are available in every resolution mode, and explicit multi-step recipes may author additional Tool references per step.
 Named ingredient sets receive their own Tool card only when the Crafting System uses `routedByIngredients`; unnamed sets and every other resolution mode expose no per-set Tool authoring.
-The per-set card reuses the Results tab's result-set outer card, header, and static-label hierarchy.
+The per-set card is the `SetCard` the Results tab draws, and the set is renamed in it.
+An empty name is refused there: the field restores the set's name, and the card notes that an ingredient set needs a name to carry Tools, because an unnamed set's Tool references are inert; they stay saved and apply again once the set is named.
 A row and the add-a-tool picker both resolve the Tool's name and image through the single precedence in `data-models/spec.md` `## Tool` requirement 13, so an item-sourced Tool renders its own snapshot rather than a placeholder.
 Rows contain Tool identity and removal only: Recipe data exposes no breakage, consumption, prerequisite, or bonus policy control because those behaviors belong to Tool Studio and Crafting System check settings.
 
@@ -582,6 +583,14 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
     The `checkOutcomeIds` assignment picker offers the tiers the system's `craftingCheck.failureResultPolicy` lets route: success tiers only (`success === true`) under `never`, and failure-marked tiers as well where the policy permits results on failure, as `ui-system-studio` § Routed result-group authoring is policy-conditional specifies.
   - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
+- Every set drawn as a card is renameable in that card in both routed modes.
+  A result set's card names its effective sources: an explicit source is removable, and a fallback source is marked "default" and is not.
+  A set nothing reaches reads "Nothing — unreachable" beside its Assign control, and a shared set states how many sources route to it.
+  Assign lists every source the system offers, and choosing one routed elsewhere re-points it, with a "now → ⟨set⟩" note naming where it routes today.
+  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers routing by name.
+  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, or no longer defined — shows struck, says it does not route, and stays removable.
+  NOT SHIPPED here yet, issue 2513: the card does not read the recipe's minimum success tier, so a tier below it still shows as routing.
+  NOT SHIPPED here yet, issue 2513: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
 
 ### Alchemy check-mode selector (issue 554)
 
@@ -621,7 +630,8 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
   Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
-  - **Simple** → a labeled "On success" result set, and a reserved, static-labeled ("On a failed check", warning/danger accent) failure result set present only while the recipe carries a `role: 'failure'` group; `Recipe.validate` tolerates its absence.
+  - **Simple** → a reserved "On success" result set, and a reserved "On a failed check" failure result set present only while the recipe carries a `role: 'failure'` group; `Recipe.validate` tolerates its absence.
+    Each is drawn in `SetCard`'s reserved form — a lock glyph, its static name, a "reserved role" badge, and a Produced-by line stating the passed or failed check in words, with no assignment — and the failure set takes the danger accent.
     An "Award results on a failed check" toggle adds that group empty and removes it, the editor never synthesizes the set, and an edit to the success set never creates it.
     Under a failure-result policy of `never` the toggle cannot add the group, states why and links to the Checks studio, and a group already present stays drawn with that reason and can still be removed.
     NOT SHIPPED here yet, issue 2514: the editor still synthesizes an undeletable failure set in the derived view, and an edit to either slot persists it.

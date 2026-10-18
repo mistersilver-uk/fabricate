@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One result group, each item a `PickerRow` naming a component, a currency or a taught recipe, with
-  a fixed or rolled amount, drawn through the result-side `ChoiceGroup`, which also draws a choice
-  group's box; or on a progressive set, `ProgressiveStageList`'s stages.
+  One result set in `SetCard`, its routing line `RouteSources` on a routed recipe, each item a
+  `PickerRow` naming a component, a currency or a taught recipe, with a fixed or rolled amount,
+  drawn through the result-side `ChoiceGroup`, which also draws a choice group's box; or on a
+  progressive set, `ProgressiveStageList`'s stages.
   Emitted as a shallow-updated copy through `onChange(nextGroup)`. On a recipe every item it
   creates carries an id and its kind's empty subject (`KindAdder`), and focus moves to its
   name field; on a gathering task it names the picked component. An empty group or an unnamed item
@@ -23,10 +24,11 @@
   import { createPendingFocus } from '../../../util/pendingFocus.js';
   import { componentCatalogue, withAddedResult } from '../../../components/resultRows.js';
   import KindAdder from '../../../components/KindAdder.svelte';
-  import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
+  import RouteSources from '../../../components/RouteSources.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import IconButton from '../../../components/IconButton.svelte';
+  import SetCard from '../../../components/SetCard.svelte';
   import ProgressiveStageList from '../ProgressiveStageList.svelte';
+  import { defaultSetName } from './setDrafts.js';
 
   let {
     group = {},
@@ -37,38 +39,34 @@
     // already producing it. Only a recipe's flat rows are reward rows.
     surface = 'gathering',
     resultKinds = null,
-    // Routed result routing (non-chromeless only): 'ingredientSet' assigns ingredient sets
-    // (`ingredientSet.resultGroupId`), 'check' assigns routed-check outcome tiers
-    // (`group.checkOutcomeIds`), and otherwise a free-text result-set name is shown.
+    // `'ingredientSet'` or `'check'` draws `RouteSources` from the section's routing rows:
+    // `sources`, `candidates` and `assigned` in its shapes, `sharedCount` the sources reaching
+    // this set, `unreachable` whether none does, `assignNote` atop Assign's panel, and
+    // `onRoute(id, add)` an Assign choice or a chip's removal. Any other provider names the set.
     routingProvider = null,
-    ingredientSetOptions = [],
-    assignedIngredientSetIds = [],
-    // POLICY-CONDITIONAL: success-filtered when `craftingCheck.failureResultPolicy` forbids
-    // failure results and unfiltered when it permits them, so a result set binds to a
-    // failure-marked tier exactly where the engine routes one. `recipeReadiness` reads the SAME
-    // swap, so the picker and the readiness warnings cannot disagree.
-    outcomeTierOptions = [],
-    // Whether the routed check has ANY outcome tier: with `outcomeTierOptions` empty it tells
-    // "no tiers authored yet" from "tiers exist but none is offerable" for the empty hint.
+    sources = [],
+    candidates = [],
+    assigned = [],
+    sharedCount = 0,
+    unreachable = false,
+    assignNote = '',
+    onRoute = () => {},
+    // The routed check's tier state, read only by the empty hint: whether it has ANY tier, and
+    // whether its failure-result policy permits results on a failed check.
     outcomeTiersDefined = false,
-    // Whether the failure-result policy permits results on a failed check. Its ONLY use here is
-    // the third empty hint: marking a tier Success is not the only remedy under a forbidding
-    // policy, and allowing failure results is the one a ruined-output recipe wants.
     failureResultsAllowed = false,
-    // Alchemy Simple two-slot editor. `staticLabel` replaces the free-text name input with a
-    // fixed header label; `reserved` marks the failure slot with a warning icon; `roleAccent`
-    // tones the static label; `hideRemove` suppresses the remove button on both slots.
+    // The set's index in its scope, naming an unnamed set "Set N"; `null` off a recipe.
+    setIndex = null,
+    // The two-slot editor (`SetCard`'s reserved form): `staticLabel` is the slot's fixed name and
+    // `reservedRole` its role, `'success'` or `'failure'`, which states how the slot is produced.
     staticLabel = '',
-    reserved = false,
-    roleAccent = '',
-    hideRemove = false,
+    reservedRole = '',
     // Progressive systems award the group's results in ORDER — the award loop spends the check
     // budget down the list — so each row grows a reorder affordance. Other modes render as-is.
     progressive = false,
     // Whether this card's scope is the recipe, or the terminal step of a multi-step recipe. Only
     // a terminal scope must produce, so an empty group elsewhere is authored intent (issue 1907).
     isTerminalStep = true,
-    onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {},
     // Deep link from a progressive row's read-only difficulty badge to the component editor.
@@ -104,22 +102,34 @@
     );
   }
 
-  // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
-  // routes by the system crafting-check outcome.
-  const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
-  const isCheckRouting = $derived(routingProvider === 'check');
-  const checkOutcomeIds = $derived(
-    Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : []
-  );
-
-  function addOutcomeTier(id) {
-    if (checkOutcomeIds.includes(id)) return;
-    onChange({ ...group, checkOutcomeIds: [...checkOutcomeIds, id] });
-  }
-
-  function removeOutcomeTier(id) {
-    onChange({ ...group, checkOutcomeIds: checkOutcomeIds.filter((tierId) => tierId !== id) });
-  }
+  const routed = $derived(routingProvider === 'check' || routingProvider === 'ingredientSet');
+  const cardTone = $derived.by(() => {
+    if (reservedRole === 'failure') return 'danger';
+    if (reservedRole === 'success') return 'success';
+    return routed && unreachable ? 'warning' : '';
+  });
+  const removeAction = $derived([
+    {
+      id: 'remove',
+      label: localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set'),
+      icon: 'fas fa-trash',
+      danger: true,
+      data: { 'data-recipe-remove': 'result-set' },
+    },
+  ]);
+  const implicitLine = $derived.by(() => {
+    if (reservedRole === 'failure') {
+      return localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.RoutingImplicitFailure',
+        'a failed check — no assignment'
+      );
+    }
+    if (reservedRole !== 'success') return '';
+    return localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.RoutingImplicitSuccess',
+      'a passed check — no assignment'
+    );
+  });
 
   const recipeSurface = $derived(surface === 'recipe');
   const offer = $derived(
@@ -142,6 +152,11 @@
   function setName(name) {
     onChange({ ...group, name });
   }
+  const namePlaceholder = $derived(
+    setIndex == null
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder', 'Result set name')
+      : defaultSetName(setIndex)
+  );
 
   let root = $state(null);
   // The control focus moves to once the row at `at` renders: `at` -1 is the set's adder.
@@ -201,7 +216,8 @@
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
   // point: "there are no tiers" must be answered before "none can be offered", or a system with
   // no outcome tiers at all would be told to change a policy.
-  const outcomeTierEmptyHint = $derived.by(() => {
+  const emptyHint = $derived.by(() => {
+    if (routingProvider !== 'check') return '';
     if (!outcomeTiersDefined) {
       return localizeOr(
         'FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers',
@@ -221,96 +237,31 @@
   });
 </script>
 
-<div
-  class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`}
+<SetCard
+  bind:element={root}
+  variant={chromeless ? 'bare' : staticLabel ? 'reserved' : 'default'}
+  tone={cardTone}
+  kicker={localizeOr('FABRICATE.Common.SetCard.Kicker.ResultSet', 'Result set')}
+  name={staticLabel || group?.name || ''}
+  {namePlaceholder}
+  nameProps={staticLabel
+    ? { 'data-recipe-result-set-static-label': '' }
+    : { 'data-recipe-result-set-field': 'name' }}
+  onRename={setName}
+  actions={removeAction}
+  onAction={(id) => {
+    if (id === 'remove') onRemove();
+  }}
+  sources={routed || reservedRole ? routeLine : undefined}
+  note={sharedCount > 1 ? sharedNote : undefined}
+  adder={!progressive || results.length === 0 ? adderSlot : undefined}
   data-recipe-set
   data-recipe-result-set-id={group?.id || ''}
+  data-recipe-set-role={reservedRole || undefined}
   data-validation-target={validationTarget}
   tabindex="-1"
   data-keyboard-focus="true"
-  bind:this={root}
 >
-  {#if !chromeless}
-    <div class="manager-recipe-ingredient-set-head">
-      {#if staticLabel}
-        <div
-          class={`manager-recipe-result-set-static-label ${roleAccent ? `is-${roleAccent}` : ''}`}
-          data-recipe-result-set-static-label
-        >
-          {#if reserved}
-            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-          {/if}
-          <span>{staticLabel}</span>
-        </div>
-      {:else if isIngredientRouting}
-        <RecipeRoutingAssignment
-          options={ingredientSetOptions}
-          selectedIds={assignedIngredientSetIds}
-          label={localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingIngredientSets', 'Produced by')}
-          addLabel={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingAddIngredientSet',
-            'Add ingredient set'
-          )}
-          placeholder={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingSearchIngredientSets',
-            'Search ingredient sets...'
-          )}
-          emptyHint={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingNoIngredientSets',
-            'Add a named ingredient set first.'
-          )}
-          onAdd={(id) => onAssignIngredientSet(id, true)}
-          onRemove={(id) => onAssignIngredientSet(id, false)}
-        />
-      {:else if isCheckRouting}
-        <RecipeRoutingAssignment
-          options={outcomeTierOptions}
-          selectedIds={checkOutcomeIds}
-          label={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers',
-            'Produced on outcome'
-          )}
-          addLabel={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier',
-            'Add outcome'
-          )}
-          placeholder={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers',
-            'Search outcomes...'
-          )}
-          emptyHint={outcomeTierEmptyHint}
-          onAdd={(id) => addOutcomeTier(id)}
-          onRemove={(id) => removeOutcomeTier(id)}
-        />
-      {:else}
-        <input
-          type="text"
-          class="manager-recipe-ingredient-set-name"
-          data-recipe-result-set-field="name"
-          placeholder={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder',
-            'Result set name'
-          )}
-          value={group?.name || ''}
-          onchange={(e) => setName(e.target.value)}
-          aria-label={localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
-        />
-      {/if}
-      {#if !hideRemove && !reserved}
-        <IconButton
-          class="is-danger"
-          data-recipe-remove="result-set"
-          ariaLabel={localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.RemoveResultSet',
-            'Remove result set'
-          )}
-          title={localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
-        >
-      {/if}
-    </div>
-  {/if}
-
   {#if results.length === 0 && !isTerminalStep}
     <p class="manager-muted" data-recipe-result-empty>
       {localizeOr(
@@ -328,61 +279,90 @@
         )}
       </p>
     </div>
+  {:else if progressive}
+    <!-- Progressive is the shared ordered stage list (issues 1512, 2511). `removeData` keeps
+         `data-recipe-remove="result-item"`, the hook the mounted suites and the smoke harness
+         address a stage's delete by. -->
+    <ProgressiveStageList
+      items={results}
+      {componentOptions}
+      activity="crafting"
+      {kinds}
+      catalogue={offer.catalogue}
+      recipeItemHook
+      rowData={() => ({ 'data-recipe-result-row': '' })}
+      removeData={(item) => ({
+        'data-recipe-remove': 'result-item',
+        ariaLabel: removeNameFor(item),
+        title: removeNameFor(item),
+      })}
+      difficultyDataAttr="data-recipe-result-difficulty"
+      editDataAttr="data-recipe-result-edit"
+      itemLabel={componentNameFor}
+      dcLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')}
+      dcUnsetLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')}
+      editLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}
+      editTitle={openComponentHint}
+      editAriaLabel={(item) => `${openComponentHint} — ${componentOf(item)?.name}`}
+      adderClass="fabricate-set-card-adder"
+      onItemChange={(item, index, value) => updateItem(index, fromValue(item, value))}
+      onReorder={(from, to) => reorderItem(from, to)}
+      onRemove={(item) => removeItem(results.indexOf(item))}
+      adder={resultAdder}
+      {onOpenComponent}
+    />
   {:else}
-    {#if progressive}
-      <!-- Progressive is the shared ordered stage list (issues 1512, 2511). `removeData` keeps
-           `data-recipe-remove="result-item"`, the hook the mounted suites and the smoke harness
-           address a stage's delete by. -->
-      <ProgressiveStageList
-        items={results}
-        {componentOptions}
-        activity="crafting"
-        {kinds}
-        catalogue={offer.catalogue}
-        recipeItemHook
-        rowData={() => ({ 'data-recipe-result-row': '' })}
-        removeData={(item) => ({
-          'data-recipe-remove': 'result-item',
-          ariaLabel: removeNameFor(item),
-          title: removeNameFor(item),
-        })}
-        difficultyDataAttr="data-recipe-result-difficulty"
-        editDataAttr="data-recipe-result-edit"
-        itemLabel={componentNameFor}
-        dcLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')}
-        dcUnsetLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')}
-        editLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}
-        editTitle={openComponentHint}
-        editAriaLabel={(item) => `${openComponentHint} — ${componentOf(item)?.name}`}
-        adderClass="manager-recipe-ingredient-set-add"
-        onItemChange={(item, index, value) => updateItem(index, fromValue(item, value))}
-        onReorder={(from, to) => reorderItem(from, to)}
-        onRemove={(item) => removeItem(results.indexOf(item))}
-        adder={resultAdder}
-        {onOpenComponent}
-      />
-    {:else}
-      <div class="manager-recipe-ingredient-set-groups">
-        {#each results as item, index (item?.id || index)}
-          <ChoiceGroup
-            side="result"
-            group={item}
-            {offer}
-            reward={recipeSurface}
-            onChange={(next) => updateItem(index, next)}
-            onRemove={() => removeItem(index)}
-          />
-        {/each}
-      </div>
-    {/if}
+    <div class="manager-recipe-ingredient-set-groups">
+      {#each results as item, index (item?.id || index)}
+        <ChoiceGroup
+          side="result"
+          group={item}
+          {offer}
+          reward={recipeSurface}
+          onChange={(next) => updateItem(index, next)}
+          onRemove={() => removeItem(index)}
+        />
+      {/each}
+    </div>
   {/if}
+</SetCard>
 
-  <!-- The adder follows the empty message (issue 1512): a footer of a list that is not rendered
-       cannot render, so at zero results and on every non-progressive set it is this sibling. -->
-  {#if !progressive || results.length === 0}
-    <div class="manager-recipe-ingredient-set-add">{@render resultAdder()}</div>
+<!-- The adder follows the empty message (issue 1512): a footer of a list that is not rendered
+     cannot render, so at zero results and on every non-progressive set it is the card's adder. -->
+{#snippet adderSlot()}{@render resultAdder()}{/snippet}
+
+{#snippet routeLine()}
+  <RouteSources
+    {sources}
+    {candidates}
+    {assigned}
+    implicitLabel={implicitLine}
+    unreachable={routed && unreachable}
+    emptyLabel={emptyHint}
+    assignLabel={localizeOr('FABRICATE.Common.RouteSources.AssignTo', 'Assign to {name}', {
+      name: group?.name || namePlaceholder,
+    })}
+    {assignNote}
+    onAssign={(id) => onRoute(id, true)}
+    onRemove={(id) => onRoute(id, false)}
+  />
+{/snippet}
+
+{#snippet sharedNote()}
+  {#if routingProvider === 'check'}
+    {localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.RoutingSharedOutcomeTiers',
+      '{count} outcome tiers route here, so editing these results changes what each of them awards.',
+      { count: sharedCount }
+    )}
+  {:else}
+    {localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.RoutingSharedIngredientSets',
+      '{count} ingredient sets route here, so editing these results changes what each of them awards.',
+      { count: sharedCount }
+    )}
   {/if}
-</div>
+{/snippet}
 
 {#snippet resultAdder()}
   {#if recipeSurface}
@@ -425,10 +405,3 @@
     />
   {/if}
 {/snippet}
-
-<style>
-  .manager-recipe-ingredient-set.is-reserved {
-    border-color: var(--fab-warning-border);
-    background: var(--fab-warning-soft);
-  }
-</style>

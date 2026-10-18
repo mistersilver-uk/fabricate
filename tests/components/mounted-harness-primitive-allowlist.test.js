@@ -52,6 +52,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/RuleSentence.svelte',
   // The set picker (issue 1782): the recipe-item editor's contents tab and the crafting bar.
   'src/ui/svelte/components/SetPicker.svelte',
+  // The set card (issue 2512): every recipe set, the Tools tab's per-set cards and salvage groups.
+  'src/ui/svelte/components/SetCard.svelte',
   // The inspector rail section (issue 1782): the essence, tool and recipe-item inspectors.
   'src/ui/svelte/components/Rail.svelte',
   // The log list (issue 1782): every tree holding the journal's Finished list renders it.

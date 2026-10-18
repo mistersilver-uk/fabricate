@@ -11,6 +11,7 @@ import {
   componentCardHarness,
 } from '../helpers/componentEditViewModules.js';
 import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const harness = componentCardHarness('ComponentSalvageCard');
 
@@ -72,7 +73,10 @@ describe('ComponentSalvageCard', () => {
     );
     name.value = 'Dust';
     name.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    target.querySelector(':scope [data-salvage-group="grp-2"] [data-remove-salvage-group]').click();
+    await chooseSetCardAction(
+      target.querySelector(':scope [data-salvage-group="grp-2"]'),
+      '[data-remove-salvage-group]'
+    );
     target
       .querySelector(':scope [data-salvage-group="grp-1"] [data-remove-salvage-result]')
       .click();
@@ -110,7 +114,10 @@ describe('ComponentSalvageCard', () => {
       ':scope [data-salvage-group="grp-1"] [data-salvage-group-name]'
     );
     assert.ok(name.disabled, 'the set name is read-only');
-    assert.ok(target.querySelector('[data-remove-salvage-group]').disabled);
+    assert.ok(
+      target.querySelector(':scope [data-salvage-group="grp-1"] [data-set-card-actions]').disabled,
+      'the set’s kebab is inert'
+    );
     assert.ok(target.querySelector('button[data-add-salvage-group]').disabled);
     assert.ok(target.querySelector('[data-salvage-route="Success"]').disabled);
     harness.remount();

@@ -278,6 +278,10 @@ See [Multi-Step Recipes]({% link crafting/recipes/multi-step.md %}) for details.
 Tools are reusable items required for crafting, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
 A recipe can require Tools for the whole recipe or for a single step.
 In **Routed by ingredients**, each named ingredient set can also require its own Tools.
+Each set's Tools card carries the set's name, and you can rename the set there.
+An ingredient set needs a name to carry Tools, so clearing the name is refused and a note explains why.
+The Tool references on an unnamed set are inert.
+They stay saved and apply again once the set is named.
 
 See [Tools]({% link tools.md %}) for source linking, prerequisites, breakage, and usage tracking.
 

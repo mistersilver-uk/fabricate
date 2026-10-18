@@ -427,6 +427,36 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-depleted-image-filled',
     'manager-gathering-task-depleted-image-empty',
   ]),
+  // The routing line (issue 2512): a routed result set in each routed mode, Assign open, and each
+  // state it draws — shared, long and truncated, unreachable, by default, struck tiers, and the
+  // longest hint at the floor.
+  'src/ui/svelte/components/RouteSources.svelte': Object.freeze([
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-failure-tier',
+    'manager-recipe-edit-results-routed-shared',
+    'manager-recipe-edit-results-routed-shared-narrow',
+    'manager-recipe-edit-results-routed-unreachable',
+    'manager-recipe-edit-results-routed-default',
+    'manager-recipe-edit-results-routed-assign',
+    'manager-recipe-edit-results-routed-check-stale',
+    'manager-recipe-edit-results-routed-check-policy-hint-narrow',
+  ]),
+  // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
+  // reserved pair and a salvage group.
+  'src/ui/svelte/components/SetCard.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients-sets',
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-alchemy',
+    'manager-component-edit-salvage',
+    'manager-recipe-edit-ingredients-check-rename',
+    'manager-recipe-edit-tools-ingredient-sets',
+    'manager-recipe-edit-results-routed-unreachable',
+    'manager-recipe-edit-results-set-menu',
+    'manager-recipe-edit-results-set-menu-narrow',
+    'manager-recipe-edit-results-alchemy-narrow',
+  ]),
   // The set picker (issue 1782): the session form, and the staged form closed, open, staged and over its bound.
   'src/ui/svelte/components/SetPicker.svelte': Object.freeze([
     'player-crafting-sources-picker',
@@ -768,10 +798,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-component-edit-salvage-rolled-narrow',
   ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
+  // Every module-sheet partial stands as this key (issue 1711), so issue 2512's four name one frame
+  // each: the set card's rules in the recipe-editor sheet, the recipe editor's set chrome, the
+  // single bare set, and the salvage group card.
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-world-downtime-tracking',
     'manager-world-downtime-collapsed',
+    'manager-recipe-edit-results-routed-shared',
+    'manager-recipe-edit-ingredients-sets',
+    'manager-recipe-edit-ingredients',
+    'manager-component-edit-salvage',
   ]),
 });
 

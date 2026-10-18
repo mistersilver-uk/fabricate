@@ -1,8 +1,8 @@
 /**
  * The recipe editor's one reading of result routing, mirroring `ResolutionModeService`: each
- * offered source with the groups it effectively awards, the sources reaching each group, and each
- * group's picker options. Groups are addressed by index, because an id-less draft group still needs
- * options. Pinned against the engine by `tests/recipe-routing-model.test.js`.
+ * offered source with the groups it effectively awards, and the sources reaching each group.
+ * Groups are addressed by index, because an id-less draft group is still a target.
+ * Pinned against the engine by `tests/recipe-routing-model.test.js`.
  */
 import {
   isFailKeyword,
@@ -84,21 +84,6 @@ function tierSources(tiers, groups, minSuccessOutcomeId, direction) {
   });
 }
 
-/** Today's picker options for the group at `index`: a set or tier claimed by another is disabled. */
-function optionsFor(index, { provider, sets, groups, tiers, setName }) {
-  const group = groups[index];
-  if (provider === 'ingredientSet') {
-    return sets.map((set, i) => ({
-      id: set?.id,
-      name: setName(set, i),
-      disabled: !!set?.resultGroupId && set.resultGroupId !== group?.id,
-    }));
-  }
-  if (provider !== 'check') return [];
-  const elsewhere = new Set(groups.flatMap((other, i) => (i === index ? [] : listedTiers(other))));
-  return tiers.map((tier) => ({ id: tier.id, name: tier.name, disabled: elsewhere.has(tier.id) }));
-}
-
 /** The groups that claim no offered source: the authoring claim the readiness warning reads. */
 function unassignedIndexes(provider, sets, groups, tiers) {
   if (provider === 'check') {
@@ -127,8 +112,6 @@ function unassignedIndexes(provider, sets, groups, tiers) {
  * - `unreachable`: the non-`failure`-role groups no source reaches, defined only for a routed
  *   provider, so it is empty under `null`.
  * - `unassigned`: the groups that claim no offered source, failure-role ones included.
- * - `routingOptionsFor(index)`: the picker options of the group at `index`, which a
- *   failure-role group keeps because the engine still awards it. They are `[]` under `null`.
  */
 export function buildRoutingModel({
   provider = null,
@@ -154,7 +137,6 @@ export function buildRoutingModel({
     entry.sharedCount = Math.max(0, ...entry.targets.map((target) => inbound[target].length));
   }
   const routed = provider === 'ingredientSet' || provider === 'check';
-  const scope = { provider, sets, groups, tiers: offered, setName };
   return {
     sources,
     inbound,
@@ -162,6 +144,5 @@ export function buildRoutingModel({
       ? indexesWhere(groups, (group, i) => group?.role !== 'failure' && inbound[i].length === 0)
       : [],
     unassigned: unassignedIndexes(provider, sets, groups, offered),
-    routingOptionsFor: (index) => optionsFor(index, scope),
   };
 }

@@ -111,7 +111,7 @@
 
 .fabricate-manager .manager-checks-tier-add > .fabricate-button,
 .fabricate-manager .manager-salvage-stage-add > .fabricate-button,
-.fabricate-manager .manager-recipe-ingredient-set-add > .manager-recipe-add-result {
+.fabricate-manager .fabricate-set-card-adder > .manager-recipe-add-result {
   flex: 1 1 auto;
 }
 
@@ -609,18 +609,6 @@
   gap: var(--fab-space-2);
 }
 
-/* Per-component salvage authoring (component editor). A result group's rows are the requirement row (issue 1516), and the outcome-routing rows pair an outcome name with its target-group select. */
-.fabricate-manager .manager-salvage-group-header {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-salvage-group-header .manager-input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* THE NAME-LENGTH CAP LIVES HERE, once, for every component picker in the studio. */
 .fabricate-manager .manager-recipe-component-picker {
   min-width: 0;
@@ -786,63 +774,7 @@
   background: var(--fab-border);
 }
 
-.fabricate-manager .manager-recipe-ingredient-set {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-manager .manager-recipe-ingredient-set-head {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-/* Shared read-only Recipe scope label. Results use it for fixed outcome slots; Tools use it for named routed-by-ingredients scopes. */
-.fabricate-manager .manager-recipe-result-set-static-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: var(--font-primary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-recipe-result-set-static-label.is-warning {
-  color: var(--fab-warning-text);
-}
-
-.fabricate-manager .manager-recipe-result-set-static-label i {
-  font-size: 0.8rem;
-}
-
-/* A routed result-set head stacks a label over the chips + "Add outcome" row, so a vertically centred delete button floats between the two lines (issue 643). */
-.fabricate-manager .manager-recipe-ingredient-set-head:has(.manager-recipe-routing-assignment) {
-  align-items: flex-end;
-}
-
-/* A NAME input is set in the serif, exactly as the name it authors renders elsewhere — the set name here, the recipe name on the Overview tab (issue 643). */
-.fabricate-manager .manager-recipe-ingredient-set-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text);
-  font-family: var(--fab-font-serif);
-  font-weight: 700;
-}
-
+/* The recipe name field is set in the serif, as the name it authors renders elsewhere (issue 643). */
 .fabricate-manager input[data-recipe-field="name"] {
   font-family: var(--fab-font-serif);
   font-weight: 600;
@@ -850,74 +782,6 @@
 
 .fabricate-manager .manager-recipe-ingredient-set-empty {
   margin: 0;
-}
-
-/* Read-only default set name shown in routed check mode (no editable input). */
-.fabricate-manager .manager-recipe-ingredient-set-name.is-readonly {
-  display: flex;
-  align-items: center;
-  border-color: transparent;
-  background: transparent;
-  opacity: 0.7;
-}
-
-.fabricate-manager .manager-recipe-routing-assignment {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-recipe-routing-assignment-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fab-text);
-  opacity: 0.7;
-}
-
-.fabricate-manager .manager-recipe-routing-assignment-empty {
-  margin: 0;
-  flex: 1 1 auto;
-}
-
-.fabricate-manager .manager-recipe-routing-assignment-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-/* The add-trigger is anchored to the RIGHT of the chip row so it sits next to the result-set delete button instead of wandering as chips are added or removed (issue 643). */
-.fabricate-manager .manager-recipe-routing-assignment-chips .manager-recipe-routing-picker {
-  margin-left: auto;
-}
-
-/* Outcome routing chips are rounded-corner rectangles, not the default full-round chip pill, so a routed outcome ("Flawed", "Standard") reads as a tag on the result set rather than a status bubble (issue 643). */
-
-/* Three classes: `gap` and `border-radius` both collide with the chip primitive, and a 999px pill would be a visible change (issue 883). */
-.fabricate-manager .manager-chip.manager-recipe-routing-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  border-radius: 6px;
-}
-
-.fabricate-manager .manager-recipe-routing-chip-remove {
-  display: inline-flex;
-  align-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.75;
-}
-
-.fabricate-manager .manager-recipe-routing-chip-remove:hover {
-  opacity: 1;
 }
 
 .fabricate-manager .manager-recipe-ingredient-set-groups {
@@ -938,13 +802,6 @@
   padding: 0;
   border: none;
   background: none;
-}
-
-/* Two-button add row: "Add component" (popover) + "Add tag requirement". */
-.fabricate-manager .manager-recipe-ingredient-set-add {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
 }
 
 /* RETIRED in issue 1118: the recipe dashed add-buttons no longer need a container rule to pin their type (issue 643). */
@@ -1847,3 +1704,203 @@
   overflow-wrap: break-word;
 }
 
+/* The set card (library §12 "The two sets"), rooted at the class `SetCard` emits. */
+.fabricate-set-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-set-card.is-warning {
+  border-color: var(--fab-warning-border);
+}
+
+.fabricate-set-card.is-danger {
+  border-color: var(--fab-danger-border);
+}
+
+/* One set needs no box: its rows sit on the tab itself, as far from its adder as a tab's rows. */
+.fabricate-set-card.is-bare {
+  gap: var(--fab-space-3);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* A set inside a raised card sits a step lower, as the salvage group does. */
+.fabricate-set-card.is-inset {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-set-card .fabricate-set-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* (0,2,1) with its element: it ties the manager's text-field baseline and wins on source order. */
+.fabricate-set-card input.fabricate-set-card-name {
+  box-sizing: border-box;
+  flex: 0 1 240px;
+  min-width: 130px;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.fabricate-set-card input.fabricate-set-card-name:hover:enabled {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-set-card input.fabricate-set-card-name:focus-visible {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-set-card .fabricate-set-card-name.is-static {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fabricate-set-card .fabricate-set-card-name.is-static > i {
+  font-size: 11px;
+}
+
+.fabricate-set-card.is-success .fabricate-set-card-name.is-static {
+  color: var(--fab-success-text);
+}
+
+.fabricate-set-card.is-warning .fabricate-set-card-name.is-static {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-set-card.is-danger .fabricate-set-card-name.is-static {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-set-card.is-reserved .fabricate-set-card-role {
+  margin-top: calc(-1 * var(--fab-space-1));
+}
+
+.fabricate-set-card .fabricate-set-card-meta {
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+/* The kebab closes the head at its end edge, wherever the name leaves it. */
+.fabricate-set-card .fabricate-set-card-actions {
+  margin-left: auto;
+}
+
+.fabricate-set-card .fabricate-set-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-set-card .fabricate-set-card-adder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-set-card .fabricate-set-card-note {
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* The line naming what routes into a set (library §12 "Routed by ingredients"), rooted at the class `RouteSources` emits; its chips are `Chip` at the row density. */
+.fabricate-route-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-route-sources .fabricate-route-sources-label {
+  flex: none;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+/* The hint takes the rest of the line and wraps there: the policy hint runs to a paragraph. */
+.fabricate-route-sources .fabricate-route-sources-empty {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+.fabricate-route-sources .fabricate-route-sources-implicit {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.fabricate-route-sources .fabricate-route-sources-hint {
+  color: var(--fab-text-secondary);
+  font-weight: 500;
+}
+
+/* Dashed at the 22px rung, its 24px hit area the module's `fab-hit-area`. */
+.fabricate-route-sources .fabricate-route-sources-assign {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-1);
+  height: 22px;
+  min-height: 22px;
+  margin: 0;
+  padding: 0 var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 6px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-route-sources .fabricate-route-sources-assign:hover:enabled {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+}
+
+.fabricate-route-sources .fabricate-route-sources-assign:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fabricate-route-sources-popover .fabricate-route-sources-note {
+  margin: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  color: var(--fab-warning-text);
+  font-size: 11px;
+  line-height: 1.4;
+}

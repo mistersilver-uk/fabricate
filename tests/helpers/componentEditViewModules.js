@@ -178,6 +178,8 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/component/ComponentDifficultyCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+  // Issue 2512: a salvage result set's head is the set card.
+  'src/ui/svelte/components/SetCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
