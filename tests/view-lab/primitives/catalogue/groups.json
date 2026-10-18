@@ -246,7 +246,7 @@
         }
       ],
       "assigned": [],
-      "assignNote": "Assigning a tier stops the other tiers routing by name."
+      "assignNote": "Assigning a tier stops the other tiers reaching a result set by default."
     }
   },
   {
