@@ -725,6 +725,73 @@
     "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. Its drawn inks carry the bare row's #2368 debt."
   },
   {
+    "spec": "<PickerRowAmount>",
+    "cap": "fixed — the unit right of the stepper",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "A currency amount, so its unit stands right of the 102 by 28 stepper. The slot renders a fragment and owns no wrapper, so its parts stand in the page's own flow, the unit a word space from the stepper, where the drawing's wrapper draws the host row's 8px gap.",
+    "props": {
+      "value": { "kind": "currency", "quantity": 50 },
+      "amount": { "unit": "gp" },
+      "name": "Gold"
+    }
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "the Fixed | Rolled toggle — a result amount",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "The toggle's well is block-level, so in the page's own flow it stands above the stepper, where a host row lays the two in line at its 8px gap.",
+    "props": {
+      "value": { "kind": "component", "quantity": 2 },
+      "name": "Karrun Warblade",
+      "rollable": true
+    }
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "rolled — the expression in the stepper’s slot",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "Measured: the expression is 102 by 28 at radius 7, the stepper's own box, beneath the toggle's 30px well. The slot renders a fragment and owns no wrapper, so the gap between its parts is the host row's, 8px, which the drawing's wrapper draws.",
+    "props": {
+      "value": { "kind": "component", "quantityFormula": "1d4 + @abilities.dex.mod" },
+      "name": "Ironwort Draught",
+      "rollable": true
+    }
+  },
+  {
+    "spec": "<KindAdder>",
+    "cap": "one kind offered — appends directly",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/KindAdder.svelte",
+    "note": "With one kind on offer the button appends directly and opens no menu. Measured: 71 by 34 at radius 9, the manager button's 34px rung.",
+    "props": {
+      "kinds": ["component"],
+      "label": "Result",
+      "ariaLabel": "Add a result"
+    }
+  },
+  {
+    "spec": "<KindAdder>",
+    "cap": "several kinds — the kind menu from the button’s start edge",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/KindAdder.svelte",
+    "fixture": "KindAdderOpen",
+    "slot": { "width": 166, "height": 131 },
+    "undrawn": {
+      "manager-recipe-or-menu manager-recipe-result-menu": "the portaled panel's classes, which draw the kind menu's 150px; the drawing draws the panel they style"
+    },
+    "note": "The act opens the menu. A boxed slot, because the menu is portalled to the window: at 166 by 131 the menu opens 4px beneath the button, 150 by 93, unflipped. It stands 8px in from the button's start edge, the menu's margin inside its host, because the adder stands at the window's own edge here; 166 is the least width that keeps that margin on both sides (165 moves it to 7), and 131 the least height that holds the whole menu (130 clips it). Its drawn inks carry the bare row's #2368 debt.",
+    "props": {
+      "kinds": ["component", "currency"],
+      "label": "Result",
+      "ariaLabel": "Add a result",
+      "heading": "Add a result",
+      "menuClass": "manager-recipe-or-menu manager-recipe-result-menu"
+    }
+  },
+  {
     "spec": "<SetPicker>",
     "cap": "membership — one record’s set",
     "draws": ".k-lbl",
