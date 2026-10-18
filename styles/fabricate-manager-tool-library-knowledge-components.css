@@ -2721,7 +2721,7 @@
   min-height: 38px;
 }
 
-/* The 28px rung (issue 2515): a choice group's `Alternative` adder, level with the stepper above it. It pins the height the `dashed` role pins, and takes the 26-32 band's corner. */
+/* The 28px rung (issue 2515): a choice group's `Alternative` adder, at the stepper's 28. It pins the height the `dashed` role pins, and takes the 26-32 band's corner. */
 .fabricate-button.fabricate-button.fab-manager-button.is-size-28 {
   height: 28px;
   min-height: 28px;

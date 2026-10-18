@@ -700,7 +700,7 @@
   white-space: nowrap;
 }
 
-/* The set-level "OR" and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. A choice group draws no divider between its alternatives (ruled 2026-10-18). */
+/* The set-level "OR" and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
 .fabricate-manager .manager-recipe-ingredient-set-or,
 .fabricate-manager .manager-recipe-ingredient-and-separator {
   display: flex;
@@ -800,7 +800,7 @@
   border: 1px solid var(--fab-accent-border);
   border-radius: 999px;
   background: var(--fab-accent-soft);
-  color: var(--fab-accent);
+  color: var(--fab-accent-text);
   font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
