@@ -114,7 +114,7 @@ const MODES = Object.freeze({
     body: [
       'AlchemySimpleBody',
       'A pass/fail check you can switch off. On a pass the success result set is produced; ' +
-        'on a fail the reserved failure result set is.',
+        'on a fail, the recipe’s failure result set is, if it has one.',
     ],
     facts: ['check:optional', 'outcomes:passFail', 'results:successFailure'],
   },

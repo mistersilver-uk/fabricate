@@ -53,6 +53,8 @@
     progressive = false,
     // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The two-slot editor's link to the Checks tab, forwarded to every section.
+    onOpenChecks = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {},
@@ -211,6 +213,7 @@
             {progressive}
             isTerminalStep={index === steps.length - 1}
             {onOpenComponent}
+            {onOpenChecks}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {routedOutcomeTiers}
@@ -234,6 +237,7 @@
       {routingProvider}
       {progressive}
       {onOpenComponent}
+      {onOpenChecks}
       {ingredientSets}
       {outcomeTierOptions}
       {routedOutcomeTiers}

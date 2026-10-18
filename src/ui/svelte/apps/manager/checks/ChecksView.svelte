@@ -193,7 +193,7 @@
       fallback: 'Simple check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
       descFallback:
-        'A pass/fail check you can switch off. On a pass the success result set is produced; on a fail the reserved failure result set is.',
+        'A pass/fail check you can switch off. On a pass the success result set is produced; on a fail, the recipe’s failure result set is, if it has one.',
     },
     {
       value: 'tiered',
