@@ -15,6 +15,7 @@ import {
   routeTier,
   scopeTarget,
   scopeWrites,
+  withFailureSet,
   withResultSlot,
 } from '../src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js';
 
@@ -121,11 +122,15 @@ describe('alchemySlots', () => {
     assert.equal(slots.failure, failure);
   });
 
-  it('synthesizes each absent slot empty', () => {
-    assert.deepEqual(alchemySlots([]), {
-      success: { results: [] },
-      failure: { role: 'failure', results: [] },
-    });
+  it('never reads a failure group as the success set', () => {
+    const failure = { id: 'gf', role: 'failure', results: [{ id: 'r1' }] };
+    assert.deepEqual(alchemySlots([failure]), { success: { results: [] }, failure });
+  });
+
+  it('leaves the failure set null when the group is absent, and fills nothing in', () => {
+    assert.deepEqual(alchemySlots([]), { success: { results: [] }, failure: null });
+    const success = { id: 'gs', results: [] };
+    assert.equal(alchemySlots([success]).failure, null);
   });
 });
 
@@ -150,25 +155,54 @@ describe('withResultSlot', () => {
     assert.equal(next[0].id, 'gs');
   });
 
-  it('synthesizes both slots with no groups, minting the success id first', () => {
-    const next = withResultSlot([], 'failure', { results: [{ id: 'r3' }] }, sequence('m1', 'm2'));
-    assert.deepEqual(next, [
-      { id: 'm1', results: [] },
-      { id: 'm2', role: 'failure', results: [{ id: 'r3' }] },
+  it('never creates the failure group from a success edit', () => {
+    assert.deepEqual(withResultSlot([success], 'success', { results: [] }), [
+      { id: 'gs', name: 'On success', results: [] },
+    ]);
+    assert.deepEqual(withResultSlot([], 'success', { results: [{ id: 'r3' }] }, () => 'm1'), [
+      { id: 'm1', results: [{ id: 'r3' }] },
     ]);
   });
 
-  it("takes the edit's id for an id-less slot, and the only group when every group is a failure", () => {
-    const next = withResultSlot(
-      [{ ...failure, id: '' }],
-      'success',
-      { id: 'e1', results: [] },
-      () => 'm'
-    );
+  it('returns its input for a failure edit with no failure group', () => {
+    const groups = [success];
+    assert.equal(withResultSlot(groups, 'failure', { results: [{ id: 'r4' }] }), groups);
+    const empty = [];
+    assert.equal(withResultSlot(empty, 'failure', { results: [] }), empty);
+  });
+
+  it("takes the edit's id for an id-less success set, ahead of a failure-only state", () => {
+    const next = withResultSlot([failure], 'success', { id: 'e1', results: [] }, () => 'm');
     assert.deepEqual(next, [
-      { id: 'e1', role: 'failure', name: 'Ruin', results: [] },
-      { id: 'm', role: 'failure', name: 'Ruin', results: [] },
+      { id: 'e1', results: [] },
+      { id: 'gf', role: 'failure', name: 'Ruin', results: [] },
     ]);
+  });
+});
+
+describe('withFailureSet', () => {
+  const success = { id: 'gs', results: [{ id: 'r1' }] };
+
+  it('appends one empty failure group under a minted id, once', () => {
+    const mint = sequence('f1', 'f2');
+    const next = withFailureSet([success], true, mint);
+    assert.deepEqual(next, [success, { id: 'f1', name: '', role: 'failure', results: [] }]);
+    assert.equal(withFailureSet(next, true, mint), next);
+    assert.equal(mint(), 'f2', 'the no-op mints no id');
+  });
+
+  it('removes every failure group, with their results', () => {
+    const groups = [
+      { id: 'f1', role: 'failure', results: [{ id: 'r2' }] },
+      success,
+      { id: 'f2', role: 'failure', results: [] },
+    ];
+    assert.deepEqual(withFailureSet(groups, false), [success]);
+  });
+
+  it('returns its input when there is nothing to remove', () => {
+    const groups = [success];
+    assert.equal(withFailureSet(groups, false), groups);
   });
 });
 
