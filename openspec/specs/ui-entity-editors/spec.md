@@ -275,10 +275,11 @@ ONE row shape authors every requirement and every result, on every surface that 
 Its anatomy is the kind FIRST and the value second:
 
 ```text
-[plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
+[lead plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
 
 The fixed-or-rolled toggle is drawn on component and currency result rows alone, and a knowledge result row draws no amount, because a recipe is taught once; a progressive result row draws neither the toggle nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
+A currency row, on either side, draws its unit's abbreviation, where the unit has one, to the right of its amount, never beneath the name.
 
 - **A result's amount is fixed or rolled.**
 Rolled swaps the stepper for a roll expression in the same slot, at the same width and height, so the toggle moves nothing else in the row; Fixed removes the expression from the result and keeps its quantity, and switching back restores what was typed.
@@ -304,26 +305,28 @@ A knowledge result on a system where learned knowledge is not observable is draw
 A knowledge result whose taught recipe is no longer in its system draws a "Missing recipe" face with the row's remove, and the Validation tab flags the set, because every craft of it would be refused.
 A fixed currency amount is a whole number, and a fraction is marked invalid on the row with its reason.
 - **A result row too narrow for one line wraps by rule, never by overflow.**
-Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+Where its list is narrower than one line needs, a flat row puts its lead plate, kind and name on the first line, and the toggle, the amount at the stepper's width and the remove at its end on the second, with any error across the row below; the 180px subject leaves the first line no room for the remove at the editor's declared floor.
 A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
-The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
-The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
+The lead plate, the subject plate's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
+The tint is on the MARK and never on the lead plate, the subject plate or the subject cell, which would make four rows of four kinds read as four differently-coloured cards; a tag row's own edge is the one row-level treatment, stated below.
+- **An unnamed row's lead plate is untinted.**
+Until a value resolves — a named subject, or a tag row's first tag — the lead plate is a dashed neutral outline around a subtle glyph, so a row still waiting for its value reads as unfinished; a missing recipe and a misconfigured row keep their own faces.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
 - **The kind is the shared select,** rendered through `components/Select.svelte` at its `inline` rung and never a native `<select>` (issue 1510), carrying the kinds the kind menu offers plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
-Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
-Unnamed, it is an inline search field — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
+Named, it is a neutral bordered subject cell, 34px tall and never narrower than 180px, carrying the subject's image or icon on a 26px subject plate, its name and a real clear BUTTON at the cell's end.
+Unnamed, it is an inline search field at that same height and minimum, edged in the accent border at rest — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
 The list's POSITION is the requirement and its DOM parent is not: it is a floating surface under `design-system`, portalled to the nearest application root, because a list positioned inside the row is clipped by the row's scrolling ancestor.
 It flips ABOVE the field only where that root has no room below, and in neither placement does it cover the field it completes.
 - **A suggestion starts where the query starts.**
 The panel shares the left edge of the field it completes, beneath it or flipped above it, so each suggestion's glyph and label are left-aligned against the typed text; a suggestion centred in its panel is not continuing what the GM typed.
 This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
-The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
+The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the subject cell showed the blur handler's value.
 Tabbing to a suggestion failed identically while the list sat in the row's tab order, which is why suppressing the pointer path alone was half a fix.
 The list is no longer in that order, so a suggestion is reached from the field's own keys and never by Tab.
 - **What Enter commits is a suggestion, not the typed string.**
@@ -342,7 +345,7 @@ It reads as the sentence it writes — the policy word, the chosen tag chips eac
 There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
 The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
 It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
-An unfilled tag row is therefore level with the component row beside it, and asks for less room than one.
+An unfilled tag row is therefore no taller than the component row beside it.
 The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
 What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
@@ -350,6 +353,10 @@ Every surface that draws a tag row supplies its tag counts.
 A recipe's ingredients and a system Tool's repair materials count the system's own components by their in-system tags, the set a tag requirement in that system matches against.
 A world Tool's repair materials count the world catalogue's components by their default tags, the same list that adder's tag vocabulary is derived from.
 That figure describes world authoring and not what the repair will match, because a world Tool's repair materials are a seed copied into each adopting system and matched there against that system's own components.
+The tag catalogue's footer offers **New tag “{name}”**, naming the typed query trimmed and lower-cased as it will be stored, while that name matches no tag in the system's own tag vocabulary under the same comparison, whatever the World Vocabulary holds, and is not already on the row.
+A recipe's ingredient tag rows offer it: creating adds the tag to the system's tag vocabulary and to the row at once, keeps the panel open with its query, and returns focus to its query field, so the new tag reads checked beneath it.
+The vocabulary write is immediate and outside the recipe draft's Save, as a Tags & Categories add is; the row's tag stages into the draft like any other choice, so discarding the draft keeps the new tag in the vocabulary, where it lists with a zero count.
+A Tool's repair materials draw no footer: a system Tool's would write the same system vocabulary and is not yet offered, and a world Tool's vocabulary is derived from the world catalogue's component defaults, so it holds no list a tag could be added to.
 
 #### Adding a requirement, and adding an alternative
 
@@ -372,11 +379,11 @@ The verb belongs to the panel, so an entry states only the kind it appends — `
 It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
 The width is stated by the caller and not left to the shared menu's own floor, which is sized for a row's overflow commands rather than four one-word kinds.
 
-Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
-One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
+Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's lead plate and its subject plate's mark rather than a second table of colours.
+One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's lead plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
 
 Both of the requirement row's in-row affordances — the `or…` trigger and a tag arm's `+ Tag` — are DASHED OUTLINES with no fill, because each is an affordance for adding standing among controls and chips that are values.
-They are drawn at their own two scales: `or…` is a control among controls, level with the quantity stepper beside it, while `+ Tag` is a chip among chips.
+They are drawn at their own two scales: `or…` is a 28px control among controls, level with the quantity stepper beside it and with no divider before it, while `+ Tag` is a chip among chips.
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
@@ -668,5 +675,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose subject cell carries the component's image and its name, never a native `<select>`.
   An art-less component falls back to a glyph rather than emitting an image element with no source.
