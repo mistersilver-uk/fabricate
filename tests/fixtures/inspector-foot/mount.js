@@ -155,9 +155,10 @@ const host = document.createElement('div');
 host.style.cssText = 'width:1280px;height:634px';
 // The two empty bands stand for the manager's header rows, so the body lands in its `1fr` track.
 host.innerHTML =
-  `<div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="${view}">` +
+  '<div class="fabricate fabricate-manager" data-fabricate-theme="dark">' +
   '<div></div><div></div><div class="manager-body"><div class="manager-rail"></div><div class="manager-main"></div>' +
   '<aside class="manager-inspector" data-probe-inspector></aside></div></div>';
+host.firstElementChild.dataset.managerView = view;
 document.body.append(host);
 
 mount(component, { target: host.querySelector('[data-probe-inspector]'), props: props() });
