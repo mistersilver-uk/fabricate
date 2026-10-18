@@ -729,7 +729,7 @@
     "cap": "fixed — the unit right of the stepper",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/PickerRowAmount.svelte",
-    "note": "A currency amount, so its unit stands right of the 102 by 28 stepper. The slot renders a fragment and owns no wrapper, so its parts stand in the page's own flow, the unit a word space from the stepper, where the drawing's wrapper draws the host row's 8px gap.",
+    "note": "A currency amount, so its unit stands right of the 102 by 28 stepper. The slot renders a fragment and owns no wrapper, so its parts stand in the page's own flow, the unit a word space from the stepper, where the drawing's wrapper draws the host row's 8px gap. In the page's own flow the unit sits on the stepper's baseline rather than centred; a host row's `align-items: center` levels it.",
     "props": {
       "value": { "kind": "currency", "quantity": 50 },
       "amount": { "unit": "gp" },
