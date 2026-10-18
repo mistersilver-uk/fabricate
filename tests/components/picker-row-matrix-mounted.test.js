@@ -999,13 +999,13 @@ describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2
   const footer = (target) => target.ownerDocument.querySelector(FOOTER);
   const searchOf = (panel) => panel.querySelector(':scope .manager-travel-popover-search input');
 
-  /** Mount a tag row with a recording `onCreateTag`, open its catalogue and type `query`. */
+  /** Mount a tag row whose `onCreateTag` records and returns `result`, or calls it, then type `query`. */
   async function typedRow(query, { tags = [], extra = {}, result } = {}) {
     const calls = [];
     const row = await mountRow(ingredient, tagRow(tags), {
       onCreateTag: (tag) => {
         calls.push(tag);
-        return result;
+        return typeof result === 'function' ? result() : result;
       },
       ...extra,
     });
@@ -1026,6 +1026,11 @@ describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2
     for (const [query, options, why] of [
       [' '.repeat(3), {}, 'an empty query'],
       ['HERB', {}, 'a vocabulary tag, cased otherwise'],
+      [
+        'herb',
+        { extra: { catalogue: { ...CATALOGUE, tags: [{ id: 'Herb', label: 'Herb' }] } } },
+        'a vocabulary tag stored cased',
+      ],
       ['ghost', { tags: ['ghost'] }, 'a tag the row holds outside the vocabulary'],
       ['brine', { extra: { onCreateTag: null } }, 'no onCreateTag'],
     ]) {
@@ -1040,6 +1045,7 @@ describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2
     const button = footer(target);
     assert.equal(optionText(button), 'New tag “brine”', 'named as it will be stored');
     assert.equal(button.getAttribute('title'), 'New tag “brine”');
+    button.focus();
     await click(button);
     await click(button);
     assert.deepEqual(calls, ['brine'], 'a double activation writes once');
@@ -1056,18 +1062,44 @@ describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2
     assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
   });
 
-  it('activates from the keyboard, leaving focus in the search once the footer is gone', async () => {
+  it('a press from the focused footer leaves focus in the search once it unmounts', async () => {
     const { target, calls, panel, applied } = await typedRow('salt');
     const button = footer(target);
     button.focus();
     const { KeyboardEvent } = target.ownerDocument.defaultView;
-    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    assert.equal(button.dispatchEvent(enter), true, "nothing cancels Enter's native activation");
     // A browser activates a focused button on Enter with a click; happy-dom raises none.
     await click(button);
     assert.deepEqual(calls, ['salt']);
     assert.deepEqual((await applied('create')).tags, ['salt']);
     assert.ok(!footer(target), 'the footer unmounted');
     assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
+  });
+
+  it('a refused write takes the tag back off the row and says so', async () => {
+    const notices = [];
+    const { ui } = globalThis;
+    Reflect.set(globalThis, 'ui', {
+      notifications: {
+        error: (message) => {
+          notices.push(message);
+        },
+      },
+    });
+    try {
+      const { target, changes } = await typedRow('brine', {
+        result: () => Promise.reject(new Error('refused')),
+      });
+      await click(footer(target));
+      await settle();
+      const staged = changes.map(([value]) => value.tags);
+      assert.deepEqual(staged, [['brine'], []], 'staged on the press, then taken back off');
+      assert.deepEqual(notices, ['Tag could not be added.']);
+      assert.equal(optionText(footer(target)), 'New tag “brine”', 'the footer offers it again');
+    } finally {
+      Reflect.set(globalThis, 'ui', ui);
+    }
   });
 
   it('does nothing on a press while the write is pending', async () => {

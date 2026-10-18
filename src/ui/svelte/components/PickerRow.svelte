@@ -31,6 +31,7 @@
   - `onCreateTag(tag)` — the tag catalogue's footer offers `New tag “{name}”` for a typed name,
     trimmed and lower-cased, that no vocabulary tag and no held tag matches; a press adds it to the
     row and calls this once, keeping the panel open with focus in its query. `null` draws no footer.
+    A rejection takes the tag back off the row and raises an error notice.
 
   Rest spread:
   - `{...rest}` lands on the root `<div>`, written after `class={…}` and `data-recipe-option`.
@@ -54,6 +55,7 @@
 <script>
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
+  import { notifyError } from '../util/foundryBridge.js';
   import { localizeOr } from '../util/localizeOr.js';
   import { normalizeTag } from '../../../utils/scalars.js';
   import SearchablePopover from './SearchablePopover.svelte';
@@ -208,7 +210,8 @@
   };
 
   // A press while the write is pending, or again for the name already added before `tags` moves,
-  // does nothing, so a double activation writes once.
+  // does nothing, so a double activation writes once; a refused write takes the tag back off.
+  const TAG_REFUSED = 'FABRICATE.Admin.Manager.TagsCategories.TagAddFailedFeedback';
   let creating = false;
   let created = { tag: '', over: null };
   async function createTag(tag, focusSearch) {
@@ -219,6 +222,9 @@
     creating = true;
     try {
       await onCreateTag(tag);
+    } catch {
+      removeTag(tag);
+      notifyError(localizeOr(TAG_REFUSED, 'Tag could not be added.'));
     } finally {
       creating = false;
     }
