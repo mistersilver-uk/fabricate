@@ -177,6 +177,32 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 
 ---
 
+## A Result Set Is Never Produced in Routed by Ingredients
+
+**Symptom:** A recipe in Routed by ingredients mode has a result set that is never produced, whatever ingredients a player uses.
+The recipe's **Validation** tab shows the warning **No ingredient set reaches a result set, so it will never be produced.**
+The system's **Overview** lists the same warning under **Recipes** as **A result set is not reached by any ingredient set.**
+
+**Likely causes:**
+
+- No ingredient set is assigned to the result set, and every ingredient set reaches a different one.
+- Every ingredient set is assigned to another result set, so even the recipe's first result set has no source.
+  An ingredient set you have not assigned anywhere reaches the first result set by default.
+
+**Step-by-step checks:**
+
+1. Open the recipe in the recipe editor and go to the **Overview** tab.
+   In the **Routing** card, look for a result set that no row's dropdown has chosen.
+2. Re-point an ingredient set to the result set from its row's dropdown.
+   You can also open the **Results** tab and choose **Assign** on the result set's card.
+   A result set that no ingredient set leads to shows **Nothing — unreachable** on its line.
+3. If you do not need the result set, remove it from the **Results** tab.
+4. A result set that is reached only by default raises no warning.
+
+**See also:** [Routed Modes]({% link crafting/recipes/routed.md %}#the-routing-overview) for the routing overview, and [System Overview]({% link crafting-systems/system-overview.md %}) for where system-wide warnings appear.
+
+---
+
 ## A Failed Check Produces Nothing, or Suddenly Produces Something
 
 **Symptom:** A recipe, salvageable item or gathering task has a failure result authored, but a failed
