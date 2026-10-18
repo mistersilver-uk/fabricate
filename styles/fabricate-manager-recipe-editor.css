@@ -1934,25 +1934,26 @@
   width: 170px;
 }
 
-.fabricate-routing-overview .fabricate-routing-overview-target .fabricate-select,
-.fabricate-routing-overview .fabricate-routing-overview-target .fabricate-select-trigger {
+/* Keyed on the source row, a caller container named by attribute, so the fill stays the overview's rule over the `Select` it composes. */
+.fabricate-routing-overview .fabricate-routing-overview-row[data-routing-overview-kind='source'] .fabricate-select,
+.fabricate-routing-overview .fabricate-routing-overview-row[data-routing-overview-kind='source'] .fabricate-select-trigger {
   width: 100%;
 }
 
-/* The per-site skin `Select` licenses, held off a read-only or disabled trigger; focus repaints the border in the accent, so the tone never hides the ring (issue 1777). */
-.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled) {
+/* The per-site skin `Select` licenses, rooted at its own namespace and keyed on the tone `RoutingOverview` stamps, held off a read-only or disabled trigger; focus repaints the border in the accent, so the tone never hides the ring (issue 1777). */
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone='warning']:not([aria-disabled='true']):not(:disabled) {
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone='warning']:not([aria-disabled='true']):not(:disabled) {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-routing-overview .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible {
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible {
   border-color: var(--fab-accent-border);
 }
 
@@ -1968,10 +1969,10 @@
   text-align: right;
 }
 
-/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating. */
+/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating: 262px is the 170px slot, the 8px row gap and the 84px column. */
 .fabricate-routing-overview .fabricate-routing-overview-blocked {
   flex: none;
-  width: calc(170px + var(--fab-space-2) + 84px);
+  width: 262px;
   color: var(--fab-text-muted);
   font-size: 11px;
   line-height: 1.4;
@@ -1994,8 +1995,9 @@
     width: 64px;
   }
 
+  /* The 140px slot, the 8px row gap and the 64px column. */
   .fabricate-routing-overview .fabricate-routing-overview-blocked {
-    width: calc(140px + var(--fab-space-2) + 64px);
+    width: 212px;
   }
 }
 
