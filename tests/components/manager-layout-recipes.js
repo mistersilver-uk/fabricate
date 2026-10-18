@@ -1872,6 +1872,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
 
 test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
   // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).
+  // In foundry-native, the one palette where the tag ink parts from the tag hue (issue 2534).
   const chipScopedForTriggers = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte')
   );
@@ -1890,7 +1891,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   try {
     await page.setContent(`
       <!doctype html>
-      <html lang="en">
+      <html lang="en" data-fabricate-theme="foundry-native">
         <head>
           <meta charset="utf-8">
           <style>
@@ -1988,7 +1989,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
     assert.equal(report.tag.fontSize, '11px', 'the drawing: 11px');
     assert.equal(report.tag.fontWeight, '600', 'the drawing: 600');
     assert.deepEqual(report.tag.paddingInline, ['12px', '12px'], 'the drawing: 12px padding');
-    assert.equal(report.tag.color, report.tagInk, 'the drawing: the tag ink');
+    assert.equal(report.tag.color, report.tagInk, 'the drawing: the tag ink, `--fab-purple-text`');
     assert.equal(
       report.tag.background,
       'rgba(0, 0, 0, 0)',
