@@ -942,7 +942,7 @@
 
   /* THE DANGER LEG RENDERS INSIDE THE SHELL'S DOCK, and this rule still reaches it: a snippet
      carries the scope hash of the component that DEFINES it, not of the one that renders it. It
-     states no spacing above itself, because the dock's own `has-foot` rhythm owns that gap. */
+     states no spacing above itself, because the `InspectorPanel` foot's own column gap owns that gap. */
   .fab-bulk-component-danger {
     display: flex;
     flex-direction: column;
