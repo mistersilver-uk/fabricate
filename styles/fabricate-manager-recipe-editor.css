@@ -700,9 +700,8 @@
   white-space: nowrap;
 }
 
-/* The set-level "OR", the within-requirement "OR", and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
+/* The set-level "OR" and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. A choice group draws no divider between its alternatives (ruled 2026-10-18). */
 .fabricate-manager .manager-recipe-ingredient-set-or,
-.fabricate-manager .manager-recipe-ingredient-or-separator,
 .fabricate-manager .manager-recipe-ingredient-and-separator {
   display: flex;
   align-items: center;
@@ -716,7 +715,6 @@
 
 /* The OR/AND label reads as a small pill so the divider looks like `[ — OR — ]` rather than bare centred text (issue 643). */
 .fabricate-manager .manager-recipe-ingredient-set-or > span,
-.fabricate-manager .manager-recipe-ingredient-or-separator > span,
 .fabricate-manager .manager-recipe-ingredient-and-separator > span {
   flex: 0 0 auto;
   padding: var(--fab-space-2xs) var(--fab-space-2);
@@ -727,11 +725,9 @@
   font-weight: 700;
 }
 
-/* Flank the label with a faint rule so each alternative ("OR"), each AND'd requirement, and each between-set ("OR") break reads as a separated unit. */
+/* Flank the label with a faint rule so each AND'd requirement and each between-set ("OR") break reads as a separated unit. */
 .fabricate-manager .manager-recipe-ingredient-set-or::before,
 .fabricate-manager .manager-recipe-ingredient-set-or::after,
-.fabricate-manager .manager-recipe-ingredient-or-separator::before,
-.fabricate-manager .manager-recipe-ingredient-or-separator::after,
 .fabricate-manager .manager-recipe-ingredient-and-separator::before,
 .fabricate-manager .manager-recipe-ingredient-and-separator::after {
   content: '';
@@ -765,6 +761,7 @@
   /* 12px, not the ingredient row's 8px: a stage row runs on the salvage row's 12px rhythm end to end, and the 8px here was the one place the two spacings met. */
   gap: var(--fab-space-3);
   min-width: 0;
+  min-height: 0;
   padding: 0;
   border: none;
   background: none;
@@ -779,12 +776,12 @@
   gap: var(--fab-space-2);
 }
 
-/* §B2: the ANY-ONE-OF (OR) container is an accent-bordered box with a header pill, not a plain box with a left bar. */
+/* §B2: the ANY-ONE-OF (OR) container is an accent box with a header pill, not a plain box with a left bar; its corner is the ladder's well radius (ruled 2026-10-18). Header, rows and adder stand 8px apart on the requirement's gap. */
 .fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-accent-border);
   border-radius: 9px;
-  background: var(--fab-surface-soft);
+  background: var(--fab-accent-soft);
 }
 
 .fabricate-manager .manager-recipe-any-one-of-head {
@@ -792,10 +789,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
-  margin-bottom: var(--fab-space-2);
 }
 
-/* THE PILL CARRIES THE ACCENT FILL, and it is the only thing in the group that does (issue 1373). */
+/* The pill names the group's state in the accent family (issue 1373). */
 .fabricate-manager .manager-recipe-any-one-of-pill {
   display: inline-flex;
   align-items: center;
@@ -818,16 +814,18 @@
 .fabricate-manager .manager-recipe-ingredient-requirement-options {
   display: flex;
   flex-direction: column;
-  gap: var(--fab-space-1);
+  gap: var(--fab-space-2);
 }
 
-/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). */
+/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). Its 52px floor is the subject cell's 34px line inside the 8px inset and the 1px edge, so a tag row stands level with a named one (ruled 2026-10-18). */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
+  box-sizing: border-box;
   min-width: 0;
+  min-height: 52px;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
@@ -837,11 +835,6 @@
 /* A TAG ROW IS EDGED IN THE TAG TINT (`proto:4658`), which is the design's one per-kind row treatment: the tag arm is the only one that carries several values at once, so its edge says where the list ends. */
 .fabricate-manager .manager-recipe-ingredient-option-row.is-tag {
   border-color: color-mix(in srgb, var(--fab-purple) 34%, transparent);
-}
-
-/* Inside an ANY-ONE-OF box the alternatives sit one rung DOWN the ramp rather than up (`proto:4658` gives a member row `--bg1` where a standalone row gets `--bg2`), so a group reads as a well the rows sit in. */
-.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives .manager-recipe-ingredient-option-row {
-  background: var(--fab-bg-0);
 }
 
 /* THE LEAD PLATE (library `<PickerRow>`): a NEUTRAL 26px tile carrying the kind's own tinted glyph. */
@@ -903,6 +896,11 @@
 .fabricate-manager .manager-recipe-option-kind {
   flex: 0 0 auto;
   width: 132px;
+}
+
+/* An ingredient row's kind slot is the specimen's 150px, as a reward row's is (ruled 2026-10-18). */
+.fabricate-manager .manager-recipe-ingredient-option-row:not(.is-result) .manager-recipe-option-kind {
+  width: 150px;
 }
 
 /* The trigger fills that slot, and keeps the secondary ink the family's own `--fab-text` would otherwise take from it: the kind word is the row's quietest label, not its subject. */
@@ -1351,7 +1349,7 @@
 }
 
 /* Under the width one line needs, the row takes two: the lead plate, kind and name, then the toggle, the amount and the remove at the end, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
-@container fabricate-result-rows (max-width: 717px) {
+@container fabricate-result-rows (max-width: 719px) {
   .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
     align-items: center;
     row-gap: var(--fab-space-1);
@@ -1402,7 +1400,7 @@
   margin-inline-end: 0;
 }
 
-@container fabricate-result-members (max-width: 807px) {
+@container fabricate-result-members (max-width: 809px) {
   .fabricate-manager .manager-recipe-result-group-members > .is-result {
     row-gap: var(--fab-space-1);
   }
@@ -1516,12 +1514,12 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-2);
-  padding-top: var(--fab-space-1);
+  padding-top: 0;
 }
 
 /* ── THE ROW'S TWO IN-ROW AFFORDANCES, AND THE RULES THAT WERE NEVER PAINTING ── `or…` (`proto:2290`) and `+ Tag` (`proto:2256`) are the two dashed affordances a requirement row carries (issue 1373). */
 
-/* `proto:2290`: `inline-flex; gap:4px; height:26px; padding:0 9px; border-radius:7px; border:1px dashed var(--border-strong); font:600 9.5px var(--sans); color:var(--subtle)`, going `color:var(--accent); border-color:var(--accent-border)` on hover; the height is the library `<PickerRow>` specimen's 28, level with the stepper. */
+/* The library `<PickerRow>` specimen's dashed button: 28px, level with the stepper, text alone at 11px/600 muted with 12px padding (ruled 2026-10-18), going `--fab-accent` on an accent edge on hover. */
 .fabricate-manager .manager-recipe-or-trigger {
   appearance: none;
   -webkit-appearance: none;
@@ -1529,27 +1527,21 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--fab-space-1);
   box-sizing: border-box;
   width: auto;
   height: 28px;
   min-height: 28px;
-  padding: 0 var(--fab-space-2);
+  padding: 0 var(--fab-space-3);
   border: 1px dashed var(--fab-border-strong);
   border-radius: 7px;
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
   background: transparent;
   font-family: var(--font-primary);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.fabricate-manager .manager-recipe-or-trigger > i {
-  flex: 0 0 auto;
-  font-size: 8px;
 }
 
 .fabricate-manager .manager-recipe-or-trigger:hover {
@@ -1585,7 +1577,7 @@
 
 /* `.manager-recipe-option-currency` / `.manager-recipe-option-essence` and their two picker wrappers are retired: a currency row and an essence row are named through the same `.manager-recipe-option-name-field` every other kind uses. */
 
-/* §B1: subtle × remove — never a loud red trash/minus button. */
+/* §B1: subtle × remove — never a loud red trash/minus button; 24px with an explicit 9px glyph (ruled 2026-10-18). */
 .fabricate-manager .manager-recipe-option-remove {
   position: relative;
   overflow: visible;
@@ -1595,14 +1587,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+
+  /* ratchet-exempt(design-system): the library's PickerRow specimen draws the 24px remove at radius 7 (ruled 2026-10-18) */
+  border-radius: 7px;
   color: var(--fab-text-subtle);
   background: transparent;
+  font-size: 9px;
   cursor: pointer;
 }
 

@@ -976,6 +976,11 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.equal(adder.textContent.trim(), 'Alternative');
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    assert.ok(adder.classList.contains('is-size-28'), 'the box’s adder stands on the 28px rung');
+    assert.ok(
+      !target.querySelector('.manager-recipe-ingredient-or-separator'),
+      'and no separator stands between the members (issue 2515)'
+    );
     const fromBox = await readMenu(target, adder);
     assert.deepEqual(fromBox, {
       heading: 'Add an alternative',

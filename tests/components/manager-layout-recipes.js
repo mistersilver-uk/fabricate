@@ -383,7 +383,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <input type="number" class="fab-stepper-input manager-recipe-option-quantity" value="2">
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
-        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
+        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
@@ -510,14 +510,16 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         );
       }
 
-      // AN EMPTY TAG ROW IS NO TALLER THAN A COMPONENT ROW.
+      // AN EMPTY TAG ROW IS LEVEL WITH A COMPONENT ROW: every row stands on one 34px line
+      // (ruled 2026-10-18), so the tag row's shorter controls no longer leave it 4px under.
       if (!surface.rowParity) continue;
       assert.ok(
-        report.empty.row.height <= report.component.row.height + 1,
-        `${surface.label} (${surface.width}px): an EMPTY tag requirement row is no taller than ` +
+        Math.abs(report.empty.row.height - report.component.row.height) <= 1,
+        `${surface.label} (${surface.width}px): an EMPTY tag requirement row is level with ` +
           `the component row beside it (${Math.round(report.empty.row.height)}px vs ` +
           `${Math.round(report.component.row.height)}px) - a taller one has either stacked its ` +
-          `policy word above + Tag or moved a whole control onto a second line`
+          `policy word above + Tag or moved a whole control onto a second line, and a shorter ` +
+          `one has lost the row's 34px line`
       );
     } finally {
       await context.close();
@@ -1111,7 +1113,7 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
                 </span>
               </span>
               <div class="manager-recipe-option-controls">
-                <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-probe="or"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
+                <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-probe="or"><span>or…</span></button></div>
               </div>
             </div>
             <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
@@ -1189,8 +1191,8 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
 const REPO_ROOT = resolve(__dirname, '../..');
 const RESULT_TREE = [...new Set([...SELECT_COMPILED_MODULES, ...RESULT_ROW_COMPILED_MODULES])];
 
-/** `ChoiceGroup`'s result side mounted once per entry, as a recipe's reward set draws it. */
-async function resultGroupMarkup(entries) {
+/** `ChoiceGroup` mounted once per props object, as its callers draw it. */
+async function choiceGroupMarkup(mounts) {
   const harness = createMountedComponentHarness({
     repoRoot: REPO_ROOT,
     tmpPrefix: 'fabricate-result-wrap-',
@@ -1199,6 +1201,21 @@ async function resultGroupMarkup(entries) {
     compiledModules: RESULT_TREE,
     componentPath: 'src/ui/svelte/components/ChoiceGroup.svelte',
   });
+  await harness.setup();
+  try {
+    const markup = [];
+    for (const props of mounts) {
+      markup.push((await harness.mount(props)).innerHTML);
+      harness.remount();
+    }
+    return markup;
+  } finally {
+    harness.teardown();
+  }
+}
+
+/** `ChoiceGroup`'s result side mounted once per entry, as a recipe's reward set draws it. */
+function resultGroupMarkup(entries) {
   const offer = recipeResultKinds({
     componentOptions: [{ id: 'cmp-ingot', name: 'Iron Ingot' }],
     currencyUnits: [
@@ -1207,17 +1224,24 @@ async function resultGroupMarkup(entries) {
     ],
     currencyEnabled: true,
   });
-  await harness.setup();
-  try {
-    const markup = [];
-    for (const group of entries) {
-      markup.push((await harness.mount({ side: 'result', group, offer, reward: true })).innerHTML);
-      harness.remount();
-    }
-    return markup;
-  } finally {
-    harness.teardown();
-  }
+  return choiceGroupMarkup(
+    entries.map((group) => ({ side: 'result', group, offer, reward: true }))
+  );
+}
+
+/** A page drawing `body` under the core floor, the module sheet and the tree's scoped blocks. */
+function mountedGroupPage(body) {
+  const scoped = RESULT_TREE.filter((path) =>
+    readFileSync(resolve(REPO_ROOT, path), 'utf8').includes('\n<style>')
+  ).map((path) => scopedComponentCss(resolve(REPO_ROOT, path)).css);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+      <style>${readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
+      <style>@layer modules { ${css} }</style>
+      <style>${scoped.join('\n')}</style>
+      <style>:root { --font-primary: Arial, sans-serif; } body { margin: 0; }
+        .fas::before, .fa-solid::before { content: "x"; }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }</style>
+      </head><body>${body}</body></html>`;
 }
 
 // Arial, not Signika: its natural wrap (flat about 706-710, members about 799-800) sits 7-11px under
@@ -1237,23 +1261,15 @@ test('the widest result rows hold one line just over each wrap rule, and wrap by
       ],
     },
   ]);
-  const scoped = RESULT_TREE.filter((path) =>
-    readFileSync(resolve(REPO_ROOT, path), 'utf8').includes('\n<style>')
-  ).map((path) => scopedComponentCss(resolve(REPO_ROOT, path)).css);
   const context = await openLayoutContext({ viewport: { width: 1200, height: 900 } });
   const page = await context.newPage();
   try {
-    await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-      <style>${readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
-      <style>@layer modules { ${css} }</style>
-      <style>${scoped.join('\n')}</style>
-      <style>:root { --font-primary: Arial, sans-serif; } body { margin: 0; }
-        .fas::before, .fa-solid::before { content: "x"; }
-        .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }</style>
-      </head><body><main class="fabricate-manager" style="width: 1100px">
+    await page.setContent(
+      mountedGroupPage(`<main class="fabricate-manager" style="width: 1100px">
         <div class="manager-recipe-ingredient-set-groups">${markup[0]}${markup[1]}</div>
         ${markup[2]}
-      </main></body></html>`);
+      </main>`)
+    );
     const layoutAt = (list, width) =>
       page.evaluate(
         ([selector, inline]) => {
@@ -1304,8 +1320,8 @@ test('the widest result rows hold one line just over each wrap rule, and wrap by
     const FLAT = '.manager-recipe-ingredient-set-groups';
     const MEMBERS = '.manager-recipe-result-group-members';
     for (const [list, rule, removeLine] of [
-      [FLAT, 717, 2],
-      [MEMBERS, 807, 1],
+      [FLAT, 719, 2],
+      [MEMBERS, 809, 1],
     ]) {
       const over = await layoutAt(list, rule + 1);
       assert.equal(over.length, 2, `${list}: two rows measured`);
@@ -1334,6 +1350,106 @@ test('the widest result rows hold one line just over each wrap rule, and wrap by
     assert.deepEqual([unit.text, unit.title], ['gold', 'gold'], 'the long unit, titled in full');
     assert.ok(unit.width <= 16 && unit.clipped, `it is cut at 16px (${unit.width})`);
     assert.equal(unit.overflow, 'ellipsis', 'with an ellipsis');
+  } finally {
+    await context.close();
+  }
+});
+
+// Ruled 2026-10-18 (issue 2515): no separator, header to first row 8, rows 8 apart, adder 8 below.
+test('a choice group stands its header, rows and 28px adder 8px apart, with no separator, on both sides', async () => {
+  const offer = recipeResultKinds({
+    componentOptions: [{ id: 'cmp-ingot', name: 'Iron Ingot' }],
+    currencyUnits: [{ id: 'gold', label: 'Gold', abbreviation: 'gp' }],
+    currencyEnabled: true,
+  });
+  const markup = await choiceGroupMarkup([
+    {
+      group: {
+        id: 'g-ing',
+        options: [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-ingot' } },
+          { quantity: 2, match: { type: 'component', componentId: 'cmp-hide' } },
+          { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } },
+        ],
+      },
+      componentOptions: [
+        { id: 'cmp-ingot', name: 'Iron Ingot' },
+        { id: 'cmp-hide', name: 'Tanned Hide' },
+      ],
+      itemTags: ['abrasive'],
+    },
+    {
+      // "Up to N", where the bundle is not exclusive and a separator would misread it.
+      side: 'result',
+      reward: true,
+      offer,
+      group: {
+        id: 'g-res',
+        awardStrategy: 'upTo',
+        awardCount: 2,
+        alternatives: [
+          { id: 'a', componentId: 'cmp-ingot', quantity: 1 },
+          { id: 'b', kind: 'currency', unit: 'gold', quantity: 5 },
+          { id: 'c', componentId: 'cmp-ingot', quantity: 2 },
+        ],
+      },
+    },
+  ]);
+  const context = await openLayoutContext({ viewport: { width: 1200, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      mountedGroupPage(`<main class="fabricate-manager" style="width: 1006px">
+        <div data-side="ingredient">${markup[0]}</div><div data-side="result">${markup[1]}</div>
+      </main>`)
+    );
+    const report = await page.evaluate(() => {
+      const box = (node) => node.getBoundingClientRect();
+      const tokens = (name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.querySelector('main').append(probe);
+        return getComputedStyle(probe).color;
+      };
+      const read = (side) => {
+        const group = document.querySelector(`[data-side="${side}"] .has-alternatives`);
+        const [head, options, adds] = group.children;
+        const rows = [...options.children];
+        const adder = adds.querySelector('button');
+        const style = getComputedStyle(group);
+        return {
+          separators: group.querySelectorAll('.manager-recipe-ingredient-or-separator').length,
+          rowsOnly: rows.every((row) => row.matches('[data-recipe-option]')),
+          headToRow: box(rows[0]).top - box(head).bottom,
+          between: rows.slice(1).map((row, index) => box(row).top - box(rows[index]).bottom),
+          rowToAdder: box(adder).top - box(rows.at(-1)).bottom,
+          rowHeights: rows.map((row) => box(row).height),
+          rowGround: getComputedStyle(rows[0]).backgroundColor,
+          adder: [box(adder).height, getComputedStyle(adder).borderTopLeftRadius],
+          ground: style.backgroundColor,
+          radius: style.borderTopLeftRadius,
+        };
+      };
+      return {
+        ingredient: read('ingredient'),
+        result: read('result'),
+        accentSoft: tokens('--fab-accent-soft'),
+        bg1: tokens('--fab-bg-1'),
+      };
+    });
+    for (const side of ['ingredient', 'result']) {
+      const group = report[side];
+      const at = `the ${side} group`;
+      assert.deepEqual([group.separators, group.rowsOnly], [0, true], `${at}: no separator`);
+      assert.equal(group.headToRow, 8, `${at}: header to first row`);
+      assert.deepEqual(group.between, [8, 8], `${at}: rows 8 apart`);
+      assert.equal(group.rowToAdder, 8, `${at}: the adder 8 below the last row`);
+      assert.deepEqual(group.adder, [28, '7px'], `${at}: the adder at 28, radius 7`);
+      assert.deepEqual([group.ground, group.radius], [report.accentSoft, '9px'], `${at}: the box`);
+      assert.equal(group.rowGround, report.bg1, `${at}: member rows on bg-1`);
+    }
+    // Every row stands on one 34px line: the tag row is level with the named rows.
+    assert.deepEqual(report.ingredient.rowHeights, [52, 52, 52], 'tag and component rows level');
   } finally {
     await context.close();
   }
@@ -1701,7 +1817,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
           <main class="fabricate-manager">
             <div class="fabricate-action-menu">
               <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
-                <i class="fa-solid fa-code-branch"></i><span>or…</span>
+                <span>or…</span>
               </button>
             </div>
             <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -1728,9 +1844,14 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
           justifyContent: style.justifyContent,
+          paddingInline: [style.paddingLeft, style.paddingRight],
         };
       };
+      const muted = document.createElement('span');
+      muted.style.color = 'var(--fab-text-muted)';
+      document.querySelector('main').append(muted);
       return {
+        muted: getComputedStyle(muted).color,
         or: read('[data-or-trigger]'),
         tag: read('[data-tag-trigger]'),
         chip: read('[data-plain-chip]'),
@@ -1744,13 +1865,15 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'the plain chip is the filled solid-edged badge both affordances were shipping as'
     );
 
-    // The library `<PickerRow>` specimen's 28px, level with the stepper it stands beside, with
-    // `proto:2290`'s 7px corner, 9.5px/600 text and dashed `--border-strong` edge (issue 2515).
+    // The library `<PickerRow>` specimen's dashed button: 28px, level with the stepper it stands
+    // beside, a 7px corner, and 11px/600 muted text at 12px padding (ruled 2026-10-18).
     assert.equal(report.or.borderStyle, 'dashed', 'the "or…" trigger is an affordance, not a fill');
     assert.equal(report.or.height, 28, 'the specimen: 28px');
-    assert.equal(report.or.borderRadius, '7px', '`proto:2290`: a 7px corner');
-    assert.equal(report.or.fontSize, '9.5px', '`proto:2290`: 9.5px');
-    assert.equal(report.or.fontWeight, '600', '`proto:2290`: 600');
+    assert.equal(report.or.borderRadius, '7px', 'the specimen: a 7px corner');
+    assert.equal(report.or.fontSize, '11px', 'the specimen: 11px');
+    assert.equal(report.or.fontWeight, '600', 'the specimen: 600');
+    assert.equal(report.or.color, report.muted, 'the specimen: muted ink');
+    assert.deepEqual(report.or.paddingInline, ['12px', '12px'], 'the specimen: 12px padding');
     assert.equal(
       report.or.background,
       'rgba(0, 0, 0, 0)',

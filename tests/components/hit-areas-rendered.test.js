@@ -249,7 +249,7 @@ const SHEET_CONTROLS = Object.freeze([
   ['manager-scope-collapse', '', 22, 22],
   ['manager-recipe-tool-remove', '', 22, 22],
   ['manager-recipe-option-clear', '', 22, 22],
-  ['manager-recipe-option-remove', '', 22, 22],
+  ['manager-recipe-option-remove', '', 24, 24],
   ['manager-availability-remove', 'fabricate-pill-select', 20, 20],
   ['manager-danger-tag-remove', '', 20, 20],
   ['manager-drop-rank-button', '', 18, 18],

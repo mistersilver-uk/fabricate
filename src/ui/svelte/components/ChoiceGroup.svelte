@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The choice group: one requirement inside a set (the data model's `ingredientGroup`), satisfied by
-  ANY one of its alternatives. Two or more render linked by a "— or —" separator inside the
+  ANY one of its alternatives. Two or more render 8px apart, with no separator, inside the
   `Any one of` box, whose member rows draw no convert control; a single alternative renders as a
   bare `PickerRow allowAny`. It emits a shallow-updated copy via `onChange(nextGroup)` and is
   dropped entirely via `onRemove()`.
@@ -306,6 +306,7 @@
       hook="alternative"
       triggerHook="alternative"
       menuClass="manager-recipe-or-menu"
+      size="28"
       {onAdd}
     />
   </div>
@@ -322,11 +323,6 @@
     <ChoiceGroupAwardHeader {group} {onChange} />
     <div class="manager-recipe-ingredient-requirement-options manager-recipe-result-group-members">
       {#each members as entry, index (entry?.id || index)}
-        {#if index > 0}
-          <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-            <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-          </div>
-        {/if}
         {@render resultRow(entry, index)}
       {/each}
     </div>
@@ -360,11 +356,6 @@
       </div>
       <div class="manager-recipe-ingredient-requirement-options">
         {#each options as option, index (index)}
-          {#if index > 0}
-            <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-              <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-            </div>
-          {/if}
           <PickerRow
             value={toValue(option)}
             {kinds}

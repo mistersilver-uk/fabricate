@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The requirement row's `or…` control: a dashed trigger over the shared `ActionMenu`, headed by
-  the caller's eyebrow and listing `kindMenuItems(kinds)`. A part of `PickerRow`, whose `allowAny`,
-  `kinds`, `disabled` and `onSelect(kind)` it receives.
+  The requirement row's `or…` control: a dashed, text-only trigger over the shared `ActionMenu`,
+  headed by the caller's eyebrow and listing `kindMenuItems(kinds)`. A part of `PickerRow`, whose
+  `allowAny`, `kinds`, `disabled` and `onSelect(kind)` it receives.
 
   Props:
   | prop | values | default | contract |
@@ -45,10 +45,7 @@
           'Accept another kind of ingredient in place of this one.'
         )}
       {disabled}
-      {...attributes}
-      ><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span
-        >{text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}</span
-      ></button
+      {...attributes}><span>{text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}</span></button
     >
   {/snippet}
 </ActionMenu>

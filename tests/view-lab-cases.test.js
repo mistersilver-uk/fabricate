@@ -906,11 +906,11 @@ const NON_VERB_CONTROLS = Object.freeze({
     '.manager-recipe-ingredient-menu',
     '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
   ),
-  // A choice group's one adder: the dashed `Button`'s pinned 34px (issue 2367).
+  // A choice group's one adder: the dashed `Button` at its 28px rung (issue 2515).
   'manager-recipe-edit-ingredients-choice-group': [
     {
       selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
-      styles: 'height: 34px; border-top-style: dashed',
+      styles: 'height: 28px; border-top-left-radius: 7px; border-top-style: dashed',
     },
   ],
   'manager-environment-edit-automatic-force-add': menuCorners(

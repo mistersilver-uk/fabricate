@@ -577,7 +577,7 @@ export const CASES = Object.freeze([
   }),
   // Only reachable frame for the open kind panel (issue 1510): the option list renders only while
   // open, and the portal occludes the closed-state frame behind it. The kind trigger is this
-  // phase's narrowest at 132px, so a panel wider than its trigger shows here.
+  // phase's narrowest at 150px, so a panel wider than its trigger shows here.
   managerCase({
     id: 'manager-recipe-edit-ingredients-kind-list',
     label: 'Manager — Recipe edit ingredient kind list',
@@ -683,10 +683,11 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'recipe-edit',
-    // Two member rows inside the box, neither drawing a convert control, and one menu adder at its foot.
+    // Two member rows inside the box, adjacent with no separator and neither drawing a convert
+    // control, and one menu adder at its foot.
     expectSelector:
       '[data-recipe-group].has-alternatives:has([data-recipe-any-one-of])' +
-      ':has([data-recipe-option] ~ [data-recipe-option])' +
+      ':has([data-recipe-option] + [data-recipe-option])' +
       ':not(:has(.manager-recipe-or-trigger, [data-recipe-add^="alternative-"])) ' +
       '.manager-recipe-requirement-adds:has(> :only-child) [data-recipe-add="alternative"][aria-haspopup="menu"]',
     expectContained: [
@@ -695,12 +696,12 @@ export const CASES = Object.freeze([
         target: '[data-recipe-group].has-alternatives [data-recipe-option]',
       },
     ],
-    // The dashed `Button`'s pinned 34px, as the set's own adder below it.
+    // The dashed `Button` at its 28px rung, level with the stepper (ruled 2026-10-18).
     expectLayout: {
       controls: [
         {
           selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
-          styles: 'height: 34px; border-top-style: dashed',
+          styles: 'height: 28px; border-top-left-radius: 7px; border-top-style: dashed',
         },
       ],
     },

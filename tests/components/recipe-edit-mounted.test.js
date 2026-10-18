@@ -4282,7 +4282,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+  it('renders a populated set as component + tag requirements, with images, no OR separator, and no group-name/match toggle', async () => {
     // Two sets, so this set renders with chrome (a Set-N box + editable name). A single
     // set would render chromeless (issue 643); the requirement rendering under test is
     // identical either way, so a multi-set recipe keeps the name-field coverage too.
@@ -4325,8 +4325,8 @@ describe('RecipeEditView (mounted)', () => {
     const options = componentReq.querySelectorAll('[data-recipe-option]');
     assert.equal(options.length, 2, 'both component alternatives render');
     assert.ok(
-      componentReq.querySelector('.manager-recipe-ingredient-or-separator'),
-      'an OR separator links the alternatives'
+      !componentReq.querySelector('.manager-recipe-ingredient-or-separator'),
+      'the alternatives sit in their box with no OR separator between them'
     );
     assert.match(
       options[0].textContent,
@@ -4451,6 +4451,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an ingredient');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(!/\bis-size-/.test(adder.className), 'at the manager button’s 34, not a group’s 28');
 
     await openKindMenu(target, adder);
     assert.equal(
@@ -4681,7 +4682,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('mixes component and tag alternatives in one requirement, rendering the box + OR separator', async () => {
+  it('mixes component and tag alternatives in one requirement, rendering the box with no separator', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
@@ -4699,7 +4700,7 @@ describe('RecipeEditView (mounted)', () => {
 
     // The in-component state re-renders to two alternatives once we feed the
     // patch back in (the parent owns recipe state in production); render a
-    // pre-mixed requirement directly to assert the box + separator.
+    // pre-mixed requirement directly to assert the box.
     const { target: mixed } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4713,8 +4714,8 @@ describe('RecipeEditView (mounted)', () => {
       'a 2-alternative requirement renders the box'
     );
     assert.ok(
-      req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the "— or —" separator renders'
+      !req.querySelector('.manager-recipe-ingredient-or-separator'),
+      'no "— or —" separator renders between the alternatives'
     );
     const optionRows = req.querySelectorAll('[data-recipe-option]');
     assert.ok(
@@ -4765,7 +4766,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders an OR separator once a component requirement has two alternatives', async () => {
+  it('draws no separator between a requirement’s alternatives, only the box’s rows', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4779,13 +4780,13 @@ describe('RecipeEditView (mounted)', () => {
       2,
       'both alternatives render'
     );
-    const separator = req.querySelector('.manager-recipe-ingredient-or-separator');
-    assert.ok(separator, 'the "— or —" separator renders between alternatives');
-    // The label is wrapped in its own span so the CSS can render it as a pill flanked
-    // by rules ("[ — OR — ]", issue 643), rather than as bare centred text.
-    const pill = separator.querySelector('span');
-    assert.ok(pill, 'the OR label is wrapped in a pill span');
-    assert.equal(pill.textContent.trim(), 'OR', 'the pill reads OR');
+    // Ruled 2026-10-18 (issue 2515): the rows stand 8px apart in the box, linked by nothing.
+    const options = req.querySelector('.manager-recipe-ingredient-requirement-options');
+    assert.deepEqual(
+      [...options.children].map((child) => child.hasAttribute('data-recipe-option')),
+      [true, true],
+      'the options list holds the two rows and nothing between them'
+    );
     editHarness.remount();
   });
 
@@ -4905,6 +4906,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(adder.classList.contains('is-size-28'), 'on the 28px rung (issue 2515)');
     assert.ok(!adder.classList.contains('is-full-width'), 'and does not span its wrapping row');
     assert.doesNotMatch(target.textContent, /\balt (component|tag|essence|currency)\b/);
     editHarness.remount();
