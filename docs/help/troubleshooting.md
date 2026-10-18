@@ -57,16 +57,19 @@ This guide covers common issues GMs and players encounter when setting up or usi
 **What to expect:** Changing the resolution mode is no longer delete-all.
 Fabricate migrates each recipe to the new mode wherever it can, and only deletes a recipe whose structure cannot be made to fit.
 The confirmation prompt runs a dry run first and tells you exactly what will happen: how many recipes will be migrated, and, only when some cannot be migrated, how many will be deleted and their names.
+It also names any ingredient sets a recipe will lose when it is collapsed into Alchemy mode, and any recipe that will lose its failure result set when you move into Progressive mode.
 
 **Likely causes for a recipe being deleted:**
 
 - You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result set) from a recipe that had more than one of either.
+  A failure result set does not count toward that limit.
 - You moved a multi-step recipe into Alchemy mode, which does not support multi-step recipes.
 
 **Step-by-step checks:**
 
 1. Read the confirmation prompt before confirming.
    It names the recipes that cannot be migrated and will be deleted.
+   It also names the ingredient sets and failure result sets that will be dropped from recipes that are kept.
    Cancel if you are not ready to lose them.
 2. Export the system first to keep a backup if you are unsure.
    You can re-import it to recover deleted recipes.
@@ -218,6 +221,7 @@ never used to.
 - The record authors no failure output at all.
   The setting SELECTS a failure output you wrote; it never invents one, so **Always** on a recipe with
   no failure result still produces nothing.
+  A simple recipe does not have a failure set until you turn on **Award results on a failed check** on its **Results** tab.
 - The resolution mode has no failure outcome to produce.
   **Routed by ingredients** and **Progressive** have no failure tier or reserved failure result set,
   and gathering's routed and progressive modes are still being built, so the setting is inert there
@@ -236,8 +240,10 @@ never used to.
 2. If the section shows a note saying the setting does not apply in this mode, that is the answer: the
    mode has no failure outcome, and the note names why.
 3. In **simple** mode, open the record and confirm the failure output exists.
-   For a recipe that is the reserved failure result set on the **Results** tab, drawn with a danger
-   border; for a salvageable item it is the reserved failure result set on the component's Salvage
+   For a recipe that is the reserved failure result set on the **Results** tab.
+   It appears only after you turn on **Award results on a failed check**, and it is drawn locked with a
+   **reserved role** badge.
+   For a salvageable item it is the reserved failure result set on the component's Salvage
    panel.
 4. In **Routed by check** mode, set the check route's **Produce a result on a failed check** to
    **Decided per recipe** or **Always** first — the failure-marked tiers only appear in a result set's
