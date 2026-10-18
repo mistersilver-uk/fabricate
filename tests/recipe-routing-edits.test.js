@@ -159,9 +159,10 @@ describe('withResultSlot', () => {
     assert.deepEqual(withResultSlot([success], 'success', { results: [] }), [
       { id: 'gs', name: 'On success', results: [] },
     ]);
-    assert.deepEqual(withResultSlot([], 'success', { results: [{ id: 'r3' }] }, () => 'm1'), [
-      { id: 'm1', results: [{ id: 'r3' }] },
-    ]);
+    assert.deepEqual(
+      withResultSlot([], 'success', { results: [{ id: 'r3' }] }, () => 'm1'),
+      [{ id: 'm1', results: [{ id: 'r3' }] }]
+    );
   });
 
   it('returns its input for a failure edit with no failure group', () => {

@@ -145,12 +145,22 @@ describe('modeChangeConfirmContent', () => {
       },
     ];
     assert.equal(
-      modeChangeConfirmContent(summarizeModeChange(recipes, 'simple', 'alchemy'), 'alchemy', english),
+      modeChangeConfirmContent(
+        summarizeModeChange(recipes, 'simple', 'alchemy'),
+        'alchemy',
+        english
+      ),
       '<p>2 recipe(s) will be migrated to alchemy.</p>' +
         '<p>1 recipe(s) will keep only their first ingredient set; these ingredient sets will be dropped: Recipe A (Gold route).</p>'
     );
     assert.deepEqual(
-      paragraphs(modeChangeConfirmContent(summarizeModeChange(recipes, 'simple', 'progressive'), 'progressive', english)),
+      paragraphs(
+        modeChangeConfirmContent(
+          summarizeModeChange(recipes, 'simple', 'progressive'),
+          'progressive',
+          english
+        )
+      ),
       [
         '<p>1 recipe(s) will be migrated to progressive; 1 cannot be migrated and will be deleted: Recipe A.</p>',
         '<p>1 recipe(s) will lose their failure result set, which progressive does not have: Fizzle.</p>',

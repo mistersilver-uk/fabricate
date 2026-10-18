@@ -2251,7 +2251,7 @@ describe('RecipeEditView (mounted)', () => {
       const [group, ...rest] = patches[0].resultGroups;
       assert.equal(rest.length, 0);
       assert.deepEqual({ ...group, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
-      assert.equal(target.querySelectorAll('[data-recipe-result-alchemy-simple] [data-recipe-set]').length, 2);
+      assert.equal(target.querySelectorAll(':scope [data-recipe-result-alchemy-simple] [data-recipe-set]').length, 2);
       assert.ok(Boolean(target.querySelector('[data-recipe-set-role="success"]')), 'the success card draws');
       editHarness.remount();
     });
@@ -2308,7 +2308,9 @@ describe('RecipeEditView (mounted)', () => {
       const opened = [];
       const { target } = await mountTwoSlot([SUCCESS], {
         routedFailureResultsAllowed: false,
-        onOpenChecks: () => opened.push('checks'),
+        onOpenChecks: () => {
+          opened.push('checks');
+        },
       });
       const toggle = target.querySelector(FAILURE_TOGGLE);
 
@@ -2353,7 +2355,9 @@ describe('RecipeEditView (mounted)', () => {
           multiStepEnabled: true,
           componentOptions: COMPONENT_OPTIONS,
           routedFailureResultsAllowed: false,
-          onOpenChecks: () => opened.push('checks'),
+          onOpenChecks: () => {
+            opened.push('checks');
+          },
           recipe: {
             ...RECIPE,
             steps: [{ id: 'st-1', name: 'Brew', ingredientSets: [], resultGroups: [SUCCESS] }],
