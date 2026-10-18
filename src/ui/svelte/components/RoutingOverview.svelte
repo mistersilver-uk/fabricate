@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `rows` | `[{ key, kind, blockedReason?, source, tone?, struck?, summary?, value?, options?, placeholder?, fallback?, shared?, hint?, blocked?, action?, readonly?, describedBy?, triggerProps? }]` | `[]` | `kind` is `source`, `blocked` or `gap`; a source draws a select over `options` (`{ value, label }`), a blocked row its `blocked` words, and either other kind the `rowAction` snippet while `action` is set. `shared` above 1 marks the target shared. |
+  | `rows` | `[{ key, kind, blockedReason?, source, tone?, struck?, summary?, value?, options?, placeholder?, fallback?, shared?, hint?, blocked?, action?, readonly?, ariaDescribedBy?, triggerProps? }]` | `[]` | `kind` is `source`, `blocked` or `gap`; a source draws a select over `options` (`{ value, label }`), a blocked row its `blocked` words, and either other kind the `rowAction` snippet while `action` is set. `shared` above 1 marks the target shared. |
   | `label` | localized string | required | The list's accessible name. |
   | `connectorLabel` / `defaultLabel` / `sharedLabel` | localized strings | `Common.RoutingOverview.*` | "produces", the inherited-target marker, and the shared marker, whose `{count}` is the row's `shared`. |
   | `disabled` | boolean | `false` | Every select off. |
@@ -26,7 +26,7 @@
   Invariants:
   - Every row reserves the marker column, so each select starts at one x; a select is named by its
     badge and connector and described by the summary, the markers only when they hold text, and
-    `describedBy`; its tone hook is stamped only while it is neither read-only nor disabled —
+    `ariaDescribedBy`; its tone hook is stamped only while it is neither read-only nor disabled —
     pinned by `tests/components/routing-overview-mounted.test.js`.
 -->
 <script>
@@ -84,7 +84,7 @@
     const ids = [];
     if (row.summary) ids.push(`${uid}-${index}-summary`);
     if (markers.length > 0) ids.push(`${uid}-${index}-markers`);
-    if (row.describedBy) ids.push(row.describedBy);
+    if (row.ariaDescribedBy) ids.push(row.ariaDescribedBy);
     return ids.join(' ');
   }
 </script>

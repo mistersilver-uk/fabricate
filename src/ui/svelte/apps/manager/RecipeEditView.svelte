@@ -25,7 +25,8 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
-  import { resultsProjection, routeSet, scopeTarget } from './recipe/recipeRoutingEdits.js';
+  import { resultsProjection, scopeWrites } from './recipe/recipeRoutingEdits.js';
+  import { routedMinimum } from './recipe/recipeRoutingModel.js';
   import {
     blocksEnable,
     countRecipeReadiness,
@@ -74,10 +75,11 @@
     // Category lives on the Overview tab.
     categories = [],
     onSetCategory = () => {},
-    // Result routing: the mode, the tiers the policy offers, and every tier the system defines.
+    // Result routing: the mode, the tiers the policy offers, and `routedCheckFacts`' every tier the
+    // system defines, the check's evaluation and its fixed gaps.
     routingProvider = null,
     routedOutcomeTierOptions = [],
-    routedOutcomeTiers = [],
+    routedCheck = {},
     // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
     // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
@@ -148,41 +150,35 @@
   function stepById(stepId) {
     return steps.find((step) => step.id === stepId) || null;
   }
-
-  // A set routes to at most one group, so assigning writes the canonical `resultGroupId` and
-  // replaces any prior target. A not-yet-saved group is ignored.
-  function assignIngredientSet(stepId, groupId, setId, assigned) {
-    if (!setId || (assigned && !groupId)) return;
-    // Collapsed chain (issue 710): the Results tab renders single-step (stepId null) over the
-    // FINAL step's data, so a routing assignment writes through to that step.
-    const scopeStepId = scopeTarget(stepId, finalStep);
-    const scopeSets =
-      scopeStepId == null ? ingredientSets : stepById(scopeStepId)?.ingredientSets || [];
-    updateIngredientSets(scopeStepId, routeSet(scopeSets, setId, assigned ? groupId : null));
-  }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
   }
 
-  // Append WITHOUT an id, since store normalization assigns one, and remove by id. A null stepId
-  // patches the recipe scope, a present one that step.
-  function updateIngredientSets(stepId, nextSets) {
-    if (stepId == null) onUpdateRecipe({ ingredientSets: nextSets });
-    else if (stepById(stepId)) onUpdateStep(stepId, { ingredientSets: nextSets });
-  }
-  // The section emits the whole replacement array, shallow-cloned to the changed node; group ids
-  // and names, which routing references, are preserved upstream.
-  function updateResultGroups(stepId, nextGroups) {
-    // Collapsed chain WRITE-THROUGH (issue 710): a null stepId edits the FINAL step's result
-    // groups, and recipe-level `resultGroups` stay empty, so re-enabling is lossless.
-    const targetStepId = scopeTarget(stepId, finalStep);
-    if (targetStepId == null) {
-      onUpdateRecipe({ resultGroups: nextGroups });
-      return;
-    }
-    if (!stepById(targetStepId)) return;
-    onUpdateStep(targetStepId, { resultGroups: nextGroups });
-  }
+  // The scope writers every tab shares: a null stepId patches the recipe, and a collapsed chain's
+  // groups and set routing write through to its final step (issue 710).
+  const writes = $derived(
+    scopeWrites({ ingredientSets, steps, finalStep, onUpdateRecipe, onUpdateStep })
+  );
+  const { tiers: routedOutcomeTiers = [], evaluation: routedEvaluation = null } = $derived(
+    routedCheck ?? {}
+  );
+  const minimum = $derived(
+    routedMinimum({
+      resolutionMode,
+      minSuccessOutcomeId: recipe?.minSuccessOutcomeId,
+      evaluation: routedEvaluation,
+    })
+  );
+  const routing = $derived({
+    provider: routingProvider,
+    tiers: routedOutcomeTierOptions,
+    rankedTiers: routedOutcomeTiers,
+    minimum,
+    gaps: routedCheck?.gaps ?? [],
+    componentOptions,
+    writes,
+  });
+
   // GM policy toggle (issue 651). Stages through the draft like every other authoring edit rather
   // than persisting immediately the way `onToggleEnabled` does.
   function toggleAllowPlayerResultReorder(next) {
@@ -469,6 +465,7 @@
             {craftingModifierMaxPicks}
             {craftingModifierInertCause}
             {onOpenChecks}
+            {routing}
             {locked}
             {onToggleLocked}
             {multiStepEnabled}
@@ -496,7 +493,7 @@
             {itemTags}
             {componentTagOptions}
             {routingProvider}
-            onUpdateIngredientSets={updateIngredientSets}
+            onUpdateIngredientSets={writes.sets}
             onDeleteStep={deleteStepFrom('ingredients')}
           />
         {:else if activeTab === 'results'}
@@ -517,10 +514,11 @@
             {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
             {routedOutcomeTiers}
+            routedMinimum={minimum}
             outcomeTiersDefined={routedOutcomeTiers.length > 0}
             failureResultsAllowed={routedFailureResultsAllowed}
-            onAssignIngredientSet={assignIngredientSet}
-            onUpdateResultGroups={updateResultGroups}
+            onAssignIngredientSet={writes.assignSet}
+            onUpdateResultGroups={writes.groups}
             onDeleteStep={deleteStepFrom('results')}
             onToggleAllowPlayerResultReorder={toggleAllowPlayerResultReorder}
           />
@@ -533,7 +531,7 @@
             {toolIds}
             {toolsLibrary}
             {routingProvider}
-            onUpdateIngredientSets={updateIngredientSets}
+            onUpdateIngredientSets={writes.sets}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}

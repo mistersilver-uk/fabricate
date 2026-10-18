@@ -2015,3 +2015,32 @@
   flex-wrap: wrap;
   gap: var(--fab-space-2);
 }
+
+/* The recipe Overview's routing card, boxed as the Overview's other cards are; each step scope stacks its heading over its routing overview. */
+.fabricate-manager .manager-recipe-routing-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-routing-card > div > p {
+  margin: var(--fab-space-2xs) 0 0;
+}
+
+.fabricate-manager .manager-recipe-routing-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-routing-step {
+  margin: 0;
+  color: var(--fab-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}

@@ -167,7 +167,7 @@ describe('RoutingOverview rows', () => {
 describe('RoutingOverview selects', () => {
   it('names a select by its badge and connector, and describes it by what holds text', async () => {
     const rows = [
-      sourceRow('Set A', { summary: 'Steel Ingot ×2', value: 'g1', describedBy: 'note-1' }),
+      sourceRow('Set A', { summary: 'Steel Ingot ×2', value: 'g1', ariaDescribedBy: 'note-1' }),
       sourceRow('Set B', { value: 'g2', fallback: true }),
       sourceRow('Set C', { value: 'g2' }),
     ];
@@ -179,7 +179,7 @@ describe('RoutingOverview selects', () => {
     const described = (key) => trigger(key).getAttribute('aria-describedby') ?? '';
     const [summaryId, ...others] = described('Set A').split(' ');
     assert.deepEqual(textOf(root, summaryId), ['Steel Ingot ×2'], 'the summary first');
-    assert.deepEqual(others, ['note-1'], 'then describedBy, with no empty marker column');
+    assert.deepEqual(others, ['note-1'], 'then ariaDescribedBy, with no empty marker column');
     assert.deepEqual(textOf(root, described('Set B')), ['default']);
     assert.equal(
       described('Set C'),

@@ -25,6 +25,7 @@
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeCraftingModifierField from './RecipeCraftingModifierField.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
+  import RecipeRoutingCard from './RecipeRoutingCard.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Select from '../../../components/Select.svelte';
   import {
@@ -82,6 +83,8 @@
     craftingModifierInertCause = '',
     // Deep link to the Checks tab, where the catalogue and the combination rule live.
     onOpenChecks = () => {},
+    // `RecipeRoutingCard`'s routing facts and writers, from `RecipeEditView`.
+    routing = null,
     // `recipe.locked` — persisted and engine-honoured (`guardCraftStart` refuses a locked craft).
     // Its write path is never gated, unlike enable: a GM locks a recipe while it is unfinished.
     locked = false,
@@ -521,4 +524,6 @@
       />
     </section>
   {/if}
+
+  <RecipeRoutingCard {recipe} {collapsed} {routing} disabled={saving} {onOpenChecks} />
 </section>

@@ -37,6 +37,8 @@
     ingredientSets = [],
     outcomeTierOptions = [],
     routedOutcomeTiers = [],
+    // `routedMinimum`'s output, which strikes a success tier below the recipe's minimum.
+    routedMinimum = {},
     outcomeTiersDefined = false,
     // Forwarded to each group card's third empty hint. A tab prop not ALSO forwarded here
     // silently defaults, which is why the whole chain is spelled out.
@@ -68,7 +70,9 @@
       ingredientSets: sets,
       resultGroups: groups,
       tiers: tierOptions,
+      rankedTiers: Array.isArray(routedOutcomeTiers) ? routedOutcomeTiers : [],
       setName: setDisplayName,
+      ...routedMinimum,
     })
   );
   const tierNames = $derived(
@@ -82,12 +86,12 @@
   const deletedTier = $derived(
     localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingDeletedTier', 'Deleted outcome tier')
   );
-  // Assigning the first tier ends routing by name for every other tier (`tierRoute`).
+  // Assigning the first tier ends the default route for every other tier (`tierRoute`).
   const assignNote = $derived(
     routingProvider === 'check' && !groups.some((group) => group?.checkOutcomeIds?.length > 0)
       ? localizeOr(
           'FABRICATE.Admin.Manager.Recipe.RoutingAssignNote',
-          'Assigning a tier stops the other tiers routing by name.'
+          'Assigning a tier stops the other tiers reaching a result set by default.'
         )
       : ''
   );

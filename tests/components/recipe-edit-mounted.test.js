@@ -107,6 +107,8 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
   'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
   'src/ui/svelte/apps/manager/recipe/resultSetSources.js',
+  // Issue 2513: the Overview routing card's scopes and rows.
+  'src/ui/svelte/apps/manager/recipe/routingOverviewRows.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
   // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
   // so omitting it throws a named "add it to rawModules" error rather than hanging.
@@ -215,6 +217,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeCraftingModifierField.svelte',
+  // Issue 2513: the Overview's routing card and the overview it draws per step scope.
+  'src/ui/svelte/apps/manager/recipe/RecipeRoutingCard.svelte',
+  'src/ui/svelte/components/RoutingOverview.svelte',
   // The Overview tab's recipe art (issue 1522).
   'src/ui/svelte/components/ArtPicker.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
@@ -1648,7 +1653,7 @@ describe('RecipeEditView (mounted)', () => {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: TIER_OPTIONS,
-        routedOutcomeTiers: TIER_OPTIONS,
+        routedCheck: { tiers: TIER_OPTIONS },
         ...props,
       },
     });
@@ -1857,7 +1862,7 @@ describe('RecipeEditView (mounted)', () => {
       { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-myth'] },
     ];
     const { target, patches } = await checkRouted(groups, {
-      routedOutcomeTiers: [...TIER_OPTIONS, { id: 'tier-botch', name: 'Botched' }],
+      routedCheck: { tiers: [...TIER_OPTIONS, { id: 'tier-botch', name: 'Botched' }] },
     });
     const card = resultCard(target, 0);
     const struck = [...card.querySelectorAll('[data-route-sources-struck]')];
@@ -1871,13 +1876,13 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('check mode: Assign warns that a first tier ends routing by name, only while none is listed', async () => {
+  it('check mode: Assign warns that a first tier ends the default route, only while none is listed', async () => {
     const unlisted = ROUTED_RESULT_GROUPS.map((group) => ({ ...group, checkOutcomeIds: [] }));
     let view = await checkRouted(unlisted);
     await openAssign(view.target, 0);
     assert.equal(
       document.querySelector('[data-route-sources-note]')?.textContent,
-      'Assigning a tier stops the other tiers routing by name.'
+      'Assigning a tier stops the other tiers reaching a result set by default.'
     );
     editHarness.remount();
 
@@ -1895,7 +1900,7 @@ describe('RecipeEditView (mounted)', () => {
       editHarness.remount();
       return text;
     };
-    assert.match(await hintFor({ routedOutcomeTiers: [] }), /Define outcome tiers/);
+    assert.match(await hintFor({ routedCheck: { tiers: [] } }), /Define outcome tiers/);
     assert.match(
       await hintFor({ routedFailureResultsAllowed: false }),
       /produces nothing on a failed check/,
@@ -2343,7 +2348,7 @@ describe('RecipeEditView (mounted)', () => {
         complex: true,
         routingProvider: 'check',
         routedOutcomeTierOptions: TIER_OPTIONS,
-        routedOutcomeTiers: TIER_OPTIONS,
+        routedCheck: { tiers: TIER_OPTIONS },
       }
     );
     await chooseSetCardAction(resultCard(target, 0), '[data-recipe-remove="result-set"]');
@@ -6945,7 +6950,7 @@ describe('RecipeEditView (mounted)', () => {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: TIER_OPTIONS,
-        routedOutcomeTiers: TIER_OPTIONS,
+        routedCheck: { tiers: TIER_OPTIONS },
       },
     });
     assert.ok(
@@ -8212,6 +8217,199 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       null,
       'no rail All-clear pill'
     );
+    editHarness.remount();
+  });
+});
+
+// The Overview's routing card through the shell (issue 2513): the draft, the scope writes, the
+// minimum threaded to the Results tab, and the zero points.
+describe('RecipeEditView — the Overview routing card (mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const tier = (id, name, success, start, end) => ({ id, name, success, start, end });
+  const TIERS = [
+    tier('t-high', 'High', true, 15, 20),
+    tier('t-low', 'Low', true, 5, 14),
+    tier('t-fail', 'Fail', false, 1, 4),
+  ];
+  const OFFERED = TIERS.filter((entry) => entry.success).map(({ id, name, success }) => ({
+    id,
+    name,
+    success,
+  }));
+  const group = (id, checkOutcomeIds = []) => ({ id, name: id, checkOutcomeIds, results: [] });
+  const tierTrigger = (id) => `[data-routing-overview-row="tier:${id}"] .fabricate-select-trigger`;
+  const routingRow = (target, key) =>
+    target.querySelector(`[data-recipe-section="routing"] [data-routing-overview-row="${key}"]`);
+
+  /** The shell on `recipe`, every recipe and step patch fed back in, the Overview open. */
+  async function mountRouted(recipe, props = {}) {
+    let current = recipe;
+    const recipePatches = [];
+    const stepPatches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: current,
+        routingProvider: 'check',
+        resolutionMode: 'routedByCheck',
+        routedOutcomeTierOptions: OFFERED,
+        routedCheck: { tiers: TIERS, evaluation: null, gaps: [] },
+        onUpdateRecipe: async (patch) => {
+          recipePatches.push(patch);
+          current = { ...current, ...patch };
+          await editHarness.setProps({ recipe: current });
+        },
+        onUpdateStep: async (stepId, patch) => {
+          stepPatches.push({ stepId, patch });
+          const steps = current.steps.map((step) =>
+            step.id === stepId ? { ...step, ...patch } : step
+          );
+          current = { ...current, steps };
+          await editHarness.setProps({ recipe: current });
+        },
+        ...props,
+      })
+    );
+    await flushRender();
+    return { target, recipePatches, stepPatches, current: () => current };
+  }
+
+  it('re-points a tier on the Overview through the draft', async () => {
+    const recipe = { ...RECIPE, resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])] };
+    const { target, recipePatches } = await mountRouted(recipe);
+    chooseSelectOption(target, tierTrigger('t-low'), 'g-a');
+    await flushRender();
+    assert.deepEqual(
+      recipePatches.at(-1).resultGroups.map((entry) => entry.checkOutcomeIds),
+      [['t-high', 't-low'], []],
+      'the patch reaches the draft the header Save persists'
+    );
+    editHarness.remount();
+  });
+
+  it('strikes a listed success tier below the minimum on the Results tab', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-high',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe);
+    assert.equal(routingRow(target, 'tier:t-low').dataset.routingOverviewBlocked, 'below-minimum');
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(
+      Boolean(target.querySelector('[data-route-sources-chip="t-low"][data-route-sources-struck]')),
+      'the minimum reaches the set cards'
+    );
+    editHarness.remount();
+  });
+
+  it('under a roll-under sum, blocks the higher-start tier and routes the lower one', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-low',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe, {
+      routedCheck: { tiers: TIERS, evaluation: { product: 'sum', direction: 'under' }, gaps: [] },
+    });
+    const high = routingRow(target, 'tier:t-high');
+    assert.equal(
+      high.querySelector('.fabricate-routing-overview-blocked').textContent,
+      'below this recipe’s minimum success tier'
+    );
+    assert.equal(routingRow(target, 'tier:t-low').dataset.routingOverviewKind, 'source');
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(
+      Boolean(target.querySelector('[data-route-sources-chip="t-high"][data-route-sources-struck]'))
+    );
+    assert.ok(
+      !target.querySelector('[data-route-sources-chip="t-low"][data-route-sources-struck]'),
+      'the lower-start tier routes'
+    );
+    editHarness.remount();
+  });
+
+  it('writes a multi-step tier re-point to that step through onUpdateStep', async () => {
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
+    const { target, stepPatches, recipePatches } = await mountRouted(
+      { ...RECIPE, steps: [step('s1'), step('s2')] },
+      { multiStepEnabled: true }
+    );
+    const scope = target.querySelector('[data-recipe-routing-scope="s2"]');
+    chooseSelectOption(target, `[data-recipe-routing-scope="s2"] ${tierTrigger('t-low')}`, 's2-a');
+    await flushRender();
+    assert.ok(Boolean(scope));
+    assert.equal(stepPatches.at(-1).stepId, 's2');
+    assert.deepEqual(stepPatches.at(-1).patch.resultGroups[0].checkOutcomeIds, ['t-low']);
+    assert.equal(recipePatches.length, 0);
+    editHarness.remount();
+  });
+
+  it('writes a collapsed chain’s re-point to its final step, not the recipe', async () => {
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
+    const { target, stepPatches, recipePatches } = await mountRouted(
+      { ...RECIPE, steps: [step('s1'), step('s2')] },
+      { multiStepEnabled: false }
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-recipe-routing-scope]')].map(
+        (scope) => scope.dataset.recipeRoutingScope
+      ),
+      ['s2']
+    );
+    chooseSelectOption(target, tierTrigger('t-low'), 's2-a');
+    await flushRender();
+    assert.equal(stepPatches.at(-1).stepId, 's2');
+    assert.equal(recipePatches.length, 0);
+    editHarness.remount();
+  });
+
+  it('shows no below-minimum row on an alchemy-tiered recipe carrying a minimum', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-high',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe, { resolutionMode: 'alchemy' });
+    assert.ok(Boolean(routingRow(target, 'tier:t-low')));
+    assert.ok(!target.querySelector('[data-routing-overview-blocked="below-minimum"]'));
+    editHarness.remount();
+  });
+
+  it('writes a tier’s default target, which ends the fallback for every other tier', async () => {
+    const recipe = { ...RECIPE, resultGroups: [group('High'), group('g-b')] };
+    const { target, recipePatches } = await mountRouted(recipe);
+    assert.ok(Boolean(target.querySelector('[data-recipe-routing-fallback-note]')));
+    chooseSelectOption(target, tierTrigger('t-high'), 'High');
+    await flushRender();
+    assert.deepEqual(recipePatches.at(-1).resultGroups[0].checkOutcomeIds, ['t-high']);
+    assert.ok(!target.querySelector('[data-recipe-routing-fallback-note]'), 'the note goes');
+    assert.equal(selectTriggerText(target, tierTrigger('t-low')), 'Not routed');
+    editHarness.remount();
+  });
+
+  it('adds the first result set and the first ingredient set from the card', async () => {
+    let view = await mountRouted({ ...RECIPE, resultGroups: [] });
+    view.target.querySelector('[data-recipe-routing-add="resultGroup"]').click();
+    await flushRender();
+    for (const id of ['t-high', 't-low']) {
+      assert.deepEqual(selectOptionLabels(view.target, tierTrigger(id)), ['Set 1'], id);
+      closeSelectPanel(view.target, tierTrigger(id));
+    }
+    editHarness.remount();
+
+    view = await mountRouted(
+      { ...RECIPE, ingredientSets: [], resultGroups: [group('g-a')] },
+      { routingProvider: 'ingredientSet', resolutionMode: 'routedByIngredients' }
+    );
+    assert.equal(view.target.querySelectorAll('[data-routing-overview-row]').length, 0);
+    view.target.querySelector('[data-recipe-routing-add="ingredientSet"]').click();
+    await flushRender();
+    assert.equal(view.target.querySelectorAll('[data-routing-overview-row]').length, 1);
     editHarness.remount();
   });
 });
