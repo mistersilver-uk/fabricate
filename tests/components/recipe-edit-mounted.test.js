@@ -5465,8 +5465,8 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  // REWRITTEN at issue 1373's maintainer round 5.
-  it('reads the tag row as a sentence: the policy word, the tags, then + Tag', async () => {
+  // REWRITTEN at issue 1373's maintainer round 5, and at issue 2534, which took the word away.
+  it('reads the tag row as a sentence: the tags, each after a #, then + Tag', async () => {
     const { target: tagTarget } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'all' } }],
       { props: { itemTags: ITEM_TAGS } }
@@ -5477,17 +5477,14 @@ describe('RecipeEditView (mounted)', () => {
     // Ordering asserted over the rendered NODES rather than an innerHTML substring scan.
     const kids = [...tagArm.children];
     const has = (node, selector) => node.matches(selector) || Boolean(node.querySelector(selector));
-    const policyAt = kids.findIndex((node) => has(node, '[data-recipe-tag-policy]'));
-    const chipAt = kids.findIndex((node) => has(node, '[data-recipe-tag="herbal"]'));
-    const addAt = kids.findIndex((node) => has(node, '[data-recipe-add-tag]'));
-    assert.ok(
-      policyAt === 0 && policyAt < chipAt && chipAt < addAt,
-      `policy word, then chips, then + Tag (${policyAt}/${chipAt}/${addAt})`
-    );
+    const tags = ['herbal'];
+    assert.equal(kids.length, tags.length + 1, 'the arm holds the chips and + Tag, nothing more');
+    assert.ok(has(kids[0], '[data-recipe-tag="herbal"]'), 'the chip leads the arm');
+    assert.ok(has(kids[1], '[data-recipe-add-tag]'), 'and + Tag follows it');
     assert.equal(
-      tagArm.querySelector('[data-recipe-tag-policy]').textContent.trim(),
-      'All of',
-      'the policy word is the sentence the Any of / All of control writes'
+      tagArm.textContent.replaceAll(/\s+/gu, ' ').trim(),
+      '#herbal Tag',
+      'no word leads the run, and the chip reads # and the stored tag'
     );
     // And the control that writes it is the row's next sibling, not a second line's.
     assert.ok(
@@ -6072,7 +6069,7 @@ describe('RecipeEditView (mounted)', () => {
 
   // ONE LINE (`proto:2251`-`2258`). The tag row broke onto a second full-width line carrying an
   // `Any|All` segmented control, an `Add tag` dropdown and a large dashed `No tags set` box. The
-  // design draws the policy word, the chips, `+ Tag` and the Any of / All of control on the row.
+  // design draws the chips, `+ Tag` and the Any of / All of control on the row.
   it('draws the tag row on ONE line, with no empty-state box below it', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
@@ -6085,11 +6082,13 @@ describe('RecipeEditView (mounted)', () => {
       !row.querySelector('.manager-recipe-option-tags-detail'),
       'and so is the full-width second line it sat on'
     );
+    const arm = row.querySelector('[data-recipe-option-tags]');
+    assert.equal(arm.children.length, 1, 'an unfilled arm holds + Tag alone');
     assert.ok(
-      row.querySelector('[data-recipe-tag-policy]'),
-      'the policy word leads the tag list, as the sentence the row reads'
+      arm.children[0].querySelector('[data-recipe-add-tag]'),
+      'the + Tag control is on the row'
     );
-    assert.ok(row.querySelector('[data-recipe-add-tag]'), 'the + Tag control is on the row');
+    assert.equal(arm.textContent.replaceAll(/\s+/gu, ' ').trim(), 'Tag', 'and no word leads it');
     assert.ok(
       row.querySelector('[data-recipe-tag-match="all"]'),
       'and so is the Any of / All of control'
@@ -7425,7 +7424,7 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
   const openPanel = () => document.querySelector('.fabricate-picker-popover');
   const optionTitled = (tag) =>
     [...(openPanel()?.querySelectorAll('[role="option"]') ?? [])].find(
-      (node) => node.title === tag
+      (node) => node.title === `#${tag}`
     );
 
   async function openTagAdder(scope) {
@@ -7467,7 +7466,7 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
         await flushRender();
         assert.deepEqual(
           await openTagAdder(target.querySelector(scope)),
-          ['herbal 2 components', 'liquid 1 component', 'rare 0 components'],
+          ['#herbal 2 components', '#liquid 1 component', '#rare 0 components'],
           `${shape}: every tag carries its exact count`
         );
       } finally {
@@ -7500,7 +7499,7 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
       assert.ok(Boolean(openPanel()), `the panel stays open after choosing ${tag}`);
       assert.equal(
         optionText(optionTitled(tag)),
-        tag === 'herbal' ? 'herbal 2 components' : 'liquid 1 component'
+        tag === 'herbal' ? '#herbal 2 components' : '#liquid 1 component'
       );
     }
     editHarness.remount();

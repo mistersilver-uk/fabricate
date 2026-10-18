@@ -497,6 +497,10 @@
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
   }
 
+  .manager-chip.is-tag.is-lit {
+    color: var(--fab-purple-text);
+  }
+
   .manager-chip.is-bare {
     border: 0;
   }

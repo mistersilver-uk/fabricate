@@ -654,6 +654,17 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     });
     const repeats = () => target.querySelector('[data-recipe-group-repeats]');
     assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'unique');
+    const mark = repeats().firstElementChild;
+    assert.ok(mark.matches('i.fa-ellipsis'), 'a `···` mark leads the button (issue 2534)');
+    assert.equal(mark.getAttribute('aria-hidden'), 'true', 'and is not announced');
+    assert.ok(
+      mark.nextElementSibling.matches('.manager-recipe-award-repeats-words'),
+      'its words follow'
+    );
+    assert.ok(
+      !repeats().hasAttribute('aria-pressed'),
+      'its word names its state, so no aria-pressed'
+    );
     repeats().click();
     await settle();
     assert.equal(groups.at(-1).results[0].withReplacement, true);
@@ -823,6 +834,22 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     });
     const cell = members(target)[0].querySelector('[data-recipe-range-cell]');
     assert.ok(cell.previousElementSibling.classList.contains('manager-recipe-option-divider'));
+    // The ruled position (issue 2534): at the row's end, after the amount and before the remove.
+    const controls = [
+      ...members(target)[0].querySelector('.manager-recipe-option-controls').children,
+    ];
+    const at = (selector) =>
+      controls.findIndex((node) => node.matches(selector) || Boolean(node.querySelector(selector)));
+    const order = [
+      '[data-recipe-option-quantity]',
+      '.manager-recipe-option-divider',
+      '[data-recipe-range-cell]',
+      '[data-recipe-remove]',
+    ].map(at);
+    assert.ok(
+      order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1])),
+      `amount, divider, cell, remove (${order.join('/')})`
+    );
     const glyph = cell.querySelector('.fa-dice-d20');
     assert.equal(glyph.getAttribute('aria-hidden'), 'true');
     assert.equal(glyph.getAttribute('title'), 'Selection roll range');

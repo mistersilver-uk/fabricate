@@ -1706,7 +1706,7 @@ describe('the world Tool entry (issue 1373)', () => {
             .querySelector('.fabricate-picker-popover')
             .querySelectorAll('[role="option"]'),
         ].map((node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()),
-        ['oak 1 component', 'wood 2 components']
+        ['#oak 1 component', '#wood 2 components']
       );
     });
 
@@ -1775,7 +1775,7 @@ describe('the world Tool entry (issue 1373)', () => {
       await settleAll();
       const choose = async (tag) => {
         target.ownerDocument
-          .querySelector(`.fabricate-picker-popover [role="option"][title="${tag}"]`)
+          .querySelector(`.fabricate-picker-popover [role="option"][title="#${tag}"]`)
           .click();
         await settleAll();
       };

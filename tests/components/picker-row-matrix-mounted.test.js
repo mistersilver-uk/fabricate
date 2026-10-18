@@ -197,7 +197,7 @@ async function openTagAdder(target) {
   return target.ownerDocument.querySelector('.fabricate-picker-popover');
 }
 const tagOptions = (panel) => [...panel.querySelectorAll('[role="option"]')];
-const tagOption = (panel, tag) => tagOptions(panel).find((node) => node.title === tag);
+const tagOption = (panel, tag) => tagOptions(panel).find((node) => node.title === `#${tag}`);
 const optionText = (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim();
 /** An option's announced selection, and whether it draws the held check. */
 const heldState = (node) => [
@@ -299,7 +299,7 @@ describe('PickerRow: every reachable cell acts', () => {
       if (kind === 'tags') {
         await click(target.querySelector('[data-recipe-add-tag]'));
         const option = [...target.ownerDocument.querySelectorAll('[role="option"]')].find(
-          (node) => node.textContent.trim() === 'rare'
+          (node) => node.textContent.trim() === '#rare'
         );
         await click(option);
         assert.deepEqual(await applied('add tag'), { ...start, tags: ['rare'] });
@@ -330,18 +330,28 @@ describe('PickerRow: every reachable cell acts', () => {
         );
       });
 
-      it(`${surface} × ${kind}: Any of / All of forwards the policy and rewrites the word`, async () => {
+      it(`${surface} × ${kind}: Any of / All of forwards the policy; no word leads the arm`, async () => {
         const start = { ...unnamed(kind), tags: ['herb'] };
         const { target, applied } = await mountRow(config, start);
-        const policy = () => target.querySelector('[data-recipe-tag-policy]').textContent;
-        assert.equal(policy(), 'Any of');
+        const arm = () => target.querySelector('[data-recipe-option-tags]');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
         await click(tagMatchRadio(target, 'all'));
         assert.deepEqual(await applied('all'), { ...start, tagMatch: 'all' });
-        assert.equal(policy(), 'All of');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
         assert.ok(tagMatchRadio(target, 'all').checked);
         await click(tagMatchRadio(target, 'any'));
         assert.deepEqual(await applied('any'), start);
-        assert.equal(policy(), 'Any of');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
+      });
+
+      it(`${surface} × ${kind}: a chip reads its stored tag after a \`#\`, lit at the tag-run scale`, async () => {
+        const { target } = await mountRow(config, { ...unnamed(kind), tags: ['herb'] });
+        const chip = target.querySelector('[data-recipe-option-tags] .manager-chip');
+        assert.equal(chip.getAttribute('data-recipe-tag'), 'herb', 'the hook holds the stored tag');
+        assert.equal(chip.querySelector(':scope > span').textContent, '#herb');
+        for (const name of ['is-tag', 'is-lit', 'is-tag-run']) {
+          assert.ok(chip.classList.contains(name), `the chip carries ${name}`);
+        }
       });
     } else {
       it(`${surface} × ${kind}: clear forwards an empty subject and returns the search`, async () => {
@@ -626,7 +636,7 @@ describe('PickerRow: the remaining branches', () => {
   it('the tag picker lists every vocabulary tag and marks the held ones selected', async () => {
     const { target } = await mountRow(ingredient, { ...unnamed('tags'), tags: ['herb'] });
     const panel = await openTagAdder(target);
-    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare'], 'vocabulary order');
+    assert.deepEqual(tagOptions(panel).map(optionText), ['#herb', '#rare'], 'vocabulary order');
     assert.deepEqual(tagOptions(panel).map(heldState), [
       ['true', true],
       ['false', false],
@@ -1062,6 +1072,19 @@ describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2
     assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
   });
 
+  it('strips one typed `#`: `#rare` is listed, and `#brine` creates `brine`', async () => {
+    const listed = await typedRow('#rare');
+    assert.ok(!footer(listed.target), 'a listed tag typed as its row reads offers no footer');
+    harness.remount();
+    const { target, calls, applied } = await typedRow('#brine');
+    assert.equal(optionText(footer(target)), 'New tag “brine”', 'named as it will be stored');
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine']);
+    assert.deepEqual((await applied('create')).tags, ['brine']);
+    const chip = target.querySelector('[data-recipe-tag="brine"]');
+    assert.equal(chip.querySelector(':scope > span').textContent, '#brine');
+  });
+
   it('a press from the focused footer leaves focus in the search once it unmounts', async () => {
     const { target, calls, panel, applied } = await typedRow('salt');
     const button = footer(target);
@@ -1181,7 +1204,7 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
   it('lists the vocabulary when the row holds only a tag outside it, and adds beside it', async () => {
     const { target, applied } = await mountRow(ingredient, tagRow(['ghost']));
     const panel = await openTagAdder(target);
-    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare']);
+    assert.deepEqual(tagOptions(panel).map(optionText), ['#herb', '#rare']);
     assert.deepEqual(tagOptions(panel).map(heldState), [
       ['false', false],
       ['false', false],
@@ -1251,13 +1274,13 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
         .querySelector('.fabricate-picker-popover')
         ?.querySelector('[data-active-option="true"]');
     await press('ArrowDown');
-    assert.equal(active()?.title, 'herb', 'the cursor is on the held tag');
+    assert.equal(active()?.title, '#herb', 'the cursor is on the held tag');
     await press('Enter');
     assert.deepEqual((await applied('enter removes')).tags, []);
-    assert.equal(active()?.title, 'herb', 'the cursor survives the removal');
+    assert.equal(active()?.title, '#herb', 'the cursor survives the removal');
     await press('Enter');
     assert.deepEqual((await applied('enter re-adds')).tags, ['herb']);
-    assert.equal(active()?.title, 'herb', 'and the re-add');
+    assert.equal(active()?.title, '#herb', 'and the re-add');
     await press('Escape');
     assert.ok(!target.ownerDocument.querySelector('.fabricate-picker-popover'), 'Escape closes');
     assert.equal(
@@ -1280,10 +1303,10 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
     const { target } = await mountRow(ingredient, tagRow(['herb']), { catalogue });
     const panel = await openTagAdder(target);
     assert.deepEqual(tagOptions(panel).map(optionText), [
-      'herb 24 components',
-      'rare 1 component',
-      'typo 0 components',
-      'bare',
+      '#herb 24 components',
+      '#rare 1 component',
+      '#typo 0 components',
+      '#bare',
     ]);
     const chipClasses = (tag) => [
       ...tagOption(panel, tag).querySelector('.manager-chip').classList,

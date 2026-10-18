@@ -1333,7 +1333,7 @@ describe('Tool Studio editor (mounted)', () => {
       [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')].map((node) =>
         node.textContent.replaceAll(/\s+/gu, ' ').trim()
       ),
-      ['metal 2 components', 'salvage 0 components'],
+      ['#metal 2 components', '#salvage 0 components'],
       'each tag counts the components carrying it exactly'
     );
   });
@@ -1390,7 +1390,7 @@ describe('Tool Studio editor (mounted)', () => {
       [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')].map((node) =>
         node.textContent.replaceAll(/\s+/gu, ' ').trim()
       ),
-      ['constructor 0 components', 'metal 1 component']
+      ['#constructor 0 components', '#metal 1 component']
     );
   });
 

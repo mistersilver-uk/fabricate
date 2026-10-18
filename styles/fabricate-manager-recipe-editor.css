@@ -1127,21 +1127,14 @@
   border-color: var(--fab-border);
 }
 
-/* THE TAG ARM, ON THE ROW (`proto:2252`): the policy word, the chosen tags and `+ Tag`, with the Any of / All of control as the row's next sibling. */
+/* THE TAG ARM, ON THE ROW (library `<PickerRow> <ChoiceGroup>` "choice group"): the chosen tags and `+ Tag` 8px apart, with no word before them and the Any of / All of control as the row's next sibling. */
 .fabricate-manager .manager-recipe-option-tags {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--fab-space-chip);
+  gap: var(--fab-space-2);
   min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-tag-policy {
-  flex: 0 0 auto;
-  color: var(--fab-text-muted);
-  font-size: 0.69rem;
-  font-weight: 600;
 }
 
 /* THE ANY-OF / ALL-OF TRACK'S PLACE IN THE ROW (`proto:2268` gives it `flex: 0 0 auto`). */
@@ -1149,7 +1142,7 @@
   flex: 0 0 auto;
 }
 
-/* `+ Tag` (`proto:2256`): `inline-flex; gap:5px; padding:3px 9px; border-radius:999px; border:1px dashed var(--tag); font:600 10px var(--sans); color:var(--tag)` — a dashed pill in the tag tint, not a filled button, because it is an affordance for adding standing in a row of chips that are VALUES. */
+/* `+ Tag` (library `<PickerRow> <ChoiceGroup>` "choice group"'s dashed `button.k-chip`): a 28px dashed pill at 11px/600 in the tag ink with a 9px plus and no fill, because it is an affordance for adding standing in a row of chips that are VALUES. */
 .fabricate-manager .manager-recipe-tag-trigger {
   appearance: none;
   -webkit-appearance: none;
@@ -1157,27 +1150,27 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--fab-space-1);
+  gap: var(--fab-space-chip);
   box-sizing: border-box;
   width: auto;
-  height: auto;
-  min-height: 0;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px dashed color-mix(in srgb, var(--fab-purple) 60%, transparent);
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-space-3);
+  border: 1px dashed color-mix(in oklab, var(--fab-purple) 40%, transparent);
   border-radius: 999px;
-  color: var(--fab-purple);
+  color: var(--fab-purple-text);
   background: transparent;
   font-family: var(--font-primary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-recipe-tag-trigger > i {
   flex: 0 0 auto;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .fabricate-manager .manager-recipe-tag-trigger:hover {
@@ -1455,6 +1448,25 @@
   flex: 1 1 8px;
 }
 
+/* Repeats (library `<PickerRow> <ChoiceGroup>` "up to N, by roll"): a quiet 26px status button, a `···` mark then its state word on no edge. (0,5,0) beats the family's 34px rules, and the resting paint is `:not(:disabled)` so the disabled invariant holds. */
+.fabricate-manager .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-award-repeats {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 var(--fab-space-3);
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.fabricate-manager .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-award-repeats:not(:disabled) {
+  border-color: transparent;
+  color: var(--fab-text-secondary);
+}
+
+.fabricate-manager .manager-recipe-award-repeats > i {
+  font-size: 11px;
+}
+
 .fabricate-manager .manager-recipe-award-caption,
 .fabricate-manager .manager-recipe-award-help {
   margin: 0;
@@ -1555,10 +1567,10 @@
 .fabricate-manager .manager-chip.manager-recipe-tag-chip {
   flex: 0 0 auto;
   margin: 0;
-  min-width: 4.5rem;
   height: 28px;
 }
 
+/* The `×` keeps the chip's old 0.62rem, so the 11px chip does not grow it (ruled 2026-10-18). */
 .fabricate-manager .manager-recipe-tag-remove {
   display: inline-flex;
   align-items: center;
@@ -1567,6 +1579,7 @@
   border: none;
   background: none;
   color: inherit;
+  font-size: 0.62rem;
   cursor: pointer;
 }
 

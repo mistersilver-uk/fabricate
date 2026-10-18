@@ -3361,11 +3361,11 @@ export function registerWorldScopeCases() {
           [...(panel()?.querySelectorAll('[role="option"]') ?? [])].map((node) =>
             node.textContent.replaceAll(/\s+/gu, ' ').trim()
           );
-        assert.deepEqual(options(), ['resin 1 component', 'wood 2 components']);
+        assert.deepEqual(options(), ['#resin 1 component', '#wood 2 components']);
 
         // Two picks inside one republish: the second must build on the first, not on the stale
         // projection the page still holds while the first write is in flight.
-        const choose = (tag) => panel().querySelector(`[role="option"][title="${tag}"]`).click();
+        const choose = (tag) => panel().querySelector(`[role="option"][title="#${tag}"]`).click();
         choose('wood');
         flushSync();
         choose('resin');
@@ -3378,7 +3378,7 @@ export function registerWorldScopeCases() {
         assert.ok(Boolean(panel()), 'the panel stays open across the save round-trip');
         assert.deepEqual(
           ['resin', 'wood'].map((tag) =>
-            panel().querySelector(`[title="${tag}"]`).getAttribute('aria-selected')
+            panel().querySelector(`[title="#${tag}"]`).getAttribute('aria-selected')
           ),
           ['true', 'true'],
           'and both saved tags now read as held'

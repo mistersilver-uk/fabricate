@@ -9,7 +9,7 @@
   | --- | --- | --- | --- |
   | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula, label, reason }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
   | `kinds` | kinds | the four match types | What the kind select offers; the row's own kind is always listed too. |
-  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count, unit }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the subject cell resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. A currency entry's `unit`, its abbreviation, draws right of the stepper unless `amount.unit` is given. |
+  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count, unit }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the subject cell resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, each tag drawn after a `#`, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. A currency entry's `unit`, its abbreviation, draws right of the stepper unless `amount.unit` is given. |
   | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face, `READONLY_FACES` in `pickerRowKinds.js`: a `currency` row while currency is off, and a `knowledge` row while learning is not observable. |
   | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
@@ -29,9 +29,9 @@
   - `onRemove()` — the remove button was pressed.
   - `onSelect(kind)` — a kind was chosen from the `or…` menu.
   - `onCreateTag(tag)` — the tag catalogue's footer offers `New tag “{name}”` for a typed name,
-    trimmed and lower-cased, that no vocabulary tag and no held tag matches; a press adds it to the
-    row and calls this once, keeping the panel open with focus in its query. `null` draws no footer.
-    A rejection takes the tag back off the row and raises an error notice.
+    trimmed, lower-cased and less one leading `#`, that no vocabulary tag and no held tag matches;
+    a press adds it to the row and calls this once, keeping the panel open with focus in its query.
+    `null` draws no footer. A rejection takes the tag back off the row and raises an error notice.
 
   Rest spread:
   - `{...rest}` lands on the root `<div>`, written after `class={…}` and `data-recipe-option`.
@@ -128,6 +128,7 @@
   // A taught recipe its system no longer holds: named as missing rather than drawn unnamed.
   const missing = $derived(!readonly && matchType === 'knowledge' && Boolean(value?.id) && !chosen);
 
+  const hashed = (tag) => `#${tag}`;
   const countWord = (count) =>
     count === 1
       ? localizeOr('FABRICATE.Admin.Manager.Recipe.TagComponentCountOne', '1 component')
@@ -140,7 +141,7 @@
   const tagPickerOptions = $derived(
     entries.map(({ id, label, icon, count }) => ({
       id,
-      label,
+      label: hashed(label),
       icon,
       ...(Number.isFinite(count)
         ? { trailing: countWord(count), trailingChip: countChip(count) }
@@ -200,12 +201,12 @@
     else addTag(tag);
   }
 
-  // The name the footer would create from `query`, or '' while it names a tag already listed.
+  // The footer's name for `query`, less one leading `#`; '' while it names a tag already listed.
   const listedTags = $derived(
     new Set([...entries.map((entry) => entry.id), ...tags].map(normalizeTag))
   );
   const newTagName = (query) => {
-    const name = normalizeTag(query);
+    const name = normalizeTag(String(query ?? '').replace(/^\s*#/, ''));
     return onCreateTag && name && !listedTags.has(name) ? name : '';
   };
 
@@ -262,11 +263,6 @@
       'The recipe this row teaches is no longer in this system, so no craft can award it. Remove this row.'
     )
   );
-  const tagPolicyWord = $derived(
-    tagMatch === 'all'
-      ? localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All of')
-      : localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
-  );
   const kindLabel = $derived(
     forSubject('FABRICATE.Admin.Manager.Recipe.KindFor', 'Kind of {name}')
   );
@@ -275,8 +271,6 @@
     'Search tags...'
   );
 
-  // The SAME two strings the policy word above reads, so the control and the sentence it writes
-  // can never disagree.
   const TAG_MATCH_OPTIONS = [
     { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any of' },
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All of' },
@@ -352,14 +346,18 @@
   />
 
   {#if matchType === 'tags'}
-    <!-- ONE LINE: the policy word, the chosen tags, `+ Tag`, and the Any of / All of control that
-         sets the word. No empty state — an unfilled row already says `Any of` with nothing
-         after it. -->
+    <!-- ONE LINE: the chosen tags, each read after a `#`, `+ Tag`, and the Any of / All of control
+         that sets how they match. No empty state: an unfilled row draws `+ Tag` alone. -->
     <span class="manager-recipe-option-tags" data-recipe-option-tags>
-      <span class="manager-recipe-tag-policy" data-recipe-tag-policy>{tagPolicyWord}</span>
       {#each tags as tag (tag)}
-        <Chip tag="span" tone="tag" class="manager-recipe-tag-chip" data-recipe-tag={tag}>
-          <span>{tag}</span>
+        <Chip
+          tone="tag"
+          emphasis="lit"
+          density="tag-run"
+          class="manager-recipe-tag-chip"
+          data-recipe-tag={tag}
+        >
+          <span>{hashed(tag)}</span>
           <button
             type="button"
             class="manager-recipe-tag-remove"
