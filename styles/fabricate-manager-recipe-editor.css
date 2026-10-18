@@ -2010,7 +2010,7 @@
   background: var(--fab-surface-soft);
 }
 
-.fabricate-manager .manager-recipe-routing-card > div > p {
+.fabricate-manager .manager-recipe-routing-head > p {
   margin: var(--fab-space-2xs) 0 0;
 }
 
@@ -2023,7 +2023,4 @@
 
 .fabricate-manager .manager-recipe-routing-step {
   margin: 0;
-  color: var(--fab-text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
 }

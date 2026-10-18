@@ -49,6 +49,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/RoutingOverview.svelte',
     CARD,
   ],
@@ -170,6 +171,9 @@ describe('RecipeRoutingCard writes', () => {
     let view = await mountCard({ recipe: setRecipe(), provider: 'ingredientSet' });
     chooseSelectOption(view.root, view.trigger('set:s-gold'), 'g-ring');
     assert.equal(view.log.recipe.length, 0, 'the set already names the Ring');
+    const summary = view.row('set:s-gold').querySelector('.fabricate-routing-overview-summary');
+    assert.equal(summary.textContent, 'Gold Ingot ×2');
+    assert.equal(summary.getAttribute('title'), 'Gold Ingot ×2');
     assert.ok(view.row('set:s-silver').textContent.includes('default'));
     chooseSelectOption(view.root, view.trigger('set:s-silver'), 'g-ring');
     assert.equal(view.log.recipe.at(-1).ingredientSets[1].resultGroupId, 'g-ring');
@@ -207,8 +211,12 @@ describe('RecipeRoutingCard check rows', () => {
     assert.ok(!gap.querySelector('.fabricate-select-trigger'), 'a gap row has no select');
     const action = gap.querySelector('[data-routing-gap-action]');
     assert.equal(action.getAttribute('aria-label'), 'Edit outcome tiers to close the gap at 15');
+    const list = view.root.querySelector('[data-recipe-routing-edit-tiers]');
+    for (const button of [action, list]) {
+      assert.ok(Boolean(button.querySelector('i.fa-star[aria-hidden="true"]')), 'a star glyph');
+    }
     action.click();
-    view.root.querySelector('[data-recipe-routing-edit-tiers]').click();
+    list.click();
     assert.equal(view.log.openChecks, 2);
     const order = [...view.root.querySelectorAll('[data-routing-overview-row]')].map(
       (li) => li.dataset.routingOverviewRow
@@ -319,7 +327,7 @@ describe('RecipeRoutingCard notes and scopes', () => {
       ['st-1', 'st-2']
     );
     assert.deepEqual(
-      scopes.map((scope) => scope.querySelector('h4')?.textContent),
+      scopes.map((scope) => scope.querySelector(':scope h4 > .fab-kicker')?.textContent),
       ['Smelt', 'Step 2']
     );
     assert.equal(

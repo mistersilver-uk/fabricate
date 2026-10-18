@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `recipe` | the staged draft | `null` | Read through `routingScopes`. |
   | `collapsed` | boolean | `false` | A collapsed chain draws its final step. |
-  | `routing` | `{ provider, tiers, rankedTiers, failureResultsAllowed, minimum, gaps, componentOptions, writes }` | `null` | `RecipeEditView`'s routing facts: the offered tiers, every tier with its bounds, `routedMinimum`'s output, the fixed gaps, and `scopeWrites`' `{ sets, groups, assignSet }`. |
+  | `routing` | `{ provider, tiers, rankedTiers, minimum, gaps, componentOptions, writes }` | `null` | `RecipeEditView`'s routing facts: the offered tiers, every tier with its bounds, `routedMinimum`'s output, the fixed gaps, and `scopeWrites`' `{ sets, groups, assignSet }`. |
   | `disabled` | boolean | `false` | Every select and adder off. |
 
   Callbacks:
@@ -21,6 +21,7 @@
 <script>
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import RoutingOverview from '../../../components/RoutingOverview.svelte';
   import { subjectName } from '../../../components/pickerRowKinds.js';
   import { componentCatalogue } from '../../../components/resultRows.js';
@@ -39,6 +40,10 @@
   } = $props();
 
   const uid = $props.id();
+  const editTiers = localizeOr(
+    'FABRICATE.Admin.Manager.Recipe.RoutingCard.EditTiers',
+    'Edit outcome tiers'
+  );
 
   const provider = $derived(routing?.provider ?? null);
   const drawn = $derived(provider === 'ingredientSet' || provider === 'check');
@@ -223,13 +228,14 @@
     {disabled}
     onclick={() => onOpenChecks()}
   >
-    {localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.EditTiers', 'Edit outcome tiers')}
+    <i class="fas fa-star" aria-hidden="true"></i>
+    <span>{editTiers}</span>
   </Button>
 {/snippet}
 
 {#if drawn}
   <section class="manager-recipe-routing-card" data-recipe-section="routing">
-    <div>
+    <div class="manager-recipe-routing-head">
       <h3 class="manager-recipe-section-title">
         {localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.Title', 'Routing')}
       </h3>
@@ -251,7 +257,9 @@
         class="manager-recipe-routing-scope"
         data-recipe-routing-scope={scope.stepId ?? 'recipe'}
       >
-        {#if scopes.length > 1}<h4 class="manager-recipe-routing-step">{view.label}</h4>{/if}
+        {#if scopes.length > 1}
+          <h4 class="manager-recipe-routing-step"><Kicker as="span">{view.label}</Kicker></h4>
+        {/if}
         <RoutingOverview
           label={view.label}
           rows={view.rows}
@@ -328,10 +336,8 @@
                 {disabled}
                 onclick={() => onOpenChecks()}
               >
-                {localizeOr(
-                  'FABRICATE.Admin.Manager.Recipe.RoutingCard.EditTiers',
-                  'Edit outcome tiers'
-                )}
+                <i class="fas fa-star" aria-hidden="true"></i>
+                <span>{editTiers}</span>
               </Button>
             {/if}
           {/snippet}
