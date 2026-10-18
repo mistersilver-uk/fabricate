@@ -21,7 +21,7 @@
   import Button from '../../../components/Button.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import Select from '../../../components/Select.svelte';
+  import RoutingOverview from '../../../components/RoutingOverview.svelte';
   import SetCard from '../../../components/SetCard.svelte';
   import SubjectModifierPicker from '../SubjectModifierPicker.svelte';
   import PickerRow from '../../../components/PickerRow.svelte';
@@ -91,6 +91,27 @@
   const salvageCatalogue = $derived(componentCatalogue(componentOptions));
   const SALVAGE_NAME_HOOK = { 'data-salvage-result-component': '' };
   const SALVAGE_AMOUNT = { inputProps: { 'data-salvage-result-quantity': '' } };
+
+  // One neutral row per outcome; `shared` counts the outcomes routed to the same set, and every
+  // unrouted trigger carries the validation hook, so `querySelector` lands on the first.
+  const routingRows = $derived(
+    salvageOutcomeNames.map((name) => {
+      const value = salvageDraft.outcomeRouting[name] || '';
+      const routedHere = (other) => value && (salvageDraft.outcomeRouting[other] || '') === value;
+      return {
+        key: name,
+        kind: 'source',
+        source: name,
+        value,
+        options: salvageRouteOptions,
+        shared: salvageOutcomeNames.filter(routedHere).length,
+        triggerProps: {
+          'data-salvage-route': name,
+          ...(value ? {} : { 'data-validation-target': 'component-salvage-routing' }),
+        },
+      };
+    })
+  );
 </script>
 
 <section
@@ -411,36 +432,18 @@
    result-group editor above does NOT, because it owns the only add-group control. -->
   {#if salvageShowChrome && salvageRouted}
     <!-- A `--fab-bg-1` well behind a hairline, headed by an `OUTCOME ROUTING` micro-label
-     and holding one row per outcome. -->
+     and holding the routing overview's row per outcome. -->
     <Field as="div" class="manager-salvage-routing-card" data-salvage-routing="">
       <p class="manager-micro-label">
         {text('FABRICATE.Admin.Manager.Component.SalvageEditor.Routing', 'Outcome routing')}
       </p>
       {#if salvageOutcomeNames.length > 0}
-        <!-- A `<div>`, not a `<label>`: `Select.svelte`'s host invariant. The caption names the trigger with `aria-labelledby` (issue 1510). -->
-        <div class="manager-salvage-routing-list">
-          {#each salvageOutcomeNames as outcomeName, routeIndex (outcomeName)}
-            <div class="manager-salvage-routing-row">
-              <span id={`${instanceId}-salvage-route-${routeIndex}`}>{outcomeName}</span>
-              <Select
-                size="inline"
-                class="manager-salvage-route-select"
-                value={salvageDraft.outcomeRouting[outcomeName] || ''}
-                options={salvageRouteOptions}
-                ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
-                disabled={saving}
-                triggerProps={{
-                  'data-salvage-route': outcomeName,
-                  // The routing row's control: querySelector lands on the FIRST unrouted outcome.
-                  ...(salvageDraft.outcomeRouting[outcomeName]
-                    ? {}
-                    : { 'data-validation-target': 'component-salvage-routing' }),
-                }}
-                onChange={(next) => onSetRoute(outcomeName, next)}
-              />
-            </div>
-          {/each}
-        </div>
+        <RoutingOverview
+          label={text('FABRICATE.Admin.Manager.Component.SalvageEditor.Routing', 'Outcome routing')}
+          rows={routingRows}
+          disabled={saving}
+          onChange={(name, next) => onSetRoute(name, next)}
+        />
       {:else}
         <p class="manager-muted">
           {text(

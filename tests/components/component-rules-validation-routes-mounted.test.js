@@ -67,7 +67,8 @@ const FAILING = {
   salvageRouting: {
     mode: 'routed',
     salvage: salvage([KNOWN], { Success: 'grp-1' }),
-    said: 'Component rules — Failure',
+    // The routing overview names a select by its badge and connector (issue 2513).
+    said: 'Component rules — Failure produces',
   },
   progressiveDc: {
     mode: 'progressive',

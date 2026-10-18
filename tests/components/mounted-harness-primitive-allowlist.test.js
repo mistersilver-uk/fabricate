@@ -54,6 +54,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/SetPicker.svelte',
   // The set card (issue 2512): every recipe set, the Tools tab's per-set cards and salvage groups.
   'src/ui/svelte/components/SetCard.svelte',
+  // The routing overview (issue 2513): the recipe Overview's routing card and the salvage well.
+  'src/ui/svelte/components/RoutingOverview.svelte',
   // The inspector rail section (issue 1782): the essence, tool and recipe-item inspectors.
   'src/ui/svelte/components/Rail.svelte',
   // The log list (issue 1782): every tree holding the journal's Finished list renders it.

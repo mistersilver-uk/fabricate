@@ -868,10 +868,11 @@ export function registerComponentsCases() {
       'routed mode should render the DC-override field'
     );
 
-    // The routing row's caption names its own outcome (issue 1510), not the generic control label.
+    // The routing row's badge and connector name its select (issues 1510, 2513), never the
+    // generic control label.
     assert.equal(
       assertSelectHasResolvedName(target, '[data-salvage-route="Success"]'),
-      'Success',
+      'Success produces',
       'the Success row resolves its own outcome name'
     );
     // `''` (Unrouted) is stamped `__unchanged__` in the DOM — a `data-popover-option` cannot be

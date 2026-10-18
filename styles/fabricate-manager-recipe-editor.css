@@ -700,40 +700,6 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-salvage-routing-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-salvage-routing-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-}
-
-/* `proto:1419`: a FIXED 120px outcome label against a `flex: 1` select, so a routed system's rows line up whatever its tiers are named. */
-.fabricate-manager .manager-salvage-routing-row > span:first-child {
-  flex: 0 0 120px;
-  width: 120px;
-}
-
-.fabricate-manager .manager-salvage-routing-row > span {
-  flex: 0 0 auto;
-  font-weight: 600;
-}
-
-/* `proto:1419`'s 14rem target column, on the shared `<Select>`'s root since issue 1510: the slot is stated on the picker and the trigger fills it. Left hugging, every routing row would be a different width and re-flow as the GM routed an outcome. */
-.fabricate-manager .manager-salvage-route-select {
-  flex: 0 1 14rem;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-salvage-route-select .fabricate-select-trigger {
-  width: 100%;
-}
-
 /* The set-level "OR", the within-requirement "OR", and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
 .fabricate-manager .manager-recipe-ingredient-set-or,
 .fabricate-manager .manager-recipe-ingredient-or-separator,
@@ -1911,6 +1877,8 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
+  container: fabricate-routing-overview / inline-size;
+  font-weight: 400;
 }
 
 .fabricate-routing-overview .fabricate-routing-overview-list {
@@ -1935,7 +1903,7 @@
 }
 
 .fabricate-routing-overview .fabricate-routing-overview-source {
-  flex: none;
+  flex: 0 1 auto;
   justify-content: center;
   min-width: 64px;
   max-width: 140px;
@@ -2014,6 +1982,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
+}
+
+/* Under the width the full columns need, as in the salvage well at the declared floor, the select slot and the marker column step down together, so every row still fits and its select keeps one x. */
+@container fabricate-routing-overview (max-width: 420px) {
+  .fabricate-routing-overview .fabricate-routing-overview-target {
+    width: 140px;
+  }
+
+  .fabricate-routing-overview .fabricate-routing-overview-markers {
+    width: 64px;
+  }
+
+  .fabricate-routing-overview .fabricate-routing-overview-blocked {
+    width: calc(140px + var(--fab-space-2) + 64px);
+  }
 }
 
 /* The recipe Overview's routing card, boxed as the Overview's other cards are; each step scope stacks its heading over its routing overview. */
