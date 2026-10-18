@@ -88,7 +88,7 @@ In Simple mode the panel shows the hint **Simple mode uses a single result set**
 Routed and Progressive modes keep the full list, where each result set maps to an outcome or a stage.
 
 In Routed mode the panel also shows an **Outcome routing** list with one row per outcome of the salvage check.
-Each row has a dropdown naming the result set that outcome produces, and **Unrouted** means the outcome awards nothing, which the component's validation flags.
+Each row has a dropdown naming the result set that outcome produces, and **Unrouted** means the outcome awards nothing, which the component's validation flags for a success outcome (a failure outcome may stay Unrouted).
 When two or more outcomes route to the same result set, their rows are marked **shared · N**, where N is how many outcomes share it.
 
 {: .note }

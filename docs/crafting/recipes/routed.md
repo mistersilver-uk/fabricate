@@ -204,7 +204,7 @@ Two markers sit at the end of a row.
 A recipe without steps has one list, labelled **Routing**.
 A multi-step recipe has one list per step, each under a heading with the step's name.
 While the Multi-Step Recipes feature is off, a multi-step recipe shows the list for its final step.
-A step with no result sets of its own shows the recipe's result sets, read-only, as a craft would award them.
+A step with no result sets of its own, in a recipe that has result sets, shows the recipe's result sets, read-only, as a craft would award them.
 A note on the step explains that the recipe cannot be enabled until the step has its own result set.
 Adding one with **Result set** gives the step its own list.
 
@@ -222,8 +222,8 @@ Some rows have no dropdown.
   A roll in a gap matches no tier, so the row is a prompt to fix the tiers.
 
 A failure tier that the setting does permit can be routed, and its dropdown reads **Awards nothing** until you choose a result set.
-Where the recipe sets a minimum success tier, every such failure tier is marked **only on a forced failure**.
-A roll below the minimum fails the craft outright and awards nothing, so a failure tier below it awards its result set only when a check trigger forces the failure.
+Where a fixed check's recipe sets a minimum success tier, every such failure tier is marked **only on a forced failure**.
+A roll that lands below the minimum fails the craft outright and awards nothing, and a check trigger that forces a failure skips the minimum and lands on the lowest-ranked failure tier, so that is the only failure tier whose result set such a craft awards.
 See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
 
 While no result set in a step lists an outcome tier and more than one success tier is offered, a **Routed by default** note warns that assigning a tier stops the other tiers reaching a result set by default.
