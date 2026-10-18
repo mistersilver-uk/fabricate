@@ -8,8 +8,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { recipeResultKinds } from '../../src/ui/svelte/components/resultRows.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
+import {
+  createMountedComponentHarness,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 import {
   blockFor,
@@ -1172,6 +1181,157 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
       'the search rests on the partial accent'
     );
     assert.equal(report.or.height, 28, '`or…` stands at 28');
+  } finally {
+    await context.close();
+  }
+});
+
+const REPO_ROOT = resolve(__dirname, '../..');
+const RESULT_TREE = [...new Set([...SELECT_COMPILED_MODULES, ...RESULT_ROW_COMPILED_MODULES])];
+
+/** `ChoiceGroup`'s result side mounted once per entry, as a recipe's reward set draws it. */
+async function resultGroupMarkup(entries) {
+  const harness = createMountedComponentHarness({
+    repoRoot: REPO_ROOT,
+    tmpPrefix: 'fabricate-result-wrap-',
+    rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, ...RESULT_ROW_RAW_MODULES],
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: RESULT_TREE,
+    componentPath: 'src/ui/svelte/components/ChoiceGroup.svelte',
+  });
+  const offer = recipeResultKinds({
+    componentOptions: [{ id: 'cmp-ingot', name: 'Iron Ingot' }],
+    currencyUnits: [
+      { id: 'gold', label: 'Gold', abbreviation: 'gp' },
+      { id: 'mark', label: 'Guild mark', abbreviation: 'gold' },
+    ],
+    currencyEnabled: true,
+  });
+  await harness.setup();
+  try {
+    const markup = [];
+    for (const group of entries) {
+      markup.push((await harness.mount({ side: 'result', group, offer, reward: true })).innerHTML);
+      harness.remount();
+    }
+    return markup;
+  } finally {
+    harness.teardown();
+  }
+}
+
+test('the widest result rows hold one line just over each wrap rule, and wrap by rule at it (issue 2515)', async () => {
+  const ranged = (entry, from, to) => ({ ...entry, selectionRange: { from, to } });
+  const markup = await resultGroupMarkup([
+    { id: 'r1', kind: 'currency', unit: 'gold', quantity: 5 },
+    { id: 'r2', kind: 'currency', unit: 'mark', quantity: 5 },
+    {
+      id: 'g1',
+      chooser: 'rolled',
+      selectionFormula: '1d20',
+      alternatives: [
+        ranged({ id: 'a', kind: 'currency', unit: 'gold', quantity: 5 }, 1, 10),
+        ranged({ id: 'b', componentId: 'cmp-ingot', quantity: 1 }, 11, 20),
+      ],
+    },
+  ]);
+  const scoped = RESULT_TREE.filter((path) =>
+    readFileSync(resolve(REPO_ROOT, path), 'utf8').includes('\n<style>')
+  ).map((path) => scopedComponentCss(resolve(REPO_ROOT, path)).css);
+  const context = await openLayoutContext({ viewport: { width: 1200, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+      <style>${readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
+      <style>@layer modules { ${css} }</style>
+      <style>${scoped.join('\n')}</style>
+      <style>:root { --font-primary: Arial, sans-serif; } body { margin: 0; }
+        .fas::before, .fa-solid::before { content: "x"; }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }</style>
+      </head><body><main class="fabricate-manager" style="width: 1100px">
+        <div class="manager-recipe-ingredient-set-groups">${markup[0]}${markup[1]}</div>
+        ${markup[2]}
+      </main></body></html>`);
+    const layoutAt = (list, width) =>
+      page.evaluate(
+        ([selector, inline]) => {
+          const container = document.querySelector(selector);
+          container.style.cssText = `width: ${inline}px; max-width: none; min-width: 0; flex: none`;
+          const rows = [...container.querySelectorAll(':scope > .is-result')];
+          return rows.map((row) => {
+            const controls = row.querySelector(':scope > .manager-recipe-option-controls');
+            const parts = [
+              ...row.querySelectorAll(':scope > :not(.manager-recipe-option-controls)'),
+              ...controls.children,
+            ].filter(
+              (part) =>
+                !part.matches('.manager-recipe-reward-body, .manager-recipe-option-invalid') &&
+                part.getBoundingClientRect().width > 0
+            );
+            const centre = (part) => {
+              const box = part.getBoundingClientRect();
+              return box.top + box.height / 2;
+            };
+            const tops = [...new Set(parts.map((part) => Math.round(centre(part))))].sort(
+              (a, b) => a - b
+            );
+            const lineStarts = tops.filter(
+              (top, index) => index === 0 || top - tops[index - 1] > 8
+            );
+            const lineOf = (part) =>
+              lineStarts.filter((start) => Math.round(centre(part)) >= start).length;
+            const remove = row.querySelector('.manager-recipe-option-remove');
+            const amount = row.querySelector('[data-recipe-option-amount-mode]');
+            const lastOnRemoveLine = parts
+              .filter((part) => lineOf(part) === lineOf(remove))
+              .every(
+                (part) => part.getBoundingClientRect().right <= remove.getBoundingClientRect().right
+              );
+            return {
+              byRule: getComputedStyle(controls).display === 'contents',
+              lines: lineStarts.length,
+              removeLine: lineOf(remove),
+              amountLine: lineOf(amount),
+              lastOnRemoveLine,
+            };
+          });
+        },
+        [list, width]
+      );
+
+    const FLAT = '.manager-recipe-ingredient-set-groups';
+    const MEMBERS = '.manager-recipe-result-group-members';
+    for (const [list, rule, removeLine] of [
+      [FLAT, 717, 2],
+      [MEMBERS, 807, 1],
+    ]) {
+      const over = await layoutAt(list, rule + 1);
+      assert.equal(over.length, 2, `${list}: two rows measured`);
+      for (const row of over) {
+        assert.deepEqual([row.byRule, row.lines], [false, 1], `${list} at ${rule + 1}: one line`);
+      }
+      for (const row of await layoutAt(list, rule)) {
+        assert.deepEqual(
+          [row.byRule, row.lines, row.amountLine, row.removeLine, row.lastOnRemoveLine],
+          [true, 2, 2, removeLine, true],
+          `${list} at ${rule}: two lines by rule, the remove ending line ${removeLine}`
+        );
+      }
+    }
+
+    const unit = await page.evaluate(() => {
+      const long = document.querySelectorAll('[data-recipe-option-unit]')[1];
+      return {
+        text: long.textContent,
+        title: long.title,
+        width: long.getBoundingClientRect().width,
+        clipped: long.scrollWidth > long.clientWidth,
+        overflow: getComputedStyle(long).textOverflow,
+      };
+    });
+    assert.deepEqual([unit.text, unit.title], ['gold', 'gold'], 'the long unit, titled in full');
+    assert.ok(unit.width <= 16 && unit.clipped, `it is cut at 16px (${unit.width})`);
+    assert.equal(unit.overflow, 'ellipsis', 'with an ellipsis');
   } finally {
     await context.close();
   }

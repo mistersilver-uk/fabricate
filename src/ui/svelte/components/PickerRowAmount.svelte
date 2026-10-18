@@ -130,7 +130,9 @@
 
 {#snippet notes()}
   {#if amount.unit}
-    <span class="manager-recipe-option-unit" data-recipe-option-unit>{amount.unit}</span>
+    <span class="manager-recipe-option-unit" title={amount.unit} data-recipe-option-unit
+      >{amount.unit}</span
+    >
   {/if}
   {#if invalid}
     <span id={errorId} class="manager-recipe-option-invalid" data-recipe-option-invalid

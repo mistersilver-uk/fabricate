@@ -1262,12 +1262,16 @@
   background: var(--fab-danger-soft);
 }
 
-/* The unit right of the amount, in the body face (library `<PickerRow>`'s `.k-unit`). */
+/* The unit right of the amount, in the body face (library `<PickerRow>`'s `.k-unit`). Capped at the presets' width, so a long abbreviation ellipsizes rather than moving the wrap points. */
 .fabricate-manager .manager-recipe-option-unit {
   flex: 0 0 auto;
+  max-width: 16px;
+  overflow: hidden;
   color: var(--fab-text-subtle);
   font-size: 10px;
   font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* A requirement row's invalid message, in the danger text at the row's small size: the amount slot's, a choice group header's and a range cell's alike. */
@@ -1347,7 +1351,7 @@
 }
 
 /* Under the width one line needs, the row takes two: the lead plate, kind and name, then the toggle, the amount and the remove at the end, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
-@container fabricate-result-rows (max-width: 715px) {
+@container fabricate-result-rows (max-width: 717px) {
   .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
     align-items: center;
     row-gap: var(--fab-space-1);
@@ -1369,7 +1373,6 @@
   }
 
   .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
-    order: 3;
     margin-inline-start: auto;
   }
 
@@ -1399,7 +1402,7 @@
   margin-inline-end: 0;
 }
 
-@container fabricate-result-members (max-width: 806px) {
+@container fabricate-result-members (max-width: 807px) {
   .fabricate-manager .manager-recipe-result-group-members > .is-result {
     row-gap: var(--fab-space-1);
   }
