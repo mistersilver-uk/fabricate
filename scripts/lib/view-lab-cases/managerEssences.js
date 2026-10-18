@@ -117,7 +117,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

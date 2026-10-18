@@ -493,7 +493,7 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the three shared bulk primitives,
+    // The browser view, any file in the browser's own directory, the shared bulk primitives and `InspectorPanel`,
     // the staging inset, the shared selection primitive and both pure models all republish the
     // frame (issue 1010).
     for (const file of [
@@ -594,7 +594,7 @@ describe('UI PR screenshot evidence', () => {
       );
     }
 
-    // The recipe browser view, anything in the browser's own directory, the four shared primitives
+    // The recipe browser view, anything in the browser's own directory, the shared bulk primitives and `InspectorPanel`
     // and the shared selection control all republish the frames.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',

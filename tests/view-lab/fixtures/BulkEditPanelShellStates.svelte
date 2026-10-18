@@ -6,7 +6,7 @@
   nor Premium; `tests/view-lab/mount.js` mounts it for `?specimen=bulk-edit-panel-shell` only.
 
   Each column is a `.manager-inspector`, the shared rail at its production 300px track, so the
-  dock bleeds by the rail's own padding (`dockBleed` unset). The children are the Essence Rules
+  dock is the `InspectorPanel` foot and bleeds by the rail's own `--fab-manager-inspector-pad`. The children are the Essence Rules
   panel's Status axis, so each notice sits between the staged axes and the dock as it will in a
   studio.
 -->

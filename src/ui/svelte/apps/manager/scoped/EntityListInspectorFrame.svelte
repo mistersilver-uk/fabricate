@@ -121,9 +121,9 @@
     // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
     // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
     // from being full-width." The inspector column below pads `--fab-space-4` and the bulk panel
-    // renders inside a `-scroll` child that owns the `overflow-y` — so `BulkEditPanelShell`'s
-    // sticky dock, whose negative bleeds are sized for the shared rail's `--fab-space-3`, was
-    // CLIPPED at the scroller's edge and stopped 16px short of the column's on every side.
+    // renders inside a `-scroll` child that owns the `overflow-y`, so the pinned foot was CLIPPED
+    // at the scroller's edge and stopped 16px short of the column's on every side; the flush
+    // scroller now carries the column's inset as `--fab-manager-inspector-pad` (issue 2500).
     flushBulkDock = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
