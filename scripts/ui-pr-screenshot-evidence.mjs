@@ -77,7 +77,7 @@ const TOOL_STUDIO_MATCHES = [
 
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
 const BULK_STUDIO_SURFACE_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard|InspectorPanel)\.svelte$/;
 const RECIPE_BULK_SELECT_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkEditSelect\.svelte$/;
 
 // The Component Studio BROWSER's own files (issue 676): the view and every component in

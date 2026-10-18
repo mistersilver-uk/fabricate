@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
+  INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
@@ -116,7 +117,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -196,6 +197,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -222,6 +224,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

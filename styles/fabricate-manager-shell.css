@@ -374,12 +374,21 @@
   overflow: hidden;
 }
 
-/* `InspectorPanel` publishes its foot's height on the aside, so a focus scroll stops above the foot (WCAG 2.4.11). */
-.fabricate-manager .manager-inspector:has(> .fab-inspector-panel) {
+/* A world catalogue's flush bulk scroller is `InspectorPanel`'s scroller there, so it carries the panel's two tokens: the column's 16px inset, and the frame aside's `--fab-bg-1` fill (`EntityListInspectorFrame`'s `.manager-scoped-list-inspector`). */
+.fabricate-manager .manager-scoped-list-inspector-scroll.is-flush-bulk {
+  --fab-manager-inspector-pad: var(--fab-space-4);
+  --fab-manager-inspector-bg: var(--fab-bg-1);
+
+  padding: var(--fab-manager-inspector-pad);
+}
+
+/* `InspectorPanel` publishes its foot's height on its scroller, so a focus scroll stops above the foot (WCAG 2.4.11). */
+.fabricate-manager .manager-inspector:has(> .fab-inspector-panel),
+.fabricate-manager .manager-scoped-list-inspector-scroll.is-flush-bulk:has(> .fab-inspector-panel) {
   scroll-padding-block-end: var(--fab-manager-inspector-scroll-pad, 0);
 }
 
-/* `bottom` answers the scrollport clamp, which Chromium measures from the aside's content box, and `margin-bottom` the containing-block clamp at maximum scroll; both are the aside's padding token, so the foot spans the rail's full inner width on the aside's own fill. */
+/* `bottom` answers the scrollport clamp, which Chromium measures from the scroller's content box, and `margin-bottom` the containing-block clamp at maximum scroll; both are the scroller's padding token, so the foot spans the rail's full inner width on the scroller's own fill. */
 .fabricate-manager .fab-inspector-panel-foot {
   bottom: calc(-1 * var(--fab-manager-inspector-pad));
   margin-inline: calc(-1 * var(--fab-manager-inspector-pad));
@@ -388,8 +397,14 @@
   background: var(--fab-manager-inspector-bg);
 }
 
-/* The foot is always in view, so while focus is inside it the aside drops that padding and focusing a foot verb does not scroll the rail; Chromium tests a focus target's own box against the padded scrollport. */
-.fabricate-manager .manager-inspector:has(> .fab-inspector-panel > .fab-inspector-panel-foot:focus-within) {
+/* The foot pays its bottom bleed back, so its verbs end on the scroller's content box, inside the panel: 12px on a rail, 16px on a world catalogue's flush bulk scroller. (0,3,0) over the primitive's scoped `padding-block`. */
+.fabricate-manager .fab-inspector-panel > .fab-inspector-panel-foot {
+  padding-bottom: var(--fab-manager-inspector-pad);
+}
+
+/* The foot is always in view, so while focus is inside it the scroller drops that padding and focusing a foot verb does not scroll the rail; Chromium tests a focus target's own box against the padded scrollport. */
+.fabricate-manager .manager-inspector:has(> .fab-inspector-panel > .fab-inspector-panel-foot:focus-within),
+.fabricate-manager .manager-scoped-list-inspector-scroll.is-flush-bulk:has(> .fab-inspector-panel > .fab-inspector-panel-foot:focus-within) {
   scroll-padding-block-end: 0;
 }
 

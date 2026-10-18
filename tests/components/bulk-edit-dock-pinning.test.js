@@ -22,12 +22,15 @@
  *                        makes the dock see-through anyway;
  *   (d) the dock element is in the RENDERED PRODUCT markup and is Apply's parent
  *                      — kills deleting the wrapper;
- *   (e) Apply's own left, right and bottom sit on the inspector's CONTENT box
+ *   (e) Apply's own left and right sit on the inspector's CONTENT box, and its bottom on the
+ *       CONTENT box bottom
  *                      — kills losing the `padding-inline` or `padding-bottom` that pay the
  *                        dock's negative margins back. Without (e) the shell's claim that
  *                        the padding "puts the button back exactly where it was" is
  *                        unmeasured, and deleting either declaration ships green with Apply
  *                        12px out of column or missing its bottom gutter.
+ * The dock is `InspectorPanel`'s foot (issue 2500), so each clause runs in both of its scrollers:
+ * the system aside and a world catalogue's flush bulk scroller.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -35,6 +38,7 @@ import { after, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { railMarkup } from '../fixtures/bulk-edit-dock/rails.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
@@ -45,9 +49,19 @@ import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
 const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
+const PANEL_PATH = 'src/ui/svelte/apps/manager/InspectorPanel.svelte';
+const FRAME_PATH = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
 const fabricateCss = readStylesheet();
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL_PATH));
 const cardCss = scopedComponentCss(resolve(repoRoot, CARD_PATH));
+const panelCss = scopedComponentCss(resolve(repoRoot, PANEL_PATH));
+// The world skeleton wears the frame's hash class, so its own scoped rules lay the scroller out.
+const frameCss = scopedComponentCss(resolve(repoRoot, FRAME_PATH));
+/** The dock's two scrollers. */
+const FRAMES = Object.freeze({
+  system: Object.freeze({ frame: 'system' }),
+  world: Object.freeze({ frame: 'world' }),
+});
 
 // Sub-pixel tolerance, not exact equality. At clamped maximum scroll an INTEGER `scrollTop`
 // meets a fractional scroll maximum and leaves a fraction of a pixel behind; measured here
@@ -75,6 +89,7 @@ const shell = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/Notice.svelte',
+    PANEL_PATH,
     SHELL_PATH,
   ],
   componentPath: SHELL_PATH,
@@ -103,31 +118,28 @@ const stagedAxes = createRawSnippet(() => ({
     ).join('')}</div>`,
 }));
 
-/** The shell's real rendered markup, dropped into the rail it actually ships in. */
-function inspectorPage(productMarkup) {
+/** The shell's real rendered markup, dropped into a scroller it actually ships in. */
+function inspectorPage(productMarkup, { frame = 'system', view = '' } = {}) {
+  const rail = railMarkup({
+    frame,
+    view,
+    scope: frameCss.hashClass,
+    height: INSPECTOR_HOST_HEIGHT_PX,
+    content: productMarkup,
+  });
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${fabricateCss}</style>
     <style>${shellCss.css}</style>
+    <style>${panelCss.css}</style>
     <style>${cardCss.css}</style>
+    <style>${frameCss.css}</style>
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
       .probe-host { width: ${CONTAINER_WIDTH_PX}px; height: ${INSPECTOR_HOST_HEIGHT_PX}px; }
       .probe-row { margin: 0; padding: 6px 0; font-size: 12px; }
     </style></head>
-    <body>
-      <div class="probe-host">
-        <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">
-          <div class="probe-shell-band"></div>
-          <div class="probe-shell-band"></div>
-          <div class="manager-body">
-            <div class="manager-rail"></div>
-            <div class="manager-main"></div>
-            <aside class="manager-inspector" data-probe-inspector>${productMarkup}</aside>
-          </div>
-        </div>
-      </div>
-    </body></html>`;
+    <body><div class="probe-host">${rail}</div></body></html>`;
 }
 
 /** Measures the dock against the inspector's padding box at the top. */
@@ -188,6 +200,7 @@ function measureDock() {
     dockRendered: true,
     applyRendered: true,
     overflow,
+    padBottomInset: padding.bottom,
     ...paint,
     samples: [
       sampleAt('scroll top', 0),
@@ -244,9 +257,37 @@ function alphaOf(color) {
   return channels.length > 3 ? Number(channels[3]) : 1;
 }
 
+/** The danger probe the 13px case measures, as the caller's `dockFoot`: a label longer than the rail. */
+const dangerProbeFoot = createRawSnippet(() => ({
+  render: () =>
+    '<div class="fab-bulk-inset-danger-probe"><button type="button" class="fabricate-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>',
+}));
+
+/** The dock's computed fill against probes painted with each candidate token, and the panel's rhythm. */
+function readFill(tokens) {
+  const inspector = document.querySelector('[data-probe-inspector]');
+  const dock = inspector.querySelector('.fab-bulk-edit-dock');
+  const manager = inspector.closest('.fabricate-manager');
+  const probes = Object.fromEntries(
+    tokens.map((token) => {
+      const probe = document.createElement('div');
+      probe.style.cssText = `position:absolute;width:1px;height:1px;background-color:var(${token})`;
+      manager.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return [token, color];
+    })
+  );
+  return {
+    dock: getComputedStyle(dock).backgroundColor,
+    probes,
+    rowGap: getComputedStyle(dock.parentElement).rowGap,
+  };
+}
+
 describe('the bulk edit dock is pinned to the inspector scrollport', () => {
-  const rendered = { markup: '', dockIsApplyParent: false, dockInMountedMarkup: false };
-  let measured = null;
+  const rendered = { markup: '', dockIsApplyParent: false, dockInMountedMarkup: false, footed: '' };
+  const measured = {};
 
   before(async () => {
     await shell.setup();
@@ -262,6 +303,15 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
       rendered.dockInMountedMarkup = Boolean(dock);
       rendered.dockIsApplyParent = Boolean(apply) && apply.parentElement === dock;
       rendered.markup = target.innerHTML;
+      shell.remount();
+      const footed = await shell.mount({
+        heading: '3 components selected',
+        applyLabel: 'Apply to 3 components',
+        canApply: true,
+        children: stagedAxes,
+        dockFoot: dangerProbeFoot,
+      });
+      rendered.footed = footed.innerHTML;
     } finally {
       shell.teardown();
     }
@@ -269,8 +319,10 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.setContent(inspectorPage(rendered.markup), { waitUntil: 'load' });
-      measured = await page.evaluate(measureDock);
+      for (const [name, frame] of Object.entries(FRAMES)) {
+        await page.setContent(inspectorPage(rendered.markup, frame), { waitUntil: 'load' });
+        measured[name] = await page.evaluate(measureDock);
+      }
     } finally {
       await browser.close();
     }
@@ -293,28 +345,20 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     // `margin-top`) and the delete wore the host button's 14px type on a 6px corner, wrapping the
     // system panel's `Remove 2 components from The Herbalist's Compendium…` to two lines. Both are
     // the SHELL's and the sheet's, so one measurement covers the world and the system panel alike.
+    // The probe is the shell's `dockFoot`, so the foot wears `has-foot` through `footClass`.
     const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      // Spliced before the LAST `</div></section>`, which closes the dock and the panel.
-      const dockClose = rendered.markup.lastIndexOf('</div></section>');
-      const probe =
-        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="fabricate-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
-      // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`).
-      const markupWithFoot = (
-        dockClose === -1
-          ? rendered.markup
-          : rendered.markup.slice(0, dockClose) + probe + rendered.markup.slice(dockClose)
-      ).replace('class="fab-bulk-edit-dock', 'class="fab-bulk-edit-dock has-foot');
-      assert.notEqual(markupWithFoot, rendered.markup, 'NON-VACUITY: the probe delete was placed in the dock');
-      await page.setContent(inspectorPage(markupWithFoot), { waitUntil: 'load' });
+      await page.setContent(inspectorPage(rendered.footed), { waitUntil: 'load' });
       const measured = await page.evaluate(() => {
         const dock = document.querySelector('.fab-bulk-edit-dock');
         const apply = document.querySelector('[data-component-bulk-apply]');
         const danger = document.querySelector('[data-danger-probe]');
+        if (!danger) return { rendered: false };
         const label = danger.querySelector('span');
         const style = (element) => getComputedStyle(element);
         return {
+          rendered: dock.contains(danger) && dock.classList.contains('has-foot'),
           dockPaddingTop: style(dock).paddingTop,
           applyMarginTop: style(apply).marginTop,
           applyTopFromDockTop: apply.getBoundingClientRect().top - dock.getBoundingClientRect().top,
@@ -335,16 +379,10 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
             wrapper: danger.parentElement.getBoundingClientRect().width,
             wrapperMinWidth: style(danger.parentElement).minWidth,
             dockClass: dock.className,
-            hasFootChildRule: [...document.styleSheets].some((sheet) => {
-              try {
-                return [...sheet.cssRules].some((rule) => /has-foot[^{]*>\s*\*/.test(rule.selectorText || ''));
-              } catch {
-                return false;
-              }
-            }),
           },
         };
       });
+      assert.ok(measured.rendered, 'NON-VACUITY: the probe delete renders in a has-foot dock');
       assert.equal(measured.dockPaddingTop, '12px', 'the dock pads --fab-space-3 above its first control (the reference`s 13)');
       assert.equal(measured.applyMarginTop, '0px', 'and Apply no longer carries the 4px it used to');
       assert.equal(Math.round(measured.applyTopFromDockTop), 13, 'so Apply sits 12px + the hairline under the dock`s top edge');
@@ -357,74 +395,131 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
         measured.labelClipped,
         `NON-VACUITY: this label is longer than the rail, so it is the clipped case (${JSON.stringify(measured.widths)})`
       );
+      assert.ok(
+        measured.widths.wrapper <= measured.widths.dock + EPSILON_PX,
+        `the long delete label widened the foot past the rail (${JSON.stringify(measured.widths)})`
+      );
     } finally {
       await browser.close();
     }
   });
 
-  it('holds the dock on the rail scrollport at the top, middle and bottom of the scroll range', () => {
-    // (a) and (b), plus the anti-vacuity preconditions that make them mean anything.
-    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
-    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
-    assert.ok(
-      measured.overflow >= MIN_OVERFLOW_PX,
-      `the rail must genuinely overflow for a sticky assertion to say anything (overflow ${measured.overflow}px, need at least ${MIN_OVERFLOW_PX}px) — either the panel shrank or .manager-inspector stopped being the scrollport`
-    );
-    const offsets = measured.samples.map((sample) => sample.scrollTop);
-    assert.ok(
-      offsets[0] < offsets[1] && offsets[1] < offsets[2],
-      `the three samples must be at DIFFERENT scroll offsets or they are one sample three times (measured ${offsets.join(', ')})`
-    );
-
-    for (const sample of measured.samples) {
+  for (const name of Object.keys(FRAMES)) {
+    it(`holds the dock on the rail scrollport at the top, middle and bottom of the scroll range (${name})`, () => {
+      // (a) and (b), plus the anti-vacuity preconditions that make them mean anything.
+      const face = measured[name];
+      assert.ok(face.dockRendered, 'the dock is absent from the rendered rail');
+      assert.ok(face.applyRendered, 'the Apply button is absent from the rendered dock');
       assert.ok(
-        Math.abs(sample.dockBottom - sample.padBottom) <= EPSILON_PX,
-        `at ${sample.label} (scrollTop ${sample.scrollTop}) the dock's bottom edge is ${sample.dockBottom}px but the inspector's padding-box bottom is ${sample.padBottom}px — the dock is not pinned to the scrollport (a deleted 'position: sticky', or a 'bottom' inset that no longer cancels the rail's padding)`
+        face.overflow >= MIN_OVERFLOW_PX,
+        `the rail must genuinely overflow for a sticky assertion to say anything (overflow ${face.overflow}px, need at least ${MIN_OVERFLOW_PX}px) — either the panel shrank or the scroller stopped being the scrollport`
       );
+      const offsets = face.samples.map((sample) => sample.scrollTop);
       assert.ok(
-        Math.abs(sample.dockLeft - sample.padLeft) <= EPSILON_PX,
-        `at ${sample.label} the dock's left edge is ${sample.dockLeft}px but the inspector's padding-box left is ${sample.padLeft}px — the dock has lost its inline bleed and reads as a floating slab rather than the rail's edge`
+        offsets[0] < offsets[1] && offsets[1] < offsets[2],
+        `the three samples must be at DIFFERENT scroll offsets or they are one sample three times (measured ${offsets.join(', ')})`
       );
-      assert.ok(
-        Math.abs(sample.dockRight - sample.padRight) <= EPSILON_PX,
-        `at ${sample.label} the dock's right edge is ${sample.dockRight}px but the inspector's padding-box right is ${sample.padRight}px — the dock has lost its inline bleed and reads as a floating slab rather than the rail's edge`
-      );
-    }
-  });
 
-  it('leaves the Apply button on the rail content box the dock bled out of', () => {
-    // (e). The dock's three bleeds are paid back by matching padding.
-    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
-    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
-
-    for (const sample of measured.samples) {
-      for (const [edge, actual, expected] of [
-        ['bottom', sample.applyBottom, sample.contentBottom],
-        ['left', sample.applyLeft, sample.contentLeft],
-        ['right', sample.applyRight, sample.contentRight],
-      ]) {
+      for (const sample of face.samples) {
         assert.ok(
-          Math.abs(actual - expected) <= EPSILON_PX,
-          `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's ${edge} edge is ${actual}px but the inspector's content-box ${edge} is ${expected}px — the dock's bleed is no longer paid back by its matching padding, so the primary action has moved out of the column every other panel row sits on`
+          Math.abs(sample.dockBottom - sample.padBottom) <= EPSILON_PX,
+          `at ${sample.label} (scrollTop ${sample.scrollTop}) the dock's bottom edge is ${sample.dockBottom}px but the inspector's padding-box bottom is ${sample.padBottom}px — the dock is not pinned to the scrollport (a deleted 'position: sticky', or a 'bottom' inset that no longer cancels the rail's padding)`
+        );
+        assert.ok(
+          Math.abs(sample.dockLeft - sample.padLeft) <= EPSILON_PX,
+          `at ${sample.label} the dock's left edge is ${sample.dockLeft}px but the inspector's padding-box left is ${sample.padLeft}px — the dock has lost its inline bleed and reads as a floating slab rather than the rail's edge`
+        );
+        assert.ok(
+          Math.abs(sample.dockRight - sample.padRight) <= EPSILON_PX,
+          `at ${sample.label} the dock's right edge is ${sample.dockRight}px but the inspector's padding-box right is ${sample.padRight}px — the dock has lost its inline bleed and reads as a floating slab rather than the rail's edge`
         );
       }
+    });
+
+    it(`leaves the Apply button on the rail content box the dock bled out of (${name})`, () => {
+      // (e). The dock's three bleeds are paid back by matching padding.
+      const face = measured[name];
+      assert.ok(face.dockRendered, 'the dock is absent from the rendered rail');
+      assert.ok(face.applyRendered, 'the Apply button is absent from the rendered dock');
+      assert.ok(face.padBottomInset >= 8, 'NON-VACUITY: the scroller pads its bottom edge');
+
+      for (const sample of face.samples) {
+        for (const [edge, actual, expected] of [
+          ['bottom', sample.applyBottom, sample.contentBottom],
+          ['left', sample.applyLeft, sample.contentLeft],
+          ['right', sample.applyRight, sample.contentRight],
+        ]) {
+          assert.ok(
+            Math.abs(actual - expected) <= EPSILON_PX,
+            `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's ${edge} edge is ${actual}px but it belongs at ${expected}px (the rail's content box) — the dock's bleed is no longer paid back by its matching padding, so the primary action has moved out of the column every other panel row sits on`
+          );
+        }
+      }
+    });
+
+    it(`fills the dock opaquely so staged rows cannot read through it (${name})`, () => {
+      // (c). The dock's only job while it covers the rail is to be a surface.
+      const face = measured[name];
+      assert.ok(face.dockRendered, 'the dock is absent from the rendered rail');
+      assert.equal(
+        alphaOf(face.backgroundColor),
+        1,
+        `the dock's background-color computed to ${face.backgroundColor} — a translucent or transparent dock lets the content it is pinned over read through it`
+      );
+      assert.equal(
+        face.opacity,
+        '1',
+        `the dock's opacity computed to ${face.opacity} — the fill is opaque but the element is not, so the staged rows still read straight through it`
+      );
+    });
+  }
+});
+
+/** Each rail's own fill, which its foot takes (issue 2500). */
+const FILLS = Object.freeze([
+  { frame: 'system', view: 'components', token: '--fab-bg-2' },
+  { frame: 'system', view: 'recipes', token: '--fab-bg-2' },
+  { frame: 'system', view: 'essences', token: '--fab-bg-0' },
+  { frame: 'world', view: 'world-components', token: '--fab-bg-1' },
+]);
+const FILL_TOKENS = ['--fab-bg-0', '--fab-bg-1', '--fab-bg-2'];
+
+describe("the bulk edit dock takes its rail's own fill on the 8px rhythm (issue 2500)", () => {
+  const read = {};
+
+  before(async () => {
+    await shell.setup();
+    let markup;
+    try {
+      markup = (await shell.mount({ heading: '3 selected', canApply: true, children: stagedAxes }))
+        .innerHTML;
+    } finally {
+      shell.teardown();
+    }
+    const browser = await borrowBrowser();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      for (const fill of FILLS) {
+        await page.setContent(inspectorPage(markup, fill), { waitUntil: 'load' });
+        read[fill.view] = await page.evaluate(readFill, FILL_TOKENS);
+      }
+    } finally {
+      await browser.close();
     }
   });
 
-  it('fills the dock opaquely so staged rows cannot read through it', () => {
-    // (c). The dock's only job while it covers the rail is to be a surface.
-    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
-    assert.equal(
-      alphaOf(measured.backgroundColor),
-      1,
-      `the dock's background-color computed to ${measured.backgroundColor} — a translucent or transparent dock lets the content it is pinned over read through it`
-    );
-    assert.equal(
-      measured.opacity,
-      '1',
-      `the dock's opacity computed to ${measured.opacity} — the fill is opaque but the element is not, so the staged rows still read straight through it`
-    );
-  });
+  for (const { frame, view, token } of FILLS) {
+    it(`paints the ${view} dock with ${token} (${frame})`, () => {
+      const { dock, probes, rowGap } = read[view];
+      const others = FILL_TOKENS.filter((other) => other !== token).map((other) => probes[other]);
+      assert.ok(
+        !others.includes(probes[token]),
+        `NON-VACUITY: ${token} must differ from the other fills (${JSON.stringify(probes)})`
+      );
+      assert.equal(dock, probes[token], `the ${view} dock is not on its rail's ${token}`);
+      assert.equal(rowGap, '8px', 'the panel keeps its 8px section rhythm over the scroller gap');
+    });
+  }
 });
 
 /** One staged axis: far shorter than the rail, so only the panel's own fill can seat the dock. */
@@ -434,7 +529,7 @@ const shortAxis = createRawSnippet(() => ({
 
 // The reported defect: a short panel drew its dock under the axes with the rail empty below it.
 describe("the bulk edit dock sits on the rail's foot when the panel is shorter than the rail", () => {
-  let measured = null;
+  const faces = {};
 
   before(async () => {
     await shell.setup();
@@ -448,17 +543,21 @@ describe("the bulk edit dock sits on the rail's foot when the panel is shorter t
     const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await page.setContent(inspectorPage(markup), { waitUntil: 'load' });
-      measured = await page.evaluate(measureDock);
-      measured.innerWidth = await page.evaluate(
-        () => document.querySelector('[data-probe-inspector]').clientWidth
-      );
+      for (const [name, frame] of Object.entries(FRAMES)) {
+        await page.setContent(inspectorPage(markup, frame), { waitUntil: 'load' });
+        faces[name] = await page.evaluate(measureDock);
+        faces[name].innerWidth = await page.evaluate(
+          () => document.querySelector('[data-probe-inspector]').clientWidth
+        );
+      }
     } finally {
       await browser.close();
     }
   });
 
-  it("seats the dock on the rail's padding-box bottom at the rail's full inner width", () => {
+  for (const name of Object.keys(FRAMES)) {
+    it(`seats the dock on the rail's padding-box bottom at the rail's full inner width (${name})`, () => {
+    const measured = faces[name];
     assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
     assert.equal(measured.overflow, 0, 'NON-VACUITY: the panel must be shorter than the rail');
     const [sample] = measured.samples;
@@ -471,7 +570,8 @@ describe("the bulk edit dock sits on the rail's foot when the panel is shorter t
         Math.abs(sample.dockLeft - sample.padLeft) <= EPSILON_PX,
       `the dock spans ${sample.dockLeft}–${sample.dockRight}px against the rail's ${measured.innerWidth}px inner width from ${sample.padLeft}px`
     );
-  });
+    });
+  }
 });
 
 /*
@@ -481,7 +581,7 @@ describe("the bulk edit dock sits on the rail's foot when the panel is shorter t
  * Apply and the delete sit in the dock at the foot, short panel or tall.
  */
 describe('the bulk edit dock carrying the set delete', () => {
-  const measured = { short: null, tall: null };
+  const measured = {};
 
   before(async () => {
     await card.setup();
@@ -523,19 +623,22 @@ describe('the bulk edit dock carrying the set delete', () => {
 
     const browser = await borrowBrowser();
     try {
-      for (const name of ['short', 'tall']) {
-        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-        await page.setContent(inspectorPage(markup[name]), { waitUntil: 'load' });
-        measured[name] = await page.evaluate(measureDockedDelete);
+      for (const [face, frame] of Object.entries(FRAMES)) {
+        for (const name of ['short', 'tall']) {
+          const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+          await page.setContent(inspectorPage(markup[name], frame), { waitUntil: 'load' });
+          measured[`${name} ${face}`] = await page.evaluate(measureDockedDelete);
+        }
       }
     } finally {
       await browser.close();
     }
   });
 
-  for (const name of ['short', 'tall']) {
-    it(`holds Apply and the delete in the dock on the rail's foot (${name} panel)`, () => {
-      const { rendered, overflow, samples } = measured[name];
+  for (const key of Object.keys(FRAMES).flatMap((face) => [`short ${face}`, `tall ${face}`])) {
+    const [name, face] = key.split(' ');
+    it(`holds Apply and the delete in the dock on the rail's foot (${name} panel, ${face})`, () => {
+      const { rendered, overflow, samples } = measured[key];
       assert.ok(rendered, 'the dock carries no Apply or no delete card');
       assert.ok(
         name === 'short' ? overflow === 0 : overflow >= MIN_OVERFLOW_PX,
@@ -572,10 +675,13 @@ const FLOOR_RAIL_PX = 454;
 // The control ladder's tallest rung, which Apply wears: the axes keep one control's room above the dock.
 const ONE_CONTROL_PX = 38;
 
-async function openDockFixture(query) {
+/** The live shell in one of its scrollers; the world face adds the frame's scoped CSS. */
+async function openDockFixture(query, { frame = 'system' } = {}) {
   const page = await dockFixture.newPage({ viewport: { width: 1280, height: 900 } });
-  await page.goto(dockFixture.url(`/tests/fixtures/bulk-edit-dock/index.html?${query}`));
+  const world = frame === 'world' ? `&frame=world&scope=${frameCss.hashClass}` : '';
+  await page.goto(dockFixture.url(`/tests/fixtures/bulk-edit-dock/index.html?${query}${world}`));
   await page.waitForSelector('html[data-bulk-dock-ready="true"] .fab-bulk-edit-dock');
+  if (world) await page.addStyleTag({ content: frameCss.css });
   await settleDock(page);
   return page;
 }
@@ -611,7 +717,10 @@ function focusWalk() {
   inspector.scrollTop = 0;
   const last = controls.at(-1);
   last.focus();
-  const published = dock.parentElement.style.getPropertyValue('--fab-bulk-edit-dock-block-size');
+  // `InspectorPanel` publishes the foot's height on its scroller, the panel's parent.
+  const published = dock.parentElement.parentElement.style.getPropertyValue(
+    '--fab-manager-inspector-scroll-pad'
+  );
   return { count: controls.length, scrolls, obscured, last: under(last), dockHeight: dock.offsetHeight, published };
 }
 
@@ -656,32 +765,121 @@ function assertNoneObscured(walk, face) {
   assert.equal(walk.published, `${walk.dockHeight}px`, `${face}: the panel publishes the dock's current height`);
 }
 
+/** The tab-order walk over every body control: idle, armed, and with the dock grown after mount. */
+async function assertFocusWalk(frame) {
+  const page = await openDockFixture('', frame);
+  try {
+    const idle = await page.evaluate(focusWalk);
+    assertNoneObscured(idle, 'idle');
+    await page.click('[data-arm-token]');
+    await page.waitForSelector('[data-arm-token][data-armed="true"]');
+    await settleDock(page);
+    assertNoneObscured(await page.evaluate(focusWalk), 'armed');
+    // The observer follows the dock after mount: a row the card did not have grows it by 60px.
+    await page.evaluate(() => {
+      const grown = Object.assign(document.createElement('div'), { style: 'height:60px' });
+      document.querySelector('.fab-bulk-edit-dock').append(grown);
+    });
+    await settleDock(page);
+    const grown = await page.evaluate(focusWalk);
+    assert.ok(grown.dockHeight >= idle.dockHeight + 60, `NON-VACUITY: the dock grew (${idle.dockHeight} → ${grown.dockHeight}px)`);
+    assertNoneObscured(grown, 'grown');
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * Park the rail at `offset` with focus on its last body control, unscrolled, and read the guards
+ * the foot-focus case needs before a foot control takes focus.
+ */
+function parkRail(offset) {
+  const rail = document.querySelector('[data-probe-inspector]');
+  const foot = rail.querySelector('.fab-inspector-panel-foot');
+  const body = [...rail.querySelectorAll('button')].filter((node) => !foot.contains(node));
+  document.activeElement?.blur();
+  const overflow = rail.scrollHeight - rail.clientHeight;
+  rail.scrollTop = offset === 'mid' ? Math.floor(overflow / 2) : 0;
+  body.at(-1).focus({ preventScroll: true });
+  return {
+    overflow,
+    scrollTop: rail.scrollTop,
+    applyEnabled: !foot.querySelector('[data-component-bulk-apply]').disabled,
+    armed: foot.querySelector('[data-arm-token]').dataset.armed,
+    pad: getComputedStyle(rail).scrollPaddingBlockEnd,
+    footHeight: `${foot.offsetHeight}px`,
+  };
+}
+
+/** The rail's offset and reserve, and whether `selector` holds focus; `blur` drops it after. */
+function readRail({ selector, blur = false }) {
+  const rail = document.querySelector('[data-probe-inspector]');
+  const focused = document.activeElement?.matches(selector) ?? false;
+  const reading = { scrollTop: rail.scrollTop, focused, pad: getComputedStyle(rail).scrollPaddingBlockEnd };
+  if (blur) document.activeElement?.blur();
+  return reading;
+}
+
+/** Focus `selector` by `.focus()`, or by Tab from the parked body control. */
+async function focusFootControl(page, selector, method) {
+  if (method === 'focus()') {
+    await page.evaluate((target) => document.querySelector(target).focus(), selector);
+    return;
+  }
+  for (let presses = 0; presses < 3; presses += 1) {
+    if ((await page.evaluate(readRail, { selector })).focused) return;
+    await page.keyboard.press('Tab');
+  }
+}
+
+/** The two foot controls the rail must not scroll for: Apply idle, and the delete once armed. */
+const FOOT_TARGETS = Object.freeze([
+  { name: 'Apply', selector: '[data-probe-inspector] [data-component-bulk-apply]', query: '' },
+  { name: 'the armed delete', selector: '[data-probe-inspector] [data-arm-token]', query: 'armed' },
+]);
+
+async function assertFootFocusHoldsRail(frame, { name, selector, query }) {
+  const page = await openDockFixture(query, frame);
+  try {
+    for (const offset of [0, 'mid']) {
+      for (const method of ['focus()', 'Tab']) {
+        const at = `${method} at scrollTop ${offset}`;
+        const parked = await page.evaluate(parkRail, offset);
+        assert.ok(
+          parked.applyEnabled &&
+            parked.overflow >= MIN_OVERFLOW_PX &&
+            (query !== 'armed' || parked.armed === 'true') &&
+            (offset === 0 ? parked.scrollTop === 0 : parked.scrollTop > 0),
+          `NON-VACUITY (${at}): ${JSON.stringify(parked)}`
+        );
+        assert.equal(parked.pad, parked.footHeight, `NON-VACUITY (${at}): the rail reserves the foot's height`);
+        await focusFootControl(page, selector, method);
+        const held = await page.evaluate(readRail, { selector, blur: true });
+        assert.ok(held.focused, `${at}: ${name} did not take focus`);
+        assert.equal(held.scrollTop, parked.scrollTop, `${at}: focusing ${name} scrolled the rail`);
+        assert.equal(held.pad, '0px', `${at}: the rail kept its reserve while the foot held focus`);
+        const blurred = await page.evaluate(readRail, { selector });
+        assert.equal(blurred.pad, parked.footHeight, `${at}: the reserve did not return on blur`);
+      }
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 describe('the live bulk edit dock', () => {
   before(() => dockFixture.start());
   after(() => dockFixture.stop());
 
-  it('stops a focus scroll above the dock, idle and after the delete arms (WCAG 2.4.11)', async () => {
-    const page = await openDockFixture('');
-    try {
-      const idle = await page.evaluate(focusWalk);
-      assertNoneObscured(idle, 'idle');
-      await page.click('[data-arm-token]');
-      await page.waitForSelector('[data-arm-token][data-armed="true"]');
-      await settleDock(page);
-      assertNoneObscured(await page.evaluate(focusWalk), 'armed');
-      // The observer follows the dock after mount: a row the card did not have grows it by 60px.
-      await page.evaluate(() => {
-        const grown = Object.assign(document.createElement('div'), { style: 'height:60px' });
-        document.querySelector('.fab-bulk-edit-dock').append(grown);
-      });
-      await settleDock(page);
-      const grown = await page.evaluate(focusWalk);
-      assert.ok(grown.dockHeight >= idle.dockHeight + 60, `NON-VACUITY: the dock grew (${idle.dockHeight} → ${grown.dockHeight}px)`);
-      assertNoneObscured(grown, 'grown');
-    } finally {
-      await page.close();
+  for (const [face, frame] of Object.entries(FRAMES)) {
+    it(`stops a focus scroll above the dock, idle and after the delete arms (${face}, WCAG 2.4.11)`, () =>
+      assertFocusWalk(frame));
+
+    for (const target of FOOT_TARGETS) {
+      it(`leaves the rail where it was when ${target.name} takes focus (${face}, WCAG 2.4.11)`, () =>
+        assertFootFocusHoldsRail(frame, target));
     }
-  });
+  }
 
   it('keeps Apply, Confirm and a control of room in view on the smallest supported rail', async () => {
     const page = await openDockFixture(`h=${FLOOR_RAIL_PX}&armed&card=recipe`);

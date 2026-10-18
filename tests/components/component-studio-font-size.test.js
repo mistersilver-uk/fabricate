@@ -334,6 +334,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   // `BulkEditSelect.svelte` is NOT here any more (issue 1504).
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
