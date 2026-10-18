@@ -574,7 +574,6 @@
   clearAttr="data-world-component-bulk-clear"
   countAttr="data-world-component-bulk-count"
   applyAttr="data-world-component-bulk-apply"
-  dockBleed="space-4"
   {onClearSelection}
   onApply={applyStaged}
   dockFoot={onDelete ? componentBulkDanger : undefined}

@@ -87,8 +87,8 @@ function cataloguePage(productMarkup, scopedCss, control) {
 const OVERLAY_CONTROL = `
   .manager-scoped-list-row { position: relative; }
   .manager-scoped-list-row::after { content: ''; position: absolute; inset: 0; }
-  .fab-bulk-edit-dock { position: relative; }
-  .fab-bulk-edit-dock::after { content: ''; position: absolute; inset: 0; }
+  .fab-inspector-panel-foot { position: relative; }
+  .fab-inspector-panel-foot::after { content: ''; position: absolute; inset: 0; }
   .fab-bulk-inset { position: relative; }
   .fab-bulk-inset::after { content: ''; position: absolute; inset: 0; }
   .fab-bulk-component-chips { position: relative; }

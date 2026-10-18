@@ -1229,13 +1229,11 @@
     background: var(--fab-bg-1);
   }
 
-  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`). */
+  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`): the manager
+     sheet pads it by its own `--fab-manager-inspector-pad`, the token `InspectorPanel`'s foot
+     bleeds by (issue 2500). */
   .manager-scoped-list-inspector:has(> .manager-scoped-list-inspector-scroll.is-flush-bulk) {
     padding: 0;
-  }
-
-  .manager-scoped-list-inspector-scroll.is-flush-bulk {
-    padding: var(--fab-space-4);
   }
 
   .manager-scoped-list-inspector-scroll {

@@ -1,10 +1,10 @@
 /** The manager's ONE bulk edit panel chrome. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -17,6 +17,7 @@ const shell = createMountedComponentHarness({
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     SHELL_PATH,
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/Notice.svelte',
   ],
@@ -247,37 +248,35 @@ describe('BulkEditPanelShell lists blocked rows and reports the write (issue 178
 });
 
 describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => {
-  it('bleeds the dock to a --fab-space-4 container only when asked (dockBleed, M24)', async () => {
-    // The dock's three negative bleeds are written as the SAME token as the container's padding
-    // so the two cannot drift — and that token is `--fab-space-3`, the shared `.manager-inspector`
-    // rail's. `EntityListInspectorFrame`'s inspector column pads `--fab-space-4`, so inside it the
-    // dock stopped 4px short of each edge and its bottom (issue 1371 r16-cat, maintainer ruling
-    // M24: "a padding/whitespace around the bulk edit panel that prevents the button panel from
-    // being full-width"). `dockBleed="space-4"` restates all five declarations at that token.
+  it('renders the dock as the InspectorPanel foot, Apply first (issue 2500)', async () => {
+    // The sheet's danger rules, the published-component manifest and the pinning probe all key on
+    // `.fab-bulk-edit-dock`, so the primitive's foot has to keep wearing it.
     const plain = await shell.mount({ ...BASE });
+    const root = plain.querySelector('[data-component-bulk-panel]');
     assert.ok(
-      !plain.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
-      'unset, the dock is the shipped one — the three studios in the shared rail do not move'
+      root.classList.contains('fab-inspector-panel') && root.classList.contains('fab-bulk-edit-panel'),
+      'the panel root is the primitive`s root wearing the shell`s own class'
+    );
+    const foot = root.lastElementChild;
+    for (const name of ['fab-inspector-panel-foot', 'fab-bulk-edit-dock']) {
+      assert.ok(foot.classList.contains(name), `the root's last child is not a ${name}`);
+    }
+    assert.ok(!foot.classList.contains('has-foot'), 'unasked, the foot claims no dockFoot');
+    assert.ok(
+      foot.firstElementChild === plain.querySelector('[data-component-bulk-apply]'),
+      'Apply is the foot`s first control'
     );
     shell.remount();
-    const wide = await shell.mount({ ...BASE, dockBleed: 'space-4' });
+    const footed = await shell.mount({ ...BASE, dockFoot: dockFootSnippet });
+    const dock = footed.querySelector('.fab-inspector-panel-foot');
     assert.ok(
-      wide.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
-      'asked for, the dock wears the class its wider bleed is painted from'
+      dock.classList.contains('fab-bulk-edit-dock') && dock.classList.contains('has-foot'),
+      'given a dockFoot, the primitive`s foot wears the dock and has-foot classes'
     );
-    // AND THE CLASS HAS A RULE BEHIND IT.
-    const source = readFileSync(resolve(repoRoot, SHELL_PATH), 'utf8');
-    const rule = /\.fab-bulk-edit-dock\.is-bleed-space-4\s*\{([^}]*)\}/.exec(source);
-    assert.ok(rule, 'nothing paints the class the dock emits for the wider bleed');
-    for (const declaration of [
-      /bottom:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
-      /margin-inline:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
-      /margin-bottom:\s*calc\(-1 \* var\(--fab-space-4\)\)/,
-      /padding-inline:\s*var\(--fab-space-4\)/,
-      /padding-bottom:\s*var\(--fab-space-4\)/,
-    ]) {
-      assert.match(rule[1], declaration, 'all five of the dock`s container-bound declarations move together');
-    }
+    assert.ok(
+      dock.firstElementChild === footed.querySelector('[data-component-bulk-apply]'),
+      'Apply stays the foot`s first control'
+    );
   });
 
   it('renders the caller Clear label over the shipped phrase', async () => {
@@ -332,28 +331,17 @@ describe('BulkEditPanelShell takes its per-site parameters (issue 1371)', () => 
     );
   });
 
-  it('states the dock’s gated column rhythm as a real rule in its own scoped block', () => {
-    // A `class:` directive with no selector behind it renders identically to one with a broken
-    // selector, and this rule cannot be written anywhere else: `styles/fabricate.css` ships at
-    // `layer(modules)` and this component's block is injected unlayered, so a rule there is
-    // emitted, matches, and has its declarations silently discarded.
-    const source = readFileSync(resolve(repoRoot, SHELL_PATH), 'utf8');
-    const rule = /\.fab-bulk-edit-dock\.has-foot\s*\{([^}]*)\}/.exec(source);
-    assert.ok(rule, 'nothing paints the class the dock emits when it is given a foot');
-    assert.match(rule[1], /display:\s*flex/);
-    assert.match(rule[1], /flex-direction:\s*column/);
-    assert.match(
-      rule[1],
-      /gap:\s*var\(--fab-space-2\)/,
-      '`proto:791` draws the foot on an 8px column rhythm, and --fab-space-2 IS 8px'
-    );
-
-    // AND THE BASE DOCK RULE DOES NOT STATE IT.
-    const base = /\.fab-bulk-edit-dock\s*\{([^}]*)\}/.exec(source);
-    assert.ok(base, 'the dock still declares its own rule');
-    assert.ok(
-      !/display:\s*flex/.test(base[1]),
-      'the unconditional dock rule took the column rhythm, so every shipped panel changed layout mode'
-    );
+  it('stacks the foot`s two children on the 8px column rhythm (proto:791)', async () => {
+    const root = await shell.mount({ ...BASE, dockFoot: dockFootSnippet });
+    const sheet = Object.assign(document.createElement('style'), { textContent: readStylesheet() });
+    document.head.append(sheet);
+    try {
+      const style = getComputedStyle(root.querySelector('.fab-bulk-edit-dock'));
+      assert.equal(style.display, 'flex', 'the foot is a flex container');
+      assert.equal(style.flexDirection, 'column', 'Apply and the delete stack');
+      assert.equal(style.gap, '8px', '`proto:791` draws the foot on an 8px column rhythm');
+    } finally {
+      sheet.remove();
+    }
   });
 });

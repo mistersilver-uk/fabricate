@@ -29,6 +29,9 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // The inspector's filling root and pinned foot (issues 2498, 2500): four system inspectors and,
+  // through `BulkEditPanelShell`, every bulk panel render it.
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   // The app's one select (issue 1504), which pulls `SearchablePopover` in behind it. The guard
   // names it for a suite whose roster it reads: inline, by name or shorthand, and one spread deep.
   'src/ui/svelte/components/Select.svelte',

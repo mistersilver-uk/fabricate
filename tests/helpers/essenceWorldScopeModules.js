@@ -84,6 +84,7 @@ export const ESSENCE_CATALOGUE_BULK_RAW_MODULES = Object.freeze([
 
 export const ESSENCE_CATALOGUE_BULK_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/components/IconPicker.svelte',

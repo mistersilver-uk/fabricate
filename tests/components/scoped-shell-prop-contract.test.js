@@ -864,9 +864,11 @@ describe('the catalogue shell FORWARDS what it declares', () => {
       /\.manager-scoped-list-inspector:has\(> \.manager-scoped-list-inspector-scroll\.is-flush-bulk\) \{\s*padding: 0;\s*\}/,
       'the column hands its inset away while that scroller is its child…'
     );
+    // The scroller's inset is the token `InspectorPanel`'s foot bleeds by, declared in the manager
+    // sheet because a scoped style may not read an area token (issue 2500).
     assert.match(
-      frame,
-      /\.manager-scoped-list-inspector-scroll\.is-flush-bulk \{\s*padding: var\(--fab-space-4\);\s*\}/,
+      readStylesheet(),
+      /\.fabricate-manager \.manager-scoped-list-inspector-scroll\.is-flush-bulk \{[^}]*--fab-manager-inspector-pad: var\(--fab-space-4\);[^}]*\bpadding: var\(--fab-manager-inspector-pad\);[^}]*\}/,
       '…to the bulk scroller, so the panel content stays where it was and the dock can bleed past it'
     );
   });

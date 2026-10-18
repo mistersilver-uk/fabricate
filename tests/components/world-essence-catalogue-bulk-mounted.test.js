@@ -420,6 +420,7 @@ describe('the world Essence Catalogue bulk face (issue 2485)', () => {
         componentPaths: [
           'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
           'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+          'src/ui/svelte/apps/manager/InspectorPanel.svelte',
           'src/ui/svelte/apps/manager/BulkEditSection.svelte',
           'src/ui/svelte/apps/manager/scoped/EssenceCatalogueBulkPanel.svelte',
           'src/ui/svelte/components/TintPicker.svelte',
