@@ -40,7 +40,7 @@
     never widens an `is-` class through a positional wildcard, so a class only ever BUILT here would
     read as a rule with no customer.
   - `size` IS A STRING NAMING A RUNG, not a boolean and not a number: a boolean could express only
-    the second of the six published rungs, and a number invites `size={37}`.
+    one of the two non-default rungs (`'28'` and `'38'`), and a number invites `size={37}`.
   - `tag="a"` WITH AN EMPTY `href` RENDERS A `<button>`, because an anchor with no `href` is not
     focusable, has no implicit link role and does not activate on Enter; several anchor call sites
     take their `href` from caller data, so the empty case is reachable.
