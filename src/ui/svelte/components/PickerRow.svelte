@@ -1,24 +1,24 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The one requirement row: a kind plate, a kind select, a name field that is a search until it is
-  named and a pill after, an amount, and the caller's trailing controls. Its anatomy is specified in
-  `openspec/specs/ui-entity-editors/spec.md` under "The requirement row".
+  The one requirement row: a lead plate, a kind select, a name field that is a search until it is
+  named and a subject cell after, an amount, and the caller's trailing controls. Its anatomy is
+  specified in `openspec/specs/ui-entity-editors/spec.md` under "The requirement row".
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula, label, reason }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
   | `kinds` | kinds | the four match types | What the kind select offers; the row's own kind is always listed too. |
-  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. |
+  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the subject cell resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. |
   | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face, `READONLY_FACES` in `pickerRowKinds.js`: a `currency` row while currency is off, and a `knowledge` row while learning is not observable. |
   | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount, and a `knowledge` row never draws one; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` or `currency` row; and the remove button. |
   | `reward` | boolean | `false` | A result surface's row: a named currency row opens its naming body and a knowledge row its help line, `PickerRowRewardBody.svelte`, beneath it. A knowledge row naming a recipe absent from `catalogue` draws the missing face. |
-  | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount and a divider, offering `kinds`. |
+  | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount, offering `kinds`. |
   | `menuHeading` / `menuHint` | localized strings | `''` | That menu's eyebrow and its trigger's tooltip; empty reads the ingredient side's. |
-  | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
+  | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The subject cell's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
   | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
 
   Snippets:
@@ -166,8 +166,8 @@
     '.manager-recipe-option-controls :is(input, button):not([disabled])',
   ];
 
-  // Naming a row with no clear swaps its search for a pill holding nothing focusable, so focus moves
-  // on to the toggle, else the naming body, else the row's next control, once the pill renders.
+  // Naming a row with no clear swaps its search for a cell holding nothing focusable, so focus moves
+  // on to the toggle, else the naming body, else the row's next control, once the cell renders.
   function choose(id) {
     emit({ id });
     if (clearable || !id) return;
@@ -192,9 +192,13 @@
     else addTag(tag);
   }
 
-  // The kind's own tint, on the glyph and never the tile; a misconfigured row draws a warning
-  // in no kind's tint.
+  // The kind's own tint, on the glyph and never the tile, once a value resolves; a misconfigured row
+  // draws a warning in no kind's tint. A missing face holds a value, so it resolves.
   const leadTone = $derived(misconfigured ? 'unknown' : kindMeta(matchType).tone);
+  const resolved = $derived(
+    matchType === 'tags' ? tags.length > 0 : Boolean(chosen || face || missing)
+  );
+  const leadFace = $derived(misconfigured || resolved ? leadTone : 'empty');
   const leadIcon = $derived(
     misconfigured ? 'fa-solid fa-triangle-exclamation' : kindMeta(matchType).icon
   );
@@ -267,7 +271,7 @@
   {...rest}
   bind:this={rowRoot}
 >
-  <span class={`manager-recipe-option-lead is-${leadTone}`} aria-hidden="true">
+  <span class={`manager-recipe-option-lead is-${leadFace}`} aria-hidden="true">
     <i class={leadIcon}></i>
   </span>
 
@@ -409,7 +413,6 @@
     {/if}
 
     {#if allowAny}
-      <span class="manager-recipe-option-divider" aria-hidden="true"></span>
       <PickerRowKindMenu {kinds} {disabled} heading={menuHeading} hint={menuHint} {onSelect} />
     {/if}
 

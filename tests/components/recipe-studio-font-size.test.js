@@ -54,13 +54,13 @@ const FIXTURE = `
           <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Ingredient</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
-        <!-- A flat result row names its component in the requirement row's pill (issue 1516),
-             as an ingredient row does, so its name reads at the pill's own size. -->
+        <!-- A flat result row names its component in the requirement row's subject cell (issue 1516),
+             as an ingredient row does, so its name reads at the cell's own size. -->
         <div class="manager-recipe-ingredient-option-row is-component is-result">
           <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
           <span class="manager-recipe-option-name-field">
             <span class="manager-recipe-option-chosen">
-              <img class="manager-recipe-option-chosen-img" alt="">
+              <span class="manager-recipe-option-plate"><img alt=""></span>
               <span class="manager-recipe-option-chosen-name" data-m="flat-picker-name">Venom Gland</span>
             </span>
           </span>
@@ -78,7 +78,7 @@ const FIXTURE = `
           <div class="manager-recipe-ingredient-option-row is-component is-result">
             <span class="manager-recipe-option-name-field">
               <span class="manager-recipe-option-chosen">
-                <img class="manager-recipe-option-chosen-img" alt="">
+                <span class="manager-recipe-option-plate"><img alt=""></span>
                 <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Mountain Herb</span>
               </span>
             </span>

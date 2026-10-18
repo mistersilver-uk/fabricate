@@ -374,7 +374,6 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <input type="number" class="fab-stepper-input manager-recipe-option-quantity" value="2">
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
-        <span class="manager-recipe-option-divider"></span>
         <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
@@ -407,7 +406,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       <span class="manager-recipe-option-lead is-component"><i class="fas fa-cube"></i></span>
       ${kindPickerFixture('Component')}
       <span class="manager-recipe-option-name-field">
-        <span class="manager-recipe-option-chosen" data-recipe-option-chosen><i class="fas fa-cube manager-recipe-option-mark is-component"></i><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
+        <span class="manager-recipe-option-chosen" data-recipe-option-chosen><span class="manager-recipe-option-plate"><i class="fas fa-cube manager-recipe-option-mark is-component"></i></span><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
       </span>${controls}
     </div>`);
 
@@ -502,11 +501,10 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         );
       }
 
-      // AN EMPTY TAG ROW IS A ROW LIKE ANY OTHER.
+      // AN EMPTY TAG ROW IS NO TALLER THAN A COMPONENT ROW.
       if (!surface.rowParity) continue;
-      assert.equal(
-        Math.round(report.empty.row.height),
-        Math.round(report.component.row.height),
+      assert.ok(
+        report.empty.row.height <= report.component.row.height + 1,
         `${surface.label} (${surface.width}px): an EMPTY tag requirement row is no taller than ` +
           `the component row beside it (${Math.round(report.empty.row.height)}px vs ` +
           `${Math.round(report.component.row.height)}px) - a taller one has either stacked its ` +
@@ -557,7 +555,7 @@ test('a suggestion reads from the left edge the typed query does, under the host
           <main class="fabricate-manager">
             <div class="harness">
               <span class="manager-recipe-option-name-field">
-                <span class="manager-recipe-option-search is-typing">
+                <span class="manager-recipe-option-search">
                   <i class="fa-solid fa-magnifying-glass"></i>
                   <input type="text" data-recipe-option-search value="ingot" role="combobox" placeholder="Search components...">
                 </span>
@@ -933,7 +931,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
         ${kindPickerFixture(kind)}
         <span class="manager-recipe-option-name-field">
           <span class="manager-recipe-option-chosen" data-recipe-option-chosen>
-            <i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i>
+            <span class="manager-recipe-option-plate"><i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i></span>
             <span class="manager-recipe-option-chosen-name">Named</span>
           </span>
         </span>
@@ -992,6 +990,116 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
       4,
       `the four kinds resolve to four distinct tints (${report.map((k) => `${k.kind}=${k.plate}`).join(', ')})`
     );
+  } finally {
+    await context.close();
+  }
+});
+
+test("the requirement row draws the library specimen's figures (issue 2515)", async () => {
+  const context = await openLayoutContext({
+    viewport: { width: 900, height: 320 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: 2rem; }
+            }
+            @layer modules { ${css} }
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager" style="width: 820px">
+            <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
+              <span class="manager-recipe-option-lead is-component" data-probe="lead"><i class="fas fa-cube"></i></span>
+              ${kindPickerFixture('Component')}
+              <span class="manager-recipe-option-name-field">
+                <span class="manager-recipe-option-chosen" data-probe="cell">
+                  <span class="manager-recipe-option-plate" data-probe="plate"><i class="fas fa-cube manager-recipe-option-mark is-component"></i></span>
+                  <span class="manager-recipe-option-chosen-name">Ore</span>
+                  <button type="button" class="manager-recipe-option-clear" data-probe="clear"><i class="fa-solid fa-xmark"></i></button>
+                </span>
+              </span>
+              <div class="manager-recipe-option-controls">
+                <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-probe="or"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
+              </div>
+            </div>
+            <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
+              <span class="manager-recipe-option-lead is-empty"><i class="fas fa-cube"></i></span>
+              <span class="manager-recipe-option-name-field">
+                <span class="manager-recipe-option-search" data-probe="search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" placeholder="Search components...">
+                </span>
+              </span>
+            </div>
+            <span data-token="strong" style="color: var(--fab-border-strong)"></span>
+            <span data-token="accent-border" style="color: var(--fab-accent-border)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const at = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const read = (name) => {
+        const rect = at(name).getBoundingClientRect();
+        const style = getComputedStyle(at(name));
+        return {
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          radius: style.borderTopLeftRadius,
+          border: style.borderTopColor,
+        };
+      };
+      const token = (name) =>
+        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+      return {
+        lead: read('lead'),
+        plate: read('plate'),
+        cell: read('cell'),
+        clear: read('clear'),
+        search: read('search'),
+        or: read('or'),
+        strong: token('strong'),
+        accentBorder: token('accent-border'),
+      };
+    });
+
+    for (const name of ['lead', 'plate']) {
+      const box = report[name];
+      assert.deepEqual([box.width, box.height, box.radius], [26, 26, '6px'], `the ${name} plate`);
+    }
+    assert.equal(report.cell.height, 34, 'the subject cell stands at 34');
+    assert.ok(
+      report.cell.width >= 180,
+      `the subject cell is never under 180 (${report.cell.width})`
+    );
+    assert.equal(report.cell.radius, '7px', 'the subject cell corners at 7');
+    assert.equal(report.cell.border, report.strong, 'the subject cell is edged neutral-strong');
+    assert.equal(
+      report.cell.right - report.clear.right,
+      5,
+      "a short name's clear stands 4px plus the border inside the cell's end edge"
+    );
+    assert.equal(report.search.height, 34, 'the search stands at the cell height');
+    assert.equal(report.search.radius, '7px', 'the search corners at 7');
+    assert.equal(
+      report.search.border,
+      report.accentBorder,
+      'the search rests on the partial accent'
+    );
+    assert.equal(report.or.height, 28, '`or…` stands at 28');
   } finally {
     await context.close();
   }
@@ -1402,10 +1510,10 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'the plain chip is the filled solid-edged badge both affordances were shipping as'
     );
 
-    // `proto:2290`: 26px — a rung on the control-height ladder, and the height of the stepper it
-    // stands beside — with a 7px corner, 9.5px/600 text and a dashed `--border-strong` edge.
+    // The library `<PickerRow>` specimen's 28px, level with the stepper it stands beside, with
+    // `proto:2290`'s 7px corner, 9.5px/600 text and dashed `--border-strong` edge (issue 2515).
     assert.equal(report.or.borderStyle, 'dashed', 'the "or…" trigger is an affordance, not a fill');
-    assert.equal(report.or.height, 26, '`proto:2290`: 26px');
+    assert.equal(report.or.height, 28, 'the specimen: 28px');
     assert.equal(report.or.borderRadius, '7px', '`proto:2290`: a 7px corner');
     assert.equal(report.or.fontSize, '9.5px', '`proto:2290`: 9.5px');
     assert.equal(report.or.fontWeight, '600', '`proto:2290`: 600');

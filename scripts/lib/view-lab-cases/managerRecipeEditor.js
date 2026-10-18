@@ -136,7 +136,7 @@ const STAGE_RESULT_GEOMETRY = Object.freeze({
   containerSelector: '[data-recipe-set]:has([data-recipe-result-row])',
   oneLineRows: STAGE_ROWS,
   alignedRight: '[data-recipe-result-row] [data-recipe-remove="result-item"]',
-  minInlineSize: { selector: `${STAGE_ROWS} .manager-recipe-option-name-field`, pixels: 140 },
+  minInlineSize: { selector: `${STAGE_ROWS} .manager-recipe-option-name-field`, pixels: 180 },
 });
 
 export const CASES = Object.freeze([

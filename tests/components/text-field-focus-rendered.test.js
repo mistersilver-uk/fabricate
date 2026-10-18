@@ -35,7 +35,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
       <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
       <input type="text" placeholder="Search components" />
     </span>
-    <span class="manager-recipe-option-search is-typing" data-case="typing">
+    <span class="manager-recipe-option-search" data-case="typing">
       <input type="text" value="iron" />
     </span>
     <label class="fabricate-field manager-prerequisite-path" data-case="path">
@@ -140,7 +140,7 @@ for (const wrapper of ['option', 'path']) {
     );
 
     assert.equal(focused.wrapperBorder, accent, 'the wrapper takes the accent on focus-within');
-    assert.notEqual(rested.wrapperBorder, accent, 'the wrapper rests on the accent already');
+    assert.notEqual(rested.wrapperBorder, accent, 'the wrapper does not rest on the full accent');
     assert.equal(focused.outlineStyle, 'none', 'the input draws a second ring inside the wrapper');
 
     assert.equal(focused.placeholderAlpha, 0, 'the placeholder stays under the caret');
@@ -148,12 +148,19 @@ for (const wrapper of ['option', 'path']) {
   });
 }
 
-test('a typed-in option field rests on the partial accent, not the focus colour', async () => {
-  const border = await page.evaluate(
-    () => getComputedStyle(document.querySelector('[data-case="typing"]')).borderTopColor
-  );
-  assert.equal(border, await token('accent-border'));
-  assert.notEqual(border, await token('accent'));
+test('an option field rests on the partial accent, typed or not, and takes the full accent on focus', async () => {
+  const resting = (name) =>
+    page.evaluate(
+      (id) => getComputedStyle(document.querySelector(`[data-case="${id}"]`)).borderTopColor,
+      name
+    );
+  for (const name of ['typing', 'option']) {
+    const border = await resting(name);
+    assert.equal(border, await token('accent-border'), `${name}: the partial accent at rest`);
+    assert.notEqual(border, await token('accent'), `${name}: not the focus colour`);
+  }
+  const { focused } = await measureFocused('[data-case="option"] input');
+  assert.equal(focused.wrapperBorder, await token('accent'), 'the full accent on focus');
 });
 
 test('a text field rings inside its own box, and a checkbox keeps the outset ring', async () => {

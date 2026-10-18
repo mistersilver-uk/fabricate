@@ -23,8 +23,8 @@ const SALVAGE_ROW = (n) => `${SALVAGE_ROWS}:nth-child(${n})`;
 
 /**
  * A flat salvage list's row geometry at 1024, where the list is too narrow for one line: the plate,
- * kind, name and remove on the first, the toggle and amount on the second, every remove and toggle
- * in a column.
+ * kind and name on the first line, the toggle, amount and remove on the second, every remove and
+ * toggle in a column.
  */
 const SALVAGE_GEOMETRY = Object.freeze({
   containerSelector: SALVAGE_LIST,
@@ -35,9 +35,12 @@ const SALVAGE_GEOMETRY = Object.freeze({
         '.manager-recipe-option-lead',
         '.manager-recipe-option-kind',
         '[data-salvage-result-component]',
+      ],
+      [
+        '[role="radiogroup"]',
+        '[data-salvage-result-quantity], [data-recipe-option-formula]',
         '[data-remove-salvage-result]',
       ],
-      ['[role="radiogroup"]', '[data-salvage-result-quantity], [data-recipe-option-formula]'],
     ],
   },
   alignedRight: `${SALVAGE_ROWS} .manager-recipe-option-remove`,
@@ -46,7 +49,7 @@ const SALVAGE_GEOMETRY = Object.freeze({
 
 /**
  * A progressive salvage's stage rows at 1024: the plate and kind, the name below them at its stated
- * minimum, then the DC and Edit.
+ * minimum of 180, then the DC and Edit.
  */
 const SALVAGE_STAGES = '.fabricate-sortable-list-row[data-salvage-result]';
 const SALVAGE_STAGE_GEOMETRY = Object.freeze({
@@ -62,7 +65,7 @@ const SALVAGE_STAGE_GEOMETRY = Object.freeze({
   alignedRight: `${SALVAGE_STAGES} [data-remove-salvage-result]`,
   minInlineSize: {
     selector: `${SALVAGE_STAGES} [data-salvage-result-component]`,
-    pixels: 140,
+    pixels: 180,
   },
 });
 

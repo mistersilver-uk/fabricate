@@ -13,6 +13,7 @@ import {
   INGREDIENT_KINDS,
   KIND_ORDER,
   fromValue,
+  kindMeta,
   toValue,
 } from '../../src/ui/svelte/components/pickerRowKinds.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -247,10 +248,9 @@ describe('PickerRow: unreachable cells are absent', () => {
           config.allowAny === true,
           `${kind}: convert`
         );
-        assert.equal(
-          Boolean(target.querySelector('.manager-recipe-option-divider')),
-          config.allowAny === true,
-          `${kind}: the divider belongs to the convert control`
+        assert.ok(
+          !target.querySelector('.manager-recipe-option-divider'),
+          `${kind}: no divider stands before the convert control`
         );
         assert.equal(
           Boolean(target.querySelector('[data-stepper-input]')),
@@ -887,13 +887,70 @@ describe('PickerRow: the remaining branches', () => {
         return node.classList[0];
       }
     );
-    assert.deepEqual(order, [
-      'fab-stepper',
-      'manager-recipe-option-divider',
-      'convert',
-      'trailing',
-      'remove',
-    ]);
+    assert.deepEqual(order, ['fab-stepper', 'convert', 'trailing', 'remove']);
+  });
+});
+
+describe('PickerRow: the lead plate is untinted until a value resolves (issue 2515)', () => {
+  const lead = (target) => target.querySelector('.manager-recipe-option-lead').className;
+  const LEAD_CELLS = [
+    ...INGREDIENT_KINDS.map((kind) => [SURFACES['recipe ingredient'], kind]),
+    [SURFACES['recipe result'], 'knowledge'],
+  ];
+
+  for (const [config, kind] of LEAD_CELLS) {
+    it(`${kind}: an empty row's lead plate is is-empty, and takes the kind tone once named`, async () => {
+      const { target, applied } = await mountRow(config, unnamed(kind));
+      assert.equal(lead(target), 'manager-recipe-option-lead is-empty', 'no kind tint');
+      if (kind === 'tags') {
+        await click(tagOption(await openTagAdder(target), 'herb'));
+        await applied('first tag');
+      } else {
+        const { id, query } = PICK[kind];
+        await type(target.querySelector('[data-recipe-option-search]'), query);
+        await click(target.ownerDocument.querySelector(`[data-recipe-option-suggestion="${id}"]`));
+        await applied('name');
+      }
+      assert.equal(lead(target), `manager-recipe-option-lead is-${kindMeta(kind).tone}`);
+      assert.ok(
+        target
+          .querySelector('[data-recipe-option]')
+          .classList.contains(`is-${kindMeta(kind).tone}`),
+        'the row keeps its own tone throughout'
+      );
+    });
+  }
+
+  it('a missing recipe, a read-only face and a misconfigured row are not is-empty', async () => {
+    const result = SURFACES['recipe result'];
+    const missing = await mountRow(result, { ...unnamed('knowledge'), id: 'r-gone' });
+    assert.ok(Boolean(missing.target.querySelector('[data-recipe-option-missing]')));
+    assert.equal(lead(missing.target), 'manager-recipe-option-lead is-knowledge');
+    harness.remount();
+    const face = await mountRow(result, unnamed('currency'), { readonlyKinds: ['currency'] });
+    assert.equal(lead(face.target), 'manager-recipe-option-lead is-currency');
+    harness.remount();
+    const unknown = await mountRow(result, unnamed('activity'));
+    assert.equal(lead(unknown.target), 'manager-recipe-option-lead is-unknown');
+  });
+
+  it('the subject cell holds the subject plate, carrying the image or the glyph', async () => {
+    for (const [id, inside] of [
+      ['c-iron', 'img'],
+      ['c-coal', 'i.manager-recipe-option-mark'],
+    ]) {
+      const { target } = await mountRow(SURFACES['recipe ingredient'], {
+        ...unnamed('component'),
+        id,
+      });
+      const plate = target.querySelector(
+        ':scope [data-recipe-option-chosen] > .manager-recipe-option-plate'
+      );
+      assert.ok(Boolean(plate), `${id}: the plate sits in the subject cell`);
+      assert.equal(plate.children.length, 1, `${id}: one mark`);
+      assert.ok(plate.firstElementChild.matches(inside), `${id}: ${inside}`);
+      harness.remount();
+    }
   });
 });
 

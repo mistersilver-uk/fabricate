@@ -84,6 +84,14 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
+    "the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17)",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the library's PickerRow specimen draws the 34px subject cell and search at radius 7",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
     "the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box " +
       'background still draws 6; retires if the adjunct moves to the ::before form or a hit-area ' +
       'token lands',

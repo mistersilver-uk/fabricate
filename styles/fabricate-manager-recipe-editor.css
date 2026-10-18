@@ -844,18 +844,27 @@
   background: var(--fab-bg-0);
 }
 
-/* THE PLATE (`proto:2247`, premium's `RewardRow` `.plate`): a NEUTRAL 28px tile carrying the kind's own tinted glyph. */
+/* THE LEAD PLATE (library `<PickerRow>`): a NEUTRAL 26px tile carrying the kind's own tinted glyph. */
 .fabricate-manager .manager-recipe-option-lead {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--fab-border);
-  border-radius: 7px;
+
+  /* ratchet-exempt(design-system): the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17) */
+  border-radius: 6px;
   background: var(--fab-bg-2);
   font-size: 0.75rem;
+}
+
+/* Untinted until a value resolves: a dashed outline around a subtle glyph, in no kind's tint. */
+.fabricate-manager .manager-recipe-option-lead.is-empty {
+  border: 1px dashed var(--fab-border-strong);
+  color: var(--fab-text-subtle);
+  background: transparent;
 }
 
 /* One tint per kind, on every glyph the row draws for its subject (`proto:4624`-`4627`), and on the kind menu's glyphs through each item's `tone`. */
@@ -902,32 +911,55 @@
   color: var(--fab-text-secondary);
 }
 
-/* THE NAME FIELD. `min-width: 0` and `flex: 1` because it is the row's ONLY flexible item — every other control states its own size — so it absorbs the row's slack and shrinks rather than forcing a wrap. */
+/* THE NAME FIELD, the row's ONLY flexible item: every other control states its own size, so it absorbs the row's slack, and below its 180px the row wraps rather than shrink the name. */
 .fabricate-manager .manager-recipe-option-name-field {
   position: relative;
   display: flex;
   flex: 1;
   align-items: center;
   gap: var(--fab-space-2);
-  min-width: 0;
+  min-width: 180px;
 }
 
-/* CHOSEN (`proto:2273`): an accent-edged pill carrying the mark, the name and a clear ×. */
+/* THE SUBJECT CELL (library `<PickerRow>`): a neutral bordered cell holding the subject plate, the name and the clear. */
 .fabricate-manager .manager-recipe-option-chosen {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-2);
   box-sizing: border-box;
+  min-width: 180px;
   max-width: 100%;
-  height: 30px;
-  padding: 0 var(--fab-space-chip) 0 var(--fab-space-2);
-  border: 1px solid var(--fab-accent-border);
-  border-radius: 999px;
-  background: var(--fab-accent-soft);
+  height: 34px;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-border-strong);
+
+  /* ratchet-exempt(design-system): the library's PickerRow specimen draws the 34px subject cell and search at radius 7 */
+  border-radius: 7px;
+  background: var(--fab-bg-2);
 }
 
-.fabricate-manager .manager-recipe-option-chosen > i {
+.fabricate-manager .manager-recipe-option-plate {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+
+  /* ratchet-exempt(design-system): the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17) */
+  border-radius: 6px;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager .manager-recipe-option-plate > img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-recipe-option-plate > i {
   font-size: 0.62rem;
 }
 
@@ -949,7 +981,7 @@
   text-overflow: ellipsis;
 }
 
-/* A REAL BUTTON inside the pill. Its own reset, because Foundry sizes every `button` to a fixed height and this one is a 20px circle inside a 30px pill. */
+/* A REAL BUTTON inside the cell, at its end edge however short the name. Its own reset, because Foundry sizes every `button` to a fixed height. */
 .fabricate-manager .manager-recipe-option-clear {
   position: relative;
   overflow: visible;
@@ -959,14 +991,15 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   min-height: 0;
+  margin-inline-start: auto;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   color: var(--fab-text-muted);
-  background: var(--fab-surface-soft);
+  background: transparent;
   font-size: 0.55rem;
   line-height: 1;
   cursor: pointer;
@@ -977,23 +1010,21 @@
   background: var(--fab-surface-raised);
 }
 
-/* UNCHOSEN (`proto:2276`): an inline search field, in the row rather than behind a popover. */
+/* UNCHOSEN: an inline search field, in the row rather than behind a popover, on the partial accent at rest. */
 .fabricate-manager .manager-recipe-option-search {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: var(--fab-space-chip);
+  gap: var(--fab-space-2);
   box-sizing: border-box;
   min-width: 0;
-  height: 30px;
+  height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border-strong);
+  border: 1px solid var(--fab-accent-border);
+
+  /* ratchet-exempt(design-system): the library's PickerRow specimen draws the 34px subject cell and search at radius 7 */
   border-radius: 7px;
   background: var(--fab-bg-2);
-}
-
-.fabricate-manager .manager-recipe-option-search.is-typing {
-  border-color: var(--fab-accent-border);
 }
 
 .fabricate-manager .manager-recipe-option-search:focus-within {
@@ -1094,7 +1125,7 @@
 }
 
 /* THE DEGRADED FACE: a world with no components and no essences, which is the world a GM installing Fabricate starts in. */
-.fabricate-manager .manager-recipe-option-search.is-empty-catalogue {
+.fabricate-manager .manager-recipe-option-search.is-empty-catalogue:not(:focus-within) {
   border-color: var(--fab-border);
 }
 
@@ -1250,11 +1281,6 @@
   align-items: flex-start;
 }
 
-/* A result row's name keeps a stated minimum: the field is the row's only flexible item, and below this the row wraps its controls instead of shrinking the name to an ellipsis. */
-.fabricate-manager .manager-recipe-ingredient-option-row.is-result .manager-recipe-option-name-field {
-  min-width: 140px;
-}
-
 /* A recipe's reward row offers `Recipe knowledge`, so its kind slot is the specimen's 150px and grows rather than ellipsise a longer word. */
 .fabricate-manager .manager-recipe-ingredient-option-row.is-reward .manager-recipe-option-kind {
   width: auto;
@@ -1307,8 +1333,8 @@
   container: fabricate-result-rows / inline-size;
 }
 
-/* Under the width one line needs, the row takes two: the plate, kind and name with the remove at the end, then the toggle and the amount, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
-@container fabricate-result-rows (max-width: 600px) {
+/* Under the width one line needs, the row takes two: the lead plate, kind and name, then the toggle, the amount and the remove at the end, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
+@container fabricate-result-rows (max-width: 695px) {
   .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
     align-items: center;
     row-gap: var(--fab-space-1);
@@ -1330,7 +1356,8 @@
   }
 
   .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
-    order: 1;
+    order: 3;
+    margin-inline-start: auto;
   }
 
   .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
@@ -1359,7 +1386,7 @@
   margin-inline-end: 0;
 }
 
-@container fabricate-result-members (max-width: 760px) {
+@container fabricate-result-members (max-width: 785px) {
   .fabricate-manager .manager-recipe-result-group-members > .is-result {
     row-gap: var(--fab-space-1);
   }
@@ -1455,7 +1482,7 @@
   color: var(--fab-text-subtle);
 }
 
-/* Vertical divider between the stepper and the inline "or…". */
+/* Vertical divider before a rolled member's range cell. */
 .fabricate-manager .manager-recipe-option-divider {
   flex: 0 0 auto;
   width: 1px;
@@ -1478,7 +1505,7 @@
 
 /* ── THE ROW'S TWO IN-ROW AFFORDANCES, AND THE RULES THAT WERE NEVER PAINTING ── `or…` (`proto:2290`) and `+ Tag` (`proto:2256`) are the two dashed affordances a requirement row carries (issue 1373). */
 
-/* `proto:2290`: `inline-flex; gap:4px; height:26px; padding:0 9px; border-radius:7px; border:1px dashed var(--border-strong); font:600 9.5px var(--sans); color:var(--subtle)`, going `color:var(--accent); border-color:var(--accent-border)` on hover. */
+/* `proto:2290`: `inline-flex; gap:4px; height:26px; padding:0 9px; border-radius:7px; border:1px dashed var(--border-strong); font:600 9.5px var(--sans); color:var(--subtle)`, going `color:var(--accent); border-color:var(--accent-border)` on hover; the height is the library `<PickerRow>` specimen's 28, level with the stepper. */
 .fabricate-manager .manager-recipe-or-trigger {
   appearance: none;
   -webkit-appearance: none;
@@ -1489,8 +1516,8 @@
   gap: var(--fab-space-1);
   box-sizing: border-box;
   width: auto;
-  height: 26px;
-  min-height: 26px;
+  height: 28px;
+  min-height: 28px;
   padding: 0 var(--fab-space-2);
   border: 1px dashed var(--fab-border-strong);
   border-radius: 7px;

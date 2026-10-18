@@ -4334,7 +4334,7 @@ describe('RecipeEditView (mounted)', () => {
       'first alternative resolves the component name on the trigger'
     );
     // The component image renders on the CHOSEN CHIP (issue 1373, maintainer round 5).
-    const herbImg = options[0].querySelector('.manager-recipe-option-chosen-img');
+    const herbImg = options[0].querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(herbImg, 'the component alternative shows an image');
     assert.equal(
       herbImg.getAttribute('src'),
@@ -4831,7 +4831,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     const chosen = row.querySelector('[data-recipe-option-chosen]');
     assert.ok(chosen, 'the named row reads back as a chip');
-    const image = chosen.querySelector('.manager-recipe-option-chosen-img');
+    const image = chosen.querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(image, 'the chip carries the component image');
     assert.equal(image.getAttribute('src'), 'icons/herb.webp', 'resolved from the component');
     assert.equal(
@@ -6981,7 +6981,7 @@ describe('RecipeEditView (mounted)', () => {
     const pill = named.querySelector('[data-recipe-option-chosen]');
     assert.equal(pill.textContent.trim(), 'Mountain Herb', 'the pill names the component');
     assert.equal(
-      pill.querySelector('.manager-recipe-option-chosen-img').getAttribute('src'),
+      pill.querySelector(':scope .manager-recipe-option-plate > img').getAttribute('src'),
       'icons/herb.webp',
       'with its image'
     );

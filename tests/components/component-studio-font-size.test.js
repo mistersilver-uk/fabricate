@@ -296,7 +296,7 @@ const FIXTURE = `
                   <div class="manager-recipe-ingredient-option-row is-component is-result">
                     <span class="manager-recipe-option-name-field">
                       <span class="manager-recipe-option-chosen">
-                        <img class="manager-recipe-option-chosen-img" alt="">
+                        <span class="manager-recipe-option-plate"><img alt=""></span>
                         <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Brass Casing</span>
                       </span>
                     </span>

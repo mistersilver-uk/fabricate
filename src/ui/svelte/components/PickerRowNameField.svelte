@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The name field of a `PickerRow` naming one subject: the named pill, or until it is named an
+  The name field of a `PickerRow` naming one subject: the subject cell, or until it is named an
   inline typeahead search over the kind's catalogue. A part of `PickerRow`, which keys it by kind.
 
   Props:
@@ -10,13 +10,13 @@
   | `chosen` | catalogue entry \| `null` | `null` | The named subject; `null` draws the search. |
   | `entries` | `[{ id, label, icon, img, offered }]` | `[]` | The kind's catalogue; suggestions list the entries whose `offered` is not `false`. |
   | `tone` | tone suffix | `'component'` | The `is-<tone>` tint on every mark. |
-  | `clearable` / `disabled` | booleans | `true` / `false` | The named pill's clear; and every control off. |
+  | `clearable` / `disabled` | booleans | `true` / `false` | The subject cell's clear; and every control off. |
   | `clearName` | string | `''` | The clear's accessible name. |
   | `nameProps` | attribute object | `{}` | The caller's hooks on the field, spread before its own. |
   | `describedBy` | element id | `''` | The search input's description, a help line the row draws. |
 
   Callbacks:
-  - `onChoose(id)` — a suggestion was committed, or `''` when the pill is cleared.
+  - `onChoose(id)` — a suggestion was committed, or `''` when the cell is cleared.
 
   Invariants:
   - The typed query is local and never reaches the row's value; Enter commits the top suggestion,
@@ -120,13 +120,15 @@
 >
   {#if chosen}
     <span class="manager-recipe-option-chosen" data-recipe-option-chosen title={chosen.label}>
-      {#if chosen.img}
-        <img src={chosen.img} alt="" class="manager-recipe-option-chosen-img" />
-      {:else}
-        <i class={`${chosen.icon} manager-recipe-option-mark is-${tone}`} aria-hidden="true"></i>
-      {/if}
+      <span class="manager-recipe-option-plate">
+        {#if chosen.img}
+          <img src={chosen.img} alt="" />
+        {:else}
+          <i class={`${chosen.icon} manager-recipe-option-mark is-${tone}`} aria-hidden="true"></i>
+        {/if}
+      </span>
       <span class="manager-recipe-option-chosen-name">{chosen.label}</span>
-      <!-- A REAL BUTTON nested INSIDE the pill rather than made of it: the pill is a `<span>`,
+      <!-- A REAL BUTTON nested INSIDE the cell rather than made of it: the cell is a `<span>`,
            never a `role="button"` wrapper, which would be a nested interactive. -->
       {#if clearable}<button
           type="button"
@@ -144,7 +146,6 @@
          beside the field starved it of width on a row that must stay on one line. -->
     <span
       class="manager-recipe-option-search"
-      class:is-typing={normalizedQuery !== ''}
       class:is-empty-catalogue={offered.length === 0}
       data-recipe-option-empty-catalogue={offered.length === 0 ? '' : undefined}
     >
