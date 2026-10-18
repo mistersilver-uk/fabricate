@@ -2,7 +2,11 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
-import { PREMIUM_ICONS_AD_PATTERN, WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  INSPECTOR_PANEL_PATTERN,
+  PREMIUM_ICONS_AD_PATTERN,
+  WORLD_SCOPE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -278,7 +282,9 @@ export const CASES = Object.freeze([
         target: '[data-world-component-bulk-mode]',
       },
       {
-        container: '[data-world-component-bulk-panel]',
+        // The dock bleeds past the panel's box and Apply ends on its content edge, so the dock is
+        // the container: a strict edge check against the panel would fail on sub-pixel rounding.
+        container: '[data-world-component-bulk-panel] > .fab-bulk-edit-dock',
         target: '[data-world-component-bulk-apply]',
       },
       // The two staged axes, so the frame is asserted to hold the changed panel rather than the resting one.
@@ -309,6 +315,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -761,7 +768,10 @@ export const CASES = Object.freeze([
         container: '[data-world-essence-bulk-panel]',
         target: '[data-world-essence-bulk-colour-state="rose"]',
       },
-      { container: '[data-world-essence-bulk-panel]', target: '[data-world-essence-bulk-apply]' },
+      {
+        container: '[data-world-essence-bulk-panel] > .fab-bulk-edit-dock',
+        target: '[data-world-essence-bulk-apply]',
+      },
       { container: '.manager-scoped-list-column', target: '[data-scoped-list-selection-count]' },
     ],
     expectCenterHit: '[data-world-essence-bulk-apply]',
@@ -773,6 +783,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
       // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/Bulk(?:EditPanelShell|EditSection|SelectionToolbar)\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

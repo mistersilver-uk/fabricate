@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
   CHECKS_ROUTE_MODEL_PATTERN,
+  INSPECTOR_PANEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
@@ -258,10 +259,7 @@ export const CASES = Object.freeze([
       { container: 'aside.manager-inspector', target: '[data-recipe-action="delete"]' },
     ],
     kinds: ['manager', 'recipes'],
-    sourceMatches: [
-      /^src\/ui\/model\/recipeBrowserModel\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/,
-    ],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/, INSPECTOR_PANEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',

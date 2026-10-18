@@ -3,6 +3,7 @@
  */
 
 import {
+  INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
   WORLD_TOOL_SEARCH_MISS_TERM,
   WORLD_TOOL_SEARCH_TERM,
@@ -198,7 +199,7 @@ export const CASES = Object.freeze([
         target: '[data-world-tool-bulk-status]',
       },
       {
-        container: '[data-world-tool-bulk-panel]',
+        container: '[data-world-tool-bulk-panel] > .fab-bulk-edit-dock',
         target: '[data-world-tool-bulk-apply]',
       },
       // And the toolbar's own count, in the same frame.
@@ -218,6 +219,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkSelectionToolbar\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

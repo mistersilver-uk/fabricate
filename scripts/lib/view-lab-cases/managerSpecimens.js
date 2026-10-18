@@ -4,6 +4,7 @@
  * depicts a state no GM can reach today, so each label says so; it is not a smoke counterpart.
  */
 
+import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 /**
@@ -195,7 +196,10 @@ export const CASES = Object.freeze([
     // The hardest of the three states: a warning report listing its skipped rows inside the notice.
     expectSelector: '[data-bulk-report][data-notice-tone="warning"] [data-bulk-blocked-row]',
     kinds: ['manager', 'specimen'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-published-tier-track-specimen',

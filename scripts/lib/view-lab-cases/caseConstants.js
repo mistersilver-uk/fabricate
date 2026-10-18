@@ -20,16 +20,20 @@ export const CANVAS_APPS = Object.freeze([CANVAS_BROWSER, CANVAS_CONFIG, CANVAS_
 
 /**
  * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section and
- * select the Component Studio and the Recipe Studio both render.
+ * select the Component Studio and the Recipe Studio both render, and the `InspectorPanel` the
+ * shell renders its dock through (issue 2500).
  */
 export const BULK_EDIT_CHROME_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/(?:Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)|InspectorPanel)\.svelte$/;
 
 /**
  * The shared bulk-delete card (issue 1132): the heading, impact statement, standing hint and armed
  * control every studio's set delete renders.
  */
 export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
+
+/** The inspector's filling root and pinned foot, which every bulk panel's dock is (issue 2500). */
+export const INSPECTOR_PANEL_PATTERN = /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/;
 
 /** The Checks Studio's route model and draft clones (issue 1721). */
 export const CHECKS_ROUTE_MODEL_PATTERN =
