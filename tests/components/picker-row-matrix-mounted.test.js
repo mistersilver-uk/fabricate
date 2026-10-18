@@ -954,6 +954,44 @@ describe('PickerRow: the lead plate is untinted until a value resolves (issue 25
   });
 });
 
+describe('PickerRow: a currency entry draws its unit right of the amount (issue 2515)', () => {
+  const units = (unit) => ({
+    ...CATALOGUE,
+    currency: [{ id: 'gp', label: 'Gold', icon: 'fa-solid fa-coins', ...(unit && { unit }) }],
+  });
+  const named = { ...unnamed('currency'), id: 'gp' };
+
+  for (const [surface, config] of [
+    ['recipe ingredient', SURFACES['recipe ingredient']],
+    ['recipe result', SURFACES['recipe result']],
+  ]) {
+    it(`${surface}: the entry's unit is the stepper's next sibling`, async () => {
+      const { target } = await mountRow(config, named, { catalogue: units('gp') });
+      const unit = target.querySelector('[data-recipe-option-unit]');
+      assert.equal(unit.textContent, 'gp');
+      assert.ok(unit.previousElementSibling.matches('.fab-stepper'), 'right of the stepper');
+    });
+  }
+
+  it('a unit with no abbreviation, and an unnamed row, draw none', async () => {
+    const bare = await mountRow(SURFACES['recipe ingredient'], named, { catalogue: units('') });
+    assert.ok(!bare.target.querySelector('[data-recipe-option-unit]'), 'no abbreviation');
+    harness.remount();
+    const empty = await mountRow(SURFACES['recipe ingredient'], unnamed('currency'), {
+      catalogue: units('gp'),
+    });
+    assert.ok(!empty.target.querySelector('[data-recipe-option-unit]'), 'nothing named yet');
+  });
+
+  it("the caller's amount.unit wins over the entry's", async () => {
+    const { target } = await mountRow(SURFACES['recipe ingredient'], named, {
+      catalogue: units('gp'),
+      amount: { unit: 'coins' },
+    });
+    assert.equal(target.querySelector('[data-recipe-option-unit]').textContent, 'coins');
+  });
+});
+
 const KIND_MENU_SURFACES = Object.entries(SURFACES).filter(([, config]) => config.allowAny);
 
 describe('PickerRow: allowAny opens the kind menu', () => {

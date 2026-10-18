@@ -5584,6 +5584,10 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.ok(amount, 'the currency amount is a Stepper in the trailing control cluster');
     assert.ok(amount.closest('.fab-stepper'), 'the currency amount is the shared Stepper');
+    // The unit's abbreviation stands right of the stepper (issue 2515).
+    const unit = target.querySelector('[data-recipe-option] [data-recipe-option-unit]');
+    assert.equal(unit.textContent, 'gp', 'the unit reads its abbreviation');
+    assert.ok(unit.previousElementSibling === amount.closest('.fab-stepper'), 'after the stepper');
 
     // Controlled component: each edit derives from the unchanged prop.
     amount.value = '250';

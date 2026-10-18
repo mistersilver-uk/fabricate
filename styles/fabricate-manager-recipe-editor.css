@@ -1229,8 +1229,8 @@
   gap: var(--fab-space-2);
 }
 
-/* The amount slot has one size: the horizontal `Stepper`'s own 102 x 28 (two 22px adjuncts, a 48px input, two 2px gaps, 2px padding and a 1px border each side), so a Rolled row is exactly as tall and as wide as a Fixed one. */
-.fabricate-manager .manager-recipe-option-controls input[data-recipe-option-formula] {
+/* The amount slot has one size: the horizontal `Stepper`'s own 102 x 28 (two 22px adjuncts, a 48px input, two 2px gaps, 2px padding and a 1px border each side), so a Rolled row is exactly as tall and as wide as a Fixed one, under every host. */
+.fabricate-manager input[data-recipe-option-formula] {
   box-sizing: border-box;
   width: 102px;
   height: 28px;
@@ -1244,17 +1244,17 @@
 }
 
 /* Invalid at rest, not only while focused, as `.fabricate-select-trigger[aria-invalid="true"]` is. */
-.fabricate-manager .manager-recipe-option-controls input[data-recipe-option-formula][aria-invalid="true"] {
+.fabricate-manager input[data-recipe-option-formula][aria-invalid="true"] {
   border-color: var(--fab-danger-border);
   background: var(--fab-danger-soft);
 }
 
-/* The unit after the amount, in the stepper's own mono type. */
+/* The unit right of the amount, in the body face (library `<PickerRow>`'s `.k-unit`). */
 .fabricate-manager .manager-recipe-option-unit {
   flex: 0 0 auto;
-  color: var(--fab-text-muted);
-  font-family: var(--fab-font-mono);
-  font-size: 0.74rem;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 /* A requirement row's invalid message, in the danger text at the row's small size: the amount slot's, a choice group header's and a range cell's alike. */
@@ -1334,7 +1334,7 @@
 }
 
 /* Under the width one line needs, the row takes two: the lead plate, kind and name, then the toggle, the amount and the remove at the end, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
-@container fabricate-result-rows (max-width: 695px) {
+@container fabricate-result-rows (max-width: 715px) {
   .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
     align-items: center;
     row-gap: var(--fab-space-1);
@@ -1386,7 +1386,7 @@
   margin-inline-end: 0;
 }
 
-@container fabricate-result-members (max-width: 785px) {
+@container fabricate-result-members (max-width: 806px) {
   .fabricate-manager .manager-recipe-result-group-members > .is-result {
     row-gap: var(--fab-space-1);
   }

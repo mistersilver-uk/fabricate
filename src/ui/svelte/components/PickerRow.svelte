@@ -9,7 +9,7 @@
   | --- | --- | --- | --- |
   | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula, label, reason }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
   | `kinds` | kinds | the four match types | What the kind select offers; the row's own kind is always listed too. |
-  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the subject cell resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. |
+  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered, count, unit }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the subject cell resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary, and a tag entry's finite `count` draws as how many components carry it; an entry without one draws no count. A currency entry's `unit`, its abbreviation, draws right of the stepper unless `amount.unit` is given. |
   | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face, `READONLY_FACES` in `pickerRowKinds.js`: a `currency` row while currency is off, and a `knowledge` row while learning is not observable. |
   | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
@@ -401,7 +401,10 @@
       {#key matchType}
         <PickerRowAmount
           {value}
-          {amount}
+          amount={{
+            ...amount,
+            unit: amount.unit ?? (matchType === 'currency' ? chosen?.unit : ''),
+          }}
           name={subjectName}
           {rollable}
           {readonly}

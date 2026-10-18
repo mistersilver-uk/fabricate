@@ -118,6 +118,7 @@
         id: unit.id,
         label: currencyUnitLabel(currencyUnits, unit.id),
         icon: currencyUnitIcon(currencyUnits, unit.id),
+        unit: unit.abbreviation || '',
       })),
     };
   });

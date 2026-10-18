@@ -471,6 +471,28 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
   });
 });
 
+describe('RecipeResultGroupCard: a currency result draws its unit (issue 2515)', () => {
+  it('the abbreviation is the next sibling after the stepper, and after the expression rolled', async () => {
+    const resultKinds = recipeResultKinds({
+      componentOptions: COMPONENTS,
+      currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }],
+      currencyEnabled: true,
+    });
+    const { target } = await mountCard([{ id: 'c1', kind: 'currency', unit: 'gp', quantity: 5 }], {
+      resultKinds,
+    });
+    const unit = () => rows(target)[0].querySelector('[data-recipe-option-unit]');
+    assert.equal(unit().textContent, 'gp');
+    assert.ok(unit().previousElementSibling.matches('.fab-stepper'), 'Fixed: after the stepper');
+    await choose(radio(rows(target)[0], 'rolled'));
+    assert.equal(unit().textContent, 'gp');
+    assert.ok(
+      unit().previousElementSibling.matches('input[data-recipe-option-formula]'),
+      'Rolled: after the expression'
+    );
+  });
+});
+
 describe('RecipeResultGroupCard: focus after a removal (issue 1773)', () => {
   it('moves to the row taking the removed one’s place, else the one before, else the adder', async () => {
     const { target } = await mountCard(
