@@ -7511,17 +7511,38 @@ describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounte
   });
   const tagSet = (id) => ({ id, name: id, ingredientGroups: [tagGroup(`${id}-grp`)] });
 
-  /** The root's two store writes this flow could reach: the tag add and the persisting toggle. */
+  /** The view's immediate writers, recorded, beside the tag add. */
+  const IMMEDIATE_WRITERS = Object.freeze([
+    'onToggleEnabled',
+    'onToggleLocked',
+    'onSetCategory',
+    'onRemoveRecipeItem',
+    'onEnterMultiStep',
+    'onRevertToSingleStep',
+    'onAddStep',
+    'onReorderSteps',
+    'onDeleteStep',
+  ]);
+
+  /**
+   * RecipeEditView cannot reach `store.updateRecipe`: the header's Save owns it. The create's only
+   * writes are `onCreateTag` and one draft patch, so every immediate writer stays unrecorded.
+   */
   function storeProps() {
-    const store = { addTag: [], updateRecipe: [] };
+    const store = { addTag: [], persisted: [] };
     const props = {
       itemTags: ITEM_TAGS,
       onCreateTag: (tag) => {
         store.addTag.push(tag);
       },
-      onToggleEnabled: () => {
-        store.updateRecipe.push('toggle');
-      },
+      ...Object.fromEntries(
+        IMMEDIATE_WRITERS.map((name) => [
+          name,
+          () => {
+            store.persisted.push(name);
+          },
+        ])
+      ),
     };
     return { store, props };
   }
@@ -7580,7 +7601,7 @@ describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounte
         await flushRender();
         await createFrom(target.querySelector(scope));
         assert.deepEqual(store.addTag, ['brine'], `${shape}: the store adds the tag once`);
-        assert.deepEqual(store.updateRecipe, [], `${shape}: and the create saves no recipe`);
+        assert.deepEqual(store.persisted, [], `${shape}: and the create persists nothing`);
         assert.equal(drafts.length, 1, `${shape}: the row's tag stages into the draft`);
         assert.deepEqual(
           staged(drafts[0]).ingredientGroups[0].options[0].match.tags,
@@ -7606,7 +7627,7 @@ describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounte
     assert.equal(rows.length, 2, 'the alternative is a second row');
     await createFrom(rows[1]);
     assert.deepEqual(store.addTag, ['brine']);
-    assert.deepEqual(store.updateRecipe, []);
+    assert.deepEqual(store.persisted, []);
     editHarness.remount();
   });
 });

@@ -472,15 +472,20 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
 });
 
 describe('RecipeResultGroupCard: a currency result draws its unit (issue 2515)', () => {
+  const resultKinds = recipeResultKinds({
+    componentOptions: COMPONENTS,
+    currencyUnits: [
+      { id: 'gold', label: 'Gold', abbreviation: 'gp' },
+      { id: 'mark', label: 'Guild mark' },
+    ],
+    currencyEnabled: true,
+  });
+
   it('the abbreviation is the next sibling after the stepper, and after the expression rolled', async () => {
-    const resultKinds = recipeResultKinds({
-      componentOptions: COMPONENTS,
-      currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }],
-      currencyEnabled: true,
-    });
-    const { target } = await mountCard([{ id: 'c1', kind: 'currency', unit: 'gp', quantity: 5 }], {
-      resultKinds,
-    });
+    const { target } = await mountCard(
+      [{ id: 'c1', kind: 'currency', unit: 'gold', quantity: 5 }],
+      { resultKinds }
+    );
     const unit = () => rows(target)[0].querySelector('[data-recipe-option-unit]');
     assert.equal(unit().textContent, 'gp');
     assert.ok(unit().previousElementSibling.matches('.fab-stepper'), 'Fixed: after the stepper');
@@ -490,6 +495,15 @@ describe('RecipeResultGroupCard: a currency result draws its unit (issue 2515)',
       unit().previousElementSibling.matches('input[data-recipe-option-formula]'),
       'Rolled: after the expression'
     );
+  });
+
+  it('a unit with no abbreviation draws none', async () => {
+    const { target } = await mountCard(
+      [{ id: 'c1', kind: 'currency', unit: 'mark', quantity: 5 }],
+      { resultKinds }
+    );
+    assert.ok(rows(target)[0].querySelector('.fab-stepper'), 'the row is drawn');
+    assert.ok(!rows(target)[0].querySelector('[data-recipe-option-unit]'), 'without a unit');
   });
 });
 
