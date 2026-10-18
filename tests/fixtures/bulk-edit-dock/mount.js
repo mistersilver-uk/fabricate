@@ -48,12 +48,19 @@ const host = document.createElement('div');
 host.style.cssText = `width:1200px;height:${height}px`;
 // The system rail's two empty bands stand for the manager's header rows, so the body lands in its
 // `1fr` track.
+// The query strings never reach the markup: the frame is picked from a fixed pair, and the view and
+// the frame's hash class are written through the DOM after it is built.
 host.innerHTML = railMarkup({
-  frame: params.get('frame') ?? 'system',
-  view: params.get('view') ?? '',
-  scope: params.get('scope') ?? '',
+  frame: params.get('frame') === 'world' ? 'world' : 'system',
   height,
 });
+const view = params.get('view');
+if (view) host.querySelector('.fabricate-manager').dataset.managerView = view;
+const scope = params.get('scope');
+if (scope) {
+  for (const node of host.querySelectorAll('[data-probe-column], [data-probe-inspector]'))
+    node.classList.add(scope);
+}
 document.body.append(host);
 
 mount(BulkDockHost, {
