@@ -50,6 +50,7 @@ export function recipeResultKinds({
         id: unit.id,
         label: currencyUnitLabel(units, unit.id),
         icon: currencyUnitIcon(units, unit.id),
+        unit: unit.abbreviation || '',
       })),
       knowledge: (recipeOptions || []).map((recipe) => ({
         id: recipe.id,

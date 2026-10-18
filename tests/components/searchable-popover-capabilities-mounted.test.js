@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { createRawSnippet, flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
@@ -1036,6 +1036,26 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         'and the caller’s handler ran after it, which is observable as the default ALREADY being ' +
           'prevented by the time it was called'
       );
+      harness.remount();
+    });
+  });
+
+  describe('the `footer` snippet (issue 2515)', () => {
+    it('receives the raw query and a call that focuses the query field', async () => {
+      let context = () => ({});
+      const footer = createRawSnippet((args) => {
+        context = args;
+        return { render: () => '<div data-test-footer></div>' };
+      });
+      await mountPicker({ footer });
+      const open = await openPanel();
+      assert.ok(open.querySelector('[data-test-footer]'), 'the footer renders in the panel');
+      search(open, '  Anv ');
+      assert.equal(context().query, '  Anv ', 'the query as typed');
+      assert.equal(typeof context().close, 'function');
+      trigger().focus();
+      context().focusSearch();
+      assert.ok(document.activeElement === holderOf(open), 'focusSearch focuses the query field');
       harness.remount();
     });
   });

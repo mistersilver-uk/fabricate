@@ -37,6 +37,8 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Adds a tag to the system's vocabulary, from a tag row's catalogue footer.
+    onCreateTag = null,
     // The system's `{ id, tags }` components, which the tag adder counts each tag over.
     componentTagOptions = [],
     // Whether the system mode allows more than one ingredient set. Forwarded to each
@@ -135,6 +137,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
@@ -150,6 +153,7 @@
       {componentOptions}
       {essenceOptions}
       {itemTags}
+      {onCreateTag}
       {tagComponentCounts}
       {currencyUnits}
       {currencyEnabled}

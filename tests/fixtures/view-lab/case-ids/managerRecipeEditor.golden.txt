@@ -20,6 +20,8 @@ manager-recipe-edit-ingredients-cost
 manager-recipe-edit-ingredients-choice-group
 manager-recipe-edit-ingredients-currency-off
 manager-recipe-edit-tag-picker
+manager-recipe-edit-tag-picker-new-tag
+manager-recipe-edit-tag-picker-new-tag-created
 manager-recipe-edit-ingredients-or-menu
 manager-recipe-edit-choice-group-menu
 manager-recipe-edit-ingredients-adder-menu

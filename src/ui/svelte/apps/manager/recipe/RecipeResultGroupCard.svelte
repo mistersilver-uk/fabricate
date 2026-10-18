@@ -390,10 +390,10 @@
   {#if recipeSurface}
     <KindAdder
       {kinds}
-      word={progressive
+      label={progressive
         ? stageLabel
         : localizeOr('FABRICATE.Admin.Manager.Recipe.ResultAdder', 'Result')}
-      name={progressive ? stageLabel : addAResult}
+      ariaLabel={progressive ? stageLabel : addAResult}
       heading={addAResult}
       hook="result"
       triggerHook="result-item"

@@ -84,6 +84,18 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
+    "the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17)",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the library's PickerRow specimen draws the 34px subject cell and search at radius 7",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the library's PickerRow specimen draws the 24px remove at radius 7 (ruled 2026-10-18)",
+    { 'styles/fabricate.css': 1 },
+  ],
+  [
     "the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box " +
       'background still draws 6; retires if the adjunct moves to the ::before form or a hit-area ' +
       'token lands',
@@ -148,18 +160,6 @@ const ALLOWLIST = Object.freeze([
     "the gathering task editor's own card, the chrome and header snippet its view carried at " +
       "base, shared by that editor's tabs and cards rather than offered as a vocabulary member",
     { 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte': 1 },
-  ],
-  [
-    'PickerRowAmount is a new manager-only member at target, because PickerRow and ' +
-      'ChoiceGroupAwardHeader both render it as the amount slot; its specimen is owed to issue ' +
-      '2515 (issue 2510)',
-    { 'src/ui/svelte/components/PickerRowAmount.svelte': 1 },
-  ],
-  [
-    'KindAdder is a new manager-only member at target, because ChoiceGroup, ' +
-      "RecipeIngredientSetCard and RecipeResultGroupCard all render it as the kind menu's adder; " +
-      'its specimen is owed to issue 2515 (issue 2510)',
-    { 'src/ui/svelte/components/KindAdder.svelte': 1 },
   ],
   [
     STEPPER_LABELS,

@@ -193,6 +193,8 @@ Every required group must be satisfied, and any one option inside a group can sa
 Add a requirement with the dashed **Ingredient** adder, which opens a menu offering Components, tags, essences, and currency.
 To give a requirement another way to be met, use its **or…** control, which opens an **Accept instead** menu of the same kinds.
 A tag requirement's adder shows how many components carry each tag, marks the tags the row already holds, and removes a held tag when you choose it again.
+A Tool's tag adder does not offer to create a new tag.
+A system Tool lists the system's tags, which you add on the **Tags & Categories** screen first.
 On a world Tool the count is of world catalogue components carrying the tag as a default, because the repair materials there are a seed each adopting system copies.
 Every added group must be complete and every option must have a positive quantity before the Tool can be saved.
 

@@ -265,15 +265,16 @@ const CONVERTED_SITES = Object.freeze([
     columnSelector: '.manager-recipe-modifier-set-field',
     rung: 'form',
   }),
-  // The one 2a site whose row hugs by design: the kind picker states 132px on the picker ROOT and
-  // the trigger fills it, so both option words measure the same fixed slot.
+  // The one 2a site whose row hugs by design: the kind picker states its width on the picker ROOT
+  // and the trigger fills it, so both option words measure the same fixed slot; an ingredient
+  // row's is the specimen's 150px (ruled 2026-10-18, issue 2515).
   Object.freeze({
     subject: 'recipe-option',
     name: 'the requirement kind',
     hook: '[data-recipe-option-kind]',
     values: ['component', 'tags'],
     column: false,
-    floor: 132,
+    floor: 150,
     rung: 'inline',
   }),
   // ISSUE 1510 COMMIT 2e — the danger ceiling, the one 2e site whose value a prop can drive. Its

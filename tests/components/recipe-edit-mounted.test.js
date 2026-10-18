@@ -4282,7 +4282,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+  it('renders a populated set as component + tag requirements, with images, no OR separator, and no group-name/match toggle', async () => {
     // Two sets, so this set renders with chrome (a Set-N box + editable name). A single
     // set would render chromeless (issue 643); the requirement rendering under test is
     // identical either way, so a multi-set recipe keeps the name-field coverage too.
@@ -4325,8 +4325,10 @@ describe('RecipeEditView (mounted)', () => {
     const options = componentReq.querySelectorAll('[data-recipe-option]');
     assert.equal(options.length, 2, 'both component alternatives render');
     assert.ok(
-      componentReq.querySelector('.manager-recipe-ingredient-or-separator'),
-      'an OR separator links the alternatives'
+      [...componentReq.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'the alternatives sit in their box with nothing between them'
     );
     assert.match(
       options[0].textContent,
@@ -4334,7 +4336,7 @@ describe('RecipeEditView (mounted)', () => {
       'first alternative resolves the component name on the trigger'
     );
     // The component image renders on the CHOSEN CHIP (issue 1373, maintainer round 5).
-    const herbImg = options[0].querySelector('.manager-recipe-option-chosen-img');
+    const herbImg = options[0].querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(herbImg, 'the component alternative shows an image');
     assert.equal(
       herbImg.getAttribute('src'),
@@ -4451,6 +4453,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an ingredient');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(!/\bis-size-/.test(adder.className), 'at the manager button’s 34, not a group’s 28');
 
     await openKindMenu(target, adder);
     assert.equal(
@@ -4681,7 +4684,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('mixes component and tag alternatives in one requirement, rendering the box + OR separator', async () => {
+  it('mixes component and tag alternatives in one requirement, rendering the box with no separator', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
@@ -4699,7 +4702,7 @@ describe('RecipeEditView (mounted)', () => {
 
     // The in-component state re-renders to two alternatives once we feed the
     // patch back in (the parent owns recipe state in production); render a
-    // pre-mixed requirement directly to assert the box + separator.
+    // pre-mixed requirement directly to assert the box.
     const { target: mixed } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4713,8 +4716,10 @@ describe('RecipeEditView (mounted)', () => {
       'a 2-alternative requirement renders the box'
     );
     assert.ok(
-      req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the "— or —" separator renders'
+      [...req.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'nothing renders between the alternatives'
     );
     const optionRows = req.querySelectorAll('[data-recipe-option]');
     assert.ok(
@@ -4765,7 +4770,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders an OR separator once a component requirement has two alternatives', async () => {
+  it('draws no separator between a requirement’s alternatives, only the box’s rows', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4779,13 +4784,13 @@ describe('RecipeEditView (mounted)', () => {
       2,
       'both alternatives render'
     );
-    const separator = req.querySelector('.manager-recipe-ingredient-or-separator');
-    assert.ok(separator, 'the "— or —" separator renders between alternatives');
-    // The label is wrapped in its own span so the CSS can render it as a pill flanked
-    // by rules ("[ — OR — ]", issue 643), rather than as bare centred text.
-    const pill = separator.querySelector('span');
-    assert.ok(pill, 'the OR label is wrapped in a pill span');
-    assert.equal(pill.textContent.trim(), 'OR', 'the pill reads OR');
+    // Ruled 2026-10-18 (issue 2515): the rows stand 8px apart in the box, linked by nothing.
+    const options = req.querySelector('.manager-recipe-ingredient-requirement-options');
+    assert.deepEqual(
+      [...options.children].map((child) => child.hasAttribute('data-recipe-option')),
+      [true, true],
+      'the options list holds the two rows and nothing between them'
+    );
     editHarness.remount();
   });
 
@@ -4831,7 +4836,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     const chosen = row.querySelector('[data-recipe-option-chosen]');
     assert.ok(chosen, 'the named row reads back as a chip');
-    const image = chosen.querySelector('.manager-recipe-option-chosen-img');
+    const image = chosen.querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(image, 'the chip carries the component image');
     assert.equal(image.getAttribute('src'), 'icons/herb.webp', 'resolved from the component');
     assert.equal(
@@ -4905,6 +4910,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(adder.classList.contains('is-size-28'), 'on the 28px rung (issue 2515)');
     assert.ok(!adder.classList.contains('is-full-width'), 'and does not span its wrapping row');
     assert.doesNotMatch(target.textContent, /\balt (component|tag|essence|currency)\b/);
     editHarness.remount();
@@ -5584,6 +5590,10 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.ok(amount, 'the currency amount is a Stepper in the trailing control cluster');
     assert.ok(amount.closest('.fab-stepper'), 'the currency amount is the shared Stepper');
+    // The unit's abbreviation stands right of the stepper (issue 2515).
+    const unit = target.querySelector(':scope [data-recipe-option] [data-recipe-option-unit]');
+    assert.equal(unit.textContent, 'gp', 'the unit reads its abbreviation');
+    assert.ok(unit.previousElementSibling === amount.closest('.fab-stepper'), 'after the stepper');
 
     // Controlled component: each edit derives from the unchanged prop.
     amount.value = '250';
@@ -6981,7 +6991,7 @@ describe('RecipeEditView (mounted)', () => {
     const pill = named.querySelector('[data-recipe-option-chosen]');
     assert.equal(pill.textContent.trim(), 'Mountain Herb', 'the pill names the component');
     assert.equal(
-      pill.querySelector('.manager-recipe-option-chosen-img').getAttribute('src'),
+      pill.querySelector(':scope .manager-recipe-option-plate > img').getAttribute('src'),
       'icons/herb.webp',
       'with its image'
     );
@@ -7493,6 +7503,137 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
         tag === 'herbal' ? 'herbal 2 components' : 'liquid 1 component'
       );
     }
+    editHarness.remount();
+  });
+});
+
+describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const tagGroup = (id) => ({
+    id,
+    options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+  });
+  const tagSet = (id) => ({ id, name: id, ingredientGroups: [tagGroup(`${id}-grp`)] });
+
+  /** The view's immediate writers, recorded, beside the tag add. */
+  const IMMEDIATE_WRITERS = Object.freeze([
+    'onToggleEnabled',
+    'onToggleLocked',
+    'onSetCategory',
+    'onRemoveRecipeItem',
+    'onEnterMultiStep',
+    'onRevertToSingleStep',
+    'onAddStep',
+    'onReorderSteps',
+    'onDeleteStep',
+  ]);
+
+  /**
+   * RecipeEditView cannot reach `store.updateRecipe`: the header's Save owns it. The create's only
+   * writes are `onCreateTag` and one draft patch, so every immediate writer stays unrecorded.
+   */
+  function storeProps() {
+    const store = { addTag: [], persisted: [] };
+    const props = {
+      itemTags: ITEM_TAGS,
+      onCreateTag: (tag) => {
+        store.addTag.push(tag);
+      },
+      ...Object.fromEntries(
+        IMMEDIATE_WRITERS.map((name) => [
+          name,
+          () => {
+            store.persisted.push(name);
+          },
+        ])
+      ),
+    };
+    return { store, props };
+  }
+
+  /** Open a row's tag catalogue, type `  Brine `, and press the footer. */
+  async function createFrom(row) {
+    row.querySelector('[data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    const panel = document.querySelector('.fabricate-picker-popover');
+    await typeInto(panel.querySelector(':scope .manager-travel-popover-search input'), '  Brine ');
+    document.querySelector('[data-recipe-tag-create]').click();
+    await flushRender();
+  }
+
+  it('adds the normalized tag once from a flat, a multi-set and a stepped recipe', async () => {
+    const shapes = {
+      'one chromeless set': {
+        recipe: { ingredientSets: [tagSet('set-1')] },
+        scope: '[data-recipe-section="ingredients"]',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+      'two ingredient sets': {
+        recipe: { ingredientSets: [tagSet('set-1'), tagSet('set-2')] },
+        scope: '[data-recipe-set-id="set-2"]',
+        staged: (patch) => patch.ingredientSets[1],
+      },
+      'a step body': {
+        recipe: { steps: [{ id: 'sa', name: 'Forge', ingredientSets: [tagSet('set-1')] }] },
+        scope: '[data-recipe-section="step-sa-ingredients"]',
+        step: 'sa',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+    };
+    for (const [shape, { recipe, scope, step, staged }] of Object.entries(shapes)) {
+      const { store, props } = storeProps();
+      const drafts = [];
+      const target = await editHarness.mount(
+        identityProps({
+          recipe: { ...RECIPE, ...recipe },
+          canAddSet: true,
+          multiStepEnabled: Boolean(step),
+          onUpdateRecipe: (patch) => {
+            drafts.push(patch);
+          },
+          onUpdateStep: (_stepId, patch) => {
+            drafts.push(patch);
+          },
+          ...props,
+        })
+      );
+      try {
+        clickTab(target, 'ingredients');
+        await flushRender();
+        if (step) target.querySelector(`[data-sortable-disclosure="${step}"]`).click();
+        await flushRender();
+        await createFrom(target.querySelector(scope));
+        assert.deepEqual(store.addTag, ['brine'], `${shape}: the store adds the tag once`);
+        assert.deepEqual(store.persisted, [], `${shape}: and the create persists nothing`);
+        assert.equal(drafts.length, 1, `${shape}: the row's tag stages into the draft`);
+        assert.deepEqual(
+          staged(drafts[0]).ingredientGroups[0].options[0].match.tags,
+          ['brine'],
+          `${shape}: as the normalized tag`
+        );
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('adds it from an alternative added through or…', async () => {
+    const { store, props } = storeProps();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { ...props, componentOptions: COMPONENT_OPTIONS }, controlled: true }
+    );
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
+    const rows = target.querySelectorAll(
+      ':scope [data-recipe-group-id="grp-1"] [data-recipe-option]'
+    );
+    assert.equal(rows.length, 2, 'the alternative is a second row');
+    await createFrom(rows[1]);
+    assert.deepEqual(store.addTag, ['brine']);
+    assert.deepEqual(store.persisted, []);
     editHarness.remount();
   });
 });

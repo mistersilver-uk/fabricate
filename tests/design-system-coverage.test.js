@@ -855,16 +855,13 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
-  // Issue 2510: KindAdder and PickerRowAmount are members at `target`; ChoiceGroupAwardHeader and
-  // the other four PickerRow* parts below each have one caller.
+  // Issue 2510: ChoiceGroupAwardHeader and the four PickerRow* parts below each have one caller.
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
-  'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/PickerRowAmount.svelte',
   'src/ui/svelte/components/PickerRowKindMenu.svelte',
   'src/ui/svelte/components/PickerRowNameField.svelte',
   'src/ui/svelte/components/PickerRowRangeCell.svelte',

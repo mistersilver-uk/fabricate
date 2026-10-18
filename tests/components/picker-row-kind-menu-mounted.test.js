@@ -51,6 +51,12 @@ describe('PickerRowKindMenu: the caller’s eyebrow and hint', () => {
     );
   });
 
+  it('draws the trigger as text alone, with no glyph (ruled 2026-10-18, issue 2515)', async () => {
+    const { trigger } = await openMenu({});
+    assert.equal(trigger.querySelectorAll('i, svg').length, 0, 'no branch glyph');
+    assert.equal(trigger.textContent.trim(), 'or…');
+  });
+
   it('heads the panel, names the trigger and titles it with a result row’s copy', async () => {
     const { trigger, heading } = await openMenu({
       heading: 'Add an alternative',

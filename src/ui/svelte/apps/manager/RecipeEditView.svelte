@@ -34,6 +34,7 @@
   } from './recipe/recipeReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
+  import { arrayOrEmpty } from '../../../../utils/scalars.js';
 
   let {
     recipe = null,
@@ -58,6 +59,8 @@
     componentTagOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Adds a tag to the system's vocabulary from an ingredient tag row's catalogue footer.
+    onCreateTag = null,
     checkTierOptions = [],
     checkEvaluation = null,
     minSuccessTierOptions = [],
@@ -120,9 +123,7 @@
 
   // Current single-step requirement scopes default to empty arrays so an unconfigured recipe still
   // renders the empty-state sections.
-  const ingredientSets = $derived(
-    Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
-  );
+  const ingredientSets = $derived(arrayOrEmpty(recipe?.ingredientSets));
   const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
@@ -266,10 +267,7 @@
   }
   function countResults(scope) {
     const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-    return groups.reduce(
-      (total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0),
-      0
-    );
+    return groups.reduce((total, group) => total + arrayOrEmpty(group?.results).length, 0);
   }
   function countTools(scope) {
     return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
@@ -490,6 +488,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {componentTagOptions}
             {routingProvider}
             onUpdateIngredientSets={writes.sets}

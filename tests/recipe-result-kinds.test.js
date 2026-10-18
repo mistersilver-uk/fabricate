@@ -53,7 +53,7 @@ test('a fixed currency amount is a whole number, which the row marks invalid oth
   );
 });
 
-test('the catalogue names units by label, else abbreviation, and recipes by name', () => {
+test('the catalogue names units by label, else abbreviation, carries the abbreviation as the unit, and recipes by name', () => {
   const { catalogue } = recipeResultKinds({
     componentOptions: [{ id: 'c-pelt', name: 'Pelt', img: 'icons/pelt.webp' }],
     currencyUnits: UNITS,
@@ -64,8 +64,8 @@ test('the catalogue names units by label, else abbreviation, and recipes by name
     [['c-pelt', 'Pelt']]
   );
   assert.deepEqual(catalogue.currency, [
-    { id: 'gp', label: 'Gold', icon: 'fa-solid fa-sun' },
-    { id: 'sp', label: 'sp', icon: 'fa-solid fa-coins' },
+    { id: 'gp', label: 'Gold', icon: 'fa-solid fa-sun', unit: '' },
+    { id: 'sp', label: 'sp', icon: 'fa-solid fa-coins', unit: 'sp' },
   ]);
   assert.deepEqual(catalogue.knowledge, [
     { id: 'r-sword', label: 'Forge Sword', img: 'icons/sword.webp', icon: 'fa-solid fa-book-open' },

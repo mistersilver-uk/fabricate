@@ -185,7 +185,7 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
 `NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
-`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 46 naming headings declare 75 distinct names.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 48 naming headings declare 77 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -351,7 +351,8 @@ It also emits `fab-expr-input-reading` on its reading, a class no rule paints, s
 Its reading is `Chip`'s and each token is `Button`'s, whose families it does not restate: its one rule on a token reaches `Button`'s own classes through a chained `:global` selector and sets the token's shrink, width floor, height, corner, line height and face alone.
 It writes no rule in the module sheet, wraps its input in nothing and portals nothing, so its input, its row and its status region are siblings in its caller's own column.
 Issue 2510 moves the requirement-row family into the shared directory, scoped `manager-only` on its member rows like the expression field it composes: `PickerRow` with its parts `PickerRowNameField`, `PickerRowAmount`, `PickerRowKindMenu` and `PickerRowRewardBody`, `ChoiceGroup` with `ChoiceGroupAwardHeader` and `PickerRowRangeCell`, `KindAdder`, and the modules they read, `pickerRowKinds.js`, `resultGroupEdits.js` and `resultRows.js`.
-It writes no root of its own and keeps its `manager-recipe-*` family, every global-sheet rule of which is rooted at `.fabricate-manager` (the one exception is the three layout rules for `manager-recipe-award-repeats-words` in `ChoiceGroupAwardHeader`'s own scoped block, which are unrooted and travel with the component), so it is not adoptable outside the manager until that family is re-rooted, and that re-rooting, together with flipping the expression field's scope, is the change that would make its rows shared; the move changes no emitted family class, no declaration and no rendered frame.
+It writes no root of its own and keeps its `manager-recipe-*` family, every global-sheet rule of which is rooted at `.fabricate-manager` (the two exceptions are the three layout rules for `manager-recipe-award-repeats-words` in `ChoiceGroupAwardHeader`'s own scoped block, which are unrooted and travel with the component, and the tag catalogue's new-tag footer, `manager-recipe-tag-create`, which is rooted at the picker's `.fabricate-picker-popover` namespace root because its panel portals out of the manager), so it is not adoptable outside the manager until that family is re-rooted, and that re-rooting, together with flipping the expression field's scope, is the change that would make its rows shared; the move changes no emitted family class, no declaration and no rendered frame.
+Issue 2515 gives `PickerRowAmount` and `KindAdder` library entries of their own, so both rows read `shipped`; their family and its `manager-only` scope are unchanged.
 Because scope is MEASURED over the import graph and read transitively, a `manager-only` row stays honest exactly when every importer outside `src/ui/svelte/components/` that reaches it, directly or through a file in that directory, lies under `src/ui/svelte/apps/manager/`.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
@@ -812,6 +813,7 @@ The search field is 38 at radius 9 on every non-compact site, the journal includ
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
 The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
+`Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
 A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.
@@ -925,7 +927,7 @@ A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
 The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
-A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper that also marks a typed-in state keeps the partial accent for that state alone.
+A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
 An auto-focused field therefore never draws its placeholder, and that is accepted rather than opted out of: the shared picker's search is named by its trigger and its `aria-label`, and an opt-out would put the caret back over the glyph.
 A borderless input inside a box-drawing wrapper MUST stretch to that wrapper's height rather than size to its own text line, because an input exactly one line tall clips the caret an empty field draws.
@@ -1657,7 +1659,8 @@ The row writes a result's kind through that one module when the GM picks a kind,
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
-A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list.
+A kind that names a record renders its subject in a neutral bordered subject cell 34px tall and never narrower than 180px, holding the subject's image or glyph on a 26px subject plate at radius 6, its name and its clear, so names align down the list.
+The row's lead chip is a 26px lead plate at radius 6.
 `tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
 The catalogue lists every tag in the site's vocabulary, those already on the row included, each with the number of components already carrying it wherever the site supplies those counts, which is what distinguishes a real tag from a typo of one.
 That number is how many of the site's components carry the tag exactly, the comparison a tag requirement matches with, and a tag no component carries reads zero; a site that supplies no counts draws none rather than a zero.
@@ -1666,14 +1669,16 @@ Each choice writes at once, and the list keeps vocabulary order, so a choice mov
 The panel stays open across choices.
 The panel opens at a 300px minimum rather than the picker's 240px floor, so a held tag's name, its count and its check read whole at ordinary tag lengths; a longer name ellipsizes and keeps its full spelling as the row's title.
 Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
+The footer offers to create the typed name while the query, trimmed and lower-cased, names no tag the site's vocabulary holds under the same comparison and none the row already holds; creating it adds the tag to the site's vocabulary and to the row at once and keeps the panel open with focus in its query field; a site that offers no way to add a tag draws no footer.
 The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
 Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
 
 Every STANDALONE row CARRIES the control that converts it into a choice group, because any requirement can acquire an alternative.
 It sits immediately before the remove action, which is always last.
+It is a 28px dashed control, level with the quantity stepper, and no divider stands before it.
 A row already inside a group MUST NOT render that control: the group carries the adder for its own alternatives, and a second one inside a member row would offer to nest a group inside a group.
 
-The purple treatment of `tag` is the whole row and not just its chip: the lead chip, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
+The purple treatment of `tag` is the whole row and not just its chip: the lead chip's glyph once the row holds a tag, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
 The group’s own accent border and header pill name the STATE — that this value is one of several the crafter may choose — so the two tints stay readable as two different facts.
 
 The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather than trailing its value, so that a column of mixed rows keeps its controls in one place.
@@ -1694,9 +1699,9 @@ The toggle selects which control occupies the quantity slot and MUST NOT be mode
 A rolled result amount resolves ONCE, when the craft is awarded, and is not re-rolled while it is being read.
 The persisted shape of an amount is out of scope for this capability: it is `quantity` beside a `quantityFormula` on `Result`, specified in the `data-models` capability.
 
-A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
-The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
-When a value is picked the search is replaced by the subject cell at its fixed width, so the row stops moving once it is complete.
+A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, at the cell's 34px height and 180px minimum and edged in the accent border at rest, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
+The lead chip stays untinted — a dashed neutral outline around a subtle glyph — until a value resolves, a named subject or a tag row's first tag, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
+When a value is picked the search is replaced by the subject cell at the same 34px height and 180px minimum, so the row does not jump once it is complete.
 
 The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
 That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.

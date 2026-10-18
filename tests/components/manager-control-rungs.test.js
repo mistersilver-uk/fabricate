@@ -304,6 +304,23 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
   });
+
+  // ── THE 28px RUNG (issue 2515): a choice group's `Alternative` adder ──────────────────────
+  const rung28 = '.fabricate-button.fabricate-button.fab-manager-button.is-size-28';
+  const dashed = '.fabricate-button.fabricate-button.fab-manager-button.is-dashed';
+
+  it('gives the 28px rung its height, over the dashed role’s pinned 34, and the 26-32 band’s corner', () => {
+    const [body] = bodiesOf(rung28);
+    assert.equal(pixels(valueOf(body, 'height')), 28, 'the rung pins the height the role pins');
+    assert.equal(pixels(valueOf(body, 'min-height')), 28, 'and lowers the floor with it');
+    assert.equal(pixels(valueOf(body, 'border-radius')), 7, 'a 28px control corners at 7');
+    assert.ok(28 >= BAND_7[0] && 28 <= BAND_7[1], '28 is inside the band whose corner is 7');
+    const [roleBody] = bodiesOf(dashed);
+    assert.equal(pixels(valueOf(roleBody, 'height')), 34, 'the role it overrides pins 34');
+    // Both are four classes, so the rung wins by standing later in the one sheet.
+    const at = (selector) => rules().findIndex((rule) => rule.selector === selector);
+    assert.ok(at(rung28) > at(dashed), 'the rung follows the dashed role in source order');
+  });
 });
 
 describe('M12a — an inspector rail’s verbs take the manager button’s rung (issue 1521)', () => {

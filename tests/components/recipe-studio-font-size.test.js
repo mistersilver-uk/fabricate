@@ -54,16 +54,20 @@ const FIXTURE = `
           <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Ingredient</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
-        <!-- A flat result row names its component in the requirement row's pill (issue 1516),
-             as an ingredient row does, so its name reads at the pill's own size. -->
+        <!-- A flat result row names its component in the requirement row's subject cell (issue 1516),
+             as an ingredient row does, so its name reads at the cell's own size. -->
         <div class="manager-recipe-ingredient-option-row is-component is-result">
           <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
           <span class="manager-recipe-option-name-field">
             <span class="manager-recipe-option-chosen">
-              <img class="manager-recipe-option-chosen-img" alt="">
+              <span class="manager-recipe-option-plate"><img alt=""></span>
               <span class="manager-recipe-option-chosen-name" data-m="flat-picker-name">Venom Gland</span>
             </span>
           </span>
+          <div class="manager-recipe-option-controls">
+            <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-m="or-trigger"><span>or…</span></button></div>
+            <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark" data-m="option-remove-glyph"></i></button>
+          </div>
         </div>
         <!-- The progressive stage row (issue 676). It is the SAME surface as the
              progressive salvage stage row, drawn by the one ProgressiveStageList under one
@@ -78,7 +82,7 @@ const FIXTURE = `
           <div class="manager-recipe-ingredient-option-row is-component is-result">
             <span class="manager-recipe-option-name-field">
               <span class="manager-recipe-option-chosen">
-                <img class="manager-recipe-option-chosen-img" alt="">
+                <span class="manager-recipe-option-plate"><img alt=""></span>
                 <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Mountain Herb</span>
               </span>
             </span>
@@ -338,6 +342,8 @@ const EXPECTED = {
   // rather than a drift: a plate is a MARK and a picker trigger is a control naming a thing.
   'option-lead': 12, // 0.75rem — the neutral plate's type-tinted glyph
   'flat-picker-name': 11.52, // 0.72rem — the requirement row pill's name
+  'or-trigger': 11, // the specimen dashed button's 11px (ruled 2026-10-18, issue 2515)
+  'option-remove-glyph': 9, // the remove's explicit 9px glyph, not Foundry's 14 (same ruling)
   // ── The progressive stage row (issue 676). Every number below is the one the salvage
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing

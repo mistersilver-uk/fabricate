@@ -2721,6 +2721,13 @@
   min-height: 38px;
 }
 
+/* The 28px rung (issue 2515): a choice group's `Alternative` adder, at the stepper's 28. It pins the height the `dashed` role pins, and takes the 26-32 band's corner. */
+.fabricate-button.fabricate-button.fab-manager-button.is-size-28 {
+  height: 28px;
+  min-height: 28px;
+  border-radius: 7px;
+}
+
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
 
 /* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; each `<Select>` rung states its own weight. */

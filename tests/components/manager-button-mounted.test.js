@@ -112,6 +112,11 @@ describe('Button emits the element and classes its call sites are styled against
     );
   });
 
+  it('emits is-size-28 for the 28px rung (issue 2515)', async () => {
+    await harness.mount({ role: 'dashed', size: '28' });
+    assert.equal(button().className, 'fabricate-button fab-manager-button is-dashed is-size-28');
+  });
+
   it('takes the rung as a number too, since a caller will write size={38}', async () => {
     await harness.mount({ size: 38 });
     assert.equal(button().className, 'fabricate-button fab-manager-button is-size-38');

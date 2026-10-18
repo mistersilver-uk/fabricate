@@ -1777,9 +1777,7 @@
     ) ?? null
   );
 
-  const libraryToolsList = $derived(
-    Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []
-  );
+  const libraryToolsList = $derived(selectedGatheringSystemTools);
   const focusedToolDraft = $derived($viewState.toolDraft || null);
   const focusedToolValidation = $derived(
     $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
@@ -4928,6 +4926,7 @@
         componentTagOptions={selectedSystem?.componentTagOptions || []}
         {essenceOptions}
         itemTags={selectedSystem?.itemTags || []}
+        onCreateTag={addTag}
         checkTierOptions={recipeCheckTierOptions}
         checkEvaluation={recipeCheckTierEvaluation}
         minSuccessTierOptions={recipeMinSuccessTierOptions}

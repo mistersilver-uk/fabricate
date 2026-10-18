@@ -248,8 +248,8 @@ const MOUNT_DEPENDENCIES = Object.freeze({
 const SHEET_CONTROLS = Object.freeze([
   ['manager-scope-collapse', '', 22, 22],
   ['manager-recipe-tool-remove', '', 22, 22],
-  ['manager-recipe-option-clear', '', 20, 20],
-  ['manager-recipe-option-remove', '', 22, 22],
+  ['manager-recipe-option-clear', '', 22, 22],
+  ['manager-recipe-option-remove', '', 24, 24],
   ['manager-availability-remove', 'fabricate-pill-select', 20, 20],
   ['manager-danger-tag-remove', '', 20, 20],
   ['manager-drop-rank-button', '', 18, 18],
@@ -309,7 +309,7 @@ ${Object.values(PARENTS)
   <div data-case="bulkRow" style="width:300px;margin:12px">${BULK_ROW(PARENTS.bulkRow.hashClass, PARENTS.bulkPanel.hashClass)}</div>
   ${SHEET_CONTROLS.map(
     ([cls, wrapper, width, height]) =>
-      `<div data-case="${cls}" class="row ${wrapper}" style="--gap:${reachOf(width)}px"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
+      `<div data-case="${cls}" class="row ${wrapper}" style="--gap:${reachOf(width)}px;width:fit-content"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
   ).join('\n')}
   <div data-case="label-input" class="row"><input class="manager-condition-label-input" aria-label="Edit label" value="Label" /></div>
   <div data-case="range" class="row manager-gathering-task-edit-view"><input type="range" min="0" max="10" value="5" /></div>

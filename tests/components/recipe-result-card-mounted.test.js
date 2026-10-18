@@ -471,6 +471,42 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
   });
 });
 
+describe('RecipeResultGroupCard: a currency result draws its unit (issue 2515)', () => {
+  const resultKinds = recipeResultKinds({
+    componentOptions: COMPONENTS,
+    currencyUnits: [
+      { id: 'gold', label: 'Gold', abbreviation: 'gp' },
+      { id: 'mark', label: 'Guild mark' },
+    ],
+    currencyEnabled: true,
+  });
+
+  it('the abbreviation is the next sibling after the stepper, and after the expression rolled', async () => {
+    const { target } = await mountCard(
+      [{ id: 'c1', kind: 'currency', unit: 'gold', quantity: 5 }],
+      { resultKinds }
+    );
+    const unit = () => rows(target)[0].querySelector('[data-recipe-option-unit]');
+    assert.equal(unit().textContent, 'gp');
+    assert.ok(unit().previousElementSibling.matches('.fab-stepper'), 'Fixed: after the stepper');
+    await choose(radio(rows(target)[0], 'rolled'));
+    assert.equal(unit().textContent, 'gp');
+    assert.ok(
+      unit().previousElementSibling.matches('input[data-recipe-option-formula]'),
+      'Rolled: after the expression'
+    );
+  });
+
+  it('a unit with no abbreviation draws none', async () => {
+    const { target } = await mountCard(
+      [{ id: 'c1', kind: 'currency', unit: 'mark', quantity: 5 }],
+      { resultKinds }
+    );
+    assert.ok(rows(target)[0].querySelector('.fab-stepper'), 'the row is drawn');
+    assert.ok(!rows(target)[0].querySelector('[data-recipe-option-unit]'), 'without a unit');
+  });
+});
+
 describe('RecipeResultGroupCard: focus after a removal (issue 1773)', () => {
   it('moves to the row taking the removed one’s place, else the one before, else the adder', async () => {
     const { target } = await mountCard(
@@ -940,6 +976,13 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.equal(adder.textContent.trim(), 'Alternative');
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    assert.ok(adder.classList.contains('is-size-28'), 'the box’s adder stands on the 28px rung');
+    const list = target.querySelector('.manager-recipe-result-group-members');
+    assert.ok(
+      list.children.length === members(target).length &&
+        [...list.children].every((child) => child.hasAttribute('data-recipe-result-member')),
+      'the members list holds the members and nothing between them (issue 2515)'
+    );
     const fromBox = await readMenu(target, adder);
     assert.deepEqual(fromBox, {
       heading: 'Add an alternative',
@@ -964,5 +1007,19 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     const field = nameField(members(target)[2]);
     assert.ok(Boolean(field), 'the new member draws its name field');
     assert.ok(target.ownerDocument.activeElement === field, 'focus lands on it, not the adder');
+  });
+
+  it('draws the one-kind Alternative adder on the 28px rung too, appending directly', async () => {
+    const componentOnly = recipeResultKinds({
+      componentOptions: COMPONENTS,
+      currencyEnabled: false,
+    });
+    const { target } = await mountGroup(PLAYER_GROUP, { resultKinds: componentOnly });
+    const adder = target.querySelector(
+      ':scope [data-recipe-result-group] [data-recipe-add="alternative"]'
+    );
+    assert.ok(Boolean(adder), 'the box draws its adder');
+    assert.ok(!adder.hasAttribute('aria-haspopup'), 'one kind opens no menu');
+    assert.ok(adder.classList.contains('is-size-28'), 'and stands on the 28px rung (issue 2515)');
   });
 });

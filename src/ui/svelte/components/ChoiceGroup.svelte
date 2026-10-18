@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The choice group: one requirement inside a set (the data model's `ingredientGroup`), satisfied by
-  ANY one of its alternatives. Two or more render linked by a "— or —" separator inside the
+  ANY one of its alternatives. Two or more render 8px apart, with no separator, inside the
   `Any one of` box, whose member rows draw no convert control; a single alternative renders as a
   bare `PickerRow allowAny`. It emits a shallow-updated copy via `onChange(nextGroup)` and is
   dropped entirely via `onRemove()`.
@@ -49,6 +49,8 @@
     group = {},
     componentOptions = [],
     itemTags = [],
+    // A tag row's new-tag footer, `PickerRow`'s `onCreateTag`; `null` draws none.
+    onCreateTag = null,
     // `{ [tag]: number }` of components carrying each tag exactly; `null` draws no counts.
     tagComponentCounts = null,
     currencyUnits = [],
@@ -118,6 +120,7 @@
         id: unit.id,
         label: currencyUnitLabel(currencyUnits, unit.id),
         icon: currencyUnitIcon(currencyUnits, unit.id),
+        unit: unit.abbreviation || '',
       })),
     };
   });
@@ -294,12 +297,16 @@
   <div class="manager-recipe-requirement-adds">
     <KindAdder
       kinds={adderKinds}
-      word={localizeOr('FABRICATE.Admin.Manager.Recipe.AlternativeAdder', 'Alternative')}
-      name={localizeOr('FABRICATE.Admin.Manager.Recipe.AddAnAlternative', 'Add an alternative')}
+      label={localizeOr('FABRICATE.Admin.Manager.Recipe.AlternativeAdder', 'Alternative')}
+      ariaLabel={localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.AddAnAlternative',
+        'Add an alternative'
+      )}
       heading={menuHeading}
       hook="alternative"
       triggerHook="alternative"
       menuClass="manager-recipe-or-menu"
+      size="28"
       {onAdd}
     />
   </div>
@@ -316,11 +323,6 @@
     <ChoiceGroupAwardHeader {group} {onChange} />
     <div class="manager-recipe-ingredient-requirement-options manager-recipe-result-group-members">
       {#each members as entry, index (entry?.id || index)}
-        {#if index > 0}
-          <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-            <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-          </div>
-        {/if}
         {@render resultRow(entry, index)}
       {/each}
     </div>
@@ -354,16 +356,12 @@
       </div>
       <div class="manager-recipe-ingredient-requirement-options">
         {#each options as option, index (index)}
-          {#if index > 0}
-            <div class="manager-recipe-ingredient-or-separator" aria-hidden="true">
-              <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
-            </div>
-          {/if}
           <PickerRow
             value={toValue(option)}
             {kinds}
             {catalogue}
             {readonlyKinds}
+            {onCreateTag}
             onChange={(value) => updateOption(index, fromValue(option, value))}
             onRemove={() => removeOption(index)}
           />
@@ -379,6 +377,7 @@
             {kinds}
             {catalogue}
             {readonlyKinds}
+            {onCreateTag}
             allowAny
             {menuHeading}
             onSelect={selectKind}
