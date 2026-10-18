@@ -712,6 +712,20 @@ Outcome-based single-selection resolution whose routing basis is the system rout
 
 [Notes](docs/domain/terms.md#routed-by-check)
 
+#### Routing Overview
+
+A list of every source of a routed scope, one row each, naming the result set it effectively produces and letting the GM re-point it in place.
+The recipe Overview draws one per step scope, and the component Salvage card draws its outcome routing with it.
+
+[Notes](docs/domain/terms.md#routing-overview)
+
+#### Unreachable Result Set
+
+A result set that no ingredient set reaches by effective routing under **Routed by Ingredients**, so it is never produced.
+It raises the non-blocking readiness warning `unreachableResultGroup`.
+
+[Notes](docs/domain/terms.md#unreachable-result-set)
+
 #### Progressive
 
 Ordered cumulative resolution driven by a numeric value and difficulty thresholds.

@@ -606,10 +606,37 @@ Spec reference: openspec/specs/resolution-modes/spec.md
 Exactly one result group is produced per attempt.
 The routing basis is a property of the **mode**, not a per-recipe provider (no `resultSelection`).
 The crafting check is **required**: a `routedByCheck` system with no authored `craftingCheck.routed.rollFormula` is an **unconditional** system-level blocker (`routedCheckNoFormula`), independent of any recipe — even with zero recipes — because every recipe routes by the check.
-**Single-result-group rule:** a recipe/step with exactly one result group needs no outcome/tier mapping — the single group is produced on any non-failure (success) outcome and nothing on a failure outcome (it uses only the success/failure aspect of the roll, mirroring routed-by-ingredients' single-group exemption); only multiple result groups require each success outcome to map (by tier assignment or name), and resolution does not abort for an unmatched success outcome when there is exactly one group.
+**Single-result-group rule:** a recipe/step with exactly one result group that lists no tier id needs no outcome/tier mapping — the single group is produced on any non-failure (success) outcome and nothing on a failure outcome (it uses only the success/failure aspect of the roll, mirroring routed-by-ingredients' single-group exemption); each success outcome must map (by tier assignment or name) once the step has multiple result groups OR any group lists a tier id (the engine's `recipeUsesTierRouting`), and resolution does not abort for an unmatched success outcome only while the exemption holds — once a group lists a tier id, an unlisted tier is `unrouted-tier`.
 A reserved failure keyword as a `ResultGroup.name` is rejected and group names must be unique under trim/case normalization — enforced at the service level via `ResolutionModeService._validateRoutedGroupNames` (reference integrity, always applied).
 
 Canonical mapping: `resolutionMode: "routedByCheck"`
+
+Spec reference: openspec/specs/resolution-modes/spec.md
+
+## Routing Overview
+
+A routing overview lists every source of a routed scope in one row each, naming the result set it effectively produces, and lets the GM re-point routing without opening a set.
+It ships as `RoutingOverview` (`src/ui/svelte/components/RoutingOverview.svelte`), drawn once per step scope by `RecipeRoutingCard` on the recipe Overview tab and by the component Salvage card for its outcome routing.
+The sources are the ingredient sets under `routedByIngredients` and the system's outcome tiers under `routedByCheck`, so the card states that the tiers belong to the system and the recipe chooses each one's result set.
+A row reads the scope's routing model, so its target is the EFFECTIVE one: marked "default" when inherited (`resultMapping`, a lone group, or the scope's first group) and "shared · N" when N sources reach the same set.
+Choosing a row's explicit target writes nothing, choosing a default target writes it, and the only writes are `IngredientSet.resultGroupId` and `ResultGroup.checkOutcomeIds`, through the fields the set card writes.
+Under `routedByCheck` a tier the system does not offer is a `policy`-blocked row, a success tier below `minSuccessOutcomeId` is a `below-minimum` row, a gap between fixed tiers is a row whose action opens the Checks Studio, and a failure tier the policy permits is marked "only on a forced failure" while a minimum is set because a roll below it fails outright.
+`routingScopes` defines the scopes: a collapsed chain is its final step, and a step with no result sets of its own is a read-only `borrowed` scope showing the recipe's.
+Salvage rows stay neutral and keep "Unrouted", because an unrouted salvage outcome awards nothing where an unrouted recipe tier aborts as a misconfiguration.
+
+Canonical mapping: `RoutingOverview`, `RecipeRoutingCard`, `routingOverviewRows.js` (`routingScopes`, `overviewRows`), `buildRoutingModel`, `routedCheckFacts`
+
+Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/design-system/spec.md
+
+## Unreachable Result Set
+
+A result set (`ResultGroup`) is unreachable under `routedByIngredients` when no ingredient set reaches it by effective routing.
+The routing is the set's `resultGroupId`, else its `resultMapping`, else the scope's first group.
+The recipe-readiness warning `unreachableResultGroup` is raised once per step for the first such group, with a `results` target and a focus tag on the group, and never blocks enabling.
+It carries the check `routedResultGroupsReachable` and is built from `buildRoutingModel`'s `inbound`, with no role filter, so a `role: 'failure'` group is held to the same rule because this mode never awards one on a failed check (the set card's own "Nothing — unreachable" reading still skips it, issue 2520).
+`systemValidation`'s `collectRecipeIssues` derives `routingProvider = 'ingredientSet'` under `routedByIngredients`, so the System Overview lists the warning with a headless message too, and a gap between fixed tiers raises nothing there.
+
+Canonical mapping: `collectUnreachableGroupIssues` in `recipeReadiness.js`; `CHECK_TO_ISSUES.routedResultGroupsReachable`; `READINESS_ISSUE_MESSAGES.unreachableResultGroup` in `src/systems/systemValidation.js`
 
 Spec reference: openspec/specs/resolution-modes/spec.md
 
@@ -762,7 +789,7 @@ The same engine-evaluated check-routing machinery is shared by `routedByCheck` *
 As of #431 this check routing is **engine-evaluated at craft time** (no longer authoring-only): when the system's routed config carries a `rollFormula`, `CraftingEngine._runRoutedCheck` rolls it (via `runFormulaRouted`) and the final (post-step) tier NAME drives routing through `ResultGroup.checkOutcomeIds` (else name fallback); a usable routed check requires `routed.rollFormula`, and with no routed `rollFormula` there is no routed check path (the deprecated macro/builtIn routed resolution has been removed).
 The **unrouted-tier diagnostic** (`ResolutionModeService._routeByTierAssignment`): when the routed outcome resolves to an authored success tier **and the recipe opts into tier routing** (at least one group declares `checkOutcomeIds`) but no group lists THAT tier's id, resolution surfaces a distinct `disposition:'unrouted-tier'` (empty groups) rather than silently falling through to name matching — disambiguating it from generic `misconfiguration`.
 A purely name-routed recipe (no group declares any `checkOutcomeIds`), or an outcome that resolves no success tier, still falls back to outcome-name matching.
-**Check-mode authoring safety (#431):** two non-blocking recipe-readiness _warnings_ (`recipeReadiness.collectRoutedCheckIssues`, fired only when `routingProvider === 'check'` — now **derived from the system mode**: `routedByCheck → 'check'`, `routedByIngredients → 'ingredientSet'`, with alchemy deriving `'check'` only in its `tiered` check-mode) flag a check-mode result group assigned no valid outcome tier (`unroutedResultGroup`) and an authored success tier no group produces (`unproducedOutcomeTier`, the backstop for the craft-time `unrouted-tier`), **but only for steps with MULTIPLE result groups** — a single-result-group step routes on the routed-by-check success/failure exemption and raises neither warning; each surviving warning carries a paired checklist entry and `target:'results'` deep link; and deleting a routed outcome tier strips its now-dangling id from every recipe's `ResultGroup.checkOutcomeIds` on save (`adminStore.saveCraftingCheckRouted` → `_stripDeletedRoutedTierIds`) with a GM notification of the count of result groups changed.
+**Check-mode authoring safety (#431):** two non-blocking recipe-readiness _warnings_ (`recipeReadiness.collectRoutedCheckIssues`, fired only when `routingProvider === 'check'` — now **derived from the system mode**: `routedByCheck → 'check'`, `routedByIngredients → 'ingredientSet'`, with alchemy deriving `'check'` only in its `tiered` check-mode) flag a check-mode result group assigned no valid outcome tier (`unroutedResultGroup`) and an authored success tier no group produces (`unproducedOutcomeTier`, the backstop for the craft-time `unrouted-tier`), **but only for steps that use tier routing, meaning MULTIPLE result groups or any group listing a tier id** — a single-result-group step in which no group lists a tier id routes on the routed-by-check success/failure exemption and raises neither warning (a single group listing one of two tiers is therefore no longer exempt: it raises `unproducedOutcomeTier`, because the engine aborts the unlisted tier as a misconfiguration); each surviving warning carries a paired checklist entry and `target:'results'` deep link; and deleting a routed outcome tier strips its now-dangling id from every recipe's `ResultGroup.checkOutcomeIds` on save (`adminStore.saveCraftingCheckRouted` → `_stripDeletedRoutedTierIds`) with a GM notification of the count of result groups changed.
 Gathering routed tasks carry **no** per-task result-selection provider: routed gathering is **system-check-formula only**, resolving via `gatheringCraftingCheck.routed.rollFormula` → outcome tier → result-group name match.
 
 Canonical mapping: `resultSelection.provider`
