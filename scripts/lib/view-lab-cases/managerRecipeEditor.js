@@ -74,9 +74,9 @@ const RESULT_GROUP = (id) => `[data-recipe-result-group="${id}"]`;
 /** What only some cells draw: N, repeats and a member's range cell. */
 const CELL_CONTROLS =
   '[data-recipe-group-count], [data-recipe-group-repeats], [data-recipe-range-cell]';
-/** The `n`th member row of a result choice group, counted from 1 past its OR separators. */
+/** The `n`th member row of a result choice group, counted from 1. */
 const GROUP_MEMBER = (id, n) =>
-  `${RESULT_GROUP(id)} .manager-recipe-result-group-members > :nth-child(${2 * n - 1})`;
+  `${RESULT_GROUP(id)} .manager-recipe-result-group-members > [data-recipe-result-member]:nth-child(${n})`;
 /** Convert the `n`th flat row of the set matching `set` through its `or…`, adding `kind`. */
 const CONVERT_ROW = (set, n, kind) => [
   { selector: `${set} ${RESULT_ROW(n)} .manager-recipe-or-trigger` },
@@ -576,8 +576,7 @@ export const CASES = Object.freeze([
     ],
   }),
   // Only reachable frame for the open kind panel (issue 1510): the option list renders only while
-  // open, and the portal occludes the closed-state frame behind it. The kind trigger is this
-  // phase's narrowest at 150px, so a panel wider than its trigger shows here.
+  // open, and the portal occludes the closed-state frame behind it.
   managerCase({
     id: 'manager-recipe-edit-ingredients-kind-list',
     label: 'Manager — Recipe edit ingredient kind list',
@@ -696,7 +695,7 @@ export const CASES = Object.freeze([
         target: '[data-recipe-group].has-alternatives [data-recipe-option]',
       },
     ],
-    // The dashed `Button` at its 28px rung, level with the stepper (ruled 2026-10-18).
+    // The dashed `Button` at its 28px rung, the stepper's height (ruled 2026-10-18).
     expectLayout: {
       controls: [
         {
