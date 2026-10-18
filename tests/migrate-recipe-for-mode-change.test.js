@@ -7,8 +7,10 @@ import {
   summarizeModeChange,
 } from '../src/systems/migrateRecipeForModeChange.js';
 
-globalThis.foundry ??= { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}` } };
-globalThis.game ??= { user: { name: 'GM' } };
+Object.assign(globalThis, {
+  foundry: { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}` } },
+  game: { user: { name: 'GM' } },
+});
 const { Recipe } = await import('../src/models/Recipe.js');
 
 const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
@@ -268,7 +270,8 @@ const FAILURE = { id: 'g-fail', name: '', role: 'failure', results: [] };
 const hasFailure = (recipe) => (recipe?.resultGroups ?? []).some((group) => group.role === 'failure');
 
 for (const from of MODES) {
-  for (const to of MODES.filter((mode) => mode !== from)) {
+  for (const to of MODES) {
+    if (to === from) continue;
     test(`${from} → ${to} never deletes a 1×1 recipe for its failure group, and drops it only into progressive`, () => {
       const recipe = oneByOne({ resultGroups: [{ ...SUCCESS }, { ...FAILURE }] });
       const result = migrateRecipeForModeChange(recipe, from, to, SYSTEM_NO_CHECK);

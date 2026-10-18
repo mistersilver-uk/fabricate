@@ -8528,6 +8528,8 @@
         "ResolutionModeChangeTitle": "Change Resolution Mode?",
         "ResolutionModeChangeContent": "{count} recipe(s) will be migrated to {mode}.",
         "ResolutionModeChangeContentDelete": "{count} recipe(s) will be migrated to {mode}; {deleteCount} cannot be migrated and will be deleted: {names}.",
+        "ResolutionModeChangeDroppedSets": "{count} recipe(s) will keep only their first ingredient set; these ingredient sets will be dropped: {sets}.",
+        "ResolutionModeChangeDroppedFailureSets": "{count} recipe(s) will lose their failure result set, which {mode} does not have: {names}.",
         "ResolutionModeChangeConfirm": "Change mode",
         "SalvageResolutionMode": "Salvage resolution mode",
         "SalvageResolutionModeHint": "Salvage has one ingredient, so ingredient-set routing does not apply. Components incompatible with the new salvage mode will have salvage disabled.",

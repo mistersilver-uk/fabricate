@@ -1444,6 +1444,63 @@ describe('createAdminStore', () => {
       assert.equal(updateCalled, false);
     });
 
+    /** The confirm `content` a mode change to `mode` shows, over `recipes` and English copy. */
+    async function resolutionModeConfirmContent(mode, recipes) {
+      let content = null;
+      const services = createMockServices({
+        localize: () => '',
+        confirmDialog: async (options) => {
+          content = options.content;
+          return false;
+        },
+      });
+      services._getRecipesMutable().splice(0, Infinity, ...recipes);
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setResolutionMode(mode);
+      return content;
+    }
+
+    it('setResolutionMode names, escaped, the recipes losing their failure set into progressive', async () => {
+      const content = await resolutionModeConfirmContent('progressive', [
+        {
+          id: 'r-a',
+          name: '<b>A</b>',
+          craftingSystemId: 'sys1',
+          ingredientSets: [{ id: 's-1' }],
+          resultGroups: [
+            { id: 'g-1', name: 'Default', results: [] },
+            { id: 'g-f', name: '', role: 'failure', results: [] },
+          ],
+        },
+      ]);
+      assert.equal(
+        content,
+        '<p>1 recipe(s) will be migrated to progressive.</p>' +
+          '<p>1 recipe(s) will lose their failure result set, which progressive does not have: &lt;b&gt;A&lt;/b&gt;.</p>'
+      );
+    });
+
+    it('setResolutionMode names the ingredient set an alchemy collapse drops', async () => {
+      const content = await resolutionModeConfirmContent('alchemy', [
+        {
+          id: 'r-a',
+          name: 'Recipe A',
+          craftingSystemId: 'sys1',
+          ingredientSets: [{ id: 's-1', name: 'Iron route' }, { id: 's-2', name: 'Gold route' }],
+          resultGroups: [{ id: 'g-1', name: 'Default', results: [] }],
+        },
+      ]);
+      assert.ok(content.includes('these ingredient sets will be dropped: Recipe A (Gold route).'), content);
+    });
+
+    it('setResolutionMode with nothing dropped confirms with exactly one paragraph', async () => {
+      const content = await resolutionModeConfirmContent('routedByCheck', [
+        { id: 'r-a', name: 'Recipe A', craftingSystemId: 'sys1', ingredientSets: [{ id: 's-1' }] },
+      ]);
+      assert.equal(content, '<p>1 recipe(s) will be migrated to routedByCheck.</p>');
+    });
+
     // Salvage mode change is non-destructive (updateSystem runs only the inline
     // _disableInvalidSalvageConfigs cleanup), so the confirm is salvage-accurate.
     async function runSalvageMode(confirmAnswer) {
