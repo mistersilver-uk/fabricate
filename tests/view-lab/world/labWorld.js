@@ -327,6 +327,13 @@ function seedRoutingMultistep(content) {
   ];
 }
 
+/** `failure-policy-never` (issue 2514): Verrin Alchemy produces nothing on a failed check, and the
+ *  Elixir of Vigour keeps its failure set, which the editor then draws with the policy note. */
+function seedFailurePolicyNever(content) {
+  const { system } = recipeAndSystem(content, 'al-r-elixir', 'failure-policy-never');
+  system.craftingCheck = { ...system.craftingCheck, failureResultPolicy: 'never' };
+}
+
 const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
@@ -345,6 +352,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'routing-fixed': seedRoutingFixed,
   'routing-fixed-permitted': seedRoutingFixedPermitted,
   'routing-multistep': seedRoutingMultistep,
+  'failure-policy-never': seedFailurePolicyNever,
 });
 
 function seedResultRowState(content, state) {
@@ -847,7 +855,8 @@ function stripAuthoredWorldComponents(content) {
  *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
  *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
  *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
- *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`.
+ *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`; or
+ *   issue 2514's `failure-policy-never`.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.

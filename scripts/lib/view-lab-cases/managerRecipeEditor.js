@@ -80,6 +80,19 @@ const ROUTED_RESULTS = (system, recipeId, state) => ({
     { selector: '#recipe-tab-results' },
   ],
 });
+/** The two-slot editor's failure-results toggle, its policy callout and that callout's link. */
+const FAILURE_TOGGLE_CARD = '[data-recipe-section="failure-results"]';
+const FAILURE_TOGGLE = '[data-recipe-field="failureResults"]';
+const FAILURE_POLICY = '[data-recipe-failure-results-policy]';
+const FAILURE_CHECKS = '[data-recipe-failure-results-checks]';
+/** `ROUTED_RESULTS`, then each selector: scrolled to if the toggle card or callout, else clicked. */
+const FAILURE_RESULTS = (system, recipeId, state, ...steps) => {
+  const base = ROUTED_RESULTS(system, recipeId, state);
+  return { ...base, steps: [...base.steps, ...steps] };
+};
+/** A step that scrolls a selector into view, and one that clicks it. */
+const SCROLL_TO = (selector) => ({ selector, scroll: true });
+const CLICK = (selector) => ({ selector });
 /** A result set's card in the editor, by its result set id. */
 const RESULT_SET = (id) => `[data-recipe-result-set-id="${id}"]`;
 const SET_SOURCES = Object.freeze([
@@ -1629,7 +1642,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-results-alchemy',
     label: 'Manager — Recipe edit results alchemy',
     smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    // Alchemy Results: an authored success set plus the reserved, undeletable failed-check set the editor draws itself.
+    // Alchemy Results: an authored success set plus the reserved failed-check set the recipe opted into.
     reaches: 'exact',
     query: { system: 'lab-alchemy' },
     steps: [
@@ -1653,6 +1666,88 @@ export const CASES = Object.freeze([
     ...ROUTED_RESULTS('lab-alchemy', 'al-r-elixir', null),
     expectView: 'recipe-edit',
     expectSelector: `${FAILURE_SET}.is-danger [data-set-card-reserved]`,
+    expectNoHorizontalOverflow: '[data-recipe-result-alchemy-simple]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // The failure-results opt-in (issue 2514), off on a recipe with no failure set.
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-optin',
+    label: 'Manager — Recipe edit results, the failure-results toggle off',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...FAILURE_RESULTS('lab-alchemy', 'al-r-smokestick', null, SCROLL_TO(FAILURE_TOGGLE_CARD)),
+    expectView: 'recipe-edit',
+    expectSelector: `[data-recipe-result-alchemy-simple]:not(:has(${FAILURE_POLICY})):not(:has(${FAILURE_SET})) ${FAILURE_TOGGLE_CARD}.is-off ${FAILURE_TOGGLE}:not(:disabled)`,
+    expectCenterHit: FAILURE_TOGGLE,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-optin-on',
+    label: 'Manager — Recipe edit results, the failure-results toggle on and its empty set',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...FAILURE_RESULTS(
+      'lab-alchemy',
+      'al-r-smokestick',
+      null,
+      SCROLL_TO(FAILURE_TOGGLE_CARD),
+      CLICK(FAILURE_TOGGLE),
+      SCROLL_TO(FAILURE_TOGGLE_CARD)
+    ),
+    expectView: 'recipe-edit',
+    expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_TOGGLE_CARD}.is-on) ${FAILURE_SET}.is-reserved:not(:has([data-recipe-result-empty])):not(:has(.fabricate-set-card-body)) [data-recipe-failure-set-note="optional"]`,
+    expectCenterHit: [FAILURE_TOGGLE, '[data-recipe-failure-set-note="optional"]'],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // Karrun Forgecraft produces nothing on a failed check, so the toggle cannot add the set.
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-policy-never',
+    label: 'Manager — Recipe edit results, the failure-results toggle a never policy disables',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...FAILURE_RESULTS('lab-smithing', 'sm-r-shield', null, SCROLL_TO(FAILURE_POLICY)),
+    expectView: 'recipe-edit',
+    expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_POLICY}) ${FAILURE_TOGGLE_CARD}.is-off ${FAILURE_TOGGLE}:disabled`,
+    expectCenterHit: [FAILURE_TOGGLE, FAILURE_CHECKS],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-policy-never-checks',
+    label: 'Manager — Recipe edit results, the failure-results callout opening the crafting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...FAILURE_RESULTS(
+      'lab-smithing',
+      'sm-r-shield',
+      null,
+      SCROLL_TO(FAILURE_POLICY),
+      CLICK(FAILURE_CHECKS)
+    ),
+    expectView: 'checks-crafting',
+    kinds: ['manager', 'recipes', 'checks'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // A failure set kept under a never policy: the note above the toggle, the callout below it.
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-policy-never-present',
+    label:
+      'Manager — Recipe edit results, a failure set a never policy keeps, at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...FAILURE_RESULTS(
+      'lab-alchemy',
+      'al-r-elixir',
+      'failure-policy-never',
+      SCROLL_TO(FAILURE_TOGGLE_CARD)
+    ),
+    expectView: 'recipe-edit',
+    expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_SET} [data-recipe-failure-set-note="policy"]):has(${FAILURE_POLICY} ${FAILURE_CHECKS}) ${FAILURE_TOGGLE_CARD}.is-on ${FAILURE_TOGGLE}:not(:disabled)`,
+    expectCenterHit: [FAILURE_TOGGLE, FAILURE_CHECKS, '[data-recipe-failure-set-note="policy"]'],
     expectNoHorizontalOverflow: '[data-recipe-result-alchemy-simple]',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'recipes', 'responsive'],

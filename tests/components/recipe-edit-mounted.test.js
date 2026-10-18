@@ -415,6 +415,9 @@ function stepsProps(overrides = {}) {
   };
 }
 
+const FAILURE_TOGGLE = '[data-recipe-field="failureResults"]';
+const FAILURE_CARD = '[data-recipe-set-role="failure"]';
+
 function clickTab(target, tab) {
   target.querySelector(`[data-recipe-tab-button="${tab}"]`).click();
 }
@@ -2039,18 +2042,25 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('alchemy Simple: two labeled result sets, reserved failure set undeletable, no Add result set (issue 554)', async () => {
+  it('alchemy Simple: two labeled result sets, no kebab on either, no Add result set (issue 554)', async () => {
     const target = await editHarness.mount(
       identityProps({
         alchemySimple: true,
         complex: false,
         componentOptions: COMPONENT_OPTIONS,
+        routedFailureResultsAllowed: true,
         recipe: {
           ...RECIPE,
           resultGroups: [
             {
               id: 'rg-ok',
               name: 'On success',
+              results: [{ componentId: 'cmp-herb', quantity: 1 }],
+            },
+            {
+              id: 'rg-fail',
+              name: '',
+              role: 'failure',
               results: [{ componentId: 'cmp-herb', quantity: 1 }],
             },
           ],
@@ -2135,12 +2145,13 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('simple-with-check: the same two-slot result editor renders (success + reserved failure)', async () => {
+  it('simple-with-check: the two-slot editor draws only the success set and the toggle off (issue 2514)', async () => {
     const target = await editHarness.mount(
       identityProps({
         simpleFailureSlot: true,
         complex: false,
         componentOptions: COMPONENT_OPTIONS,
+        routedFailureResultsAllowed: true,
         recipe: {
           ...RECIPE,
           resultGroups: [{ id: 'rg-ok', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
@@ -2153,17 +2164,216 @@ describe('RecipeEditView (mounted)', () => {
 
     const view = target.querySelector('[data-recipe-result-alchemy-simple]');
     assert.ok(view, 'a simple system with a check gets the two-slot success/failure editor');
-    assert.equal(
-      view.querySelectorAll('[data-recipe-set]').length,
-      2,
-      'exactly two result sets (success + reserved failure)'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      null,
+    assert.equal(view.querySelectorAll('[data-recipe-set]').length, 1, 'only the success set');
+    assert.ok(!view.querySelector(FAILURE_CARD), 'no failure set is drawn or synthesized');
+    const toggle = view.querySelector(FAILURE_TOGGLE);
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'the toggle reads off');
+    assert.equal(toggle.disabled, false);
+    assert.ok(!toggle.hasAttribute('title'), 'an enabled switch carries no tooltip');
+    assert.ok(!view.querySelector('[data-recipe-failure-results-policy]'), 'no policy callout');
+    assert.ok(
+      !target.querySelector('[data-recipe-add="result-set"]'),
       'no "Add result set" in the two-slot view'
     );
     editHarness.remount();
+  });
+
+  describe('the failure-results opt-in (issue 2514)', () => {
+    const SUCCESS = Object.freeze({
+      id: 'rg-ok',
+      results: [{ id: 'res-herb', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    const FAILURE = Object.freeze({
+      id: 'rg-fail',
+      name: '',
+      role: 'failure',
+      results: [{ id: 'res-ash', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    const failureOf = (groups) => groups.filter((group) => group.role === 'failure');
+
+    /** The two-slot editor over `resultGroups`, feeding each patch back as the parent does. */
+    async function mountTwoSlot(resultGroups, props = {}) {
+      const patches = [];
+      let recipe = { ...RECIPE, resultGroups };
+      const target = await editHarness.mount(
+        identityProps({
+          simpleFailureSlot: true,
+          componentOptions: COMPONENT_OPTIONS,
+          routedFailureResultsAllowed: true,
+          recipe,
+          onUpdateRecipe: (patch) => {
+            patches.push(patch);
+            recipe = { ...recipe, ...patch };
+            editHarness.setProps({ recipe });
+          },
+          ...props,
+        })
+      );
+      clickTab(target, 'results');
+      await flushRender();
+      return { target, patches };
+    }
+
+    async function toggleFailure(target) {
+      target.querySelector(FAILURE_TOGGLE).click();
+      await flushRender();
+    }
+
+    it('turning it on adds exactly one empty failure group and draws its reserved card', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS]);
+      await toggleFailure(target);
+
+      assert.equal(patches.length, 1);
+      const [success, failure, ...rest] = patches[0].resultGroups;
+      assert.deepEqual(success, SUCCESS);
+      assert.equal(rest.length, 0);
+      assert.deepEqual({ ...failure, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
+      assert.ok(failure.id, 'the group is minted an id');
+      const card = target.querySelector(FAILURE_CARD);
+      assert.ok(card?.classList.contains('is-reserved'), 'the reserved failure card is drawn');
+      assert.equal(target.querySelector(FAILURE_TOGGLE).getAttribute('aria-pressed'), 'true');
+      editHarness.remount();
+    });
+
+    it('turning it off removes the failure group with its results, without a confirm', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS, FAILURE]);
+      await toggleFailure(target);
+
+      assert.deepEqual(patches.at(-1).resultGroups, [SUCCESS]);
+      assert.ok(!target.querySelector(FAILURE_CARD), 'the failure card is gone');
+      editHarness.remount();
+    });
+
+    it('from no groups, turning it on writes only the failure group and the success card still draws', async () => {
+      const { target, patches } = await mountTwoSlot([]);
+      await toggleFailure(target);
+
+      const [group, ...rest] = patches[0].resultGroups;
+      assert.equal(rest.length, 0);
+      assert.deepEqual({ ...group, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
+      assert.equal(target.querySelectorAll(':scope [data-recipe-result-alchemy-simple] [data-recipe-set]').length, 2);
+      assert.ok(Boolean(target.querySelector('[data-recipe-set-role="success"]')), 'the success card draws');
+      editHarness.remount();
+    });
+
+    it('a success edit from no groups writes one success group and no failure group', async () => {
+      const { target, patches } = await mountTwoSlot([]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(groups.length, 1);
+      assert.equal(failureOf(groups).length, 0);
+      editHarness.remount();
+    });
+
+    it('a success edit after a failure-only state writes the success set first, then the failure set', async () => {
+      const { target, patches } = await mountTwoSlot([FAILURE]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.deepEqual(groups.map((group) => group.role ?? 'success'), ['success', 'failure']);
+      assert.deepEqual(groups[1], FAILURE);
+      editHarness.remount();
+    });
+
+    it('a success-set edit leaves no failure group in the patch', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(groups.length, 1);
+      assert.equal(groups[0].results.length, 2, 'the row lands in the success set');
+      assert.equal(failureOf(groups).length, 0);
+      editHarness.remount();
+    });
+
+    it('an empty failure card draws no warning and no body, only the optional note, and its adder writes into it', async () => {
+      const empty = { ...FAILURE, results: [] };
+      const { target, patches } = await mountTwoSlot([SUCCESS, empty]);
+      const card = target.querySelector(FAILURE_CARD);
+
+      assert.ok(!card.querySelector('[data-recipe-result-empty]'), 'no "Nothing produced" panel');
+      assert.ok(!card.querySelector('.fabricate-set-card-body'), 'no empty body');
+      assert.ok(Boolean(card.querySelector('[data-recipe-failure-set-note="optional"]')));
+      assert.match(card.textContent, /Optional\. Leave it empty and a failed check produces nothing\./u);
+
+      await addResultRow(target, FAILURE_CARD);
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(failureOf(groups)[0].results.length, 1, 'the row lands in the failure set');
+      assert.equal(groups[0].results.length, 1, 'the success set is untouched');
+      editHarness.remount();
+    });
+
+    it('under a never policy the toggle cannot add the set, says why, and links to the Checks tab', async () => {
+      const opened = [];
+      const { target } = await mountTwoSlot([SUCCESS], {
+        routedFailureResultsAllowed: false,
+        onOpenChecks: () => {
+          opened.push('checks');
+        },
+      });
+      const toggle = target.querySelector(FAILURE_TOGGLE);
+
+      assert.equal(toggle.disabled, true);
+      assert.equal(
+        toggle.getAttribute('title'),
+        'This system produces nothing on a failed check, so there is no failure set to add.'
+      );
+      const callout = target.querySelector('[data-recipe-failure-results-policy]');
+      assert.match(callout.textContent, /Failed checks produce nothing on this system/u);
+      callout.querySelector('[data-recipe-failure-results-checks]').click();
+      await flushRender();
+      assert.deepEqual(opened, ['checks']);
+      editHarness.remount();
+    });
+
+    it('under a never policy a present failure set stays drawn with the policy note, and the toggle removes it', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS, { ...FAILURE, results: [] }], {
+        routedFailureResultsAllowed: false,
+      });
+      const toggle = target.querySelector(FAILURE_TOGGLE);
+      assert.equal(toggle.disabled, false, 'a present set can still be removed');
+      assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+      assert.ok(Boolean(target.querySelector(`${FAILURE_CARD} [data-recipe-failure-set-note="policy"]`)));
+      assert.ok(!target.querySelector('[data-recipe-failure-set-note="optional"]'));
+
+      await toggleFailure(target);
+      assert.deepEqual(patches.at(-1).resultGroups, [SUCCESS]);
+      const button = target.querySelector('[data-recipe-failure-results-checks]');
+      assert.ok(
+        globalThis.document.activeElement === button,
+        'focus moves to the callout button, as the switch it was on is now disabled'
+      );
+      editHarness.remount();
+    });
+
+    it("a step section's callout opens the Checks tab too", async () => {
+      const opened = [];
+      const target = await editHarness.mount(
+        identityProps({
+          alchemySimple: true,
+          multiStepEnabled: true,
+          componentOptions: COMPONENT_OPTIONS,
+          routedFailureResultsAllowed: false,
+          onOpenChecks: () => {
+            opened.push('checks');
+          },
+          recipe: {
+            ...RECIPE,
+            steps: [{ id: 'st-1', name: 'Brew', ingredientSets: [], resultGroups: [SUCCESS] }],
+          },
+        })
+      );
+      clickTab(target, 'results');
+      await flushRender();
+
+      const section = target.querySelector('[data-recipe-section="step-st-1-results"]');
+      assert.ok(Boolean(section), 'PRE-CONDITION: the step section renders');
+      section.querySelector('[data-recipe-failure-results-checks]').click();
+      await flushRender();
+      assert.deepEqual(opened, ['checks']);
+      editHarness.remount();
+    });
   });
 
   it('names every ingredient set in its card, in check mode as in ingredient mode', async () => {

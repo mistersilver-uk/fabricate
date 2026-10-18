@@ -11,19 +11,28 @@
   expected. `idPrefix` namespaces the `data-recipe-section` marker per instance.
 -->
 <script>
+  import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import { rendersBare, setDisplayName, withSoleEntry } from './setDrafts.js';
   import { buildRoutingModel } from './recipeRoutingModel.js';
   import { assignCandidates, inboundChips } from './resultSetSources.js';
-  import { addResultGroup, alchemySlots, routeTier, withResultSlot } from './recipeRoutingEdits.js';
+  import {
+    addResultGroup,
+    alchemySlots,
+    routeTier,
+    withFailureSet,
+    withResultSlot,
+  } from './recipeRoutingEdits.js';
 
   let {
     resultGroups = [],
-    // Alchemy Simple mode: a FIXED two-slot view — a labeled "On success" set plus a reserved,
-    // undeletable "On a failed check" set — instead of the generic add/remove list.
+    // The two-slot editor instead of the add/remove list: the reserved "On success" set, and the
+    // reserved "On a failed check" set only while "Award results on a failed check" is on.
     alchemySimple = false,
     componentOptions = [],
     // The card's `surface` and `resultKinds`: `'recipe'` with what a result row offers and names,
@@ -53,6 +62,8 @@
     onChange = () => {},
     // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The failure-results callout's link to the Checks tab, drawn while the policy forbids them.
+    onOpenChecks = () => {},
     idPrefix = '',
   } = $props();
 
@@ -155,12 +166,24 @@
     onChange(groups.map((group, i) => (i === index ? nextGroup : group)));
   }
 
-  // Alchemy Simple two-slot view. Either card's edit reconstructs both slots, spreading to preserve
-  // id and name — persist-on-first-edit.
+  // The two-slot view. A card's edit writes the success set, and the failure set only when it
+  // exists, spreading each to preserve its id and name; only the toggle adds or removes it.
   const alchemy = $derived(alchemySlots(groups));
+  const failureBlocked = $derived(!alchemy.failure && !failureResultsAllowed);
+  let twoSlotRoot = $state(null);
 
   function updateAlchemyPair(slot, nextGroup) {
     onChange(withResultSlot(groups, slot, nextGroup));
+  }
+
+  // Under a forbidding policy the switch disables once the set is gone, so focus moves to the link.
+  async function toggleFailureSet(on) {
+    const next = withFailureSet(groups, on);
+    if (next === groups) return;
+    onChange(next);
+    if (on || failureResultsAllowed) return;
+    await tick();
+    twoSlotRoot?.querySelector('[data-recipe-failure-results-checks]')?.focus();
   }
 
   function addGroup() {
@@ -178,8 +201,12 @@
   data-set-card-scope
 >
   {#if alchemySimple}
-    <!-- Alchemy Simple: two labeled result sets, no add-set and no remove on either. -->
-    <div class="manager-recipe-result-set-alchemy-simple" data-recipe-result-alchemy-simple>
+    <!-- The success set, the failure set once opted into, then the toggle; no add-set or kebab. -->
+    <div
+      class="manager-recipe-result-set-alchemy-simple"
+      data-recipe-result-alchemy-simple
+      bind:this={twoSlotRoot}
+    >
       <RecipeResultGroupCard
         group={alchemy.success}
         {componentOptions}
@@ -190,19 +217,71 @@
         staticLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
-      <RecipeResultGroupCard
-        group={alchemy.failure}
-        {componentOptions}
-        {surface}
-        {resultKinds}
-        {onOpenComponent}
-        reservedRole="failure"
-        staticLabel={localizeOr(
-          'FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure',
-          'On a failed check'
+      {#if alchemy.failure}
+        <RecipeResultGroupCard
+          group={alchemy.failure}
+          {componentOptions}
+          {surface}
+          {resultKinds}
+          {onOpenComponent}
+          {failureResultsAllowed}
+          reservedRole="failure"
+          staticLabel={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure',
+            'On a failed check'
+          )}
+          onChange={(nextGroup) => updateAlchemyPair('failure', nextGroup)}
+        />
+      {/if}
+      <ToggleCard
+        variant=""
+        icon=""
+        section={`${idPrefix}failure-results`}
+        field="failureResults"
+        title={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.FailureResultsTitle',
+          'Award results on a failed check'
         )}
-        onChange={(nextGroup) => updateAlchemyPair('failure', nextGroup)}
+        sub={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.FailureResultsSub',
+          'Adds an “On a failed check” result set; turning it off removes the set and its results.'
+        )}
+        on={Boolean(alchemy.failure)}
+        disabled={failureBlocked}
+        toggleTitle={failureBlocked
+          ? localizeOr(
+              'FABRICATE.Admin.Manager.Recipe.FailureResultsBlockedTooltip',
+              'This system produces nothing on a failed check, so there is no failure set to add.'
+            )
+          : ''}
+        onToggle={toggleFailureSet}
       />
+      {#if !failureResultsAllowed}
+        <Callout
+          tone="neutral"
+          title={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.FailureResultsPolicyTitle',
+            'Failed checks produce nothing on this system'
+          )}
+          text={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.FailureResultsPolicyText',
+            'To award results on a failed check, set “Produce a result on a failed check” to Decided per recipe or Always on the crafting check’s On failure section.'
+          )}
+          data-recipe-failure-results-policy
+        >
+          {#snippet actions()}
+            <Button role="ghost" data-recipe-failure-results-checks onclick={() => onOpenChecks()}>
+              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+              <span
+                >{localizeOr(
+                  'FABRICATE.Admin.Manager.Recipe.FailureResultsOpenChecks',
+                  'Open the crafting check'
+                )}</span
+              >
+            </Button>
+          {/snippet}
+        </Callout>
+      {/if}
     </div>
   {:else if !effectiveComplex}
     <!-- Simple mode: a single result group with no Set-N label, remove, or add-set. -->

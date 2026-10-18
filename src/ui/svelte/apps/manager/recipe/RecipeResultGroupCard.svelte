@@ -51,8 +51,8 @@
     unreachable = false,
     assignNote = '',
     onRoute = () => {},
-    // The routed check's tier state, read only by the empty hint: whether it has ANY tier, and
-    // whether its failure-result policy permits results on a failed check.
+    // The routed check's tier state, read by the empty hint: whether it has ANY tier, and whether
+    // its failure-result policy permits results on a failed check, which the failure set's note reads.
     outcomeTiersDefined = false,
     failureResultsAllowed = false,
     // The set's index in its scope, naming an unnamed set "Set N"; `null` off a recipe.
@@ -253,15 +253,19 @@
     if (id === 'remove') onRemove();
   }}
   sources={routed || reservedRole ? routeLine : undefined}
-  note={sharedCount > 1 ? sharedNote : undefined}
+  note={sharedCount > 1 ? sharedNote : reservedRole === 'failure' ? failureNote : undefined}
   adder={!progressive || results.length === 0 ? adderSlot : undefined}
+  children={reservedRole === 'failure' && results.length === 0 ? undefined : body}
   data-recipe-set
   data-recipe-result-set-id={group?.id || ''}
   data-recipe-set-role={reservedRole || undefined}
   data-validation-target={validationTarget}
   tabindex="-1"
   data-keyboard-focus="true"
->
+/>
+
+<!-- An empty failure set is optional rather than a gap, so it draws no body at all. -->
+{#snippet body()}
   {#if results.length === 0 && !isTerminalStep}
     <p class="manager-muted" data-recipe-result-empty>
       {localizeOr(
@@ -325,7 +329,7 @@
       {/each}
     </div>
   {/if}
-</SetCard>
+{/snippet}
 
 <!-- The adder follows the empty message (issue 1512): a footer of a list that is not rendered
      cannot render, so at zero results and on every non-progressive set it is the card's adder. -->
@@ -361,6 +365,24 @@
       '{count} ingredient sets route here, so editing these results changes what each of them awards.',
       { count: sharedCount }
     )}
+  {/if}
+{/snippet}
+
+{#snippet failureNote()}
+  {#if failureResultsAllowed}
+    <span data-recipe-failure-set-note="optional"
+      >{localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.FailureSetOptionalNote',
+        'Optional. Leave it empty and a failed check produces nothing.'
+      )}</span
+    >
+  {:else}
+    <span data-recipe-failure-set-note="policy"
+      >{localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.FailureSetPolicyNote',
+        'This system produces nothing on a failed check, so this set awards nothing.'
+      )}</span
+    >
   {/if}
 {/snippet}
 

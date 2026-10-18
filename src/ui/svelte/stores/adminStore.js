@@ -72,7 +72,7 @@ import {
 } from '../../../systems/normalize/checkEvaluation.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
-import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
+import { summarizeModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
@@ -141,6 +141,7 @@ import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
+import { modeChangeConfirmContent } from './modeChangeConfirm.js';
 import { createWorldScopeActions } from './worldScopeActions.js';
 import {
   buildWorldScopeState as _buildWorldScopeState,
@@ -165,14 +166,6 @@ const FEATURE_MAP = {
   chatOutput: 'chatOutput',
   salvage: 'salvage',
   refundOnPlayerCancel: 'refundOnPlayerCancel',
-};
-
-const RESOLUTION_MODE_LABEL_KEYS = {
-  simple: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
-  routedByIngredients: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByIngredients',
-  routedByCheck: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheck',
-  progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
-  alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy',
 };
 
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
@@ -330,11 +323,6 @@ function _normalizeComponentEssences(essences) {
     out[id] = qty;
   }
   return out;
-}
-
-function _resolutionModeLabel(mode, localizeFn) {
-  const key = RESOLUTION_MODE_LABEL_KEYS[mode];
-  return key ? localizeFn?.(key) || mode : mode;
 }
 
 function _normalizeGatheringTag(value) {
@@ -3973,42 +3961,15 @@ export function createAdminStore(services) {
     const currentMode = system.resolutionMode || 'simple';
     if (nextMode === currentMode) return true;
 
-    // Dry-run the migration so the GM sees accurate migrate/delete counts before
-    // committing. Migration-first: recipes are migrated to the new mode wherever
-    // possible and only the structurally un-migratable ones are deleted.
+    // Dry-run the migration so the GM sees what is migrated, deleted and dropped before committing.
     const affectedRecipes = recipeManager?.getRecipes?.({ craftingSystemId: sysId }) || [];
-    const deletedNames = [];
-    let migrateCount = 0;
-    for (const recipe of affectedRecipes) {
-      const recipeJSON = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
-      const { outcome } = classifyModeChange(recipeJSON, currentMode, nextMode, system);
-      if (outcome === 'delete') {
-        deletedNames.push(recipe.name || recipe.id);
-      } else {
-        migrateCount += 1;
-      }
-    }
-
+    const summary = summarizeModeChange(affectedRecipes, currentMode, nextMode, system);
     const localizeFn = services.localize;
-    const modeLabel = _resolutionModeLabel(nextMode, localizeFn);
-    const content =
-      deletedNames.length > 0
-        ? localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContentDelete', {
-            count: migrateCount,
-            deleteCount: deletedNames.length,
-            names: deletedNames.join(', '),
-            mode: modeLabel,
-          }) ||
-          `${migrateCount} recipe(s) will be migrated to ${modeLabel}; ${deletedNames.length} cannot be migrated and will be deleted: ${deletedNames.join(', ')}.`
-        : localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContent', {
-            count: migrateCount,
-            mode: modeLabel,
-          }) || `${migrateCount} recipe(s) will be migrated to ${modeLabel}.`;
     const confirmed = await services.confirmDialog({
       title:
         localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
         'Change Resolution Mode?',
-      content: `<p>${content}</p>`,
+      content: modeChangeConfirmContent(summary, nextMode, localizeFn),
       yes: {
         label:
           localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeConfirm') ||

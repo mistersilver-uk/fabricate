@@ -42,13 +42,13 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
   }
 
   // Structural deletion: narrowing into a single-group mode requires exactly one ingredient set AND
-  // one result group, which seed or clear alone cannot reshape.
+  // one success result group, which seed or clear alone cannot reshape.
   if (SINGLE_GROUP_MODES.has(toMode) && !_isOneByOne(recipeJSON)) {
     return {
       outcome: 'delete',
       recipe: null,
       reasons: [
-        `recipe has multiple ingredient sets or result groups and cannot be narrowed to ${toMode} mode`,
+        `recipe has multiple ingredient sets or success result groups and cannot be narrowed to ${toMode} mode`,
       ],
     };
   }
@@ -111,16 +111,41 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
   }
 
   // The target routes via no recipe-level provider: clear any selection so the recipe conforms.
+  const reasons = [];
   if (recipeJSON.resultSelection != null) {
     recipeJSON.resultSelection = null;
-    return {
-      outcome: 'cleared',
-      recipe: recipeJSON,
-      reasons: [`cleared resultSelection for ${toMode} mode`],
-    };
+    reasons.push(`cleared resultSelection for ${toMode} mode`);
   }
+  const dropped = toMode === 'progressive' ? _dropFailureGroupForProgressive(recipeJSON) : null;
+  if (dropped) reasons.push(dropped);
+  return reasons.length > 0
+    ? { outcome: 'cleared', recipe: recipeJSON, reasons }
+    : { outcome: 'lossless', recipe: recipeJSON, reasons: ['no routed selection to clear'] };
+}
 
-  return { outcome: 'lossless', recipe: recipeJSON, reasons: ['no routed selection to clear'] };
+/**
+ * Dry-run a mode change over a system's recipes for the confirm: the migrate count, the deleted
+ * recipe names, and what each surviving recipe loses. Never mutates its input.
+ */
+export function summarizeModeChange(recipes, fromMode, toMode, system = {}) {
+  const summary = { migrated: 0, deleted: [], droppedIngredientSets: [], droppedFailureSets: [] };
+  for (const recipe of recipes ?? []) {
+    const source = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+    const name = source?.name || source?.id;
+    const { outcome, recipe: next } = classifyModeChange(source, fromMode, toMode, system);
+    if (outcome === 'delete') {
+      summary.deleted.push(name);
+      continue;
+    }
+    summary.migrated += 1;
+    const keptIds = new Set((next?.ingredientSets ?? []).map((set) => set?.id));
+    const sets = (source?.ingredientSets ?? []).flatMap((set, index) =>
+      keptIds.has(set?.id) ? [] : [{ name: set?.name, index }]
+    );
+    if (sets.length > 0) summary.droppedIngredientSets.push({ recipe: name, sets });
+    if (_hasFailureGroup(source) && !_hasFailureGroup(next)) summary.droppedFailureSets.push(name);
+  }
+  return summary;
 }
 
 /** Number of authoring steps on the recipe (0 for a flat recipe). */
@@ -129,14 +154,27 @@ function _stepCount(recipe) {
 }
 
 /**
- * Whether the recipe is "1×1" — exactly one ingredient set and one result group across every scope.
- * A multi-step recipe is never 1×1: each step is its own scope and single-group modes have no steps.
+ * Whether the recipe is "1×1" — exactly one ingredient set and one success result group across
+ * every scope; the reserved failure group is not counted. A multi-step recipe is never 1×1: each
+ * step is its own scope and single-group modes have no steps.
  */
 function _isOneByOne(recipe) {
   if (_stepCount(recipe) > 0) return false;
   const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
   const resultGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
-  return ingredientSets.length <= 1 && resultGroups.length <= 1;
+  return ingredientSets.length <= 1 && resultGroups.filter((g) => !_isFailureGroup(g)).length <= 1;
+}
+
+const _isFailureGroup = (group) => group?.role === 'failure';
+
+const _hasFailureGroup = (recipe) =>
+  Array.isArray(recipe?.resultGroups) && recipe.resultGroups.some(_isFailureGroup);
+
+/** `progressive` has no failure set: remove every one, returning the reason or `null`. */
+function _dropFailureGroupForProgressive(recipeJSON) {
+  if (!_hasFailureGroup(recipeJSON)) return null;
+  recipeJSON.resultGroups = recipeJSON.resultGroups.filter((group) => !_isFailureGroup(group));
+  return 'dropped the failure result set for progressive mode';
 }
 
 function _clone(value) {

@@ -13,7 +13,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   `destructive-changes-and-migrations/spec.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
-  be satisfied by clearing the result selection or collapsing a multi-set recipe.
+  be satisfied by clearing the result selection, collapsing a multi-set recipe, or dropping its reserved failure result group.
   System-level gaps (a target mode that needs a check the system has not
   configured, an alchemy signature collision, ...) never delete a recipe; they are
   surfaced as system-validation issues that gate visibility, not deletion.
@@ -29,7 +29,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   "carry" keeps the recipe verbatim;
   "reconcile" means the recipe survives but its stale routing is surfaced as a
   re-authoring validation issue, never silently mis-routed;
-  "1×1" means the recipe has exactly one ingredient set and one result group.
+  "1×1" means the recipe has exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted.
 
   | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`                          | `progressive`                | `alchemy`                                                           |
   |-----------------------|------------------------------|------------------------------|------------------------------------------|------------------------------|--------------------------------------------------------------------|
@@ -40,12 +40,13 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   | `alchemy`             | clear if 1×1 else **delete** | carry                        | carry; reconcile                         | clear if 1×1 else **delete** | —                                                                  |
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
-  (which require 1×1) from a recipe with more than one ingredient set or result
-  group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
+  (which require 1×1) from a recipe with more than one ingredient set or success
+  result group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
   support).
 Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
+  Migrating into `progressive` drops every reserved `role: 'failure'` group, because that mode has none; every other target keeps it, and only `simple` and alchemy's simple check mode select it by role.
   Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
 - Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `destructive-changes-and-migrations/spec.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
 

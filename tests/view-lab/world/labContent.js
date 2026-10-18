@@ -2958,9 +2958,9 @@ export function buildLabContent({ journalCaseState = null } = {}) {
       // Restricted on purpose: this is what makes the Access rail entry exist.
       resolutionMode: 'alchemy',
       craftingCheck: SIMPLE_CHECK,
-      // `checkMode: 'simple'` is what draws the alchemy Results tab's FIXED TWO-SLOT editor — a
-      // labelled "On success" set plus a reserved, undeletable "On a failed check" set
-      // (`recipeAlchemySimple = alchemyCheckMode === 'simple'`).
+      // `checkMode: 'simple'` is what draws the alchemy Results tab's TWO-SLOT editor — a reserved
+      // "On success" set plus, on a recipe carrying a `role: 'failure'` group, a reserved "On a
+      // failed check" set (`recipeAlchemySimple = alchemyCheckMode === 'simple'`).
       alchemy: { checkMode: 'simple' },
       features: {
         essences: true,

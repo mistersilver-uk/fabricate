@@ -566,8 +566,9 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result set editor, and, with the crafting check enabled, the reserved failure result set on the terms Alchemy Simple states below.
-  NOT SHIPPED here yet, issue 2514: the Simple editor offers no "Award results on a failed check" toggle; with the crafting check enabled a single-step recipe draws the Alchemy Simple two-slot editor (issue 643), which synthesizes the undeletable failure set in the derived view, and an edit to either slot persists it.
+- One result set editor.
+  With the crafting check enabled, a single-step recipe draws it as the reserved "On success" set, and the reserved "On a failed check" set and its "Award results on a failed check" toggle follow on the terms Alchemy Simple states below.
+  NOT SHIPPED here yet, issue 2523: a step of a multi-step recipe offers no "Award results on a failed check" toggle, so a step's failure set can be neither added nor removed in the editor.
 
 ### Routed UI
 
@@ -639,7 +640,7 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
     Each is drawn in `SetCard`'s reserved form — a lock glyph, its static name, a "reserved role" badge, and a Produced-by line stating the passed or failed check in words, with no assignment — and the failure set takes the danger accent.
     An "Award results on a failed check" toggle adds that group empty and removes it, the editor never synthesizes the set, and an edit to the success set never creates it.
     Under a failure-result policy of `never` the toggle cannot add the group, states why and links to the Checks studio, and a group already present stays drawn with that reason and can still be removed.
-    NOT SHIPPED here yet, issue 2514: the editor still synthesizes an undeletable failure set in the derived view, and an edit to either slot persists it.
+    The toggle sits below the sets, and an empty failure set draws no "Nothing produced" warning, only a note that a failed check then produces nothing.
     No "add result set" beyond the two.
   - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.

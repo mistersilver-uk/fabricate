@@ -39,9 +39,8 @@
     recipe = null,
     // Whether the mode allows more than one ingredient set: the single-set view's promotion (643).
     canAddSet = false,
-    // Alchemy Simple two-slot result editor (issue 554).
+    // The two-slot result editor: alchemy Simple (issue 554), and simple with the check on (643).
     alchemySimple = false,
-    // A simple system with the check enabled also gets the reserved-failure two slots (issue 643).
     simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
@@ -512,6 +511,7 @@
             {routingProvider}
             {progressive}
             {onOpenComponent}
+            {onOpenChecks}
             outcomeTierOptions={routedOutcomeTierOptions}
             {routedOutcomeTiers}
             routedMinimum={minimum}

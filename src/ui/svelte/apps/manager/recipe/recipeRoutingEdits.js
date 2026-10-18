@@ -85,30 +85,40 @@ export function addIngredientSet(sets, mintId = newDraftId) {
   return [...sets, { id: mintId(), name: '', ingredientGroups: [] }];
 }
 
+const isFailureGroup = (group) => group?.role === 'failure';
+
 /**
- * Alchemy Simple's two slots: the success set is the first non-failure group and the failure set
- * the reserved `role: 'failure'` one, each synthesized empty when absent.
+ * The two-slot editor's sets: the success set is the first non-failure group, else empty, and the
+ * failure set is the reserved `role: 'failure'` group, else `null`; neither is ever filled in.
  */
 export function alchemySlots(groups) {
   return {
-    success: groups.find((group) => group?.role !== 'failure') || groups[0] || { results: [] },
-    failure: groups.find((group) => group?.role === 'failure') || { role: 'failure', results: [] },
+    success: groups.find((group) => !isFailureGroup(group)) || { results: [] },
+    failure: groups.find(isFailureGroup) || null,
   };
 }
 
 /**
- * Alchemy Simple's `[success, failure]` pair with `nextGroup` written into `slot`, each slot read
- * by `alchemySlots` and spread so its id and name survive.
+ * `[success]`, plus the failure set only when one exists, with `nextGroup` written into `slot`;
+ * each is spread so its id and name survive. A `'failure'` edit with no failure set is a no-op.
  */
 export function withResultSlot(groups, slot, nextGroup, mintId = newDraftId) {
   const { success, failure } = alchemySlots(groups);
+  if (slot === 'failure' && !failure) return groups;
   const write = (current, edit) => ({
     ...current,
     ...edit,
     id: current.id || edit?.id || mintId(),
   });
-  return [
-    write(success, slot === 'success' ? nextGroup : null),
-    { ...write(failure, slot === 'failure' ? nextGroup : null), role: 'failure' },
-  ];
+  const next = [write(success, slot === 'success' ? nextGroup : null)];
+  if (!failure) return next;
+  return [...next, { ...write(failure, slot === 'failure' ? nextGroup : null), role: 'failure' }];
+}
+
+/** Adds the reserved failure set empty (`on`) or removes every one; a no-op returns `groups`. */
+export function withFailureSet(groups, on, mintId = newDraftId) {
+  if (Boolean(on) === groups.some(isFailureGroup)) return groups;
+  return on
+    ? [...groups, { id: mintId(), name: '', role: 'failure', results: [] }]
+    : groups.filter((group) => !isFailureGroup(group));
 }
