@@ -278,6 +278,8 @@ Its anatomy is the kind FIRST and the value second:
 [lead plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
 
+Every row stands on one 34px minimum line, the subject cell's height, whatever its kind; a row that draws no subject cell, a tag row among them, keeps that line.
+
 The fixed-or-rolled toggle is drawn on component and currency result rows alone, and a knowledge result row draws no amount, because a recipe is taught once; a progressive result row draws neither the toggle nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
 A currency row, on either side, draws its unit's abbreviation, where the unit has one, to the right of its amount, never beneath the name.
 
@@ -345,7 +347,7 @@ It reads as the sentence it writes — the policy word, the chosen tag chips eac
 There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
 The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
 It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
-An unfilled tag row is therefore no taller than the component row beside it.
+An unfilled tag row is therefore level with the component row beside it.
 The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
 What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
@@ -365,6 +367,7 @@ No adder chooses a subject, so none can dedupe against a requirement the set alr
 
 A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through ONE kind menu with two triggers.
 A bare requirement carries the **"or…"** control; a requirement holding two or more alternatives carries one dashed **`Alternative`** adder at the foot of its box instead, named "Add an alternative", and no row inside the box draws the `or…` control.
+A choice group draws no separator between its alternatives, on either side: its header, each alternative and its 28px adder stand 8px apart, so a result group awarding up to N of them is not misread as exclusive.
 Both triggers open the SAME menu — a single flat **"Accept instead"** list of the ingredient match types the system can honour, Component, Tag, Essence and Currency in that order — and choosing one appends a new OR alternative of that kind for the row's own field to name.
 The adder's menu opens from the button's start edge.
 A result-side box carries the same one `Alternative` adder, its menu headed **"Add an alternative"** as a standalone result row's convert menu is, offering its set's kinds, and appending directly where the set offers one kind.
