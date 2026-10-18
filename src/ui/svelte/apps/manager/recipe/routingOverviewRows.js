@@ -94,7 +94,7 @@ export function overviewRows({
   const groups = asArray(scope?.groups);
   if (provider === 'ingredientSet') {
     return model.sources.map((entry, index) =>
-      sourceRow(`set:${entry.id ?? index}`, entry, groups, { index })
+      sourceRow(`set:${entry.id || `#${index}`}`, entry, groups, { index })
     );
   }
   if (provider !== 'check') return [];

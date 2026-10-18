@@ -297,8 +297,10 @@ describe('overviewRows: set rows and markers', () => {
     assert.deepEqual(markers(setRows([{ id: 's1' }], [])), [['set:s1', '', false, 0]]);
   });
 
-  it('keys an id-less set by its index', () => {
-    assert.deepEqual(keys(setRows([{ name: 'Draft' }], [{ id: 'g1' }])), ['set:0']);
+  it('keys an id-less set by its index, apart from any real id', () => {
+    assert.deepEqual(keys(setRows([{ name: 'Draft' }], [{ id: 'g1' }])), ['set:#0']);
+    const blank = setRows([{ id: '' }, { id: '' }, { id: '0' }], [{ id: 'g1' }]);
+    assert.deepEqual(keys(blank), ['set:#0', 'set:#1', 'set:0']);
   });
 
   it('marks a tier routed by the single-group exemption or by name as default', () => {
