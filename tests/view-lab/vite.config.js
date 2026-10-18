@@ -6,7 +6,6 @@ import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
-import { SPECIMEN_PAGE } from './primitives/specimenProtocol.js';
 import { openServedFile } from './servedFile.js';
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
@@ -116,6 +115,8 @@ function chromeStatusEndpoint() {
   };
 }
 
+/** The Primitive Lab's specimen document, the one page the Vite-client drop below targets. */
+export const SPECIMEN_PAGE = '/tests/view-lab/primitives/specimen.html';
 const VITE_CLIENT_TAG = /<script type="module" src="\/@vite\/client"><\/script>/;
 
 /**

@@ -26,7 +26,6 @@ import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
   SPECIMEN_MOUNTED,
-  SPECIMEN_PAGE,
   SPECIMEN_READY,
   SPECIMEN_RECHECK,
   SPECIMEN_REACHED,
@@ -71,6 +70,9 @@ const CHROME_PROBE_URL = '/@foundry-chrome/css/foundry2.css';
 
 /** Where the dev server reports what it knows about the harvest. */
 const CHROME_STATUS_URL = '/@primitive-lab/chrome-status';
+
+/** The document one specimen's `<iframe>` navigates to. Carries no row of its own in its URL. */
+const SPECIMEN_URL = '/tests/view-lab/primitives/specimen.html';
 
 /**
  * Fail closed unless the harvested stylesheet itself is served; the status endpoint only supplies
@@ -383,7 +385,7 @@ function loadSpecimen({ slot, iframe, host }, problems, results, onReady, acts) 
       }
     }
     globalThis.addEventListener('message', onMessage);
-    iframe.src = SPECIMEN_PAGE;
+    iframe.src = SPECIMEN_URL;
     // Armed after `src`: the placed iframe's own `about:blank` load must not start the clock.
     cancelWatchdog = armReadyWatchdog(iframe, () => {
       problems.push(
