@@ -86,14 +86,13 @@ const FAILURE_TOGGLE = '[data-recipe-field="failureResults"]';
 const FAILURE_POLICY = '[data-recipe-failure-results-policy]';
 const FAILURE_CHECKS = '[data-recipe-failure-results-checks]';
 /** `ROUTED_RESULTS`, then each selector: scrolled to if the toggle card or callout, else clicked. */
-const FAILURE_RESULTS = (system, recipeId, state, ...selectors) => {
+const FAILURE_RESULTS = (system, recipeId, state, ...steps) => {
   const base = ROUTED_RESULTS(system, recipeId, state);
-  const scrolled = new Set([FAILURE_TOGGLE_CARD, FAILURE_POLICY]);
-  const steps = selectors.map((selector) =>
-    scrolled.has(selector) ? { selector, scroll: true } : { selector }
-  );
   return { ...base, steps: [...base.steps, ...steps] };
 };
+/** A step that scrolls a selector into view, and one that clicks it. */
+const SCROLL_TO = (selector) => ({ selector, scroll: true });
+const CLICK = (selector) => ({ selector });
 /** A result set's card in the editor, by its result set id. */
 const RESULT_SET = (id) => `[data-recipe-result-set-id="${id}"]`;
 const SET_SOURCES = Object.freeze([
@@ -1678,7 +1677,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit results, the failure-results toggle off',
     smokeLabels: [],
     reaches: 'beyond',
-    ...FAILURE_RESULTS('lab-alchemy', 'al-r-smokestick', null, FAILURE_TOGGLE_CARD),
+    ...FAILURE_RESULTS('lab-alchemy', 'al-r-smokestick', null, SCROLL_TO(FAILURE_TOGGLE_CARD)),
     expectView: 'recipe-edit',
     expectSelector: `[data-recipe-result-alchemy-simple]:not(:has(${FAILURE_POLICY})):not(:has(${FAILURE_SET})) ${FAILURE_TOGGLE_CARD}.is-off ${FAILURE_TOGGLE}:not(:disabled)`,
     expectCenterHit: FAILURE_TOGGLE,
@@ -1694,9 +1693,9 @@ export const CASES = Object.freeze([
       'lab-alchemy',
       'al-r-smokestick',
       null,
-      FAILURE_TOGGLE_CARD,
-      FAILURE_TOGGLE,
-      FAILURE_TOGGLE_CARD
+      SCROLL_TO(FAILURE_TOGGLE_CARD),
+      CLICK(FAILURE_TOGGLE),
+      SCROLL_TO(FAILURE_TOGGLE_CARD)
     ),
     expectView: 'recipe-edit',
     expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_TOGGLE_CARD}.is-on) ${FAILURE_SET}.is-reserved:not(:has([data-recipe-result-empty])):not(:has(.fabricate-set-card-body)) [data-recipe-failure-set-note="optional"]`,
@@ -1710,7 +1709,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit results, the failure-results toggle a never policy disables',
     smokeLabels: [],
     reaches: 'beyond',
-    ...FAILURE_RESULTS('lab-smithing', 'sm-r-shield', null, FAILURE_POLICY),
+    ...FAILURE_RESULTS('lab-smithing', 'sm-r-shield', null, SCROLL_TO(FAILURE_POLICY)),
     expectView: 'recipe-edit',
     expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_POLICY}) ${FAILURE_TOGGLE_CARD}.is-off ${FAILURE_TOGGLE}:disabled`,
     expectCenterHit: [FAILURE_TOGGLE, FAILURE_CHECKS],
@@ -1722,7 +1721,13 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit results, the failure-results callout opening the crafting check',
     smokeLabels: [],
     reaches: 'beyond',
-    ...FAILURE_RESULTS('lab-smithing', 'sm-r-shield', null, FAILURE_POLICY, FAILURE_CHECKS),
+    ...FAILURE_RESULTS(
+      'lab-smithing',
+      'sm-r-shield',
+      null,
+      SCROLL_TO(FAILURE_POLICY),
+      CLICK(FAILURE_CHECKS)
+    ),
     expectView: 'checks-crafting',
     kinds: ['manager', 'recipes', 'checks'],
     sourceMatches: [...SET_SOURCES],
@@ -1734,7 +1739,12 @@ export const CASES = Object.freeze([
       'Manager — Recipe edit results, a failure set a never policy keeps, at the declared floor',
     smokeLabels: [],
     reaches: 'beyond',
-    ...FAILURE_RESULTS('lab-alchemy', 'al-r-elixir', 'failure-policy-never', FAILURE_TOGGLE_CARD),
+    ...FAILURE_RESULTS(
+      'lab-alchemy',
+      'al-r-elixir',
+      'failure-policy-never',
+      SCROLL_TO(FAILURE_TOGGLE_CARD)
+    ),
     expectView: 'recipe-edit',
     expectSelector: `[data-recipe-result-alchemy-simple]:has(${FAILURE_SET} [data-recipe-failure-set-note="policy"]):has(${FAILURE_POLICY} ${FAILURE_CHECKS}) ${FAILURE_TOGGLE_CARD}.is-on ${FAILURE_TOGGLE}:not(:disabled)`,
     expectCenterHit: [FAILURE_TOGGLE, FAILURE_CHECKS, '[data-recipe-failure-set-note="policy"]'],

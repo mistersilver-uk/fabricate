@@ -574,9 +574,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
+    'manager-recipe-edit-results-failure-policy-never-present',
     // The `items` form, which only the essence On craft primer draws (issue 1521).
     'manager-essence-edit-unscoped-on-craft',
-    'manager-recipe-edit-results-failure-policy-never-present',
   ]),
   // The fact row at `rule` density: the essence catalogue's world-default cards and the tool entry's
   // effective-rules rail (issue 1521).

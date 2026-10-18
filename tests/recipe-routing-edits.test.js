@@ -172,6 +172,14 @@ describe('withResultSlot', () => {
     assert.equal(withResultSlot(empty, 'failure', { results: [] }), empty);
   });
 
+  it('mints an empty success set when the failure set is edited with no success set', () => {
+    const next = withResultSlot([failure], 'failure', { results: [{ id: 'r5' }] }, () => 'm');
+    assert.deepEqual(next, [
+      { id: 'm', results: [] },
+      { id: 'gf', role: 'failure', name: 'Ruin', results: [{ id: 'r5' }] },
+    ]);
+  });
+
   it("takes the edit's id for an id-less success set, ahead of a failure-only state", () => {
     const next = withResultSlot([failure], 'success', { id: 'e1', results: [] }, () => 'm');
     assert.deepEqual(next, [
