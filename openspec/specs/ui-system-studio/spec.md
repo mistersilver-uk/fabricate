@@ -901,7 +901,7 @@ Re-entering the same Tool does not prompt.
 Stopping use of the Tool in this system is armed at its own control rather than confirmed by a separate DialogV2; successful removal returns to the library without a second dirty prompt.
 `Delete`, which destroys the Tool itself, belongs to the world Tool entry.
 
-Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, and no component on them restates that type in its own scoped block.
+Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, except a `Field` caption, which takes it from the primitive's own kicker rule; and no component on them restates that type in its own scoped block.
 The same holds for a card's surface fill, which comes from the route's surface ladder in the global sheet.
 Both are correctness rules rather than tidiness: the global sheet is imported at `layer(modules)` while a component's scoped block is injected unlayered, so a local declaration silently discards the shared rule for that property at any specificity, and the shared value can then be corrected without the screen moving.
 The two breakage configuration labels — `Uses per copy` and `Break chance per use` — are NOT eyebrows and carry no kicker: each names the control on its own row and is drawn as a sentence-case title in the body ink.

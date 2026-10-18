@@ -1253,6 +1253,11 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
+A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
+It inherits the host's face and line height, which a `Kicker` states for itself.
+At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.
+The `Field` box carries its value's type, 12.5px at weight 500, the `form` size rung's type, and a text control inside it takes that through the family's `font: inherit` floor, so no screen restates a value weight against its caption.
+The caption's text is the localized string as written; its case is presentation.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
 An empty state INSIDE AN OVERLAY the product has already drawn a boundary around — a picker popover, a suggestion list — is a note rather than a panel: one quiet line at that overlay's own scale, with no border, no fill and no icon tile, because a second bordered box inside a bordered panel reads as a card the GM could act on.
 
@@ -1318,6 +1323,12 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
+
+#### Scenario: A field draws its caption and its value
+
+- **WHEN** a `<Field>` renders a first-child `<span>` caption above a text input, in the manager or in a host carrying no application root
+- **THEN** the caption computes 8.5px at weight 700, `0.11em` tracking, upper case and the muted ink, and the input computes 12.5px at weight 500
+- **AND** a caption whose own class declares any of those properties keeps that class's value, and a span that is not the first child takes none of them
 
 ### Requirement: A tab strip always keeps a tab stop, and names and describes a tab from its own entry
 
@@ -2621,6 +2632,7 @@ The second difference is structural and smaller — `Kicker` takes no `class` an
 The run bar's and run progress's kickers adopt `Kicker` (each as `<Kicker as="span">`), because their shipped subtle ink is under the 4.5:1 floor; its muted ink clears 4.5:1 on the run ground.
 Run progress keeps the `id` its group's `aria-labelledby` names on a wrapper span around the `Kicker`, since `Kicker` forwards no `id`.
 The converted-select captions remain ruled out.
+`Field` draws its caption through its own rule rather than the `Kicker` primitive, which leaves this ruling unchanged.
 
 An `asidePlacement` prop on `ListRow`, which would draw the selectable form's `aside` inline beside its button, is recorded as declined (issue 1523, decision D1): the aside stays beneath the button, as "Dense result rows and compact rail pagination retain their meaning" states, and the library's list row specimens draw it there.
 
