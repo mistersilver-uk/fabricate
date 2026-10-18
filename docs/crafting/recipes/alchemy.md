@@ -73,7 +73,8 @@ A combination that matches nothing still fizzles without a roll, whatever the Al
 With the check switched **off**, each alchemy recipe has one result set, and a match always produces it.
 
 With a **Simple check**, each recipe has an **On success** result set, and it can also have an **On a failed check** result set.
-A recipe has no failure set until you opt in.
+A new recipe has no failure set until you opt in.
+A recipe that already has one keeps it.
 Turn on **Award results on a failed check**, below the sets in the recipe editor, to add an empty failure set.
 Turn it off to remove the set and its results.
 Both sets are reserved sets, drawn with a lock, a **reserved role** badge, and a **Produced by** line that reads "a passed check — no assignment" or "a failed check — no assignment".
@@ -85,8 +86,8 @@ A failed check is still a genuine outcome, not a fizzle, so the components are c
 The failure set may be left empty, in which case a failed brew consumes the components and produces nothing, but it is still recorded as a failed brew rather than a fizzle.
 An empty failure set shows a note saying so, rather than a warning.
 
-If the system's **Produce a result on a failed check** setting is **Never**, the toggle is disabled and a note explains why.
-Choose **Open the crafting check** in that note to change the setting.
+If the system's **Produce a result on a failed check** setting is **Never**, for a recipe with no failure set the toggle is disabled and a note explains why.
+Choose **Open the crafting check** in that note, then change the setting on its **On failure** section.
 A failure set the recipe already has stays in the editor with a note that it awards nothing, and the toggle can still remove it.
 
 With a **Tiered check**, each success outcome tier is assigned its own result set, exactly the way [Routed by check]({% link crafting/recipes/routed.md %}) recipes work.
@@ -265,7 +266,7 @@ Whether the components are consumed then depends on the system's [Consume on Fai
 
 When the system's [Alchemy check](#the-alchemy-check) is Simple or Tiered, brewing a matching recipe prompts you to roll, the same way a check works elsewhere in Fabricate.
 The roll decides which result set the brew produces.
-A failed Simple check produces the recipe's failure result set instead of its success set, if the recipe has one, and it still counts as a brew, so the recipe can still be discovered.
+A failed Simple check produces the recipe's failure result set instead of its success set, if the recipe has one and the system's failed-check setting permits it, and it still counts as a brew, so the recipe can still be discovered.
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
 A banner confirms the outcome after each brew.

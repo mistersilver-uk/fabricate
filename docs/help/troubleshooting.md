@@ -221,7 +221,8 @@ never used to.
 - The record authors no failure output at all.
   The setting SELECTS a failure output you wrote; it never invents one, so **Always** on a recipe with
   no failure result still produces nothing.
-  A simple recipe does not have a failure set until you turn on **Award results on a failed check** on its **Results** tab.
+  A single-step simple recipe does not have a failure set until you turn on **Award results on a failed check** on its **Results** tab.
+  Steps of a multi-step recipe do not offer that toggle yet.
 - The resolution mode has no failure outcome to produce.
   **Routed by ingredients** and **Progressive** have no failure tier or reserved failure result set,
   and gathering's routed and progressive modes are still being built, so the setting is inert there
@@ -241,7 +242,7 @@ never used to.
    mode has no failure outcome, and the note names why.
 3. In **simple** mode, open the record and confirm the failure output exists.
    For a recipe that is the reserved failure result set on the **Results** tab.
-   It appears only after you turn on **Award results on a failed check**, and it is drawn locked with a
+   On a recipe that has none, it appears only after you turn on **Award results on a failed check**, and it is drawn locked with a
    **reserved role** badge.
    For a salvageable item it is the reserved failure result set on the component's Salvage
    panel.

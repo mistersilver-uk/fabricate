@@ -45,12 +45,14 @@ If crafting checks are enabled on the system, simple mode uses pass/fail:
 - **Fail**: what the attempt costs depends on your consumption-on-failure settings, and what it produces depends on whether the system lets a failed check produce a result
 
 What a failure costs and what it produces are separate settings, so you can have either, both, or neither.
-A recipe has no failure set until you opt in.
-On the Results tab, turn on **Award results on a failed check** and a second **On a failed check** set appears, holding what the failure hands back.
+A new recipe has no failure set until you opt in.
+A recipe that already has one keeps it.
+On the Results tab of a single-step recipe, turn on **Award results on a failed check** and a second **On a failed check** set appears, holding what the failure hands back.
+A step of a multi-step recipe does not offer the toggle yet.
 Turn it off and the set and its results are removed.
 The failure set is optional, so if you leave it empty a failed check produces nothing.
-If the system's **Produce a result on a failed check** setting is **Never**, the toggle is disabled and a note says so.
-Choose **Open the crafting check** in that note to change the setting.
+If the system's **Produce a result on a failed check** setting is **Never**, then for a recipe with no failure set the toggle is disabled and a note says so.
+Choose **Open the crafting check** in that note, then change the setting on its **On failure** section.
 
 The crafting check decides whether the attempt passes or fails.
 See [Crafting Checks]({% link checks/crafting.md %}) for how checks work.
