@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PickerRowAmount is a new manager-only member at target, because PickerRow and ChoiceGroupAwardHeader both render it as the amount slot; its specimen is owed to issue 2515 (issue 2510) -->
 <!--
   The amount slot of a `PickerRow`: a stepper, or behind a Fixed | Rolled toggle a roll expression.
   It renders a fragment into the row's trailing controls and owns no wrapper element.

@@ -158,18 +158,6 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte': 1 },
   ],
   [
-    'PickerRowAmount is a new manager-only member at target, because PickerRow and ' +
-      'ChoiceGroupAwardHeader both render it as the amount slot; its specimen is owed to issue ' +
-      '2515 (issue 2510)',
-    { 'src/ui/svelte/components/PickerRowAmount.svelte': 1 },
-  ],
-  [
-    'KindAdder is a new manager-only member at target, because ChoiceGroup, ' +
-      "RecipeIngredientSetCard and RecipeResultGroupCard all render it as the kind menu's adder; " +
-      'its specimen is owed to issue 2515 (issue 2510)',
-    { 'src/ui/svelte/components/KindAdder.svelte': 1 },
-  ],
-  [
     STEPPER_LABELS,
     {
       'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte': 3,

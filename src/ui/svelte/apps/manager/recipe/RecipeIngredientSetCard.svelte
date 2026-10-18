@@ -181,8 +181,8 @@
   {#snippet adder()}
     <KindAdder
       {kinds}
-      word={localizeOr('FABRICATE.Admin.Manager.Recipe.IngredientAdder', 'Ingredient')}
-      name={addAnIngredient}
+      label={localizeOr('FABRICATE.Admin.Manager.Recipe.IngredientAdder', 'Ingredient')}
+      ariaLabel={addAnIngredient}
       heading={addAnIngredient}
       hook="ingredient"
       triggerHook="ingredient"

@@ -297,8 +297,11 @@
   <div class="manager-recipe-requirement-adds">
     <KindAdder
       kinds={adderKinds}
-      word={localizeOr('FABRICATE.Admin.Manager.Recipe.AlternativeAdder', 'Alternative')}
-      name={localizeOr('FABRICATE.Admin.Manager.Recipe.AddAnAlternative', 'Add an alternative')}
+      label={localizeOr('FABRICATE.Admin.Manager.Recipe.AlternativeAdder', 'Alternative')}
+      ariaLabel={localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.AddAnAlternative',
+        'Add an alternative'
+      )}
       heading={menuHeading}
       hook="alternative"
       triggerHook="alternative"
