@@ -41,21 +41,18 @@ function setSource(set, index, groups, setName) {
 }
 
 /**
- * Whether a fixed check's minimum blocks `tier`, comparing `start` in the check's direction as
- * `checkRouting.minSuccessTierFailed` does. A minimum with no `start` (stale, or a relative check)
- * blocks nothing, and a tier with none is blocked, since no roll can match it.
+ * Whether a fixed check's minimum blocks a success tier, comparing `start` in the check's direction
+ * as `checkRouting.minSuccessTierFailed` does. A forced failure skips that gate, so a failure tier
+ * is never blocked, and a non-finite `start` never blocks where the engine coerces it to 0.
  */
-function belowMinimum(tier, minimum, direction) {
-  const required = Number(minimum?.start);
-  if (!Number.isFinite(required)) return false;
-  const start = Number(tier.start);
-  if (!Number.isFinite(start)) return true;
-  return direction === 'under' ? start > required : start < required;
+function belowMinimum(tier, start, minimum, direction) {
+  if (tier.success !== true || !minimum || !Number.isFinite(start)) return false;
+  return direction === 'under' ? start > minimum.start : start < minimum.start;
 }
 
 /** The groups a tier awards, or the reason it awards none (`_resolveRoutedByCheckResultGroups`). */
-function tierRoute(tier, groups, { anyListed, minimum, direction }) {
-  if (belowMinimum(tier, minimum, direction)) return [[], null, 'below-minimum'];
+function tierRoute(tier, groups, { anyListed, minimum, direction, startOf }) {
+  if (belowMinimum(tier, startOf(tier.id), minimum, direction)) return [[], null, 'below-minimum'];
   const listed = groups.findIndex((group) => listedTiers(group).includes(tier.id));
   if (listed !== -1) return [[listed], 'explicit', null];
   if (anyListed) return [[], null, 'unrouted-tier'];
@@ -66,11 +63,19 @@ function tierRoute(tier, groups, { anyListed, minimum, direction }) {
   return named ? [[groups.indexOf(named)], 'name', null] : [[], null, 'no-name-match'];
 }
 
-function tierSources(tiers, groups, minSuccessOutcomeId, direction) {
+/** The minimum success tier among `rankedTiers`, located only with a finite raw `start`. */
+function locateMinimum(rankedTiers, minSuccessOutcomeId) {
+  if (!minSuccessOutcomeId) return null;
+  const found = rankedTiers.find((tier) => tier?.id === minSuccessOutcomeId);
+  return found && Number.isFinite(found.start) ? found : null;
+}
+
+function tierSources(tiers, groups, { minimum, rankedTiers, direction }) {
   const context = {
     anyListed: groups.some((group) => listedTiers(group).length > 0),
-    minimum: minSuccessOutcomeId ? tiers.find((tier) => tier.id === minSuccessOutcomeId) : null,
+    minimum,
     direction,
+    startOf: (id) => rankedTiers.find((tier) => tier?.id === id)?.start,
   };
   return tiers.map((tier) => {
     const [targets, how, blockedReason] = tierRoute(tier, groups, context);
@@ -98,8 +103,9 @@ function unassignedIndexes(provider, sets, groups, tiers) {
 
 /**
  * `provider` is `'ingredientSet'`, `'check'` or `null`, and `tiers` the policy-offered
- * `{ id, name, success }` options. `minSuccessOutcomeId` blocks fixed tiers below it, which needs
- * `start` on the tiers and the check's `direction` (`'over'` or `'under'`).
+ * `{ id, name, success }` options. `minSuccessOutcomeId` blocks fixed success tiers below it,
+ * reading `start` by id from `rankedTiers` (every system tier, defaulting to `tiers`) in the
+ * check's `direction` (`'over'` or `'under'`); {@link routedMinimum} supplies both.
  *
  * - `sources`: one per set or offered tier, each `{ id, kind, name, targets, targetId, how,
  *   blockedReason, sharedCount }`. `targets` are group indexes, `how` is `explicit`, `fallback`,
@@ -112,12 +118,14 @@ function unassignedIndexes(provider, sets, groups, tiers) {
  * - `unreachable`: the non-`failure`-role groups no source reaches, defined only for a routed
  *   provider, so it is empty under `null`.
  * - `unassigned`: the groups that claim no offered source, failure-role ones included.
+ * - `minimum`: the located minimum tier, or `null`.
  */
 export function buildRoutingModel({
   provider = null,
   ingredientSets = [],
   resultGroups = [],
   tiers = [],
+  rankedTiers = tiers,
   setName = () => '',
   minSuccessOutcomeId = null,
   direction = 'over',
@@ -125,11 +133,13 @@ export function buildRoutingModel({
   const sets = asArray(ingredientSets);
   const groups = asArray(resultGroups);
   const offered = asArray(tiers).filter((tier) => typeof tier?.id === 'string' && tier.id);
+  const ranked = asArray(rankedTiers);
+  const minimum = provider === 'check' ? locateMinimum(ranked, minSuccessOutcomeId) : null;
   let sources = [];
   if (provider === 'ingredientSet') {
     sources = sets.map((set, index) => setSource(set, index, groups, setName));
   } else if (provider === 'check') {
-    sources = tierSources(offered, groups, minSuccessOutcomeId, direction);
+    sources = tierSources(offered, groups, { minimum, rankedTiers: ranked, direction });
   }
   const inbound = groups.map(() => []);
   for (const entry of sources) for (const target of entry.targets) inbound[target].push(entry);
@@ -144,5 +154,19 @@ export function buildRoutingModel({
       ? indexesWhere(groups, (group, i) => group?.role !== 'failure' && inbound[i].length === 0)
       : [],
     unassigned: unassignedIndexes(provider, sets, groups, offered),
+    minimum,
+  };
+}
+
+/**
+ * The minimum inputs {@link buildRoutingModel} takes for a recipe: its `minSuccessOutcomeId` under
+ * `routedByCheck` only, as `_runRoutedCheck` gates it, and the check's direction, restating
+ * `checkRouting.sumGrading` (pinned by `tests/recipe-routing-model.test.js`).
+ */
+export function routedMinimum({ resolutionMode, minSuccessOutcomeId, evaluation }) {
+  const sum = (evaluation?.product ?? 'sum') === 'sum';
+  return {
+    minSuccessOutcomeId: resolutionMode === 'routedByCheck' ? (minSuccessOutcomeId ?? null) : null,
+    direction: sum && evaluation?.direction === 'under' ? 'under' : 'over',
   };
 }

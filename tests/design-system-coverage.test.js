@@ -918,22 +918,13 @@ const CITED_WITHOUT_ENTRY = [
       'required `reason`. Both citations are library prose describing a specimen; `spec.md` ' +
       'commits to no clause naming it, so this is a loose citation with a missing entry.',
   },
-  {
-    name: 'RoutingOverview',
-    why:
-      'Cited at `library.html:1756` and `:1768` as the element two specimens render. NOT a loose ' +
-      'citation: spec.md requirement "Sets and groups are the container layer above the row" ' +
-      'already MANDATES the surface — "The routing is authored in TWO surfaces" and "A ROUTING ' +
-      'OVERVIEW lists every source with the set it produces". This is a bound requirement whose ' +
-      'specimen has no entry of its own.',
-  },
 ];
 
 test('every primitive name in the library is an entry, a declined candidate, or a recorded debt', () => {
   // The length pin runs FIRST, deliberately.
   assert.equal(
     CITED_WITHOUT_ENTRY.length,
-    2,
+    1,
     'the cited-without-entry register is pinned for the same reason the heading census is: ' +
       'without it the cheapest repair available to the next author is a one-token append'
   );

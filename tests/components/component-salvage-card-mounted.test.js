@@ -108,6 +108,43 @@ describe('ComponentSalvageCard', () => {
     harness.remount();
   });
 
+  // Issue 2513: the well is a routing overview, one neutral row per outcome.
+  it('marks outcomes routed to one set "shared · 2", and gives unrouted ones no shared marker', async () => {
+    const markers = (target, name) =>
+      [
+        ...target.querySelectorAll(
+          `:scope [data-salvage-routing] [data-routing-overview-row="${name}"] .fabricate-routing-overview-marker`
+        ),
+      ].map((marker) => marker.textContent);
+    const outcomes = ['Fine', 'Masterwork', 'Ruined', 'Botched'];
+    const { target } = await mountWith({
+      salvageOutcomeNames: outcomes,
+      salvageDraft: {
+        enabled: true,
+        outcomeRouting: { Fine: 'grp-1', Masterwork: 'grp-1' },
+        resultGroups: GROUPS,
+      },
+    });
+    assert.deepEqual(markers(target, 'Fine'), ['shared · 2']);
+    assert.deepEqual(markers(target, 'Masterwork'), ['shared · 2']);
+    assert.deepEqual(markers(target, 'Ruined'), [], 'two unrouted outcomes share nothing');
+    assert.deepEqual(markers(target, 'Botched'), []);
+    assert.equal(selectTriggerText(target, '[data-salvage-route="Ruined"]'), 'Unrouted');
+    assert.equal(
+      target.querySelector('[data-validation-target="component-salvage-routing"]').dataset
+        .salvageRoute,
+      'Ruined',
+      'the validation hook lands on the first unrouted outcome'
+    );
+    assert.ok(
+      !target.querySelector(
+        ':scope [data-salvage-routing] .fabricate-routing-overview-summary:not(:empty)'
+      ),
+      'no row carries a summary'
+    );
+    harness.remount();
+  });
+
   it('holds the result-set controls while saving', async () => {
     const { target } = await mountWith({ saving: true });
     const name = target.querySelector(

@@ -19,8 +19,9 @@
     activity marks it again — and `resolveEligibleModifierIds` applies the same intersection at roll
     time. THE INHERITED SET IS NAMED through `foundryBridge.formatList` into a `{list}` PLACEHOLDER,
     never concatenated, because separator, conjunction and Oxford comma vary by locale.
-  - The recipe site is NOT converted: `changeModifierSetMode` in `RecipeOverviewTab` SEEDS the pick
-    from the system default set where this toggle authors `[]`, which is a behaviour decision.
+  - The recipe site is NOT converted: `changeModifierSetMode` in `RecipeCraftingModifierField`
+    SEEDS the pick from the system default set where this toggle authors `[]`, which is a
+    behaviour decision.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -105,7 +106,7 @@
   const capBounded = $derived(Number.isFinite(capLimit));
   const atCap = $derived(capBounded && pickedEligible.length >= capLimit);
 
-  // A cap of exactly 1 gets its own sentence, following `RecipeOverviewTab`'s pair.
+  // A cap of exactly 1 gets its own sentence, following `RecipeCraftingModifierField`'s pair.
   const capText = $derived.by(() => {
     if (capLimit === 1) return localizeOr(copy.capOneKey, copy.capOne);
     const translated = localize(copy.capKey, { count: capLimit });

@@ -1,6 +1,7 @@
 /**
- * The recipe editor's routing and result-set edits (issues 2511, 2512): the scope a write lands on,
- * the collapsed results projection, and the set, tier, group and alchemy-slot writes.
+ * The recipe editor's routing and result-set edits (issues 2511, 2512, 2513): the scope a write
+ * lands on, the collapsed results projection, the scope writes, and the set, tier, group and
+ * alchemy-slot writes.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -13,6 +14,7 @@ import {
   routeSet,
   routeTier,
   scopeTarget,
+  scopeWrites,
   withResultSlot,
 } from '../src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js';
 
@@ -210,5 +212,77 @@ describe('routeTier', () => {
     assert.equal(next[0], groups[0]);
     assert.deepEqual(next[1], { id: 'g2', checkOutcomeIds: [] });
     assert.deepEqual(next[2], { id: 'g3', checkOutcomeIds: ['t-fine'] });
+  });
+});
+
+describe('scopeWrites', () => {
+  const recipeSets = [{ id: 's1' }];
+  const stepA = { id: 'a', ingredientSets: [{ id: 's1', resultGroupId: 'g1' }] };
+  const last = { id: 'last', ingredientSets: [{ id: 's1' }, { id: 's2' }] };
+  const scopes = {
+    'single-step': { steps: [], finalStep: null, stepId: null },
+    'step-scoped': { steps: [stepA, last], finalStep: null, stepId: 'a' },
+    'collapsed-null': { steps: [stepA, last], finalStep: last, stepId: null },
+    'unknown-step': { steps: [stepA, last], finalStep: null, stepId: 'gone' },
+  };
+  const writesFor = ({ steps, finalStep }) => {
+    const calls = [];
+    const writes = scopeWrites({
+      ingredientSets: recipeSets,
+      steps,
+      finalStep,
+      onUpdateRecipe: (patch) => {
+        calls.push(['recipe', patch]);
+      },
+      onUpdateStep: (stepId, patch) => {
+        calls.push(['step', stepId, patch]);
+      },
+    });
+    return { writes, calls };
+  };
+  const nextSets = [{ id: 'new' }];
+  const nextGroups = [{ id: 'g9' }];
+  const expected = {
+    'single-step': {
+      sets: [['recipe', { ingredientSets: nextSets }]],
+      groups: [['recipe', { resultGroups: nextGroups }]],
+      assignSet: [['recipe', { ingredientSets: [{ id: 's1', resultGroupId: 'g2' }] }]],
+    },
+    'step-scoped': {
+      sets: [['step', 'a', { ingredientSets: nextSets }]],
+      groups: [['step', 'a', { resultGroups: nextGroups }]],
+      assignSet: [['step', 'a', { ingredientSets: [{ id: 's1', resultGroupId: 'g2' }] }]],
+    },
+    'collapsed-null': {
+      sets: [['recipe', { ingredientSets: nextSets }]],
+      groups: [['step', 'last', { resultGroups: nextGroups }]],
+      assignSet: [
+        ['step', 'last', { ingredientSets: [{ id: 's1', resultGroupId: 'g2' }, { id: 's2' }] }],
+      ],
+    },
+    'unknown-step': { sets: [], groups: [], assignSet: [] },
+  };
+
+  for (const [name, scope] of Object.entries(scopes)) {
+    it(`forwards each write for a ${name} scope as the view did`, () => {
+      const run = (write, ...args) => {
+        const { writes, calls } = writesFor(scope);
+        writes[write](scope.stepId, ...args);
+        return calls;
+      };
+      assert.deepEqual(run('sets', nextSets), expected[name].sets, 'sets');
+      assert.deepEqual(run('groups', nextGroups), expected[name].groups, 'groups');
+      assert.deepEqual(run('assignSet', 'g2', 's1', true), expected[name].assignSet, 'assignSet');
+    });
+  }
+
+  it('unassigns with a null group, and ignores a missing set or an assignment with no group', () => {
+    const { writes, calls } = writesFor(scopes['step-scoped']);
+    writes.assignSet('a', 'g1', 's1', false);
+    writes.assignSet('a', 'g1', '', true);
+    writes.assignSet('a', null, 's1', true);
+    assert.deepEqual(calls, [
+      ['step', 'a', { ingredientSets: [{ id: 's1', resultGroupId: null }] }],
+    ]);
   });
 });

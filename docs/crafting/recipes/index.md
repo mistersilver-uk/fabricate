@@ -307,6 +307,8 @@ The Overview tab edits identity (name, description, image, and whether it is on 
 When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link crafting/recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
+In both routed modes the Overview tab ends with a **Routing** card that lists each ingredient set or outcome tier beside the result set it produces.
+See [The routing overview]({% link crafting/recipes/routed.md %}#the-routing-overview).
 When the system has a Modifiers library and its combination rule is **By recipe**, the Overview tab also lets the recipe pick which of those modifiers apply to it, up to the system's pick limit.
 The combination rule itself is always the system's, and no other rule offers a recipe a control.
 See [Check modifiers]({% link checks/index.md %}#check-modifiers).

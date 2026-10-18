@@ -12,6 +12,34 @@ export function scopeTarget(stepId, finalStep) {
 }
 
 /**
+ * The draft's scope writers: `sets(stepId, next)` and `groups(stepId, next)` patch the recipe for a
+ * null `stepId` and that step otherwise, an unknown step writing nothing. `groups` and
+ * `assignSet(stepId, groupId, setId, assigned)` send a null `stepId` through {@link scopeTarget};
+ * `sets` does not.
+ */
+export function scopeWrites({ ingredientSets, steps, finalStep, onUpdateRecipe, onUpdateStep }) {
+  const stepById = (stepId) => steps.find((step) => step.id === stepId) || null;
+  function sets(stepId, nextSets) {
+    if (stepId == null) onUpdateRecipe({ ingredientSets: nextSets });
+    else if (stepById(stepId)) onUpdateStep(stepId, { ingredientSets: nextSets });
+  }
+  function groups(stepId, nextGroups) {
+    const targetStepId = scopeTarget(stepId, finalStep);
+    if (targetStepId == null) onUpdateRecipe({ resultGroups: nextGroups });
+    else if (stepById(targetStepId)) onUpdateStep(targetStepId, { resultGroups: nextGroups });
+  }
+  // A set routes to at most one group, so assigning replaces any prior target.
+  function assignSet(stepId, groupId, setId, assigned) {
+    if (!setId || (assigned && !groupId)) return;
+    const scopeStepId = scopeTarget(stepId, finalStep);
+    const scopeSets =
+      scopeStepId == null ? ingredientSets : stepById(scopeStepId)?.ingredientSets || [];
+    sets(scopeStepId, routeSet(scopeSets, setId, assigned ? groupId : null));
+  }
+  return { sets, groups, assignSet };
+}
+
+/**
  * The single-step recipe the Results tab edits while a chain is collapsed: the final step's groups,
  * sets and routing over the recipe, or `recipe` itself with no final step.
  */

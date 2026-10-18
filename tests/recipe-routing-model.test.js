@@ -1,18 +1,25 @@
 /**
- * The recipe editor's routing model (issue 2511): every `how` and `blockedReason`, the inbound,
- * shared, unreachable and unassigned readings, golden picker options, and a parity suite pinning
- * each offered source's `targets` to the groups the real `ResolutionModeService` awards.
+ * The recipe editor's routing model (issues 2511, 2513): every `how` and `blockedReason`, the
+ * inbound, shared, unreachable and unassigned readings, the minimum, and a parity suite pinning each
+ * offered source's `targets` to the groups the real `ResolutionModeService` awards.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { classifyCheckTotal } from '../src/systems/checkRouting.js';
+import { classifyCheckTotal, sumGrading } from '../src/systems/checkRouting.js';
+import { activeCheckEvaluation } from '../src/systems/checkTarget.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
-import { buildRoutingModel } from '../src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js';
+import {
+  buildRoutingModel,
+  routedMinimum,
+} from '../src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js';
 import { setDisplayName } from '../src/ui/svelte/apps/manager/recipe/setDrafts.js';
 import { activityPermitsFailureResults } from '../src/utils/failureResultPolicy.js';
-import { routedTierOptionsForPolicy } from '../src/utils/routedOutcomeKeywords.js';
+import {
+  routedOutcomeTierRows,
+  routedTierOptionsForPolicy,
+} from '../src/utils/routedOutcomeKeywords.js';
 
 const FINE = { id: 't-fine', name: 'Fine', success: true };
 const GREAT = { id: 't-great', name: 'Great', success: true };
@@ -172,9 +179,77 @@ describe('tier sources', () => {
     assert.deepEqual(byHow(stale)[0], ['t-fine', 'explicit', null]);
   });
 
+  it('reads starts by id from rankedTiers, blocks success tiers only, and returns the minimum', () => {
+    const rankedTiers = [
+      { ...BOTCH, start: 1 },
+      { ...FINE, start: 6 },
+      { ...GREAT, start: 16 },
+      { id: 't-null', name: 'Null', success: true, start: null },
+    ];
+    const tiers = [BOTCH, FINE, GREAT, { id: 't-null', name: 'Null', success: true }];
+    const model = tierModel([{ id: 'g1' }], tiers, {
+      rankedTiers,
+      minSuccessOutcomeId: 't-great',
+    });
+    assert.deepEqual(byHow(model), [
+      ['t-botch', null, 'failure-unassigned'],
+      ['t-fine', null, 'below-minimum'],
+      ['t-great', 'single', null],
+      ['t-null', 'single', null],
+    ]);
+    assert.equal(model.minimum, rankedTiers[2]);
+  });
+
+  it('locates no minimum outside check routing, without a finite start, or by a stale id', () => {
+    const rankedTiers = [
+      { ...FINE, start: null },
+      { ...GREAT, start: 16 },
+    ];
+    const minimumOf = (extra) =>
+      tierModel([{ id: 'g1' }], [FINE, GREAT], { rankedTiers, ...extra }).minimum;
+    assert.equal(minimumOf({ minSuccessOutcomeId: 't-fine' }), null);
+    assert.equal(minimumOf({ minSuccessOutcomeId: 't-gone' }), null);
+    assert.equal(minimumOf({}), null);
+    const setScoped = buildRoutingModel({
+      provider: 'ingredientSet',
+      rankedTiers,
+      minSuccessOutcomeId: 't-great',
+    });
+    assert.equal(setScoped.minimum, null);
+  });
+
   it('offers only id-bearing tiers', () => {
     const model = tierModel([{ id: 'g1' }], [FINE, { id: '', name: 'Blank' }, null]);
     assert.deepEqual(byHow(model), [['t-fine', 'single', null]]);
+  });
+});
+
+describe('routedMinimum', () => {
+  it('passes the minimum under routedByCheck alone', () => {
+    const read = (resolutionMode, minSuccessOutcomeId) =>
+      routedMinimum({ resolutionMode, minSuccessOutcomeId, evaluation: null }).minSuccessOutcomeId;
+    assert.equal(read('routedByCheck', 't-fine'), 't-fine');
+    assert.equal(read('routedByCheck', undefined), null);
+    for (const mode of ['alchemy', 'routedByIngredients', 'simple', 'progressive', undefined]) {
+      assert.equal(read(mode, 't-fine'), null, String(mode));
+    }
+  });
+
+  it('reads the direction exactly as sumGrading does', () => {
+    const evaluations = [null];
+    for (const product of [undefined, 'sum', 'count']) {
+      for (const direction of [undefined, 'over', 'under']) {
+        evaluations.push({ product, direction });
+      }
+    }
+    for (const evaluation of evaluations) {
+      assert.equal(
+        routedMinimum({ resolutionMode: 'routedByCheck', minSuccessOutcomeId: null, evaluation })
+          .direction,
+        sumGrading(evaluation).direction,
+        JSON.stringify(evaluation)
+      );
+    }
   });
 });
 
@@ -271,11 +346,18 @@ function awardedIndexes(service, system, { recipe, step, ingredientSet, checkRes
   return resolved.groups.map((group) => candidates.indexOf(group));
 }
 
-function routedSystem({ type = 'relative', outcomes, policy = 'never', mode = 'routedByCheck' }) {
+function routedSystem({
+  type = 'relative',
+  outcomes,
+  policy = 'never',
+  mode = 'routedByCheck',
+  evaluation = undefined,
+}) {
   const routed =
     type === 'fixed'
       ? { type, fixedOutcomes: outcomes, relativeOutcomes: [] }
       : { type, relativeOutcomes: outcomes, fixedOutcomes: [] };
+  if (evaluation) routed.evaluation = evaluation;
   return {
     id: 'sys',
     resolutionMode: mode,
@@ -284,24 +366,72 @@ function routedSystem({ type = 'relative', outcomes, policy = 'never', mode = 'r
   };
 }
 
-/** The roll result a tier produces: a fixed tier classified from its own start, minimum applied. */
-function checkResultFor(system, recipe, tier) {
+/**
+ * The roll result a tier produces, classified from its own `start` as the engine would: the
+ * system's evaluation, and the minimum only where `_runRoutedCheck` applies it. `forced` adds a
+ * forced-failure trigger.
+ */
+function classifyTier(system, mode, recipe, tier, { forced = false } = {}) {
   const routed = system.craftingCheck.routed;
-  if (routed.type !== 'fixed') return { outcome: tier.name, success: tier.success === true };
-  const { matched, success } = classifyCheckTotal({
+  if (routed.type !== 'fixed') {
+    return { checkResult: { outcome: tier.name, success: tier.success === true } };
+  }
+  const total = Number(tier.start ?? 0);
+  const trigger = {
+    outcome: 'failure',
+    condition: { type: 'rollTotal', operator: '==', value: total },
+  };
+  const { matched, success, minTierFailed } = classifyCheckTotal({
     type: 'fixed',
-    total: tier.start,
+    total,
     fixedOutcomes: routed.fixedOutcomes,
-    minOutcomeId: recipe.minSuccessOutcomeId ?? null,
+    triggers: forced ? [trigger] : [],
+    minOutcomeId: mode === 'routedByCheck' ? (recipe.minSuccessOutcomeId ?? null) : null,
+    evaluation: activeCheckEvaluation(routed),
   });
-  return { outcome: matched?.name ?? null, success };
+  return { checkResult: { outcome: matched?.name ?? null, success }, matched, minTierFailed };
+}
+
+const NULL_START =
+  'Backlog 1: the engine coerces a null start to 0 and blocks a tier the editor routes';
+
+/**
+ * Asserts one tier's source against the engine. A failure tier the minimum gates is compared on
+ * its forced-failure path, its natural roll awarding nothing; a `coercesNullStart` tier asserts
+ * the null-start divergence by name.
+ */
+function assertTierParity(context, tier, source, coercesNullStart) {
+  const { service, system, mode, recipe, step, ingredientSet } = context;
+  const award = (checkResult) =>
+    awardedIndexes(service, system, { recipe, step, ingredientSet, checkResult });
+  const natural = classifyTier(system, mode, recipe, tier);
+  const awarded = award(natural.checkResult);
+  if (!source) {
+    return assert.deepEqual(awarded, [], `the unoffered tier ${tier.name} awards nothing`);
+  }
+  if (coercesNullStart.includes(tier.id)) {
+    assert.deepEqual(awarded, [], `${NULL_START}: ${tier.name}`);
+    return assert.ok(source.targets.length > 0, `${NULL_START}: ${tier.name}`);
+  }
+  if (tier.success === true || !natural.minTierFailed) {
+    return assert.deepEqual(source.targets, awarded, `tier ${tier.name}`);
+  }
+  assert.deepEqual(awarded, [], `only on a forced failure: a natural ${tier.name} awards nothing`);
+  const forced = classifyTier(system, mode, recipe, tier, { forced: true });
+  if (forced.matched?.id !== tier.id)
+    return assert.equal(
+      forced.matched?.success,
+      false,
+      `a forced failure lands on another failure tier, so ${tier.name} is reached only by a step`
+    );
+  return assert.deepEqual(source.targets, award(forced.checkResult), `forced ${tier.name}`);
 }
 
 /**
  * Asserts the model built for one scope against the engine: every offered source's `targets` are
  * the awarded groups, and every tier the policy does not offer awards nothing.
  */
-function assertParity({ system, recipe, step = null, mode, expected }) {
+function assertParity({ system, recipe, step = null, mode, expected, coercesNullStart = [] }) {
   const service = new ResolutionModeService({ getSystem: () => system });
   assert.ok(recipe.craftingSystemId, 'premise: the fixture names its system');
   assert.equal(service.getMode(recipe), mode, 'premise: the fixture runs the intended mode');
@@ -324,25 +454,22 @@ function assertParity({ system, recipe, step = null, mode, expected }) {
   }
   const routed = system.craftingCheck.routed;
   const outcomes = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
-  const offered = routedTierOptionsForPolicy(routed, system.craftingCheck.failureResultPolicy);
-  const tiers = offered.map((tier) => ({
-    ...tier,
-    start: outcomes.find((o) => o.id === tier.id).start,
-  }));
   const model = buildRoutingModel({
     provider: 'check',
     ingredientSets: scope.ingredientSets,
     resultGroups,
-    tiers,
-    minSuccessOutcomeId: recipe.minSuccessOutcomeId ?? null,
+    tiers: routedTierOptionsForPolicy(routed, system.craftingCheck.failureResultPolicy),
+    rankedTiers: routedOutcomeTierRows(routed),
+    ...routedMinimum({
+      resolutionMode: system.resolutionMode,
+      minSuccessOutcomeId: recipe.minSuccessOutcomeId,
+      evaluation: activeCheckEvaluation(routed),
+    }),
   });
-  const ingredientSet = scope.ingredientSets[0];
+  const context = { service, system, mode, recipe, step, ingredientSet: scope.ingredientSets[0] };
   for (const tier of outcomes) {
-    const checkResult = checkResultFor(system, recipe, tier);
-    const awarded = awardedIndexes(service, system, { recipe, step, ingredientSet, checkResult });
     const source = model.sources.find(({ id }) => id === tier.id);
-    if (source) assert.deepEqual(source.targets, awarded, `tier ${tier.name}`);
-    else assert.deepEqual(awarded, [], `the unoffered tier ${tier.name} awards nothing`);
+    assertTierParity(context, tier, source, coercesNullStart);
   }
   if (expected) assert.deepEqual(byHow(model), expected);
   return model;
@@ -633,7 +760,7 @@ describe('parity: routedByCheck, fixed tiers', () => {
       mode: 'routedByCheck',
     });
     assert.deepEqual(byHow(model), [
-      ['t-botch', null, 'below-minimum'],
+      ['t-botch', 'explicit', null],
       ['t-fine', null, 'below-minimum'],
       ['t-great', 'explicit', null],
     ]);
@@ -679,4 +806,226 @@ describe('parity: a multi-step step scope', () => {
     const model = assertParity({ system, recipe, step: empty, mode: 'routedByCheck' });
     assert.deepEqual(model.sources[0].targets, [0], 'the model is fed the engine’s candidates');
   });
+});
+
+describe('parity: the minimum success tier', () => {
+  const ROUGH = { id: 't-rough', name: 'Rough', success: true };
+  const fixed = (outcomes, extra = {}) =>
+    routedSystem({ type: 'fixed', outcomes, policy: 'perRecord', ...extra });
+  const minimumOn = (resultGroups, minSuccessOutcomeId) =>
+    recipeOf(resultGroups, [{ id: 's1' }], { minSuccessOutcomeId });
+
+  it('a minimum on a failure tier the policy does not offer, reached by flipping a chosen tier', () => {
+    const outcomes = [
+      { ...BOTCH, start: 1, end: 5 },
+      { ...FINE, success: false, start: 6, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+    ];
+    const model = assertParity({
+      system: fixed(outcomes, { policy: 'never' }),
+      recipe: minimumOn([{ id: 'g1', checkOutcomeIds: ['t-great'] }, { id: 'g2' }], 't-fine'),
+      mode: 'routedByCheck',
+      expected: [['t-great', 'explicit', null]],
+    });
+    assert.equal(model.minimum?.id, 't-fine');
+  });
+
+  it('a relative check carrying a minimum blocks nothing', () => {
+    const model = assertParity({
+      system: routedSystem({ outcomes: [FINE, GREAT, BOTCH], policy: 'perRecord' }),
+      recipe: minimumOn(
+        [
+          { id: 'g1', checkOutcomeIds: ['t-fine', 't-botch'] },
+          { id: 'g2', checkOutcomeIds: ['t-great'] },
+        ],
+        't-great'
+      ),
+      mode: 'routedByCheck',
+      expected: [
+        ['t-fine', 'explicit', null],
+        ['t-great', 'explicit', null],
+        ['t-botch', 'explicit', null],
+      ],
+    });
+    assert.equal(model.minimum, null);
+  });
+
+  it('a stale minimum blocks nothing', () => {
+    const outcomes = [
+      { ...FINE, start: 6, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+    ];
+    assertParity({
+      system: fixed(outcomes),
+      recipe: minimumOn([{ id: 'g1' }], 't-gone'),
+      mode: 'routedByCheck',
+      expected: [
+        ['t-fine', 'single', null],
+        ['t-great', 'single', null],
+      ],
+    });
+  });
+
+  it('a tier sharing the minimum’s start is not below it, and the failure tier routes forced', () => {
+    const outcomes = [
+      { ...BOTCH, start: 1, end: 5 },
+      { ...FINE, start: 6, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+      { id: 't-keen', name: 'Keen', success: true, start: 16, end: 20 },
+    ];
+    assertParity({
+      system: fixed(outcomes),
+      recipe: minimumOn(
+        [
+          { id: 'g1', checkOutcomeIds: ['t-botch', 't-fine'] },
+          { id: 'g2', checkOutcomeIds: ['t-great', 't-keen'] },
+        ],
+        't-keen'
+      ),
+      mode: 'routedByCheck',
+      expected: [
+        ['t-botch', 'explicit', null],
+        ['t-fine', null, 'below-minimum'],
+        ['t-great', 'explicit', null],
+        ['t-keen', 'explicit', null],
+      ],
+    });
+  });
+
+  it('a forced failure lands on the lowest failure tier, so a second one is reached by a step', () => {
+    const outcomes = [
+      { ...BOTCH, start: 1, end: 5 },
+      { id: 't-fumble', name: 'Fumble', success: false, start: 6, end: 8 },
+      { ...FINE, start: 9, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+    ];
+    const system = fixed(outcomes);
+    const recipe = minimumOn(
+      [
+        { id: 'g1', checkOutcomeIds: ['t-botch', 't-fumble'] },
+        { id: 'g2', checkOutcomeIds: ['t-fine', 't-great'] },
+      ],
+      't-fine'
+    );
+    assertParity({
+      system,
+      recipe,
+      mode: 'routedByCheck',
+      expected: [
+        ['t-botch', 'explicit', null],
+        ['t-fumble', 'explicit', null],
+        ['t-fine', 'explicit', null],
+        ['t-great', 'explicit', null],
+      ],
+    });
+    const forced = classifyTier(system, 'routedByCheck', recipe, outcomes[1], { forced: true });
+    assert.equal(forced.matched?.id, 't-botch', 'premise: the forced Fumble roll lands on Botch');
+  });
+
+  it('sum/under blocks the higher starts, given the evaluation on both sides', () => {
+    const outcomes = [
+      { ...GREAT, start: 1, end: 5 },
+      { ...FINE, start: 6, end: 10 },
+      { ...ROUGH, start: 11, end: 15 },
+      { ...BOTCH, start: 16, end: 20 },
+    ];
+    assertParity({
+      system: fixed(outcomes, { evaluation: { product: 'sum', direction: 'under' } }),
+      recipe: minimumOn(
+        [
+          { id: 'g1', checkOutcomeIds: ['t-great', 't-fine', 't-rough'] },
+          { id: 'g2', checkOutcomeIds: ['t-botch'] },
+        ],
+        't-fine'
+      ),
+      mode: 'routedByCheck',
+      expected: [
+        ['t-great', 'explicit', null],
+        ['t-fine', 'explicit', null],
+        ['t-rough', null, 'below-minimum'],
+        ['t-botch', 'explicit', null],
+      ],
+    });
+  });
+
+  it('tiered alchemy ignores a carried minimum', () => {
+    const outcomes = [
+      { ...BOTCH, start: 1, end: 5 },
+      { ...FINE, start: 6, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+    ];
+    const model = assertParity({
+      system: fixed(outcomes, { mode: 'alchemy' }),
+      recipe: minimumOn([{ id: 'g1', checkOutcomeIds: ['t-fine', 't-great'] }], 't-great'),
+      mode: 'alchemy',
+    });
+    assert.deepEqual(byHow(model).slice(1), [
+      ['t-fine', 'explicit', null],
+      ['t-great', 'explicit', null],
+    ]);
+    assert.equal(model.minimum, null);
+  });
+
+  for (const direction of ['over', 'under']) {
+    const evaluation = { product: 'sum', direction };
+
+    it(`a null-start minimum blocks nothing in the editor (${direction})`, () => {
+      const outcomes = [
+        { id: 't-low', name: 'Low', success: true, start: null, end: 8 },
+        { ...FINE, start: 9, end: 15 },
+        { ...GREAT, start: 16, end: 20 },
+      ];
+      const model = assertParity({
+        system: fixed(outcomes, { evaluation }),
+        recipe: minimumOn(
+          [
+            { id: 'g1', checkOutcomeIds: ['t-low', 't-fine'] },
+            { id: 'g2', checkOutcomeIds: ['t-great'] },
+          ],
+          't-low'
+        ),
+        mode: 'routedByCheck',
+        coercesNullStart: direction === 'under' ? ['t-fine', 't-great'] : [],
+      });
+      assert.equal(model.minimum, null);
+      assert.ok(model.sources.every(({ blockedReason }) => blockedReason === null));
+    });
+
+    it(`a boundless tier is never below the minimum in the editor (${direction})`, () => {
+      const outcomes = [
+        { ...BOTCH, start: 1, end: 8 },
+        { ...FINE, start: 9, end: 15 },
+        { ...GREAT, start: 16, end: 20 },
+        { id: 't-wild', name: 'Wild', success: true, start: null, end: null },
+      ];
+      const system = fixed(outcomes, { evaluation });
+      const recipe = minimumOn(
+        [
+          { id: 'g1', checkOutcomeIds: ['t-botch', 't-wild'] },
+          { id: 'g2', checkOutcomeIds: ['t-fine', 't-great'] },
+        ],
+        't-fine'
+      );
+      const model = assertParity({
+        system,
+        recipe,
+        mode: 'routedByCheck',
+        coercesNullStart: direction === 'over' ? ['t-wild'] : [],
+      });
+      assert.deepEqual(byHow(model), [
+        ['t-botch', 'explicit', null],
+        ['t-fine', 'explicit', null],
+        ['t-great', ...(direction === 'over' ? ['explicit', null] : [null, 'below-minimum'])],
+        ['t-wild', 'explicit', null],
+      ]);
+      if (direction === 'under') {
+        const natural = classifyTier(system, 'routedByCheck', recipe, outcomes[0]);
+        assert.equal(
+          natural.minTierFailed,
+          false,
+          'a failure tier above the minimum routes naturally'
+        );
+      }
+    });
+  }
 });

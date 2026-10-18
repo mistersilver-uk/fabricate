@@ -69,6 +69,26 @@ export function routedOutcomeTierOptions(routed) {
     .map((tier) => ({ id: tier.id, name: tier.name || tier.id, success: tier.success === true }));
 }
 
+const finiteOrNull = (value) => (Number.isFinite(value) ? value : null);
+
+/**
+ * {@link routedOutcomeTierOptions} with each tier's `start` and `end`: the raw values on a fixed
+ * check when they are finite numbers, else `null`, and always `null` on a relative check.
+ */
+export function routedOutcomeTierRows(routed) {
+  const fixed = routed?.type === 'fixed';
+  const tiers = fixed ? routed.fixedOutcomes : routed?.relativeOutcomes;
+  return (Array.isArray(tiers) ? tiers : [])
+    .filter((tier) => tier?.id)
+    .map((tier) => ({
+      id: tier.id,
+      name: tier.name || tier.id,
+      success: tier.success === true,
+      start: fixed ? finiteOrNull(tier.start) : null,
+      end: fixed ? finiteOrNull(tier.end) : null,
+    }));
+}
+
 /** Chosen by the activity's failure-result policy (issue 1098, decision 7). */
 export function routedTierOptionsForPolicy(routed, failureResultPolicy) {
   return permitsFailureResults(failureResultPolicy)

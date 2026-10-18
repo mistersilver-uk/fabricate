@@ -917,3 +917,157 @@ describe('evaluateRecipeReadiness routed check-mode warnings over the routing mo
     ]);
   });
 });
+
+// Issue 2513: a result set no ingredient set reaches, and the single result set that lists a tier.
+describe('evaluateRecipeReadiness: unreachable result sets under ingredient routing', () => {
+  const ingredientRouted = (recipe) =>
+    evaluateRecipeReadiness(
+      { name: 'Routed', enabled: true, ...recipe },
+      { routingProvider: 'ingredientSet' }
+    );
+  const unreachable = (readiness) =>
+    readiness.issues.filter(issue => issue.id === 'unreachableResultGroup');
+
+  it('raises the first unreachable set with its focus and step tag, and passes a fallback', () => {
+    const readiness = ingredientRouted({
+      steps: [
+        {
+          id: 'st1',
+          name: 'Forge',
+          ingredientSets: [{ id: 's1', resultGroupId: 'g1' }],
+          resultGroups: [{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }]
+        }
+      ]
+    });
+    assert.deepEqual(unreachable(readiness), [
+      {
+        id: 'unreachableResultGroup',
+        severity: 'warning',
+        target: 'results',
+        focusTarget: 'result-group-g2',
+        stepId: 'st1',
+        stepName: 'Forge'
+      }
+    ]);
+    assert.equal(check(readiness.checks, 'routedResultGroupsReachable').satisfied, false);
+    assert.equal(blocksEnable(readiness.issues), false);
+
+    const fallback = ingredientRouted({ ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1' }] });
+    assert.deepEqual(unreachable(fallback), [], 'the first set is reached by default');
+    assert.equal(check(fallback.checks, 'routedResultGroupsReachable').satisfied, true);
+  });
+
+  it('raises a failure-role set no ingredient set reaches', () => {
+    const readiness = ingredientRouted({
+      ingredientSets: [{ id: 's1', resultGroupId: 'g1' }],
+      resultGroups: [{ id: 'g1' }, { id: 'gf', role: 'failure' }]
+    });
+    assert.deepEqual(unreachable(readiness), [
+      { id: 'unreachableResultGroup', severity: 'warning', target: 'results', focusTarget: 'result-group-gf' }
+    ]);
+  });
+
+  it('raises an id-less unreachable set with no focusTarget key', () => {
+    const [issue] = unreachable(
+      ingredientRouted({
+        ingredientSets: [{ id: 's1', resultGroupId: 'g1' }],
+        resultGroups: [{ id: 'g1' }, { name: 'Draft' }]
+      })
+    );
+    assert.deepEqual(issue, { id: 'unreachableResultGroup', severity: 'warning', target: 'results' });
+    assert.equal('focusTarget' in issue, false);
+  });
+
+  it('raises once per step, each with its step tag', () => {
+    const step = (id, name) => ({
+      id,
+      name,
+      ingredientSets: [{ id: `${id}-s`, resultGroupId: `${id}-a` }],
+      resultGroups: [{ id: `${id}-a` }, { id: `${id}-b` }, { id: `${id}-c` }]
+    });
+    const issues = unreachable(ingredientRouted({ steps: [step('st1', 'Smelt'), step('st2', 'Temper')] }));
+    assert.deepEqual(
+      issues.map(({ focusTarget, stepId, stepName }) => [focusTarget, stepId, stepName]),
+      [
+        ['result-group-st1-b', 'st1', 'Smelt'],
+        ['result-group-st2-b', 'st2', 'Temper']
+      ]
+    );
+  });
+
+  it('raises nothing for the recipe’s sets a step borrows', () => {
+    const readiness = ingredientRouted({
+      ingredientSets: [{ id: 'rs1', resultGroupId: 'g1' }],
+      resultGroups: [{ id: 'g1' }, { id: 'g2' }],
+      steps: [{ id: 'st1', name: 'Forge', ingredientSets: [{ id: 's1' }], resultGroups: [] }]
+    });
+    assert.deepEqual(unreachable(readiness), []);
+  });
+
+  it('raises nothing under check routing or no routing', () => {
+    const recipe = { ingredientSets: [{ id: 's1', resultGroupId: 'g1' }], resultGroups: [{ id: 'g1' }, { id: 'g2' }] };
+    for (const routingProvider of ['check', null]) {
+      const readiness = evaluateRecipeReadiness(
+        { name: 'Routed', enabled: true, ...recipe },
+        { routingProvider, routedOutcomeTierOptions: [] }
+      );
+      assert.deepEqual(unreachable(readiness), [], String(routingProvider));
+      assert.equal(check(readiness.checks, 'routedResultGroupsReachable'), undefined);
+    }
+  });
+
+  it('lets the reachable check claim its issue on the Validation rows', () => {
+    const readiness = ingredientRouted({
+      ingredientSets: [{ id: 's1', resultGroupId: 'g1' }],
+      resultGroups: [{ id: 'g1' }, { id: 'g2' }]
+    });
+    const row = recipeValidationRowStates(readiness).find(
+      entry => entry.checkId === 'routedResultGroupsReachable'
+    );
+    assert.equal(row.issue?.id, 'unreachableResultGroup');
+    assert.equal(row.status, 'warn');
+  });
+});
+
+describe('evaluateRecipeReadiness: a single result set that lists a tier', () => {
+  const tiers = [
+    { id: 't-good', name: 'Good', success: true },
+    { id: 't-great', name: 'Great', success: true }
+  ];
+  const routedIds = (resultGroups, extra = {}) =>
+    evaluateRecipeReadiness(
+      { name: 'Routed', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups, ...extra },
+      { routingProvider: 'check', routedOutcomeTierOptions: tiers }
+    ).issues.map(issue => issue.id);
+
+  it('raises unproducedOutcomeTier when it lists one of two tiers', () => {
+    assert.deepEqual(routedIds([{ id: 'g1', checkOutcomeIds: ['t-good'] }]), ['unproducedOutcomeTier']);
+  });
+
+  it('raises both warnings when it lists only a deleted tier', () => {
+    assert.deepEqual(routedIds([{ id: 'g1', checkOutcomeIds: ['t-deleted'] }]), [
+      'unroutedResultGroup',
+      'unproducedOutcomeTier'
+    ]);
+  });
+
+  it('raises nothing for a gap between fixed tiers', () => {
+    const fixed = [
+      { id: 't-good', name: 'Good', success: true, start: 1, end: 9 },
+      { id: 't-great', name: 'Great', success: true, start: 15, end: 20 }
+    ];
+    const readiness = evaluateRecipeReadiness(
+      {
+        name: 'Gapped',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [
+          { id: 'g1', checkOutcomeIds: ['t-good'] },
+          { id: 'g2', checkOutcomeIds: ['t-great'] }
+        ]
+      },
+      { routingProvider: 'check', routedOutcomeTierOptions: fixed }
+    );
+    assert.deepEqual(readiness.issues, []);
+  });
+});

@@ -700,40 +700,6 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-salvage-routing-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-salvage-routing-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-2);
-}
-
-/* `proto:1419`: a FIXED 120px outcome label against a `flex: 1` select, so a routed system's rows line up whatever its tiers are named. */
-.fabricate-manager .manager-salvage-routing-row > span:first-child {
-  flex: 0 0 120px;
-  width: 120px;
-}
-
-.fabricate-manager .manager-salvage-routing-row > span {
-  flex: 0 0 auto;
-  font-weight: 600;
-}
-
-/* `proto:1419`'s 14rem target column, on the shared `<Select>`'s root since issue 1510: the slot is stated on the picker and the trigger fills it. Left hugging, every routing row would be a different width and re-flow as the GM routed an outcome. */
-.fabricate-manager .manager-salvage-route-select {
-  flex: 0 1 14rem;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-salvage-route-select .fabricate-select-trigger {
-  width: 100%;
-}
-
 /* The set-level "OR", the within-requirement "OR", and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
 .fabricate-manager .manager-recipe-ingredient-set-or,
 .fabricate-manager .manager-recipe-ingredient-or-separator,
@@ -1903,4 +1869,160 @@
   color: var(--fab-warning-text);
   font-size: 11px;
   line-height: 1.4;
+}
+
+/* The routing overview (library §12 "<RoutingOverview>"), rooted at the class `RoutingOverview` emits; its badges are `Chip` at the row density and its targets `Select` at the inline rung. */
+.fabricate-routing-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  container: fabricate-routing-overview / inline-size;
+  font-weight: 400;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-source {
+  flex: 0 1 auto;
+  justify-content: center;
+  min-width: 64px;
+  max-width: 140px;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-connector {
+  flex: none;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+}
+
+/* The select slot and the marker column are fixed, so every row's select starts at one x. */
+.fabricate-routing-overview .fabricate-routing-overview-target {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 170px;
+}
+
+/* Keyed on the source row, a caller container named by attribute, so the fill stays the overview's rule over the `Select` it composes. */
+.fabricate-routing-overview .fabricate-routing-overview-row[data-routing-overview-kind='source'] .fabricate-select,
+.fabricate-routing-overview .fabricate-routing-overview-row[data-routing-overview-kind='source'] .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The per-site skin `Select` licenses, rooted at its own namespace and keyed on the tone `RoutingOverview` stamps, held off a read-only or disabled trigger; focus repaints the border in the accent, so the tone never hides the ring (issue 1777). */
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone='success']:not([aria-disabled='true']):not(:disabled) {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone='warning']:not([aria-disabled='true']):not(:disabled) {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-select .fabricate-select-trigger[data-routing-overview-tone]:not([aria-disabled='true']):not(:disabled):focus-visible {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-markers {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 84px;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating: 262px is the 170px slot, the 8px row gap and the 84px column. */
+.fabricate-routing-overview .fabricate-routing-overview-blocked {
+  flex: none;
+  width: 262px;
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+/* Under the width the full columns need, as in the salvage well at the declared floor, the select slot and the marker column step down together, so every row still fits and its select keeps one x. */
+@container fabricate-routing-overview (max-width: 420px) {
+  .fabricate-routing-overview .fabricate-routing-overview-target {
+    width: 140px;
+  }
+
+  .fabricate-routing-overview .fabricate-routing-overview-markers {
+    width: 64px;
+  }
+
+  /* The 140px slot, the 8px row gap and the 64px column. */
+  .fabricate-routing-overview .fabricate-routing-overview-blocked {
+    width: 212px;
+  }
+}
+
+/* The recipe Overview's routing card, boxed as the Overview's other cards are; each step scope stacks its heading over its routing overview. */
+.fabricate-manager .manager-recipe-routing-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4);
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-routing-head > p {
+  margin: var(--fab-space-2xs) 0 0;
+}
+
+.fabricate-manager .manager-recipe-routing-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-routing-step {
+  margin: 0;
 }

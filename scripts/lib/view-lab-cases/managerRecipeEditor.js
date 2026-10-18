@@ -87,6 +87,36 @@ const SET_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\//,
 ]);
 
+/** A routed recipe's Overview scrolled to its routing card (issue 2513), the lab world seeded. */
+const ROUTING_CARD = '[data-recipe-section="routing"]';
+const ROUTING_OVERVIEW = (system, recipeId, state, lastRow = '') => ({
+  query: state ? { system, resultRowState: state } : { system },
+  steps: [
+    'Crafting',
+    { selector: `[data-recipe-edit="${recipeId}"]` },
+    { selector: '#recipe-tab-overview' },
+    { selector: ROUTING_CARD, scroll: true },
+    // A tall card centres on its middle, so the row a case is named for is brought in after it.
+    ...(lastRow
+      ? [{ selector: `${ROUTING_CARD} [data-routing-overview-row="${lastRow}"]`, scroll: true }]
+      : []),
+  ],
+});
+/** One line per row, every select at one x, and the marker column at its 84px. */
+const ROUTING_GEOMETRY = (scope = ROUTING_CARD) => ({
+  containerSelector: `${scope} .fabricate-routing-overview-list`,
+  oneLineRows: `${scope} .fabricate-routing-overview-row`,
+  alignedLeft: `${scope} .fabricate-routing-overview-target`,
+  minInlineSize: { selector: `${scope} .fabricate-routing-overview-markers`, pixels: 84 },
+});
+const ROUTING_HITS = Object.freeze([
+  `${ROUTING_CARD} .fabricate-routing-overview-select .fabricate-select-trigger`,
+  `${ROUTING_CARD} [data-recipe-routing-add="resultGroup"]`,
+]);
+/** A routing row by key, and the same row inside the card. */
+const ROW = (key) => `[data-routing-overview-row="${key}"]`;
+const ROUTING_ROW = (key) => `${ROUTING_CARD} ${ROW(key)}`;
+
 /** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
 const STAGE_ROWS = '[data-recipe-result-row] [data-recipe-result-item]';
 const STAGE_RESULT_GEOMETRY = Object.freeze({
@@ -1512,6 +1542,8 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-section="collapsed-steps"]', scroll: true },
     ],
     expectView: 'recipe-edit',
+    // The routing card draws the final step alone (issue 2513).
+    expectSelector: '[data-recipe-section="routing"] [data-recipe-routing-scope="jw-step-chase"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -1760,6 +1792,101 @@ export const CASES = Object.freeze([
       sourceMatches: [...SET_SOURCES, ...ANCHORED_POPOVER_SOURCES],
     })
   ),
+  // The Overview's routing card (issue 2513), routed by ingredients: the gold route shares the
+  // Ring with the silver one, and both adders close the list.
+  managerCase({
+    id: 'manager-recipe-edit-overview-routing-ingredients',
+    label: 'Manager — Recipe edit overview, routing by ingredient set with a shared result set',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTING_OVERVIEW('lab-jewelry', 'jw-r-cast', 'routed-shared'),
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${ROUTING_CARD}:has([data-recipe-routing-add="ingredientSet"]):has(${ROW('set:jw-set-silver')}:has-text("shared · 2")) ` +
+      `${ROW('set:jw-set-gold')}:has-text("shared · 2")`,
+    expectLayout: ROUTING_GEOMETRY(),
+    expectCenterHit: [...ROUTING_HITS],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-overview-routing-default',
+    label: 'Manager — Recipe edit overview, two ingredient sets routed by default',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTING_OVERVIEW('lab-jewelry', 'jw-r-cast', 'routed-default'),
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${ROUTING_CARD}:has(${ROW('set:jw-set-silver')} .fabricate-routing-overview-marker:has-text("default")) ` +
+      `${ROW('set:jw-set-gold')} .fabricate-routing-overview-marker:has-text("default")`,
+    expectLayout: ROUTING_GEOMETRY(),
+    expectCenterHit: [...ROUTING_HITS],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // Routed by check on fixed tiers: a shared pair, the gap at 15, Rough below the Standard minimum
+  // and the failure tier the policy forbids, at full size and at the declared floor.
+  ...[
+    ['manager-recipe-edit-overview-routing-check', 'routing by check on fixed tiers', undefined],
+    [
+      'manager-recipe-edit-overview-routing-check-narrow',
+      'routing by check at the declared floor',
+      { width: 1024, height: 640 },
+    ],
+  ].map(([id, what, position]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit overview, ${what}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      ...ROUTING_OVERVIEW('lab-runework', 'rw-r-blade', 'routing-fixed', 'tier:rw-ruined'),
+      expectView: 'recipe-edit',
+      expectSelector:
+        `${ROUTING_CARD}:has(${ROW('tier:rw-fine')}:has-text("shared · 2"))` +
+        `:has(${ROW('tier:rw-rough')}[data-routing-overview-blocked="below-minimum"])` +
+        `:has(${ROW('tier:rw-ruined')}[data-routing-overview-blocked="policy"]) ` +
+        `${ROW('gap:15')} [data-routing-gap-action]`,
+      expectLayout: ROUTING_GEOMETRY(),
+      expectCenterHit: [...ROUTING_HITS, `${ROUTING_CARD} [data-routing-gap-action]`],
+      ...(position && { position, expectNoHorizontalOverflow: ROUTING_CARD }),
+      kinds: position
+        ? ['manager', 'recipes', 'responsive']
+        : ['manager', 'recipes', 'resolution-mode'],
+      sourceMatches: [...SET_SOURCES],
+    })
+  ),
+  managerCase({
+    id: 'manager-recipe-edit-overview-routing-check-permitted',
+    label: 'Manager — Recipe edit overview, a failure tier routed only on a forced failure',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTING_OVERVIEW('lab-runework', 'rw-r-blade', 'routing-fixed-permitted', 'tier:rw-ruined'),
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${ROUTING_ROW('tier:rw-ruined')}[data-routing-overview-kind="source"]:has-text("Awards nothing") ` +
+      '.fabricate-routing-overview-marker:has-text("only on a forced failure")',
+    expectLayout: ROUTING_GEOMETRY(),
+    expectCenterHit: [...ROUTING_HITS],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
+  // Multi-step: the first step routes by default under the fallback note, and the second borrows
+  // the recipe's result sets read-only beneath its own note.
+  managerCase({
+    id: 'manager-recipe-edit-overview-routing-multistep',
+    label: 'Manager — Recipe edit overview, a routed step and a borrowing step',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTING_OVERVIEW('lab-runework', 'rw-r-blade', 'routing-multistep'),
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${ROUTING_CARD}:has([data-recipe-routing-scope="rw-step-forge"] > h4 + .fabricate-routing-overview [data-recipe-routing-fallback-note])` +
+      ' [data-recipe-routing-scope="rw-step-etch"] > h4 + .fabricate-routing-overview [data-recipe-routing-borrowed-note]',
+    expectLayout: ROUTING_GEOMETRY('[data-recipe-routing-scope="rw-step-forge"]'),
+    expectCenterHit: [...ROUTING_HITS],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
   managerCase({
     id: 'manager-recipe-edit-access-rail',
     label: 'Manager — Recipe edit access rail',

@@ -43,6 +43,9 @@
     routingProvider = null,
     outcomeTierOptions = [],
     routedOutcomeTiers = [],
+    // `routedMinimum`'s `{ minSuccessOutcomeId, direction }`, so a set card strikes a success tier
+    // below the recipe's minimum.
+    routedMinimum = {},
     outcomeTiersDefined = false,
     // Issue 1098: threaded on to the section and the single-step group card alike.
     failureResultsAllowed = false,
@@ -211,6 +214,7 @@
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
             {routedOutcomeTiers}
+            {routedMinimum}
             {outcomeTiersDefined}
             {failureResultsAllowed}
             onAssignIngredientSet={(groupId, setId, assigned) =>
@@ -233,6 +237,7 @@
       {ingredientSets}
       {outcomeTierOptions}
       {routedOutcomeTiers}
+      {routedMinimum}
       {outcomeTiersDefined}
       {failureResultsAllowed}
       onAssignIngredientSet={(groupId, setId, assigned) =>

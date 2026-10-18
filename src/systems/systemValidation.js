@@ -111,6 +111,7 @@ const READINESS_ISSUE_MESSAGES = {
   requirementOverlap: 'Two ingredient requirements can be satisfied by the same component.',
   unroutedResultGroup: 'A result group is not routed to any crafting-check outcome.',
   unproducedOutcomeTier: 'A crafting-check outcome tier produces no result group.',
+  unreachableResultGroup: 'A result set is not reached by any ingredient set.',
   missingTaughtRecipe: 'A result teaches a recipe that is no longer in this system.',
   choiceGroupInProgressive:
     'A result set holds a choice of rewards, which a progressive system cannot award.',
@@ -177,7 +178,17 @@ function tagEnvironmentIssue(issue, environment) {
   };
 }
 
-/** Every recipe's readiness issues, with the routing context the routed-check warnings need. */
+/**
+ * The routing basis, from the system MODE: `routedByCheck`, and alchemy with a tiered
+ * `alchemy.checkMode`, route by the check, `routedByIngredients` by the set, and the rest by neither.
+ */
+function recipeRoutingProvider(system, mode) {
+  if (mode === 'routedByCheck') return 'check';
+  if (mode === 'alchemy' && system?.alchemy?.checkMode === 'tiered') return 'check';
+  return mode === 'routedByIngredients' ? 'ingredientSet' : null;
+}
+
+/** Every recipe's readiness issues, with the routing context the routed warnings need. */
 function collectRecipeIssues(system, recipes, systemComponents) {
   // POLICY-CONDITIONAL, the SAME set the recipe editor's picker offers (issue 1098): with failure
   // results permitted it is the unfiltered tier list, or every failure-tier assignment would read
@@ -187,17 +198,10 @@ function collectRecipeIssues(system, recipes, systemComponents) {
     system?.craftingCheck?.failureResultPolicy
   );
   const mode = system?.resolutionMode || 'simple';
+  const routingProvider = recipeRoutingProvider(system, mode);
   const issues = [];
   for (const recipe of asArray(recipes)) {
     const projected = projectRecipe(recipe, system);
-    // The routing basis is the system MODE: `routedByCheck`, and alchemy with a tiered
-    // `alchemy.checkMode`, route by the check; every other mode routes by neither.
-    let routingProvider = null;
-    if (mode === 'routedByCheck') {
-      routingProvider = 'check';
-    } else if (mode === 'alchemy' && system?.alchemy?.checkMode === 'tiered') {
-      routingProvider = 'check';
-    }
     const { issues: recipeIssues } = evaluateRecipeReadiness(projected, {
       systemComponents,
       routingProvider,

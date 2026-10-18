@@ -67,6 +67,10 @@
       'CheckRoutedOutcomeTiersProduced',
       'Every check success outcome produces a result set',
     ],
+    routedResultGroupsReachable: [
+      'CheckRoutedResultGroupsReachable',
+      'Every result set is reached by an ingredient set',
+    ],
     taughtRecipesResolve: [
       'CheckTaughtRecipesResolve',
       'Every recipe it teaches is in this system',
@@ -105,6 +109,10 @@
     unproducedOutcomeTier: [
       'IssueUnproducedOutcomeTier',
       'A check outcome is not assigned to any result set, so it produces nothing.',
+    ],
+    unreachableResultGroup: [
+      'IssueUnreachableResultGroup',
+      'No ingredient set reaches a result set, so it will never be produced.',
     ],
     missingTaughtRecipe: [
       'IssueMissingTaughtRecipe',
@@ -148,6 +156,7 @@
     hasResultGroup: 'results',
     routedResultGroupsRouted: 'results',
     routedOutcomeTiersProduced: 'results',
+    routedResultGroupsReachable: 'results',
     taughtRecipesResolve: 'results',
     choiceGroupsValid: 'results',
     alchemyResultSelection: 'resolution',

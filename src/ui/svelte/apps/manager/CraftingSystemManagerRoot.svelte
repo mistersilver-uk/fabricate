@@ -7,7 +7,6 @@
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
-    routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
     routedOutcomeTierNamesForPolicy,
     routedOutcomeTierCount,
@@ -28,6 +27,7 @@
   // trigger carries no authored name — `_normalizeUnifiedTrigger` drops `label` deliberately.
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
+  import { routedCheckFacts } from './recipe/routedCheckFacts.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
@@ -554,11 +554,9 @@
       selectedSystem?.craftingCheck?.failureResultPolicy
     )
   );
-  // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
+  // Every routed tier with its bounds, the check's evaluation and its gaps; the library inspector
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
-  const recipeAllOutcomeTierOptions = $derived.by(() =>
-    routedOutcomeTierOptions(selectedSystem?.craftingCheck?.routed)
-  );
+  const recipeRoutedCheck = $derived(routedCheckFacts(selectedSystem?.craftingCheck?.routed));
   // Whether this system's crafting failure-result policy permits results on a failed check (issue
   // 1098).
   const recipeFailureResultsAllowed = $derived(
@@ -4943,7 +4941,7 @@
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
-        routedOutcomeTiers={recipeAllOutcomeTierOptions}
+        routedCheck={recipeRoutedCheck}
         routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
@@ -5559,7 +5557,7 @@
             <RecipeBrowserInspector
               {selectedRecipe}
               resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-              outcomeTiers={recipeAllOutcomeTierOptions}
+              outcomeTiers={recipeRoutedCheck.tiers}
               recipeCount={($viewState.recipes || []).length}
               componentCount={selectedCounts.components}
               componentOptions={selectedSystem?.managedItemOptions || []}

@@ -94,7 +94,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
+The Overview tab's per-recipe crafting-check modifier control (`RecipeCraftingModifierField.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
 Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no callout: a control the engine will ignore is worse than no control, and a callout explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
@@ -234,7 +234,7 @@ The Checks screens' read-only modifier cards deep-link here, expanding the secti
 
 `SubjectModifierPicker.svelte` is the ONE authoring surface for the two NEW `bySubject` subjects, `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`.
 It is one component with two hosts — `ComponentEditView` (the component's Salvage tab) and `GatheringTaskEditView` (the task card) — rather than two copies, because the pick's semantics are subtle in exactly the way a copy gets wrong, and because the two hosts disagreeing about them is a defect no screen shows.
-The recipe's equivalent control (`RecipeOverviewTab`) is deliberately NOT converted onto it; the mismatch is named in the component's own header and is a behaviour decision about the recipe surface, not a refactor.
+The recipe's equivalent control (`RecipeCraftingModifierField`) is deliberately NOT converted onto it; the mismatch is named in the component's own header and is a behaviour decision about the recipe surface, not a refactor.
 
 - **It renders under the activity's `bySubject` rule and a NON-EMPTY system catalogue, and nothing else gates it.**
 Each host asks its OWN activity's rule (salvage's from `salvageCraftingCheck`, gathering's from `gatheringCraftingCheck`), never another activity's, because the catalogue is shared and the SELECTION is not.
@@ -243,7 +243,7 @@ An empty catalogue draws NOTHING at all — a control whose menu could only ever
 - **Three states, and the two absent-vs-empty ones are different rolls.** An ABSENT pick INHERITS the activity's `defaultModifierIds`; an AUTHORED EMPTY array is a real pick of zero and appends no term; an authored non-empty array is the pick.
 The authoredness toggle is the only place a GM moves between the first two: switching it ON emits `[]` and switching it OFF emits `null` (gathering's host patches `undefined`, which is what makes its normalizer drop the key).
 Turning it ON deliberately does NOT seed from the activity's default set — a record turning the switch on has stated that it picks its own, and seeding would author picks the GM never made.
-This is the one axis on which it differs from `RecipeOverviewTab`'s `changeModifierSetMode`, which does seed.
+This is the one axis on which it differs from `RecipeCraftingModifierField`'s `changeModifierSetMode`, which does seed.
 - **Under inheritance the inherited entries are NAMED, not merely announced.**
 The pill row has nothing to author, so it is hidden and the note lists the activity's default set, resolved against the catalogue and dropping unknown ids exactly as the resolver drops them — so the line cannot promise a modifier the roll would not apply.
 The names are joined by `formatList` (the active language's list conventions) and interpolated into a **`{list}` placeholder** on the sentence; a hand-joined `', '` tail is wrong in English before it is wrong in any other language, and a runtime value concatenated onto a localized string takes the list's position in the sentence away from the translator.
@@ -254,7 +254,7 @@ The internal noun for the abstraction the two share never reaches a screen.
 The inherit sentences name the ACTIVITY's check rather than "the system", because the default set is per-activity and a GM reading "the system default set" on the Salvage tab would look for it on the wrong screen.
 - **The cap is stated STANDING**, not only once the add button has already gone dead, with an at-cap clause appended when it is reached.
 It is read through `resolveMaxModifierPicks`, so a stored `0`, `-2` or `"three"` shows no cap at all — the picker bounds exactly what the engine bounds.
-A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeOverviewTab` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
+A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeCraftingModifierField` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
 - **The accessible control is the `SelectionCheckbox` and it carries the whole accessible name; the visible sentence beside it is `aria-hidden`.** One of the two, never both — the same rule the eligibility pill above follows, for the same reason.
 
 ### Tools tab
@@ -453,6 +453,7 @@ The GM component surfaces: the component browser and the component editor.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
    The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
    The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
+   Routed salvage draws its outcome routing as a routing overview: one row per offered outcome with the result set it routes to and a shared marker.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
@@ -581,16 +582,20 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
     The `checkOutcomeIds` assignment picker offers the tiers the system's `craftingCheck.failureResultPolicy` lets route: success tiers only (`success === true`) under `never`, and failure-marked tiers as well where the policy permits results on failure, as `ui-system-studio` § Routed result-group authoring is policy-conditional specifies.
-  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+  - A step with exactly one result set that lists no tier needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 - Every set drawn as a card is renameable in that card in both routed modes.
   A result set's card names its effective sources: an explicit source is removable, and a fallback source is marked "default" and is not.
   A set nothing reaches reads "Nothing — unreachable" beside its Assign control, and a shared set states how many sources route to it.
   Assign lists every source the system offers, and choosing one routed elsewhere re-points it, with a "now → ⟨set⟩" note naming where it routes today.
-  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers routing by name.
-  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, or no longer defined — shows struck, says it does not route, and stays removable.
-  NOT SHIPPED here yet, issue 2513: the card does not read the recipe's minimum success tier, so a tier below it still shows as routing.
-  NOT SHIPPED here yet, issue 2513: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
+  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers reaching a result set by default.
+  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, no longer defined, or a success tier below the recipe's minimum success tier — shows struck, says it does not route, and stays removable.
+  NOT SHIPPED here yet, issue 2520: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
+- The Overview tab ends with a routing card in both routed modes: one routing overview per step scope, each row naming a source and the result set it effectively produces, marked "default" when inherited and "shared · N" when shared, re-pointed in place through the same fields the set card writes.
+  Under check routing the card states that the tiers belong to the system and offers "Edit outcome tiers"; a failure tier the policy forbids reads "routing not permitted by this system", a success tier below the recipe's minimum success tier reads "below this recipe's minimum success tier", and a gap between fixed tiers is a blocked row with "Edit outcome tiers".
+  Where the recipe sets a minimum success tier, a failure tier the policy permits is marked "only on a forced failure".
+  While no result set in a scope lists a tier and more than one success tier is offered, the card warns that assigning one stops the other tiers reaching a result set by default.
+  A step with no result sets of its own shows the recipe's, read-only, as the engine would award them, and the recipe cannot be enabled until the step has its own.
 
 ### Alchemy check-mode selector (issue 554)
 

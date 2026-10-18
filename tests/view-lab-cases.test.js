@@ -754,6 +754,13 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-component-edit-salvage-narrow',
   'manager-checks-parity-outcomes-multiply',
   'manager-checks-parity-outcomes-under-fixed',
+  // The recipe Overview's routing card (issue 2513): one select x and the 84px marker column.
+  'manager-recipe-edit-overview-routing-ingredients',
+  'manager-recipe-edit-overview-routing-default',
+  'manager-recipe-edit-overview-routing-check',
+  'manager-recipe-edit-overview-routing-check-narrow',
+  'manager-recipe-edit-overview-routing-check-permitted',
+  'manager-recipe-edit-overview-routing-multistep',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
@@ -3165,6 +3172,8 @@ test('changed files map to the windows they affect', () => {
     'manager-gathering-task-editor-normal-hearth-herb',
     'manager-recipe-edit-ingredients',
     'manager-recipe-edit-ingredients-sets',
+    // Issue 2513: the Overview's routing card, whose rules sit in the recipe-editor sheet.
+    'manager-recipe-edit-overview-routing-check',
     'manager-recipe-edit-results-routed-shared',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',

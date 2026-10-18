@@ -225,6 +225,43 @@ describe('evaluateSystemValidation — composition', () => {
     );
   });
 
+  // Issue 2513: a result set no ingredient set reaches surfaces under ingredient routing only.
+  it('surfaces an unreachable result set under routedByIngredients alone, with its message', () => {
+    const unreachableFor = (resolutionMode) => {
+      const system = makeSystem({
+        resolutionMode,
+        craftingCheck: {
+          routed: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'tier-hit', name: 'Hit', success: true }],
+          },
+        },
+      });
+      const recipe = makeRecipe({
+        id: `r-${resolutionMode}`,
+        resultGroups: [
+          { id: 'rg-a', name: 'A', checkOutcomeIds: ['tier-hit'], results: [] },
+          { id: 'rg-b', name: 'B', checkOutcomeIds: ['tier-hit'], results: [] },
+        ],
+      });
+      return evaluateSystemValidation(system, { recipes: [recipe] }).issues.filter(
+        (issue) => issue.code === 'unreachableResultGroup'
+      );
+    };
+    const [issue, ...rest] = unreachableFor('routedByIngredients');
+    assert.equal(rest.length, 0);
+    assert.equal(issue.severity, 'warning');
+    assert.equal(issue.kind, 'recipe');
+    assert.equal(issue.blocks, undefined);
+    assert.deepEqual(issue.nav, { view: 'recipe-edit', tab: 'results' });
+    assert.notEqual(issue.message, issue.code, 'the headless message is copy, not the code');
+    assert.match(issue.message, /result set/);
+    for (const mode of ['simple', 'routedByCheck']) {
+      assert.deepEqual(unreachableFor(mode), [], mode);
+    }
+  });
+
   // Issue 2511: the routed warnings read the routing model over the policy-offered tiers.
   it('reads a failure-tier assignment as routed only where the policy offers that tier', () => {
     const recipe = makeRecipe({

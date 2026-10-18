@@ -425,6 +425,31 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]'), null, 'no routed checklist entry off check-mode');
     harness.remount();
   });
+
+  // Issue 2513: a result set no ingredient set reaches, under ingredient routing.
+  it('lists an unreachable result set as a warning row that focuses that set', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipe: {
+        name: 'Routed Brew',
+        enabled: true,
+        ingredientSets: [{ id: 's1', resultGroupId: 'g-good' }],
+        resultGroups: [{ id: 'g-good' }, { id: 'g-orphan' }]
+      },
+      routingProvider: 'ingredientSet',
+      onSelectIssue: (...args) => {
+        calls.push(args);
+      }
+    });
+    const check = target.querySelector('[data-check="routedResultGroupsReachable"]');
+    assert.equal(check.dataset.satisfied, 'false');
+    assert.match(check.textContent, /Every result set is reached by an ingredient set/);
+    assert.ok(check.classList.contains('is-warn'), 'it reads as a warning, not a blocker');
+    check.querySelector('[data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(rowActionArgs(calls), [['results', 'result-group-g-orphan']]);
+    harness.remount();
+  });
 });
 
 /** THE SURFACE ITSELF, MOUNTED (issue 1517). */
