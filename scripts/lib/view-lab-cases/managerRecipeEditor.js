@@ -17,6 +17,19 @@ import { managerCase } from './caseFactories.js';
 const COMPONENT_NAME_FIELD =
   '.manager-recipe-option-name-field:not([data-recipe-option-essence]):not([data-recipe-option-currency])';
 
+/** A recipe ingredient tag row's catalogue, opened over the herbalism system's vocabulary. */
+const TAG_PICKER_STEPS = Object.freeze([
+  'Crafting',
+  { selector: '[data-recipe-edit="hb-r-tincture"]' },
+  { selector: '#recipe-tab-ingredients' },
+  { selector: '[data-recipe-option-tags]', scroll: true },
+  { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
+]);
+
+/** The first ingredient set's first requirement, a bare row, so each control matches one element. */
+const FIRST_INGREDIENT_ROW =
+  '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
+
 /** The `n`th flat result row of a result set, as a child and from the page. */
 const RESULT_ROW_CHILD = (n) => `[data-recipe-result-item]:nth-child(${n})`;
 const RESULT_ROW = (n) => `.manager-recipe-ingredient-set-groups > ${RESULT_ROW_CHILD(n)}`;
@@ -523,8 +536,21 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-ingredients' },
     ],
     expectView: 'recipe-edit',
-    // The converged row, named (issue 1373).
+    // The converged row, named (issue 1373), at the library specimen's figures (issue 2515).
     expectSelector: '[data-recipe-option] [data-recipe-option-kind]',
+    expectLayout: {
+      controls: [
+        {
+          selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-option-plate`,
+          styles: 'width: 26px; height: 26px; border-top-left-radius: 6px',
+        },
+        {
+          selector: `${FIRST_INGREDIENT_ROW} [data-recipe-option-chosen]`,
+          styles: 'height: 34px; border-top-left-radius: 7px',
+        },
+        { selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-or-trigger`, styles: 'height: 28px' },
+      ],
+    },
     expectContained: [
       {
         container: '[data-recipe-option]',
@@ -596,6 +622,15 @@ export const CASES = Object.freeze([
     expectContained: [
       { container: '.fabricate-manager', target: '.manager-recipe-option-suggestions' },
     ],
+    // Focused in this frame, so the search measures its full-accent focus face (issue 2515).
+    expectLayout: {
+      controls: [
+        {
+          selector: '.manager-recipe-option-search',
+          styles: 'height: 34px; border-top-color: var(--fab-accent)',
+        },
+      ],
+    },
     expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -705,13 +740,7 @@ export const CASES = Object.freeze([
     // No case in the registry opened this popover (issue 1373), which is why it went on drawing a panel that is not the design's.
     reaches: 'beyond',
     query: { system: 'lab-herbalism' },
-    steps: [
-      'Crafting',
-      { selector: '[data-recipe-edit="hb-r-tincture"]' },
-      { selector: '#recipe-tab-ingredients' },
-      { selector: '[data-recipe-option-tags]', scroll: true },
-      { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
-    ],
+    steps: TAG_PICKER_STEPS,
     expectView: 'recipe-edit',
     // The panel and A row in it.
     expectSelector:
@@ -724,6 +753,29 @@ export const CASES = Object.freeze([
         target: '.fabricate-picker-popover .manager-travel-popover-search input',
       },
     ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // A query no tag in the vocabulary is named, `ve` (`solvent`, `vessel`, `salve`), so the panel's
+  // footer offers it as a new tag (issue 2515).
+  managerCase({
+    id: 'manager-recipe-edit-tag-picker-new-tag',
+    label: 'Manager — Recipe edit, the tag picker offering a new tag',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...TAG_PICKER_STEPS,
+      { selector: '.fabricate-picker-popover .manager-travel-popover-search input', fill: 've' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: '.fabricate-picker-popover [data-recipe-tag-create]',
+    expectContained: [{ container: '.fabricate-manager', target: '[data-recipe-tag-create]' }],
+    expectCenterHit: '[data-recipe-tag-create]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

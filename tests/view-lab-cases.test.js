@@ -825,6 +825,8 @@ const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button`;
 /** One published switch of the same fixture, by its section's key. */
 const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
+const FIRST_INGREDIENT_ROW =
+  '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -842,6 +844,24 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-checks-v3-count-additional-dice-macro-narrow': macroZonesFill(),
   'manager-checks-v3-count-additional-dice-macro-pair-narrow': macroZonesFill(),
   'manager-component-edit-salvage': toolbarSelects('[data-salvage-dc-preset]'),
+  // The requirement row at the library specimen's figures, and its search's focus face (issue 2515).
+  'manager-recipe-edit-ingredients': [
+    {
+      selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-option-plate`,
+      styles: 'width: 26px; height: 26px; border-top-left-radius: 6px',
+    },
+    {
+      selector: `${FIRST_INGREDIENT_ROW} [data-recipe-option-chosen]`,
+      styles: 'height: 34px; border-top-left-radius: 7px',
+    },
+    { selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-or-trigger`, styles: 'height: 28px' },
+  ],
+  'manager-recipe-edit-ingredients-suggestions': [
+    {
+      selector: '.manager-recipe-option-search',
+      styles: 'height: 34px; border-top-color: var(--fab-accent)',
+    },
+  ],
   'manager-checks-simple-two-band-strip': toolbarSelects(
     '[data-simple-band-record]',
     '[data-checks-preview-record]'
@@ -3215,7 +3235,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // The representative pair plus the panel's fourteen overrides.
+  // The representative pair plus the panel's fifteen overrides.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -3226,6 +3246,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-crafting-modifier-cap-reached',
       'manager-recipe-edit-tag-picker',
+      'manager-recipe-edit-tag-picker-new-tag',
       'manager-recipe-item-contents-picker',
       'manager-recipes-bulk-edit-check-tier',
       'manager-system-edit-lists',
@@ -3279,6 +3300,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-results-set-menu-narrow',
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
+  'manager-recipe-edit-tag-picker-new-tag',
   'manager-recipe-item-contents-picker',
   'manager-recipe-item-contents-picker-staged',
   'manager-recipe-item-limits-suggestions',
