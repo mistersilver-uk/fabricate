@@ -420,9 +420,10 @@ async function renderPage(
       }
     }
 
-    if (expectCenterHit) {
-      const hit = await page.evaluate((selector) => {
-        const element = globalThis.document.querySelector(selector);
+    // One selector, or a list of them, each owning the pointer target at its centre.
+    for (const selector of [expectCenterHit ?? []].flat()) {
+      const hit = await page.evaluate((query) => {
+        const element = globalThis.document.querySelector(query);
         if (!element) return false;
         const box = element.getBoundingClientRect();
         const target = globalThis.document.elementFromPoint(
@@ -430,9 +431,8 @@ async function renderPage(
           box.top + box.height / 2
         );
         return target === element || element.contains(target);
-      }, expectCenterHit);
-      if (!hit)
-        throw new Error(`${label}: ${expectCenterHit} does not own its centre pointer target.`);
+      }, selector);
+      if (!hit) throw new Error(`${label}: ${selector} does not own its centre pointer target.`);
     }
 
     if (expectClick) {

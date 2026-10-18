@@ -262,6 +262,71 @@ function seedCheckTwoSets(content) {
   ];
 }
 
+/** `routing-fixed` (issue 2513): Runework rolls fixed tiers with a gap at 15 under `policy`; the
+ *  Runeblade's minimum is Standard, and its Standard Blade lists Fine and Standard. */
+function seedRoutingFixed(content, state = 'routing-fixed', policy = 'never') {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', state);
+  const tier = (id, name, success, start, end) => ({
+    id,
+    name,
+    success,
+    breakTools: !success,
+    start,
+    end,
+  });
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    failureResultPolicy: policy,
+    routed: {
+      ...system.craftingCheck.routed,
+      type: 'fixed',
+      fixedOutcomes: [
+        tier('rw-masterwork', 'Masterwork', true, 18, 20),
+        tier('rw-fine', 'Fine', true, 16, 17),
+        tier('rw-standard', 'Standard', true, 12, 14),
+        tier('rw-rough', 'Rough', true, 8, 11),
+        tier('rw-ruined', 'Ruined', false, 1, 7),
+      ],
+    },
+  };
+  recipe.minSuccessOutcomeId = 'rw-standard';
+  recipe.resultGroups = recipe.resultGroups.map((group) =>
+    group.id === 'rw-grp-standard'
+      ? { ...group, checkOutcomeIds: ['rw-fine', 'rw-standard'] }
+      : group
+  );
+}
+
+/** `routing-fixed-permitted`: the same under `perRecord`, so Ruined routes on a forced failure. */
+function seedRoutingFixedPermitted(content) {
+  seedRoutingFixed(content, 'routing-fixed-permitted', 'perRecord');
+}
+
+/** `routing-multistep`: Runework turns multi-step on and the Runeblade keeps its result sets; its
+ *  first step has two that list no tier, and its second has none of its own, so it borrows them. */
+function seedRoutingMultistep(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routing-multistep');
+  system.features = { ...system.features, multiStepRecipes: true };
+  const group = (id, name) => ({
+    id,
+    name,
+    checkOutcomeIds: [],
+    results: [{ componentId: 'rw-blade-standard', quantity: 1 }],
+  });
+  recipe.steps = [
+    {
+      id: 'rw-step-forge',
+      name: 'Forge the blank',
+      ingredientSets: recipe.ingredientSets,
+      resultGroups: [
+        group('rw-grp-step-master', 'Masterwork'),
+        group('rw-grp-step-standard', 'Standard'),
+      ],
+    },
+    { id: 'rw-step-etch', name: 'Etch the runes', ingredientSets: [], resultGroups: [] },
+  ];
+}
+
 const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
@@ -277,6 +342,9 @@ const RESULT_ROW_STATES = Object.freeze({
   'routed-check-stale': seedRoutedCheckStale,
   'routed-check-no-success': seedRoutedCheckNoSuccess,
   'check-two-sets': seedCheckTwoSets,
+  'routing-fixed': seedRoutingFixed,
+  'routing-fixed-permitted': seedRoutingFixedPermitted,
+  'routing-multistep': seedRoutingMultistep,
 });
 
 function seedResultRowState(content, state) {

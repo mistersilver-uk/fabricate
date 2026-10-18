@@ -1865,6 +1865,7 @@ A group that no set and no tier reaches, explicitly or by fallback, is UNREACHAB
 The routing is authored in TWO surfaces, and neither is a copy of the other.
 
 A ROUTING OVERVIEW lists every source with the set it produces, one row each, and belongs on the record’s overview: it answers what the recipe does in one screen and lets a GM re-point routing without opening a set, which is the common edit.
+It ships as `RoutingOverview`; the recipe Overview draws one per step scope, and the component Salvage card draws its outcome routing with it.
 The SET CARD holds the set’s own contents and states what routes into it, which is where the rarer edit happens.
 It ships as `SetCard`, and the line naming what routes into the set as `RouteSources`.
 On the set card, an assignment that stays on disk but does not route is listed struck rather than hidden, and the GM can remove it there.

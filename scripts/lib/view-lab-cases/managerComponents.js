@@ -743,6 +743,8 @@ export const CASES = Object.freeze([
       { selector: '[data-salvage-routing]', scroll: true },
     ],
     expectView: 'component-edit',
+    // The routing well's rows are the routing overview's (issue 2513).
+    expectSelector: '[data-salvage-routing] .fabricate-routing-overview [data-salvage-route]',
     // The flat row in view after the scroll; its amount toggle is the requirement row's (issue 1516).
     expectCenterHit:
       '[data-salvage-group="rw-salv-partial"] [data-salvage-result] [data-recipe-option-amount-mode="rolled"]',
@@ -754,6 +756,34 @@ export const CASES = Object.freeze([
     },
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The routing well at the declared floor (issue 2513): Masterwork re-pointed to the set Standard
+  // already routes to, so both rows say the set is shared and the rows fit the narrow card.
+  managerCase({
+    id: 'manager-component-edit-salvage-routed-narrow',
+    label:
+      'Manager — Component edit salvage, two outcomes routed to one set, at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-route="Masterwork"]' },
+      { selector: '.fabricate-select-popover [data-popover-option="rw-salv-partial"]' },
+      { selector: '[data-salvage-routing]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '[data-salvage-routing]:has([data-routing-overview-row="Standard"] .fabricate-routing-overview-marker:has-text("shared · 2")) ' +
+      '[data-routing-overview-row="Masterwork"] .fabricate-routing-overview-marker:has-text("shared · 2")',
+    expectNoHorizontalOverflow: '[data-salvage-routing]',
+    expectCenterHit: '[data-salvage-routing] [data-salvage-route="Masterwork"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({

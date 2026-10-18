@@ -453,6 +453,7 @@ The GM component surfaces: the component browser and the component editor.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
    The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
    The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
+   Routed salvage draws its outcome routing as a routing overview: one row per offered outcome with the result set it routes to and a shared marker.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
@@ -581,16 +582,20 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
     The `checkOutcomeIds` assignment picker offers the tiers the system's `craftingCheck.failureResultPolicy` lets route: success tiers only (`success === true`) under `never`, and failure-marked tiers as well where the policy permits results on failure, as `ui-system-studio` § Routed result-group authoring is policy-conditional specifies.
-  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+  - A step with exactly one result set that lists no tier needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 - Every set drawn as a card is renameable in that card in both routed modes.
   A result set's card names its effective sources: an explicit source is removable, and a fallback source is marked "default" and is not.
   A set nothing reaches reads "Nothing — unreachable" beside its Assign control, and a shared set states how many sources route to it.
   Assign lists every source the system offers, and choosing one routed elsewhere re-points it, with a "now → ⟨set⟩" note naming where it routes today.
-  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers routing by name.
-  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, or no longer defined — shows struck, says it does not route, and stays removable.
-  NOT SHIPPED here yet, issue 2513: the card does not read the recipe's minimum success tier, so a tier below it still shows as routing.
+  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers reaching a result set by default.
+  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, no longer defined, or a success tier below the recipe's minimum success tier — shows struck, says it does not route, and stays removable.
   NOT SHIPPED here yet, issue 2513: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
+- The Overview tab ends with a routing card in both routed modes: one routing overview per step scope, each row naming a source and the result set it effectively produces, marked "default" when inherited and "shared · N" when shared, re-pointed in place through the same fields the set card writes.
+  Under check routing the card states that the tiers belong to the system and offers "Edit outcome tiers"; a failure tier the policy forbids reads "routing not permitted by this system", a success tier below the recipe's minimum success tier reads "below this recipe's minimum success tier", and a gap between fixed tiers is a blocked row with "Edit outcome tiers".
+  Where the recipe sets a minimum success tier, a failure tier the policy permits is marked "only on a forced failure".
+  While no result set in a scope lists a tier and more than one success tier is offered, the card warns that assigning one stops the other tiers reaching a result set by default.
+  A step with no result sets of its own shows the recipe's, read-only, as the engine would award them, and the recipe cannot be enabled until the step has its own.
 
 ### Alchemy check-mode selector (issue 554)
 

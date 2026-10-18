@@ -565,6 +565,7 @@ It never reads outcome tiers and never changes which result group is produced (r
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
+- A result group no ingredient set reaches by effective routing — the set's `resultGroupId`, else the set's `resultMapping`, else the scope's first group — raises the readiness warning `unreachableResultGroup`, which never blocks enabling; this mode never awards a `role: 'failure'` group on a failed check, so such a group is held to the same rule.
 - This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs.
 It shares the `craftingCheck.simple` config slot with its `simple`/`alchemy` peers, but its run condition matches alchemy-Simple (an authored formula rolls on its own), not simple mode (which also requires the crafting-checks toggle enabled).
 
@@ -619,8 +620,9 @@ Alchemy tiered brews already gate success through each outcome tier's own `succe
 This matches the authoring control, which auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`): the value the GM cannot see or clear is also the value the runtime ignores.
 A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard rather than migrated away.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
+The exemption holds only while no result group in the scope lists a tier id; once one does, an unlisted tier is `unrouted-tier`.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
-Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
+While the exemption holds, resolution never aborts with a misconfiguration for an unmatched success outcome.
 - **Routing is success-disposition-gated.**
 A check result whose final tier has `success: false` takes the failure/consumption path regardless of the tier's name: under `failureResultPolicy: 'never'` the engine short-circuits on `!checkResult.success` before routing runs, and otherwise the failure branch asks routing only for an authored failure output (`recipes-and-steps`, "A FAILED check resolves an authored FAILURE result group when the policy permits it").
 **Invariant:** `data.success` and the final tier's own `success` can never disagree.
@@ -629,8 +631,9 @@ Routing via `checkOutcomeIds` never gives a `success: false` tier `disposition: 
 So a relative check's non-keyword-named failure tier (for example "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never produces a success result, and under `never` it does not route at all.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
   1. Explicit tier assignment wins: when an outcome resolves to a routed-check outcome tier id — a success tier always, a failure-marked tier only where `craftingCheck.failureResultPolicy` permits results on failure — the result group listing that tier id in `checkOutcomeIds` is selected, as `disposition: 'success'` or `disposition: 'failure'` respectively.
+     Where any result group in the scope lists a tier id and none lists the resolved tier, the outcome is `unrouted-tier` and no later rule applies.
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
-  3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
+  3. If the scope has exactly one result group and it lists no tier id, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
   5. If multiple result groups are present and no result-group name matches, execution aborts with a crafting-system misconfiguration error (not a player failure outcome).
      For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
@@ -703,8 +706,8 @@ The minimum-success-tier gate consumes that ranking only to LOCATE the required 
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
-- **One result group → no mapping required:** a step with exactly one result group needs no outcome/tier mapping; it is produced on any non-failure outcome and yields nothing on a failure keyword.
-Outcome/tier mapping is required only when a step has multiple result groups (each success outcome must route to a group), and the `recipe-visibility` readiness warnings (`unroutedResultGroup`, `unproducedOutcomeTier`) do not fire for single-result-group steps.
+- **One result group → no mapping required:** a step with exactly one result group that lists no tier id needs no outcome/tier mapping; it is produced on any non-failure outcome and yields nothing on a failure keyword.
+Outcome/tier mapping is required only when a step has multiple result groups or any of its groups lists a tier id (each offered success tier must then route to a group), and the `recipe-visibility` readiness warnings (`unroutedResultGroup`, `unproducedOutcomeTier`) do not fire for a single-result-group step in which no group lists a tier id.
 - Reference integrity (always applies): `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison, and may not be any reserved failure keyword.
 - A missing routed crafting check (`craftingCheck.routed.rollFormula` unauthored) is an **unconditional system-level blocker** (`routedCheckNoFormula`), independent of any recipe — every recipe in this mode routes by the check, so no craft can resolve without it (see `recipe-visibility`).
 A `routedByCheck` recipe is otherwise structurally valid regardless of the check configuration; the formula requirement is a system-level concern, not a per-recipe validation error.

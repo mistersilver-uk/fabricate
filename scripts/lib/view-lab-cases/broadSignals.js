@@ -442,9 +442,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-routed-check-stale',
     'manager-recipe-edit-results-routed-check-policy-hint-narrow',
   ]),
-  // The routing overview (issue 2513): the salvage well's outcome routing.
+  // The routing overview (issue 2513): the salvage well's outcome routing, at rest and shared at
+  // the declared floor, and the recipe Overview's routing card in each state it draws.
   'src/ui/svelte/components/RoutingOverview.svelte': Object.freeze([
     'manager-component-edit-salvage',
+    'manager-component-edit-salvage-routed-narrow',
+    'manager-recipe-edit-overview-routing-ingredients',
+    'manager-recipe-edit-overview-routing-default',
+    'manager-recipe-edit-overview-routing-check',
+    'manager-recipe-edit-overview-routing-check-narrow',
+    'manager-recipe-edit-overview-routing-check-permitted',
+    'manager-recipe-edit-overview-routing-multistep',
   ]),
   // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
   // reserved pair and a salvage group.
@@ -804,7 +812,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   // Every module-sheet partial stands as this key (issue 1711), so issue 2512's four name one frame
   // each: the set card's rules in the recipe-editor sheet, the recipe editor's set chrome, the
-  // single bare set, and the salvage group card.
+  // single bare set, and the salvage group card; issue 2513 adds the Overview's routing card.
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-world-downtime-tracking',
@@ -813,6 +821,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-ingredients-sets',
     'manager-recipe-edit-ingredients',
     'manager-component-edit-salvage',
+    'manager-recipe-edit-overview-routing-check',
   ]),
 });
 
