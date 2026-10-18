@@ -1220,6 +1220,8 @@ async function resultGroupMarkup(entries) {
   }
 }
 
+// Arial, not Signika: its natural wrap (flat about 706-710, members about 799-800) sits 7-11px under
+// the rules, so this test pins the rule values and not the real-font fit, which View Lab measures.
 test('the widest result rows hold one line just over each wrap rule, and wrap by rule at it (issue 2515)', async () => {
   const ranged = (entry, from, to) => ({ ...entry, selectionRange: { from, to } });
   const markup = await resultGroupMarkup([

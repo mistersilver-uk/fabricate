@@ -4,7 +4,7 @@
  * errors return past 254 frames: the page the plugin names must exist, and only it loses the client.
  */
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
@@ -15,6 +15,11 @@ const CLIENT_TAG = '<script type="module" src="/@vite/client"></script>';
 
 test('the Vite-client drop targets the specimen page the lab frames, and that page exists', () => {
   assert.ok(existsSync(resolve(repoRoot, `.${SPECIMEN_PAGE}`)), `${SPECIMEN_PAGE} exists`);
+  assert.match(
+    readFileSync(resolve(repoRoot, 'tests/view-lab/primitives/mount.js'), 'utf8'),
+    new RegExp(`SPECIMEN_URL = '${SPECIMEN_PAGE}'`),
+    'the lab mounts the same specimen page the plugin targets'
+  );
   const plugin = config.plugins
     .flat()
     .find((entry) => entry?.name === 'view-lab-specimen-without-vite-client');
