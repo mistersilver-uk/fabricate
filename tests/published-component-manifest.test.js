@@ -456,7 +456,7 @@ const BUTTON = Object.freeze({
 });
 
 /** The classes `Button.svelte` spells that no published key writes. */
-const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-38']);
+const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-28', 'is-size-38']);
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
