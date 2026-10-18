@@ -3108,10 +3108,13 @@ ResultGroup = {
   id: string,
   name: string,
   // Reserved role discriminator (issue 554). `'failure'` marks the reserved failure
-  // result group, valid on plain `simple` recipes and on alchemy `simple` checkMode;
-  // absent/other = a success group. Still forbidden on None/Tiered groups. The
-  // reserved failure group is undeletable in the editor and defaults to empty.
-  // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
+  // result group; absent/other = a success group. Only plain `simple` recipes and
+  // alchemy `simple` checkMode select it, by role, on a failed check the failure-result
+  // policy permits; an empty one awards nothing. Its presence is the recipe's opt-in:
+  // the editor adds it empty and removes it through "Award results on a failed check",
+  // and never synthesizes it. No other mode or checkMode selects it by role, and a
+  // mode change into `progressive` drops it. Preserved verbatim by normalization so a
+  // settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
   // alchemy tiered). Empty for non-tiered groups, and OMITTED from the serialized

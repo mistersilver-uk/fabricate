@@ -22,8 +22,9 @@ When `CraftingSystem.resolutionMode` changes:
 1. Require explicit GM confirmation.
    The confirmation reports accurate counts from a dry run: how many recipes will be migrated to the new mode and, only when any cannot be migrated, how many will be deleted and their names.
    When no recipe will be deleted the confirmation must not mention deletion.
+   When a surviving recipe loses part of its shape, the confirmation names what is lost: each ingredient set after the first, with its recipe, when collapsed into `alchemy`, and each recipe whose reserved failure result set is dropped when moved into `progressive`; it mentions neither when there is none.
 2. Persist the merged system (with its new mode) before migrating recipes, so recipe migration and validation read the new mode.
-3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `resolution-modes/spec.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, or carry it verbatim).
+3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `resolution-modes/spec.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, drop the reserved failure result set when moving into progressive, or carry it verbatim).
    Migrating *into* `alchemy` seeds NO per-recipe provider (retired, issue 554): it clears any `resultSelection` and collapses a multi-INGREDIENT-SET recipe to its first set; the system-level `alchemy.checkMode` is seeded separately (defaults to `none`).
    Migrated recipes are persisted on structural validity alone.
 4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-STEP recipe into `alchemy` (a multi-INGREDIENT-SET recipe is collapsed, not deleted).
