@@ -402,7 +402,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-ingredient-routed',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
-  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze(['manager-recipe-edit-normal']),
+  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
+    'manager-recipe-edit-normal',
+    'manager-recipe-edit-results-failure-optin',
+  ]),
   // A third entry as of issue 1458, and it is a third mode rather than a third instance.
   'src/ui/svelte/components/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
@@ -468,6 +471,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-set-menu',
     'manager-recipe-edit-results-set-menu-narrow',
     'manager-recipe-edit-results-alchemy-narrow',
+    'manager-recipe-edit-results-failure-optin-on',
   ]),
   // The set picker (issue 1782): the session form, and the staged form closed, open, staged and over its bound.
   'src/ui/svelte/components/SetPicker.svelte': Object.freeze([
@@ -572,6 +576,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-salvage',
     // The `items` form, which only the essence On craft primer draws (issue 1521).
     'manager-essence-edit-unscoped-on-craft',
+    'manager-recipe-edit-results-failure-policy-never-present',
   ]),
   // The fact row at `rule` density: the essence catalogue's world-default cards and the tool entry's
   // effective-rules rail (issue 1521).

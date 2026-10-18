@@ -62,6 +62,11 @@ manager-recipe-edit-results-progressive
 manager-recipe-edit-results-progressive-adder
 manager-recipe-edit-results-alchemy
 manager-recipe-edit-results-alchemy-narrow
+manager-recipe-edit-results-failure-optin
+manager-recipe-edit-results-failure-optin-on
+manager-recipe-edit-results-failure-policy-never
+manager-recipe-edit-results-failure-policy-never-checks
+manager-recipe-edit-results-failure-policy-never-present
 manager-recipe-edit-results-routed-shared
 manager-recipe-edit-results-routed-shared-narrow
 manager-recipe-edit-results-routed-unreachable
