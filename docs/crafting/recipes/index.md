@@ -92,6 +92,7 @@ A progressive recipe's stages can only be components, so its adder offers nothin
 
 Search for the currency unit in the row's name field, then set the amount with the **Fixed** and **Rolled** choice described above.
 A fixed currency amount must be a whole number, and a row with a fraction is marked until you fix it.
+The unit's abbreviation shows beside the amount, and a long one is cut off to fit.
 Once a unit is named, two optional fields open beneath the row.
 
 | Field | What it does |
@@ -235,6 +236,10 @@ On a requirement's bare row, **or…** opens the same kinds in a menu headed **A
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
   The tag adder lists the system's tags with how many components carry each, marks the row's tags as selected, and choosing one again removes it.
+  Type a tag the system does not have yet, and the adder offers **New tag “name”**.
+  Choosing it adds the tag to the system's tags right away and checks it on the row.
+  The new tag is saved with the system at once, not with the recipe's **Save**, so **Discard** leaves it in the system's tags with no components carrying it.
+  If the tag cannot be saved, it comes back off the row and an error says so.
 - Match an essence amount, satisfied by any combination of items whose totalled essence reaches the amount.
 - Match a currency cost, paid from the crafter's coins rather than consumed items.
 

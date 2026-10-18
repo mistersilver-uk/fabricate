@@ -116,7 +116,7 @@ A progressive stage can swap its component in place.
 Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
 While salvage is enabled, saving the component with such a row is refused until you fix it.
 A component with salvage disabled still saves.
-The editor wraps a row onto two lines where the column is narrow.
+The editor wraps a row onto two lines where the column is narrow, with the component and its kind on the first line and the remove button at the end of the second.
 
 ### The Salvage Override
 
