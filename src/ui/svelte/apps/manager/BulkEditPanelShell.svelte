@@ -308,13 +308,6 @@
     list-style: none;
   }
 
-  /* A flex item's automatic minimum is its min-content width, so a `nowrap` delete label would
-     widen the foot past the rail. `:global` because the foot is the primitive's and the snippet's
-     root is the consumer's. */
-  :global(.fabricate-manager .fab-bulk-edit-dock.has-foot) > :global(*) {
-    min-width: 0;
-  }
-
   /* Full-width and accent, inert until an axis is staged. Geometry, weight and foreground are the
      browser inspector's primary button verbatim, because this button swaps places with it in the
      rail's bottom slot. `:global()` AND chained, both load-bearing (issue 1118): `:global()`

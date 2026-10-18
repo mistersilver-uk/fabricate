@@ -259,10 +259,7 @@ export const CASES = Object.freeze([
       { container: 'aside.manager-inspector', target: '[data-recipe-action="delete"]' },
     ],
     kinds: ['manager', 'recipes'],
-    sourceMatches: [
-      /^src\/ui\/model\/recipeBrowserModel\.js$/,
-      INSPECTOR_PANEL_PATTERN,
-    ],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/, INSPECTOR_PANEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',

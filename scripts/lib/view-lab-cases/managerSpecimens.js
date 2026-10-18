@@ -196,7 +196,10 @@ export const CASES = Object.freeze([
     // The hardest of the three states: a warning report listing its skipped rows inside the notice.
     expectSelector: '[data-bulk-report][data-notice-tone="warning"] [data-bulk-blocked-row]',
     kinds: ['manager', 'specimen'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/, INSPECTOR_PANEL_PATTERN],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-published-tier-track-specimen',
