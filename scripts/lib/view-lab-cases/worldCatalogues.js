@@ -282,7 +282,9 @@ export const CASES = Object.freeze([
         target: '[data-world-component-bulk-mode]',
       },
       {
-        container: '[data-world-component-bulk-panel]',
+        // The dock bleeds past the panel's box and Apply ends on its content edge, so the dock is
+        // the container: a strict edge check against the panel would fail on sub-pixel rounding.
+        container: '[data-world-component-bulk-panel] > .fab-bulk-edit-dock',
         target: '[data-world-component-bulk-apply]',
       },
       // The two staged axes, so the frame is asserted to hold the changed panel rather than the resting one.
@@ -766,7 +768,10 @@ export const CASES = Object.freeze([
         container: '[data-world-essence-bulk-panel]',
         target: '[data-world-essence-bulk-colour-state="rose"]',
       },
-      { container: '[data-world-essence-bulk-panel]', target: '[data-world-essence-bulk-apply]' },
+      {
+        container: '[data-world-essence-bulk-panel] > .fab-bulk-edit-dock',
+        target: '[data-world-essence-bulk-apply]',
+      },
       { container: '.manager-scoped-list-column', target: '[data-scoped-list-selection-count]' },
     ],
     expectCenterHit: '[data-world-essence-bulk-apply]',

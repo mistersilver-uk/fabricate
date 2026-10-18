@@ -199,7 +199,7 @@ export const CASES = Object.freeze([
         target: '[data-world-tool-bulk-status]',
       },
       {
-        container: '[data-world-tool-bulk-panel]',
+        container: '[data-world-tool-bulk-panel] > .fab-bulk-edit-dock',
         target: '[data-world-tool-bulk-apply]',
       },
       // And the toolbar's own count, in the same frame.
