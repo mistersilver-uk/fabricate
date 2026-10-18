@@ -705,6 +705,7 @@ A well on a modal body, which is itself `--fab-bg-1`, takes the next level, `--f
 Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-raised` on hover, and `--fab-surface-active` when pressed or selected.
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
+The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip and the tag row's `+ Tag` ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1.
 A contrast claim about a translucent fill MUST name the ground it composites over, because `-soft` is an alpha and there are two.
 An unchecked selection control — a radio ring or a checkbox box — draws its outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
 That outline MUST meet WCAG 1.4.11's 3:1 against the control's surface in every palette: the fill it encloses where the control draws one — `--fab-bg-0` in a medium or large checkbox, `--fab-bg-1` in a radio card's dot — and otherwise the surface beneath it.
@@ -1662,6 +1663,9 @@ Every row leads with a kind-tinted chip, and the tint is what makes a list of ei
 A kind that names a record renders its subject in a neutral bordered subject cell 34px tall and never narrower than 180px, holding the subject's image or glyph on a 26px subject plate at radius 6, its name and its clear, so names align down the list.
 The row's lead chip is a 26px lead plate at radius 6.
 `tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
+Each chip is the shared chip at its `tag-run` scale in the tag family's lit emphasis, a 28px pill at 11px/600, and the adder a 28px dashed pill in the same hue, with no word before the run.
+Each chip reads the tag as it is stored with a `#` before it — `solvent` reads `#solvent`, never `#Solvent` — and the catalogue's rows list each tag the same way; its new-tag footer names the tag as it will be stored.
+The `#` is drawn and never stored, so a tag's id, the comparison a requirement matches with and its normalization are unchanged.
 The catalogue lists every tag in the site's vocabulary, those already on the row included, each with the number of components already carrying it wherever the site supplies those counts, which is what distinguishes a real tag from a typo of one.
 That number is how many of the site's components carry the tag exactly, the comparison a tag requirement matches with, and a tag no component carries reads zero; a site that supplies no counts draws none rather than a zero.
 A tag already on the row that the vocabulary holds is listed SELECTED — the shared picker's multi-select state, announced as selected and marked with a check — so the panel doubles as the row's current state, and choosing a selected tag takes it off the row exactly as its chip's remove does.
@@ -1670,8 +1674,8 @@ The panel stays open across choices.
 The panel opens at a 300px minimum rather than the picker's 240px floor, so a held tag's name, its count and its check read whole at ordinary tag lengths; a longer name ellipsizes and keeps its full spelling as the row's title.
 Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
 The footer offers to create the typed name while the query, trimmed and lower-cased, names no tag the site's vocabulary holds under the same comparison and none the row already holds; creating it adds the tag to the site's vocabulary and to the row at once and keeps the panel open with focus in its query field; a site that offers no way to add a tag draws no footer.
-The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
-Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
+The any-of / all-of control MUST be present at every tag count, none and one included, and its place MUST NOT depend on the count.
+Against a single tag both settings select the same items, but the setting is the row's own and governs the next tag added, and a control that appeared with the second tag would reflow the row at the moment the GM extends it (ruled at issue 2534).
 
 Every STANDALONE row CARRIES the control that converts it into a choice group, because any requirement can acquire an alternative.
 It sits immediately before the remove action, which is always last.
@@ -1730,7 +1734,13 @@ Naming the adders after the kinds would state the menu's own list twice.
 
 - **WHEN** a GM adds a second tag to a tag row
 - **THEN** the row renders both as removable chips followed by the adder
-- **AND** the any-of / all-of control appears, having been absent while one tag was held
+- **AND** the any-of / all-of control stays where it stood while one tag was held
+
+#### Scenario: A tag requirement names its tags
+
+- **WHEN** a tag row holds the stored tag `solvent`
+- **THEN** its chip and its catalogue row read `#solvent`
+- **AND** the row still stores and matches `solvent`
 
 #### Scenario: A GM looks for a rolled amount on a requirement
 
@@ -1932,6 +1942,7 @@ It sits in the group HEADER because it governs the whole bundle, and a copy on e
 
 The chooser decides which controls the rows carry, and the surface MUST show only the ones the current value can fire.
 Under `rolled` the group states its SELECTION EXPRESSION in the header and each alternative carries a RANGE cell naming the values that select it.
+The range cell stands at the row's end, in the convert control's slot after the amount and a divider and before the remove: a die glyph, then the lowest and the highest roll.
 Under player-chooses both are hidden, because a range with no roll behind it is authoring that can never fire.
 The rows are otherwise the same row in both states: only the range cell appears and disappears.
 
@@ -1962,6 +1973,7 @@ Under `any one of` there is nothing to repeat, and under player-chooses a person
 A setting with no behaviour behind it invites a GM to hunt for a difference that does not exist, so it is ABSENT rather than disabled in the three cells that cannot use it.
 
 It defaults to NO REPEATS, and it states its own current value in plain terms rather than being read as a checked box or as the statistical name for it.
+It is a quiet status button that names its own value — a `···` mark, then the word, on no edge — and never a bordered button or a checkbox.
 A GM reads "up to 3, unique" and "up to 3, repeats allowed" without help; "with replacement" asks them to translate.
 With repeats allowed the same alternative may be awarded more than once and N is exact; without, the awards are distinct and an N above the alternative count exhausts the bundle rather than erroring.
 
@@ -2004,7 +2016,7 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 
 - **WHEN** a GM sets a result-side choice group's chooser to rolled
 - **THEN** the group states its selection expression in its header
-- **AND** each alternative carries the range cell that names the values selecting it
+- **AND** each alternative carries, at its row's end after its amount, the range cell that names the values selecting it
 
 #### Scenario: A GM offers the player a choice of two rewards
 
