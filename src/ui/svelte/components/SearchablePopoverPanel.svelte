@@ -86,6 +86,8 @@
   function keepFocusOnHolder(event) {
     if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
   }
+
+  const focusSearch = () => search?.focus();
 </script>
 
 <div
@@ -256,7 +258,7 @@
     </div>
   {/if}
 
-  {#if footer}{@render footer({ close, failed: status?.kind === 'error' })}{/if}
+  {#if footer}{@render footer({ close, failed: status?.kind === 'error', query, focusSearch })}{/if}
 
   <span class="visually-hidden" aria-live="polite" data-popover-live
     >{status?.kind === 'loading' ? status.text : ''}</span

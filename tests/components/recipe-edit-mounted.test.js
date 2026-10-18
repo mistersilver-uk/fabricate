@@ -5585,7 +5585,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(amount, 'the currency amount is a Stepper in the trailing control cluster');
     assert.ok(amount.closest('.fab-stepper'), 'the currency amount is the shared Stepper');
     // The unit's abbreviation stands right of the stepper (issue 2515).
-    const unit = target.querySelector('[data-recipe-option] [data-recipe-option-unit]');
+    const unit = target.querySelector(':scope [data-recipe-option] [data-recipe-option-unit]');
     assert.equal(unit.textContent, 'gp', 'the unit reads its abbreviation');
     assert.ok(unit.previousElementSibling === amount.closest('.fab-stepper'), 'after the stepper');
 
@@ -7497,6 +7497,116 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
         tag === 'herbal' ? 'herbal 2 components' : 'liquid 1 component'
       );
     }
+    editHarness.remount();
+  });
+});
+
+describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const tagGroup = (id) => ({
+    id,
+    options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+  });
+  const tagSet = (id) => ({ id, name: id, ingredientGroups: [tagGroup(`${id}-grp`)] });
+
+  /** The root's two store writes this flow could reach: the tag add and the persisting toggle. */
+  function storeProps() {
+    const store = { addTag: [], updateRecipe: [] };
+    const props = {
+      itemTags: ITEM_TAGS,
+      onCreateTag: (tag) => {
+        store.addTag.push(tag);
+      },
+      onToggleEnabled: () => {
+        store.updateRecipe.push('toggle');
+      },
+    };
+    return { store, props };
+  }
+
+  /** Open a row's tag catalogue, type `  Brine `, and press the footer. */
+  async function createFrom(row) {
+    row.querySelector('[data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    const panel = document.querySelector('.fabricate-picker-popover');
+    await typeInto(panel.querySelector(':scope .manager-travel-popover-search input'), '  Brine ');
+    document.querySelector('[data-recipe-tag-create]').click();
+    await flushRender();
+  }
+
+  it('adds the normalized tag once from a flat, a multi-set and a stepped recipe', async () => {
+    const shapes = {
+      'one chromeless set': {
+        recipe: { ingredientSets: [tagSet('set-1')] },
+        scope: '[data-recipe-section="ingredients"]',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+      'two ingredient sets': {
+        recipe: { ingredientSets: [tagSet('set-1'), tagSet('set-2')] },
+        scope: '[data-recipe-set-id="set-2"]',
+        staged: (patch) => patch.ingredientSets[1],
+      },
+      'a step body': {
+        recipe: { steps: [{ id: 'sa', name: 'Forge', ingredientSets: [tagSet('set-1')] }] },
+        scope: '[data-recipe-section="step-sa-ingredients"]',
+        step: 'sa',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+    };
+    for (const [shape, { recipe, scope, step, staged }] of Object.entries(shapes)) {
+      const { store, props } = storeProps();
+      const drafts = [];
+      const target = await editHarness.mount(
+        identityProps({
+          recipe: { ...RECIPE, ...recipe },
+          canAddSet: true,
+          multiStepEnabled: Boolean(step),
+          onUpdateRecipe: (patch) => {
+            drafts.push(patch);
+          },
+          onUpdateStep: (_stepId, patch) => {
+            drafts.push(patch);
+          },
+          ...props,
+        })
+      );
+      try {
+        clickTab(target, 'ingredients');
+        await flushRender();
+        if (step) target.querySelector(`[data-sortable-disclosure="${step}"]`).click();
+        await flushRender();
+        await createFrom(target.querySelector(scope));
+        assert.deepEqual(store.addTag, ['brine'], `${shape}: the store adds the tag once`);
+        assert.deepEqual(store.updateRecipe, [], `${shape}: and the create saves no recipe`);
+        assert.equal(drafts.length, 1, `${shape}: the row's tag stages into the draft`);
+        assert.deepEqual(
+          staged(drafts[0]).ingredientGroups[0].options[0].match.tags,
+          ['brine'],
+          `${shape}: as the normalized tag`
+        );
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('adds it from an alternative added through or…', async () => {
+    const { store, props } = storeProps();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { ...props, componentOptions: COMPONENT_OPTIONS }, controlled: true }
+    );
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
+    const rows = target.querySelectorAll(
+      ':scope [data-recipe-group-id="grp-1"] [data-recipe-option]'
+    );
+    assert.equal(rows.length, 2, 'the alternative is a second row');
+    await createFrom(rows[1]);
+    assert.deepEqual(store.addTag, ['brine']);
+    assert.deepEqual(store.updateRecipe, []);
     editHarness.remount();
   });
 });

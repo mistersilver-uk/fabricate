@@ -49,6 +49,8 @@
     group = {},
     componentOptions = [],
     itemTags = [],
+    // A tag row's new-tag footer, `PickerRow`'s `onCreateTag`; `null` draws none.
+    onCreateTag = null,
     // `{ [tag]: number }` of components carrying each tag exactly; `null` draws no counts.
     tagComponentCounts = null,
     currencyUnits = [],
@@ -365,6 +367,7 @@
             {kinds}
             {catalogue}
             {readonlyKinds}
+            {onCreateTag}
             onChange={(value) => updateOption(index, fromValue(option, value))}
             onRemove={() => removeOption(index)}
           />
@@ -380,6 +383,7 @@
             {kinds}
             {catalogue}
             {readonlyKinds}
+            {onCreateTag}
             allowAny
             {menuHeading}
             onSelect={selectKind}

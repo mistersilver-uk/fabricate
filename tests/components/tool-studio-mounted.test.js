@@ -1338,6 +1338,35 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
+  it('offers no new-tag footer on a repair tag row (issue 2515)', async () => {
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          onBreak: { mode: 'flagBroken' },
+          repairRequirements: [
+            {
+              id: 'tags',
+              options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+            },
+          ],
+        }),
+        itemTags: ['metal'],
+      })
+    );
+    root.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    const field = document.querySelector(
+      '.fabricate-picker-popover .manager-travel-popover-search input'
+    );
+    field.value = 'brine';
+    field.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    await tick();
+    await settle();
+    assert.equal(field.value, 'brine', 'the absent tag is typed');
+    assert.ok(!document.querySelector('[data-recipe-tag-create]'), 'and no footer offers it');
+  });
+
   it('reads a zero for a vocabulary tag named like an Object.prototype member (issue 2430)', async () => {
     const root = await harness.mount(
       props({

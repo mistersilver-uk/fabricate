@@ -23,6 +23,7 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    onCreateTag = null,
     tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
@@ -87,6 +88,7 @@
         {componentOptions}
         {essenceOptions}
         {itemTags}
+        {onCreateTag}
         {tagComponentCounts}
         {currencyUnits}
         {currencyEnabled}
@@ -119,6 +121,7 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}

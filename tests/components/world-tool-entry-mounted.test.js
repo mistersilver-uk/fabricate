@@ -1710,6 +1710,37 @@ describe('the world Tool entry (issue 1373)', () => {
       );
     });
 
+    it('offers no new-tag footer on a world repair tag row (issue 2515)', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+              },
+            ],
+          },
+          itemTags: ['oak', 'wood'],
+        }
+      );
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await tick();
+      await settle();
+      const panel = target.ownerDocument.querySelector('.fabricate-picker-popover');
+      const field = panel.querySelector(':scope .manager-travel-popover-search input');
+      field.value = 'brine';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await tick();
+      await settle();
+      assert.equal(field.value, 'brine', 'the absent tag is typed');
+      assert.ok(
+        !target.ownerDocument.querySelector('[data-recipe-tag-create]'),
+        'and no footer offers it'
+      );
+    });
+
     it('keeps the latest in-flight repair list until its own write settles, and reverts a refused one (issue 2430)', async () => {
       const writes = [];
       const groupOf = (tags) => [

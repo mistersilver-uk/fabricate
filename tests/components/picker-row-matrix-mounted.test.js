@@ -992,6 +992,101 @@ describe('PickerRow: a currency entry draws its unit right of the amount (issue 
   });
 });
 
+describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2515)', () => {
+  const ingredient = SURFACES['recipe ingredient'];
+  const tagRow = (tags) => ({ ...unnamed('tags'), tags });
+  const FOOTER = '[data-recipe-tag-create]';
+  const footer = (target) => target.ownerDocument.querySelector(FOOTER);
+  const searchOf = (panel) => panel.querySelector(':scope .manager-travel-popover-search input');
+
+  /** Mount a tag row with a recording `onCreateTag`, open its catalogue and type `query`. */
+  async function typedRow(query, { tags = [], extra = {}, result } = {}) {
+    const calls = [];
+    const row = await mountRow(ingredient, tagRow(tags), {
+      onCreateTag: (tag) => {
+        calls.push(tag);
+        return result;
+      },
+      ...extra,
+    });
+    const panel = await openTagAdder(row.target);
+    await type(searchOf(panel), query);
+    return { ...row, calls, panel };
+  }
+
+  it('offers an absent name, against a vocabulary and against none at all', async () => {
+    const { target } = await typedRow('brine');
+    assert.equal(optionText(footer(target)), 'New tag “brine”');
+    harness.remount();
+    const zero = await typedRow('brine', { extra: { catalogue: EMPTY_CATALOGUE } });
+    assert.equal(optionText(footer(zero.target)), 'New tag “brine”', "a system's first tag");
+  });
+
+  it('offers nothing for an empty query, a listed tag in any case, a held tag, or no handler', async () => {
+    for (const [query, options, why] of [
+      [' '.repeat(3), {}, 'an empty query'],
+      ['HERB', {}, 'a vocabulary tag, cased otherwise'],
+      ['ghost', { tags: ['ghost'] }, 'a tag the row holds outside the vocabulary'],
+      ['brine', { extra: { onCreateTag: null } }, 'no onCreateTag'],
+    ]) {
+      const { target } = await typedRow(query, options);
+      assert.ok(!footer(target), `${why}: no footer`);
+      harness.remount();
+    }
+  });
+
+  it('a press adds the normalized tag once, keeps the panel and its query, and focuses the search', async () => {
+    const { target, calls, panel, changes, applied } = await typedRow('  Brine ');
+    const button = footer(target);
+    assert.equal(optionText(button), 'New tag “brine”', 'named as it will be stored');
+    assert.equal(button.getAttribute('title'), 'New tag “brine”');
+    await click(button);
+    await click(button);
+    assert.deepEqual(calls, ['brine'], 'a double activation writes once');
+    assert.equal(changes.length, 1, 'and adds to the row once');
+    assert.deepEqual((await applied('create')).tags, ['brine']);
+    assert.ok(!footer(target), 'the held tag takes the footer away');
+    assert.ok(target.ownerDocument.querySelector('.fabricate-picker-popover'), 'the panel stays');
+    assert.equal(searchOf(panel).value, '  Brine ', 'with its query');
+    await harness.setProps({
+      catalogue: { ...CATALOGUE, tags: [...CATALOGUE.tags, { id: 'brine', label: 'brine' }] },
+    });
+    await settle();
+    assert.ok(!footer(target), 'the refreshed vocabulary lists it');
+    assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
+  });
+
+  it('activates from the keyboard, leaving focus in the search once the footer is gone', async () => {
+    const { target, calls, panel, applied } = await typedRow('salt');
+    const button = footer(target);
+    button.focus();
+    const { KeyboardEvent } = target.ownerDocument.defaultView;
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    // A browser activates a focused button on Enter with a click; happy-dom raises none.
+    await click(button);
+    assert.deepEqual(calls, ['salt']);
+    assert.deepEqual((await applied('create')).tags, ['salt']);
+    assert.ok(!footer(target), 'the footer unmounted');
+    assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
+  });
+
+  it('does nothing on a press while the write is pending', async () => {
+    let finish;
+    const pending = new Promise((done) => (finish = done));
+    const { target, calls, panel, changes, applied } = await typedRow('brine', { result: pending });
+    await click(footer(target));
+    await applied('create');
+    await type(searchOf(panel), 'salt');
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine'], 'the second name waits on the first write');
+    assert.equal(changes.length, 0, 'and adds nothing to the row');
+    finish();
+    await settle();
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine', 'salt'], 'the write settled, a press creates again');
+  });
+});
+
 const KIND_MENU_SURFACES = Object.entries(SURFACES).filter(([, config]) => config.allowAny);
 
 describe('PickerRow: allowAny opens the kind menu', () => {

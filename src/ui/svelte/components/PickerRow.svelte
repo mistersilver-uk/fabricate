@@ -28,6 +28,9 @@
   - `onChange(value)` — the whole next `value`; the caller merges it with `fromValue(entry, value)`.
   - `onRemove()` — the remove button was pressed.
   - `onSelect(kind)` — a kind was chosen from the `or…` menu.
+  - `onCreateTag(tag)` — the tag catalogue's footer offers `New tag “{name}”` for a typed name,
+    trimmed and lower-cased, that no vocabulary tag and no held tag matches; a press adds it to the
+    row and calls this once, keeping the panel open with focus in its query. `null` draws no footer.
 
   Rest spread:
   - `{...rest}` lands on the root `<div>`, written after `class={…}` and `data-recipe-option`.
@@ -49,8 +52,10 @@
 </script>
 
 <script>
+  import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import { localizeOr } from '../util/localizeOr.js';
+  import { normalizeTag } from '../../../utils/scalars.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import Select from './Select.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
@@ -96,6 +101,7 @@
     onChange = () => {},
     onRemove = () => {},
     onSelect = () => {},
+    onCreateTag = null,
     ...rest
   } = $props();
 
@@ -192,6 +198,32 @@
     else addTag(tag);
   }
 
+  // The name the footer would create from `query`, or '' while it names a tag already listed.
+  const listedTags = $derived(
+    new Set([...entries.map((entry) => entry.id), ...tags].map(normalizeTag))
+  );
+  const newTagName = (query) => {
+    const name = normalizeTag(query);
+    return onCreateTag && name && !listedTags.has(name) ? name : '';
+  };
+
+  // A press while the write is pending, or again for the name already added before `tags` moves,
+  // does nothing, so a double activation writes once.
+  let creating = false;
+  let created = { tag: '', over: null };
+  async function createTag(tag, focusSearch) {
+    focusSearch();
+    if (creating || (created.tag === tag && created.over === tags)) return;
+    created = { tag, over: tags };
+    addTag(tag);
+    creating = true;
+    try {
+      await onCreateTag(tag);
+    } finally {
+      creating = false;
+    }
+  }
+
   // The kind's own tint, on the glyph and never the tile, once a value resolves; a misconfigured row
   // draws a warning in no kind's tint. A missing face holds a value, so it resolves.
   const leadTone = $derived(misconfigured ? 'unknown' : kindMeta(matchType).tone);
@@ -249,6 +281,28 @@
       : TAG_MATCH_OPTIONS
   );
 </script>
+
+{#snippet tagCreate({ query, focusSearch })}
+  {@const name = newTagName(query)}
+  {#if name}
+    {@const label = localizeOr('FABRICATE.Admin.Manager.Recipe.TagCreate', 'New tag “{name}”', {
+      name,
+    })}
+    <div class="manager-recipe-tag-create">
+      <Button
+        role="ghost"
+        fullWidth
+        data-recipe-tag-create=""
+        title={label}
+        {disabled}
+        onclick={() => createTag(name, focusSearch)}
+      >
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+        <span>{label}</span>
+      </Button>
+    </div>
+  {/if}
+{/snippet}
 
 {#snippet remove()}
   <button
@@ -333,6 +387,7 @@
         searchLabel={searchTagsWord}
         emptyHint={localizeOr('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
+        footer={onCreateTag ? tagCreate : undefined}
         {disabled}
         onSelect={toggleTag}
       />

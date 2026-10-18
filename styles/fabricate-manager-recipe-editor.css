@@ -1186,6 +1186,19 @@
   background: var(--fab-purple-soft);
 }
 
+/* The tag catalogue's new-tag footer, under the list's hairline; a long name ellipsizes inside the panel. */
+.fabricate-picker-popover .manager-recipe-tag-create {
+  padding-top: var(--fab-space-1);
+  border-top: 1px solid var(--fab-border);
+}
+
+.fabricate-picker-popover .manager-recipe-tag-create span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* The row's small end-of-row type pill. Only ONE face of it is still emitted: the disabled one, the `Currency off` flag on a cost authored before the system turned currency off (issues 676, 1373). */
 .fabricate-manager .manager-recipe-req-tag {
   display: inline-flex;

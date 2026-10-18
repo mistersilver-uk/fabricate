@@ -795,6 +795,78 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
   }
 });
 
+test("the tag catalogue's new-tag footer keeps a long name inside the 300px panel (issue 2515)", async () => {
+  const popoverScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
+  );
+  const name = 'a-very-long-tag-name-that-runs-past-forty-characters';
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 400 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; }
+            }
+            @layer modules { ${css} }
+            ${popoverScoped.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${withScopeHash(
+              `<div class="fabricate-picker-popover manager-travel-popover" data-probe="panel" style="width: 300px; min-width: 300px; max-width: 300px">
+                <div class="manager-recipe-tag-create" data-probe="footer">
+                  <button type="button" class="fabricate-button fab-manager-button is-ghost is-full-width" data-recipe-tag-create title="New tag “${name}”">
+                    <i class="fa-solid fa-plus"></i><span data-probe="label">New tag “${name}”</span>
+                  </button>
+                </div>
+              </div>`,
+              'manager-travel-popover',
+              popoverScoped.hashClass
+            )}
+          </main>
+        </body>
+      </html>
+    `);
+    const report = await page.evaluate(() => {
+      const at = (probe) => document.querySelector(`[data-probe="${probe}"]`);
+      const panel = at('panel');
+      const button = document.querySelector('[data-recipe-tag-create]');
+      const label = at('label');
+      const panelStyle = getComputedStyle(panel);
+      return {
+        panelInner: panel.getBoundingClientRect().right - Number.parseFloat(panelStyle.paddingRight),
+        buttonRight: button.getBoundingClientRect().right,
+        labelRight: label.getBoundingClientRect().right,
+        clipped: label.scrollWidth > label.clientWidth,
+        textOverflow: getComputedStyle(label).textOverflow,
+        rule: getComputedStyle(at('footer')).borderTopWidth,
+      };
+    });
+    assert.ok(
+      report.buttonRight <= report.panelInner + 0.5,
+      `the footer button stays inside the panel (${report.buttonRight} vs ${report.panelInner})`
+    );
+    assert.ok(report.labelRight <= report.buttonRight, 'and its label inside the button');
+    assert.ok(report.clipped, 'the long name is cut rather than widening the panel');
+    assert.equal(report.textOverflow, 'ellipsis', 'with an ellipsis');
+    assert.equal(report.rule, '1px', 'the footer sits under its hairline');
+  } finally {
+    await context.close();
+  }
+});
+
 test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm one', async () => {
   // `proto:4628` is `segStyle`: the chosen segment takes the design's own translucent tag value
   // and `var(--text)`, the unchosen one is transparent over `var(--subtle)`, and `proto:2268`

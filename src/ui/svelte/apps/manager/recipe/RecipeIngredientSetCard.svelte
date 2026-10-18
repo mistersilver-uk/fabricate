@@ -31,6 +31,8 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // A tag row's new-tag footer; absent, as on a Tool's repair set, draws none.
+    onCreateTag = null,
     tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled. Preset units are seeded even for a
@@ -164,6 +166,7 @@
           {group}
           {componentOptions}
           {itemTags}
+          {onCreateTag}
           {tagComponentCounts}
           {currencyUnits}
           {currencyEnabled}
