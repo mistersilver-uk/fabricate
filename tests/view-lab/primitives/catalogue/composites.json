@@ -91,7 +91,7 @@
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
@@ -99,13 +99,13 @@
       "catalogue": {
         "tags": [
           {
-            "id": "#Hardwood",
-            "label": "#Hardwood",
+            "id": "hardwood",
+            "label": "hardwood",
             "icon": "fas fa-tag"
           },
           {
-            "id": "#Seasoned",
-            "label": "#Seasoned",
+            "id": "seasoned",
+            "label": "seasoned",
             "icon": "fas fa-tag"
           }
         ]
@@ -278,25 +278,25 @@
     "fixture": "TagAdderOpen",
     "slot": { "width": 772, "height": 336 },
     "data": { "typed": "wood" },
-    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone, and the footer offers `New tag “wood”`, since no tag is named `wood`. A boxed slot, because the panel is portalled to the window. Measured: at 772 by 336 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 275 with its footer, unclamped and unflipped; below 772 the row wraps to a second line, and 336 is the least height that holds the whole panel (335 clips it to 274.5). The tag panel opens at its 300px site minimum, so the held `#Hardwood` reads whole and only `#Seasoned-Heartwood-Planks` ellipsizes beside its count chip.",
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, each stored lowercase without a `#` as the build stores it and drawn by the row as `#` and that spelling: the held `#hardwood` selected with a check and every tag with its count chip, `#dirftwood`'s zero in the warning tone, and the footer offers `New tag “wood”`, since no tag is stored as `wood`. A boxed slot, because the panel is portalled to the window. Measured: at 772 by 336 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 275 with its footer, unclamped and unflipped; below 772 the row wraps to a second line, and 336 is the least height that holds the whole panel (335 clips it to 274.5). The tag panel opens at its 300px site minimum, so the held `#hardwood` reads whole and only `#seasoned-heartwood-planks` ellipsizes beside its count chip.",
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
       "kinds": ["component", "tags", "essence", "currency"],
       "catalogue": {
         "tags": [
-          { "id": "#Hardwood", "label": "#Hardwood", "icon": "fas fa-tag", "count": 24 },
-          { "id": "#Seasoned", "label": "#Seasoned", "icon": "fas fa-tag", "count": 11 },
-          { "id": "#Softwood", "label": "#Softwood", "icon": "fas fa-tag", "count": 9 },
-          { "id": "#Driftwood", "label": "#Driftwood", "icon": "fas fa-tag", "count": 3 },
-          { "id": "#Dirftwood", "label": "#Dirftwood", "icon": "fas fa-tag", "count": 0 },
+          { "id": "hardwood", "label": "hardwood", "icon": "fas fa-tag", "count": 24 },
+          { "id": "seasoned", "label": "seasoned", "icon": "fas fa-tag", "count": 11 },
+          { "id": "softwood", "label": "softwood", "icon": "fas fa-tag", "count": 9 },
+          { "id": "driftwood", "label": "driftwood", "icon": "fas fa-tag", "count": 3 },
+          { "id": "dirftwood", "label": "dirftwood", "icon": "fas fa-tag", "count": 0 },
           {
-            "id": "#Seasoned-Heartwood-Planks",
-            "label": "#Seasoned-Heartwood-Planks",
+            "id": "seasoned-heartwood-planks",
+            "label": "seasoned-heartwood-planks",
             "icon": "fas fa-tag",
             "count": 1
           }
@@ -448,7 +448,7 @@
             "quantity": 1,
             "match": {
               "type": "tags",
-              "tags": ["#Hardwood", "#Seasoned"],
+              "tags": ["hardwood", "seasoned"],
               "tagMatch": "any"
             }
           }
@@ -460,7 +460,7 @@
           "name": "Oak Haft"
         }
       ],
-      "itemTags": ["#Hardwood", "#Seasoned"],
+      "itemTags": ["hardwood", "seasoned"],
       "currencyUnits": [
         {
           "id": "sp",
@@ -700,7 +700,7 @@
     "slot": { "width": 661, "height": 347 },
     "undrawn": {
       "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
-      "#Hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
+      "hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
       "Vitality": "the system’s essence, whose presence offers Essence; the drawing draws no essence catalogue",
       "Gold": "the currency unit’s name, whose presence offers Currency; the drawing draws no currency catalogue",
       "gp": "the currency unit’s abbreviation; the drawing draws no currency catalogue"
@@ -712,12 +712,12 @@
           { "quantity": 1, "match": { "type": "component", "componentId": "oak-haft" } },
           {
             "quantity": 1,
-            "match": { "type": "tags", "tags": ["#Hardwood"], "tagMatch": "any" }
+            "match": { "type": "tags", "tags": ["hardwood"], "tagMatch": "any" }
           }
         ]
       },
       "componentOptions": [{ "id": "oak-haft", "name": "Oak Haft" }],
-      "itemTags": ["#Hardwood"],
+      "itemTags": ["hardwood"],
       "essenceOptions": [{ "id": "vitality", "name": "Vitality" }],
       "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
       "currencyEnabled": true
