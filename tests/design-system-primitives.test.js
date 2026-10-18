@@ -1270,12 +1270,12 @@ test('the two studio recipes share one bulk-surface pattern, and it names only t
 
   const sharedPattern = new RegExp(shared[0]);
   const claimed = RENDER_FILES.filter((file) => sharedPattern.test(file));
-  // Four since issue 1371 r16-list: `BulkEditSelect` is the Recipe Studio's alone and is routed
-  // to the recipe frames by its own pattern rather than by the shared one.
+  // `BulkEditSelect` is the Recipe Studio's alone and is routed to the recipe frames by its own
+  // pattern (issue 1371 r16-list); `InspectorPanel` joined at issue 2500, as every bulk dock.
   assert.equal(
     claimed.length,
-    4,
-    `expected the four shared bulk surfaces, got ${JSON.stringify(claimed)}`
+    5,
+    `expected the five shared bulk surfaces, got ${JSON.stringify(claimed)}`
   );
 
   const targetedPaths = new Set(primitivePathsByEvidence('targeted'));

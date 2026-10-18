@@ -7,6 +7,7 @@ import {
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
   COMPONENT_EDITOR_MATCHES,
+  INSPECTOR_PANEL_PATTERN,
   PREMIUM_ICONS_AD_PATTERN,
   PROGRESSIVE_STAGE_LIST_MATCH,
   REQUIREMENT_SUGGESTION,
@@ -491,6 +492,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       BULK_EDIT_CHROME_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -515,6 +517,7 @@ export const CASES = Object.freeze([
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -541,6 +544,7 @@ export const CASES = Object.freeze([
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

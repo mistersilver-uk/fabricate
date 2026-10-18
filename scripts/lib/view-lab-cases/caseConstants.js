@@ -31,6 +31,9 @@ export const BULK_EDIT_CHROME_PATTERN =
  */
 export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
 
+/** The inspector's filling root and pinned foot, which every bulk panel's dock is (issue 2500). */
+export const INSPECTOR_PANEL_PATTERN = /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/;
+
 /** The Checks Studio's route model and draft clones (issue 1721). */
 export const CHECKS_ROUTE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/;

@@ -502,6 +502,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/InspectorPanel.svelte',
       'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
       'src/ui/model/componentBulkEditModel.js',
@@ -601,6 +602,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/InspectorPanel.svelte',
       'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
     ]) {

@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
   CHECKS_ROUTE_MODEL_PATTERN,
+  INSPECTOR_PANEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
@@ -313,7 +314,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
     kinds: ['manager', 'recipes'],
-    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN],
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN, INSPECTOR_PANEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-unstaged',
@@ -580,6 +581,7 @@ export const CASES = Object.freeze([
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/utils\/recipeDeleteImpact\.js$/,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -605,6 +607,7 @@ export const CASES = Object.freeze([
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/utils\/recipeDeleteImpact\.js$/,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

@@ -3,6 +3,7 @@
  */
 
 import {
+  INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
   WORLD_TOOL_SEARCH_MISS_TERM,
   WORLD_TOOL_SEARCH_TERM,
@@ -218,6 +219,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkSelectionToolbar\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

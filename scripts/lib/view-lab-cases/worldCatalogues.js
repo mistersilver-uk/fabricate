@@ -2,7 +2,11 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
-import { PREMIUM_ICONS_AD_PATTERN, WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  INSPECTOR_PANEL_PATTERN,
+  PREMIUM_ICONS_AD_PATTERN,
+  WORLD_SCOPE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -309,6 +313,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -773,6 +778,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
       // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/Bulk(?:EditPanelShell|EditSection|SelectionToolbar)\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
