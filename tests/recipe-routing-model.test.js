@@ -418,7 +418,12 @@ function assertTierParity(context, tier, source, coercesNullStart) {
   }
   assert.deepEqual(awarded, [], `only on a forced failure: a natural ${tier.name} awards nothing`);
   const forced = classifyTier(system, mode, recipe, tier, { forced: true });
-  if (forced.matched?.id !== tier.id) return undefined;
+  if (forced.matched?.id !== tier.id)
+    return assert.equal(
+      forced.matched?.success,
+      false,
+      `a forced failure lands on another failure tier, so ${tier.name} is reached only by a step`
+    );
   return assert.deepEqual(source.targets, award(forced.checkResult), `forced ${tier.name}`);
 }
 
@@ -885,6 +890,36 @@ describe('parity: the minimum success tier', () => {
         ['t-keen', 'explicit', null],
       ],
     });
+  });
+
+  it('a forced failure lands on the lowest failure tier, so a second one is reached by a step', () => {
+    const outcomes = [
+      { ...BOTCH, start: 1, end: 5 },
+      { id: 't-fumble', name: 'Fumble', success: false, start: 6, end: 8 },
+      { ...FINE, start: 9, end: 15 },
+      { ...GREAT, start: 16, end: 20 },
+    ];
+    const system = fixed(outcomes);
+    const recipe = minimumOn(
+      [
+        { id: 'g1', checkOutcomeIds: ['t-botch', 't-fumble'] },
+        { id: 'g2', checkOutcomeIds: ['t-fine', 't-great'] },
+      ],
+      't-fine'
+    );
+    assertParity({
+      system,
+      recipe,
+      mode: 'routedByCheck',
+      expected: [
+        ['t-botch', 'explicit', null],
+        ['t-fumble', 'explicit', null],
+        ['t-fine', 'explicit', null],
+        ['t-great', 'explicit', null],
+      ],
+    });
+    const forced = classifyTier(system, 'routedByCheck', recipe, outcomes[1], { forced: true });
+    assert.equal(forced.matched?.id, 't-botch', 'premise: the forced Fumble roll lands on Botch');
   });
 
   it('sum/under blocks the higher starts, given the evaluation on both sides', () => {
