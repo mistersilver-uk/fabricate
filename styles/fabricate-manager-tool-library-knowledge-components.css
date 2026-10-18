@@ -34,7 +34,7 @@
 
 /* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest. */
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
-  padding: var(--fab-space-4);
+  --fab-manager-inspector-pad: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-authority-card,
@@ -853,7 +853,7 @@
 
 /* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to be brought onto the same ladder here rather than in a component's scoped `<style>`. */
 .fabricate-manager[data-manager-view='essences'] .manager-inspector {
-  background: var(--fab-bg-0);
+  --fab-manager-inspector-bg: var(--fab-bg-0);
 }
 
 .fabricate-manager[data-manager-view='essences'] .manager-inspector .fabricate-card {
@@ -959,7 +959,7 @@
 
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence rules list does, so its surfaces are brought onto the ladder here rather than in a scoped block (issue 1373). */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
-  background: var(--fab-bg-1);
+  --fab-manager-inspector-bg: var(--fab-bg-1);
 }
 
 .fabricate-manager[data-manager-view='tools'] .manager-inspector .fabricate-card {
@@ -2051,14 +2051,7 @@
   font-size: 0.5rem;
 }
 
-/* ── C7. THE INSPECTOR ── `proto:1247`: a scrolling body at 17px padding (snapped to 16) with 13px gaps (snapped to 12), over a PINNED foot. */
-.fabricate-manager .manager-component-browser-inspector {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-height: 0;
-}
-
+/* ── C7. THE INSPECTOR ── `proto:1247`: a scrolling body with 13px gaps (snapped to 12), over the `InspectorPanel` foot. */
 .fabricate-manager .manager-component-inspector-body {
   display: flex;
   flex: 1 1 auto;
@@ -2213,21 +2206,6 @@
   margin: 0;
   color: var(--fab-danger-text);
   font-size: 0.74rem;
-}
-
-/* `proto:1268`: the pinned foot — a top hairline over the inspector's own surface, holding ONE primary action. */
-.fabricate-manager .manager-component-inspector-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-4);
-  padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
 }
 
 /* === ISSUE 1371 · PART D — THE COMPONENT RULES EDITOR === `rebuild-spec.md` Part D, `proto:1282-1501`. */

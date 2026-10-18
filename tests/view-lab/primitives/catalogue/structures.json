@@ -99,6 +99,42 @@
     "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it, and the track is 34px where the drawing’s is 36."
   },
   {
+    "spec": "<InspectorPanel>",
+    "cap": "rail — content continuing under the foot",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/InspectorPanel.svelte",
+    "inset": 12,
+    "fixture": "InspectorPanelRecipeVerbs",
+    "partial": "verbs and foot",
+    "props": {
+      "style": "--fab-manager-inspector-pad: var(--fab-space-3); --fab-manager-inspector-bg: var(--fab-bg-2)"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Selected recipe"
+      },
+      {
+        "tag": "strong",
+        "text": "Healing Draught"
+      },
+      {
+        "tag": "span",
+        "text": "Mountain Herb"
+      },
+      {
+        "tag": "span",
+        "text": "Clear Water"
+      }
+    ],
+    "data": {
+      "duplicate": "Duplicate recipe",
+      "edit": "Edit recipe",
+      "remove": "Delete recipe"
+    },
+    "note": "The panel’s three recipe verbs in its foot, the content above it as plain text. The aside’s two tokens ride the root’s `style`, because the lab’s slot is not a `.manager-inspector`; the slot is not a scroller, so the foot stands under the content."
+  },
+  {
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
     "path": "src/ui/svelte/components/Modal.svelte",

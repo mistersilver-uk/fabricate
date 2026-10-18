@@ -178,6 +178,19 @@ const worldNavigationFrame = (id, label) => ({
 
 export const VIEW_RECIPES = Object.freeze([
   {
+    // The system inspectors' filling root and pinned foot (issue 2498): the four browsers whose
+    // record verbs render through it, each at its default selection.
+    id: 'manager-inspector-panel',
+    label: 'Manager system inspectors — record verbs pinned to the rail foot',
+    smokeLabels: [
+      'manager-recipes-normal',
+      'manager-essences-normal',
+      'manager-components-normal',
+      'manager-tool-parity-01-library-1280x720',
+    ],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/],
+  },
+  {
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],

@@ -80,6 +80,7 @@ const inspector = createComponentScopeHarness({
   compiledExtras: [
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   ],
 });
 

@@ -125,6 +125,7 @@ const inspector = createMountedComponentHarness({
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipes/RecipeProduceRow.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'

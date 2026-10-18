@@ -525,15 +525,17 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
-  it('puts the inspector primary action above its reference cards', () => {
-    // The rendered symptom: `Edit essence` — the loudest control the rail has.
+  it('puts the inspector record verbs last, in the foot, after the delete note (issue 2498)', () => {
+    // The verbs are pinned to the rail's foot, so they close the panel in source order too.
     const actions = inspectorSource.indexOf('data-essence-section="actions"');
     const source = inspectorSource.indexOf('data-essence-section="source"');
     const usage = inspectorSource.indexOf('data-essence-section="usage"');
     const onCraft = inspectorSource.indexOf('data-essence-section="oncraft"');
-    assert.ok(onCraft > 0 && actions > onCraft, 'the actions follow the behaviour summary');
-    assert.ok(actions < source, 'and precede the source card');
-    assert.ok(actions < usage, 'and the usage card');
+    const note = inspectorSource.indexOf('class="manager-muted manager-essence-delete-note"');
+    const foot = inspectorSource.indexOf('{#snippet foot()}');
+    assert.ok(onCraft > 0 && source > onCraft && usage > source, 'NON-VACUITY: the cards render');
+    assert.ok(note > usage, 'the delete note is the last content block, after Usage');
+    assert.ok(foot > note && actions > foot, 'and the verbs follow it, inside the foot snippet');
   });
 
   it('titles the behaviour list once, and offers no prop with which to title it twice', () => {

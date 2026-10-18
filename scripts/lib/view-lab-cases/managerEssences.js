@@ -88,7 +88,8 @@ export const CASES = Object.freeze([
     // Beyond the smoke: no smoke step scrolls an essence inspector to its verbs.
     reaches: 'beyond',
     smokeLabels: [],
-    // The rail's four verbs, which sit below its fold on every other essence frame (issue 1521).
+    // The rail's four verbs: Edit and Delete pinned in its foot (issue 2498), and Copy and Unlink
+    // beside Source, which sits below the fold on every other essence frame (issue 1521).
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -115,6 +116,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/,
     ],
   }),
   managerCase({

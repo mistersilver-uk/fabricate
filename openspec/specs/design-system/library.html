@@ -1556,6 +1556,27 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="delta">The player side is the same shape: bulk salvage carries the same count header, blocked-rows-with-reasons, apply preview and committed report.<span class="cite">4 bar callers &middot; 5 panel callers &middot; <b>BulkEditPanelShell.svelte</b>, <b>BulkSelectionToolbar.svelte</b></span></div>
   </div>
 
+  <div class="spec" data-status="shipped" data-status-InspectorPanel="shipped">
+    <div class="spec-head"><h4>&lt;InspectorPanel&gt;</h4><span class="st st-shipped">InspectorPanel &middot; shipped</span><p class="why">The single-record inspector&rsquo;s filling root and pinned foot. Recipes, Essence Rules, Component Rules and Tool Rules render the selected record&rsquo;s verbs through it, so its primary verb sits on the rail&rsquo;s bottom edge at the rail&rsquo;s full inner width at every scroll offset, short panel or tall, where each of the four had placed its verbs its own way (issue 2498).</p></div>
+    <div class="stage col">
+      <div class="unit"><span class="cap">rail &mdash; content continuing under the foot</span>
+        <div style="display:flex;flex-direction:column;gap:12px;width:300px;height:300px;padding:12px;border-left:1px solid var(--fab-border);background:var(--fab-bg-2);overflow:hidden">
+          <span class="k-kicker">Selected recipe</span>
+          <div style="display:flex;gap:8px;align-items:center"><div class="k-ic s38"><svg class="i"><use href="#i-book"/></svg></div><strong style="font-family:var(--fab-font-serif);font-size:15px;color:var(--fab-text)">Healing Draught</strong></div>
+          <span class="k-kicker">Requires</span>
+          <div class="k-row dense" style="display:flex;align-items:center;gap:8px"><div class="k-ic s22"><svg class="i"><use href="#i-leaf"/></svg></div><span class="grow">Mountain Herb</span><span style="font-family:var(--fab-font-mono);font-size:10px">&times;2</span></div>
+          <div class="k-row dense" style="display:flex;align-items:center;gap:8px"><div class="k-ic s22"><svg class="i"><use href="#i-flask"/></svg></div><span class="grow">Clear Water</span><span style="font-family:var(--fab-font-mono);font-size:10px">&times;1</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin:auto -12px -12px;padding:12px;border-top:1px solid var(--fab-border);background:var(--fab-bg-2)"><button class="k-btn" style="width:100%">Duplicate recipe</button><button class="k-btn primary" style="width:100%">Edit recipe</button><button class="k-btn danger" style="width:100%">Delete recipe</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div><h5>Canonical spec</h5><ul><li><b>root</b> the <code>.manager-inspector</code> aside&rsquo;s direct child, filling it, its content at the aside&rsquo;s own gap</li><li><b>foot</b> sticky on the aside&rsquo;s bottom edge, bled by <code>--fab-manager-inspector-pad</code> to the rail&rsquo;s full inner width, on a top hairline and the aside&rsquo;s own <code>--fab-manager-inspector-bg</code>, with no shadow and no z-index; on a short panel it still sits on the rail&rsquo;s foot</li><li><b>verbs only</b> the record verbs stack in the foot; a note about a verb&rsquo;s consequence is the last content block above it and describes that verb</li><li><b>focus</b> the foot publishes its height on the aside as its scroll padding, so a focused control stops above the foot (WCAG 2.4.11); focus inside the foot releases that padding, so a foot verb takes focus without scrolling the rail</li></ul></div>
+      <div><h5>Svelte API</h5><ul><li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>InspectorPanel.svelte</code>&rsquo;s <code>$props()</code> at issue 2498.</li><li><b>children</b> the content &middot; <b>foot</b> the record verbs</li><li><b>class</b> appended to the root &middot; <b>footClass</b> appended to the foot &middot; <b>footAttrs</b> spread on the foot &middot; a rest spread on the root, after the class</li></ul></div>
+    </div>
+    <div class="delta">The bulk edit panel&rsquo;s dock is the same skeleton with a hero above it, and it moves onto this component in issue 2500.<span class="cite">4 callers &middot; <b>InspectorPanel.svelte</b> &middot; <b>RecipeBrowserInspector.svelte</b>, <b>EssenceBrowserInspector.svelte</b>, <b>ComponentBrowserInspector.svelte</b>, <b>ToolBrowserInspector.svelte</b></span></div>
+  </div>
+
   <div class="spec" data-status="shipped" data-status-BulkStagingInset="shipped">
     <div class="spec-head"><h4>&lt;BulkStagingInset&gt;</h4><span class="st st-shipped">BulkStagingInset &middot; shipped</span><p class="why">The staging inset INSIDE the bulk panel: a recessed card holding a 28px search well, a fixed window of five rows and a pager, drawn once per axis a GM can stage. Two panels render it &mdash; the system Component Rules list&rsquo;s (categories, tags, essence values) and the world Component catalogue&rsquo;s (systems, category, tags, essence values) &mdash; which is the membership bar, and they are the same object over different data (issue 1371, maintainer rulings M23&ndash;M25).</p></div>
     <div class="stage col">

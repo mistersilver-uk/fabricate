@@ -253,8 +253,15 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipes',
     expectSelector: '.fabricate-manager [data-recipe-fact="check"]:has-text("Check off")',
+    // Delete, the last record verb, is pinned in the rail's foot rather than clipped by it (issue 2498).
+    expectContained: [
+      { container: 'aside.manager-inspector', target: '[data-recipe-action="delete"]' },
+    ],
     kinds: ['manager', 'recipes'],
-    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/],
+    sourceMatches: [
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',

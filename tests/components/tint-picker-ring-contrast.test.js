@@ -154,10 +154,18 @@ test('the cursor is under 3:1 on the popover ground in two palettes, debt owned 
   );
 });
 
-/** Each inline caller's ground, as the sheet selectors that paint it, top first. */
+/**
+ * Each inline caller's ground, as the sheet selectors that paint it, top first; a `[selector,
+ * property]` pair reads a fill token the selector declares rather than its `background`.
+ */
 const INLINE_GROUNDS = {
   EssenceIdentityTab: ['.fabricate-manager .manager-edit-card', '.fabricate-manager .manager-main'],
-  EssenceBulkEditPanel: [".fabricate-manager[data-manager-view='essences'] .manager-inspector"],
+  EssenceBulkEditPanel: [
+    [
+      ".fabricate-manager[data-manager-view='essences'] .manager-inspector",
+      '--fab-manager-inspector-bg',
+    ],
+  ],
   WorldEssenceEntryPage: [
     ".fabricate-manager[data-manager-view='world-essence-entry'] .manager-main",
   ],
@@ -165,7 +173,10 @@ const INLINE_GROUNDS = {
 
 for (const [caller, selectors] of Object.entries(INLINE_GROUNDS)) {
   test(`the cursor clears 3:1 on the inline strip's ground in ${caller}, in every palette`, (t) => {
-    const stack = selectors.map((selector) => declaredToken(sheet, selector, 'background', SHEET));
+    const stack = selectors.map((ground) => {
+      const [selector, property] = Array.isArray(ground) ? ground : [ground, 'background'];
+      return declaredToken(sheet, selector, property, SHEET);
+    });
     const { short, lowest, figures } = cursorOn(stack);
     t.diagnostic(`lowest cursor ratio on ${stack.join(' over ')} ${lowest}:1 (${figures})`);
     assert.deepEqual(short, [], `the inline cursor would be under WCAG 1.4.11 in ${caller}`);

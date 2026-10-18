@@ -22,6 +22,7 @@
   import EssenceChip from './EssenceChip.svelte';
   import ActionMenu from '../../../components/ActionMenu.svelte';
   import Button from '../../../components/Button.svelte';
+  import InspectorPanel from '../InspectorPanel.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import { getComponentCategoryLabel } from '../../../../../utils/componentCategories.js';
@@ -158,7 +159,11 @@
 </script>
 
 {#if selectedComponent}
-  <section class="manager-component-browser-inspector" data-component-inspector>
+  <InspectorPanel
+    class="manager-component-browser-inspector"
+    data-component-inspector=""
+    footAttrs={{ 'data-component-inspector-foot': '' }}
+  >
     <div class="manager-component-inspector-body">
       <div class="manager-component-inspector-title-row">
         <p class="manager-kicker" data-component-inspector-kicker>
@@ -344,8 +349,8 @@
       </div>
     </div>
 
-    <!-- THE PINNED FOOT. One action, and it is the act this whole screen exists to reach. -->
-    <div class="manager-component-inspector-foot" data-component-inspector-foot>
+    <!-- One action, and it is the act this whole screen exists to reach. -->
+    {#snippet foot()}
       <Button
         role="primary"
         fullWidth
@@ -354,6 +359,6 @@
       >
         {text('FABRICATE.Admin.Manager.Component.EditSystemRules', 'Edit system rules')}
       </Button>
-    </div>
-  </section>
+    {/snippet}
+  </InspectorPanel>
 {/if}

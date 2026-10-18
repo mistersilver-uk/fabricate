@@ -22,6 +22,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/InspectorCard.svelte',
     // Its two rule groups are rail sections (issue 1782).
     'src/ui/svelte/components/Rail.svelte',
+    // The filling root and pinned foot the record verbs render through (issue 2498).
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
   ],
 });
