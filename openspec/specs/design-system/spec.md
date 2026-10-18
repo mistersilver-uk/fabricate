@@ -1256,6 +1256,7 @@ The uppercase micro-label that names what follows is a kicker, at one size and o
 A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
 It inherits the host's face and line height, which a `Kicker` states for itself.
 At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.
+Inside a `RuleRow` body the caption is the one module-sheet exception: the rule-row family's own rule, at (0,3,1), keeps the `RuleRow` specimen's 8px, `0.64px` tracking and `--fab-text-subtle` at the kicker's weight and case.
 The `Field` box carries its value's type, 12.5px at weight 500, the `form` size rung's type, and a text control inside it takes that through the family's `font: inherit` floor, so no screen restates a value weight against its caption.
 The caption's text is the localized string as written; its case is presentation.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
@@ -1326,7 +1327,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 
 #### Scenario: A field draws its caption and its value
 
-- **WHEN** a `<Field>` renders a first-child `<span>` caption above a text input, in the manager or in a host carrying no application root
+- **WHEN** a `<Field>` outside a `RuleRow` body renders a first-child `<span>` caption above a text input, in the manager or in a host carrying no application root
 - **THEN** the caption computes 8.5px at weight 700, `0.11em` tracking, upper case and the muted ink, and the input computes 12.5px at weight 500
 - **AND** a caption whose own class declares any of those properties keeps that class's value, and a span that is not the first child takes none of them
 
