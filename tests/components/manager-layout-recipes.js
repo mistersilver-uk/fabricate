@@ -510,8 +510,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         );
       }
 
-      // AN EMPTY TAG ROW IS LEVEL WITH A COMPONENT ROW: every row stands on one 34px line
-      // (ruled 2026-10-18), so the tag row's shorter controls no longer leave it 4px under.
+      // AN EMPTY TAG ROW IS LEVEL WITH A COMPONENT ROW: every row stands on one 34px line (ruled 2026-10-18).
       if (!surface.rowParity) continue;
       assert.ok(
         Math.abs(report.empty.row.height - report.component.row.height) <= 1,
@@ -1114,6 +1113,14 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
               </span>
               <div class="manager-recipe-option-controls">
                 <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-probe="or"><span>or…</span></button></div>
+                <button type="button" class="manager-recipe-option-remove" data-probe="remove"><i class="fas fa-xmark"></i></button>
+              </div>
+            </div>
+            <div class="manager-progressive-stage-row">
+              <div class="manager-recipe-ingredient-option-row is-component is-result" data-probe="stage">
+                <span class="manager-recipe-option-name-field">
+                  <span class="manager-recipe-option-chosen"><span class="manager-recipe-option-plate"><i class="fas fa-cube"></i></span><span class="manager-recipe-option-chosen-name">Herb</span></span>
+                </span>
               </div>
             </div>
             <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
@@ -1154,6 +1161,14 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
         clear: read('clear'),
         search: read('search'),
         or: read('or'),
+        remove: read('remove'),
+        stage: {
+          ...read('stage'),
+          minHeight: getComputedStyle(at('stage')).minHeight,
+          tallest: Math.max(
+            ...[...at('stage').children].map((child) => child.getBoundingClientRect().height)
+          ),
+        },
         strong: token('strong'),
         accentBorder: token('accent-border'),
       };
@@ -1183,6 +1198,14 @@ test("the requirement row draws the library specimen's figures (issue 2515)", as
       'the search rests on the partial accent'
     );
     assert.equal(report.or.height, 28, '`or…` stands at 28');
+    assert.deepEqual(
+      [report.remove.width, report.remove.height, report.remove.radius],
+      [24, 24, '7px'],
+      'the remove is 24 by 24 at radius 7 (ruled 2026-10-18)'
+    );
+    // A progressive stage row drops the row's box, so it drops the 52px floor with it.
+    assert.equal(report.stage.minHeight, '0px', 'the stage row lifts the row floor');
+    assert.equal(report.stage.height, report.stage.tallest, 'and stands as tall as its subject');
   } finally {
     await context.close();
   }
@@ -1418,7 +1441,6 @@ test('a choice group stands its header, rows and 28px adder 8px apart, with no s
         const adder = adds.querySelector('button');
         const style = getComputedStyle(group);
         return {
-          separators: group.querySelectorAll('.manager-recipe-ingredient-or-separator').length,
           rowsOnly: rows.every((row) => row.matches('[data-recipe-option]')),
           headToRow: box(rows[0]).top - box(head).bottom,
           between: rows.slice(1).map((row, index) => box(row).top - box(rows[index]).bottom),
@@ -1440,7 +1462,7 @@ test('a choice group stands its header, rows and 28px adder 8px apart, with no s
     for (const side of ['ingredient', 'result']) {
       const group = report[side];
       const at = `the ${side} group`;
-      assert.deepEqual([group.separators, group.rowsOnly], [0, true], `${at}: no separator`);
+      assert.ok(group.rowsOnly, `${at}: the rows stand with nothing between them`);
       assert.equal(group.headToRow, 8, `${at}: header to first row`);
       assert.deepEqual(group.between, [8, 8], `${at}: rows 8 apart`);
       assert.equal(group.rowToAdder, 8, `${at}: the adder 8 below the last row`);

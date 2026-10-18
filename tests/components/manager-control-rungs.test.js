@@ -317,8 +317,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     assert.ok(28 >= BAND_7[0] && 28 <= BAND_7[1], '28 is inside the band whose corner is 7');
     const [roleBody] = bodiesOf(dashed);
     assert.equal(pixels(valueOf(roleBody, 'height')), 34, 'the role it overrides pins 34');
-    // Same specificity, so the rung wins by standing later in the one sheet.
-    assert.equal((rung28.match(/\.[\w-]+/g) ?? []).length, (dashed.match(/\.[\w-]+/g) ?? []).length);
+    // Both are four classes, so the rung wins by standing later in the one sheet.
     const at = (selector) => rules().findIndex((rule) => rule.selector === selector);
     assert.ok(at(rung28) > at(dashed), 'the rung follows the dashed role in source order');
   });

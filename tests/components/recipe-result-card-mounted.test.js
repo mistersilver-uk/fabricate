@@ -977,9 +977,11 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-size-28'), 'the box’s adder stands on the 28px rung');
+    const list = target.querySelector('.manager-recipe-result-group-members');
     assert.ok(
-      !target.querySelector('.manager-recipe-ingredient-or-separator'),
-      'and no separator stands between the members (issue 2515)'
+      list.children.length === members(target).length &&
+        [...list.children].every((child) => child.hasAttribute('data-recipe-result-member')),
+      'the members list holds the members and nothing between them (issue 2515)'
     );
     const fromBox = await readMenu(target, adder);
     assert.deepEqual(fromBox, {
@@ -1005,5 +1007,19 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     const field = nameField(members(target)[2]);
     assert.ok(Boolean(field), 'the new member draws its name field');
     assert.ok(target.ownerDocument.activeElement === field, 'focus lands on it, not the adder');
+  });
+
+  it('draws the one-kind Alternative adder on the 28px rung too, appending directly', async () => {
+    const componentOnly = recipeResultKinds({
+      componentOptions: COMPONENTS,
+      currencyEnabled: false,
+    });
+    const { target } = await mountGroup(PLAYER_GROUP, { resultKinds: componentOnly });
+    const adder = target.querySelector(
+      ':scope [data-recipe-result-group] [data-recipe-add="alternative"]'
+    );
+    assert.ok(Boolean(adder), 'the box draws its adder');
+    assert.ok(!adder.hasAttribute('aria-haspopup'), 'one kind opens no menu');
+    assert.ok(adder.classList.contains('is-size-28'), 'and stands on the 28px rung (issue 2515)');
   });
 });

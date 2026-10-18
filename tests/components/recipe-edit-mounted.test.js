@@ -4325,8 +4325,10 @@ describe('RecipeEditView (mounted)', () => {
     const options = componentReq.querySelectorAll('[data-recipe-option]');
     assert.equal(options.length, 2, 'both component alternatives render');
     assert.ok(
-      !componentReq.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the alternatives sit in their box with no OR separator between them'
+      [...componentReq.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'the alternatives sit in their box with nothing between them'
     );
     assert.match(
       options[0].textContent,
@@ -4714,8 +4716,10 @@ describe('RecipeEditView (mounted)', () => {
       'a 2-alternative requirement renders the box'
     );
     assert.ok(
-      !req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'no "— or —" separator renders between the alternatives'
+      [...req.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'nothing renders between the alternatives'
     );
     const optionRows = req.querySelectorAll('[data-recipe-option]');
     assert.ok(
