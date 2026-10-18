@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
+import { SPECIMEN_PAGE } from './primitives/specimenProtocol.js';
 import { openServedFile } from './servedFile.js';
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
@@ -115,7 +116,6 @@ function chromeStatusEndpoint() {
   };
 }
 
-const SPECIMEN_PAGE = '/tests/view-lab/primitives/specimen.html';
 const VITE_CLIENT_TAG = /<script type="module" src="\/@vite\/client"><\/script>/;
 
 /**

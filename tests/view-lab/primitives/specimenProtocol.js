@@ -6,6 +6,9 @@
  * an `act` asks for a turn before acting and ends it after (issue 2339), and later answers RECHECK.
  */
 
+/** Each specimen `<iframe>`'s document, carrying no row in its URL; the Vite-client drop targets it. */
+export const SPECIMEN_PAGE = '/tests/view-lab/primitives/specimen.html';
+
 /** The iframe's module has run and is listening for its assignment. */
 export const SPECIMEN_READY = 'primitive-lab-specimen-ready';
 

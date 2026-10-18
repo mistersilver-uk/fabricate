@@ -3235,7 +3235,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // The representative pair plus the panel's fifteen overrides.
+  // The representative pair plus the panel's sixteen overrides.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -3247,6 +3247,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-recipe-edit-crafting-modifier-cap-reached',
       'manager-recipe-edit-tag-picker',
       'manager-recipe-edit-tag-picker-new-tag',
+      'manager-recipe-edit-tag-picker-new-tag-created',
       'manager-recipe-item-contents-picker',
       'manager-recipes-bulk-edit-check-tier',
       'manager-system-edit-lists',
@@ -3301,6 +3302,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-edit-tag-picker-new-tag',
+  'manager-recipe-edit-tag-picker-new-tag-created',
   'manager-recipe-item-contents-picker',
   'manager-recipe-item-contents-picker-staged',
   'manager-recipe-item-limits-suggestions',

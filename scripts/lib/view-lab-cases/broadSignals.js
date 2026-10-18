@@ -492,6 +492,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-actor-picker',
     'manager-recipe-edit-tag-picker',
     'manager-recipe-edit-tag-picker-new-tag',
+    'manager-recipe-edit-tag-picker-new-tag-created',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-essences-source-picker',
     'player-crafting-sources-picker',
@@ -684,6 +685,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-on-break-repair-suggestions',
     'manager-component-edit-salvage-suggestions',
     'manager-recipe-edit-tag-picker-new-tag',
+    'manager-recipe-edit-tag-picker-new-tag-created',
   ]),
   'src/ui/svelte/components/PickerRowNameField.svelte': Object.freeze([
     'manager-recipe-edit-ingredients',

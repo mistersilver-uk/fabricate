@@ -26,6 +26,12 @@ const TAG_PICKER_STEPS = Object.freeze([
   { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
 ]);
 
+/** The tag picker over `ve`, which no tag in the vocabulary is named (`solvent`, `vessel`, `salve`). */
+const NEW_TAG_STEPS = Object.freeze([
+  ...TAG_PICKER_STEPS,
+  { selector: '.fabricate-picker-popover .manager-travel-popover-search input', fill: 've' },
+]);
+
 /** The first ingredient set's first requirement, a bare row, so each control matches one element. */
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
@@ -760,22 +766,38 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
-  // A query no tag in the vocabulary is named, `ve` (`solvent`, `vessel`, `salve`), so the panel's
-  // footer offers it as a new tag (issue 2515).
+  // The panel's footer offers the absent query as a new tag (issue 2515).
   managerCase({
     id: 'manager-recipe-edit-tag-picker-new-tag',
     label: 'Manager — Recipe edit, the tag picker offering a new tag',
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-herbalism' },
-    steps: [
-      ...TAG_PICKER_STEPS,
-      { selector: '.fabricate-picker-popover .manager-travel-popover-search input', fill: 've' },
-    ],
+    steps: NEW_TAG_STEPS,
     expectView: 'recipe-edit',
     expectSelector: '.fabricate-picker-popover [data-recipe-tag-create]',
     expectContained: [{ container: '.fabricate-manager', target: '[data-recipe-tag-create]' }],
     expectCenterHit: '[data-recipe-tag-create]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // …and its press, through the root's `addTag` to the store: the refreshed vocabulary lists `ve`,
+  // and the row holds it.
+  managerCase({
+    id: 'manager-recipe-edit-tag-picker-new-tag-created',
+    label: 'Manager — Recipe edit, a new tag created from the tag picker',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [...NEW_TAG_STEPS, { selector: '.fabricate-picker-popover [data-recipe-tag-create]' }],
+    expectView: 'recipe-edit',
+    expectSelector: '.fabricate-picker-popover [role="option"][title="ve"][aria-selected="true"]',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-picker-popover' }],
+    expectCenterHit: '.fabricate-picker-popover [role="option"][title="ve"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
