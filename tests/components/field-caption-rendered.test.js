@@ -64,6 +64,7 @@ function pageHtml(rewardBody) {
         <span class="manager-condition-shortcut-label" data-m="shortcut"><i class="fas fa-cloud" data-m="shortcut-i"></i>Weather</span>
         <div class="fabricate-picker manager-travel-picker fabricate-select"></div>
       </div>
+      <label class="fabricate-field"><input type="checkbox"><span data-m="after-input">Enabled</span></label>
       <div class="fabricate-rule-row"><div class="fabricate-rule-row-body">
         <label class="fabricate-field"><span data-m="rule-cap">Rule</span><input type="text"></label>
       </div></div>
@@ -160,6 +161,11 @@ test('(c) caller classes, later spans and the rule row keep their own type', () 
   assert.deepEqual([note.fs, note.fw, note.tt], ['10.5px', '400', 'none'], 'select note');
   assert.equal(m['search-shell'].tt, 'none', 'search shell span is not uppercased');
   assert.equal(m['search-in'].fs, VALUE.fs, 'search input reads at the value size');
+  assert.deepEqual(
+    [m['after-input'].fs, m['after-input'].tt],
+    [VALUE.fs, 'none'],
+    'a span after a non-span first child is not a caption'
+  );
   assert.equal(m['rule-cap'].fs, '8px', 'rule-row caption keeps 8px');
   const shortcut = m.shortcut;
   assert.deepEqual(
