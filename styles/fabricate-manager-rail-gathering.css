@@ -563,13 +563,13 @@
   align-items: center;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-text);
   line-height: 1.25;
 }
 
 .fabricate-manager .manager-condition-shortcut-label i {
   width: 16px;
   color: var(--fab-text-muted);
+  font-size: 12px;
   text-align: center;
 }
 

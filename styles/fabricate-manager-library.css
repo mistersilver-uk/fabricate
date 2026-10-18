@@ -3183,20 +3183,21 @@
   gap: var(--fab-space-chip);
   min-width: 0;
   color: var(--fab-text);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .fabricate-field.fabricate-field.is-wide {
   grid-column: 1 / -1;
 }
 
-/* A FIELD'S VALUE IS NOT ITS CAPTION (issue 1373, world Tool parity round). */
-.fabricate-manager[data-manager-view='world-tool-entry']
-  .fabricate-field
-  input:not(.fab-stepper-input),
-.fabricate-manager[data-manager-view='world-tool-entry'] .fabricate-field textarea {
-  font-weight: 400;
+/* The caption is the kicker, at (0,1,1) so a caller's caption class at (0,2,0) keeps what it declares (issue 2532). */
+.fabricate-field > span:where(:first-child) {
+  color: var(--fab-text-muted);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
 .fabricate-manager .manager-currency-edit-grid {

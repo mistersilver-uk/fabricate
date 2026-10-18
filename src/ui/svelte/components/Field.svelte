@@ -7,7 +7,7 @@
   | --- | --- | --- | --- |
   | `as` | `'label'` \| `'div'` \| `'fieldset'` | none | REQUIRED-SHAPED; see the invariants. An unrecognised or missing value renders a `<div>` and `console.warn`s. |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
-  | `children` | snippet | `undefined` | Conventionally a `<span>` caption followed by the control — the shape the sheet's `> span` and blanket control rules are written against. |
+  | `children` | snippet | `undefined` | Conventionally a `<span>` caption followed by the control. The sheet draws a first-child `<span>` as the kicker, below a caller's caption class, and the box carries the value type its control inherits (issue 2532). |
 
   Rest spread:
   - `{...rest}` lands on the host element, carrying `data-*` hooks, `id`, `aria-*`, `title`, and
