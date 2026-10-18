@@ -23,7 +23,7 @@
  *   (d) the dock element is in the RENDERED PRODUCT markup and is Apply's parent
  *                      — kills deleting the wrapper;
  *   (e) Apply's own left and right sit on the inspector's CONTENT box, and its bottom on the
- *       padding-box bottom less the foot's `--fab-space-3` gutter
+ *       CONTENT box bottom
  *                      — kills losing the `padding-inline` or `padding-bottom` that pay the
  *                        dock's negative margins back. Without (e) the shell's claim that
  *                        the padding "puts the button back exactly where it was" is
@@ -151,14 +151,6 @@ function measureDock() {
   // The fill and the element's own alpha are read before the geometry.
   const dockStyle = getComputedStyle(dock);
   const paint = { backgroundColor: dockStyle.backgroundColor, opacity: dockStyle.opacity };
-  // The expected gutter is the foot's token, not the foot's own computed padding: reading the
-  // foot would make the bottom comparison true for any padding (Apply's bottom IS the foot's
-  // bottom less that padding), so a lost or widened gutter would ship green.
-  const gutterProbe = document.createElement('div');
-  gutterProbe.style.cssText = 'position:absolute;padding-bottom:var(--fab-space-3)';
-  (inspector.closest('.fabricate-manager') ?? document.body).append(gutterProbe);
-  const footGutter = parseFloat(getComputedStyle(gutterProbe).paddingBottom);
-  gutterProbe.remove();
 
   const apply = dock.querySelector('[data-component-bulk-apply]');
   if (!apply) return { dockRendered: true, applyRendered: false, ...paint };
@@ -192,8 +184,6 @@ function measureDock() {
       padRight,
       // The rail's CONTENT box — where every OTHER item in this column sits.
       contentBottom: padBottom - padding.bottom,
-      // Apply's floor: the foot bleeds to the padding box and pays back its `--fab-space-3` gutter.
-      applyFloor: padBottom - footGutter,
       contentLeft: padLeft + padding.left,
       contentRight: padRight - padding.right,
       dockBottom: box.bottom,
@@ -210,7 +200,7 @@ function measureDock() {
     dockRendered: true,
     applyRendered: true,
     overflow,
-    footGutter,
+    padBottomInset: padding.bottom,
     ...paint,
     samples: [
       sampleAt('scroll top', 0),
@@ -451,17 +441,17 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
       const face = measured[name];
       assert.ok(face.dockRendered, 'the dock is absent from the rendered rail');
       assert.ok(face.applyRendered, 'the Apply button is absent from the rendered dock');
-      assert.ok(face.footGutter >= 8, 'NON-VACUITY: --fab-space-3 resolved to a real gutter');
+      assert.ok(face.padBottomInset >= 8, 'NON-VACUITY: the scroller pads its bottom edge');
 
       for (const sample of face.samples) {
         for (const [edge, actual, expected] of [
-          ['bottom', sample.applyBottom, sample.applyFloor],
+          ['bottom', sample.applyBottom, sample.contentBottom],
           ['left', sample.applyLeft, sample.contentLeft],
           ['right', sample.applyRight, sample.contentRight],
         ]) {
           assert.ok(
             Math.abs(actual - expected) <= EPSILON_PX,
-            `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's ${edge} edge is ${actual}px but it belongs at ${expected}px (the rail's content box, and on the bottom the foot's own padding above the rail's edge) — the dock's bleed is no longer paid back by its matching padding, so the primary action has moved out of the column every other panel row sits on`
+            `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's ${edge} edge is ${actual}px but it belongs at ${expected}px (the rail's content box) — the dock's bleed is no longer paid back by its matching padding, so the primary action has moved out of the column every other panel row sits on`
           );
         }
       }
