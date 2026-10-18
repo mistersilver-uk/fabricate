@@ -39,8 +39,6 @@
   } = $props();
 
   const uid = $props.id();
-  const KEY = 'FABRICATE.Admin.Manager.Recipe.RoutingCard';
-  const copy = (key, fallback, data) => localizeOr(`${KEY}.${key}`, fallback, data);
 
   const provider = $derived(routing?.provider ?? null);
   const drawn = $derived(provider === 'ingredientSet' || provider === 'check');
@@ -72,8 +70,16 @@
   }
 
   const BLOCKED_COPY = {
-    policy: () => copy('BlockedPolicy', 'routing not permitted by this system'),
-    'below-minimum': () => copy('BlockedMinimum', 'below this recipe’s minimum success tier'),
+    policy: () =>
+      localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.RoutingCard.BlockedPolicy',
+        'routing not permitted by this system'
+      ),
+    'below-minimum': () =>
+      localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.RoutingCard.BlockedMinimum',
+        'below this recipe’s minimum success tier'
+      ),
   };
 
   /** One `overviewRows` row as `RoutingOverview` draws it; `select` is the scope's target shape. */
@@ -83,10 +89,18 @@
       return {
         key: row.key,
         kind: 'gap',
-        source: copy('Gap', 'Gap'),
+        source: localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.Gap', 'Gap'),
         tone: 'warning',
-        summary: copy('GapSummary', '{values} — no tier claims this value', { values }),
-        action: copy('GapAction', 'Edit outcome tiers to close the gap at {values}', { values }),
+        summary: localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.RoutingCard.GapSummary',
+          '{values} — no tier claims this value',
+          { values }
+        ),
+        action: localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.RoutingCard.GapAction',
+          'Edit outcome tiers to close the gap at {values}',
+          { values }
+        ),
       };
     }
     if (row.kind === 'blocked') {
@@ -119,8 +133,15 @@
     return {
       ...base,
       ...tierFace(row.tier),
-      placeholder: row.tier.success ? select.placeholder : copy('AwardsNothing', 'Awards nothing'),
-      hint: row.forcedFailure ? copy('ForcedFailure', 'only on a forced failure') : undefined,
+      placeholder: row.tier.success
+        ? select.placeholder
+        : localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.AwardsNothing', 'Awards nothing'),
+      hint: row.forcedFailure
+        ? localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RoutingCard.ForcedFailure',
+            'only on a forced failure'
+          )
+        : undefined,
       ariaDescribedBy: noteIds.tiers,
     };
   }
@@ -155,7 +176,10 @@
         options: scope.groups.flatMap((group, i) =>
           group?.id ? [{ value: group.id, label: setDisplayName(group, i) }] : []
         ),
-        placeholder: copy('NotRouted', 'Not routed'),
+        placeholder: localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.RoutingCard.NotRouted',
+          'Not routed'
+        ),
         readonly: scope.borrowed,
       },
       noteIds: {
@@ -164,7 +188,10 @@
       },
     };
     return {
-      label: scopes.length > 1 ? stepLabel(scope, index) : copy('Title', 'Routing'),
+      label:
+        scopes.length > 1
+          ? stepLabel(scope, index)
+          : localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.Title', 'Routing'),
       fallbackNote,
       ids,
       byKey: new Map(rows.map((row) => [row.key, row])),
@@ -196,22 +223,24 @@
     {disabled}
     onclick={() => onOpenChecks()}
   >
-    {copy('EditTiers', 'Edit outcome tiers')}
+    {localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.EditTiers', 'Edit outcome tiers')}
   </Button>
 {/snippet}
 
 {#if drawn}
   <section class="manager-recipe-routing-card" data-recipe-section="routing">
     <div>
-      <h3 class="manager-recipe-section-title">{copy('Title', 'Routing')}</h3>
+      <h3 class="manager-recipe-section-title">
+        {localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.Title', 'Routing')}
+      </h3>
       <p class="manager-muted">
         {provider === 'check'
-          ? copy(
-              'HintCheck',
+          ? localizeOr(
+              'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintCheck',
               'The outcome tiers belong to this system’s crafting check; this recipe chooses the result set each one produces.'
             )
-          : copy(
-              'HintIngredients',
+          : localizeOr(
+              'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintIngredients',
               'Each ingredient set produces the result set its row names; re-point a row to change it.'
             )}
       </p>
@@ -234,7 +263,10 @@
             {#if view.fallbackNote}
               <Callout
                 tone="warning"
-                title={copy('FallbackTitle', 'Routed by default')}
+                title={localizeOr(
+                  'FABRICATE.Admin.Manager.Recipe.RoutingCard.FallbackTitle',
+                  'Routed by default'
+                )}
                 text={localizeOr(
                   'FABRICATE.Admin.Manager.Recipe.RoutingAssignNote',
                   'Assigning a tier stops the other tiers reaching a result set by default.'
@@ -245,8 +277,8 @@
             {/if}
             {#if scope.borrowed}
               <Callout
-                text={copy(
-                  'BorrowedNote',
+                text={localizeOr(
+                  'FABRICATE.Admin.Manager.Recipe.RoutingCard.BorrowedNote',
                   'This step has no result sets of its own, so the recipe can’t be enabled. Until it has one, it falls back to the recipe’s.'
                 )}
                 id={view.ids.borrowed}
@@ -263,7 +295,12 @@
                 onclick={() => routing.writes.sets(scope.stepId, addIngredientSet(scope.sets))}
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
-                <span>{copy('AddIngredientSet', 'Ingredient set')}</span>
+                <span
+                  >{localizeOr(
+                    'FABRICATE.Admin.Manager.Recipe.RoutingCard.AddIngredientSet',
+                    'Ingredient set'
+                  )}</span
+                >
               </Button>
             {/if}
             <Button
@@ -277,7 +314,12 @@
                 )}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{copy('AddResultSet', 'Result set')}</span>
+              <span
+                >{localizeOr(
+                  'FABRICATE.Admin.Manager.Recipe.RoutingCard.AddResultSet',
+                  'Result set'
+                )}</span
+              >
             </Button>
             {#if provider === 'check'}
               <Button
@@ -286,7 +328,10 @@
                 {disabled}
                 onclick={() => onOpenChecks()}
               >
-                {copy('EditTiers', 'Edit outcome tiers')}
+                {localizeOr(
+                  'FABRICATE.Admin.Manager.Recipe.RoutingCard.EditTiers',
+                  'Edit outcome tiers'
+                )}
               </Button>
             {/if}
           {/snippet}

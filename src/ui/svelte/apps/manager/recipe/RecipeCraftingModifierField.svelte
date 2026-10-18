@@ -33,6 +33,7 @@
     onUpdateRecipe = () => {},
   } = $props();
 
+  // ratchet-exempt(text-helper): moved verbatim out of RecipeOverviewTab (issue 2513 T5)
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
