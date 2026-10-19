@@ -196,7 +196,7 @@ describe('2445 StageComplicationList', () => {
   });
 
   // GUARD: red when the list's `font-weight: 400` is deleted.
-  it('GUARD: the trigger sentence keeps 400 inside the Component Studio’s 700 field', async () => {
+  it('GUARD: the trigger sentence keeps 400 inside the Component Studio’s 500 field', async () => {
     const { innerHTML } = await mountList();
     const css = STYLED.map((path) => scopedComponentCss(resolve(repoRoot, path)).css).join('\n');
     const browser = await chromium.launch();

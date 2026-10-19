@@ -901,17 +901,6 @@
     width: 100%;
   }
 
-  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.fabricate-field` sets `font-weight:
-     700` on the BOX because the caption it wraps is a label, and Foundry's control reset gives
-     an `<input>` `font: inherit` - so a GM's typed name would render at heading weight. The
-     shipped repair for the same defect is scoped to one manager route
-     (`[data-manager-view='world-tool-entry']` in `styles/fabricate.css`); this is that rule
-     for this window, with its `:not(.fab-stepper-input)` exclusion intact because the stepper
-     supplies its own chrome. */
-  .fabricate-interactable-config :global(.fabricate-field input:not(.fab-stepper-input)) {
-    font-weight: 400;
-  }
-
   /* THE SWITCH'S READING IS A SENTENCE HERE. `.fabricate-toggle` caps itself at 78px, so
      with a 34px track the label has ~36px and every reading in this panel would ellipsise -
      "Linked to gathering task" to "Li...". The shipped precedent for a switch whose reading is

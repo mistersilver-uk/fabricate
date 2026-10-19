@@ -258,10 +258,21 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'coverage-mode-routed-check-checks',
     'manager-gathering-time-of-day-bar',
   ]),
-  // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame.
+  // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame,
+  // plus the captions issue 2532's kicker reaches and two scoped captions it must leave alone.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-currency-body-empty',
+    'manager-selected-condition-select-long-option',
+    'manager-checks-crafting-trigger-break-tools',
+    'manager-gathering-task-stamina-modifier-list',
+    'world-tool-entry',
+    'interactables-config-configured',
+    'manager-component-edit-salvage',
+    'player-crafting-roll-prompt-basic',
+    'manager-import-folder-mapping',
   ]),
   // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches only its neutral state.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([

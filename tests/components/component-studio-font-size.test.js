@@ -419,7 +419,7 @@ const EXPECTED = {
   // ── The editor column.
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
-  'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
+  'readonly-label': 8.5, // the Field caption is the kicker (issue 2532)
   // 12.5px, the shared `<Select>`'s `form` rung, and a REAL change (issue 1510). It was 12 — the
   // literal `.manager-component-category-select` stated for the native control it painted, which
   // has no carrier now that the card's one control is the shared picker. The role still follows
