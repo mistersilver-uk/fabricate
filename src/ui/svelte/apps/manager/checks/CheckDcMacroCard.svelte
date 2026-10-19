@@ -108,7 +108,7 @@
         unlink: { 'data-unlink-macro': true },
       }}
       documentType="Macro"
-      item={macroUuid ? { name: macroCardLabel } : null}
+      value={macroUuid ? { uuid: macroUuid, name: macroCardLabel } : null}
       state={resolvedMacroMissing ? 'missing' : 'linked'}
       title={macroCardLabel}
       emptyIcon="fas fa-scroll"

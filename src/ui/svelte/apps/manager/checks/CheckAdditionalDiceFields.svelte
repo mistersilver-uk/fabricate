@@ -203,11 +203,11 @@
       kind={slot.kind}
       hookAttrs={{ root: { [slot.hook]: '' } }}
       documentType="Macro"
-      item={rule[slot.key] ? { name: macroName(slot.key) } : null}
+      value={rule[slot.key] ? { uuid: rule[slot.key], name: macroName(slot.key) } : null}
       state={macroStates[slot.key]?.missing ? 'missing' : 'linked'}
+      showUuid
       title={text('FABRICATE.Admin.Manager.Checks.AdditionalDice.MacroEmpty', 'Drop a macro here')}
       hint={rule[slot.key] ? '' : slot.hint}
-      uuid={rule[slot.key]}
       emptyIcon={rule[slot.key] ? 'fas fa-file-code' : 'fas fa-link'}
       copyLabel={slot.copy}
       unlinkLabel={slot.unlink}

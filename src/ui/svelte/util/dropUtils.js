@@ -1,7 +1,8 @@
-// Reading a Foundry drag payload, whose shape depends on the drag source: a world sidebar item
-// carries `uuid`, a compendium item carries `pack` + `id` and no `uuid`, and `uuid` wins when both
-// are present. A v13+ FOLDER drag carries only `uuid` (`Folder.<id>`) where the legacy shape
-// carried a bare `id`, so both are read — otherwise dropping a folder silently no-ops.
+// Reading a Foundry drag payload. On Foundry 13 and 14 every core document drag, world or
+// compendium, carries `{ type, uuid }`; the legacy `{ pack, id }` shape is still read for
+// third-party drag sources, and `uuid` wins when both are present. A v13+ FOLDER drag carries only
+// `uuid` (`Folder.<id>`) where the legacy shape carried a bare `id`, so both are read — otherwise
+// dropping a folder silently no-ops.
 
 export function resolveDropUuid(data) {
   if (!data) return null;

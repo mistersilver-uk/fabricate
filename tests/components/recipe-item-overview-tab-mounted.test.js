@@ -123,6 +123,7 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     assert.ok(root.querySelector('[data-recipe-item-link]'), 'expected the filled link chip');
     // The raw UUID text is no longer shown — the Copy button carries it.
     assert.equal(root.querySelector('[data-recipe-item-uuid]'), null);
+    assert.ok(!root.querySelector('[data-item-drop-zone-uuid]'), 'nor does the zone draw it');
     assert.equal(
       root.querySelector('[data-recipe-item-name]').textContent.trim(),
       'Ashfall Compendium'

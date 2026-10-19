@@ -338,12 +338,10 @@
   });
 
   function macroDisplay(uuid) {
-    if (!uuid) return { name: '', missing: false };
+    if (!uuid) return { uuid: '', name: '', missing: false };
     const known = (macroOptions || []).find((macro) => macro?.uuid === uuid);
-    if (known) return { name: known.name || uuid, missing: false };
-    const resolved = macroNames[uuid];
-    if (resolved) return { name: resolved.name || uuid, missing: resolved.missing === true };
-    return { name: uuid, missing: false };
+    const resolved = known ?? macroNames[uuid] ?? {};
+    return { uuid, name: resolved.name || uuid, missing: resolved.missing === true };
   }
 
   function summaryFor(complication) {
@@ -1007,7 +1005,8 @@
                       <!-- Browse is the head's trigger, beside the zone (a recorded prototype
                            deviation); Relink opens that same list. -->
                       <ItemDropZone
-                        item={complication.macroUuid ? { name: macro.name } : null}
+                        value={complication.macroUuid ? macro : null}
+                        showUuid
                         documentType="Macro"
                         kind="complication-macro"
                         emptyIcon="fas fa-scroll"
@@ -1016,11 +1015,12 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.DropTitle',
                           'Drop a macro here'
                         )}
-                        hint={complication.macroUuid ||
-                          text(
-                            'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
-                            'Or browse this world’s script macros.'
-                          )}
+                        hint={complication.macroUuid
+                          ? ''
+                          : text(
+                              'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
+                              'Or browse this world’s script macros.'
+                            )}
                         subline={macro.missing
                           ? text(
                               'FABRICATE.Admin.Manager.Component.Complications.Macro.Missing',
