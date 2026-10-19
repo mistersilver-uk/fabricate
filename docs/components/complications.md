@@ -67,6 +67,7 @@ The **Then** card holds two optional effects, and a complication can carry eithe
 - **Roll a dice expression**, rolled and posted to chat when the complication fires.
 - **Run a macro**, which you set by dragging a script macro onto the drop zone or by using **Browse macros**.
   When that macro no longer resolves, the zone says so and offers **Relink**, which opens the same list as **Browse macros**.
+  A macro that no longer resolves shows its stored address under the drop zone, so you can find or relink it.
   A macro linked here runs on one of your own connected GM clients rather than on the acting player's client, so it always runs with your authority.
   It receives the component, the acting character, and details of the complication that fired.
   Fabricate only ever runs a **script** macro this way.

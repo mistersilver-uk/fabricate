@@ -823,8 +823,8 @@
                 </Chip>
               {/if}
             </div>
-            <!-- TWO LINES AND ONE BUTTON, which is what the design's tile carries: a raw uuid on
-                 a third line displaced the hint that says what dropping DOES. -->
+            <!-- Two lines and one button when linked, as the design's tile draws: no `showUuid`,
+                 since a uuid on a third line displaced the hint saying what a drop does. -->
             <!-- THE ONE SITE NAMING ALL FOUR HOOK REGIONS (issue 1509).
                  `data-tool-source-layout` carries the STRING `'compact'` rather than `true`,
                  because it is a layout id and not a presence flag, and
@@ -838,7 +838,7 @@
                 copy: { 'data-tool-source-copy-uuid': true },
                 unlink: { 'data-tool-source-unlink': true },
               }}
-              item={sourceLinked ? source : null}
+              value={sourceLinked ? source : null}
               state={sourceMissing ? 'missing' : 'linked'}
               title={entryName}
               hint={sourceDropHint}
