@@ -216,15 +216,14 @@
       class={triggerClass}
       {ariaLabel}
       {disabled}
+      icon={triggerIcon}
       {...triggerProps}
       aria-haspopup="menu"
       aria-expanded={open}
-      title={triggerTitle || undefined}
+      tooltip={triggerTitle || undefined}
       onclick={toggleFromTrigger}
       onkeydown={onTriggerKeydown}
-    >
-      <i class={triggerIcon} aria-hidden="true"></i>
-    </IconButton>
+    />
   {/if}
 
   {#snippet menuItems()}
