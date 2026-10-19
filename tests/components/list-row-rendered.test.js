@@ -2,7 +2,7 @@
  * Issue 1778 — ListRow's selectable form, measured in Chromium: the card layout's button keeps its
  * content's height, a default row's button outgrows Foundry's fixed button height, a focused row's
  * ring sits inside the row where a scrolling list cannot clip it, and a truncated name keeps 6ch
- * before its badges wrap beneath it.
+ * before its badges wrap beneath it. Issue 2547: an untruncated name's badges follow the name.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -52,6 +52,17 @@ const CASES = Object.freeze({
     onOpen: open,
     badges: snippet(`<span class="probe-badges">${'<span></span>'.repeat(3)}</span>`),
   },
+  // Issue 2547: an untruncated name, its badges after it.
+  untruncated: {
+    name: 'Moonlit Glade',
+    onOpen: open,
+    badges: snippet(`<span class="probe-badges">${'<span></span>'.repeat(2)}</span>`),
+  },
+  railName: {
+    name: 'Forge a Pattern-Welded Blade of the Deep Seam',
+    onOpen: open,
+    badges: snippet(`<span class="probe-badges">${'<span></span>'.repeat(2)}</span>`),
+  },
   // Issue 2321: a read-only row and an opening one, side by side in one cross-reference list.
   still: { name: 'Carve Bone Idol', detail: 'Recipe', truncateName: true, detailAlign: 'end' },
   opening: {
@@ -90,6 +101,8 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
   <div data-case="scroller" style="overflow-y:auto;width:320px;height:120px">${markup.focus}</div>
   <div data-case="narrow" style="width:220px">${markup.floor}</div>
   <div data-case="wide" style="width:360px">${markup.floor}</div>
+  <div data-case="untruncated" style="width:360px">${markup.untruncated}</div>
+  <div data-case="rail" style="width:200px">${markup.railName}</div>
   <div data-case="still" style="width:320px">${markup.still}</div>
   <div data-case="opening" style="width:320px">${markup.opening}</div>
   <div data-case="long-detail" style="width:320px">${markup.longDetail}</div>
@@ -234,6 +247,44 @@ describe('ListRow selectable form, rendered (issue 1778)', () => {
     assert.ok(narrow.overflow <= 0, `the head overflows the row by ${narrow.overflow}px`);
     assert.equal(wide.badgesBelow, false, 'where the line has room, the badges stay beside it');
     assert.ok(wide.nameWidth >= wide.sixCh - 0.01);
+  });
+});
+
+describe('ListRow badges after an untruncated name, rendered (issue 2547)', () => {
+  /** The head's gap and the name's and badges' boxes, for one case. */
+  const head = (caseId) =>
+    tab.evaluate((id) => {
+      const box = (element) => {
+        const { left, top, right, bottom } = element.getBoundingClientRect();
+        return { left, top, right, bottom };
+      };
+      const row = document.querySelector(`[data-case="${id}"] .fabricate-list-row`);
+      const headEl = row.querySelector('.fabricate-list-row-head');
+      // The name's text, not its box: a growing box would close the gap however far the text ends.
+      const text = document.createRange();
+      text.selectNodeContents(headEl.querySelector('.fabricate-list-row-name'));
+      return {
+        gap: Number.parseFloat(getComputedStyle(headEl).columnGap),
+        name: box(text),
+        badges: box(headEl.querySelector('.fabricate-list-row-badges')),
+        overflow: headEl.scrollWidth - headEl.clientWidth,
+      };
+    }, caseId);
+
+  it('sets the badges beside the name, one head gap after it, where the line has room', async () => {
+    const { gap, name, badges } = await head('untruncated');
+    assert.ok(gap > 0, 'the head gap measured nothing');
+    assert.ok(badges.top < name.bottom, 'the badges share the name’s line');
+    assert.ok(
+      badges.left - name.right <= gap + 0.01,
+      `the badges start ${badges.left - name.right}px after the name, past the ${gap}px gap`
+    );
+  });
+
+  it('wraps the badges beneath a long name in a narrow rail without overflowing it', async () => {
+    const { name, badges, overflow } = await head('rail');
+    assert.ok(badges.top >= name.bottom - 0.01, 'the badges wrap beneath the name');
+    assert.ok(overflow <= 0, `the head overflows the row by ${overflow}px`);
   });
 });
 

@@ -1,4 +1,7 @@
-<!-- The Journal's Active run, as `RunCard` wires its row: the bolt and the status chip, and the stage bars beneath. -->
+<!--
+  The Journal's Active run, as `RunCard` wires its row: the bolt and the status chip, and the stage
+  bars and world-time countdown of its `timing` snippet beneath, the countdown the row's `aside`.
+-->
 <script>
   import Chip from '../../../../src/ui/svelte/components/Chip.svelte';
   import RunProgress from '../../../../src/ui/svelte/components/RunProgress.svelte';
@@ -9,6 +12,7 @@
     props = {},
     meta,
     children,
+    aside,
     statusKey,
     statusIcon = '',
     tone,
@@ -28,6 +32,7 @@
 
 {#snippet timing()}
   <RunProgress {stages} {current} {progress} ariaLabel={localize(progressKey)} />
+  {@render aside?.()}
 {/snippet}
 
 <Specimen {...props} onOpen={open} badges={heading} {meta} aside={stages ? timing : undefined} />
