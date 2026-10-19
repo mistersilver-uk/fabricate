@@ -1,12 +1,11 @@
 <!--
   A gathering task, as `GatheringTaskRow` wires its row: the 56px thumb leading, its callouts as
   badges, and the success chance beneath it, `ChanceBar`'s composition inlined because `ChanceBar`
-  is app-scoped. The thumb arrives as the row's `content`.
+  is app-scoped, its caption beside the track. The thumb arrives as the row's `content`.
 -->
 <script>
   import BandedBar from '../../../../src/ui/svelte/components/BandedBar.svelte';
   import Chip from '../../../../src/ui/svelte/components/Chip.svelte';
-  import Kicker from '../../../../src/ui/svelte/components/Kicker.svelte';
   import { statusChipTone } from '../../../../src/ui/svelte/util/statusChipTone.js';
   import { format, localize } from '../fixtureActs.js';
 
@@ -20,6 +19,7 @@
     chanceKey,
     percent,
     fill,
+    chanceStyle,
   } = $props();
 
   const label = $derived(format(chanceKey, { x: percent }));
@@ -38,8 +38,12 @@
 {/snippet}
 
 {#snippet chance()}
-  <Kicker as="span">{localize(chanceLabelKey)}</Kicker>
-  <BandedBar rows={[{ name: '', percent, fill }]} aria-label={label} title={label} />
+  <BandedBar
+    rows={[{ name: localize(chanceLabelKey), percent, fill }]}
+    aria-label={label}
+    title={label}
+    style={chanceStyle}
+  />
 {/snippet}
 
 <Specimen {...props} onOpen={open} leading={thumb} {badges} {meta} aside={chance} />

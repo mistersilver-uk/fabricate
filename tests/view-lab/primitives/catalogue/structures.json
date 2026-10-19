@@ -835,9 +835,10 @@
       "chanceLabelKey": "FABRICATE.App.Gathering.Detail.SuccessChanceLabel",
       "chanceKey": "FABRICATE.App.Gathering.Detail.SuccessChance",
       "percent": 62,
-      "fill": "success"
+      "fill": "success",
+      "chanceStyle": "display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--fab-space-2)"
     },
-    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button, `ChanceBar`’s composition inlined because `ChanceBar` is app-scoped. The badges are `Chip`s at the list density, as the row’s other callers draw them, where `GatheringTaskRow`’s own blocked-reason callouts are a scoped pill. Drawn differently: the caption stands above its bar, because the grid `GatheringTaskRow` sets it beside the bar on is its own scoped `.gathering-task-chance`."
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button, `ChanceBar`’s composition inlined because `ChanceBar` is app-scoped, its caption set beside the track as that row’s scoped `.gathering-task-chance` grid sets it. The badges are `Chip`s at the list density; `GatheringTaskRow`’s own `.gathering-task-callout` pill, in the same tones, is adoption debt that becomes `Chip density=\"list\"` under issue 2559."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
