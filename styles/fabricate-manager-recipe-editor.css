@@ -1976,7 +1976,7 @@
   font-size: 11px;
 }
 
-/* The select slot and the marker column are fixed, so every row's select starts at one x. */
+/* The select slot and the marker column are fixed, so every row's select starts at one x; a list with no marker text draws no column (`RoutingOverview`). */
 .fabricate-routing-overview .fabricate-routing-overview-target {
   display: flex;
   flex: none;
@@ -2020,7 +2020,7 @@
   text-align: right;
 }
 
-/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating: 262px is the 170px slot, the 8px row gap and the 84px column. */
+/* A blocked row's words span the select slot and the marker column, wrapping rather than truncating: 262px is the 170px slot, the 8px row gap and the 84px column, and an unmarked list's is the slot alone. */
 .fabricate-routing-overview .fabricate-routing-overview-blocked {
   flex: none;
   width: 262px;
@@ -2028,6 +2028,10 @@
   font-size: 11px;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.fabricate-routing-overview .fabricate-routing-overview-list:not([data-routing-overview-marked]) .fabricate-routing-overview-blocked {
+  width: 170px;
 }
 
 .fabricate-routing-overview .fabricate-routing-overview-actions {
@@ -2049,6 +2053,10 @@
   /* The 140px slot, the 8px row gap and the 64px column. */
   .fabricate-routing-overview .fabricate-routing-overview-blocked {
     width: 212px;
+  }
+
+  .fabricate-routing-overview .fabricate-routing-overview-list:not([data-routing-overview-marked]) .fabricate-routing-overview-blocked {
+    width: 140px;
   }
 }
 
