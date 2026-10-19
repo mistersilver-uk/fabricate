@@ -199,7 +199,7 @@
   margin-inline-start: auto;
 }
 
-/* THE LABELLED FORM. `.fabricate-field` and its `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
+/* THE LABELLED FORM. `.fabricate-field` and its first-child `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
 .fabricate-select-note {
   color: var(--fab-text-subtle);
   font-size: 10.5px;

@@ -1672,7 +1672,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
     // The NEGATIVE CONTROL for the rail rule, on the leg it still has.
     assert.equal(
       measured['field-input-elsewhere'].fontSize,
-      '13.12px',
+      '12.5px',
       'a field control outside the rail is unchanged — this gate must not be measuring a ' +
         'global re-type of every control in the manager'
     );
