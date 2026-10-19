@@ -21,7 +21,7 @@
 :root{
   --fab-bg-0:#111A23; --fab-bg-1:#15212B; --fab-bg-2:#1B2833; --fab-bg-3:#2C3B49;
   --fab-surface-soft:rgb(241 209 181/5%); --fab-surface-raised:rgb(241 209 181/8%); --fab-surface-active:rgb(241 209 181/12%);
-  --fab-overlay-light-06:rgb(241 209 181/6%);
+  --fab-overlay-light-06:rgb(241 209 181/6%); --fab-overlay-light-12:rgb(241 209 181/12%);
   --fab-border:rgb(217 184 156/18%); --fab-border-strong:rgb(217 184 156/32%);
   --fab-text:#F1D1B5; --fab-text-secondary:#D9B89C; --fab-text-muted:rgb(217 184 156/74%);
   --fab-text-subtle:rgb(217 184 156/56%); --fab-text-disabled:rgb(217 184 156/42%);
@@ -127,20 +127,24 @@ a{color:var(--fab-accent)}
 .k-kicker{font-family:var(--page-ui-face);font-weight:700;font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--fab-text-muted)}
 .k-kicker.accent{color:var(--fab-accent)}
 .k-mono{font-family:var(--fab-font-mono);font-variant-numeric:tabular-nums}
-.k-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--fab-space-chip);height:34px;min-height:34px;padding:0 var(--fab-space-3);border-radius:9px;border:1px solid transparent;font-family:var(--page-ui-face);font-size:11.52px;font-weight:500;cursor:pointer;background:var(--fab-surface-soft);color:var(--fab-text-secondary);white-space:nowrap}
+.k-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--fab-space-chip);height:34px;min-height:34px;padding:0 var(--fab-space-3);border-radius:9px;border:1px solid var(--fab-border);font-family:var(--page-ui-face);font-size:11.52px;font-weight:700;cursor:pointer;background:var(--fab-surface-soft);color:var(--fab-text-secondary);white-space:nowrap}
 .k-btn .i{width:11px;height:11px}
-.k-btn:hover{background:var(--fab-surface-raised);color:var(--fab-text)}
+.k-btn:hover{background:var(--fab-surface-raised);color:var(--fab-text);border-color:var(--fab-border-strong)}
 .k-btn.page{height:38px;min-height:38px;padding:0 16px;border-radius:9px;gap:7px}
-.k-btn.primary{background:var(--fab-success);color:var(--fab-on-accent);font-weight:700}
+.k-btn.primary{background:var(--fab-success);color:var(--fab-on-accent);border-color:var(--fab-success-border)}
 .k-btn.ghost{background:transparent;color:var(--fab-text-muted);border-color:var(--fab-border)}
 .k-btn.r28{height:28px;min-height:28px;border-radius:7px}
 .k-btn.busy{opacity:.7;cursor:progress}
+/* A busy control takes no hover: the rest paint of each role, held. */
+.k-btn.busy:hover{background:var(--fab-surface-soft);color:var(--fab-text-secondary);border-color:var(--fab-border)}
+.k-btn.primary.busy:hover{background:var(--fab-success);color:var(--fab-on-accent);border-color:var(--fab-success-border)}
+.k-btn.danger.busy:hover{background:var(--fab-danger-soft);color:var(--fab-danger-text);border-color:var(--fab-danger-border)}
 .k-btn.warning{background:var(--fab-warning-soft);color:var(--fab-warning-text);border-color:var(--fab-warning-border)}
 .k-btn.danger{background:var(--fab-danger-soft);color:var(--fab-danger-text);border-color:var(--fab-danger-border)}
 .k-btn.dashed{background:transparent;border:1px dashed var(--fab-border-strong);color:var(--fab-text-muted);font-weight:600;font-size:11px}
 .k-btn.dashed:hover{border-color:var(--fab-accent-border);color:var(--fab-accent)}
 .k-btn.icon{width:28px;height:28px;min-height:28px;padding:0;border-radius:7px}
-.k-btn.dis{color:var(--fab-text-disabled);cursor:default;background:var(--fab-surface-soft)}
+.k-btn.dis{color:var(--fab-text-disabled);cursor:default;background:var(--fab-surface-soft);border-color:var(--fab-overlay-light-12)}
 .k-btn.full{width:100%}
 .k-btn.bare{background:transparent;border:0;width:24px;height:24px;min-height:24px;padding:0;border-radius:7px;color:var(--fab-text-subtle)}
 .k-btn.bare:hover{color:var(--fab-danger-text);background:transparent}
@@ -556,7 +560,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="spec-head"><h4>The state set</h4><span class="st st-prose">prose</span></div>
     <div class="stage">
       <div class="unit"><span class="cap">rest</span><button class="k-btn">Apply to all</button></div>
-      <div class="unit"><span class="cap">hover</span><button class="k-btn" style="background:var(--fab-surface-raised);color:var(--fab-text)">Apply to all</button></div>
+      <div class="unit"><span class="cap">hover</span><button class="k-btn" style="background:var(--fab-surface-raised);color:var(--fab-text);border-color:var(--fab-border-strong)">Apply to all</button></div>
       <div class="unit"><span class="cap">focus-visible</span><button class="k-btn" style="outline:2px solid var(--fab-accent);outline-offset:2px">Apply to all</button></div>
       <div class="unit"><span class="cap">disabled</span><button class="k-btn dis">Apply to all</button></div>
       <div class="unit"><span class="cap">busy</span><button class="k-btn busy"><svg class="i"><use href="#i-clock"/></svg>Applying&hellip;</button></div>
@@ -650,8 +654,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <span class="k-hint">Three faces, not two. The busy face is load-bearing: disabling a focused button fires blur, which disarms it mid-write, so <code>Button</code>&rsquo;s <code>busy</code> is <code>aria-disabled</code> and keeps the focus; <code>ArmedDangerButton</code> still disables natively behind its blur guard until it converges.</span></div>
     </div>
     <div class="notes">
-      <div><h5>Canonical spec</h5><ul><li><b>38</b> · radius 9 · padding 0 <code>--fab-space-4</code> · icon 11 &mdash; the page header&rsquo;s actions</li><li><b>34</b> · radius 9 · padding 0 <code>--fab-space-3</code> · 11.52px &mdash; everything in the body; the ghost keeps a <code>--fab-border</code> edge at rest</li><li><b>28</b> · radius 7 &mdash; a choice group&rsquo;s Alternative adder</li><li><b>busy</b> opacity .7 · <code>cursor: progress</code> · no hover and no spinner</li><li><b>icon</b> 28&times;28 · radius 7</li><li>Sets its own <code>height</code> <b>and</b> <code>min-height</code> — core's button height crops it otherwise</li></ul></div>
-      <div><h5>Svelte API</h5><ul><li class="k-hint"><b>SHIPPED</b> &mdash; every row is read from the <code>$props()</code> of <code>Button.svelte</code> (issue 2540).</li><li><b>role</b> neutral | primary | ghost | dashed | warning | danger — a <b>closed set of six</b>; a per-site tint travels on <code>class</code>, never as a seventh role</li><li><b>onclick</b> <span class="req">required</span> · <b>type</b> button | submit</li><li><b>tag</b> button | a · <b>href · target · rel</b> — external destinations only (&sect;16)</li><li><b>fullWidth · disabled</b> · <b>class</b> an EXTRA class, appended, never a replacement · a rest spread carrying every <code>data-*</code> hook</li><li><b>children</b> snippet</li><li><b>icon</b> a Font Awesome class drawn before the label, hidden from assistive technology; the icon-only form is <code>IconButton</code>, so no <code>iconOnly</code></li><li><b>size</b> &lsquo;&rsquo; | 28 | 38 = &lsquo;&rsquo; — &lsquo;&rsquo; draws 34 at r9, 38 at r9, 28 at r7; the control-height rung, named by its height: &lsquo;&rsquo; the manager button&rsquo;s 34 at radius 9, <b>38</b> the page header&rsquo;s actions at the same corner, and <b>28</b> a choice group&rsquo;s <b>Alternative</b> adder at radius 7 (issue 2515); an unrecognised value draws 34</li><li><b>busy</b> — <code>aria-disabled</code> + <code>aria-busy</code>, never <code>disabled</code>, so focus and arm state survive and the press is swallowed; the caller changes the label, because the primitive draws none</li></ul></div>
+      <div><h5>Canonical spec</h5><ul><li><b>38</b> · radius 9 · padding 0 <code>--fab-space-4</code> · icon 11 &mdash; the page header&rsquo;s actions</li><li><b>34</b> · radius 9 · padding 0 <code>--fab-space-3</code> · 11.52px &mdash; everything in the body; the ghost keeps a <code>--fab-border</code> edge at rest</li><li><b>28</b> · radius 7 &mdash; a choice group&rsquo;s Alternative adder</li><li><b>busy</b> opacity .7 · <code>cursor: progress</code> · no hover; a spinner glyph is the caller&rsquo;s optional decoration, never the only signal</li><li><b>icon</b> 28&times;28 · radius 7</li><li>Sets its own <code>height</code> <b>and</b> <code>min-height</code> — core's button height crops it otherwise</li></ul></div>
+      <div><h5>Svelte API</h5><ul><li class="k-hint"><b>SHIPPED</b> &mdash; every row is read from the <code>$props()</code> of <code>Button.svelte</code> (issue 2540).</li><li><b>role</b> neutral | primary | ghost | dashed | warning | danger — a <b>closed set of six</b>; a per-site tint travels on <code>class</code>, never as a seventh role</li><li><b>onclick</b> = a no-op · <b>type</b> the native button type, button | submit | reset = button, written only on a <code>&lt;button&gt;</code></li><li><b>tag</b> button | a · <b>href · target · rel</b> — external destinations only (&sect;16)</li><li><b>fullWidth · disabled</b> · <b>class</b> an EXTRA class, appended, never a replacement · a rest spread carrying every <code>data-*</code> hook</li><li><b>children</b> snippet</li><li><b>icon</b> a Font Awesome class drawn before the label, hidden from assistive technology; the icon-only form is <code>IconButton</code>, so no <code>iconOnly</code></li><li><b>size</b> &lsquo;&rsquo; | 28 | 38 = &lsquo;&rsquo; — &lsquo;&rsquo; draws 34 at r9, 38 at r9, 28 at r7; the control-height rung, named by its height: &lsquo;&rsquo; the manager button&rsquo;s 34 at radius 9, <b>38</b> the page header&rsquo;s actions at the same corner, and <b>28</b> a choice group&rsquo;s <b>Alternative</b> adder at radius 7 (issue 2515); an unrecognised value draws 34</li><li><b>busy</b> — <code>aria-disabled</code> + <code>aria-busy</code>, never <code>disabled</code>, so focus and arm state survive and the press is swallowed; the caller changes the label, because the primitive draws none</li></ul></div>
     </div>
     <div class="delta"><b>Issue 1648 IconButton extension.</b> Numeric <code>size={24}</code> opts into a 24px-square border-box, 24px minimum dimensions, zero padding and fixed 24px flex-basis, retaining the existing 6px radius and caller's role classes. <code>size="default"</code> preserves the existing default/pager geometry. The wider geometry and role reconciliation below remains target.</div>
     <div class="delta ok"><b>Ruled: PRIMARY is the SUCCESS family, everywhere.</b> Maintainer, 2026-09-03. The specimen CSS above already paints <code>.k-btn.primary</code> with <code>--fab-success</code>, and the shipped sheet agrees &mdash; <code>.fabricate-button.is-primary:not(:disabled)</code> sets <code>background: var(--fab-success)</code> with the matching border and ink. There is no second accent for a commit verb. <code>ui-visual-style/spec.md</code>&rsquo;s &ldquo;Right-inspector actions&rdquo; rule stated an accent for that stack; issue 1521 amended it and folded the inspector action button into this primitive, and the row is recorded in section 16.</div>
