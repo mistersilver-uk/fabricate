@@ -578,6 +578,8 @@ test("a tag chip is the choice-group drawing's 28px `#` pill in the tag ink", as
         tagInk: resolved('color', 'var(--fab-purple-text)'),
         hue: resolved('color', 'var(--fab-purple)'),
         removeSize: getComputedStyle(chip.querySelector('.manager-recipe-tag-remove')).fontSize,
+        minWidth: style.minWidth,
+        armGap: getComputedStyle(chip.parentElement).columnGap,
         oldChipSize: resolved('font-size', '0.62rem'),
       };
     });
@@ -591,6 +593,8 @@ test("a tag chip is the choice-group drawing's 28px `#` pill in the tag ink", as
     assert.notEqual(report.tagInk, report.hue, 'foundry-native parts the tag ink from its hue');
     assert.equal(report.color, report.tagInk, 'the lit chip inks with `--fab-purple-text`');
     assert.equal(report.removeSize, report.oldChipSize, 'the `×` keeps its 0.62rem (ruling 4)');
+    assert.equal(report.minWidth, 'auto', 'the chip hugs its tag: no minimum width');
+    assert.equal(report.armGap, '8px', "the drawing's 8px between chips");
   } finally {
     await context.close();
   }
@@ -1951,6 +1955,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
         tagInk: ink('var(--fab-purple-text)'),
         or: read('[data-or-trigger]'),
         tag: read('[data-tag-trigger]'),
+        tagPlus: getComputedStyle(document.querySelector('[data-tag-trigger] > i')).fontSize,
         chip: read('[data-plain-chip]'),
       };
     });
@@ -1990,6 +1995,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
     assert.equal(report.tag.fontSize, '11px', 'the drawing: 11px');
     assert.equal(report.tag.fontWeight, '600', 'the drawing: 600');
     assert.deepEqual(report.tag.paddingInline, ['12px', '12px'], 'the drawing: 12px padding');
+    assert.equal(report.tagPlus, '9px', 'the drawing: a 9px plus');
     assert.equal(report.tag.color, report.tagInk, 'the drawing: the tag ink, `--fab-purple-text`');
     assert.equal(
       report.tag.background,
