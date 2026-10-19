@@ -1304,8 +1304,8 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track',
-    'color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text))',
+    '.fabricate-toggle.fabricate-toggle.is-on:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track',
+    'color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-toggle-lift))',
     'a switch track lifts toward its ink: a control’s track, not a surface',
   ],
   [

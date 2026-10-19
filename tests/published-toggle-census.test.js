@@ -39,18 +39,35 @@ import {
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
 
-/** The ten sheet rules that draw a published switch, each with nothing above its root's compound. */
+/** The disabled checkbox host's selector, which the census fails closed on because it reads no class inside `:has()`. */
+const DISABLED_CHECKBOX_HOST =
+  '.fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled)';
+
+/** The selectors the forced-colours block restates, which name the same compounds as the rules they repaint (issue 2492). */
+const FORCED_COLOURS_RULES = Object.freeze([
+  'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-track',
+  'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-knob',
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle',
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-off',
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on',
+  `styles/fabricate-manager-library.css: ${DISABLED_CHECKBOX_HOST}`,
+]);
+
+/** The eighteen sheet rules that draw a published switch, each with nothing above its root's compound. */
 const TOGGLE_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-toggle',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-off',
-  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track',
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track',
+  'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-off:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle:focus',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle:focus-visible',
   'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-track',
   'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-knob',
   'styles/fabricate-manager-library.css: .fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob',
+  `styles/fabricate-manager-library.css: ${DISABLED_CHECKBOX_HOST}`,
+  ...FORCED_COLOURS_RULES,
 ]);
 
 /** The classes `StatusToggle.svelte` writes on its root that no published key draws: the indicator's and the checkbox's. */
@@ -85,12 +102,14 @@ const shippedBareButtons = () =>
   );
 
 describe('the module sheet and every component style against the published StatusToggle', () => {
-  it('reaches a published switch through its ten family rules, of 29 that name its root', () => {
+  // 29 at publication; issue 2525 added eleven: the forced-colours block's eight, the third
+  // disabled host, the hover split by state and the checkbox input's disabled cursor.
+  it('reaches a published switch through its eighteen family rules, of 40 that name its root', () => {
     const census = shippedCensus(TOGGLE, 'StatusToggle');
     assert.deepEqual(writtenOf(reachingOf(census)), [...TOGGLE_FAMILY_RULES].sort(byName));
-    assert.equal(census.length, 29, 'the census the switch was published on');
+    assert.equal(census.length, 40, 'the census the switch was published on, and issue 2525');
     const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
-    assert.equal(inPartials, 25, 'the partials were read');
+    assert.equal(inPartials, 36, 'the partials were read');
     assert.deepEqual(
       staleAncestors(TOGGLE, census, publishedManagerClasses()),
       [],
@@ -103,7 +122,7 @@ describe('the module sheet and every component style against the published Statu
     );
   });
 
-  it('keeps three selectors off a published switch only by the classes no published key draws', () => {
+  it('keeps four selectors off a published switch only by the classes no published key draws', () => {
     const drawnAll = { ...TOGGLE, undrawn: new Set() };
     const census = shippedCensus(drawnAll, 'StatusToggle');
     assert.deepEqual(
@@ -111,6 +130,7 @@ describe('the module sheet and every component style against the published Statu
       [
         'styles/fabricate-manager-library.css: .fabricate-toggle .manager-status-toggle-label',
         'styles/fabricate-manager-tool-editor-environments.css: .fabricate-toggle .manager-tool-setting-toggle-input',
+        'styles/fabricate-manager-tool-editor-environments.css: .fabricate-toggle .manager-tool-setting-toggle-input:disabled',
         'styles/fabricate-manager-tool-editor-environments.css: .fabricate-toggle .manager-tool-setting-toggle-input:focus',
       ]
     );
@@ -166,13 +186,14 @@ describe('the module sheet and every component style against the published Statu
     );
   });
 
-  it('names its track and knob only through its root, in the four family rules that do', () => {
+  // Seven: the track, the knob, the on knob, the two hover faces and the forced-colours pair.
+  it('names its track and knob only through its root, in the seven family rules that do', () => {
     const named = everyStylesheet().flatMap(([file, css]) =>
       TOGGLE_PARTS.flatMap((part) =>
         selectorsNaming(css, part).map((complex) => `${file}: ${writtenSelector(css, complex)}`)
       )
     );
-    assert.equal(named.length, 4, 'the parts were read');
+    assert.equal(named.length, 7, 'the parts were read');
     assert.ok(named.every((written) => TOGGLE_FAMILY_RULES.includes(written)));
     assert.deepEqual(partFaults(everyStylesheet(), TOGGLE_PARTS, TOGGLE), []);
   });

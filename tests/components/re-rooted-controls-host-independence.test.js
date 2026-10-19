@@ -522,10 +522,10 @@ const EXTRA_PROBES = Object.freeze([
   'pill-select-any',
 ]);
 
-/** The two family RAILS whose rendered border box follows the host's `box-sizing`. */
-const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
+/** The family RAIL whose rendered border box follows the host's `box-sizing`; the switch's track declares its own (issue 2525). */
+const BORDERED_TRACK_PROBES = Object.freeze(['slider-track']);
 
-/** Those two rails, plus the fill INSIDE one of them, which inherits the same dependence. */
+/** That rail, plus the fill INSIDE it, which inherits the same dependence. */
 const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   ...BORDERED_TRACK_PROBES,
   'slider-fill',
@@ -747,7 +747,9 @@ const TOGGLE_TRACK_COMPARED = Object.freeze([
   'border-top-style',
   'border-top-color',
   'background-color',
-  'position',
+  'background-clip',
+  'box-sizing',
+  'padding-top',
   'display',
   'align-items',
 ]);
@@ -756,9 +758,8 @@ const TOGGLE_KNOB_COMPARED = Object.freeze([
   'height',
   'border-radius',
   'background-color',
-  'position',
-  'top',
-  'left',
+  'display',
+  'margin-left',
 ]);
 /** The reading beside the rail, whose type is the family's own at (0,2,0). */
 const TOGGLE_LABEL_COMPARED = Object.freeze([
@@ -2188,10 +2189,10 @@ test('the toggle and the slider declare their own control chrome rather than inh
   );
 
   // AND THE RAIL AND KNOB GEOMETRY the two families are recognisable by.
-  assert.equal(bare('toggle-track').width, '34px');
-  assert.equal(bare('toggle-track').height, '20px');
-  assert.equal(bare('toggle-knob').width, '14px');
-  assert.equal(bare('toggle-knob').height, '14px');
+  assert.equal(bare('toggle-track').width, '38px');
+  assert.equal(bare('toggle-track').height, '22px');
+  assert.equal(bare('toggle-knob').width, '18px');
+  assert.equal(bare('toggle-knob').height, '18px');
   assert.equal(bare('slider-track').height, '6px');
 });
 
@@ -2234,7 +2235,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
     );
   }
 
-  // THE TWO BORDERED RAILS, which are the field's case rather than the pager's.
+  // THE BORDERED RAIL, which is the field's case rather than the pager's.
   for (const probe of BORDERED_TRACK_PROBES) {
     assert.equal(
       measured[probe].bare['box-sizing'],
@@ -2253,6 +2254,11 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
       `the ${probe} rail must still declare the 1px border that is why its border box differs by ` +
         'host at all; without it the opt-out above would be hiding a real move'
     );
+  }
+
+  // THE SWITCH'S TRACK DECLARES ITS OWN, so its 38x22 box is compared in every host.
+  for (const host of HOSTS) {
+    assert.equal(measured['toggle-track'][host.id]['box-sizing'], 'border-box');
   }
 
   // AND THE SLIDER'S NUMBER INPUT DOES DECLARE ONE, in its own rule.
