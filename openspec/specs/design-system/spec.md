@@ -954,7 +954,7 @@ It declares `disabled`, which disables its input and every token together and le
 A host MUST stack the input and its row in a column that states the gap between them, as `Field` does at 6px, and MUST host the field outside a `<label>` when it passes `tokens` or `resolve`, because a label would take every token, the reading and the status text into the field's name.
 
 The switch dims to opacity 0.45 when disabled on all three hosts and draws no hover face; an enabled off switch's hover changes its border only.
-Under forced colours the track and knob set `forced-color-adjust: none`: off is a `Canvas` track with a `CanvasText` edge and knob, on is a `Highlight` track and edge with a `HighlightText` knob, and disabled is `GrayText` at opacity 1.
+Under forced colours the track and knob set `forced-color-adjust: none`: off is a `Canvas` track with a `CanvasText` edge and knob, on is a `Highlight` track and edge with a `HighlightText` knob, and disabled is `GrayText` at opacity 1: a disabled off switch keeps its `Canvas` track with a `GrayText` edge and knob, a disabled on switch fills its track `GrayText` with a `Canvas` knob, and its reading is `GrayText`.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
@@ -1012,7 +1012,7 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 #### Scenario: Forced colours are active
 
 - **WHEN** forced colours are active
-- **THEN** a switch's on and off differ in track fill, knob colour and knob position, and a disabled switch draws in `GrayText` at full opacity
+- **THEN** a switch's on and off differ in track fill, knob colour and knob position, and a disabled switch draws in `GrayText` at full opacity, filled when on and hollow when off
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
