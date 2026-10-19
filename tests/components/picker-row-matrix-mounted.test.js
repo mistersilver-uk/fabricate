@@ -346,7 +346,7 @@ describe('PickerRow: every reachable cell acts', () => {
 
       it(`${surface} × ${kind}: a chip reads its stored tag after a \`#\`, lit at the tag-run scale`, async () => {
         const { target } = await mountRow(config, { ...unnamed(kind), tags: ['herb'] });
-        const chip = target.querySelector('[data-recipe-option-tags] .manager-chip');
+        const chip = target.querySelector(':scope [data-recipe-option-tags] .manager-chip');
         assert.equal(chip.getAttribute('data-recipe-tag'), 'herb', 'the hook holds the stored tag');
         assert.equal(chip.querySelector(':scope > span').textContent, '#herb');
         for (const name of ['is-tag', 'is-lit', 'is-tag-run']) {

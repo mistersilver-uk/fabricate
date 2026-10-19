@@ -573,6 +573,7 @@ test("a tag chip is the choice-group drawing's 28px `#` pill in the tag ink", as
         fontWeight: style.fontWeight,
         textTransform: style.textTransform,
         color: style.color,
+        // ratchet-exempt(lint): innerText applies text-transform, so it reads the chip as drawn.
         text: chip.innerText.trim(),
         tagInk: resolved('color', 'var(--fab-purple-text)'),
         hue: resolved('color', 'var(--fab-purple)'),
