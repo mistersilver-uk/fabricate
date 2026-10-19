@@ -1550,7 +1550,7 @@
   align-items: center;
 }
 
-/* The drops summary card has no rule of its own. It used to restate the whole `.fabricate-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px `--fab-border` edge and an 8px radius were all the same values the shell already declares — and then diverged on the only two it changed: `--fab-bg-3` instead of the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px (issue 883). */
+/* The drops summary card is the shared card with no rule of its own (issue 883). */
 
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;
@@ -2949,11 +2949,6 @@
 .fabricate-manager .manager-condition-remove:not(:disabled):hover,
 .fabricate-manager .manager-condition-remove:not(:disabled):focus-visible {
   color: var(--fab-danger);
-}
-
-.fabricate-manager .manager-gathering-rules-card {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-warning-soft);
 }
 
 .fabricate-manager .manager-rule-row {

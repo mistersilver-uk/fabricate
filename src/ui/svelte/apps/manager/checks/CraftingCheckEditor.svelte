@@ -478,9 +478,9 @@
   <!-- The tier list renders under BOTH DC modes: the macro takes the tier's DC as its anchor
          and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
-    <!-- `manager-checks-card`, not the bare `.fabricate-card` shell, which pads on TOP of
-             `CheckRecipeTiers`' own card-body padding and insets the tier rows past the cards above.
-             `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both for that reason. -->
+    <!-- `flush`: `CheckRecipeTiers` insets its own body, so the card's padding would push the
+         tier rows past the cards above. `SimpleCraftingCheckEditor`'s `data-static-dc` card is
+         flush for the same reason. -->
     <InspectorCard flush class="manager-checks-card" data-routed-tiers="">
       <CheckRecipeTiers
         anchorsBands
