@@ -196,9 +196,15 @@ describe('Button emits the element and classes its call sites are styled against
   });
 
   it('swallows an anchor press while busy, so the link does not navigate', async () => {
-    await harness.mount({ tag: 'a', href: '/docs', busy: true });
+    const presses = [];
+    const onclick = () => {
+      presses.push('press');
+    };
+    await harness.mount({ tag: 'a', href: '/docs', busy: true, onclick });
+    assert.equal(button().tagName, 'A', 'the anchor form renders');
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });
     button().dispatchEvent(event);
+    assert.deepEqual(presses, [], 'a busy anchor press reaches no callback');
     assert.equal(event.defaultPrevented, true);
     assert.equal(button().getAttribute('aria-disabled'), 'true');
   });
