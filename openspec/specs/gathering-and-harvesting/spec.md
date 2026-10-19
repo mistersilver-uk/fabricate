@@ -573,7 +573,7 @@ Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`
 6. GM-customized vocabularies are preserved.
 Defaults are seeded only when a custom list is absent or empty.
 6a. `vocabularies.{biomes,danger,weather,timeOfDay}` normalize to a de-duplicated list of ids.
-Entries persisted as condition-option or biome-option records are accepted and normalized to their id; the label, icon and color token on such an entry are display metadata derived from the id, are not authored at this level, and are re-derived on read.
+Entries persisted as condition-option or biome-option records are accepted and normalized to their id; the label, icon, colour token and custom hex on such an entry persist on that option record in `vocabularies.biomes.values`; a record that omits its label or icon takes the id's default on read, and a colour token outside the biome set folds to `sage`.
 GM-authored option metadata lives in the per-system `conditions[kind].values` and `vocabularies.biomes.values` records.
 An entry whose normalized id is the lower-cased stringification of a plain object — `[object object]`, or `object-object` once condition-id normalization has stripped the brackets — is not a tag and is discarded.
 `weather` and `timeOfDay` ids are condition-option ids and are kebab-cased; `biomes` and `danger` ids are tags and are lower-cased only.
