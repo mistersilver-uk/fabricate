@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -137,11 +138,14 @@ describe('Button emits the element and classes its call sites are styled against
 
   // ── THE LEADING ICON (issue 2540) ─────────────────────────────────────────────────────
   it('draws one hidden <i> carrying the icon class as the first child', async () => {
-    await harness.mount({ icon: 'fas fa-plus' });
+    const children = createRawSnippet(() => ({ render: () => '<span>Add</span>' }));
+    await harness.mount({ icon: 'fas fa-plus', children });
     const node = button();
     const glyphs = node.querySelectorAll('i');
     assert.equal(glyphs.length, 1);
+    assert.equal(node.children.length, 2);
     assert.equal(node.firstElementChild, glyphs[0]);
+    assert.equal(node.children[1].textContent, 'Add');
     assert.equal(glyphs[0].className, 'fas fa-plus');
     assert.equal(glyphs[0].getAttribute('aria-hidden'), 'true');
   });

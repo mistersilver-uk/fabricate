@@ -166,6 +166,7 @@
         {/if}
       {:else}
         <Button
+          icon={primary?.icon || ''}
           role={primaryEnabled ? 'primary' : 'neutral'}
           class="fab-run-action-control fab-run-action-primary"
           data-run-action="primary"
@@ -174,7 +175,6 @@
           disabled={!primaryEnabled}
           onclick={onPrimary}
         >
-          {#if primary?.icon}<i class={primary.icon} aria-hidden="true"></i>{/if}
           {primaryLabel}
         </Button>
       {/if}
