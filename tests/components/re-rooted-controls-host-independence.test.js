@@ -579,9 +579,9 @@ const GLYPH_ONLY_PROBES = Object.freeze([
   'pill-select-glyph',
   // AND THE LINK FIELD'S COMPACT GLYPH TILE (issue 1509 phase 4). The compact face's whole point
   // is that it does NOT show the art, so the family draws no plate and lets the glyph size
-  // itself — and the glyph is a Font Awesome
-  // ligature this core-less harness does not load, so the tile lays out at 0x0 in every host. Its
-  // DECLARED values are compared instead, in all three, which is where the family's claim lives.
+  // itself — and the glyph is a Font Awesome ligature this core-less harness does not load, so
+  // the tile lays out at 0x0 in every host. Its DECLARED values are compared instead, in all
+  // three, which is where the family's claim lives.
   'link-field-compact-icon',
 ]);
 

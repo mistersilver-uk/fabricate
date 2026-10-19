@@ -1,9 +1,9 @@
 /**
  * The link field's faces as Chromium draws them (issue 2466): the 104px floor, the three grounds
  * and borders, the empty stack, the two-line caps, the action column, the compact face, the 38px
- * chip, the uuid line and the named group. The sheet sits in `@layer modules`, Foundry's `code` rule in `@layer
- * elements` and the scoped blocks unlayered, as Foundry loads them, so each clause measures the
- * cascade a selector reading cannot.
+ * chip, the uuid line and the named group. The sheet sits in `@layer modules`, Foundry's `code`
+ * rule in `@layer elements` and the scoped blocks unlayered, as Foundry loads them, so each
+ * clause measures the cascade a selector reading cannot.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
