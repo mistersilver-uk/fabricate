@@ -22,7 +22,7 @@ import {
 /** A book's Read & learn, which is its identity header's one primary. */
 const READ_LEARN_ACTION = '[data-player-detail-header] [data-inventory-learn-all]';
 /** The bulk roll prompt: Fabricate's own modal over the player window. */
-const BULK_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="bulk"]';
+const BULK_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="bulk"]';
 /** The help line under the bonus field, then the batch list holding each `[name, need]` row. */
 const BULK_PROMPT_ROWS = (help, rows) =>
   `${BULK_PROMPT}:has(.bonus-group > .help:text-is("${help}")) .bulk-list` +
@@ -72,7 +72,7 @@ const buyOneAndRoll = (prompt) => [
   { selector: `${prompt} [data-roll-prompt-additional-dice-stepper] [data-stepper-increment]` },
   { selector: `${prompt} button[type="submit"]` },
 ];
-const SINGLE_SALVAGE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+const SINGLE_SALVAGE_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 /** The Longsword's single salvage, its one bought die rolled at or under 20 (frame 39). */
 const SALVAGE_LONGSWORD_BOUGHT = Object.freeze([
   { selector: '[data-inventory-search]', fill: 'Longsword' },
@@ -414,7 +414,8 @@ export const CASES = Object.freeze([
       { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
-        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+        selector:
+          '.fabricate-app [data-manager-modal][data-roll-prompt="single"] button[type="submit"]',
       },
       {
         selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]',
@@ -450,7 +451,8 @@ export const CASES = Object.freeze([
       { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
-        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+        selector:
+          '.fabricate-app [data-manager-modal][data-roll-prompt="single"] button[type="submit"]',
       },
       {
         selector: '[data-inventory-salvage-summary="failure"] [data-check-evidence-rows]',
@@ -885,7 +887,7 @@ export const CASES = Object.freeze([
     // Held to the prompt's own element, never to the tab. The one row that rolls offers keep, so
     // the batch does; the row with no check never joins the offer (issue 2007).
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="bulk"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="bulk"]' +
       ':has(.manager-modal-title:has-text("Salvage checks"))' +
       ':has(.bulk-need:text-is("No check"))' +
       ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))' +
@@ -1135,7 +1137,8 @@ export const CASES = Object.freeze([
       { selector: '[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
       {
-        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+        selector:
+          '.fabricate-app [data-manager-modal][data-roll-prompt="single"] button[type="submit"]',
       },
       {
         selector: '[data-inventory-salvage-summary="success"] [data-check-count-tiles]',

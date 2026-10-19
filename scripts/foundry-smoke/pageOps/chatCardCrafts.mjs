@@ -7,7 +7,7 @@
 import { describeClickTarget, ensurePageRendering } from './pageRendering.mjs';
 import { chooseSelectOption } from './selectControl.mjs';
 
-export const ROLL_PROMPT = '.manager-modal[data-roll-prompt]';
+export const ROLL_PROMPT = '[data-manager-modal][data-roll-prompt]';
 
 /**
  * Close every standing roll prompt through its own close control. Never Escape: with focus on the
