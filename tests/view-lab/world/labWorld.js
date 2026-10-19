@@ -622,6 +622,21 @@ function seedDepletedImage(content) {
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(withImage);
 }
 
+/** Choking dust's macro names `Macro.lab-retired`, which no lab document answers, so the macro
+ *  zone draws its missing face with Relink (issue 2466). */
+function seedMissingComplicationMacro(content) {
+  const retire = (entry) =>
+    entry.id === 'hb-comp-dust-cloud' ? { ...entry, macroUuid: 'Macro.lab-retired' } : entry;
+  const withRetired = (components) =>
+    components.map((entry) =>
+      entry.id === 'hb-mortar-dust'
+        ? { ...entry, complications: entry.complications.map(retire) }
+        : entry
+    );
+  for (const system of content.systems) system.components = withRetired(system.components ?? []);
+  content.components = withRetired(content.components);
+}
+
 function seedCheckOverride(content, state) {
   const spec = CHECK_OVERRIDE_STATES[state];
   if (!spec) return;
@@ -894,6 +909,7 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
  * @param {boolean} [options.scriptMacros] List the lab's script macro in `game.macros`, so a macro
  *   picker offers an option (issue 2466).
+ * @param {boolean} [options.missingComplicationMacro] See {@link seedMissingComplicationMacro}.
  * @param {string} [options.timeOfDayBar] `'1'` or `'fallback'`: the time-of-day bar's periods,
  *   and the world clock at 14:34. See {@link seedTimeOfDayBar}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -919,6 +935,7 @@ export async function buildLabWorld({
   systemBlocked = false,
   depletedImage = false,
   scriptMacros = false,
+  missingComplicationMacro = false,
   tagStacks = false,
   timeOfDayBar = '',
 } = {}) {
@@ -936,6 +953,7 @@ export async function buildLabWorld({
   seedCheckOverride(content, checkOverride);
   if (systemBlocked) blockHerbalism(content);
   if (depletedImage) seedDepletedImage(content);
+  if (missingComplicationMacro) seedMissingComplicationMacro(content);
   if (tagStacks) seedTagStacks(content);
   seedTimeOfDayBar(content, timeOfDayBar);
   if (noTools) stripTools(content);

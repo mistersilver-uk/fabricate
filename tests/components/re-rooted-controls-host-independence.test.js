@@ -424,7 +424,7 @@ const CONTROLS = Object.freeze([
     id: 'link-field',
     classes: `${LINK_FIELD_CLASSES} is-linked`,
     markup: (host) =>
-      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-icon"><img src="icons/svg/item-bag.svg" alt="" data-probe="${host}-link-field-art"></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
+      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
   }),
   Object.freeze({
     id: 'link-field-compact',
@@ -498,8 +498,6 @@ const EXTRA_PROBES = Object.freeze([
   'toggle-card-title',
   'toggle-card-sub',
   'toggle-card-info-icon',
-  'link-field-icon',
-  'link-field-art',
   'link-field-copy',
   'link-field-name',
   'link-field-uuid',
@@ -580,10 +578,10 @@ const GLYPH_ONLY_PROBES = Object.freeze([
   // pill's icon slot — is compared instead, in all three.
   'pill-select-glyph',
   // AND THE LINK FIELD'S COMPACT GLYPH TILE (issue 1509 phase 4). The compact face's whole point
-  // is that it does NOT show the art, so the family replaces the default face's 44x44 plate with
-  // `width: auto; height: auto` and lets the glyph size itself — and the glyph is a Font Awesome
-  // ligature this core-less harness does not load, so the tile lays out at 0x0 in every host. Its
-  // DECLARED values are compared instead, in all three, which is where the family's claim lives.
+  // is that it does NOT show the art, so the family draws no plate and lets the glyph size
+  // itself — and the glyph is a Font Awesome ligature this core-less harness does not load, so
+  // the tile lays out at 0x0 in every host. Its DECLARED values are compared instead, in all
+  // three, which is where the family's claim lives.
   'link-field-compact-icon',
 ]);
 
@@ -1171,22 +1169,6 @@ const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
   'text-align',
 ]);
 
-/** The linked face's 44px art tile. */
-const LINK_FIELD_ICON_COMPARED = Object.freeze([
-  'display',
-  'align-items',
-  'justify-content',
-  'width',
-  'height',
-  'border-radius',
-  'overflow-x',
-  'background-color',
-  'color',
-]);
-
-/** And the art inside it, which the family sizes and crops. */
-const LINK_FIELD_ART_COMPARED = Object.freeze(['width', 'height', 'object-fit']);
-
 /** The compact face's glyph, which the family re-sizes: it keeps the empty glyph's ink and no box. */
 const LINK_FIELD_COMPACT_ICON_COMPARED = Object.freeze(['width', 'height', 'font-size', 'color']);
 
@@ -1376,8 +1358,6 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'toggle-card-sub': TOGGLE_CARD_SUB_COMPARED,
   'link-field': LINK_FIELD_COMPARED,
   'link-field-compact': LINK_FIELD_COMPACT_COMPARED,
-  'link-field-icon': LINK_FIELD_ICON_COMPARED,
-  'link-field-art': LINK_FIELD_ART_COMPARED,
   'link-field-compact-icon': LINK_FIELD_COMPACT_ICON_COMPARED,
   'link-field-copy': LINK_FIELD_COPY_COMPARED,
   'link-field-compact-copy': LINK_FIELD_COMPACT_COPY_COMPARED,
@@ -2905,15 +2885,15 @@ test('the link field family declares no font floor and no focus pair', async () 
     // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY.
     assert.equal(
       endingInBareElement(family).length,
-      9,
-      'the link field no longer ends nine rules in a bare element, so `floorShaped`s zero above ' +
+      8,
+      'the link field no longer ends eight rules in a bare element, so `floorShaped`s zero above ' +
         'has stopped discriminating and the docblock`s contrast with the status card is stale: ' +
         endingInBareElement(family)
           .map((rule) => rule.selectorText)
           .join(', ')
     );
 
-    // Of those nine, the five that TYPE it. Asserted separately because the zero above cannot be
+    // Of those eight, the five that TYPE it. Asserted separately because the zero above cannot be
     // mistaken for "this family types nothing" — the predicate is shape, not absence, and a
     // reader reconciling the two needs the second number.
     const typedBareElement = endingInBareElement(family).filter((rule) =>

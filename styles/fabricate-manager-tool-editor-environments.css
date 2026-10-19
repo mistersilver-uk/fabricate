@@ -724,12 +724,13 @@
 
 .fabricate-link-field.manager-item-drop-zone.is-linked {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) max-content;
+  grid-template-columns: 38px minmax(0, 1fr) max-content;
   justify-content: normal;
   gap: var(--fab-space-3);
   border-style: solid;
   background: var(--fab-bg-1);
   text-align: start;
+  container: fabricate-link-field / inline-size;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing {
@@ -788,26 +789,6 @@
   font-size: 18px;
 }
 
-.fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 11px;
-  overflow: hidden;
-  background: var(--fab-surface-soft);
-  color: var(--fab-accent);
-  font-size: inherit;
-}
-
-.fabricate-link-field.manager-item-drop-zone.is-missing .manager-item-drop-zone-icon {
-  color: var(--fab-danger-text);
-}
-
-.fabricate-link-field .manager-item-drop-zone-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .fabricate-link-field .manager-item-drop-zone-copy {
   display: grid;
   gap: var(--fab-space-1);
@@ -856,7 +837,21 @@
 .fabricate-link-field .manager-item-drop-zone-actions {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--fab-space-1);
+}
+
+/* At 260px and narrower (a 234px content box inside the zone's padding and border) the actions take their own row below the copy, so a long Relink label cannot squeeze the copy column. The copy then spans to the right padding: a container query cannot style its own container, so the zone's track list stays and the copy takes the empty third track's 12px gap as well. */
+@container fabricate-link-field (max-width: 234px) {
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy {
+    grid-column: 2 / -1;
+  }
+
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-actions {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
 }
 
 /* The Tool Studio's checklist row is GONE with its component (issue 1373, round 5). */

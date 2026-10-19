@@ -1,6 +1,7 @@
 <!--
   The manager's ONE document drop target: a dashed empty prompt that becomes a linked card once the
-  caller resolves a document, with optional copy-uuid and unlink actions.
+  caller resolves a document, with optional copy-uuid and unlink actions and, on a missing link,
+  Relink.
 
   Props:
   | prop | values | default | contract |
@@ -10,6 +11,7 @@
   | `address` / `subline` | strings | `''` | The resolved document's own address, a mono line directly UNDER the name and not a sub-line; and a SECOND sub-line under `hint`, for a card carrying both a uuid and a description. Each renders only when supplied. |
   | `compact` / `purpose` | boolean / string | `false` / `''` | A PROMPT, NEVER A SUMMARY (see the invariants); and WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone` rather than a branch selector. |
   | `hookAttrs` | bag keyed by region | `{}` | The test and styling hooks, over a CLOSED region set — `root`, `hint`, `copy`, `unlink` — each an object of attribute name to value. `{}` for an absent region, so a caller naming none renders byte-identically to one that passed no bag. A caller's bag need not be static: one shipped site's two hooks are two faces of ONE state. |
+  | `onRelink()` / `relinkLabel` | function / string | `null` / `''` | Relink, a `<Button>` drawn only in `missing` and only where a caller can re-pick the document; it stamps its own `data-item-drop-zone-relink` rather than a fifth region. |
   | `unlinkDataAttr` / `onDrop(data)` | attribute name / function | `''` / no-op | One unlink attribute rather than a set, deliberately not folded into the bag, so a caller passing both gets both; and a handler receiving the raw drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
 
   Invariants:
@@ -31,11 +33,19 @@
     `openspec/specs/design-system/spec.md`; one measured residue follows from the same spread, in
     that an element carrying one has its scope hash stamped defensively, so the hint `<small>`
     renders a `class` the compiled CSS never names.
+  - The root is a group named by its `<strong>` and, in `missing`, described by its hint and
+    subline, so the state is announced as text as well as drawn in colour — pinned by
+    `tests/components/link-field-faces-rendered.test.js`.
+  - A missing chip draws the alert glyph, never the document's art or the caller's glyph, because
+    a broken link must not look like a working one — pinned by
+    `tests/components/link-field-faces-rendered.test.js`.
 -->
 <script>
   import { dragDrop } from '../actions/dragDrop.js';
   import { resolveDropUuid } from '../util/dropUtils.js';
+  import Button from './Button.svelte';
   import IconButton from './IconButton.svelte';
+  import Medallion from './Medallion.svelte';
 
   let {
     item = null,
@@ -56,11 +66,22 @@
     onDrop = () => {},
     onCopy = null,
     onUnlink = null,
+    onRelink = null,
+    relinkLabel = '',
   } = $props();
 
   const isMissing = $derived(Boolean(item) && state === 'missing');
+  const showRelink = $derived(isMissing && !compact && Boolean(onRelink));
   const unlinkAttrs = $derived(unlinkDataAttr ? { [unlinkDataAttr]: true } : {});
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
+  const nameId = $props.id();
+  const hintId = $derived(hookAttrs?.hint?.id || `${nameId}-hint`);
+  const sublineId = `${nameId}-subline`;
+  const describedBy = $derived(
+    isMissing
+      ? [hint && hintId, subline && sublineId].filter(Boolean).join(' ') || undefined
+      : undefined
+  );
 
   function handleDrop(data) {
     if (data?.type !== documentType) return;
@@ -79,26 +100,46 @@
   data-manager-item-drop-zone=""
   data-item-drop-zone={kind || undefined}
   data-item-drop-state={isMissing ? 'missing' : undefined}
+  role="group"
+  aria-labelledby={nameId}
+  aria-describedby={describedBy}
   {...hooksFor('root')}
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
-  <span class="manager-item-drop-zone-icon" aria-hidden="true">
-    {#if item?.img && !compact}<img src={item.img} alt="" />{:else}<i class={emptyIcon}></i>{/if}
-  </span>
+  {#if item && !compact}
+    <Medallion
+      size={38}
+      variant="glyph-chip"
+      alt=""
+      art={isMissing ? '' : item.img || ''}
+      icon={isMissing ? 'fas fa-triangle-exclamation' : emptyIcon}
+      ink={isMissing ? 'danger' : ''}
+    />
+  {:else}
+    <span class="manager-item-drop-zone-icon" aria-hidden="true"><i class={emptyIcon}></i></span>
+  {/if}
   <span class="manager-item-drop-zone-copy">
-    <strong>{compact ? title : item?.name || title}</strong>
+    <strong id={nameId}>{compact ? title : item?.name || title}</strong>
     {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
         >{uuid}</code
       >{/if}
-    {#if hint}<small {...hooksFor('hint')}>{hint}</small>{/if}
-    {#if subline}<small data-item-drop-zone-subline>{subline}</small>{/if}
+    {#if hint}<small id={isMissing ? hintId : undefined} {...hooksFor('hint')}>{hint}</small>{/if}
+    {#if subline}<small id={isMissing ? sublineId : undefined} data-item-drop-zone-subline
+        >{subline}</small
+      >{/if}
   </span>
-  {#if item && !compact && (onCopy || onUnlink)}
+  {#if item && !compact && (showRelink || onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
+      {#if showRelink}
+        <Button data-item-drop-zone-relink="" {disabled} onclick={() => onRelink()}
+          >{relinkLabel}</Button
+        >
+      {/if}
       {#if onCopy}
         <IconButton
           ariaLabel={copyLabel}
           title={copyLabel}
+          {disabled}
           {...hooksFor('copy')}
           onclick={() => onCopy(item)}
         >
@@ -110,6 +151,7 @@
           class="is-danger"
           ariaLabel={unlinkLabel}
           title={unlinkLabel}
+          {disabled}
           {...hooksFor('unlink')}
           {...unlinkAttrs}
           onclick={onUnlink}
@@ -130,9 +172,11 @@
   .manager-item-drop-zone-uuid {
     display: block;
     font-family: var(--fab-font-mono);
-    font-size: 0.68rem;
+    font-size: 10px;
     color: var(--fab-text-muted);
-    /* Foundry's `code` keeps one unbroken line, which ran the uuid beneath the actions. */
+    /* Foundry's `code` pads, offsets and keeps one unbroken line, which ran the uuid beneath the actions. */
+    padding: 0;
+    margin: 0;
     white-space: normal;
     word-break: normal;
     overflow-wrap: anywhere;
