@@ -14,6 +14,10 @@ import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -239,7 +243,12 @@ const MOUNTS = Object.freeze({
 /** What a mounted primitive renders besides itself, by name. */
 const MOUNT_DEPENDENCIES = Object.freeze({
   ThresholdBandStrip: {
-    rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
+    rawModules: [
+      'src/ui/svelte/util/rangeBarGeometry.js',
+      'src/ui/svelte/util/rangeBarText.js',
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+    ],
     compiledModules: [component('RangeBarMarker'), component('IconButton')],
   },
 });

@@ -61,6 +61,7 @@ const harness = createMountedComponentHarness({
     'src/utils/scalars.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/ui/svelte/util/rangeBarGeometry.js',
+    'src/ui/svelte/util/rangeBarText.js',
   ],
   // The browse-list wiring is a runes composable (issue 1716), reached by this view and by the
   // two gathering browsers it compiles below, so it is compiled rather than copied. An omission
