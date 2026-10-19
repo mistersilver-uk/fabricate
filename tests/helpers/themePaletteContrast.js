@@ -41,6 +41,16 @@ export function flatten(top, base) {
   return `rgb(${over(top, base).join(' ')})`;
 }
 
+/** `color-mix(in srgb, a share%, b)` as an `rgb()`, interpolated premultiplied as CSS does. */
+export function mix(a, b, share) {
+  const [first, second] = [channels(a), channels(b)];
+  const alpha = first[3] * share + second[3] * (1 - share);
+  const rgb = [0, 1, 2].map(
+    (index) => (first[index] * first[3] * share + second[index] * second[3] * (1 - share)) / alpha
+  );
+  return `rgb(${rgb.join(' ')} / ${alpha * 100}%)`;
+}
+
 /** WCAG contrast of `ink` composited over the opaque `ground`. */
 export function contrast(ink, ground) {
   const base = channels(ground);
