@@ -211,10 +211,6 @@ const MOUNTS = Object.freeze({
       ],
     },
   },
-  /**
-   * The Times of day panel's bar, which spans the settings grid's full row: 543px of track at a
-   * 1121px manager, and 248px once the grid folds to one column and the panel is narrow.
-   */
   /** A check strip's shape, ticks on, for the specimen's grip, cursor and tick type (issue 2435). */
   rangeBarTicked: {
     name: 'ThresholdBandStrip',
@@ -227,6 +223,10 @@ const MOUNTS = Object.freeze({
       ],
     },
   },
+  /**
+   * The Times of day panel's bar, which spans the settings grid's full row: 543px of track at a
+   * 1121px manager, and 248px once the grid folds to one column and the panel is narrow.
+   */
   rangeBarPanel: timeOfDayBar(543),
   rangeBarPanelNarrow: timeOfDayBar(248),
   /** The panel's fallback note, which keeps the bar's footprint beside it. */

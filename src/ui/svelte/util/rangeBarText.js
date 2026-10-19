@@ -1,9 +1,8 @@
 /**
  * The range bar's own words (issue 2435): its default group name, the name qualified by the
  * previewed record, the default boundary name and every handle's value text. Each reads its own
- * `Common.RangeBar` lang key through `localizeOr` with its English as the fallback, so a world
- * with no lang loaded reads exactly what the strip drew before, and the check callers' frozen markup
- * holds.
+ * `Common.RangeBar` lang key through `localizeOr` with its English as the fallback: with no lang
+ * loaded it reads the English that `tests/fixtures/threshold-band-strip/checkCallerStrips.js` pins.
  */
 import { localizeOr } from './localizeOr.js';
 

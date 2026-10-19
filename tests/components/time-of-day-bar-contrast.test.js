@@ -14,7 +14,10 @@ import {
   TIME_OF_DAY_TAGS,
   timeOfDayTint,
 } from '../../src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js';
+import { CHECK_CALLER_STRIPS } from '../fixtures/threshold-band-strip/checkCallerStrips.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
+import { walkNodes } from '../helpers/moduleAst.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -35,17 +38,28 @@ const STRIP_CLASSES = [
   'fab-band-strip-grip',
 ];
 
-/**
- * The Checks band fills: the crafting editor's five-tone ramp, `bandFill` in
- * `CraftingCheckEditor.svelte`, and the simple editor's two, its `BAND_COLORS`.
- */
+/** The tone ramp's fills as the check callers render them, from their frozen strips. */
+const RAMP_FILLS = [
+  ...new Set(CHECK_CALLER_STRIPS.flatMap(({ props }) => props.bands.map((band) => band.color))),
+];
+
+/** The simple editor's count-band fills, read as its `BAND_COLORS` object's literal values. */
+function simpleCountFills() {
+  const ast = componentAstOf('src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte');
+  for (const node of walkNodes(ast.instance)) {
+    if (node.type !== 'VariableDeclarator' || node.id?.name !== 'BAND_COLORS') continue;
+    return node.init.properties.map((property) => [
+      `simple-${property.key.name}`,
+      property.value.value,
+    ]);
+  }
+  return [];
+}
+
+/** The Checks band fills: the crafting ramp and the simple editor's two count-band fills. */
 const CHECK_FILLS = [
-  ...BAND_TONES.map((tone) => [
-    tone,
-    `color-mix(in oklab, var(--fab-${tone}) 26%, var(--fab-bg-0))`,
-  ]),
-  ['simple-failure', 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))'],
-  ['simple-success', 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))'],
+  ...RAMP_FILLS.map((color, position) => [`ramp-${position + 1}`, color]),
+  ...simpleCountFills(),
 ];
 
 /** A grip at rest, and one lit as the dragged handle's is. */
@@ -161,6 +175,13 @@ test('every time-of-day band clears its contrast floors in every shipped theme',
 
   const { bands: measured, checks } = await measure(themes);
   assert.equal(measured.length, themes.length * TIME_OF_DAY_TAGS.length);
+  assert.equal(RAMP_FILLS.length, BAND_TONES.length, 'the frozen strips draw the whole tone ramp');
+  assert.equal(
+    CHECK_FILLS.length,
+    BAND_TONES.length + 2,
+    "the simple editor's two count-band fills are read"
+  );
+  assert.ok(CHECK_FILLS.every(([, color]) => typeof color === 'string' && color.includes('var(')));
   assert.equal(checks.length, themes.length * CHECK_FILLS.length);
   const unreadable = [...measured, ...checks].filter(
     (m) =>
