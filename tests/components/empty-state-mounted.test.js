@@ -233,13 +233,13 @@ describe('2178 EmptyState — small-text ink clears 4.5:1 on its host grounds', 
   ];
 
   it('paints no ground on the panel itself', () => {
-    const painted = rules
-      .filter((rule) => /^\.manager-empty(?:\.[\w-]+)*$/u.test(rule.selector))
-      .flatMap((rule) =>
-        [...propertiesOf(rule)]
-          .filter(([property, value]) => property.startsWith('background') && value !== 'none')
-          .map(([property, value]) => `${rule.selector} ${property}: ${value}`)
-      );
+    const isPanel = (rule) => /^\.manager-empty(?:\.[\w-]+)*$/u.test(rule.selector);
+    const painted = rules.flatMap((rule) =>
+      [...propertiesOf(rule)]
+        .filter(([property]) => isPanel(rule) && property.startsWith('background'))
+        .filter(([, value]) => value !== 'none')
+        .map(([property, value]) => `${rule.selector} ${property}: ${value}`)
+    );
     assert.deepEqual(painted, []);
   });
 
