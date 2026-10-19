@@ -2226,11 +2226,13 @@ describe('the module sheet against the published Chip', () => {
 });
 
 describe('the module sheet and every component style against the published InspectorCard', () => {
-  it('names the card root in 23 selectors: its two family rules, two data-hook rules, and nineteen no published card can match', () => {
+  // Issue 2315 retired seven caller rules that restated or wrapped the card and added its `flush`
+  // rule, so the census InspectorCard was published on, 23, is now 17.
+  it('names the card root in 17 selectors: its two family rules, two data-hook rules, and thirteen no published card can match', () => {
     assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
     const selectors = shippedCensus(CARD, 'InspectorCard');
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
-    assert.equal(selectors.length, 23, 'the census InspectorCard was published on');
+    assert.equal(selectors.length, 17, 'the census at issue 2315');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
       ['InspectorCard', 'Button', 'StatusToggle'],
@@ -2277,6 +2279,19 @@ describe('the module sheet and every component style against the published Inspe
       assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), [`sheet.css: ${flat}`]);
     });
   }
+
+  it('refuses the flush rule once a published key could write is-flush', () => {
+    const css = '.fabricate-card.fabricate-card.is-flush { padding: 0 }';
+    assert.deepEqual(
+      unsafeCardSelectors(css),
+      [],
+      'flush is unpublished, so is-flush is unwritable'
+    );
+    const flushPublished = { ...CARD, writable: new Set(['is-flush']) };
+    assert.deepEqual(unsafeOf(syntheticCensus(flushPublished, css, { spelled: SPELLED })), [
+      'sheet.css: .fabricate-card.fabricate-card.is-flush',
+    ]);
+  });
 
   it('admits a class a published closure spells once the shape calls it undrawn', () => {
     const css = '.fabricate-card .manager-chip { gap: 0 }';

@@ -84,7 +84,7 @@
   });
 </script>
 
-<InspectorCard class="manager-checks-card" data-dynamic-dc="">
+<InspectorCard flush class="manager-checks-card" data-dynamic-dc="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">

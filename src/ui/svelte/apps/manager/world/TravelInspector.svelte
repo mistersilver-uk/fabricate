@@ -1,9 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The overland-travel inspector card: the selected realm on the realms tab, the selected map
-  region and its two party lists on the map tab, and each tab's no-selection line (issue 1707).
+  The overland-travel inspector: the selected realm on the realms tab, the selected map region and
+  its two party lists on the map tab, each in cards, and each tab's no-selection panel (issue 1707).
+  Its root is a layout column rather than a card, because a card never contains a card.
 
-  `travelTab` is `'realms'` or `'map'` and any other value renders an empty card; `realms` is the
+  `travelTab` is `'realms'` or `'map'` and any other value renders an empty column; `realms` is the
   whole library, which resolves the map region's linked realm by id. `onDeleteRealm(realmId)` and
   `onRenameRealm(realmId, name)` are the realm's two writers, and `travelSaving` disables both.
 -->
@@ -35,8 +36,8 @@
   );
 </script>
 
-<InspectorCard
-  class={isEmpty ? 'manager-travel-inspector is-empty' : 'manager-travel-inspector'}
+<section
+  class={['manager-travel-inspector', isEmpty && 'is-empty']}
   data-gathering-inspector-travel=""
   data-travel-inspector={travelTab}
   aria-label={travelTab === 'map'
@@ -280,15 +281,4 @@
       />
     {/if}
   {/if}
-</InspectorCard>
-
-<style>
-  /* `InspectorCard`'s element, so `:global`, chained to keep the scoped form's (0,3,0). */
-  :global(.fabricate-card.manager-travel-inspector.is-empty) {
-    flex: 1 1 auto;
-    min-height: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
-</style>
+</section>

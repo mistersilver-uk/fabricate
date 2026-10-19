@@ -377,7 +377,7 @@
 <div class="manager-checks-editor" data-crafting-check-editor>
   <!-- Check type anchors the OUTCOME tiers, so it sits with them rather than with the roll. -->
   {#if shows('outcomes')}
-    <InspectorCard class="manager-checks-card" data-check-type-card="">
+    <InspectorCard flush class="manager-checks-card" data-check-type-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -407,7 +407,7 @@
   {/if}
 
   {#if shows('roll')}
-    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
+    <InspectorCard flush class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -481,7 +481,7 @@
     <!-- `manager-checks-card`, not the bare `.fabricate-card` shell, which pads on TOP of
              `CheckRecipeTiers`' own card-body padding and insets the tier rows past the cards above.
              `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both for that reason. -->
-    <InspectorCard class="manager-checks-card" data-routed-tiers="">
+    <InspectorCard flush class="manager-checks-card" data-routed-tiers="">
       <CheckRecipeTiers
         anchorsBands
         tiers={value?.tiers || []}
@@ -499,7 +499,7 @@
   {#if shows('outcomes')}
     <!-- ONE card: the strip and the tier rows it draws are one subject, and two cards put a
              border between a band and the row that moves it. -->
-    <InspectorCard class="manager-checks-card" data-outcome-bands="">
+    <InspectorCard flush class="manager-checks-card" data-outcome-bands="">
       <!-- STACKED and full-width, like every other studio card head: `is-inline` sets the
                  description on the title's line and pushes it right, where it reads as a caption rather
                  than the card's lead. The head action went with it, leaving ONE add control at the

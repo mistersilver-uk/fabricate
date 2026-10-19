@@ -2,7 +2,6 @@
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
-  import InspectorCard from '../../../components/InspectorCard.svelte';
   import Rail from '../../../components/Rail.svelte';
   import Button from '../../../components/Button.svelte';
   import InspectorPanel from '../InspectorPanel.svelte';
@@ -115,126 +114,125 @@
 
 {#if row || unadopted}
   <InspectorPanel
+    class="manager-tool-browser-inspector"
     footClass="manager-tool-inspector-foot"
     data-tool-browser-inspector=""
     data-tool-inspector-membership={row ? 'member' : 'absent'}
   >
-    <InspectorCard class="manager-tool-browser-inspector">
-      <!-- THE KICKER IS ITS OWN FULL-WIDTH LINE ABOVE THE BLOCK, where the world catalogue's
-         inspector already puts its own: inside the copy column it read as a caption belonging to
-         the name. `Selected tool`, not `Tool page` — the two screens had their kickers swapped,
-         and `Tool page` names the WORLD record. -->
-      <p class="manager-kicker manager-tool-inspector-kicker" data-tool-inspector-kicker>
-        {text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Selected tool')}
-      </p>
-      <div class="manager-tool-inspector-hero">
-        <img src={row?.img || unadopted?.entity?.img || ''} alt="" />
-        <div>
-          <h2 title={subjectName}>{subjectName}</h2>
-          <!-- THE PILL STATES MEMBERSHIP FIRST: `Enabled here` over a Tool with no rules record
-             would claim rules that do not exist, and only a member can be on or off. -->
-          {#if row}
-            <Chip
-              tone={row.enabled ? 'positive' : 'neutral'}
-              icon={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
-            >
-              {row.enabled
-                ? text('FABRICATE.Admin.Manager.Tools.InspectorEnabledHere', 'Enabled here')
-                : text('FABRICATE.Admin.Manager.Tools.InspectorDisabledHere', 'Disabled here')}
-            </Chip>
-          {:else}
-            <!-- NEUTRAL, not `warning`: an unadopted world Tool is an ordinary state with its own
-               row treatment and pinned CTA, and a warning tint read as a defect it has not. -->
-            <Chip tone="neutral" icon="fas fa-circle-minus" data-tool-inspector-no-rules>
-              {text('FABRICATE.Admin.Manager.Tools.InspectorNoRulesHere', 'No rules here')}
-            </Chip>
-          {/if}
-          {#if row && !row.validation.valid}
-            <Chip
-              tone="danger"
-              icon="fas fa-circle-exclamation"
-              data-tool-validation-status="needs-attention"
-            >
-              {text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
-            </Chip>
-          {/if}
-        </div>
+    <!-- THE KICKER IS ITS OWN FULL-WIDTH LINE ABOVE THE BLOCK, where the world catalogue's
+       inspector already puts its own: inside the copy column it read as a caption belonging to
+       the name. `Selected tool`, not `Tool page` — the two screens had their kickers swapped,
+       and `Tool page` names the WORLD record. -->
+    <p class="manager-kicker manager-tool-inspector-kicker" data-tool-inspector-kicker>
+      {text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Selected tool')}
+    </p>
+    <div class="manager-tool-inspector-hero">
+      <img src={row?.img || unadopted?.entity?.img || ''} alt="" />
+      <div>
+        <h2 title={subjectName}>{subjectName}</h2>
+        <!-- THE PILL STATES MEMBERSHIP FIRST: `Enabled here` over a Tool with no rules record
+           would claim rules that do not exist, and only a member can be on or off. -->
+        {#if row}
+          <Chip
+            tone={row.enabled ? 'positive' : 'neutral'}
+            icon={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
+          >
+            {row.enabled
+              ? text('FABRICATE.Admin.Manager.Tools.InspectorEnabledHere', 'Enabled here')
+              : text('FABRICATE.Admin.Manager.Tools.InspectorDisabledHere', 'Disabled here')}
+          </Chip>
+        {:else}
+          <!-- NEUTRAL, not `warning`: an unadopted world Tool is an ordinary state with its own
+             row treatment and pinned CTA, and a warning tint read as a defect it has not. -->
+          <Chip tone="neutral" icon="fas fa-circle-minus" data-tool-inspector-no-rules>
+            {text('FABRICATE.Admin.Manager.Tools.InspectorNoRulesHere', 'No rules here')}
+          </Chip>
+        {/if}
+        {#if row && !row.validation.valid}
+          <Chip
+            tone="danger"
+            icon="fas fa-circle-exclamation"
+            data-tool-validation-status="needs-attention"
+          >
+            {text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
+          </Chip>
+        {/if}
       </div>
-      <p class="manager-muted" data-tool-inspector-description>
-        {row?.description ||
-          unadopted?.entity?.description ||
-          text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+    </div>
+    <p class="manager-muted" data-tool-inspector-description>
+      {row?.description ||
+        unadopted?.entity?.description ||
+        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+    </p>
+    {#if row && !row.validation.valid}
+      <p class="manager-muted is-danger" data-tool-inspector-validation>
+        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+        {validationContext()}
       </p>
-      {#if row && !row.validation.valid}
-        <p class="manager-muted is-danger" data-tool-inspector-validation>
-          <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-          {validationContext()}
-        </p>
-      {/if}
-      <!-- ONE GROUP, ONE KICKER, where four separately-headed sections each sat over a single row
-         already stating the same thing in bold. The heading the panel needs is the one naming what
-         the whole group is: the rules that apply HERE, after inheritance and overrides. -->
+    {/if}
+    <!-- ONE GROUP, ONE KICKER, where four separately-headed sections each sat over a single row
+       already stating the same thing in bold. The heading the panel needs is the one naming what
+       the whole group is: the rules that apply HERE, after inheritance and overrides. -->
+    <Rail
+      label={row
+        ? text('FABRICATE.Admin.Manager.Tools.InspectorEffectiveRules', 'Effective rules here')
+        : text(
+            'FABRICATE.Admin.Manager.Tools.InspectorWorldDefaultsHere',
+            'What it would inherit here'
+          )}
+      data-tool-inspector-section="rules"
+    >
+      <div class="manager-tool-inspector-rules">
+        {#each facts as fact (fact.id)}
+          <!-- The SAME row the editor's behavior preview renders, from the same projection. -->
+          <IconFactRow
+            icon={fact.icon}
+            title={fact.title}
+            subtitle={fact.subtitle}
+            tile
+            density="rule"
+            data-tool-inspector-rule={fact.id || true}
+          />
+        {/each}
+      </div>
+    </Rail>
+    <!-- WHICH OF THOSE FOUR ARE THIS SYSTEM'S OWN. The rules above cannot state where each answer
+       came from, because a section overridden to the world's own value resolves identically to
+       one inherited, so the row's `Overrides …` claim was unverifiable on the screen it opened.
+       A separate region rather than a per-row pill, because `Inherited` qualifies the RULE.
+       Members only: a Tool with no rules record inherits nothing. -->
+    {#if row}
       <Rail
-        label={row
-          ? text('FABRICATE.Admin.Manager.Tools.InspectorEffectiveRules', 'Effective rules here')
-          : text(
-              'FABRICATE.Admin.Manager.Tools.InspectorWorldDefaultsHere',
-              'What it would inherit here'
-            )}
-        data-tool-inspector-section="rules"
+        label={text('FABRICATE.Admin.Manager.Tools.InspectorInheritance', 'Inheritance')}
+        data-tool-inspector-section="inheritance"
       >
-        <div class="manager-tool-inspector-rules">
-          {#each facts as fact (fact.id)}
-            <!-- The SAME row the editor's behavior preview renders, from the same projection. -->
-            <IconFactRow
-              icon={fact.icon}
-              title={fact.title}
-              subtitle={fact.subtitle}
-              tile
-              density="rule"
-              data-tool-inspector-rule={fact.id || true}
-            />
+        <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
+          {#each inheritRows as section (section.id)}
+            <div
+              class="manager-tool-inspector-inherit-row"
+              data-tool-inspector-inherit={section.id}
+              data-tool-inspector-inherit-state={section.inherited ? 'inherited' : 'overridden'}
+            >
+              <span>{section.label}</span>
+              <Chip tone={section.inherited ? 'info' : 'warning'}>{section.state}</Chip>
+            </div>
           {/each}
         </div>
       </Rail>
-      <!-- WHICH OF THOSE FOUR ARE THIS SYSTEM'S OWN. The rules above cannot state where each answer
-         came from, because a section overridden to the world's own value resolves identically to
-         one inherited, so the row's `Overrides …` claim was unverifiable on the screen it opened.
-         A separate region rather than a per-row pill, because `Inherited` qualifies the RULE.
-         Members only: a Tool with no rules record inherits nothing. -->
-      {#if row}
-        <Rail
-          label={text('FABRICATE.Admin.Manager.Tools.InspectorInheritance', 'Inheritance')}
-          data-tool-inspector-section="inheritance"
-        >
-          <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
-            {#each inheritRows as section (section.id)}
-              <div
-                class="manager-tool-inspector-inherit-row"
-                data-tool-inspector-inherit={section.id}
-                data-tool-inspector-inherit-state={section.inherited ? 'inherited' : 'overridden'}
-              >
-                <span>{section.label}</span>
-                <Chip tone={section.inherited ? 'info' : 'warning'}>{section.state}</Chip>
-              </div>
-            {/each}
-          </div>
-        </Rail>
-      {/if}
-      <!-- TWO GROUPS, AND THE SPLIT IS THE DESIGN'S OWN: the first is a NAVIGATION out of this
-         system entirely, to where identity and the world defaults are authored once, and the
-         second is the one WRITE this panel makes and its terminal action. -->
-      <div class="manager-tool-inspector-routes">
-        <Button
-          fullWidth
-          data-tool-inspector-edit-world={subjectId}
-          onclick={() => onEditWorldTool(subjectId)}
-        >
-          <i class="fas fa-globe" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}</span>
-        </Button>
-      </div>
-    </InspectorCard>
+    {/if}
+    <!-- TWO GROUPS, AND THE SPLIT IS THE DESIGN'S OWN: the first is a NAVIGATION out of this
+       system entirely, to where identity and the world defaults are authored once, and the
+       second is the one WRITE this panel makes and its terminal action. -->
+    <div class="manager-tool-inspector-routes">
+      <Button
+        fullWidth
+        data-tool-inspector-edit-world={subjectId}
+        onclick={() => onEditWorldTool(subjectId)}
+      >
+        <i class="fas fa-globe" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}</span>
+      </Button>
+    </div>
     <!-- The panel's one terminal action, pinned for both membership states. The member label
          names the system, since `Edit rules` alone is ambiguous where a Tool has rules in several. -->
     {#snippet foot()}
@@ -297,9 +295,9 @@
     min-width: 0;
   }
 
-  /* Each section keeps the card's rhythm, kicker to body; chained through the card because `Rail`
-     writes the section. */
-  :global(.fabricate-card.manager-tool-browser-inspector > .fab-rail) {
+  /* Each section keeps the inspector's rhythm, kicker to body; chained through the panel because
+     `Rail` writes the section. */
+  :global(.fab-inspector-panel.manager-tool-browser-inspector > .fab-rail) {
     gap: inherit;
   }
 

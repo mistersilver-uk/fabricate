@@ -121,7 +121,7 @@ export const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } =
 // The Difficulty card and the recipe-tier list beneath it (issue 1096 follow-up, "The roll").
 export async function checksRollEdges(page, tiersWrapperClass) {
   const difficultyCard = `
-    <section class="fabricate-card manager-checks-card" data-check-difficulty-card>
+    <section class="fabricate-card is-flush manager-checks-card" data-check-difficulty-card>
       <div class="manager-checks-card-head">
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>

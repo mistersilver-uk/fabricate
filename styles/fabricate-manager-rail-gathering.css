@@ -480,11 +480,16 @@
   background: var(--fab-warning);
 }
 
+/* The card's box is the `<Card>` specimen's, and a caller rule places a card without restating it; `flush` is the one variant. Pinned by `card-drawing-parity.test.js`. */
 .fabricate-card.fabricate-card {
-  padding: var(--fab-space-3);
+  padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-2);
+}
+
+.fabricate-card.fabricate-card.is-flush {
+  padding: 0;
 }
 
 .fabricate-manager .manager-fact-grid {
@@ -2948,7 +2953,7 @@
 
 .fabricate-manager .manager-gathering-rules-card {
   border-color: var(--fab-warning-border);
-  background: var(--fab-overlay-light-08);
+  background: var(--fab-warning-soft);
 }
 
 .fabricate-manager .manager-rule-row {

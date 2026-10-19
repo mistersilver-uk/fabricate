@@ -307,6 +307,7 @@
 
 <!-- CARD ONE: the library, read-only, with the selection control on each row. -->
 <InspectorCard
+  flush
   class="manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
@@ -489,7 +490,7 @@
 
 <!-- CARD TWO: how the marked entries reduce to the one number the roll gets, in its own
      studio card rather than under an uppercase micro-label. -->
-<InspectorCard class="manager-checks-card" data-crafting-modifier-policy-card="">
+<InspectorCard flush class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <h3 class="manager-checks-card-title">
@@ -568,17 +569,11 @@
 </InspectorCard>
 
 <style>
-  /* The card is the host the sheet's `.is-config-cards` radio reflow answers. That rule queries
+  /* The card is the host the sheet's `.is-config-cards` radio reflow answers: that rule queries
        `fabricate-option-host`, which the manager shell also carries, so without this the grid
-       reflowed only when the entire manager was narrow.
-
-       `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
-       `fabricate-card` is written by that primitive and a scoped rule stopped matching —
-       SILENTLY, because an `<i class={…}>` here makes every class selector in the block
-       possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
-       reported nothing. Anchored on the two `data-` hooks rather than the `.manager-checks-card`
-       modifier the cards share, because that has eleven other sites and `container-type` creates a
-       containment context rather than painting. Each half stays at (0,2,0). */
+       reflowed only when the entire manager was narrow. `:global()` because `InspectorCard`
+       writes the element, and anchored on the two cards' `data-` hooks rather than the
+       `.manager-checks-card` modifier other studio cards share; each half stays at (0,2,0). */
   :global(.fabricate-card[data-crafting-modifier-catalogue]),
   :global(.fabricate-card[data-crafting-modifier-policy-card]) {
     container: fabricate-option-host / inline-size;

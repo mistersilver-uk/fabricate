@@ -270,7 +270,7 @@
   const parseAdjustment = (value) => parseCheckAdjustment(adjustmentKind, value);
 </script>
 
-<InspectorCard class="manager-checks-card" data-check-difficulty-card="">
+<InspectorCard flush class="manager-checks-card" data-check-difficulty-card="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">
