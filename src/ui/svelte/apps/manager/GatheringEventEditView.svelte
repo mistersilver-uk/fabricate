@@ -654,16 +654,15 @@
             }}>{linkedSceneLabel}</button
           >
           <IconButton
-            class="is-danger"
+            role="danger"
             ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Events.SceneUnlink',
               'Unlink scene'
             )}
             title={text('FABRICATE.Admin.Manager.Environment.Events.SceneUnlink', 'Unlink scene')}
             onclick={unlinkScene}
-          >
-            <i class="fas fa-link-slash" aria-hidden="true"></i>
-          </IconButton>
+            icon="fas fa-link-slash"
+          />
         </div>
       {:else}
         <div

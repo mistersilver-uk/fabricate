@@ -484,8 +484,8 @@
                     ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
                     data-economy-actor-roll=""
-                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></IconButton
-                  >
+                    icon="fas fa-arrows-rotate"
+                  />
                 {:else}
                   <IconButton
                     class="manager-economy-actor-roll is-roll-needed"
@@ -496,8 +496,8 @@
                     ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
                     data-economy-actor-roll=""
-                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></IconButton
-                  >
+                    icon="fas fa-dice-d20"
+                  />
                 {/if}
               </li>
             {/each}

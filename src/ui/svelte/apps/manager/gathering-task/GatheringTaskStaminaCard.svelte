@@ -153,11 +153,11 @@
               onChange={(next) => updateStaminaCostModifier(index, { max: next })}
             />
             <IconButton
-              class="is-danger"
+              role="danger"
               ariaLabel={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')}
               onclick={() => removeStaminaCostModifier(index)}
-              ><i class="fas fa-times" aria-hidden="true"></i></IconButton
-            >
+              icon="fas fa-times"
+            />
           </div>
         {/each}
         <!-- Dashed and NOT `fullWidth` (issue 1118): a full-width dashed control under the grid rows

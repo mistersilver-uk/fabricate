@@ -816,9 +816,8 @@
                           ariaLabel={`${action.label} — ${name}`}
                           title={action.label}
                           onclick={() => action.run(entry)}
-                        >
-                          <i class={action.icon} aria-hidden="true"></i>
-                        </IconButton>
+                          icon={action.icon}
+                        />
                       {/if}
                     {/each}
                   </span>

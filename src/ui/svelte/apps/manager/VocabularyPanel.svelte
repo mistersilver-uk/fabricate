@@ -274,13 +274,12 @@
             >
           {/if}
           <IconButton
-            class={isSilentlyDeletable(row) ? 'is-danger' : ''}
+            role={isSilentlyDeletable(row) ? 'danger' : 'neutral'}
             ariaLabel={removeNamedLabel.replace('{name}', row.name)}
             title={removeLabel}
             onclick={() => requestRemove(row)}
-          >
-            <i class="fas fa-trash" aria-hidden="true"></i>
-          </IconButton>
+            icon="fas fa-trash"
+          />
         </div>
         {#if pendingRemovalId === row.id}
           <div

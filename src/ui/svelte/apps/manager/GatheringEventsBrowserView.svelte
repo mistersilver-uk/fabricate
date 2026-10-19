@@ -558,9 +558,8 @@
                 ).replace('{name}', eventName(event))}
                 title={text('FABRICATE.Admin.Manager.Environment.Events.Edit', 'Edit event')}
                 onclick={() => onEditEvent(event.id)}
-              >
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-edit"
+              />
               <!--
                 THE ROW MENU IS NAMED FOR WHAT IT ACTS ON (issue 1515), mirroring the sibling
                 gathering-task browser. `Column.Actions` is the COLUMN's name and is right in the

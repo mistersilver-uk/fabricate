@@ -154,12 +154,12 @@
               >
             {/if}
             <IconButton
-              class="is-danger"
+              role="danger"
               ariaLabel={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               onclick={() => unlinkDefinition(def)}
-              ><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
-            >
+              icon="fas fa-link-slash"
+            />
           </li>
         {/each}
       </ul>

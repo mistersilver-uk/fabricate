@@ -287,6 +287,7 @@
     title={labelled
       ? text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')
       : text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
+    icon={labelled ? '' : 'fas fa-pen'}
     onclick={(event) => {
       event.stopPropagation();
       onEdit(essence.id);
@@ -297,8 +298,6 @@
         >{text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    {:else}
-      <i class="fas fa-pen" aria-hidden="true"></i>
     {/if}
   </IconButton>
 {/snippet}

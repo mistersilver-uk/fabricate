@@ -81,9 +81,8 @@
             ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             title={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             onclick={() => onIconChange(DEFAULT_ESSENCE_ICON)}
-          >
-            <i class="fas fa-undo" aria-hidden="true"></i>
-          </IconButton>
+            icon="fas fa-undo"
+          />
         </div>
         <div class="manager-essence-icon-actions">
           <IconPicker

@@ -306,9 +306,8 @@
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('tool', tool.id)}
                     data-interactable-browser-place=""
-                  >
-                    <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-cubes"
+                  />
                   <IconButton
                     ariaLabel={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
@@ -320,9 +319,8 @@
                     )}
                     onclick={() => place('tool', tool.id, 'none')}
                     data-interactable-browser-place-region=""
-                  >
-                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-draw-polygon"
+                  />
                 </div>
               </li>
             {/each}
@@ -374,9 +372,8 @@
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('gatheringTask', task.id)}
                     data-interactable-browser-place=""
-                  >
-                    <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-cubes"
+                  />
                   <IconButton
                     ariaLabel={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
@@ -388,9 +385,8 @@
                     )}
                     onclick={() => place('gatheringTask', task.id, 'none')}
                     data-interactable-browser-place-region=""
-                  >
-                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-draw-polygon"
+                  />
                 </div>
               </li>
             {/each}

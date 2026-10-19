@@ -206,18 +206,16 @@
                 data-move-prerequisite-up={entry.id}
                 disabled={index === 0}
                 onclick={() => onReorder(index, index - 1, entry.name)}
-              >
-                <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-              </IconButton>
+                icon="fa-solid fa-chevron-up"
+              />
               <IconButton
                 ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-move-prerequisite-down={entry.id}
                 disabled={index === library.length - 1}
                 onclick={() => onReorder(index, index + 1, entry.name)}
-              >
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-              </IconButton>
+                icon="fa-solid fa-chevron-down"
+              />
               {#if onCopyToModifier}
                 <IconButton
                   ariaLabel={text(
@@ -230,21 +228,19 @@
                   )}
                   data-copy-to-modifier={entry.id}
                   onclick={() => onCopyToModifier(entry)}
-                >
-                  <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                </IconButton>
+                  icon="fa-solid fa-user-gear"
+                />
               {/if}
               <IconButton
-                class="is-danger"
+                role="danger"
                 ariaLabel={text(
                   'FABRICATE.Admin.Manager.CharacterPrerequisites.Delete',
                   'Remove prerequisite'
                 )}
                 data-delete-prerequisite=""
                 onclick={() => handleDelete(entry.id)}
-              >
-                <i class="fa-solid fa-trash" aria-hidden="true"></i>
-              </IconButton>
+                icon="fa-solid fa-trash"
+              />
             </div>
 
             {#if open}

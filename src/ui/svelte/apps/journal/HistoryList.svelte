@@ -104,14 +104,15 @@
   >
     {#snippet action(entry)}
       <IconButton
-        size={24}
-        class="journal-history-dismiss is-ghost"
+        size="24"
+        role="ghost"
+        class="journal-history-dismiss"
         ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
         title={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
         data-journal-dismiss={entry.id}
         onclick={() => onDismiss?.(entry.run)}
-        ><i class="fas fa-xmark" aria-hidden="true"></i></IconButton
-      >
+        icon="fas fa-xmark"
+      />
     {/snippet}
   </LogList>
   {#snippet footer()}

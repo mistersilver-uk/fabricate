@@ -535,9 +535,8 @@
                   'Edit gathering task'
                 )}
                 onclick={() => onEditTask(task.id)}
-              >
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-edit"
+              />
               <ActionMenu
                 items={rowMenuItems()}
                 ariaLabel={text(

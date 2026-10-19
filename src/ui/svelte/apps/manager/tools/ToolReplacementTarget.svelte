@@ -118,7 +118,7 @@
         onSelect={onChoose}
       />
       <IconButton
-        class="is-danger"
+        role="danger"
         {disabled}
         data-tool-replacement-unlink=""
         ariaLabel={text(
@@ -129,8 +129,9 @@
           'FABRICATE.Admin.Manager.Tools.Editor.UnlinkReplacement',
           'Unlink replacement component'
         )}
-        onclick={() => onClear()}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
-      >
+        onclick={() => onClear()}
+        icon="fas fa-link-slash"
+      />
     </div>
   {:else}
     <!-- A DIV, NOT A BUTTON: the zone holds the picker trigger, and a button inside a button is

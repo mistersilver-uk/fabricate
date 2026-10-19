@@ -872,9 +872,8 @@
                       ).replace('{name}', environmentName(displayEnvironment))}
                       title={text('FABRICATE.Admin.Manager.Environment.Edit', 'Edit environment')}
                       onclick={() => onEditEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-edit" aria-hidden="true"></i>
-                    </IconButton>
+                      icon="fas fa-edit"
+                    />
                     <ActionMenu
                       items={rowMenuItems()}
                       ariaLabel={text(

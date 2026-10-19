@@ -718,12 +718,8 @@
                           'Locked recipes stay visible to players, but only a GM can craft them.'
                         )}
                         onclick={() => onToggleLocked(recipe.id, recipe.locked !== true)}
-                      >
-                        <i
-                          class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
-                          aria-hidden="true"
-                        ></i>
-                      </IconButton>
+                        icon={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
+                      />
 
                       <!-- No "On"/"Off" text IN THE ROW: the track carries the state, `aria-label`
                         names it, and the Disabled pill says it in words. -->
@@ -753,9 +749,8 @@
                         )}
                         title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}
                         onclick={() => onEditRecipe(recipe.id)}
-                      >
-                        <i class="fas fa-pen" aria-hidden="true"></i>
-                      </IconButton>
+                        icon="fas fa-pen"
+                      />
 
                       <!--
                         The bulk selection box (issue 1010), INSIDE this cluster as its last cell:

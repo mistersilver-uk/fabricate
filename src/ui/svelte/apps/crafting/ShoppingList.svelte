@@ -289,13 +289,13 @@
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
               <IconButton
-                class="crafting-shopping-remove is-ghost"
+                role="ghost"
+                class="crafting-shopping-remove"
                 ariaLabel={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 title={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 onclick={() => onEntryRemove(entry.recipeId)}
-              >
-                <i class="fas fa-xmark" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-xmark"
+              />
             </li>
           {/each}
         </ul>

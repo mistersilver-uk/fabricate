@@ -228,9 +228,8 @@
         onMoveDrop(row.id, 'up');
       }}
       onkeydown={(event) => event.stopPropagation()}
-    >
-      <i class="fas fa-chevron-up" aria-hidden="true"></i>
-    </IconButton>
+      icon="fas fa-chevron-up"
+    />
     <span class="manager-drop-rank-value" data-gathering-task-drop-rank>#{rankIndex + 1}</span>
     <IconButton
       class="manager-drop-rank-button"
@@ -243,9 +242,8 @@
         onMoveDrop(row.id, 'down');
       }}
       onkeydown={(event) => event.stopPropagation()}
-    >
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-    </IconButton>
+      icon="fas fa-chevron-down"
+    />
   </span>
 {:else if column === 'component'}
   <span class="manager-drop-component-cell" data-gathering-task-drop-component-cell>
