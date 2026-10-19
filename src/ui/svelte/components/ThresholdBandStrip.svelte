@@ -427,7 +427,7 @@
     height: 24px;
     transform: translate(-50%, -50%);
     border-radius: 6px;
-    cursor: ew-resize;
+    cursor: col-resize;
     touch-action: none;
   }
 
@@ -436,19 +436,18 @@
     outline-offset: 1px;
   }
 
+  /* The specimen's 2×16 seam, its r1 drawn as the pill a 2px width makes it, in `--fab-text-secondary` at full opacity: it clears 3:1 on every band fill in every palette (`time-of-day-bar-contrast.test.js`, issue 2435). */
   .fab-band-strip-grip {
     display: block;
-    width: 6px;
-    height: 20px;
-    border: 1px solid var(--fab-border-strong);
+    width: 2px;
+    height: 16px;
     border-radius: 999px;
-    background: var(--fab-surface);
+    background: var(--fab-text-secondary);
   }
 
   .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
   .fab-band-strip-handle:hover .fab-band-strip-grip {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
+    background: var(--fab-accent);
   }
 
   .fab-band-strip-track.is-disabled .fab-band-strip-handle {
@@ -466,7 +465,7 @@
     transform: translateX(-50%);
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
-    font-size: 0.66rem;
+    font-size: 10.5px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }

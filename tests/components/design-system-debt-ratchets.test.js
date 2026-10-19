@@ -1269,8 +1269,8 @@ const STATE_TINTS = Object.freeze([
   [
     `${COMPONENTS}/ThresholdBandStrip.svelte`,
     '.fab-band-strip-handle.is-dragging .fab-band-strip-grip, .fab-band-strip-handle:hover .fab-band-strip-grip',
-    'var(--fab-accent-soft)',
-    'a drag grip, a mark that lights while it is grabbed',
+    'var(--fab-accent)',
+    'a drag grip, a 2px seam that lights in the accent while it is hovered or grabbed',
   ],
   [
     MODULE_SHEET,
