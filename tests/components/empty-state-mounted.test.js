@@ -243,6 +243,26 @@ describe('2178 EmptyState — small-text ink clears 4.5:1 on its host grounds', 
     assert.deepEqual(painted, []);
   });
 
+  const HINT_RULES = [
+    '.manager-empty p',
+    '.manager-empty.is-note p',
+    '.manager-empty.is-filtered p',
+  ];
+  const strayHintInk = (sheetRules) =>
+    sheetRules
+      .filter((rule) => /^\.manager-empty\S*\s+p$/u.test(rule.selector))
+      .filter((rule) => !HINT_RULES.includes(rule.selector) && propertiesOf(rule).has('color'))
+      .map((rule) => rule.selector);
+
+  it('lets no other variant rule ink the hint outside the checked ones', () => {
+    assert.deepEqual(strayHintInk(rules), []);
+  });
+
+  it('would catch a variant hint rule that declared its own colour', () => {
+    const probe = rulesIn('.manager-empty.is-inline p { color: red; }');
+    assert.deepEqual(strayHintInk(probe), ['.manager-empty.is-inline p']);
+  });
+
   for (const selector of [
     '.manager-empty p',
     '.manager-empty.is-note h3',
