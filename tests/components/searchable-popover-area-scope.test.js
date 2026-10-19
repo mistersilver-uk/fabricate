@@ -343,10 +343,11 @@ const PRIMITIVES = Object.freeze([
     family: 'fabricate-card',
     anchors: Object.freeze(['fabricate-card']),
     composesClasses: true,
-    // Measured at this commit: 1 written, 7 family selectors, 2 owned.
+    // One written root, four family selectors and three of them owned: the flex stack, the box and
+    // `flush` (issue 2315); the fourth is the Checks Studio's caller-class compound.
     writtenFloor: 1,
-    familyFloor: 6,
-    ownedFloor: 1,
+    familyFloor: 4,
+    ownedFloor: 3,
     mirrored: Object.freeze([]),
   }),
   Object.freeze({
