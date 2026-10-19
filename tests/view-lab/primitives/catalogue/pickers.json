@@ -366,7 +366,8 @@
     },
     "note": "The popover is absolutely positioned, so it needs a containing block to stand in; a caller would anchor it to its trigger.",
     "props": {
-      "colorToken": "sage"
+      "colorToken": "sage",
+      "allowCustom": true
     }
   },
   {

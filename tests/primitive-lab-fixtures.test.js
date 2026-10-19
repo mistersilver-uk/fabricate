@@ -562,6 +562,20 @@ test('every notice row that passes an action names the fixture that gives it a h
   );
 });
 
+test('the popover-shipped TintPicker row opts in to the free-hex field its library specimen draws', () => {
+  const popover = CATALOGUE.map((entry) => entry.row).filter(
+    (row) =>
+      row.path === 'src/ui/svelte/components/TintPicker.svelte' &&
+      String(row.cap ?? '').startsWith('popover')
+  );
+  assert.equal(popover.length, 1, 'one popover-shipped row');
+  assert.equal(
+    popover[0].props?.allowCustom,
+    true,
+    'the Lab must draw the hex field the library popover draws (issue 2352)'
+  );
+});
+
 test('every fixture is a call site that authors no word', () => {
   for (const { file, source, rows } of FIXTURES) {
     assert.deepEqual(fixtureProblems(source, { file, rows, propsOf: declaredFor }), [], file);

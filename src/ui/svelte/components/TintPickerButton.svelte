@@ -19,7 +19,9 @@
     // Left unset, `TintPicker` names the palette in the localized default (issue 2257).
     presetGridLabel = undefined,
     customHexLabel = undefined,
-    allowCustom = true,
+    // Free-hex entry is opt-in: only a caller whose stored model carries a `customColor` sibling
+    // (the gathering biome) passes true (issue 2352).
+    allowCustom = false,
     // TRUE when the caller's model holds no authored colour at all: `colorToken` normalizes an
     // absent value onto a preset, so without this the control would assert an authored choice
     // nobody made. Unset paints a neutral swatch and selects no preset.
