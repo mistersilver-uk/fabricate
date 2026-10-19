@@ -135,6 +135,30 @@ describe('Button emits the element and classes its call sites are styled against
     }
   });
 
+  // ── THE LEADING ICON (issue 2540) ─────────────────────────────────────────────────────
+  it('draws one hidden <i> carrying the icon class as the first child', async () => {
+    await harness.mount({ icon: 'fas fa-plus' });
+    const node = button();
+    const glyphs = node.querySelectorAll('i');
+    assert.equal(glyphs.length, 1);
+    assert.equal(node.firstElementChild, glyphs[0]);
+    assert.equal(glyphs[0].className, 'fas fa-plus');
+    assert.equal(glyphs[0].getAttribute('aria-hidden'), 'true');
+  });
+
+  it('draws no <i> for an empty icon, and none by default', async () => {
+    await harness.mount({ icon: '' });
+    assert.equal(button().querySelector('i'), null);
+    harness.remount();
+    await harness.mount({});
+    assert.equal(button().querySelector('i'), null);
+  });
+
+  it('leaves the root class unchanged by an icon', async () => {
+    await harness.mount({ role: 'ghost', icon: 'fas fa-plus' });
+    assert.equal(button().className, 'fabricate-button fab-manager-button is-ghost');
+  });
+
   it('appends the pass-through class after its own, never in place of them', async () => {
     await harness.mount({ role: 'ghost', class: 'is-subtle manager-thing' });
     // A `class` arriving through the rest spread would REPLACE the primitive's classes and
