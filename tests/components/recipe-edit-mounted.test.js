@@ -5465,7 +5465,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  // REWRITTEN at issue 1373's maintainer round 5, and at issue 2534, which took the word away.
+  // REWRITTEN at issue 1373's maintainer round 5.
   it('reads the tag row as a sentence: the tags, each after a #, then + Tag', async () => {
     const { target: tagTarget } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'all' } }],

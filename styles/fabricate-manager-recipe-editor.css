@@ -1570,7 +1570,7 @@
   height: 28px;
 }
 
-/* The `×` keeps the chip's old 0.62rem, so the 11px chip does not grow it (ruled 2026-10-18). */
+/* The `×` stays at 0.62rem, so the 11px chip does not grow it (ruled 2026-10-18). */
 .fabricate-manager .manager-recipe-tag-remove {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): a density's geometry must live in this scoped block, and D10 added the header rung; extraction is issue 2317 -->
+<!-- ratchet-exempt(file-size): a density's geometry and a tone's lit ink must live in this scoped block, which the layered sheet cannot override, and D10 added the header rung; extraction is issue 2317 -->
 <!--
   The app's one chip: a short, fully-rounded badge carrying a count, a state, a category or a tag. `SearchablePopover` and `Select` render it too, so it ships under `components/`, and its CSS lives in this scoped `<style>` so `VIEW_RECIPES` maps a change here to the views that render it.
 
@@ -497,7 +497,7 @@
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
   }
 
-  .manager-chip.is-tag.is-lit {
+  .manager-chip.is-tag.is-lit:not(.has-tint) {
     color: var(--fab-purple-text);
   }
 

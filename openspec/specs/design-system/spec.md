@@ -1673,7 +1673,7 @@ Each choice writes at once, and the list keeps vocabulary order, so a choice mov
 The panel stays open across choices.
 The panel opens at a 300px minimum rather than the picker's 240px floor, so a held tag's name, its count and its check read whole at ordinary tag lengths; a longer name ellipsizes and keeps its full spelling as the row's title.
 Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
-The footer offers to create the typed name while the query, trimmed and lower-cased, names no tag the site's vocabulary holds under the same comparison and none the row already holds; creating it adds the tag to the site's vocabulary and to the row at once and keeps the panel open with focus in its query field; a site that offers no way to add a tag draws no footer.
+The footer offers to create the typed name while the query, trimmed, lower-cased and less one leading `#`, names no tag the site's vocabulary holds under the same comparison and none the row already holds; creating it adds the tag to the site's vocabulary and to the row at once and keeps the panel open with focus in its query field; a site that offers no way to add a tag draws no footer.
 The any-of / all-of control MUST be present at every tag count, none and one included, and its place MUST NOT depend on the count.
 Against a single tag both settings select the same items, but the setting is the row's own and governs the next tag added, and a control that appeared with the second tag would reflow the row at the moment the GM extends it (ruled at issue 2534).
 
