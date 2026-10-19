@@ -395,6 +395,15 @@ function groundOf(grounds) {
   );
 }
 
+/** Paint the page under one theme; `''` is the default. */
+function setTheme(page, theme) {
+  return page.evaluate((id) => {
+    const root = document.querySelector('.fabricate');
+    if (id) root.dataset.fabricateTheme = id;
+    else delete root.dataset.fabricateTheme;
+  }, theme);
+}
+
 describe('Button busy at its six adopting sites (issue 2540)', () => {
   const measured = new Map();
   let browser;
@@ -438,6 +447,7 @@ describe('Button busy at its six adopting sites (issue 2540)', () => {
       it('is reached by Tab in Chromium and keeps the busy face under the pointer', async () => {
         const busyCase = { name: `${site.name}-busy`, selector: site.selector };
         const idleCase = { name: `${site.name}-idle`, selector: site.selector };
+        await setTheme(page, '');
         const rest = await page.evaluate(readCase, busyCase);
         assert.ok(rest, `${site.name}: the busy markup draws no ${site.selector}`);
         assert.equal(rest.cursor, 'progress');
@@ -462,24 +472,24 @@ describe('Button busy at its six adopting sites (issue 2540)', () => {
 
       it(`draws its busy focus ring at ${RING_FLOOR}:1 or better in the default and foundry-native themes`, async () => {
         const busyCase = { name: `${site.name}-busy`, selector: site.selector };
-        for (const theme of THEMES) {
-          await page.evaluate((id) => {
-            const root = document.querySelector('.fabricate');
-            if (id) root.dataset.fabricateTheme = id;
-            else delete root.dataset.fabricateTheme;
-          }, theme);
-          await tabInto(page, busyCase);
-          const ring = await page.evaluate(readCase, busyCase);
-          assert.equal(ring.focusVisible, true);
-          assert.notEqual(ring.outline.style, 'none', `${theme || 'default'}: a ring is drawn`);
-          const [r, g, b, a] = ring.outline.colour;
-          const shown = css([r, g, b, a * ring.opacity]);
-          const ground = groundOf(ring.grounds);
-          const ratio = contrast(shown, `rgb(${ground.join(' ')})`);
-          assert.ok(
-            ratio >= RING_FLOOR,
-            `${theme || 'default'}: the busy ring reads ${ratio.toFixed(2)}:1 at opacity ${ring.opacity}`
-          );
+        try {
+          for (const theme of THEMES) {
+            await setTheme(page, theme);
+            await tabInto(page, busyCase);
+            const ring = await page.evaluate(readCase, busyCase);
+            assert.equal(ring.focusVisible, true);
+            assert.notEqual(ring.outline.style, 'none', `${theme || 'default'}: a ring is drawn`);
+            const [r, g, b, a] = ring.outline.colour;
+            const shown = css([r, g, b, a * ring.opacity]);
+            const ground = groundOf(ring.grounds);
+            const ratio = contrast(shown, `rgb(${ground.join(' ')})`);
+            assert.ok(
+              ratio >= RING_FLOOR,
+              `${theme || 'default'}: the busy ring reads ${ratio.toFixed(2)}:1 at opacity ${ring.opacity}`
+            );
+          }
+        } finally {
+          await setTheme(page, '');
         }
       });
     });
