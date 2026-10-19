@@ -1,27 +1,19 @@
-<!-- ratchet-exempt(file-size): Relink's caller (issue 2466) grows it by seven lines; extracting the macro card is its own change -->
 <!--
-  The Component Studio's COMPLICATIONS authoring section: what goes wrong when this component is
+  The Component Studio's complications authoring section: what goes wrong when this component is
   produced as a stage of a progressive result.
 
-  IT GATES ITSELF on the SYSTEM resolving at least one activity progressively — a complication has
-  no moment to fire otherwise, and a card offering a consequence that can never happen is worse than
-  no card. The gate lives here rather than in `ComponentEditView` so there is ONE predicate rather
-  than a prop the host could forget to compute.
+  It gates itself on the system resolving at least one activity progressively, since a
+  complication has no moment to fire otherwise; one predicate here, not a prop the host computes.
 
-  THE SUB-LINE IS NOT THE PROTOTYPE'S, which is wrong for the shipped model twice over: a
-  complication fires when this component is PRODUCED as a progressive stage, and not when the
-  component is itself salvaged or spent. That second case is deferred, so the copy discloses it
-  rather than letting a GM author for a moment this build never reaches. It says nothing about
-  player visibility either: `visibility: 'gmOnly'` is a DISCLOSURE guarantee, not a confidentiality
-  one, and the spec and the field documentation are where that limit belongs.
+  The sub-line names only the produced-as-a-progressive-stage moment and discloses that the
+  salvaged-or-spent case is deferred. `visibility: 'gmOnly'` is a disclosure guarantee, not a
+  confidentiality one; the spec and the field documentation own that limit.
 
-  IDS ARE MINTED THROUGH AN INJECTED `random`, falling back to `foundry.utils.randomID()`, because
-  the sibling sections' idiom would put a `Math.random()` literal in new code that SonarCloud flags
-  (S2245). The last-resort counter serves a context with neither, where determinism is a feature.
+  Ids mint through the injected `random`, then `foundry.utils.randomID()`, then a counter (pinned
+  by the "carries NO `Math.random()` literal" test).
 
-  The draft lives in `ComponentEditView`, which is what makes an edit here dirty the component and
-  survive Save. This is a controlled component: it never mutates the array it is given, it emits a
-  whole new one, and the only state it keeps is which row is open and what a rejected drop says.
+  A controlled component: the draft lives in `ComponentEditView`, this emits a whole new array,
+  and it keeps only which row is open and what a rejected drop says.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
