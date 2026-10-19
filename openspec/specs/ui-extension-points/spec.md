@@ -659,8 +659,7 @@ Each group states the accepted values of every key that entry publishes.
   - It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is the companion's.
   - It draws no fill, so it sits on `target`'s ground.
     The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
-    The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so the companion passes a `title` that says what is absent where a level-3 heading fits, and where one does not, keeps the hint to a sentence the surrounding text already says.
-    At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
+    The hint inks `--fab-text-muted` on every variant, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2` in every palette.
   - The title states its own serif face, and the hint inherits `target`'s.
   - The panel never moves its content slot while it is requested.
 - **`Notice`.**
