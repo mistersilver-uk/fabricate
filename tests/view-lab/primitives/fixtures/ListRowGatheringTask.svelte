@@ -1,7 +1,8 @@
 <!--
   A gathering task, as `GatheringTaskRow` wires its row: the 56px thumb leading, its callouts as
-  badges, and the success chance beneath it, `ChanceBar`'s composition inlined because `ChanceBar`
-  is app-scoped, its caption beside the track. The thumb arrives as the row's `content`.
+  badges, and the success chance beneath it as a `BandedBar`, because `ChanceBar` is app-scoped. Its
+  caption rides inside the meter, which its `aria-label` names, rather than beside it as the row's
+  `aria-hidden` Kicker; it draws the same. The thumb arrives as the row's `content`.
 -->
 <script>
   import BandedBar from '../../../../src/ui/svelte/components/BandedBar.svelte';

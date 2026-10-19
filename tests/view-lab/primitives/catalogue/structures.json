@@ -838,7 +838,7 @@
       "fill": "success",
       "chanceStyle": "display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--fab-space-2)"
     },
-    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button, `ChanceBar`’s composition inlined because `ChanceBar` is app-scoped, its caption set beside the track as that row’s scoped `.gathering-task-chance` grid sets it. The badges are `Chip`s at the list density; `GatheringTaskRow`’s own `.gathering-task-callout` pill, in the same tones, is adoption debt that becomes `Chip density=\"list\"` under issue 2559."
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button as a `BandedBar`, because `ChanceBar` is app-scoped, its caption set beside the track as that row’s scoped `.gathering-task-chance` grid sets it. The caption rides inside the meter, which its `aria-label` names, where `GatheringTaskRow` draws `ChanceBar showCaption={false}` with the caption as an `aria-hidden` `Kicker` beside it; it draws the same. The badges are `Chip`s at the list density; `GatheringTaskRow`’s own `.gathering-task-callout` pill, in the same tones, is adoption debt that becomes `Chip density=\"list\"` under issue 2559."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
