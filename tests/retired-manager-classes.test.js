@@ -1,6 +1,6 @@
 /**
- * The nine `manager-*` root classes issue 1507 retired stay retired, and each primitive still
- * writes the root that replaced its retired class.
+ * The ten `manager-*` root classes issues 1507 and 2543 retired stay retired, and each primitive
+ * still writes the root that replaced its retired class.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -34,7 +34,7 @@ const SKIPPED = Object.freeze([
   'tests/helpers/retiredManagerClasses.js',
 ]);
 
-/** One of the nine exact tokens: a family descendant or `fab-manager-button` is not one. */
+/** One of the ten exact tokens: a family descendant or `fab-manager-button` is not one. */
 const RETIRED_TOKEN = new RegExp(
   String.raw`(?:(?<=\\b)|(?<![\w-]))(?:${Object.keys(RETIRED_CLASSES).join('|')})(?![\w-])`,
   'u'
@@ -61,7 +61,7 @@ function retiredTokenLines(corpus, allowlist = HISTORICAL_LINES) {
   return { hits, allowed };
 }
 
-// ratchet-exempt(source-pin): a whole-tree absence gate for nine retired class names, not a pin on any site's shape
+// ratchet-exempt(source-pin): a whole-tree absence gate for ten retired class names, not a pin on any site's shape
 const corpus = collectWorkingTreeSources(SCANNED_ROOTS, SCANNED_EXTENSIONS);
 
 test('no retired manager root class is written in code, styles, tests, scripts or specs', () => {
@@ -99,8 +99,11 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
     'src/ui/svelte/apps/Planted.svelte': '<section class="fabricate-card manager-inspector-card">',
     'tests/components/planted.test.js': "root.querySelector('.manager-pagination')",
     'scripts/foundry-smoke/planted.mjs': String.raw`page.locator('\bmanager-icon-button\b')`,
+    'src/ui/svelte/components/PlantedModal.svelte': ':global(.manager-modal) .fab-well {',
     'tests/components/survivors.test.js':
       'manager-pagination-nav fab-manager-button manager-status-toggle-track manager-travel-picker',
+    'tests/components/modal-survivors.test.js':
+      "'.manager-modal-footer [data-manager-modal]' width: var(--manager-modal-width)",
   };
   const { hits } = retiredTokenLines(planted, []);
   assert.deepEqual(
@@ -109,6 +112,7 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
       'src/ui/svelte/apps/Planted.svelte',
       'tests/components/planted.test.js',
       'scripts/foundry-smoke/planted.mjs',
+      'src/ui/svelte/components/PlantedModal.svelte',
     ],
     'the scan must red on each planted token and on none of the out-of-scope names'
   );

@@ -478,7 +478,7 @@
   }
   /* `100%` is the viewport at scale 1 and the window when Foundry scales it with a transform,
      where `vh` would overflow the window. */
-  :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
+  :global(.fabricate-modal[data-manager-modal][data-roll-prompt]) {
     max-height: min(640px, calc(100% - (2 * 16px)));
   }
 </style>

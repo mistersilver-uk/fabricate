@@ -33,7 +33,7 @@
   }
 
   /* A modal body is itself `--fab-bg-1`, so a well on it takes the next level to separate. */
-  :global(.manager-modal) .fab-well {
+  :global(.fabricate-modal) .fab-well {
     background: var(--fab-bg-2);
   }
 
