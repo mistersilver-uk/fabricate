@@ -482,7 +482,7 @@ it('draws Relink over unlink in a missing zone, on one right edge, inside the bo
 });
 
 it('drops the actions to their own row below the copy in a 220px zone, Relink before unlink', () => {
-  const { root, name, uuid, hint, actionButtons } = faces['narrow-relink'];
+  const { root, name, uuid, hint, actions, actionButtons } = faces['narrow-relink'];
   const [relink, unlink] = actionButtons;
   assert.equal(
     relink.text,
@@ -490,6 +490,10 @@ it('drops the actions to their own row below the copy in a 220px zone, Relink be
     'the label is long enough to have squeezed the copy'
   );
   assert.ok(name.box.width >= 100, `the copy column is ${name.box.width}px wide, under 100`);
+  assert.ok(
+    Math.abs(name.box.right - actions.box.right) <= 1,
+    `the copy ends at ${name.box.right}px, short of the actions row's right edge at ${actions.box.right}px`
+  );
   assert.ok(
     name.box.height <= px(name.style['line-height']) + 0.5,
     `"Untitled" breaks over ${name.box.height}px, more than one line`

@@ -841,8 +841,12 @@
   gap: var(--fab-space-1);
 }
 
-/* Under a 260px zone (234px inside its padding and border) the actions take their own row below the copy, so a long Relink label cannot squeeze the copy column. */
+/* At 260px and narrower (a 234px content box inside the zone's padding and border) the actions take their own row below the copy, so a long Relink label cannot squeeze the copy column. The copy then spans to the right padding: a container query cannot style its own container, so the zone's track list stays and the copy takes the empty third track's 12px gap as well. */
 @container fabricate-link-field (max-width: 234px) {
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy {
+    grid-column: 2 / -1;
+  }
+
   .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-actions {
     grid-column: 2 / -1;
     flex-direction: row;
