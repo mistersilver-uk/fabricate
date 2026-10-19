@@ -502,7 +502,6 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowDefaultBrowse",
-    "partial": "status button stays drawn",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
       "Delete system": "a menu item’s label; the drawing draws the menu closed",
@@ -584,9 +583,12 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions",
+      "on": true,
+      "statusKey": "FABRICATE.Admin.Manager.StatusOn",
+      "toggleKey": "FABRICATE.Admin.Manager.DisableSystemNamed"
     },
-    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and the kebab is `ActionMenu`’s `IconButton` trigger, 34px with a 1px border at radius 9 and the vertical `fa-ellipsis-vertical` every shipped menu uses, where the drawing’s is a 28px borderless square at radius 7 with horizontal dots."
+    "note": "The badges are `Chip`s at the list density as `RunCard` renders its status, and the trailing cell is a `StatusToggle` and then a closed `ActionMenu`, as `SystemsBrowserView` wires its status cell and row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The switch reads On or Off, `SystemsBrowserView`’s own reading, and is named Enable or Disable and the system’s name. The kebab is `ActionMenu`’s `IconButton` trigger, 34px at radius 9 with the vertical `fa-ellipsis-vertical` every shipped menu uses."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -594,7 +596,6 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowDefaultBrowse",
-    "partial": "status button stays drawn",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
       "Delete system": "a menu item’s label; the drawing draws the menu closed",
@@ -659,7 +660,10 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+      "menuKey": "FABRICATE.Admin.Manager.SystemActions",
+      "on": false,
+      "statusKey": "FABRICATE.Admin.Manager.StatusOff",
+      "toggleKey": "FABRICATE.Admin.Manager.EnableSystemNamed"
     },
     "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
   },
@@ -669,7 +673,6 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowRunCard",
-    "partial": "no countdown",
     "undrawn": {
       "Progress": "the stage bars' accessible name, the Journal's own copy; the drawing names no group"
     },
@@ -690,6 +693,28 @@
         {
           "tag": "span",
           "text": "Stage 2 of 2"
+        }
+      ],
+      "aside": [
+        {
+          "tag": "span",
+          "attrs": {
+            "style": "display:inline-flex;align-items:center;gap:var(--fab-space-chip);font-family:var(--fab-font-mono);font-size:10px;font-weight:500;color:var(--fab-text);white-space:nowrap"
+          },
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-clock",
+                "aria-hidden": "true",
+                "style": "font-size:11px;color:var(--fab-text-muted)"
+              }
+            },
+            {
+              "tag": "span",
+              "text": "5h 0m 0s remaining"
+            }
+          ]
         }
       ]
     },
@@ -727,7 +752,7 @@
       "progress": 40,
       "progressKey": "FABRICATE.App.Journal.Progress.Label"
     },
-    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars as the aside beneath the one button. The bolt arrives as the row's `content`, its paint restated from `RunCard`'s scoped `.journal-run-card-bolt`. The countdown stays drawn: it shares the aside with the bars inside `RunCard`'s own timing block, which a row's one `content` cannot reach."
+    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars and the world-time countdown of `RunCard`’s `timing` snippet as the aside beneath the one button. The bolt arrives as the row’s `content` and the countdown as its `aside` snippet, each painted as `RunCard`’s scoped `.journal-run-card-bolt` and `.journal-run-card-countdown` paint it. Drawn differently: the countdown stands beneath the bars, because the flex line `RunCard` sets them on is its own scoped `.journal-run-card-timing`, where the drawing and the shipped row set it beside them."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
@@ -767,7 +792,6 @@
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowGatheringTask",
-    "partial": "art mark, not the 56px thumb; no badges; the caption stands above its bar",
     "props": {
       "name": "Gather Ironvale ore",
       "icon": "fas fa-leaf",
@@ -775,6 +799,16 @@
       "density": "default",
       "markSize": 38
     },
+    "content": [
+      {
+        "tag": "img",
+        "attrs": {
+          "src": "icons/containers/bags/pouch-leather-brown-green.webp",
+          "alt": "",
+          "style": "display:block;box-sizing:border-box;width:56px;height:56px;padding:var(--fab-space-2);border-radius:9px;object-fit:contain;background:var(--fab-surface-raised)"
+        }
+      }
+    ],
     "snippets": {
       "meta": [
         {
@@ -788,12 +822,22 @@
       ]
     },
     "data": {
+      "chips": [
+        {
+          "label": "2 h",
+          "tone": "neutral"
+        },
+        {
+          "label": "Ready",
+          "tone": "success"
+        }
+      ],
       "chanceLabelKey": "FABRICATE.App.Gathering.Detail.SuccessChanceLabel",
       "chanceKey": "FABRICATE.App.Gathering.Detail.SuccessChance",
       "percent": 62,
       "fill": "success"
     },
-    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button, `ChanceBar`'s composition inlined because `ChanceBar` is app-scoped. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button, `ChanceBar`’s composition inlined because `ChanceBar` is app-scoped. The badges are `Chip`s at the list density, as the row’s other callers draw them, where `GatheringTaskRow`’s own blocked-reason callouts are a scoped pill. Drawn differently: the caption stands above its bar, because the grid `GatheringTaskRow` sets it beside the bar on is its own scoped `.gathering-task-chance`."
   },
   {
     "spec": "<ListRow> <ViewToggle> <XrefList>",
