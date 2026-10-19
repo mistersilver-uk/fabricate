@@ -45,26 +45,26 @@
       {#snippet trigger({ attributes })}
         <!-- ratchet-exempt(design-system): the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), never a caller's name -->
         <Button
+          icon="fas fa-plus"
           role="dashed"
           {size}
           data-recipe-add={triggerHook}
           aria-label={ariaLabel || undefined}
           {...attributes}
         >
-          <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{label}</span>
         </Button>
       {/snippet}
     </ActionMenu>
   {:else}
     <Button
+      icon="fas fa-plus"
       role="dashed"
       {size}
       data-recipe-add={triggerHook}
       aria-label={ariaLabel || undefined}
       onclick={() => onAdd(kinds[0] ?? 'component')}
     >
-      <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{label}</span>
     </Button>
   {/if}
