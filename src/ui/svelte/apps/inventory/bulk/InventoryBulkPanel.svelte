@@ -58,11 +58,9 @@
    - counts / entries / salvageable / blocked / yieldRows: the store's already
      partitioned bulk state. Pure data carrying no i18n; this component localizes it.
    - running / destroying / progress / report: the run state.
-   - destroyLabel: the ALREADY-localized destroy trigger, naming BOTH the component
-     count and the unit count. It arrives composed because the confirmation dialog
-     must name the same two numbers in the same words, and `InventoryView` owns the
-     dialog copy — so the fragments have one author, not two. While `destroying` it is
-     the busy label, because `Button`'s `busy` draws none.
+   - destroyLabel: the ALREADY-localized destroy trigger, naming both counts in the
+     confirmation dialog's words, so `InventoryView` is their one author; while
+     `destroying`, the busy label (`Button`'s `busy` draws none).
    - onClear / onRemove / onSalvage / onDestroy / onDone: store actions.
 -->
 <script>
@@ -129,7 +127,6 @@
   });
 
   const busy = $derived(running === true || destroying === true);
-  // A busy button names the act in flight; `Button` draws no busy label (issue 2540).
   const salvageText = $derived(
     running === true
       ? localize('FABRICATE.App.Inventory.Bulk.SalvageBusy')
