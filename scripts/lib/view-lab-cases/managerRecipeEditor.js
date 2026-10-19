@@ -2109,6 +2109,24 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [...SET_SOURCES],
   }),
+  // No row holds marker text, so the card draws no marker column and each select ends at the row's padding.
+  managerCase({
+    id: 'manager-recipe-edit-overview-routing-distinct',
+    label: 'Manager — Recipe edit overview, each tier routed to its own result set',
+    smokeLabels: [],
+    reaches: 'beyond',
+    ...ROUTING_OVERVIEW('lab-runework', 'rw-r-blade', 'routing-distinct', 'tier:rw-ruined'),
+    expectView: 'recipe-edit',
+    expectSelector: `${ROUTING_CARD}:not(:has(.fabricate-routing-overview-markers)) ${ROW('tier:rw-masterwork')}`,
+    expectLayout: {
+      containerSelector: `${ROUTING_CARD} .fabricate-routing-overview-list`,
+      oneLineRows: `${ROUTING_CARD} .fabricate-routing-overview-row`,
+      alignedLeft: `${ROUTING_CARD} .fabricate-routing-overview-target`,
+    },
+    expectCenterHit: [...ROUTING_HITS],
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [...SET_SOURCES],
+  }),
   // Multi-step: the first step routes by default under the fallback note, and the second borrows
   // the recipe's result sets read-only beneath its own note.
   managerCase({

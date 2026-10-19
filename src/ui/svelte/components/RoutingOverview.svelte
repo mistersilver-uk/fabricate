@@ -24,10 +24,11 @@
   - `class` is a named prop, because a rest key would replace it instead of extending it.
 
   Invariants:
-  - Every row reserves the marker column, so each select starts at one x; a select is named by its
-    badge and connector and described by the summary, the markers only when they hold text, and
-    `ariaDescribedBy`; its tone hook is stamped only while it is neither read-only nor disabled —
-    pinned by `tests/components/routing-overview-mounted.test.js`.
+  - The marker column is drawn on every select row while any row holds marker text, and on none
+    otherwise, so each select starts at one x and an unmarked list leaves no empty gutter; a select
+    is named by its badge and connector and described by the summary, the markers only when they
+    hold text, and `ariaDescribedBy`; its tone hook is stamped only while it is neither read-only
+    nor disabled — pinned by `tests/components/routing-overview-mounted.test.js`.
 -->
 <script>
   import Chip from './Chip.svelte';
@@ -73,6 +74,8 @@
     return lines;
   }
 
+  const marked = $derived(listed.some((row) => markersOf(row).length > 0));
+
   /** `success` for a chosen target, `warning` for none unless the row is danger, on a live select. */
   function toneOf(row) {
     if (row.readonly || disabled) return undefined;
@@ -91,7 +94,11 @@
 
 <div class={['fabricate-routing-overview', extraClass]} {...rest}>
   {#if note}{@render note()}{/if}
-  <ul class="fabricate-routing-overview-list" aria-label={label}>
+  <ul
+    class="fabricate-routing-overview-list"
+    aria-label={label}
+    data-routing-overview-marked={marked ? '' : undefined}
+  >
     {#each listed as row, index (row.key)}
       {@const markers = markersOf(row)}
       {@const isSource = row.kind === 'source'}
@@ -138,11 +145,13 @@
               {@render rowAction(row)}
             {/if}
           </div>
-          <span class="fabricate-routing-overview-markers" id={`${uid}-${index}-markers`}>
-            {#each markers as marker, markerIndex (markerIndex)}
-              <span class="fabricate-routing-overview-marker">{marker}</span>
-            {/each}
-          </span>
+          {#if marked}
+            <span class="fabricate-routing-overview-markers" id={`${uid}-${index}-markers`}>
+              {#each markers as marker, markerIndex (markerIndex)}
+                <span class="fabricate-routing-overview-marker">{marker}</span>
+              {/each}
+            </span>
+          {/if}
         {:else}
           <span class="fabricate-routing-overview-blocked">{row.blocked || ''}</span>
         {/if}

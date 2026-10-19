@@ -2894,12 +2894,12 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul>
-        <li><b>row</b> a flex row at gap 8 and padding 8/12, radius 9, on <code>--fab-bg-1</code> with a hairline: the badge, the summary, the connector, the target and the marker column</li>
+        <li><b>row</b> a flex row at gap 8 and padding 8/12, radius 9, on <code>--fab-bg-1</code> with a hairline: the badge, the summary, the connector, the target and, while any row has marker text, the marker column</li>
         <li><b>badge</b> <code>&lt;Chip&gt;</code> at the row density in the row&rsquo;s tone, at least 64 wide, truncated at 140 with the source&rsquo;s name as its title; struck on a blocked row</li>
         <li><b>summary</b> grows and truncates with a title; <b>connector</b> &ldquo;produces&rdquo;, its cell kept empty on a blocked or gap row</li>
         <li><b>target</b> <code>&lt;Select&gt;</code> at the inline rung in a 170 slot, skinned by its value &mdash; success when chosen, warning when empty unless the row is danger &mdash; and never on a read-only or disabled trigger; focus repaints the border in the accent</li>
-        <li><b>markers</b> a fixed 84 column, right-aligned at line-height 1.4, stacking &ldquo;default&rdquo;, &ldquo;shared &middot; N&rdquo; and the row&rsquo;s hint; every row reserves it</li>
-        <li><b>blocked</b> no select: the words span the slot and the marker column in <code>--fab-text-muted</code>, wrapping to two lines; with an action, the caller&rsquo;s control fills the slot instead</li>
+        <li><b>markers</b> a fixed 84 column, right-aligned at line-height 1.4, stacking &ldquo;default&rdquo;, &ldquo;shared &middot; N&rdquo; and the row&rsquo;s hint; every select row draws it while any row in the list has marker text, and none does otherwise, so an unmarked list leaves no empty gutter</li>
+        <li><b>blocked</b> no select: the words span the slot and the marker column, or the slot alone in an unmarked list, in <code>--fab-text-muted</code>, wrapping to two lines; with an action, the caller&rsquo;s control fills the slot instead</li>
         <li><b>names</b> a select is named by its badge and connector and described by the summary, the markers when they hold text, and the caller&rsquo;s ids</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>

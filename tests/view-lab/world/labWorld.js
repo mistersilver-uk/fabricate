@@ -302,6 +302,37 @@ function seedRoutingFixedPermitted(content) {
   seedRoutingFixed(content, 'routing-fixed-permitted', 'perRecord');
 }
 
+/** `routing-distinct`: each Runework tier reaches its own result set, so no row carries a marker. */
+function seedRoutingDistinct(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routing-distinct');
+  const tier = (id, name, success, start, end) => ({
+    id,
+    name,
+    success,
+    breakTools: !success,
+    start,
+    end,
+  });
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    failureResultPolicy: 'never',
+    routed: {
+      ...system.craftingCheck.routed,
+      type: 'fixed',
+      fixedOutcomes: [
+        tier('rw-masterwork', 'Masterwork', true, 16, 20),
+        tier('rw-standard', 'Standard', true, 8, 15),
+        tier('rw-ruined', 'Ruined', false, 1, 7),
+      ],
+    },
+  };
+  recipe.minSuccessOutcomeId = 'rw-standard';
+  recipe.resultGroups = recipe.resultGroups.map((group) => ({
+    ...group,
+    checkOutcomeIds: group.id === 'rw-grp-master' ? ['rw-masterwork'] : ['rw-standard'],
+  }));
+}
+
 /** `routing-multistep`: Runework turns multi-step on and the Runeblade keeps its result sets; its
  *  first step has two that list no tier, and its second has none of its own, so it borrows them. */
 function seedRoutingMultistep(content) {
@@ -351,6 +382,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'check-two-sets': seedCheckTwoSets,
   'routing-fixed': seedRoutingFixed,
   'routing-fixed-permitted': seedRoutingFixedPermitted,
+  'routing-distinct': seedRoutingDistinct,
   'routing-multistep': seedRoutingMultistep,
   'failure-policy-never': seedFailurePolicyNever,
 });
