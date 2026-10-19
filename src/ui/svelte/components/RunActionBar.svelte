@@ -32,10 +32,10 @@
 
   const paused = $derived(run?.paused === true || Boolean(run?.pauseState));
   const busy = $derived(primary?.busy === true || run?.busy === true);
-  const primaryEnabled = $derived(primary?.enabled === true && !busy);
+  const primaryEnabled = $derived(primary?.enabled === true);
   const primaryLabel = $derived(busy ? primary?.busyLabel || primary?.label : primary?.label);
   const pauseEnabled = $derived(pause?.enabled !== false && !busy);
-  const beginEnabled = $derived(begin?.enabled === true && !busy);
+  const beginEnabled = $derived(begin?.enabled === true);
 
   function confirmCancel() {
     onCancel();
@@ -149,7 +149,7 @@
             role={beginEnabled ? 'primary' : 'neutral'}
             class="fab-run-action-control fab-run-action-primary"
             data-run-action="begin"
-            aria-busy={busy || undefined}
+            {busy}
             title={beginEnabled ? begin.prompt : begin.reason || undefined}
             disabled={!beginEnabled}
             onclick={onBegin}
@@ -170,7 +170,7 @@
           role={primaryEnabled ? 'primary' : 'neutral'}
           class="fab-run-action-control fab-run-action-primary"
           data-run-action="primary"
-          aria-busy={busy || undefined}
+          {busy}
           title={primaryEnabled ? primary?.title : primary?.reason || primary?.title || undefined}
           disabled={!primaryEnabled}
           onclick={onPrimary}

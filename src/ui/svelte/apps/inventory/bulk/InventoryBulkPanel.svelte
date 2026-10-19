@@ -58,11 +58,9 @@
    - counts / entries / salvageable / blocked / yieldRows: the store's already
      partitioned bulk state. Pure data carrying no i18n; this component localizes it.
    - running / destroying / progress / report: the run state.
-   - destroyLabel: the ALREADY-localized destroy trigger, naming BOTH the component
-     count and the unit count. It arrives composed because the confirmation dialog
-     must name the same two numbers in the same words, and `InventoryView` owns the
-     dialog copy — so the fragments have one author, not two. Same reason the shell
-     takes an already-localized `total`.
+   - destroyLabel: the ALREADY-localized destroy trigger, naming both counts in the
+     confirmation dialog's words, so `InventoryView` is their one author; while
+     `destroying`, the busy label (`Button`'s `busy` draws none).
    - onClear / onRemove / onSalvage / onDestroy / onDone: store actions.
 -->
 <script>
@@ -129,6 +127,11 @@
   });
 
   const busy = $derived(running === true || destroying === true);
+  const salvageText = $derived(
+    running === true
+      ? localize('FABRICATE.App.Inventory.Bulk.SalvageBusy')
+      : localize('FABRICATE.App.Inventory.Bulk.SalvageAction')
+  );
   // The footer's height, by a ResizeObserver Svelte disconnects on destroy.
   let footerHeight = $state(0);
   const footerReserve = $derived(footerHeight > 0 ? `${footerHeight}px` : undefined);
@@ -522,8 +525,8 @@
             role="danger"
             fullWidth
             data-inventory-bulk-destroy=""
-            disabled={busy || entries.length === 0}
-            aria-busy={destroying === true}
+            disabled={running === true || entries.length === 0}
+            busy={destroying === true}
             onclick={() => onDestroy?.()}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
@@ -533,18 +536,12 @@
             role="primary"
             fullWidth
             data-inventory-bulk-salvage=""
-            disabled={busy || salvageable.length === 0}
-            aria-busy={running === true}
+            disabled={destroying === true || salvageable.length === 0}
+            busy={running === true}
+            icon={running ? 'fas fa-spinner fa-spin' : 'fas fa-recycle'}
             onclick={(event) => onSalvage?.(event)}
           >
-            <i
-              class="fas"
-              class:fa-spinner={running}
-              class:fa-spin={running}
-              class:fa-recycle={!running}
-              aria-hidden="true"
-            ></i>
-            <span>{localize('FABRICATE.App.Inventory.Bulk.SalvageAction')}</span>
+            <span>{salvageText}</span>
           </Button>
         </div>
       {/if}

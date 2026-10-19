@@ -60,7 +60,11 @@ const MOUNTS = Object.freeze({
   'drop-zone': {
     name: 'ItemDropZone',
     bold: true,
-    props: { item: { name: 'Read Momentum' }, uuid: 'Macro.abc123', title: 'Drop a macro here' },
+    props: {
+      value: { uuid: 'Macro.abc123', name: 'Read Momentum' },
+      showUuid: true,
+      title: 'Drop a macro here',
+    },
   },
 });
 

@@ -711,6 +711,7 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.ok(Boolean(zone.querySelector('[data-world-tool-entry-source-unlink]')), 'unlink');
       assert.ok(!zone.querySelector('[data-tool-source-copy-uuid]'), 'no second action');
       assert.ok(!zone.querySelector('[data-item-drop-zone-subline]'), 'no raw uuid line');
+      assert.ok(!zone.querySelector('[data-item-drop-zone-uuid]'), 'nor a uuid line in linked');
       // AND NO `Linked` CHIP ON THE HEADING. A pill on the card of a record whose whole premise
       // is that it IS a game-world Item states the rule rather than the exception; the catalogue
       // row one route away already makes the identical split for the identical badge.

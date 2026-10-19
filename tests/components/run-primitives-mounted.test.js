@@ -260,9 +260,13 @@ describe('run primitives mounted behavior', () => {
       primary: { ...common.primary, busy: true, busyLabel: 'Rolling check…' },
     });
     const busyPrimary = busy.querySelector('[data-run-action="primary"]');
-    assert.equal(busyPrimary.disabled, true);
+    // Busy keeps the tab stop (issue 2540): aria-disabled, never `disabled`, and the press no-ops.
+    assert.equal(busyPrimary.disabled, false);
+    assert.equal(busyPrimary.getAttribute('aria-disabled'), 'true');
     assert.equal(busyPrimary.getAttribute('aria-busy'), 'true');
     assert.match(busyPrimary.textContent, /Rolling check/u);
+    busyPrimary.click();
+    assert.equal(calls.length, 0, 'a busy primary swallows the press');
     runActionHarness.remount();
 
     const paused = await runActionHarness.mount({

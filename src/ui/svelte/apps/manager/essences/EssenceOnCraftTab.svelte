@@ -136,21 +136,22 @@
     return { tone: 'info', label: configuredLabel, suppressed: false };
   }
 
-  const macroItem = $derived(macroUuid ? { name: macroName || macroUuid, img: '' } : null);
+  const macroValue = $derived(macroUuid ? { uuid: macroUuid, name: macroName } : null);
 
-  // The linked source in `ItemDropZone`'s shape. `img` is what shows real item art rather than the
+  // The linked source as the zone's `value`. `img` is what shows real item art rather than the
   // empty-drop glyph, so an unresolved link yields a fallback-icon card rather than no card: the
   // GM must be able to see and clear a link that no longer resolves.
   const sourceLinked = $derived(Boolean(selectedSource || sourceComponentId || storedSourceName));
-  const sourceItem = $derived(
+  const sourceUuid = $derived(selectedSource?.originItemUuid || '');
+  const sourceValue = $derived(
     sourceLinked
       ? {
+          uuid: sourceUuid,
           name: selectedSource?.name || storedSourceName || sourceComponentId,
           img: selectedSource?.img || 'icons/svg/item-bag.svg',
         }
       : null
   );
-  const sourceUuid = $derived(selectedSource?.originItemUuid || '');
 
   const explainerItems = $derived([
     {
@@ -290,10 +291,10 @@
              INSTRUCTION, not the uuid: the card IS the drop target, and the address has its own
              mono line above it. -->
           <ItemDropZone
-            item={sourceItem}
+            value={sourceValue}
+            showUuid
             kind="essence-source"
-            title={sourceItem.name}
-            uuid={sourceUuid}
+            title={sourceValue.name}
             hint={text(
               'FABRICATE.Admin.Manager.Essence.OnCraft.SourceReplaceHint',
               'Drop another Item here to replace the linked source.'
@@ -381,8 +382,7 @@
            paints an unresolvable link as broken — otherwise indistinguishable from a working one,
            since at craft time such a uuid is logged and SKIPPED SILENTLY rather than toasting a
            player once per essence per result for a GM-side defect. -->
-      <!-- `hint` is the INSTRUCTION, not the uuid, which `macroItem.name` falls back to when the
-           macro does not resolve, so the card rendered it as title AND sub-line. -->
+      <!-- `hint` is the instruction; the zone draws the uuid on its own mono line. -->
       {#if macroLocked}
         <!-- LOCKED, for the same reason and with the same consequence as the source card. -->
         <div class="manager-essence-locked-card" data-scoped-macro-locked="macro">
@@ -403,12 +403,12 @@
         </div>
       {:else}
         <ItemDropZone
-          item={macroItem}
+          value={macroValue}
+          showUuid
           kind="essence-macro"
           documentType="Macro"
           state={macroMissing ? 'missing' : 'linked'}
           disabled={saving}
-          uuid={macroUuid && macroUuid !== macroItem?.name ? macroUuid : ''}
           title={text(
             'FABRICATE.Admin.Manager.Essence.Macro.DropTitle',
             'Drop a script macro here'

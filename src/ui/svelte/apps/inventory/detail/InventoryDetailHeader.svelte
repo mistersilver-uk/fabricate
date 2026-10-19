@@ -45,7 +45,8 @@
    - chips: `{ id, label, icon?, tone?, attrs? }[]` rendered as the header's chip row. Data, not
      a snippet: the chip markup and every tone then live here once.
    - primary: `PlayerDetailHeader`'s primary props (`primaryLabel`, `primaryIcon`,
-     `primaryDisabled`, `primaryProps`, `onclick`), forwarded verbatim. Empty renders none.
+     `primaryDisabled`, `primaryBusy`, `primaryProps`, `onclick`), forwarded verbatim. Empty
+     renders none.
    - headerAction: an optional non-primary snippet pinned to the right of the header (the bulk
      panel's Clear), in its own wrapper so a consumer passing none adds no flex child.
    - children: the body, rendered inside the scrolling column.

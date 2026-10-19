@@ -1,6 +1,9 @@
-/** The link field's HOOK BAG, pinned in source (issue 1509). */
-import test from 'node:test';
+/** The link field's HOOK BAG and its retired props, pinned in source (issues 1509, 2466). */
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import test from 'node:test';
+
 import { parse } from 'svelte/compiler';
 
 import { SOURCES, walkTemplate } from '../helpers/primitiveAdoptionContract.js';
@@ -187,11 +190,11 @@ test('every hook region a call site names is one the zone actually spreads', () 
 });
 
 test('the tag scan reaches every caller, so the clauses above hold over the real corpus', () => {
-  // The corpus floor. Nine files render this zone and one of them renders it twice.
+  // The corpus floor. Eleven files render this zone and one of them renders it twice.
   const files = callSites();
   assert.ok(
-    files.length >= 9,
-    `only ${files.length} files render <${TAG}>, against a floor of 9: ${files.join(', ')}`
+    files.length >= 11,
+    `only ${files.length} files render <${TAG}>, against a floor of 11: ${files.join(', ')}`
   );
   for (const expected of [
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
@@ -245,4 +248,46 @@ test('the styled hook is still named by the caller that needs it', () => {
     'the world tool entry no longer names `data-tool-source-layout` with the string `compact`. ' +
       'It is a layout id and not a presence flag, and `true` is not the same attribute.'
   );
+});
+
+/** The props `value` retired: a caller passing either renders an empty zone with no error. */
+const RETIRED = new Set(['item', 'uuid']);
+
+test('no call site passes the retired `item` or `uuid`, or spreads props it cannot be read for', () => {
+  const offenders = [];
+  let zones = 0;
+  let valued = 0;
+  for (const file of callSites()) {
+    walkTemplate(parse(SOURCES[file], { modern: true, filename: file }).fragment, (node) => {
+      if (node.type !== 'Component' || node.name !== TAG) return;
+      zones += 1;
+      for (const attribute of node.attributes ?? []) {
+        if (attribute.type === 'SpreadAttribute') offenders.push(`${file}: a spread`);
+        const named = attribute.type === 'Attribute' || attribute.type === 'BindDirective';
+        if (named && RETIRED.has(attribute.name)) offenders.push(`${file}: ${attribute.name}`);
+        if (named && attribute.name === 'value') valued += 1;
+      }
+    });
+  }
+  assert.ok(zones >= 12, `the walk reached ${zones} <${TAG}> nodes, against a floor of 12`);
+  assert.ok(valued >= 9, `only ${valued} <${TAG}> nodes pass \`value\`, against a floor of 9`);
+  assert.deepEqual(offenders, [], `pass \`value\` instead:\n  ${offenders.join('\n  ')}`);
+});
+
+test('no catalogue row draws the link field with `item` or `uuid`, and the linked row shows it', () => {
+  const dir = resolve(import.meta.dirname, '../view-lab/primitives/catalogue');
+  const rows = readdirSync(dir)
+    .flatMap((name) =>
+      name.endsWith('.json') ? JSON.parse(readFileSync(resolve(dir, name), 'utf8')) : []
+    )
+    .filter((row) => row?.spec === '<LinkField>');
+  assert.ok(rows.length >= 4, `only ${rows.length} <LinkField> catalogue rows were found`);
+  const retired = rows.flatMap((row) =>
+    Object.keys(row.props ?? {})
+      .filter((key) => RETIRED.has(key))
+      .map((key) => `${row.cap}: ${key}`)
+  );
+  assert.deepEqual(retired, [], 'a catalogue row passes a retired prop');
+  const linked = rows.find((row) => row.cap === 'linked');
+  assert.equal(linked?.props?.showUuid, true, 'the linked row draws its uuid line');
 });

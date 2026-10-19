@@ -906,22 +906,19 @@ test('every component in the primitive directory carries a manifest row', () => 
   );
 });
 
-/** Primitives the library CITES normatively without giving them an entry. */
-const CITED_WITHOUT_ENTRY = [
-  {
-    name: 'Locked',
-    why:
-      'Cited at `library.html:642` and `:852` as the route a disabled option takes, carrying a ' +
-      'required `reason`. Both citations are library prose describing a specimen; `spec.md` ' +
-      'commits to no clause naming it, so this is a loose citation with a missing entry.',
-  },
-];
+/**
+ * Primitives the library CITES normatively without giving them an entry. Empty since issue 2467
+ * struck the last such citation: the option cards entry states a disabled option's reason as its
+ * own `disabledOptions`, so no name is cited without a heading. Appending here is the cheapest
+ * repair available to the next author, which is why the length pin below runs first.
+ */
+const CITED_WITHOUT_ENTRY = [];
 
 test('every primitive name in the library is an entry, a declined candidate, or a recorded debt', () => {
   // The length pin runs FIRST, deliberately.
   assert.equal(
     CITED_WITHOUT_ENTRY.length,
-    1,
+    0,
     'the cited-without-entry register is pinned for the same reason the heading census is: ' +
       'without it the cheapest repair available to the next author is a one-token append'
   );

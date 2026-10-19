@@ -680,13 +680,13 @@
   background: var(--fab-warning-soft);
 }
 
-.fabricate-button.fabricate-button:not(:disabled):hover,
+.fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover,
 .fabricate-icon-button.fabricate-icon-button:not(:disabled):hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-surface-raised);
 }
 
-.fabricate-button.fabricate-button.is-primary:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
@@ -698,17 +698,23 @@
   background: var(--fab-success-soft);
 }
 
-.fabricate-button.fabricate-button.is-danger:not(:disabled):hover,
+.fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover,
 .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
+}
+
+/* THE BUSY FACE (issue 2540): an action in flight keeps its tab stop, so it is `aria-disabled` and never `:disabled`, and every role hover above refuses it. A natively disabled carrier (`ArmedDangerButton`) keeps the disabled face. */
+.fabricate-button.fabricate-button[aria-busy='true']:not(:disabled) {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 .fabricate-icon-button.fabricate-icon-button {
