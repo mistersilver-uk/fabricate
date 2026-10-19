@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   activeCursorIndex,
   filteredCountLabel,
+  gridColumnCount,
   groupedOptionBuckets,
   labelSubstringFilter,
   latestSourceRequest,
@@ -371,5 +372,19 @@ describe('picker option model: the list arithmetic', () => {
       assert.deepEqual(stagedMembership(['a', 'b', 'd'], change), ['b', 'd', 'c']);
       assert.deepEqual(stagedMembership(['b', 'c'], change), ['b', 'c'], 'an add already made');
     });
+  });
+});
+
+describe('gridColumnCount (issue 2459)', () => {
+  it('admits 2 to 6 in the grid form and answers one column for anything else', () => {
+    for (const columns of [2, 3, 4, 5, 6]) assert.equal(gridColumnCount('grid', columns), columns);
+    for (const columns of [1, 7, 0, -2, 1.5, '4', null, undefined, NaN]) {
+      assert.equal(gridColumnCount('grid', columns), 1, String(columns));
+    }
+    assert.equal(
+      gridColumnCount('list', 4),
+      1,
+      'the list form has one column whatever it is passed'
+    );
   });
 });

@@ -22,7 +22,7 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { activeOptionId } from '../util/listboxNavigation.js';
+  import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
 
@@ -59,6 +59,7 @@
     as = 'list',
     isGrid = false,
     gridColumns = 1,
+    squareTiles = false,
     optionClass = '',
     option: optionContent = undefined,
     instanceId = '',
@@ -88,6 +89,7 @@
   }
 
   const focusSearch = () => search?.focus();
+  const squareTileList = $derived(isGrid && squareTiles);
 </script>
 
 <div
@@ -140,7 +142,8 @@
       data-active-option={index === activeIndex ? 'true' : undefined}
       data-recipe-add={option.addMarker || undefined}
       data-popover-option={option.dataId || undefined}
-      title={option.label}
+      title={squareTileList ? squareTileName(option) : option.label}
+      aria-label={squareTileList ? squareTileName(option) : undefined}
       onclick={() => chooseOption(option)}
       onmousedown={(event) => event.preventDefault()}
     >
@@ -154,27 +157,29 @@
         {:else if option.icon}
           <i class={option.icon} aria-hidden="true"></i>
         {/if}
-        {#if option.meta}
-          <span class="manager-travel-option-lines">
+        {#if !squareTileList}
+          {#if option.meta}
+            <span class="manager-travel-option-lines">
+              <span class="manager-travel-option-name">{option.label}</span>
+              <span class="manager-travel-option-meta">{option.meta}</span>
+            </span>
+          {:else}
             <span class="manager-travel-option-name">{option.label}</span>
-            <span class="manager-travel-option-meta">{option.meta}</span>
-          </span>
-        {:else}
-          <span class="manager-travel-option-name">{option.label}</span>
+          {/if}
+          {#if option.trailing}<Chip
+              class="manager-travel-option-trailing"
+              tone={option.trailingChip?.tone ?? 'disabled'}
+              mono={option.trailingChip?.mono === true}>{option.trailing}</Chip
+            >{/if}
+          {#if option.trailingIcon}<i
+              class={`manager-travel-option-marker ${option.trailingIcon}`}
+              aria-hidden="true"
+            ></i>{/if}
+          {#if option.disabled && option.disabledReason}<Chip
+              tone="disabled"
+              data-popover-option-reason="">{option.disabledReason}</Chip
+            >{/if}
         {/if}
-        {#if option.trailing}<Chip
-            class="manager-travel-option-trailing"
-            tone={option.trailingChip?.tone ?? 'disabled'}
-            mono={option.trailingChip?.mono === true}>{option.trailing}</Chip
-          >{/if}
-        {#if option.trailingIcon}<i
-            class={`manager-travel-option-marker ${option.trailingIcon}`}
-            aria-hidden="true"
-          ></i>{/if}
-        {#if option.disabled && option.disabledReason}<Chip
-            tone="disabled"
-            data-popover-option-reason="">{option.disabledReason}</Chip
-          >{/if}
       {/if}
     </button>
   {/snippet}
@@ -227,6 +232,7 @@
       aria-busy={status?.kind === 'refining' ? 'true' : undefined}
       data-picker-as={as}
       data-picker-columns={isGrid ? String(gridColumns) : undefined}
+      data-picker-tiles={squareTileList ? 'square' : undefined}
     >
       {#if isGrouped}
         {#each groupedOptions as bucket (bucket.id)}
@@ -289,6 +295,7 @@
 
   .manager-travel-popover-count {
     flex: 0 0 auto;
+    margin-left: auto;
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 9px;

@@ -211,9 +211,10 @@ function propsBlock() {
 }
 
 /** The destructure's digest (issues 1719, 1507). */
-// Re-derived at issue 1782, which added `source`, `loading` and `error` after `options`.
-const PROPS_BLOCK_DIGEST = 'e8349aa1252b4539dc5a7da0affedbad25c32a9e30ac4a8cf3467e9e4fbea124';
-const PROPS_BLOCK_NAMES = 62;
+// Re-derived at issue 1782, which added `source`, `loading` and `error` after `options`, and at
+// issue 2459, which added `squareTiles` after `columns`.
+const PROPS_BLOCK_DIGEST = '6eb4049e72c2af4c4b6879af9f932ba8223ac54f3ade2128ce3da83335b3808b';
+const PROPS_BLOCK_NAMES = 63;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
   // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this

@@ -445,6 +445,55 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
+  describe('`squareTiles` (issue 2459)', () => {
+    it('draws each option as a text-free tile named by its label', async () => {
+      await mountPicker({ as: 'grid', columns: 4, squareTiles: true });
+      const open = await openPanel();
+      assert.equal(listOf(open).getAttribute('data-picker-tiles'), 'square');
+      for (const [index, row] of optionRows(open).entries()) {
+        assert.equal(row.getAttribute('aria-label'), ICONS[index].label, 'the tile is named');
+        assert.equal(row.getAttribute('title'), ICONS[index].label, 'and titled the same');
+        assert.equal(row.textContent.trim(), '', 'and renders no text node');
+        assert.ok(
+          Boolean(row.querySelector(`i.${ICONS[index].icon.replace('fas ', '')}`)),
+          'only a glyph'
+        );
+      }
+      harness.remount();
+    });
+
+    it('names a tile the caller draws, and a gated tile with its reason and no chip', async () => {
+      await mountPicker({
+        as: 'grid',
+        columns: 4,
+        squareTiles: true,
+        useOptionSnippet: true,
+        options: [
+          ...ICONS,
+          { id: 'flint', label: 'Flint', disabled: true, disabledReason: 'Spent' },
+        ],
+      });
+      const rows = optionRows(await openPanel());
+      assert.equal(rows[0].getAttribute('aria-label'), 'Anvil', 'a caller snippet keeps the name');
+      assert.equal(rows[5].getAttribute('aria-label'), 'Flint — Spent');
+      assert.equal(rows[5].getAttribute('title'), 'Flint — Spent');
+      assert.ok(!rows[5].querySelector('[data-popover-option-reason]'), 'no reason chip renders');
+      harness.remount();
+    });
+
+    it('is opt-in: neither a plain grid nor a list form carries it', async () => {
+      for (const props of [{ as: 'grid', columns: 2 }, { squareTiles: true }]) {
+        await mountPicker(props);
+        const open = await openPanel();
+        assert.ok(!listOf(open).hasAttribute('data-picker-tiles'), JSON.stringify(props));
+        const row = optionRows(open)[0];
+        assert.ok(!row.hasAttribute('aria-label'), 'a row is named by its text, not a label');
+        assert.equal(row.querySelector('.manager-travel-option-name').textContent.trim(), 'Anvil');
+        harness.remount();
+      }
+    });
+  });
+
   describe('`filterOptions`', () => {
     it('is consulted on the EMPTY-QUERY pass, which is what a pinned row depends on', async () => {
       const queries = [];

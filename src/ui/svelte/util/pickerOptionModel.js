@@ -78,6 +78,11 @@ export function filteredCountLabel(template, matched, total) {
   return String(template).replace('{matched}', String(matched)).replace('{total}', String(total));
 }
 
+/** A grid's cells per row: 2 to 6, the counts the sheet draws, and 1 for any other value or the list form. */
+export function gridColumnCount(as, columns) {
+  return as === 'grid' && Number.isInteger(columns) && columns >= 2 && columns <= 6 ? columns : 1;
+}
+
 /** A list holding nothing takes the caller's hint and detail; a list the query emptied takes the no-matches line and no detail. */
 export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, emptyDetail }) {
   const filteredToNothing = total > 0 && matched === 0;

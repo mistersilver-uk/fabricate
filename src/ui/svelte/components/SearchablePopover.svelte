@@ -19,7 +19,7 @@
   | `showSearch` | boolean | `true` | Render the query field. With it off, `search` stays `''`, the filter degrades to the full list, and the TRIGGER becomes the focus holder. |
   | `inlineSearchTrigger` / `inlineCloseLabel` | boolean / string | `false` / `''` | The trigger REPLACES ITSELF with the query field while open and the panel's search row is suppressed, so there is exactly one query in exactly one field; it wins over every trigger form while open. |
   | `popoverTitle` / `showFilteredCount` / `filteredCountTemplate` / `compactOptionRows` | string / boolean / template / boolean | `''` / `false` / `'{matched} of {total}'` / `false` | The shared panel header — the caller supplies the template so its words stay localized, while this primitive owns the live numbers because it owns the query — and the dense full-width presentation as a WHOLE: the 5px frame, bordered rows with a 24px leading tile, an accent fill on the current value, and the 30px bordered search field. |
-  | `as` / `columns` | `'list'` \| `'grid'` / integer | `'list'` / `1` | The list's FORM and a grid's cells per row, EMITTED as `data-picker-as`/`data-picker-columns` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor. |
+  | `as` / `columns` / `squareTiles` | `'list'` \| `'grid'` / integer / boolean | `'list'` / `1` / `false` | The list's form, a grid's cells per row and its opt-in square tiles, emitted as `data-picker-as`/`data-picker-columns`/`data-picker-tiles` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor, and a count outside 2–6 draws and maps one column. A square tile is text-free, its label both its `title` and its `aria-label`. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces this component's trigger button; the caller spreads `attributes` onto its own element last, names and titles the button itself, passes neither `ariaLabel` nor `triggerTitle`, and gets `triggerClass` as a declared no-op. See the spread invariant. |
   | `option` | snippet `(option)` | `undefined` | Draws the row's CONTENT while this component keeps the row ELEMENT. When supplied it is the row's SOLE content — no `Chip`, no trailing marker, no label span — because a picker's suite reads its row label with `span:last-child`. |
   | `header` / `footer` | snippets | `undefined` | Caller-owned content above and below the list. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks; `footer` with `{ close, failed, query, focusSearch }`, the dismissal a commit action ends on, whether the panel is showing an error, the raw query, and a call that focuses the query field. |
@@ -42,7 +42,7 @@
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
-    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin it.
+    `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
     its own chrome refusing focus above all — are stated there rather than restated here.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
@@ -82,6 +82,7 @@
     PENDING_SOURCE,
     activeCursorIndex,
     filteredCountLabel,
+    gridColumnCount,
     groupedOptionBuckets,
     labelSubstringFilter,
     latestSourceRequest,
@@ -129,6 +130,7 @@
     compactOptionRows = false,
     as = 'list',
     columns = 1,
+    squareTiles = false,
     trigger = undefined,
     option: optionContent = undefined,
     header = undefined,
@@ -204,7 +206,7 @@
   );
 
   const isGrid = $derived(as === 'grid');
-  const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
+  const gridColumns = $derived(gridColumnCount(as, columns));
 
   const groupedOptions = $derived(groupedOptionBuckets(filteredOptions, optionGroups));
   const isGrouped = $derived(groupedOptions.length > 0);
@@ -504,6 +506,7 @@
       {as}
       {isGrid}
       {gridColumns}
+      {squareTiles}
       {optionClass}
       option={optionContent}
       {instanceId}
@@ -526,18 +529,5 @@
     flex-direction: column;
     min-width: 0;
     text-align: left;
-  }
-
-  .manager-travel-picker-meta {
-    min-width: 0;
-    margin-top: var(--fab-space-2xs);
-    overflow: hidden;
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 0.6rem;
-    font-weight: 400;
-    line-height: 1.3;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 </style>
