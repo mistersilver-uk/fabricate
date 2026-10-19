@@ -1,14 +1,15 @@
 <!-- ratchet-exempt(design-system): the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row stays target only until the panel is recomposed onto the search popover's grid form, owned by issue 2459 (library.html, the target popover specimen) -->
 <!--
-  The manager's colour palette and the library's `<TintPicker>` specimen, rendered as a popover by
-  three pickers and inline by two editors; `TintPickerButton.svelte` is its single-caller trigger.
+  The manager's colour palette and the library's `<TintPicker>` specimen, imported by six files: two
+  open it as a popover (the two gathering-biome pickers, the new-biome one through
+  `TintPickerButton.svelte`, its single-caller trigger) and four essence surfaces render it inline.
   It takes already-localized strings, never keys.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `layout` | `'popover'` \| `'inline'` | `'popover'` | `inline` suppresses the popover chrome the GLOBAL sheet applies — absolute positioning, z-index, a fixed width, a border and a shadow — and nothing else. |
-  | `allowCustom` | boolean | `true` | Whether free-hex entry is offered beside the presets. A caller whose stored model has no `customColor` sibling sets it false: the palette is then the whole vocabulary, because a free hex cannot be guaranteed legible across all seven themes. |
+  | `allowCustom` | boolean | `false` | Whether free-hex entry is offered beside the presets. Only a caller whose stored model carries a `customColor` sibling (the gathering biome) passes true; otherwise the palette is the whole vocabulary, because a free hex cannot be guaranteed legible across all seven themes. |
   | `allowNone` / `unset` | booleans | `false` | `allowNone` adds a ninth NO-COLOUR cell, the only route this palette has ever had back to unset, off by default because the preset grid is `repeat(4, 1fr)`. `unset` is TRUE when the caller holds no authored colour: `normalizedToken` folds an absent value onto a preset, so without it the palette marks that preset selected for a model that has chosen nothing. |
   | `noneSelected` | boolean or `null` | `null` | Whether the No-colour cell is MARKED. `null` derives it from `unset`, which is what every popover caller wants. A bulk-edit STAGE has a third state this cannot otherwise express — "leave unchanged", "clear colour" or a token, where the first two are BOTH "no preset is marked" — so passing `false` marks nothing at all. |
   | `onClear` | function or `null` | `null` | The No-colour cell's handler, separate from `onChange` because the two are different instructions; a caller that does not pass it cannot show the cell. |
@@ -43,7 +44,7 @@
     presetGridLabel = localizeOr('FABRICATE.Common.TintPicker.Presets', 'Colour presets'),
     customHexLabel = localizeOr('FABRICATE.Common.TintPicker.CustomHex', 'Custom hex'),
     noneLabel = localizeOr('FABRICATE.Common.TintPicker.None', 'No colour'),
-    allowCustom = true,
+    allowCustom = false,
     unset = false,
     layout = 'popover',
     allowNone = false,

@@ -134,7 +134,12 @@ const COMPONENTS = {
       onChange: () => {},
     },
   ],
-  color: [TintPickerButton, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
+  // `allowCustom` keeps the hex field, so the clamp is measured on the panel's tallest shape: the
+  // gathering-biome form, the one caller that opts in (issue 2352).
+  color: [
+    TintPickerButton,
+    { colorToken: 'sage', ariaLabel: 'Choose a colour', allowCustom: true },
+  ],
   // THE SIXTH COPY OF THE POSITIONING PASS (issue 1500), and the only one of the six that had no
   // row here.
   duration: [

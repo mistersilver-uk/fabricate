@@ -697,7 +697,7 @@ Neither is answerable by reading the source, so the method that settles both is 
 
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
-Every colour, spacing value and shadow MUST come from a `--fab-*` token.
+Every colour, spacing value and shadow MUST come from a `--fab-*` token, outside a gathering biome's stored `customColor`.
 A `@media (forced-colors: active)` block MAY name CSS system colours (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`, `GrayText`) and set `forced-color-adjust: none`, because under forced colours the reader's palette, not a token, is the source.
 A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside the approved theme blocks fails `tests/components/theme-colour-contract.test.js`, so a literal is a gate failure rather than a style preference.
 
@@ -730,7 +730,8 @@ A caller routes by MEANING and never by matching a tone name to a token name: `m
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
 And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the seven themes — they are equal only in `mythwright` and `foundry-native` — so a ground swap between them is MEASURED per theme and never reasoned: it is why the chip's `neutral` tone, which inherits the base overlay rather than the raised surface, is a stated move for a converted caller that took the raised surface before.
 
-Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one.
+Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one; the one exception is the gathering biome, whose stored option carries a `customColor` sibling (see `gathering-and-harvesting`, the biome vocabulary), and no other model accepts a free hex.
+`TintPicker` offers free-hex entry only to a caller that passes `allowCustom`, which defaults to `false`, and a caller passes it only when its stored model carries a `customColor` sibling.
 Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
 By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
@@ -778,6 +779,11 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 - **WHEN** a theme block's edit leaves the off knob under 3:1 on its track over one of the four named grounds
 - **THEN** `control-outline-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A caller renders the tint picker without opting in to a hex
+
+- **WHEN** a caller renders `TintPicker` without passing `allowCustom`
+- **THEN** the palette offers only its preset tokens and no free-hex field
 
 ### Requirement: The token namespace is one generation and names its purpose
 

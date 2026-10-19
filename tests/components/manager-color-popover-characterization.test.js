@@ -180,6 +180,7 @@ describe('1036 TintPicker — characterization', () => {
     try {
       const target = await harness.mount({
         colorToken: 'sage',
+        allowCustom: true,
         allowNone: true,
         onClear: () => {},
       });
@@ -236,7 +237,7 @@ describe('1036 TintPicker — characterization', () => {
     const target = await harness.mount({ colorToken: 'sage', allowCustom: true });
     assert.ok(
       Boolean(target.querySelector('[data-manager-custom-color]')),
-      'the default caller keeps the hex field'
+      'a caller that opts in, the gathering biome, gets the hex field'
     );
 
     await harness.setProps({ allowCustom: false });
@@ -245,6 +246,17 @@ describe('1036 TintPicker — characterization', () => {
       'the per-essence colour caller (issue 917) has the palette as its whole vocabulary'
     );
     assert.equal(presetCells(target).length, 8, 'and still exactly eight cells');
+    harness.remount();
+  });
+
+  it('offers no free-hex entry to a caller that does not opt in (issue 2352)', async () => {
+    const target = await harness.mount({ colorToken: 'sage' });
+    assert.ok(
+      !target.querySelector('[data-manager-custom-color]'),
+      'free hex is opt-in: a caller passing nothing has the palette as its whole vocabulary'
+    );
+    assert.ok(!target.querySelector('.manager-color-custom'), 'and no hex caption either');
+    assert.equal(presetCells(target).length, 8, 'the preset cells are unchanged');
     harness.remount();
   });
 

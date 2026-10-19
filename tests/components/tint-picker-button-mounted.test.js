@@ -51,4 +51,19 @@ describe('TintPickerButton swatch', () => {
     assert.ok(Boolean(group), 'the trigger opened the palette');
     assert.equal(group.getAttribute('aria-label'), 'Colour presets');
   });
+
+  it('opens a palette with no free-hex field when the caller does not opt in (issue 2352)', async () => {
+    const root = await harness.mount({ colorToken: 'rose' });
+    root.querySelector('.manager-color-picker-trigger').click();
+    await harness.setProps({});
+    assert.ok(
+      Boolean(globalThis.document.querySelector('[data-manager-color-picker-popover]')),
+      'the trigger opened the palette'
+    );
+    assert.equal(
+      globalThis.document.querySelector('[data-manager-custom-color]'),
+      null,
+      'free hex is opt-in, so a trigger mounted without `allowCustom` offers presets only'
+    );
+  });
 });

@@ -325,6 +325,41 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
   });
 });
 
+// Free hex is opt-in (issue 2352): the biome option record carries a `customColor` sibling, so
+// both biome pickers pass `allowCustom`, and a dropped opt-in would silently lose the field.
+describe('EnvironmentsBrowserView biome pickers offer the free hex (issue 2352)', () => {
+  /** The hex field's input inside the open palette, named by its `customHexLabel` caption. */
+  function customHexInput() {
+    const input = globalThis.document.querySelector(
+      '[data-manager-color-picker-popover] label.manager-color-custom input[data-manager-custom-color]'
+    );
+    return input && input.closest('label').textContent.trim() === 'Custom hex' ? input : null;
+  }
+
+  it('the new-biome colour button opens a palette with the hex field', async () => {
+    const target = await mountSettingsTab();
+    const trigger = target.querySelector('[aria-label="New biome colour"]');
+    assert.ok(trigger, 'the new-biome colour trigger renders');
+
+    trigger.click();
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.ok(customHexInput(), 'the new-biome palette offers a text input named "Custom hex"');
+  });
+
+  it("a biome's colour edit popover offers the hex field", async () => {
+    const target = await mountSettingsTab();
+    const trigger = stageManagerShell(target);
+
+    await openBiomePopover(trigger);
+    assert.ok(colorPopover(target), 'popover opens on right-click');
+
+    assert.ok(customHexInput(), 'the edit palette offers a text input named "Custom hex"');
+  });
+});
+
 // `EnvironmentsBrowserView` renders the two gathering browsers itself and threads their lifted
 // state through, so all three instantiations below mount the same component.
 const SWITCH_SYSTEM = 'sys-first';

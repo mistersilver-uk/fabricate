@@ -147,14 +147,12 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
-  // The popover root, registered via registerBiomeColorPopoverNode. It is what `anchoredPopover`
-  // portals and positions below, and it is ALSO fed as an `additionalNodes` entry to the
-  // dismissOnOutsideClick wrapping the trigger, the same pattern TintPickerButton uses for its
-  // own popover. TintPicker's own internal dismissal is disabled here
+  // The popover root, registered via registerBiomeColorPopoverNode: `anchoredPopover` portals and
+  // positions it below, and it is ALSO an `additionalNodes` entry of the dismissOnOutsideClick on
+  // the trigger, as in TintPickerButton. TintPicker's own dismissal is off here
   // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
-  // mousedown on the trigger itself would count as "outside" (the trigger is not inside the
-  // portaled popover), dismiss on mousedown, then the trigger's own contextmenu handler would
-  // reopen it in the same gesture.
+  // mousedown on the trigger would count as "outside" the portaled popover, dismiss it, and the
+  // trigger's contextmenu handler would reopen it in the same gesture.
   let biomeColorPopoverRoot = $state(null);
   const biomeColorPopoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
@@ -563,10 +561,10 @@
   }
 
   // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
-  // `TintPickerButton` records against its own copy of this shape: the panel is
-  // `TintPicker`, a shared component this view does not own the markup of and whose
-  // other call sites render it inline. An action is a plain function, so this view applies it to
-  // the node the popover registers — same contract, same teardown, no new prop on that component.
+  // `TintPickerButton` records against its own copy of this shape: the panel is `TintPicker`, a
+  // shared component this view does not own the markup of and whose other call sites render it
+  // inline. An action is a plain function, so this view applies it to the node the popover
+  // registers — same contract, same teardown, no new prop on that component.
   //
   // The options reproduce the measure/flip/clamp pass this view used to hand-write: the picker
   // layout in host-relative coordinates, left-aligned at a fixed 220px, clipped inside the
@@ -1043,6 +1041,7 @@
                   'FABRICATE.Admin.Manager.Environment.Vocabularies.CustomHex',
                   'Custom hex'
                 )}
+                allowCustom
                 onChange={(updates) => {
                   biomeColorTokenInput = updates.colorToken;
                   biomeCustomColorInput = updates.customColor;
@@ -1123,6 +1122,7 @@
                           'FABRICATE.Admin.Manager.Environment.Vocabularies.CustomHex',
                           'Custom hex'
                         )}
+                        allowCustom
                         onChange={(updates) =>
                           onUpdateGatheringVocabularyValue?.(
                             vocabulary.kind,
