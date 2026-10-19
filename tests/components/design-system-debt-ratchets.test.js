@@ -1652,7 +1652,7 @@ const HOVER_EDGE_TINTS = Object.freeze(
     MODULE_SHEET,
     selector,
     'var(--fab-accent-border)',
-    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (library.html:134)',
+    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (library.html:141)',
   ])
 );
 
