@@ -169,16 +169,10 @@
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-chevron-left",
-          "aria-hidden": "true"
-        }
-      },
-      "Back"
-    ]
+    "content": ["Back"],
+    "props": {
+      "icon": "fas fa-chevron-left"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
@@ -196,18 +190,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "danger"
+      "role": "danger",
+      "icon": "fas fa-trash"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-trash",
-          "aria-hidden": "true"
-        }
-      },
-      "Delete"
-    ]
+    "content": ["Delete"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -229,18 +215,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "warning"
+      "role": "warning",
+      "icon": "fas fa-triangle-exclamation"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-triangle-exclamation",
-          "aria-hidden": "true"
-        }
-      },
-      "Review"
-    ]
+    "content": ["Review"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -351,18 +329,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Ingredient"
-    ]
+    "content": ["Ingredient"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -370,18 +340,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Result"
-    ]
+    "content": ["Result"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -389,18 +351,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Add ingredient set"
-    ]
+    "content": ["Add ingredient set"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -409,18 +363,10 @@
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed",
-      "fullWidth": true
+      "fullWidth": true,
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Add another tier"
-    ]
+    "content": ["Add another tier"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -428,18 +374,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "danger"
+      "role": "danger",
+      "icon": "fas fa-trash"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-trash",
-          "aria-hidden": "true"
-        }
-      },
-      "Delete essence"
-    ]
+    "content": ["Delete essence"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -468,18 +406,10 @@
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger",
-      "disabled": true
+      "disabled": true,
+      "icon": "fas fa-clock"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-clock",
-          "aria-hidden": "true"
-        }
-      },
-      "Deleting…"
-    ]
+    "content": ["Deleting…"]
   },
   {
     "spec": "<Toggle>",

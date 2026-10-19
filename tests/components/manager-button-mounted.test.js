@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -133,6 +134,33 @@ describe('Button emits the element and classes its call sites are styled against
       );
       harness.remount();
     }
+  });
+
+  // ── THE LEADING ICON (issue 2540) ─────────────────────────────────────────────────────
+  it('draws one hidden <i> carrying the icon class as the first child', async () => {
+    const children = createRawSnippet(() => ({ render: () => '<span>Add</span>' }));
+    await harness.mount({ icon: 'fas fa-plus', children });
+    const node = button();
+    const glyphs = node.querySelectorAll('i');
+    assert.equal(glyphs.length, 1);
+    assert.equal(node.children.length, 2);
+    assert.equal(node.firstElementChild, glyphs[0]);
+    assert.equal(node.children[1].textContent, 'Add');
+    assert.equal(glyphs[0].className, 'fas fa-plus');
+    assert.equal(glyphs[0].getAttribute('aria-hidden'), 'true');
+  });
+
+  it('draws no <i> for an empty icon, and none by default', async () => {
+    await harness.mount({ icon: '' });
+    assert.equal(button().querySelector('i'), null);
+    harness.remount();
+    await harness.mount({});
+    assert.equal(button().querySelector('i'), null);
+  });
+
+  it('leaves the root class unchanged by an icon', async () => {
+    await harness.mount({ role: 'ghost', icon: 'fas fa-plus' });
+    assert.equal(button().className, 'fabricate-button fab-manager-button is-ghost');
   });
 
   it('appends the pass-through class after its own, never in place of them', async () => {

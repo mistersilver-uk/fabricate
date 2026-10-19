@@ -290,6 +290,7 @@
     })}
     <div class="manager-recipe-tag-create">
       <Button
+        icon="fa-solid fa-plus"
         role="ghost"
         fullWidth
         data-recipe-tag-create=""
@@ -297,7 +298,6 @@
         {disabled}
         onclick={() => createTag(name, focusSearch)}
       >
-        <i class="fa-solid fa-plus" aria-hidden="true"></i>
         <span>{label}</span>
       </Button>
     </div>

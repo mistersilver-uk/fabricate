@@ -76,11 +76,11 @@
     {/if}
     {#if safeView !== safeCurrent}
       <Button
+        icon="fas fa-bullseye"
         class="fab-stage-nav-return"
         data-stage-nav-return
         onclick={() => select(safeCurrent)}
       >
-        <i class="fas fa-bullseye" aria-hidden="true"></i>
         {returnLabel(safeCurrent)}
       </Button>
     {/if}

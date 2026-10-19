@@ -396,7 +396,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - An element-ref bindable (`Chip`'s and `Button`'s `element`) is never published.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
-- `Button`'s `size`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
+- `Button`'s `size`, `icon`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
