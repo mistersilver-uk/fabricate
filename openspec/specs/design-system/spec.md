@@ -1120,7 +1120,7 @@ A component outside that directory is not bound by this requirement, even where 
 An `IconButton` MUST write its name, or its `tooltip` when one is passed, as plain tooltip text — Foundry's `data-tooltip-text`, which no localize lookup or HTML path reaches — so Foundry's tooltip shows it on pointer hover.
 Keyboard focus MUST show the same tooltip, and only under `:focus-visible`, so a pointer focus adds no second tooltip.
 Blur, a click and Escape MUST each close the button's own tooltip and never another element's.
-No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip` or `data-tooltip-html` suppresses the primitive's own tooltip rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
+No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` suppresses the primitive's own tooltip, on hover and focus alike, rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
 `tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
 
 #### Scenario: A user Tabs to an icon button

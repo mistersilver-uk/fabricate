@@ -7,13 +7,13 @@
   | --- | --- | --- | --- |
   | `ariaLabel` | pre-localized string | `''` | REQUIRED; see the invariants. Dropped when empty rather than emitted blank. |
   | `icon` | Font Awesome class string | `''` | The glyph, drawn as a hidden `<i>`; empty draws none. |
-  | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'ghost-danger'` | `'neutral'` | A CLOSED subset of `Button`'s verb roles plus the ghost-danger compound; an unrecognised value renders neutral. Never an ARIA role. |
+  | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'ghost-danger'` | `'neutral'` | A closed subset of `Button`'s verb roles plus the ghost-danger compound; an unrecognised value renders neutral. Never an ARIA role. |
   | `size` | `''` \| `'24'` \| `'26'` | `''` | The rung, named as a string as `Button`'s is: `''` is 34, `'26'` the banded Modal's close; an unrecognised value draws 34. |
   | `tooltip` | pre-localized string | `ariaLabel` | The plain-text name shown on hover and keyboard focus; `''` shows none. |
   | `disabled` | boolean | `false` | Forwarded to the `<button>`. |
   | `onclick` | function | no-op | Forwarded, so a call site keeps its `event.stopPropagation()`. |
   | `children` | snippet | `undefined` | Content after the glyph, for a caller whose label is not an icon. |
-  | `class` | class string | `''` | An EXTRA class — a STATE such as `is-locked`, never a role — appended to the primitive's own. |
+  | `class` | class string | `''` | An extra class — a state such as `is-locked`, never a role — appended to the primitive's own. |
   | `element` | bindable | `null` | The rendered `<button>`, which `ActionMenu` measures its panel against and returns focus to. |
 
   Rest spread:
@@ -22,13 +22,14 @@
   - `class` and `data-keyboard-focus="true"` stand before the spread, per `design-system/spec.md`.
 
   Invariants:
-  - THE ACCESSIBLE NAME IS A REQUIRED PROP, emitted only when non-empty, because `aria-label=""`
+  - The accessible name is a required prop, emitted only when non-empty, because `aria-label=""`
     suppresses the fallback; `tests/icon-button-source-contract.test.js` is the gate.
-  - THE NAME IS `data-tooltip-text`, Foundry's plain-text path, so a record name never reaches the
+  - The name is written as `data-tooltip-text`, Foundry's plain-text path, so a record name never reaches the
     localize or HTML path. Keyboard focus activates `game.tooltip` only under `:focus-visible`, and
     blur, click and Escape deactivate it only while this button owns it. A caller's `title`,
-    `data-tooltip` or `data-tooltip-html` wins and the primitive writes no tooltip beside it.
-  - CLASS ORDER IS THE ROOT, THE RUNG, THE ROLE, THEN THE CALLER'S EXTRA; the root is the array's
+    `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` wins: the primitive writes no
+    tooltip beside it and opens none on focus, so a hint belongs in `tooltip` instead.
+  - Class order is the root, the rung, the role, then the caller's extra; the root is the array's
     only literal, which `re-rooted-controls-host-independence.test.js` reads. No scoped `<style>`.
 -->
 <script>

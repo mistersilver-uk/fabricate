@@ -59,7 +59,7 @@ export const BANNED_NAMES = Object.freeze([
 export const REGISTER_ONLY_NAMES = Object.freeze(['compact', 'onChoose']);
 
 /**
- * The CLOSED register of primitives whose `role` prop is a VERB role (issue 2541). An ARIA `role`
+ * The closed register of primitives whose `role` prop is a verb role (issue 2541). An ARIA `role`
  * reaches any other primitive's root through `...rest`, so a declared `role` elsewhere is a fault.
  */
 export const VERB_ROLE_PRIMITIVES = Object.freeze(['Button', 'IconButton']);
