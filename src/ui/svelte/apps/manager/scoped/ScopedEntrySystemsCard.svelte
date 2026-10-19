@@ -87,6 +87,7 @@
 </script>
 
 <InspectorCard
+  flush
   class="manager-component-entry-card manager-component-entry-systems-card"
   data-scoped-entry-systems={entryId}
   data-scoped-entry-systems-card=""

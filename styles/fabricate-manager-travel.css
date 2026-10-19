@@ -135,14 +135,14 @@
   background: var(--fab-overlay-light-04);
 }
 
-/* Map tab inspector: the selected map region and its link live in two sibling cards, so the shared outer inspector card drops its own chrome and just lays them out in a spaced column. */
-.fabricate-manager .manager-travel-inspector[data-travel-inspector="map"] {
-  padding: 0;
-  border: none;
-  background: transparent;
+/* The travel inspector is a column of sibling cards, never a card around them, and it fills the rail so a tab's no-selection panel does too. */
+.fabricate-manager .manager-travel-inspector {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--fab-space-3);
+  min-width: 0;
+  min-height: 0;
 }
 
 .fabricate-manager .manager-map-link-region-card .manager-inspector-title-row {

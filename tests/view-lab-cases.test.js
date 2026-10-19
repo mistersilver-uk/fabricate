@@ -1080,7 +1080,7 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '.fabricate-card',
       styles:
-        'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+        'display: flex; row-gap: 8px; padding-top: 16px; border-radius: 11px; background-color: var(--fab-bg-2)',
     },
     { selector: '.fab-rail > div', styles: 'display: contents' },
     { selector: '.fab-rail > div > div', styles: 'display: contents' },

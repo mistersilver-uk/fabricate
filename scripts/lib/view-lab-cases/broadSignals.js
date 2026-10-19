@@ -298,11 +298,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
   ]),
-  // The manager's card shell (issue 1427), extracted from 80 hand-written inspector-card sections.
+  // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
+  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card.
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
     'manager-published-leaves-specimen',
+    'manager-tool-parity-01-library-1280x720',
+    'manager-world-travel-realms-normal',
+    'manager-world-travel-map-normal',
+    'manager-world-travel-map-empty',
   ]),
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),

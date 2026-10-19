@@ -32,20 +32,11 @@
   overflow: hidden;
 }
 
-/* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest. */
+/* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest; the selected tool's panel and its sections inherit the column's 16px rhythm. */
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
   --fab-manager-inspector-pad: var(--fab-space-4);
-}
 
-.fabricate-manager .manager-tools-authority-card,
-.fabricate-manager .manager-tools-create-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-overlay-light-04);
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-library-card {
@@ -63,8 +54,7 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-tools-authority-card h2,
-.fabricate-manager .manager-tools-create-card h3 {
+.fabricate-manager .manager-tools-authority-card h2 {
   margin: 0;
   font-family: var(--fab-font-serif);
   font-size: 0.84rem;
@@ -72,27 +62,22 @@
   line-height: 1.2;
 }
 
-.fabricate-manager .manager-tools-authority-card .manager-kicker,
-.fabricate-manager .manager-tools-create-card .manager-kicker {
+.fabricate-manager .manager-tools-authority-card .manager-kicker {
   margin-bottom: var(--fab-space-1);
   font-size: 0.64rem;
 }
 
-.fabricate-manager .manager-tools-authority-card .manager-muted,
-.fabricate-manager .manager-tools-create-card p:not(.manager-kicker) {
+.fabricate-manager .manager-tools-authority-card .manager-muted {
   margin: var(--fab-space-1) 0 0;
   font-size: 0.7rem;
   line-height: 1.3;
 }
 
-/* ── THE BREAKAGE-MODE CARD ── `proto:2499`: `padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 11px` (issue 1373). */
+/* ── THE BREAKAGE-MODE CARD ── Its box is the shared card's; this rule only stacks its content (issue 1373). */
 .fabricate-manager .manager-tools-authority-card {
   flex-flow: column nowrap;
   align-items: stretch;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tools-authority-heading {
@@ -321,11 +306,6 @@
 /* ── THE ROW'S ENABLE SWITCH IS THE SHARED ONE, AND ITS FIVE-RULE SKIN IS GONE ── The Tools list drew this switch by hand — a 36px box, a 34x20 track and a 14px knob that travelled 14px, in the accent on and the raised neutral off (issue 1515). */
 
 .fabricate-manager .manager-tool-browser-inspector {
-  gap: var(--fab-space-4);
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -445,7 +425,6 @@
 
 @container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-tools-authority-card,
-  .fabricate-manager .manager-tools-create-card,
   .fabricate-manager .manager-tools-library-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -856,10 +835,6 @@
   --fab-manager-inspector-bg: var(--fab-bg-0);
 }
 
-.fabricate-manager[data-manager-view='essences'] .manager-inspector .fabricate-card {
-  background: transparent;
-}
-
 /* THE PAGE HEADER BAND IS PART OF THE SAME FLAT SURFACE, and it was the one region the block above could not reach. */
 .fabricate-manager[data-manager-view='world-essences'] .manager-header,
 .fabricate-manager[data-manager-view='world-essence-entry'] .manager-header,
@@ -960,10 +935,6 @@
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence rules list does, so its surfaces are brought onto the ladder here rather than in a scoped block (issue 1373). */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
   --fab-manager-inspector-bg: var(--fab-bg-1);
-}
-
-.fabricate-manager[data-manager-view='tools'] .manager-inspector .fabricate-card {
-  background: transparent;
 }
 
 /* THE WORLD TOOLS CATALOGUE'S TOOLBAR STRIP IS FLUSH TOO (issue 1373). */
@@ -1137,10 +1108,6 @@
 /* ── THE CARD, AND THE HEAD EVERY CARD SHARES ── `proto:845`, `:882` and `:921` draw one head: a 12px glyph in the card's own ink, an `h3` at 14px serif, a 10px muted subtitle, and an optional trailing action. */
 .fabricate-manager .manager-component-entry-card {
   gap: var(--fab-space-3);
-  padding: var(--fab-space-4);
-  background: var(--fab-bg-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
 }
 
 .fabricate-manager .manager-component-entry-card-head {
@@ -1213,10 +1180,6 @@
 }
 
 /* ── A3. THE IDENTITY CARD ── `proto:833-843`: a 56px chip and a copy column (issue 1371). */
-.fabricate-manager .manager-component-entry-identity {
-  background: var(--fab-surface-soft);
-}
-
 .fabricate-manager .manager-component-entry-identity-body {
   display: flex;
   align-items: flex-start;
@@ -1461,7 +1424,6 @@
 .fabricate-manager .manager-component-entry-systems-card {
   flex: 0 0 auto;
   gap: 0;
-  padding: 0;
   overflow: hidden;
 }
 
@@ -1682,7 +1644,6 @@
 
 /* ── A7. DELETE FROM THE WORLD ── `proto:928-936`: the danger card at the foot, in place of the header `Delete`. */
 .fabricate-manager .manager-scoped-entry-danger {
-  padding: var(--fab-space-3) var(--fab-space-4);
   background: var(--fab-danger-soft);
   border-color: var(--fab-danger-border);
 }

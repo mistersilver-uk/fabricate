@@ -488,7 +488,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   try {
     const page = await context.newPage();
 
-    const edges = await checksRollEdges(page, 'fabricate-card manager-checks-card');
+    const edges = await checksRollEdges(page, 'fabricate-card is-flush manager-checks-card');
     assert.equal(
       edges.rowLeft,
       edges.radioLeft,
@@ -571,10 +571,10 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
   // TWO fixed arms and TWO controls.
   assert.deepEqual(
     [...new Set(wrapperArguments)].sort(compareStrings),
-    [root, `${root} manager-checks-card`],
+    [root, `${root} is-flush manager-checks-card`],
     'every interpolated card fixture must carry the family root; the control arms remove the ' +
-      'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +
-      'from the one those tests are proofs of'
+      'caller’s `flush` and class and nothing else, because "the primitive unrooted" is a ' +
+      'different mutation from the one those tests are proofs of'
   );
 });
 
@@ -587,9 +587,9 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
   // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>`.
   assert.match(
     withoutComments(craftingCheckEditor),
-    /<InspectorCard class="manager-checks-card" data-routed-tiers="">/,
-    'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
-      '.fabricate-card shell and its own 12px padding re-insets the tier row'
+    /<InspectorCard flush class="manager-checks-card" data-routed-tiers="">/,
+    'the routed tier section must be a flush manager-checks-card, or it falls back to the bare ' +
+      '.fabricate-card shell and its own padding re-insets the tier row'
   );
 });
 
@@ -601,7 +601,10 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
   try {
     const page = await context.newPage();
 
-    const fixed = await modifiersCombinationRuleMetrics(page, 'fabricate-card manager-checks-card');
+    const fixed = await modifiersCombinationRuleMetrics(
+      page,
+      'fabricate-card is-flush manager-checks-card'
+    );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
     // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
     assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
@@ -639,8 +642,8 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
   // RETARGETED at the primitive (issue 1427), same reasoning as the routed-tier join above.
   assert.match(
     withoutComments(modifierCatalogueSource),
-    /<InspectorCard\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
-    'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
+    /<InspectorCard\s+flush\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    'the modifiers card must be a flush manager-checks-card, or it falls back to the bare ' +
       '.fabricate-card shell and the combination-rule cards fall back to the generic scale'
   );
 });
@@ -1100,7 +1103,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
-        '<section class="fabricate-card manager-checks-card" data-outcome-bands>' +
+        '<section class="fabricate-card is-flush manager-checks-card" data-outcome-bands>' +
         '<div class="manager-checks-card-body">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +

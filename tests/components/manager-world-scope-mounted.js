@@ -686,7 +686,7 @@ export function registerWorldScopeCases() {
     assert.equal(
       target.querySelector('.manager-travel-inspector').getAttribute('data-travel-inspector'),
       'map',
-      'the one card follows the tab rather than being two cards'
+      'the one inspector follows the tab rather than being two'
     );
     assert.ok(
       target.querySelector('.manager-travel-inspector').classList.contains('is-empty'),

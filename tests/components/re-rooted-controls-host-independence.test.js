@@ -2333,7 +2333,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
   );
 
   // THE CARD. Padding, a hairline border on all four edges, the 11px corner.
-  assert.equal(card['padding-top'], '12px');
+  assert.equal(card['padding-top'], '16px');
   assert.equal(card['border-top-width'], '1px');
   assert.equal(card['border-top-style'], 'solid');
   assert.equal(card['border-radius'], '11px');
