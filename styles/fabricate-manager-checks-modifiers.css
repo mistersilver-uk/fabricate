@@ -42,14 +42,10 @@
   margin-bottom: var(--fab-space-2);
 }
 
-/* ══ Checks Studio visual parity with the standalone prototype ══ Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json` records the prototype's computed styles per named region (issue 1096). */
+/* ══ Checks Studio visual parity with the standalone prototype ══ The rules below take their values from the prototype's computed styles per named region (issue 1096). A studio card is a `flush` card: its head and body inset themselves, and its box is the shared card's. */
 .fabricate-card.fabricate-card.manager-checks-card {
   gap: 0;
-  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-checks-card > .manager-checks-card-head {
@@ -656,14 +652,6 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager .manager-checks-rail .fabricate-card {
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
-}
-
 .fabricate-manager .manager-checks-rail .manager-kicker {
   margin: 0;
   min-width: 0;
@@ -730,11 +718,6 @@
 }
 
 /* ── The activation card ── The prototype gives this section NO heading: the card is the statement, so it carries the state in its own surface. */
-.fabricate-manager .manager-checks-rail .manager-checks-active-card {
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3) var(--fab-space-4);
-}
-
 .fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
@@ -779,9 +762,12 @@
   line-height: 1.35;
 }
 
-/* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
-.fabricate-manager .manager-checks-rail .fabricate-card.is-rail-list {
+/* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE `flush` card of compact rows each, not a stack of bordered cards. The list insets its rows, so each row's text sits 20px in and its hover corners stay inside the card. */
+.fabricate-manager .manager-checks-rail-list {
+  display: flex;
+  flex-direction: column;
   gap: var(--fab-space-1);
+  min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 

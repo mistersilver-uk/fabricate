@@ -199,9 +199,9 @@
   margin-inline-start: auto;
 }
 
-/* THE LABELLED FORM. `.fabricate-field` and its first-child `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
+/* THE LABELLED FORM. `.fabricate-field` and its first-child `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. The note inks muted, a recorded correction of the specimen's subtle `k-hint` that clears 4.5:1 on every ground (issue 2315). */
 .fabricate-select-note {
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
   font-size: 10.5px;
   font-weight: 400;
   line-height: 1.5;

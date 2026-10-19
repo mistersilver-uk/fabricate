@@ -642,7 +642,7 @@
      the editor first. A preset authors an ORDINARY trigger, with no marker field and nothing
      downstream treating it differently. -->
 {#if presets.length > 0}
-  <InspectorCard class="manager-checks-card" data-check-trigger-presets="">
+  <InspectorCard flush class="manager-checks-card" data-check-trigger-presets="">
     <div class="manager-checks-card-head">
       <div>
         <h3 class="manager-checks-card-title">

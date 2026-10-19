@@ -506,13 +506,7 @@
                in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
                the sibling clause in `manager-select-conversion-rendered.test.js` compares the
                two computed treatments. Changing the element is what lets the class win, and it
-               leaves the shared sheet alone.
-
-               The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
-               12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
-               (3.71:1). The library's `k-hint` is the authority for that treatment and the token
-               question belongs to issue 2315, not here —
-               consistency inside the card is what this change owes. -->
+               leaves the shared sheet alone. -->
           <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
             >{currencySpendStrategyHint()}</span
           >
