@@ -83,6 +83,7 @@ const ALLOWLIST = Object.freeze([
     "a nav row keeps its 30px rung's corner when a long label wraps it taller",
     { 'styles/fabricate.css': 1 },
   ],
+  ['knob travel derived from the track and knob sizes, not spacing', { 'styles/fabricate.css': 1 }],
   [
     "the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17)",
     { 'styles/fabricate.css': 2 },
