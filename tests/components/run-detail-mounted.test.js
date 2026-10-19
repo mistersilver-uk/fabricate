@@ -1436,19 +1436,27 @@ describe('RunDetail mounted behavior', () => {
     );
   });
 
-  it('disables Trigger while the run is busy even after the gate has matured', async () => {
+  it('holds Trigger busy while the run is busy even after the gate has matured', async () => {
     const run = makeCraftingRun();
+    const executed = [];
     // Matured gate (now past availableAt) would normally enable the button.
     const svc = {
-      journal: { busyRunId: run.id, advance() {} },
+      journal: {
+        busyRunId: run.id,
+        execute: (busyRun) => {
+          executed.push(busyRun?.id);
+        },
+      },
       getWorldTimeComponents: () => null,
     };
     const target = await mount({ run, now: 2000, services: svc });
-    assert.equal(
-      target.querySelector('[data-run-action="primary"]').disabled,
-      true,
-      'busy → disabled'
-    );
+    // Busy, not disabled (issue 2540): Trigger keeps its tab stop and refuses the press.
+    const trigger = target.querySelector('[data-run-action="primary"]');
+    assert.equal(trigger.disabled, false, 'busy keeps the tab stop');
+    assert.equal(trigger.getAttribute('aria-disabled'), 'true');
+    assert.equal(trigger.getAttribute('aria-busy'), 'true');
+    trigger.click();
+    assert.deepEqual(executed, [], 'a busy Trigger swallows the press');
   });
 
   it('marks a failed step node with the failed state', async () => {

@@ -221,7 +221,7 @@
   background: transparent;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover {
+.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-raised);
@@ -251,7 +251,7 @@
   background: transparent;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover {
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-raised);

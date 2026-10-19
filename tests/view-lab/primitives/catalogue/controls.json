@@ -146,72 +146,77 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "primary"
+      "role": "primary",
+      "size": "38"
     },
     "content": ["Save recipe"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "primary"
+      "role": "primary",
+      "size": "38"
     },
     "content": ["New template"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Back"],
     "props": {
-      "icon": "fas fa-chevron-left"
+      "icon": "fas fa-chevron-left",
+      "size": "38"
     }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "ghost"
+      "role": "ghost",
+      "size": "38"
     },
     "content": ["Cancel"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger",
-      "icon": "fas fa-trash"
+      "icon": "fas fa-trash",
+      "size": "38"
     },
     "content": ["Delete"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Open editor"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Apply to all"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
@@ -222,7 +227,7 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
@@ -232,13 +237,25 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "disabled": true
     },
     "content": ["Unavailable"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "busy · an action in flight",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/Button.svelte",
+    "props": {
+      "role": "primary",
+      "busy": true,
+      "icon": "fas fa-clock"
+    },
+    "content": ["Salvaging…"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -370,6 +387,18 @@
   },
   {
     "spec": "<Button> <IconButton>",
+    "cap": "28 · a choice group’s Alternative adder",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/Button.svelte",
+    "props": {
+      "role": "dashed",
+      "size": "28",
+      "icon": "fas fa-plus"
+    },
+    "content": ["Alternative"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
     "cap": "destructive — arm, then confirm (row carve-out only)",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
@@ -406,8 +435,8 @@
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger",
-      "disabled": true,
-      "icon": "fas fa-clock"
+      "icon": "fas fa-clock",
+      "busy": true
     },
     "content": ["Deleting…"]
   },
