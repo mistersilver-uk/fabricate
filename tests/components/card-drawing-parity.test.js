@@ -4,6 +4,8 @@
  * restates that box outside a status tone; a card never contains a card, in a template or a
  * mounted inspector; and the entry's Card chip, its status and the manifest agree. Declarations
  * are read as written.
+ * Limit: a class or `data-*` hook a card takes through a script variable is no census subject, and
+ * a card a child component renders inside a card is caught only where the mounted probe reaches.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -97,6 +99,23 @@ const CARD_CLASSES = new Set([
   ).filter((name) => !name.startsWith('is-')),
 ]);
 
+/** The `data-*` hooks a card's tag writes statically: a caller rule's subjects too. */
+const CARD_HOOKS = new Set(
+  COMPONENTS.flatMap(([, ast]) =>
+    renderedNodes(ast, 'InspectorCard').flatMap((node) =>
+      (node.attributes ?? [])
+        .filter((attribute) => attribute.type === 'Attribute')
+        .map((attribute) => attribute.name)
+        .filter((name) => name.startsWith('data-'))
+    )
+  )
+);
+
+/** Whether a subject compound names a card by a class or a `data-*` hook its tag writes. */
+const namesCard = (compound) =>
+  compoundClasses(compound).some((name) => CARD_CLASSES.has(name)) ||
+  [...compound.matchAll(/\[(data-[\w-]+)/gu)].some(([, hook]) => CARD_HOOKS.has(hook));
+
 /** Border colour and a soft fill from one status ramp: a tone, which is not a restatement. */
 function isStatusTone(box) {
   const ramps = [...box].map(([property, value]) => {
@@ -119,9 +138,7 @@ function restatements(styles) {
         .filter((raw) => file === SHEET || (file.endsWith('.svelte') && subjectIsGlobal(raw)))
         .map(unwrapGlobal)
         .filter((selector) => !(file === SHEET && [BASE, FLUSH].includes(selector)))
-        .filter((selector) =>
-          compoundClasses(compoundsOf(selector).at(-1)).some((name) => CARD_CLASSES.has(name))
-        )
+        .filter((selector) => namesCard(compoundsOf(selector).at(-1)))
         .map((selector) => `${file}: ${selector}`);
     })
   );
@@ -147,6 +164,7 @@ test('the flush unit draws the padding the flush rule ships, and nothing else', 
 
 test('no caller rule restates the card’s box outside a status tone', () => {
   assert.ok(CARD_CLASSES.size > 20, `${CARD_CLASSES.size} card classes read`);
+  assert.ok(CARD_HOOKS.size > 20, `${CARD_HOOKS.size} card hooks read`);
   assert.deepEqual(restatements(corpus), []);
 });
 
@@ -170,6 +188,9 @@ test('the census refuses a restatement at any specificity, and admits a tone and
   );
   assert.equal(sheet('.fabricate-card.x { background: var(--fab-surface-soft) }').length, 1);
   assert.deepEqual(sheet('.fabricate-card > .x { padding: 0 }'), [], 'the subject is the content');
+  const hooked = '.manager-checks-rail [data-checks-digest]';
+  assert.deepEqual(sheet(`${hooked} { padding: 0 }`), [`${SHEET}: ${hooked}`], 'a card hook');
+  assert.deepEqual(sheet('.x [data-not-a-card-hook] { padding: 0 }'), []);
   const component = 'src/A.svelte';
   assert.deepEqual(restatements({ [component]: '.fabricate-card { padding: 0 }' }), []);
   assert.deepEqual(restatements({ [component]: ':global(.fabricate-card.y) { padding: 0 }' }), [
