@@ -495,6 +495,8 @@ describe('the readout’s state', () => {
     assert.deepEqual([waiting.medallion, waiting.card, waiting.note, waiting.rows], [null, null, null, []]);
     const rolled = readout(plan(OVER), result(true, { total: 15, diceGroups: d20(12) }));
     assert.equal(rolled.rollLabel, 'Roll again');
+    // A roll in flight names itself, because `Button`'s busy draws no label (issue 2540).
+    assert.equal(readout(plan(OVER), null, { rolling: true }).rollLabel, 'Rolling…');
   });
 
   it('withholds every rolled figure while abstaining', () => {

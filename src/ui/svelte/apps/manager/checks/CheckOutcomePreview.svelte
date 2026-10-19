@@ -130,7 +130,7 @@
       class="manager-checks-simulator-roll"
       data-checks-simulator-roll
       disabled={Boolean(abstain)}
-      aria-disabled={preview.rolling === true ? 'true' : undefined}
+      busy={preview.rolling === true}
       onclick={() => onRoll(additionalDice)}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>

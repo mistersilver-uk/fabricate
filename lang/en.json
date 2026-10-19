@@ -7154,6 +7154,7 @@
             "NoFormula": "Give this check a roll formula to preview an outcome.",
             "Roll": "Roll a test check",
             "RollAgain": "Roll again",
+            "Rolling": "Rolling…",
             "DynamicDc": "This check takes its DC from a macro at craft time. The preview never runs that macro, so it reads against the static fallback DC instead.",
             "DynamicTarget": "This check's target comes from a macro at craft time. The preview never runs that macro, so it reads against the adjusted character value instead.",
             "NeedsCharacter": "Choose a character who has every value this check reads, then roll.",
