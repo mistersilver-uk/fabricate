@@ -483,7 +483,7 @@ test('(a) the older overrides still name the frame that renders their state', ()
     [
       'src/ui/svelte/components/ItemDropZone.svelte',
       'world-essence-entry',
-      'the frame that draws a linked zone whose name is the stored address',
+      'the frame that draws a linked zone with no name, named by its uuid line',
     ],
     [
       'src/ui/svelte/components/ItemDropZone.svelte',
@@ -533,7 +533,7 @@ test('(a) the older overrides still name the frame that renders their state', ()
     [
       'src/ui/svelte/components/ItemDropZone.svelte',
       'manager-component-complications-macro-linked',
-      'the frame that draws the complication macro zone linked, with its uuid as the hint',
+      'the frame that draws the complication macro zone linked, with its uuid line under the name',
     ],
     [
       'src/ui/svelte/components/ItemDropZone.svelte',

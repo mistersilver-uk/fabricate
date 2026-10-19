@@ -91,7 +91,7 @@
       >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</Kicker
     >
     <ItemDropZone
-      item={hasLink ? { name: itemName || uuid, img: itemImg } : null}
+      value={hasLink ? { uuid, name: itemName, img: itemImg } : null}
       title={text(
         'FABRICATE.Admin.Manager.RecipeItem.Overview.DropHint',
         'Drop a game-world Item here'

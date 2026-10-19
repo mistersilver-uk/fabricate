@@ -2404,6 +2404,22 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
 
+    // The card's null guard: no scene address means the empty face, not a linked one.
+    const sceneZone = target.querySelector(
+      ':scope [data-overview-section="scene"] [data-manager-item-drop-zone]'
+    );
+    assert.ok(Boolean(sceneZone), 'the scene card keeps its drop zone after unlink');
+    assert.ok(!sceneZone.classList.contains('is-linked'), 'an unlinked scene zone is not linked');
+    assert.ok(
+      !sceneZone.querySelector('[data-overview-scene-unlink]'),
+      'an unlinked scene zone offers no unlink'
+    );
+    assert.equal(
+      target.querySelector(`#${sceneZone.getAttribute('aria-labelledby')}`).textContent.trim(),
+      'Drag a scene here to link it.',
+      'the unlinked scene zone names itself with the empty-face title'
+    );
+
     picker = target.querySelector('[data-overview-section="identity"] .fab-art-picker-tile');
     assert.equal(
       picker.tagName,
