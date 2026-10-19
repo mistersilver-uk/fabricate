@@ -22,7 +22,7 @@
   | `as` / `columns` / `squareTiles` | `'list'` \| `'grid'` / integer / boolean | `'list'` / `1` / `false` | The list's form, a grid's cells per row and its opt-in square tiles, emitted as `data-picker-as`/`data-picker-columns`/`data-picker-tiles` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor, and a count outside 2–6 draws and maps one column. A square tile is text-free, its label both its `title` and its `aria-label`. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces this component's trigger button; the caller spreads `attributes` onto its own element last, names and titles the button itself, passes neither `ariaLabel` nor `triggerTitle`, and gets `triggerClass` as a declared no-op. See the spread invariant. |
   | `option` | snippet `(option)` | `undefined` | Draws the row's CONTENT while this component keeps the row ELEMENT. When supplied it is the row's SOLE content — no `Chip`, no trailing marker, no label span — because a picker's suite reads its row label with `span:last-child`. |
-  | `header` / `footer` | snippets | `undefined` | Caller-owned content above and below the list. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks; `footer` with `{ close, failed, query, focusSearch }`, the dismissal a commit action ends on, whether the panel is showing an error, the raw query, and a call that focuses the query field. |
+  | `header` / `footer` / `keyHints` / `footerAction` | snippets / boolean / `{ label, onActivate }` or `null` | `undefined` / `false` / `null` | Caller-owned content above and below the list, and the primitive's own footer row beneath it. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks; `footer` with `{ close, failed, query, focusSearch }`, the dismissal a commit action ends on, whether the panel is showing an error, the raw query, and a call that focuses the query field. `keyHints` adds that row: the localized hints for the cursor's real key map, and at its end the one `footerAction`, a button whose `onActivate` is handed `{ close }`. |
   | `maxHeight` / `minWidth` / `maxWidth` | px | `0` / `240` / `340` | The panel's size band; `0` takes the layout's own value. |
   | `triggerAddMarker` / `triggerProps` / `triggerTitle` / `triggerHasPopup` | string / attribute object / string / `'dialog'` \| `'listbox'` | `''` / `{}` / `''` / `'dialog'` | Stable hooks and a native tooltip stamped on the trigger button itself rather than on a wrapper, plus what activating it opens. `triggerProps` is spread first, so it can never override this component's `type`, `onclick` or ARIA contract; and `'listbox'` is passed only with `showSearch={false}` and whenever `showSearch={false}`, both directions being refused at the source by `tests/components/searchable-popover-source-contract.test.js`, which also holds the two `trigger`-snippet refusals above. |
   | `triggerAriaDisabled` | boolean | `false` | Render `aria-disabled="true"` and refuse to open while leaving the trigger ENABLED and focusable. Not a synonym for `disabled`: several screen readers drop a `disabled` button from the tab order and `focus()` on one silently no-ops. The trade is that `aria-disabled` does not suppress the click, so `toggle()` must. |
@@ -135,6 +135,8 @@
     option: optionContent = undefined,
     header = undefined,
     footer = undefined,
+    keyHints = false,
+    footerAction = null,
     maxHeight = 0,
     popoverClass = '',
     triggerAddMarker = '',
@@ -515,6 +517,8 @@
       emptyBody={emptiness.body}
       {header}
       {footer}
+      {keyHints}
+      {footerAction}
       {chooseOption}
       {optionIsSelected}
       {close}

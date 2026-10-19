@@ -494,6 +494,68 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
+  describe('`keyHints` and `footerAction` (issue 2459)', () => {
+    const GRID_HINT = '←↑↓→ move · ↵ pick · esc close';
+    const LIST_HINT = '↑↓ move · ↵ pick · esc close';
+    const hintRow = (open) => open.querySelector('[data-popover-key-hints]');
+
+    it('hints the key map the cursor really has, below the caller footer', async () => {
+      const footer = createRawSnippet(() => ({ render: () => '<div data-test-footer></div>' }));
+      for (const [props, hint] of [
+        [{ as: 'grid', columns: 4 }, GRID_HINT],
+        [{}, LIST_HINT],
+        [{ as: 'grid', columns: 1 }, LIST_HINT],
+      ]) {
+        await mountPicker({ ...props, keyHints: true, footer });
+        const open = await openPanel();
+        const row = hintRow(open);
+        assert.equal(row.textContent.trim(), hint, JSON.stringify(props));
+        assert.equal(row.querySelector('span').getAttribute('aria-hidden'), 'true');
+        assert.ok(
+          open.querySelector('[data-test-footer]').compareDocumentPosition(row) &
+            globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
+          'the row sits beneath the caller footer'
+        );
+        harness.remount();
+      }
+    });
+
+    it('draws no row by default', async () => {
+      await mountPicker({ as: 'grid', columns: 4 });
+      assert.ok(!hintRow(await openPanel()), 'every new prop defaults off');
+      harness.remount();
+    });
+
+    it('hands the footer action the panel`s close', async () => {
+      const calls = [];
+      chosen.length = 0;
+      await mountPicker({
+        keyHints: true,
+        footerAction: {
+          label: 'Open catalogue',
+          onActivate: (context) => {
+            calls.push(context);
+          },
+        },
+      });
+      const action = hintRow(await openPanel()).querySelector(
+        'button.fabricate-picker-footer-action'
+      );
+      assert.equal(action.textContent.trim(), 'Open catalogue');
+      assert.equal(action.getAttribute('data-keyboard-focus'), 'true');
+      action.click();
+      flushSync();
+      assert.equal(calls.length, 1);
+      assert.equal(typeof calls[0].close, 'function');
+      assert.ok(panel(), 'the action alone does not close the panel');
+      calls[0].close();
+      await settle();
+      assert.ok(!panel(), 'the close it was handed does');
+      assert.deepEqual(chosen, [], 'and no option was chosen');
+      harness.remount();
+    });
+  });
+
   describe('`filterOptions`', () => {
     it('is consulted on the EMPTY-QUERY pass, which is what a pinned row depends on', async () => {
       const queries = [];

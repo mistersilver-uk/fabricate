@@ -22,7 +22,9 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
+  import { localize } from '../util/foundryBridge.js';
   import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
+  import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
 
@@ -68,6 +70,8 @@
     emptyBody = '',
     header = undefined,
     footer = undefined,
+    keyHints = false,
+    footerAction = null,
     chooseOption,
     optionIsSelected,
     close,
@@ -90,6 +94,14 @@
 
   const focusSearch = () => search?.focus();
   const squareTileList = $derived(isGrid && squareTiles);
+
+  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
+  const KEY_HINTS = {
+    grid: ['FABRICATE.Common.Picker.KeyHints.Grid', '←↑↓→ move · ↵ pick · esc close'],
+    list: ['FABRICATE.Common.Picker.KeyHints.List', '↑↓ move · ↵ pick · esc close'],
+  };
+  const [hintKey, hintFallback] = $derived(KEY_HINTS[gridColumns > 1 ? 'grid' : 'list']);
+  const keyHintText = $derived(localize(hintKey) === hintKey ? hintFallback : localize(hintKey));
 </script>
 
 <div
@@ -265,6 +277,20 @@
   {/if}
 
   {#if footer}{@render footer({ close, failed: status?.kind === 'error', query, focusSearch })}{/if}
+
+  {#if keyHints || footerAction}
+    <div class="fabricate-picker-key-hints" data-popover-key-hints>
+      {#if keyHints}<span class="fabricate-picker-key-hints-text" aria-hidden="true"
+          >{keyHintText}</span
+        >{/if}
+      {#if footerAction}<Button
+          role="ghost"
+          size="28"
+          class="fabricate-picker-footer-action"
+          onclick={() => footerAction.onActivate?.({ close })}>{footerAction.label}</Button
+        >{/if}
+    </div>
+  {/if}
 
   <span class="visually-hidden" aria-live="polite" data-popover-live
     >{status?.kind === 'loading' ? status.text : ''}</span
