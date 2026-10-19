@@ -220,6 +220,7 @@
               )}
           onclick={() => onChange(withRepeats(group, !repeats))}
         >
+          <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
           <span class="manager-recipe-award-repeats-words">
             <span class:is-shown={!repeats} aria-hidden={repeats ? 'true' : undefined}
               >{localizeOr('FABRICATE.Admin.Manager.Recipe.ChoiceGroup.Unique', 'Unique')}</span
@@ -282,6 +283,7 @@
 <style>
   .manager-recipe-award-repeats-words {
     display: inline-grid;
+    justify-items: start;
   }
 
   .manager-recipe-award-repeats-words > span {

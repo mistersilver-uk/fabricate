@@ -343,19 +343,22 @@ The input still renders and is still typeable, and its own placeholder says ther
 A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
 
 A TAG row is one line.
-It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
-There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
+It reads as the sentence it writes — the chosen tag chips each with their own remove, then `+ Tag`, with no word before them — and the any-of / all-of control that sets how they match stands beside it at every tag count, none included, through the shared segmented-control primitive.
+Each chip is the shared chip at its `tag-run` scale in the tag family's lit emphasis, a 28px pill at 11px/600, reading the tag as it is stored after a `#`: `solvent` reads `#solvent`, and no chip capitalizes the stored spelling.
+The `#` is drawn and never stored, so a tag's id, the comparison a requirement matches with and `normalizeTag` are unchanged.
+There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row draws `+ Tag` alone in its arm.
 The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
 It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
 An unfilled tag row is therefore level with the component row beside it.
 The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
-What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
+What must hold there is that the tag ARM stays whole: the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
 Every surface that draws a tag row supplies its tag counts.
+Its catalogue lists each tag as its chip reads it, `#` and the stored spelling, beside that count.
 A recipe's ingredients and a system Tool's repair materials count the system's own components by their in-system tags, the set a tag requirement in that system matches against.
 A world Tool's repair materials count the world catalogue's components by their default tags, the same list that adder's tag vocabulary is derived from.
 That figure describes world authoring and not what the repair will match, because a world Tool's repair materials are a seed copied into each adopting system and matched there against that system's own components.
-The tag catalogue's footer offers **New tag “{name}”**, naming the typed query trimmed and lower-cased as it will be stored, while that name matches no tag in the system's own tag vocabulary under the same comparison, whatever the World Vocabulary holds, and is not already on the row.
+The tag catalogue's footer offers **New tag “{name}”**, naming the typed query trimmed, lower-cased and less one leading `#`, as it will be stored, while that name matches no tag in the system's own tag vocabulary under the same comparison, whatever the World Vocabulary holds, and is not already on the row.
 A recipe's ingredient tag rows offer it: creating adds the tag to the system's tag vocabulary and to the row at once, keeps the panel open with its query, and returns focus to its query field, so the new tag reads checked beneath it.
 The vocabulary write is immediate and outside the recipe draft's Save, as a Tags & Categories add is; the row's tag stages into the draft like any other choice, so discarding the draft keeps the new tag in the vocabulary, where it lists with a zero count.
 A Tool's repair materials draw no footer: a system Tool's would write the same system vocabulary and is not yet offered, and a world Tool's vocabulary is derived from the world catalogue's component defaults, so it holds no list a tag could be added to.
@@ -386,7 +389,7 @@ Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration t
 One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's lead plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
 
 Both of the requirement row's in-row affordances — the `or…` trigger and a tag arm's `+ Tag` — are DASHED OUTLINES with no fill, because each is an affordance for adding standing among controls and chips that are values.
-They are drawn at their own two scales: `or…` is a 28px control among controls, level with the quantity stepper beside it and with no divider before it, while `+ Tag` is a chip among chips.
+Both are 28px and drawn in two shapes: `or…` is a control among controls at the 7px corner, level with the quantity stepper beside it and with no divider before it, while `+ Tag` is a pill among the tag chips it stands with — a 9px plus and `Tag` at 11px/600 on a dashed tag-hue edge.
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
@@ -410,7 +413,7 @@ The group's header is one `role="group"` described by its help line, and its fir
 
 - How many it awards: a `Select` offering **Any one of** and **Up to N of**; up to N opens on a fixed N of two.
 - N, under up to N only: the amount slot's Fixed | Rolled control, a fixed N held at two or more, and a rolled N exactly one expression in its place.
-- Repeats, under up to N by roll only: a neutral button naming its own state, **Unique** or **Repeats allowed**, defaulting to unique, its slot as wide as its wider word.
+- Repeats, under up to N by roll only: a quiet status button naming its own state, **Unique** or **Repeats allowed**, after a `···` mark — 26px, on no edge, in secondary ink at 10.5px/500 — defaulting to unique, its slot as wide as its wider word, the shorter word starting where the wider one does so the mark stays one gap from either.
 - Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
 
 Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
@@ -420,6 +423,7 @@ Focus moves to that row's `or…` control, never to the document.
 Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
 
 Under a roll each alternative carries a RANGE CELL in its convert control's slot, after the row's divider: a d20 glyph titled **"Selection roll range"**, then two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**, `{name}` being the alternative's subject or, unnamed, its kind's word.
+It is never drawn beside the subject (ruled at issue 2534).
 A range overlapping another's, one whose lowest roll is above its highest, or one with an end that is not a whole number marks both fields invalid with its reason on a line of its own across the row.
 The reason is stated once a field is committed, on its `change` or `blur`, rather than on every keystroke; at a narrow width the cell follows the toggle and the amount on the row's second line.
 A rolled group with no rollable expression or a missing range, an up-to group with no N, a group of fewer than two alternatives, and any group in a progressive system's set are flagged by the Validation tab on their set and refused by the save, both reading one set of shape rules.

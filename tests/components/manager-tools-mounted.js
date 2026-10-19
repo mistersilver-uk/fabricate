@@ -1463,7 +1463,7 @@ export function registerToolsCases() {
     flushSync();
     const countOf = (tag) =>
       [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')]
-        .find((node) => node.title === tag)
+        .find((node) => node.title === `#${tag}`)
         ?.querySelector('.manager-chip')
         ?.textContent.trim();
     assert.equal(countOf('herb'), '2 components', 'selectedSystem.componentTagOptions is counted');

@@ -248,8 +248,8 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
       return { property: declaration.slice(0, colon).trim(), value: declaration.slice(colon + 1).trim() };
     });
   assert.ok(
-    declarations.length >= 4,
-    'the rule still states the position and size the primitive has no opinion about'
+    declarations.length >= 3,
+    'the rule still states the position and height the primitive has no opinion about'
   );
 
   const context = await openLayoutContext({
@@ -282,10 +282,9 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
         <body>
           <main class="fabricate-manager">
             <span class="manager-recipe-option-tags" data-recipe-option-tags>
-              <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
               ${withChipHash(
-                '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>' +
-                  '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
+                '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="reagent"><span>#reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>' +
+                  '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="rare"><span>#rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
               )}
             </span>
           </main>
@@ -388,8 +387,8 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       </div>`;
 
   const tagChips = `
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
+        <span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>#abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="hide"><span>#hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
 
   // The row exactly as `PickerRow` renders a tag requirement: the plate.
   const tagRow = (caseName, chips) =>
@@ -397,8 +396,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
       <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
       ${kindPickerFixture('Tag')}
-      <span class="manager-recipe-option-tags" data-recipe-option-tags>
-        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
+      <span class="manager-recipe-option-tags" data-recipe-option-tags>${chips}
         <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
           <button type="button" class="manager-recipe-tag-trigger" data-recipe-add-tag><i class="fa-solid fa-plus"></i><span class="manager-travel-picker-value">Tag</span></button>
         </div>
@@ -492,9 +490,8 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         const tallest = Math.max(...measured.armMembers.map((member) => member.height));
         assert.ok(
           measured.arm.height <= tallest + 1,
-          `${surface.label} (${surface.width}px): ${caseName} tag arm is ONE line - the policy ` +
-            `word, the chips and + Tag stay together (arm ${measured.arm.height}px vs tallest ` +
-            `member ${tallest}px)`
+          `${surface.label} (${surface.width}px): ${caseName} tag arm is ONE line - the chips ` +
+            `and + Tag stay together (arm ${measured.arm.height}px vs tallest member ${tallest}px)`
         );
         for (const [index, member] of measured.armMembers.entries()) {
           assert.ok(
@@ -516,13 +513,90 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         Math.abs(report.empty.row.height - report.component.row.height) <= 1,
         `${surface.label} (${surface.width}px): an EMPTY tag requirement row is level with ` +
           `the component row beside it (${Math.round(report.empty.row.height)}px vs ` +
-          `${Math.round(report.component.row.height)}px) - a taller one has either stacked its ` +
-          `policy word above + Tag or moved a whole control onto a second line, and a shorter ` +
-          `one has lost the row's 34px line`
+          `${Math.round(report.component.row.height)}px) - a taller one has moved a whole ` +
+          `control onto a second line, and a shorter one has lost the row's 34px line`
       );
     } finally {
       await context.close();
     }
+  }
+});
+
+// In foundry-native, the one palette where the tag ink and the tag hue part (issue 2534).
+test("a tag chip is the choice-group drawing's 28px `#` pill in the tag ink", async () => {
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en" data-fabricate-theme="foundry-native">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer modules { ${css} }
+            ${chipCss}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            .fas::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <span class="manager-recipe-option-tags" data-recipe-option-tags>
+              ${withChipHash(
+                '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="solvent"><span>#solvent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
+              )}
+            </span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const chip = document.querySelector('[data-recipe-tag="solvent"]');
+      const resolved = (property, value) => {
+        const probe = document.createElement('span');
+        probe.style.setProperty(property, value);
+        chip.append(probe);
+        const used = getComputedStyle(probe).getPropertyValue(property);
+        probe.remove();
+        return used;
+      };
+      const style = getComputedStyle(chip);
+      return {
+        height: chip.getBoundingClientRect().height,
+        radius: style.borderTopLeftRadius,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        textTransform: style.textTransform,
+        color: style.color,
+        // ratchet-exempt(lint): innerText applies text-transform, so it reads the chip as drawn.
+        text: chip.innerText.trim(),
+        tagInk: resolved('color', 'var(--fab-purple-text)'),
+        hue: resolved('color', 'var(--fab-purple)'),
+        removeSize: getComputedStyle(chip.querySelector('.manager-recipe-tag-remove')).fontSize,
+        minWidth: style.minWidth,
+        armGap: getComputedStyle(chip.parentElement).columnGap,
+        oldChipSize: resolved('font-size', '0.62rem'),
+      };
+    });
+
+    assert.equal(report.height, 28, 'the drawing: 28px');
+    assert.equal(report.radius, '999px', 'the drawing: a pill');
+    assert.equal(report.fontSize, '11px', 'the drawing: 11px');
+    assert.equal(report.fontWeight, '600', 'the drawing: 600');
+    assert.equal(report.textTransform, 'none', 'a tag is drawn as stored, never capitalised');
+    assert.equal(report.text, '#solvent', 'the chip reads `#` and the stored spelling');
+    assert.notEqual(report.tagInk, report.hue, 'foundry-native parts the tag ink from its hue');
+    assert.equal(report.color, report.tagInk, 'the lit chip inks with `--fab-purple-text`');
+    assert.equal(report.removeSize, report.oldChipSize, 'the `×` keeps its 0.62rem (ruling 4)');
+    assert.equal(report.minWidth, 'auto', 'the chip hugs its tag: no minimum width');
+    assert.equal(report.armGap, '8px', "the drawing's 8px between chips");
+  } finally {
+    await context.close();
   }
 });
 
@@ -1803,6 +1877,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
 
 test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
   // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).
+  // In foundry-native, the one palette where the tag ink parts from the tag hue (issue 2534).
   const chipScopedForTriggers = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte')
   );
@@ -1821,7 +1896,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   try {
     await page.setContent(`
       <!doctype html>
-      <html lang="en">
+      <html lang="en" data-fabricate-theme="foundry-native">
         <head>
           <meta charset="utf-8">
           <style>
@@ -1869,13 +1944,18 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
           paddingInline: [style.paddingLeft, style.paddingRight],
         };
       };
-      const muted = document.createElement('span');
-      muted.style.color = 'var(--fab-text-muted)';
-      document.querySelector('main').append(muted);
+      const ink = (value) => {
+        const probe = document.createElement('span');
+        probe.style.color = value;
+        document.querySelector('main').append(probe);
+        return getComputedStyle(probe).color;
+      };
       return {
-        muted: getComputedStyle(muted).color,
+        muted: ink('var(--fab-text-muted)'),
+        tagInk: ink('var(--fab-purple-text)'),
         or: read('[data-or-trigger]'),
         tag: read('[data-tag-trigger]'),
+        tagPlus: getComputedStyle(document.querySelector('[data-tag-trigger] > i')).fontSize,
         chip: read('[data-plain-chip]'),
       };
     });
@@ -1907,19 +1987,20 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'and it displaces the host `button { justify-content: center }` rather than inheriting it'
     );
 
-    // `proto:2256`: a ~20px stadium in the TAG tint at 10px/600.
+    // The library choice-group unit's dashed `button.k-chip`: a 28px pill in the tag ink at
+    // 11px/600, level with the 28px chips it stands among (issue 2534).
     assert.equal(report.tag.borderStyle, 'dashed', 'the `+ Tag` pill is an affordance too');
-    assert.equal(report.tag.borderRadius, '999px', '`proto:2256`: a stadium');
-    assert.equal(report.tag.fontSize, '10px', '`proto:2256`: 10px');
-    assert.equal(report.tag.fontWeight, '600', '`proto:2256`: 600');
+    assert.equal(report.tag.height, 28, 'the drawing: 28px, the chips\' height');
+    assert.equal(report.tag.borderRadius, '999px', 'the drawing: a pill');
+    assert.equal(report.tag.fontSize, '11px', 'the drawing: 11px');
+    assert.equal(report.tag.fontWeight, '600', 'the drawing: 600');
+    assert.deepEqual(report.tag.paddingInline, ['12px', '12px'], 'the drawing: 12px padding');
+    assert.equal(report.tagPlus, '9px', 'the drawing: a 9px plus');
+    assert.equal(report.tag.color, report.tagInk, 'the drawing: the tag ink, `--fab-purple-text`');
     assert.equal(
       report.tag.background,
       'rgba(0, 0, 0, 0)',
-      '`proto:2256` gives it no fill either — the chips beside it are the filled things'
-    );
-    assert.ok(
-      report.tag.height <= 22,
-      `\`proto:2256\` draws a pill no taller than the chips it stands among (got ${report.tag.height}px)`
+      'the drawing gives it no fill either — the chips beside it are the filled things'
     );
     // The two carry DIFFERENT inks, and neither is the chip's. `+ Tag` is in the tag family
     // because a tag is what it adds; `or…` is quiet because it offers four kinds and favours none.
@@ -1951,5 +2032,74 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       new RegExp(`\\.manager-chip\\.${retired}`),
       `the discarded chip-bound rules for \`${retired}\` are retired rather than left reading as live`
     );
+  }
+});
+
+test('Repeats is the "up to N, by roll" drawing\'s quiet 26px status button (issue 2534)', async () => {
+  const button = (hook, disabled = '') =>
+    `<button type="button" class="fabricate-button fab-manager-button manager-recipe-award-repeats" ${hook} ${disabled}><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Unique</span></button>`;
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: 2rem; }
+            }
+            @layer modules { ${css} }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${button('data-repeats')}
+            ${button('data-repeats-off', 'disabled')}
+            <button type="button" class="fabricate-button fab-manager-button" data-family-off disabled>Off</button>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const repeats = document.querySelector('[data-repeats]');
+      const style = getComputedStyle(repeats);
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--fab-text-secondary)';
+      document.querySelector('main').append(probe);
+      const edge = (selector) => getComputedStyle(document.querySelector(selector)).borderTopColor;
+      return {
+        height: repeats.getBoundingClientRect().height,
+        radius: style.borderTopLeftRadius,
+        border: style.borderTopColor,
+        color: style.color,
+        secondary: getComputedStyle(probe).color,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        markSize: getComputedStyle(repeats.querySelector('i.fa-ellipsis')).fontSize,
+        offEdge: edge('[data-repeats-off]'),
+        familyOffEdge: edge('[data-family-off]'),
+      };
+    });
+
+    assert.equal(report.height, 26, 'the drawing: 26px, under the family\'s 34px');
+    assert.equal(report.radius, '7px', 'the drawing: a 7px corner (A3)');
+    assert.equal(report.border, 'rgba(0, 0, 0, 0)', 'the drawing: no edge');
+    assert.equal(report.color, report.secondary, 'the drawing: secondary ink');
+    assert.equal(report.fontSize, '10.5px', 'the drawing: 10.5px');
+    assert.equal(report.fontWeight, '500', 'the drawing: 500');
+    assert.equal(report.markSize, '11px', 'the `···` mark is 11px');
+    assert.equal(report.offEdge, report.familyOffEdge, 'a disabled Repeats keeps the family edge');
+  } finally {
+    await context.close();
   }
 });

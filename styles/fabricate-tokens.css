@@ -115,6 +115,7 @@
   --fab-danger-border: rgb(185 124 120 / 54%);
   --fab-purple: #CEC1E6;
   --fab-purple-soft: rgb(206 193 230 / 14%);
+  --fab-purple-text: #CEC1E6;
   --fab-tag-sage: #BFD5C3;
   --fab-tag-mist: #B9D3DD;
   --fab-tag-lavender: #CEC1E6;
@@ -213,6 +214,7 @@
   --fab-danger-border: rgb(255 82 82 / 54%);
   --fab-purple: #A875FF;
   --fab-purple-soft: rgb(168 117 255 / 16%);
+  --fab-purple-text: #A875FF;
   --fab-tag-sage: #BFD5C3;
   --fab-tag-mist: #B9D3DD;
   --fab-tag-lavender: #CEC1E6;
@@ -309,6 +311,7 @@
   --fab-danger-border: rgb(168 109 102 / 54%);
   --fab-purple: #C3B2CA;
   --fab-purple-soft: rgb(195 178 202 / 14%);
+  --fab-purple-text: #C3B2CA;
   --fab-tag-sage: #B1BEAC;
   --fab-tag-mist: #C9C3BF;
   --fab-tag-lavender: #C3B2CA;
@@ -405,6 +408,7 @@
   --fab-danger-border: rgb(185 131 120 / 54%);
   --fab-purple: #D0C7E2;
   --fab-purple-soft: rgb(208 199 226 / 14%);
+  --fab-purple-text: #D0C7E2;
   --fab-tag-sage: #C6D8C2;
   --fab-tag-mist: #C8D9D3;
   --fab-tag-lavender: #D0C7E2;
@@ -501,6 +505,7 @@
   --fab-danger-border: rgb(199 138 150 / 54%);
   --fab-purple: #BEC3EE;
   --fab-purple-soft: rgb(190 195 238 / 14%);
+  --fab-purple-text: #BEC3EE;
   --fab-tag-sage: #B8DBE0;
   --fab-tag-mist: #C7D7EE;
   --fab-tag-lavender: #D6C4EC;
@@ -599,6 +604,7 @@
   --fab-danger-border: rgb(161 108 96 / 44%);
   --fab-purple: #584A75;
   --fab-purple-soft: rgb(88 74 117 / 16%);
+  --fab-purple-text: #A99BC4;
   --fab-tag-sage: #A9BE9E;
   --fab-tag-mist: #CBC6BB;
   --fab-tag-lavender: #A99BC4;
@@ -695,6 +701,7 @@
   --fab-danger-border: rgb(201 110 102 / 54%);
   --fab-purple: #C4B6DE;
   --fab-purple-soft: rgb(196 182 222 / 14%);
+  --fab-purple-text: #C4B6DE;
   --fab-tag-sage: #B6CDBA;
   --fab-tag-mist: #AFC6DC;
   --fab-tag-lavender: #C4B6DE;

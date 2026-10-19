@@ -235,8 +235,11 @@ On a requirement's bare row, **or…** opens the same kinds in a menu headed **A
 
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
+  The row shows each tag in a chip as a `#` followed by the tag as it is stored, such as `#solvent`, and the adder's list reads the same way.
+  The `#` is only for display and is not part of the tag.
   The tag adder lists the system's tags with how many components carry each, marks the row's tags as selected, and choosing one again removes it.
-  Type a tag the system does not have yet, and the adder offers **New tag “name”**, showing the name trimmed and in lowercase as it will be saved.
+  Type a tag the system does not have yet, and the adder offers **New tag “name”**, showing the name trimmed, in lowercase and without a leading `#`, as it will be saved.
+  Typing `#brine` therefore adds the tag `brine`.
   Choosing it adds the tag to the system's tags right away and checks it on the row.
   The new tag is saved with the system at once, not with the recipe's **Save**, so **Discard** leaves it in the system's tags with no components carrying it.
   If the tag cannot be saved, it comes back off the row and the message "Tag could not be added." appears.

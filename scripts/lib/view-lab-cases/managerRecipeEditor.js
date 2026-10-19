@@ -759,11 +759,66 @@ export const CASES = Object.freeze([
         target: '.fabricate-picker-popover .manager-travel-popover-search input',
       },
     ],
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-recipe-option-tags] [data-recipe-add-tag]',
+          styles: 'height: 28px; border-top-style: dashed',
+        },
+      ],
+    },
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
       ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // A second tag picked from the catalogue, the panel closed through the tab so the pointer leaves
+  // `+ Tag`: two `#` chips and the adder at the choice-group drawing's figures (issue 2534).
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-tag-row-two-tags',
+    label: 'Manager — Recipe edit ingredients, a tag row holding two tags',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...TAG_PICKER_STEPS,
+      { selector: '.fabricate-picker-popover [role="option"][title="#vessel"]' },
+      { selector: '#recipe-tab-ingredients' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-option]:has([data-recipe-tag="solvent"]):has([data-recipe-tag="vessel"]) [data-recipe-tag-match]',
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-recipe-tag="vessel"]',
+          styles:
+            'height: 28px; border-top-left-radius: 999px; font-size: 11px; font-weight: 600; ' +
+            'text-transform: none; color: var(--fab-purple-text)',
+        },
+        {
+          selector: '[data-recipe-tag="vessel"] .manager-recipe-tag-remove',
+          styles: 'font-size: 0.62rem',
+        },
+        { selector: '[data-recipe-option-tags]', styles: 'column-gap: 8px' },
+        {
+          selector: '[data-recipe-option-tags] [data-recipe-add-tag]',
+          styles:
+            'height: 28px; border-top-style: dashed; border-top-left-radius: 999px; ' +
+            'font-size: 11px; font-weight: 600; padding-left: 12px; background-color: transparent',
+        },
+      ],
+    },
+    expectCenterHit: [
+      '[data-recipe-tag="vessel"] [data-recipe-remove="tag"]',
+      '[data-recipe-option-tags] [data-recipe-add-tag]',
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
   // The panel's footer offers the absent query as a new tag (issue 2515).
@@ -795,9 +850,9 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [...NEW_TAG_STEPS, { selector: '.fabricate-picker-popover [data-recipe-tag-create]' }],
     expectView: 'recipe-edit',
-    expectSelector: '.fabricate-picker-popover [role="option"][title="ve"][aria-selected="true"]',
+    expectSelector: '.fabricate-picker-popover [role="option"][title="#ve"][aria-selected="true"]',
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-picker-popover' }],
-    expectCenterHit: '.fabricate-picker-popover [role="option"][title="ve"]',
+    expectCenterHit: '.fabricate-picker-popover [role="option"][title="#ve"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -1466,6 +1521,21 @@ export const CASES = Object.freeze([
         `${RESULT_GROUP('sm-r-horseshoe-draws')}:has([data-recipe-group-selection]) ` +
         '[data-recipe-group-repeats="repeats"]',
       expectCenterHit: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-repeats]`,
+      // The drawing's quiet status button: 26px on no edge, a `···` mark before its word.
+      expectLayout: {
+        controls: [
+          {
+            selector: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-repeats]`,
+            styles:
+              'height: 26px; border-top-left-radius: 7px; border-top-color: transparent; ' +
+              'color: var(--fab-text-secondary); font-size: 10.5px; font-weight: 500',
+          },
+          {
+            selector: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-repeats] > i.fa-ellipsis`,
+            styles: 'font-size: 11px',
+          },
+        ],
+      },
       expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-draws'),
       ...(position && { position }),
       kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],

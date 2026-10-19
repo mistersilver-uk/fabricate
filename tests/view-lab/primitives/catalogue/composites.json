@@ -91,7 +91,7 @@
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
@@ -99,13 +99,13 @@
       "catalogue": {
         "tags": [
           {
-            "id": "#Hardwood",
-            "label": "#Hardwood",
+            "id": "hardwood",
+            "label": "hardwood",
             "icon": "fas fa-tag"
           },
           {
-            "id": "#Seasoned",
-            "label": "#Seasoned",
+            "id": "seasoned",
+            "label": "seasoned",
             "icon": "fas fa-tag"
           }
         ]
@@ -276,27 +276,27 @@
     "draws": ":scope > div > div",
     "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "TagAdderOpen",
-    "slot": { "width": 772, "height": 336 },
+    "slot": { "width": 765, "height": 337 },
     "data": { "typed": "wood" },
-    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone, and the footer offers `New tag “wood”`, since no tag is named `wood`. A boxed slot, because the panel is portalled to the window. Measured: at 772 by 336 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 275 with its footer, unclamped and unflipped; below 772 the row wraps to a second line, and 336 is the least height that holds the whole panel (335 clips it to 274.5). The tag panel opens at its 300px site minimum, so the held `#Hardwood` reads whole and only `#Seasoned-Heartwood-Planks` ellipsizes beside its count chip.",
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, each stored lowercase without a `#` as the build stores it and drawn by the row as `#` and that spelling: the held `#hardwood` selected with a check and every tag with its count chip, `#dirftwood`'s zero in the warning tone, and the footer offers `New tag “wood”`, since no tag is stored as `wood`. A boxed slot, because the panel is portalled to the window. Measured: at 765 by 337 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 275 with its footer, unclamped and unflipped; below 765 the row wraps to a second line, and 337 is the least height that holds the whole panel (336 clips it to 274). The tag panel opens at its 300px site minimum, so the held `#hardwood` reads whole and only `#seasoned-heartwood-planks` ellipsizes beside its count chip.",
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
       "kinds": ["component", "tags", "essence", "currency"],
       "catalogue": {
         "tags": [
-          { "id": "#Hardwood", "label": "#Hardwood", "icon": "fas fa-tag", "count": 24 },
-          { "id": "#Seasoned", "label": "#Seasoned", "icon": "fas fa-tag", "count": 11 },
-          { "id": "#Softwood", "label": "#Softwood", "icon": "fas fa-tag", "count": 9 },
-          { "id": "#Driftwood", "label": "#Driftwood", "icon": "fas fa-tag", "count": 3 },
-          { "id": "#Dirftwood", "label": "#Dirftwood", "icon": "fas fa-tag", "count": 0 },
+          { "id": "hardwood", "label": "hardwood", "icon": "fas fa-tag", "count": 24 },
+          { "id": "seasoned", "label": "seasoned", "icon": "fas fa-tag", "count": 11 },
+          { "id": "softwood", "label": "softwood", "icon": "fas fa-tag", "count": 9 },
+          { "id": "driftwood", "label": "driftwood", "icon": "fas fa-tag", "count": 3 },
+          { "id": "dirftwood", "label": "dirftwood", "icon": "fas fa-tag", "count": 0 },
           {
-            "id": "#Seasoned-Heartwood-Planks",
-            "label": "#Seasoned-Heartwood-Planks",
+            "id": "seasoned-heartwood-planks",
+            "label": "seasoned-heartwood-planks",
             "icon": "fas fa-tag",
             "count": 1
           }
@@ -448,7 +448,7 @@
             "quantity": 1,
             "match": {
               "type": "tags",
-              "tags": ["#Hardwood", "#Seasoned"],
+              "tags": ["hardwood", "seasoned"],
               "tagMatch": "any"
             }
           }
@@ -460,7 +460,7 @@
           "name": "Oak Haft"
         }
       ],
-      "itemTags": ["#Hardwood", "#Seasoned"],
+      "itemTags": ["hardwood", "seasoned"],
       "currencyUnits": [
         {
           "id": "sp",
@@ -677,7 +677,7 @@
     "draws": ":scope > div > div > div",
     "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "KindMenuOpen",
-    "slot": { "width": 582, "height": 194 },
+    "slot": { "width": 585, "height": 194 },
     "undrawn": {
       "Oak Haft": "the row’s named component; the drawing draws the trigger without its row"
     },
@@ -689,7 +689,7 @@
       },
       "allowAny": true
     },
-    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 582 by 194 holds the row on one line with its subject cell whole, and the menu opens 4px beneath its trigger at its end edge, unclamped and unflipped; below 582 the trailing controls wrap to a second line rather than squeeze the subject cell, and 194 is the least height that holds the whole menu (193 clips it). On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
+    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 585 by 194 holds the row on one line with its subject cell whole, and the menu opens 4px beneath its trigger at its end edge, unclamped and unflipped; below 585 the trailing controls wrap to a second line rather than squeeze the subject cell, and the whole menu fits with 3px to spare (191 is the least height that holds it and 190 clips it; the slot keeps 194 so CI's chrome has room). On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
@@ -700,7 +700,7 @@
     "slot": { "width": 661, "height": 347 },
     "undrawn": {
       "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
-      "#Hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
+      "hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
       "Vitality": "the system’s essence, whose presence offers Essence; the drawing draws no essence catalogue",
       "Gold": "the currency unit’s name, whose presence offers Currency; the drawing draws no currency catalogue",
       "gp": "the currency unit’s abbreviation; the drawing draws no currency catalogue"
@@ -712,12 +712,12 @@
           { "quantity": 1, "match": { "type": "component", "componentId": "oak-haft" } },
           {
             "quantity": 1,
-            "match": { "type": "tags", "tags": ["#Hardwood"], "tagMatch": "any" }
+            "match": { "type": "tags", "tags": ["hardwood"], "tagMatch": "any" }
           }
         ]
       },
       "componentOptions": [{ "id": "oak-haft", "name": "Oak Haft" }],
-      "itemTags": ["#Hardwood"],
+      "itemTags": ["hardwood"],
       "essenceOptions": [{ "id": "vitality", "name": "Vitality" }],
       "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
       "currencyEnabled": true

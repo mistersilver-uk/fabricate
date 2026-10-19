@@ -827,6 +827,18 @@ const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button
 const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
+const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
+const REPEATS = '[data-recipe-result-group="sm-r-horseshoe-draws"] [data-recipe-group-repeats]';
+// The quiet status button the "up to N, by roll" drawing draws (issue 2534).
+const REPEATS_CONTROLS = [
+  {
+    selector: REPEATS,
+    styles:
+      'height: 26px; border-top-left-radius: 7px; border-top-color: transparent; ' +
+      'color: var(--fab-text-secondary); font-size: 10.5px; font-weight: 500',
+  },
+  { selector: `${REPEATS} > i.fa-ellipsis`, styles: 'font-size: 11px' },
+];
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -913,6 +925,31 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'height: 28px; border-top-left-radius: 7px; border-top-style: dashed',
     },
   ],
+  // The tag row at the choice-group drawing's figures: `#` pills and a dashed adder (issue 2534).
+  'manager-recipe-edit-tag-picker': [
+    { selector: TAG_ADDER, styles: 'height: 28px; border-top-style: dashed' },
+  ],
+  'manager-recipe-edit-ingredients-tag-row-two-tags': [
+    {
+      selector: '[data-recipe-tag="vessel"]',
+      styles:
+        'height: 28px; border-top-left-radius: 999px; font-size: 11px; font-weight: 600; ' +
+        'text-transform: none; color: var(--fab-purple-text)',
+    },
+    {
+      selector: '[data-recipe-tag="vessel"] .manager-recipe-tag-remove',
+      styles: 'font-size: 0.62rem',
+    },
+    { selector: '[data-recipe-option-tags]', styles: 'column-gap: 8px' },
+    {
+      selector: TAG_ADDER,
+      styles:
+        'height: 28px; border-top-style: dashed; border-top-left-radius: 999px; ' +
+        'font-size: 11px; font-weight: 600; padding-left: 12px; background-color: transparent',
+    },
+  ],
+  'manager-recipe-edit-results-group-rolled-upto-repeats': REPEATS_CONTROLS,
+  'manager-recipe-edit-results-group-rolled-upto-repeats-narrow': REPEATS_CONTROLS,
   'manager-environment-edit-automatic-force-add': menuCorners(
     '.fabricate-action-menu-panel',
     '.fabricate-action-menu-panel [data-action="force-include"]'
