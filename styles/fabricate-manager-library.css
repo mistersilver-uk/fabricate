@@ -1447,6 +1447,7 @@
 }
 
 .fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob {
+  /* ratchet-exempt(design-system): knob travel derived from the track and knob sizes, not spacing */
   margin-left: 16px;
 }
 
