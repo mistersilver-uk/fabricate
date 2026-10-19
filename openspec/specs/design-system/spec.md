@@ -355,7 +355,7 @@ It writes no root of its own and keeps its `manager-recipe-*` family, every glob
 Issue 2515 gives `PickerRowAmount` and `KindAdder` library entries of their own, so both rows read `shipped`; their family and its `manager-only` scope are unchanged.
 Because scope is MEASURED over the import graph and read transitively, a `manager-only` row stays honest exactly when every importer outside `src/ui/svelte/components/` that reaches it, directly or through a file in that directory, lies under `src/ui/svelte/apps/manager/`.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
-The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
+The retirement is of those nine exact tokens; family descendants remain, `fab-manager-button` is retired by the `<Button>` flip, and the un-rooted `manager-modal` family is rooted by the `<Modal>` flip, both remaining items of issue 2315.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
 All six that issue 1508 names are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
@@ -716,6 +716,8 @@ A FILLED control clips its fill to the padding box, so its outline composites ov
 The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a radio card's dot on the gathering task editor's option cards measures 2.03:1 against that surround in `hearth-herb`, and a large checkbox on a selected row 2.76:1 in `hearth-herb`.
 `tests/components/control-outline-contrast.test.js` holds the single declaration, the 3:1 floor on `--fab-bg-0`, `--fab-bg-1` and `--fab-bg-2` in all seven palettes, every outline site, and the padding-box clip on every filled one.
 The switch's off knob is `--fab-text-muted` and MUST clear 3:1 against its off track, `--fab-surface-soft`, composited over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and over `--fab-surface-soft` on `--fab-bg-2` (a card), in every palette (issue 2492); `control-outline-contrast` holds it beside the outline floor.
+A labelled `Select`'s note (`.fabricate-select-note`) inks `--fab-text-muted` at 10.5px, weight 400, line height 1.5, a recorded correction of the specimen's subtle `k-hint` (issue 2315).
+It clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
 
 The recessive tones `secondary`, `neutral`, `subtle` and `muted` are a FOUR-RANK ORDERED ink ladder routed by MEANING: `secondary` names the rule the GM is reading, `neutral` a fact that is merely present, `subtle` a quiet non-actionable state, and `muted` unavailable.
 Each is measurably weaker than the last in every theme, and the ORDER is the invariant rather than any percentage: `fabricate` and `sovereign` express the ladder as one opaque hue at 74%, 56% and 42% of itself, `ironblood-forge`, `hearth-herb` and `starglass-arcana` as one opaque hue at 80%, 56% and 42% of itself, `mythwright` states the first three as three DIFFERENT opaque hues plus one alpha, and `foundry-native` uses 80% and 60% of its secondary triple, then a different base triple at 50%.
@@ -895,6 +897,18 @@ It joins a rule to a same-selector twin elsewhere in the same file, so a family 
 - **THEN** the rendered size is preserved and the tile carries a `ratchet-exempt` reason at the site
 - **AND** that reason states the rung that was rejected and why
 - **AND** the resize is left to the geometry sweep that owns the ladder
+
+### Requirement: The card draws one box and its callers only place it
+
+`InspectorCard` (the library's `<Card>`) draws the specimen's box from the module sheet: radius 11, padding `--fab-space-4`, 1px `--fab-border`, `--fab-bg-2`.
+Its one variant, `flush`, emits `is-flush` and draws padding 0 for a card whose head and body inset themselves.
+A caller rule places a card (margin, flex or grid placement, gap, position) and never restates its padding, fill, radius or border; a status tone (`border-color` and a `--fab-*-soft` fill from one status ramp) is not a restatement.
+A card never contains a card.
+
+#### Scenario: A caller rule restates the card's box
+
+- **WHEN** a caller rule under a `.fabricate-card` selector declares padding, background, border-radius or border outside a status tone
+- **THEN** `card-drawing-parity` fails and names the rule
 
 ### Requirement: Field-sized empty states match their associated controls
 

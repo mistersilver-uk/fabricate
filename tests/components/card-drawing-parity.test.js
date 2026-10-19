@@ -1,8 +1,9 @@
 /**
  * Issue 2315: the `<Card>` entry's `.k-card` kit declares the box `InspectorCard`'s family rule
  * ships and its inline flush unit the `flush` rule's padding; no caller rule, at any specificity,
- * restates that box outside a status tone; and a card never contains a card, in a template or a
- * mounted inspector. Declarations are read as written.
+ * restates that box outside a status tone; a card never contains a card, in a template or a
+ * mounted inspector; and the entry's Card chip, its status and the manifest agree. Declarations
+ * are read as written.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -10,6 +11,7 @@ import { after, before, test } from 'node:test';
 
 import { Window } from 'happy-dom';
 
+import { DESIGN_SYSTEM_PRIMITIVES } from '../../scripts/lib/designSystemPrimitives.js';
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
 import { readDesignLibrary } from '../helpers/designLibrary.js';
 import {
@@ -40,6 +42,7 @@ const FLUSH = `${BASE}.is-flush`;
 const BOX = /^(?:padding|background|border)(?:-|$)/u;
 const STATUS_RAMPS = new Set(['success', 'danger', 'warning', 'info']);
 const TRAVEL = 'src/ui/svelte/apps/manager/world/TravelInspector.svelte';
+const CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 
 const { document } = new Window();
 document.write(readDesignLibrary());
@@ -174,6 +177,20 @@ test('the census refuses a restatement at any specificity, and admits a tone and
   ]);
 });
 
+test('the entry’s Card chip reads its declared status, as the manifest does', () => {
+  const status = entry.getAttribute('data-status-card');
+  assert.equal(status, 'shipped');
+  const chips = [...entry.querySelectorAll(':scope .spec-head > .st')].filter((chip) =>
+    chip.textContent.startsWith('Card')
+  );
+  assert.deepEqual(
+    chips.map((chip) => [chip.className, chip.textContent]),
+    [[`st st-${status}`, `Card · ${status}`]]
+  );
+  const row = DESIGN_SYSTEM_PRIMITIVES.find(({ path }) => path === CARD);
+  assert.deepEqual([row.library, row.status], ['<Card>', status]);
+});
+
 test('no template renders a card inside a card', () => {
   const nested = COMPONENTS.flatMap(([file, ast]) =>
     renderedNodes(ast, 'InspectorCard')
@@ -196,7 +213,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/InspectorCard.svelte',
+    CARD,
     'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     TRAVEL,
   ],
