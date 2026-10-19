@@ -33,10 +33,12 @@
     `openspec/specs/design-system/spec.md`; one measured residue follows from the same spread, in
     that an element carrying one has its scope hash stamped defensively, so the hint `<small>`
     renders a `class` the compiled CSS never names.
-  - THE ROOT IS A GROUP NAMED BY ITS `<strong>`, and in `missing` described by its hint and subline,
-    so the state is announced as text as well as drawn in colour.
-  - A MISSING CHIP DRAWS THE ALERT GLYPH, never the document's art or the caller's glyph, because a
-    broken link must not look like a working one.
+  - The root is a group named by its `<strong>` and, in `missing`, described by its hint and
+    subline, so the state is announced as text as well as drawn in colour — pinned by
+    `tests/components/link-field-faces-rendered.test.js`.
+  - A missing chip draws the alert glyph, never the document's art or the caller's glyph, because
+    a broken link must not look like a working one — pinned by
+    `tests/components/link-field-faces-rendered.test.js`.
 -->
 <script>
   import { dragDrop } from '../actions/dragDrop.js';
