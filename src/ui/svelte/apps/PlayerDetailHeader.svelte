@@ -11,7 +11,7 @@
   | `art` / `icon` / `tint` | resolved image path / Font Awesome classes / bare `--fab-tag-*` key | `''` / the tile's own / `''` | Forwarded to the tile: a 38px record tile. The caller resolves the image. |
   | `artDimmed` | boolean | `false` | Fades the artwork beneath `tileOverlay`, never the overlay itself. |
   | `primaryLabel` | string | `''` | The primary's visible text. Empty renders no primary at all. |
-  | `primaryIcon` / `primaryDisabled` | Font Awesome classes / boolean | `''` / `false` | The primary's leading glyph and its disabled state. |
+  | `primaryIcon` / `primaryDisabled` / `primaryBusy` | Font Awesome classes / boolean / boolean | `''` / `false` / `false` | The primary's leading glyph, its disabled state and `Button`'s `busy`. |
   | `primaryProps` | attribute map | `{}` | Spread onto the primary: `data-*` hooks, `class`, `title`, `aria-*`. |
   | `class` | class string | `''` | An extra class on the root, appended to the row's own. |
 
@@ -43,6 +43,7 @@
     primaryLabel = '',
     primaryIcon = '',
     primaryDisabled = false,
+    primaryBusy = false,
     primaryProps = {},
     onclick = () => {},
     tileOverlay = null,
@@ -76,7 +77,13 @@
   {#if primaryLabel}
     <div class="player-detail-header-action">
       <!-- ratchet-exempt(design-system): the spread is `primaryProps`, the caller's extra `class` and the `data-*`, `title` and `aria-*` Button takes through rest -->
-      <Button role="primary" disabled={primaryDisabled} {onclick} {...primaryProps}>
+      <Button
+        role="primary"
+        disabled={primaryDisabled}
+        busy={primaryBusy}
+        {onclick}
+        {...primaryProps}
+      >
         {#if primaryIcon}<i class={primaryIcon} aria-hidden="true"></i>{/if}
         <span>{primaryLabel}</span>
       </Button>

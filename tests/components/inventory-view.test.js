@@ -3538,8 +3538,10 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       'one row per queued item, in run order'
     );
     // The footer stays put and goes BUSY rather than disappearing.
+    // Busy, not disabled (issue 2540): the commit keeps focus and swallows a second press.
     const commit = target.querySelector('[data-inventory-bulk-salvage]');
-    assert.equal(commit.disabled, true, 'the commit button cannot be pressed twice');
+    assert.equal(commit.disabled, false, 'the busy commit keeps its tab stop');
+    assert.equal(commit.getAttribute('aria-disabled'), 'true', 'and cannot be pressed twice');
     assert.equal(commit.getAttribute('aria-busy'), 'true');
     assert.equal(
       target.querySelector('[data-inventory-bulk-destroy]').disabled,

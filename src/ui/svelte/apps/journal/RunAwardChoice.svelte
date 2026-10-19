@@ -116,13 +116,15 @@
           <div class="run-award-choice-actions">
             <Button
               role={index === 0 ? 'primary' : 'neutral'}
-              disabled={busy || run?.actions?.chooseAward !== true || !canConfirm(choice, picks)}
-              aria-busy={busy || undefined}
+              disabled={run?.actions?.chooseAward !== true || !canConfirm(choice, picks)}
+              {busy}
               data-award-confirm={choice.choiceId}
               onclick={() => confirm(choice)}
             >
               <i class="fas fa-gift" aria-hidden="true"></i>
-              {confirmLabel(choice, picks, localize)}
+              {busy
+                ? localize('FABRICATE.App.Journal.AwardChoice.Busy')
+                : confirmLabel(choice, picks, localize)}
             </Button>
           </div>
         {/if}

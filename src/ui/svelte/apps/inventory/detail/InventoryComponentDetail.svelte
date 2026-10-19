@@ -327,18 +327,18 @@
   });
 
   // The pane's one primary: the one-shot salvage, in the header and only while Salvage is open.
-  const action = $derived(
-    salvageAction({ salvage, busy: salvaging, depleted, result: salvageResult })
-  );
+  const action = $derived(salvageAction({ salvage, depleted, result: salvageResult }));
   const headerPrimary = $derived(
     salvageable && activeTab === 'salvage' && action.shown
       ? {
-          primaryLabel: localize(action.labelKey),
+          primaryLabel: localize(
+            salvaging ? 'FABRICATE.App.Inventory.Salvage.ActionBusy' : action.labelKey
+          ),
           primaryIcon: salvaging ? 'fas fa-spinner fa-spin' : 'fas fa-recycle',
           primaryDisabled: action.disabled,
+          primaryBusy: salvaging,
           primaryProps: {
             'data-inventory-salvage-action': '',
-            'aria-busy': salvaging,
             'aria-describedby': action.toolBlocked ? 'salvage-footer-note' : undefined,
           },
           onclick: (event) => withRollPromptOrigin(event, () => onSalvage?.()),
