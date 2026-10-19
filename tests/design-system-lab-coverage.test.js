@@ -570,6 +570,7 @@ test('no drawing a row replaces contains a drawing another row claims', () => {
     }))
   );
   assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
+  assert.ok([...modes.values()].includes(BESIDE), 'no specimen stands beside its drawing');
   assert.deepEqual(detachedClaims(hosts), []);
 
   // No shipped pair nests today, so the beside exemption is held on a synthetic pair alone.
