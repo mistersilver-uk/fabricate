@@ -233,7 +233,7 @@ const readFaces = () => {
           ? null
           : describedBy.split(' ').map((id) => byId(id)?.textContent.trim() ?? `#${id} unresolved`),
     };
-    face.glyphClass = host.querySelector('.fab-medallion > i')?.className ?? '';
+    face.glyphClass = host.querySelector(':scope .fab-medallion > i')?.className ?? '';
     const uuidLine = doc.createRange();
     const uuidNode = host.querySelector(PARTS.uuid);
     if (uuidNode) uuidLine.selectNodeContents(uuidNode);
