@@ -589,6 +589,11 @@
   min-width: 0;
 }
 
+/* An untruncated name takes its text's width, so its badges follow it and wrap beneath a name that fills the line. */
+.fabricate-list-row:not(.is-truncated) .fabricate-list-row-head > .fabricate-list-row-name {
+  flex: 0 1 auto;
+}
+
 /* A truncated row keeps its badges on the name's line, the name ellipsizing first, until the name would narrow past 6ch; then the badges wrap beneath it. */
 .fabricate-list-row.is-truncated .fabricate-list-row-head > .fabricate-list-row-name {
   flex: 1 1 6ch;

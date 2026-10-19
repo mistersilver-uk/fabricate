@@ -179,11 +179,14 @@
       { count: bulkUnitCount }
     )
   );
+  // A destroy in flight names itself; `Button`'s busy draws no label of its own (issue 2540).
   const bulkDestroyLabel = $derived(
-    localize('FABRICATE.App.Inventory.Bulk.DestroyAction', {
-      components: bulkComponentsText,
-      units: bulkUnitsText,
-    })
+    store?.bulkDestroying === true
+      ? localize('FABRICATE.App.Inventory.Bulk.DestroyBusy')
+      : localize('FABRICATE.App.Inventory.Bulk.DestroyAction', {
+          components: bulkComponentsText,
+          units: bulkUnitsText,
+        })
   );
 
   // The store signals a refused 26th selection rather than authoring a message; the

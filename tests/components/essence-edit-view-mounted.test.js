@@ -390,12 +390,19 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     flushSync();
 
     const card = root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]');
-    const title = card.querySelector('.manager-item-drop-zone-copy strong').textContent.trim();
+    const uuidLine = card.querySelector('[data-item-drop-zone-uuid]');
+    const title = uuidLine.textContent.trim();
     const sublines = [...card.querySelectorAll('.manager-item-drop-zone-copy small')].map(
       (line) => line.textContent.trim()
     );
 
-    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by the uuid — its only name');
+    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by its uuid line');
+    assert.equal(
+      uuidLine.id,
+      card.getAttribute('aria-labelledby'),
+      'which is the line that names the group'
+    );
+    assert.ok(!card.querySelector('.manager-item-drop-zone-copy strong'), 'with no name over it');
     assert.equal(
       sublines.includes(title),
       false,

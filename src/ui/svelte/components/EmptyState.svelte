@@ -139,10 +139,12 @@
     line-height: 1.25;
   }
 
+  /* Small text on every variant, so the muted tone: the subtle one is under 4.5:1 in six of seven
+     palettes (issue 2178). */
   .manager-empty p {
     max-width: 280px;
     margin: 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 11px;
     line-height: 1.5;
     overflow-wrap: break-word;

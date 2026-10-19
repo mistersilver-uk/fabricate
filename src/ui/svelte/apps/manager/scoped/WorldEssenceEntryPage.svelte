@@ -383,7 +383,7 @@
   }
 
   /**
-   * The raw stored referent for one section, for the card's uuid sub-line: a section value is
+   * The raw stored referent for one section, for the zone's uuid line: a section value is
    * opaque, so the display NAME and the ADDRESS are two different reads.
    */
   function sectionValueAddress(section) {
@@ -391,16 +391,6 @@
     const value = defaults?.[section];
     if (value && typeof value === 'object') return typeof value.id === 'string' ? value.id : '';
     return typeof value === 'string' ? value : '';
-  }
-
-  /**
-   * The card's uuid SUB-LINE, or `''` where it would only restate the name above it: a bare uuid
-   * resolves to itself as its name, and the card printed it twice.
-   */
-  function sectionAddressLine(section, name) {
-    if (!name) return '';
-    const address = sectionValueAddress(section);
-    return address === name ? '' : address;
   }
 
   function sectionUi(section) {
@@ -739,9 +729,9 @@
                       data-scoped-world-default-value={section}
                     >
                       <ItemDropZone
-                        item={value ? { name: value } : null}
+                        value={value ? { uuid: sectionValueAddress(section), name: value } : null}
+                        showUuid
                         title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
-                        hint={sectionAddressLine(section, value)}
                         documentType={ui?.documentType ?? 'Item'}
                         unlinkDataAttr="data-scoped-world-default-clear"
                         unlinkLabel={format(

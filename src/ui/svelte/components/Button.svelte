@@ -12,6 +12,7 @@
   | `type` / `disabled` | native button type / boolean | `'button'` / `false` | Both emitted only on a `<button>`, so a manager button inside a form-adjacent card never submits by accident and `disabled` is ignored and warned about on an anchor. |
   | `fullWidth` / `size` | boolean / `''` \| `'28'` \| `'38'` | `false` / `''` | `is-full-width`, which is not a role because width states something about the CONTAINER rather than about the verb; and the control-height rung, named as a string, where an unrecognised value resolves to `''` rather than an unstyled `is-size-*`. |
   | `icon` | Font Awesome class string | `''` | The leading glyph, drawn as a hidden `<i>` before `children`; empty draws none. `children` stays the required label, because the icon-only form is `IconButton`. |
+  | `busy` | boolean | `false` | An action in flight: writes `aria-busy` and `aria-disabled`, never `disabled`, so focus and arm state survive, and swallows the press. `disabled` beside it still renders disabled. |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
   | `element` / `children` | bindable / snippet | `null` / `undefined` | The rendered DOM node, since `bind:this` on a component yields the INSTANCE and a caller that must measure or focus the button has no other way to reach it; and the label, a snippet rather than a string because call sites wrap the label in their own spans. |
 
@@ -40,6 +41,12 @@
     nowhere, so a guessed spelling ships with no treatment; and `scripts/lib/stylesheetLiveClasses.js`
     never widens an `is-` class through a positional wildcard, so a class only ever BUILT here would
     read as a rule with no customer.
+  - `busy` ALONE IS A CONTRACT BREACH: the primitive draws no busy label, so the caller changes
+    `children` while busy (the specimen's loading rule), or the control reads as idle but refuses;
+    on a neutral button the busy and disabled faces differ only slightly, so the label carries it.
+    The busy ARIA stands BEFORE the rest spread: the published gate reads `rest` only through
+    its spread, and a caller's own `aria-disabled` must survive while idle; so do not pass
+    `aria-busy` or `aria-disabled` beside `busy`.
   - `size` IS A STRING NAMING A RUNG, not a boolean and not a number: a boolean could express only
     one of the two non-default rungs (`'28'` and `'38'`), and a number invites `size={37}`.
   - `tag="a"` WITH AN EMPTY `href` RENDERS A `<button>`, because an anchor with no `href` is not
@@ -59,6 +66,7 @@
     fullWidth = false,
     size = '',
     icon = '',
+    busy = false,
     disabled = false,
     onclick = () => {},
     element = $bindable(null),
@@ -126,7 +134,9 @@
   class={classes}
   data-keyboard-focus="true"
   {...attributes}
-  {onclick}
+  onclick={(event) => (busy ? event.preventDefault() : onclick(event))}
+  aria-busy={busy ? 'true' : undefined}
+  aria-disabled={busy ? 'true' : undefined}
   {...rest}
   >{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{@render children?.()}</svelte:element
 >

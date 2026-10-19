@@ -329,6 +329,7 @@ describe('what the published Button refuses', () => {
     'type',
     'size',
     'icon',
+    'busy',
     'class',
     'element',
     'title',

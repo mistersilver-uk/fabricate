@@ -215,10 +215,8 @@
       "Unlink": "the unlink action’s accessible name; the drawing draws its glyph alone"
     },
     "props": {
-      "item": {
-        "name": "Blacksmith’s Compendium"
-      },
-      "uuid": "Item.kR3nQ8sT1vW2xY4z",
+      "value": { "uuid": "Item.kR3nQ8sT1vW2xY4z", "name": "Blacksmith’s Compendium" },
+      "showUuid": true,
       "emptyIcon": "fas fa-book",
       "copyLabel": "Copy UUID",
       "unlinkLabel": "Unlink"
@@ -235,10 +233,7 @@
       "Unlink": "the unlink action’s accessible name; the drawing draws its glyph alone"
     },
     "props": {
-      "item": {
-        "name": "Untitled"
-      },
-      "uuid": "Item.9pQr2sT4uV6wX8yZ",
+      "value": { "uuid": "Item.9pQr2sT4uV6wX8yZ", "name": "Untitled" },
       "state": "missing",
       "hint": "This document no longer resolves.",
       "relinkLabel": "Relink",

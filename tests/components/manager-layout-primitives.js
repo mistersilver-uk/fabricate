@@ -177,7 +177,9 @@ test('manager body starts as a three-region grid and stacks at narrow width', ()
 // system (issue 1777), and a text back link out to the system library.
 test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const selectBlock = blockFor('.fabricate-manager .manager-scope-select .fabricate-select-trigger');
+  const selectBlock = blockFor(
+    '.fabricate-manager .manager-scope-select .fabricate-select-trigger'
+  );
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
@@ -508,7 +510,10 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
-  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
+  const calloutIconBlock = blockIn(
+    calloutStyles,
+    '.manager-callout > i,\n  .manager-callout-item > i'
+  );
   const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
   const warningIconBlock = blockIn(
     calloutStyles,
@@ -760,9 +765,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
   })
     .filter(
       (entry) =>
-        entry.isFile() &&
-        entry.name.endsWith('.svelte') &&
-        entry.name !== 'IconFactRow.svelte'
+        entry.isFile() && entry.name.endsWith('.svelte') && entry.name !== 'IconFactRow.svelte'
     )
     .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
     .join('\n');
@@ -926,8 +929,8 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
     'disabled manager buttons should have explicit disabled styling'
   );
   assert.ok(
-    css.includes('.fabricate-button.fabricate-button:not(:disabled):hover'),
-    'manager hover styles should not target disabled buttons'
+    css.includes(".fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover"),
+    'manager hover styles should not target disabled or busy buttons (issue 2540)'
   );
 });
 
@@ -1287,8 +1290,9 @@ test('every view-specific manager-body grid override narrows the rail column whe
       columns: declaration(declarations, 'grid-template-columns'),
     }))
   );
-  const views = rules.filter(({ selector, columns }) =>
-    selector.includes('[data-manager-view') && selector.endsWith(' .manager-body') && columns
+  const views = rules.filter(
+    ({ selector, columns }) =>
+      selector.includes('[data-manager-view') && selector.endsWith(' .manager-body') && columns
   );
   assert.ok(views.length > 0, 'expected view-specific manager-body grid overrides');
 

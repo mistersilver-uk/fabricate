@@ -323,7 +323,9 @@ const REVIEWED = [
       'three components below are counted from the tree rather than asserted in prose.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.is-ghost:not(:disabled):hover'),
+    id: globalRule(
+      ".fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover"
+    ),
     disposition: 'INTENDED',
     convertedReach: [
       {
@@ -528,7 +530,9 @@ const REVIEWED = [
       'is the same reason it is EXCLUDE now rather than merely safe.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button:not(:disabled):hover'),
+    id: globalRule(
+      ".fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover"
+    ),
     disposition: 'EXCLUDE',
     why:
       MOVED_POPULATION +
@@ -546,7 +550,9 @@ const REVIEWED = [
       'not come from a `role="danger"` prop.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.is-danger:not(:disabled):hover'),
+    id: globalRule(
+      ".fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover"
+    ),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE REVIEWED LIST BEFORE: while `is-danger` sites were literal this rule beat ' +
@@ -575,8 +581,7 @@ const REVIEWED = [
       '.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger'
     ),
     disposition: 'EXCLUDE',
-    why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. The world Component entry`s system rows draw removal as a 26px square EXIT ICON in the row`s own clothing (`proto:944`) rather than as a labelled danger button, and the control is the shared `ArmedDangerButton`: it renders `fabricate-button is-danger` from its own template and never gains `fab-manager-button`, so this rule cannot be re-chained onto the primitive. What it states is a SIZE and a surface taken from the layout context — the arm/disarm two-step, the Escape and blur disarm and the single-armed-token invariant are all still the primitive`s. The twin of the `SystemRulesRoster` entry above.',
+    why: 'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. The world Component entry`s system rows draw removal as a 26px square EXIT ICON in the row`s own clothing (`proto:944`) rather than as a labelled danger button, and the control is the shared `ArmedDangerButton`: it renders `fabricate-button is-danger` from its own template and never gains `fab-manager-button`, so this rule cannot be re-chained onto the primitive. What it states is a SIZE and a surface taken from the layout context — the arm/disarm two-step, the Escape and blur disarm and the single-armed-token invariant are all still the primitive`s. The twin of the `SystemRulesRoster` entry above.',
   },
 
   {
@@ -584,8 +589,7 @@ const REVIEWED = [
       '.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger:not(:disabled)'
     ),
     disposition: 'EXCLUDE',
-    why:
-      'The PAINT half of the entry above. Geometry is unqualified and colour is not, which is the split `.fabricate-button:disabled` requires: switching the exit icon off must take its colours from the primitive and keep the 26px square it had when enabled.',
+    why: 'The PAINT half of the entry above. Geometry is unqualified and colour is not, which is the split `.fabricate-button:disabled` requires: switching the exit icon off must take its colours from the primitive and keep the 26px square it had when enabled.',
   },
 
   {
@@ -593,8 +597,7 @@ const REVIEWED = [
       '.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger'
     ),
     disposition: 'EXCLUDE',
-    why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. Deletion moved out of the header band and into a `Delete from the world` danger CARD at the foot of the Catalogue entry tab (`proto:928-936`), whose action is an `ArmedDangerButton` and so can never gain `fab-manager-button`. What it states is the card`s own treatment: the 34px rung (32 is retired), radius 9, and a transparent fill on the card`s danger hairline rather than the sheet`s filled danger face, which on a `--fab-danger-soft` card would be a danger block inside a danger block.',
+    why: 'NOT IN THE REVIEWED LIST BEFORE — issue 1371`s parity round 4 wrote it. Deletion moved out of the header band and into a `Delete from the world` danger CARD at the foot of the Catalogue entry tab (`proto:928-936`), whose action is an `ArmedDangerButton` and so can never gain `fab-manager-button`. What it states is the card`s own treatment: the 34px rung (32 is retired), radius 9, and a transparent fill on the card`s danger hairline rather than the sheet`s filled danger face, which on a `--fab-danger-soft` card would be a danger block inside a danger block.',
   },
 
   {
@@ -602,8 +605,7 @@ const REVIEWED = [
       '.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger:not(:disabled)'
     ),
     disposition: 'EXCLUDE',
-    why:
-      'The PAINT half of the entry above, split from its geometry for the same reason.',
+    why: 'The PAINT half of the entry above, split from its geometry for the same reason.',
   },
 
   {
@@ -655,7 +657,9 @@ const REVIEWED = [
       'ten converted (task 8) the triggers are all that is left.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.is-dashed:not(:disabled):hover'),
+    id: globalRule(
+      ".fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover"
+    ),
     disposition: 'EXCLUDE',
     why: 'The hover half of the same ruling, likewise reconciled to the primitive.',
   },

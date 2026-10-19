@@ -49,7 +49,7 @@ A ListRow given none of the selectable form's props MUST draw the dense output u
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
-Its loading and error forms remain targets in the library.
+ListRow is shipped; a browse list's loading and error forms are list-level targets (issue 2548).
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
@@ -727,6 +727,8 @@ A caller routes by MEANING and never by matching a tone name to a token name: `m
 `--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
+`EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
+`tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
 And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the seven themes — they are equal only in `mythwright` and `foundry-native` — so a ground swap between them is MEASURED per theme and never reasoned: it is why the chip's `neutral` tone, which inherits the base overlay rather than the raised surface, is a stated move for a converted caller that took the raised surface before.
 
@@ -941,6 +943,7 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 ### Requirement: Every interactive primitive declares its full state set
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
+`Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.

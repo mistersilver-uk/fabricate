@@ -1324,7 +1324,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     assert.ok(!live.querySelector('[aria-live]'), 'no region nests inside it');
   });
 
-  it('keeps the Roll button focusable while rolling, marked aria-disabled (F11)', async () => {
+  it('keeps the Roll button focusable while rolling, marked busy (F11, issue 2540)', async () => {
     let release;
     const gate = new Promise((resolveGate) => {
       release = resolveGate;
@@ -1342,9 +1342,12 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await settle();
       assert.equal(button.disabled, false, 'a disabled button would drop focus mid-roll');
       assert.equal(button.getAttribute('aria-disabled'), 'true');
+      assert.equal(button.getAttribute('aria-busy'), 'true');
+      assert.equal(button.textContent.trim(), 'Rolling…', 'the roll in flight names itself');
       release();
       for (let attempt = 0; attempt < 12; attempt += 1) await settle();
       assert.ok(!button.hasAttribute('aria-disabled'), 'and it clears once the roll lands');
+      assert.ok(!button.hasAttribute('aria-busy'));
     } finally {
       globalThis.Roll.prototype.evaluate = evaluate;
     }

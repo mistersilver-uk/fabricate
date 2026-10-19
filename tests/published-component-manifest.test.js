@@ -477,16 +477,16 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-primary',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled)',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled)',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-full-width',
   'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled)',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled):hover',
+  "styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed',
   'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled)',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled):hover',
+  "styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
@@ -496,15 +496,19 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled)',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
 ]);
-/** The two rules no published button can match, an anchor's and a glyph child's, which fail closed. */
+/**
+ * The three rules no published button can match, which fail closed: an anchor's, a glyph child's,
+ * and the busy face, whose `aria-busy` the seam refuses (issue 2540).
+ */
 const BUTTON_UNMATCHED_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:is(a)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button i',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
 ]);
 /** The sheet rule a button matches only through a `data-*` hook Fabricate writes. */
 const BUTTON_DATA_HOOK_RULES = Object.freeze([
@@ -2455,7 +2459,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 29 selectors: 26 that draw it, two it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 30 selectors: 26 that draw it, three it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),

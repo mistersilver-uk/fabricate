@@ -5,7 +5,7 @@
  * Each takes no argument: a snippet a component hands an item draws per item, which one node array
  * cannot.
  */
-export const SPECIMEN_SNIPPET_NAMES = Object.freeze(['actions', 'body', 'footer', 'meta']);
+export const SPECIMEN_SNIPPET_NAMES = Object.freeze(['actions', 'aside', 'body', 'footer', 'meta']);
 
 /**
  * Read a row's `snippets`, refusing a name `LiveSpecimen.svelte` has no snippet for.
