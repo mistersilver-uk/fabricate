@@ -3,13 +3,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
 
-import { byCodePoint } from './helpers/codePointOrder.js';
+import {
+  TEMPLATE_CORPUS,
+  assertFloor,
+  checkGate,
+  gateOver,
+  templatesOf,
+  workingTree,
+} from './helpers/designSystemRatchet.js';
+import { walkNodes } from './helpers/moduleAst.js';
 import {
   definePrimitiveSourceContract,
   defineSoleWriterClauses,
 } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { openingTagsNamed } from './helpers/svelteTagScan.js';
+import { lineOf } from './helpers/svelteTemplateScan.js';
 
 /**
  * The class only the primitive may write, and the root `styles/fabricate.css` paints the control
@@ -153,102 +162,66 @@ test('a tag NAMED in a `//` comment is not read as a call site', () => {
 /** A role an icon button takes through `role` (issue 2541), never as a class. */
 const ROLE_CLASS = /\bis-(?:primary|ghost|danger)\b/;
 
-/** A tooltip an icon button writes from its name or `tooltip` (issue 2541), never by hand. */
-const HAND_WRITTEN_TOOLTIP = /(?:^|\s)(?:title=|data-tooltip=|\{title\})/;
-
 /** An `ActionMenu`'s `triggerClass` value, quoted or braced. */
 const TRIGGER_CLASS = /\btriggerClass=("[^"]*"|\{[^}]*\})/;
 
-const APPS = 'src/ui/svelte/apps';
+/** The attributes through which a caller hand-writes a tooltip Foundry would show. */
+const HAND_WRITTEN_TOOLTIPS = new Set([
+  'title',
+  'data-tooltip',
+  'data-tooltip-html',
+  'data-tooltip-text',
+]);
 
-/**
- * The app files PR 3b of issue 2541 sweeps, each with how many of its icon-button tags still pass
- * a role class. Counts are exact, so a swept file must leave the ledger as it leaves the debt.
- */
-const PENDING_ROLE_CLASSES = Object.freeze({
-  [`${APPS}/crafting/ShoppingList.svelte`]: 1,
-  [`${APPS}/interactables/InteractablesManagerRoot.svelte`]: 1,
-  [`${APPS}/journal/HistoryList.svelte`]: 1,
-  [`${APPS}/manager/ComplicationSummaryRow.svelte`]: 1,
-  [`${APPS}/manager/environment/CompositionList.svelte`]: 2,
-  [`${APPS}/manager/environment/GatheringModifierEditor.svelte`]: 1,
-  [`${APPS}/manager/gathering-task/GatheringTaskStaminaCard.svelte`]: 1,
-  [`${APPS}/manager/GatheringEventEditView.svelte`]: 1,
-  [`${APPS}/manager/ManagerPremiumIconsAd.svelte`]: 1,
-  [`${APPS}/manager/RealmEnvironmentsEditor.svelte`]: 1,
-  [`${APPS}/manager/recipe/RecipeBooksScrollsTab.svelte`]: 1,
-  [`${APPS}/manager/system/CharacterPrerequisitesCard.svelte`]: 1,
-  [`${APPS}/manager/tools/ToolReplacementTarget.svelte`]: 1,
-  [`${APPS}/manager/VocabularyPanel.svelte`]: 1,
-  [`${APPS}/manager/world/WorldCurrencyTab.svelte`]: 2,
-  [`${APPS}/manager/world/WorldModifiersTab.svelte`]: 1,
-});
+const ROLE_CLASS_SITE = 'an icon button role class on `class`';
+const TOOLTIP_SITE = 'an icon button hand-written tooltip';
 
-/** The same files' tags that still hand-write `title` or `data-tooltip`, at exact counts. */
-const PENDING_TOOLTIPS = Object.freeze({
-  [`${APPS}/crafting/ShoppingList.svelte`]: 1,
-  [`${APPS}/InteractableBrowserRoot.svelte`]: 4,
-  [`${APPS}/interactables/InteractablesManagerRoot.svelte`]: 3,
-  [`${APPS}/journal/HistoryList.svelte`]: 1,
-  [`${APPS}/manager/BooksScrollsView.svelte`]: 1,
-  [`${APPS}/manager/ComplicationSummaryRow.svelte`]: 1,
-  [`${APPS}/manager/environment/CompositionList.svelte`]: 2,
-  [`${APPS}/manager/environment/CompositionOverrideBody.svelte`]: 1,
-  [`${APPS}/manager/environment/GatheringModifierEditor.svelte`]: 1,
-  [`${APPS}/manager/EnvironmentsBrowserView.svelte`]: 1,
-  [`${APPS}/manager/essences/EssenceIdentityTab.svelte`]: 1,
-  [`${APPS}/manager/essences/EssenceRow.svelte`]: 1,
-  [`${APPS}/manager/gathering-task/GatheringTaskDropCell.svelte`]: 2,
-  [`${APPS}/manager/GatheringEconomyView.svelte`]: 2,
-  [`${APPS}/manager/GatheringEventEditView.svelte`]: 1,
-  [`${APPS}/manager/GatheringEventsBrowserView.svelte`]: 1,
-  [`${APPS}/manager/GatheringTasksBrowserView.svelte`]: 1,
-  [`${APPS}/manager/ManagerPremiumIconsAd.svelte`]: 1,
-  [`${APPS}/manager/RealmEnvironmentsEditor.svelte`]: 2,
-  [`${APPS}/manager/recipe/RecipeBooksScrollsTab.svelte`]: 1,
-  [`${APPS}/manager/recipes/RecipeBrowserInspector.svelte`]: 2,
-  [`${APPS}/manager/RecipesBrowserView.svelte`]: 2,
-  [`${APPS}/manager/scoped/EntityListInspectorFrame.svelte`]: 1,
-  [`${APPS}/manager/system/CharacterPrerequisitesCard.svelte`]: 3,
-  [`${APPS}/manager/SystemsBrowserView.svelte`]: 1,
-  [`${APPS}/manager/tools/ToolReplacementTarget.svelte`]: 1,
-  [`${APPS}/manager/VocabularyPanel.svelte`]: 1,
-  [`${APPS}/manager/world/WorldCurrencyTab.svelte`]: 3,
-  [`${APPS}/manager/world/WorldModifiersTab.svelte`]: 3,
-});
-
-/** How many icon-button tags in each file `probe` matches. */
-function tagsMatching(probe) {
-  const counts = {};
-  for (const [file, tag] of contract.callSiteTags) {
-    if (probe.test(tag)) counts[file] = (counts[file] ?? 0) + 1;
+/** Each icon-button tag in one template that passes a role class or a hand-written tooltip. */
+function sweepDebtSites({ file, source, ast }) {
+  const sites = [];
+  for (const node of walkNodes(ast.fragment)) {
+    if (node.type !== 'Component' || node.name !== 'IconButton') continue;
+    const line = lineOf(source, node.start);
+    for (const attribute of node.attributes) {
+      const text = source.slice(attribute.start, attribute.end);
+      if (attribute.name === 'class' && ROLE_CLASS.test(text)) {
+        sites.push({ file, line, id: ROLE_CLASS_SITE });
+      }
+      if (HAND_WRITTEN_TOOLTIPS.has(attribute.name)) sites.push({ file, line, id: TOOLTIP_SITE });
+    }
   }
-  return counts;
+  return sites;
 }
 
-const sorted = (counts) =>
-  Object.fromEntries(Object.entries(counts).sort(([a], [b]) => byCodePoint(a, b)));
+/**
+ * Shrink-only against the merge base: PR 3b of issue 2541 sweeps the app files that still carry
+ * these, and a site new to base fails unless a reasoned `ratchet-exempt(design-system)` excuses it.
+ */
+const SWEEP_GATE = gateOver([TEMPLATE_CORPUS], (readFile, files) =>
+  templatesOf(readFile, files).flatMap(sweepDebtSites)
+);
 
-test('no icon button takes a role class on `class`, beyond the 3b ledger', () => {
+test('no icon button gains a role class or a hand-written tooltip against the base', (t) => {
   contract.assertCallSitesAlive();
-  assert.deepEqual(
-    sorted(tagsMatching(ROLE_CLASS)),
-    sorted(PENDING_ROLE_CLASSES),
-    'an icon button takes `is-primary`, `is-ghost` or `is-danger` through `role` ' +
-      '(`ghost-danger` for both), and a state such as `is-locked` alone on `class`; a file the ' +
-      'sweep has converted leaves PENDING_ROLE_CLASSES'
+  checkGate(
+    t,
+    SWEEP_GATE,
+    'an icon button takes `is-primary`, `is-ghost` or `is-danger` through `role` (`ghost-danger` ' +
+      'for both) and keeps only a state such as `is-locked` on `class`; it shows `ariaLabel` as ' +
+      'its tooltip, and an information-bearing hint passes `tooltip`, because a native `title` ' +
+      'stacks a second tooltip and is never shown to the keyboard'
   );
 });
 
-test('no icon button hand-writes `title` or `data-tooltip`, beyond the 3b ledger', () => {
-  contract.assertCallSitesAlive();
-  assert.deepEqual(
-    sorted(tagsMatching(HAND_WRITTEN_TOOLTIP)),
-    sorted(PENDING_TOOLTIPS),
-    'an icon button shows its `ariaLabel` as its tooltip, and an information-bearing hint ' +
-      'passes `tooltip`; a native `title` stacks a second tooltip and is never shown to the ' +
-      'keyboard. A file the sweep has converted leaves PENDING_TOOLTIPS'
-  );
+test('the swept shared components carry no role class and no hand-written tooltip', () => {
+  const tree = workingTree(TEMPLATE_CORPUS);
+  const templates = templatesOf(tree.readFile, tree.listFiles());
+  assertFloor('templates', templates.length, 300);
+  const shared = templates
+    .filter(({ file }) => file.startsWith('src/ui/svelte/components/'))
+    .flatMap(sweepDebtSites)
+    .map(({ file, line, id }) => `${file}:${line} ${id}`);
+  assert.deepEqual(shared, [], 'issue 2541 swept every shared caller; keep them swept');
 });
 
 test('no ActionMenu trigger takes a role class on `triggerClass`', () => {

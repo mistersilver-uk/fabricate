@@ -81,10 +81,13 @@ describe('IconButton writes its name as plain tooltip text', () => {
   });
 
   it('yields to a caller-written tooltip rather than stacking a second one', async () => {
-    for (const override of ['title', 'data-tooltip', 'data-tooltip-html']) {
+    const overrides = ['title', 'data-tooltip', 'data-tooltip-html', 'data-tooltip-text'];
+    for (const override of overrides) {
       const tooltip = withTooltip();
       const button = await mountButton({ [override]: 'Caller hint' });
-      assert.ok(!button.hasAttribute('data-tooltip-text'), `${override} must suppress the name`);
+      // A raw `data-tooltip-text` is the caller's own, so it stands; the name never does.
+      const written = override === 'data-tooltip-text' ? 'Caller hint' : null;
+      assert.equal(button.getAttribute('data-tooltip-text'), written, `${override} wins`);
       focus(button);
       assert.equal(activations(tooltip).length, 0, `${override} must suppress the focus tooltip`);
       harness.remount();
@@ -137,11 +140,20 @@ describe('IconButton shows its name under keyboard focus', () => {
     other.remove();
   });
 
-  it('composes with a caller’s own focus, blur and keydown handlers', async () => {
-    withTooltip();
+  it('runs a caller’s focus, blur and keydown handlers first, then its own', async () => {
+    const tooltip = withTooltip();
     const heard = [];
     const hear = (what) => {
       heard.push(what);
+    };
+    const { activate, deactivate } = tooltip;
+    tooltip.activate = (...args) => {
+      hear('activate');
+      activate.apply(tooltip, args);
+    };
+    tooltip.deactivate = () => {
+      hear('deactivate');
+      deactivate.call(tooltip);
     };
     const button = await mountButton({
       onfocus: () => hear('focus'),
@@ -150,8 +162,43 @@ describe('IconButton shows its name under keyboard focus', () => {
     });
     focus(button);
     press(button, 'Escape');
+    focus(button);
     blur(button);
-    assert.deepEqual(heard, ['focus', 'key Escape', 'blur']);
+    assert.deepEqual(heard, [
+      'focus',
+      'activate',
+      'key Escape',
+      'deactivate',
+      'focus',
+      'activate',
+      'blur',
+      'deactivate',
+    ]);
+    assert.deepEqual(transcript(tooltip, button), [
+      ['activate', 'button', { text: 'Remove Iron ingot' }],
+      ['deactivate', 'button'],
+      ['activate', 'button', { text: 'Remove Iron ingot' }],
+      ['deactivate', 'button'],
+    ]);
+  });
+
+  it('lets Escape reach an ancestor’s keydown listener, not prevented', async () => {
+    withTooltip();
+    const button = await mountButton();
+    const heard = [];
+    const listener = (event) => {
+      heard.push([event.key, event.defaultPrevented]);
+    };
+    document.body.addEventListener('keydown', listener);
+    try {
+      focus(button);
+      button.dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    } finally {
+      document.body.removeEventListener('keydown', listener);
+    }
+    assert.deepEqual(heard, [['Escape', false]]);
   });
 
   it('does nothing outside Foundry, where there is no tooltip manager', async () => {
@@ -160,6 +207,26 @@ describe('IconButton shows its name under keyboard focus', () => {
     press(button, 'Escape');
     blur(button);
     button.click();
+  });
+
+  it('does nothing when `game` is absent altogether, and still forwards the press', async () => {
+    const pressed = [];
+    const button = await mountButton({
+      onclick: () => {
+        pressed.push('click');
+      },
+    });
+    const game = globalThis.game;
+    delete globalThis.game;
+    try {
+      focus(button);
+      press(button, 'Escape');
+      blur(button);
+      button.click();
+    } finally {
+      Object.assign(globalThis, { game });
+    }
+    assert.deepEqual(pressed, ['click']);
   });
 });
 
