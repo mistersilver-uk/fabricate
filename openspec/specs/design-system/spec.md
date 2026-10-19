@@ -171,7 +171,7 @@ Its info-family fill, border and ink MUST remain distinct from the single shared
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
-IconButton's opt-in numeric `size={24}` and `size={26}` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+IconButton's opt-in rungs `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
 The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
@@ -1102,7 +1102,7 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 ### Requirement: Shared primitives share one API convention
 
 Every component under `src/ui/svelte/components/` MUST name its props by the API convention `openspec/specs/design-system/library.html` publishes in its five-rules block; the library holds the convention's wording and this requirement binds it.
-The convention fixes the accessible-name props, with `label` reserved for visible text; `density` as the one density prop, with `size` naming a published ladder rung only; `tone`; a `role` prop on `Button` only, which is its verb role, so an ARIA `role` reaches any other primitive's root through `...rest`; the callback names; and the passthrough shape of `class` plus a rest spread on the root, `<part>Props` for a fixed sub-element and `<part>DataAttr` for a per-item hook, with an attribute the primitive writes from a declared prop passed by that prop and never through rest.
+The convention fixes the accessible-name props, with `label` reserved for visible text; `density` as the one density prop, with `size` naming a published ladder rung only; `tone`; a `role` prop on `Button`, its verb role, and on `IconButton` the closed subset `neutral | primary | ghost | danger | ghost-danger`; an ARIA `role` reaches any other primitive's root through `...rest`; the callback names; and the passthrough shape of `class` plus a rest spread on the root, `<part>Props` for a fixed sub-element and `<part>DataAttr` for a per-item hook, with an attribute the primitive writes from a declared prop passed by that prop and never through rest.
 A prop name outside the convention MUST be carried in the gate's exceptions register with its component and a reason, and a register entry that matches no declared prop MUST fail.
 `tests/design-system-api-convention.test.js` is the gate, and it rules on prop NAMES because a `$props()` destructuring declares nothing else; it is a fixed rule, not a ratchet.
 Its one ratchet clause holds the spreads a caller writes onto a primitive's tag, because the gate cannot read what a spread carries: a spread new against the base commit fails unless a reasoned `ratchet-exempt(design-system)` marker sits above its tag.
@@ -1114,6 +1114,29 @@ A component outside that directory is not bound by this requirement, even where 
 - **WHEN** a component under `src/ui/svelte/components/` declares a prop the convention retires, such as `dataAttr`
 - **THEN** the convention gate fails naming the component and the prop
 - **AND** it passes only when the prop is renamed or the register carries it with a reason
+
+### Requirement: An icon button shows its name under pointer and keyboard focus alike
+
+An `IconButton` MUST write its name, or its `tooltip` when one is passed, as plain tooltip text — Foundry's `data-tooltip-text`, which no localize lookup or HTML path reaches — so Foundry's tooltip shows it on pointer hover.
+Keyboard focus MUST show the same tooltip, and only under `:focus-visible`, so a pointer focus adds no second tooltip.
+Blur, a click and Escape MUST each close the button's own tooltip and never another element's.
+No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip` or `data-tooltip-html` suppresses the primitive's own tooltip rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
+`tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
+
+#### Scenario: A user Tabs to an icon button
+
+- **WHEN** a user Tabs to an icon button
+- **THEN** its name shows as a tooltip once
+
+#### Scenario: A user clicks an icon button
+
+- **WHEN** the user clicks an icon button
+- **THEN** no second tooltip opens
+
+#### Scenario: An icon button blurs or hears Escape
+
+- **WHEN** the button blurs or the user presses Escape
+- **THEN** its own tooltip closes and no other
 
 ### Requirement: The Foundry contract binds every primitive
 
