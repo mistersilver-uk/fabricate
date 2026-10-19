@@ -190,3 +190,12 @@ test('the off switch’s hover edge and the on knob hold 3:1, in every palette',
   }
   assert.deepEqual(short, []);
 });
+
+test('the switch’s base defaults are its off face', () => {
+  const faces = ['--fab-toggle-track', '--fab-toggle-track-border', '--fab-toggle-knob'];
+  assert.deepEqual(
+    faces.map((property) => declaredOn(SWITCH, property)),
+    faces.map((property) => declaredOn(SWITCH_OFF, property)),
+    'a switch without a state class would draw a face that is neither on nor off'
+  );
+});

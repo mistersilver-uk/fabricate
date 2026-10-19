@@ -738,7 +738,7 @@ const TOGGLE_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/** The 34x20 rail and the 14x14 knob, which is the geometry the switch is recognisable by. */
+/** The 38x22 rail and the 18x18 knob, which is the geometry the switch is recognisable by. */
 const TOGGLE_TRACK_COMPARED = Object.freeze([
   'width',
   'height',
@@ -1133,7 +1133,12 @@ const TOGGLE_CARD_COPY_COMPARED = Object.freeze([
 ]);
 
 /** The title line. */
-const TOGGLE_CARD_TITLE_COMPARED = Object.freeze(['margin-top', 'margin-bottom', 'font-weight']);
+const TOGGLE_CARD_TITLE_COMPARED = Object.freeze([
+  'margin-top',
+  'margin-bottom',
+  'font-size',
+  'font-weight',
+]);
 
 /** The sub-line, scoped to what this family owns. */
 const TOGGLE_CARD_SUB_COMPARED = Object.freeze(['min-width']);

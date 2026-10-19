@@ -495,7 +495,7 @@ test('the row enable switch is the shared control rather than a copy of it', asy
     assert.equal(measured['resting-switch'].width, 38, 'the switch is the family box');
     assert.equal(measured['resting-switch'].height, 24, 'and the family rung');
 
-    // `.fabricate-toggle .manager-status-toggle-track` is an `inline-flex`.
+    // `.fabricate-toggle .manager-status-toggle-track` is a `flex` box.
     for (const probe of ['resting-switch-track', 'selected-still-switch-track']) {
       assert.equal(measured[probe].display, 'flex', `${probe} is the primitive track box`);
       assert.equal(measured[probe].width, 38, `${probe} is 38px wide`);
