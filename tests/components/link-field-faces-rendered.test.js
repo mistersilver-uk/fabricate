@@ -97,6 +97,17 @@ const CASES = Object.freeze({
     width: 280,
     props: { ...MISSING, hint: 'This document no longer resolves.', ...RELINK, onUnlink: noop },
   },
+  'narrow-relink': {
+    width: 220,
+    props: {
+      ...MISSING,
+      hint: 'This document no longer resolves.',
+      relinkLabel: 'Relink this item',
+      onRelink: noop,
+      unlinkLabel: 'Unlink',
+      onUnlink: noop,
+    },
+  },
   'disabled-linked': {
     width: 280,
     props: { item: { name: 'Blacksmith’s Compendium' }, ...ACTIONS, ...RELINK, disabled: true },
@@ -468,6 +479,34 @@ it('draws Relink over unlink in a missing zone, on one right edge, inside the bo
       `${label} is not wholly inside the zone`
     );
   }
+});
+
+it('drops the actions to their own row below the copy in a 220px zone, Relink before unlink', () => {
+  const { root, name, uuid, hint, actionButtons } = faces['narrow-relink'];
+  const [relink, unlink] = actionButtons;
+  assert.equal(
+    relink.text,
+    'Relink this item',
+    'the label is long enough to have squeezed the copy'
+  );
+  assert.ok(name.box.width >= 100, `the copy column is ${name.box.width}px wide, under 100`);
+  assert.ok(
+    name.box.height <= px(name.style['line-height']) + 0.5,
+    `"Untitled" breaks over ${name.box.height}px, more than one line`
+  );
+  const copyBottom = Math.max(name.box.bottom, uuid.box.bottom, hint.box.bottom);
+  for (const [label, { box }] of [
+    ['Relink', relink],
+    ['unlink', unlink],
+  ]) {
+    assert.ok(box.top >= copyBottom, `${label} is not on a row below the copy`);
+    assert.ok(
+      box.left >= root.box.left && box.right <= root.box.right && box.bottom <= root.box.bottom,
+      `${label} is not wholly inside the zone`
+    );
+  }
+  assert.ok(Math.abs(relink.box.top - unlink.box.top) <= 0.5, 'the two share one row');
+  assert.ok(relink.box.right <= unlink.box.left, 'Relink sits before unlink');
 });
 
 it('draws Relink only in a missing zone with a handler, and no column when no action renders', () => {

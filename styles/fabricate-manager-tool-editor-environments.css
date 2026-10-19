@@ -730,6 +730,7 @@
   border-style: solid;
   background: var(--fab-bg-1);
   text-align: start;
+  container: fabricate-link-field / inline-size;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing {
@@ -838,6 +839,15 @@
   flex-direction: column;
   align-items: flex-end;
   gap: var(--fab-space-1);
+}
+
+/* Under a 260px zone (234px inside its padding and border) the actions take their own row below the copy, so a long Relink label cannot squeeze the copy column. */
+@container fabricate-link-field (max-width: 234px) {
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-actions {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
 }
 
 /* The Tool Studio's checklist row is GONE with its component (issue 1373, round 5). */
