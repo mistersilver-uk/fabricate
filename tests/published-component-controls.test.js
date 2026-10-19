@@ -352,11 +352,27 @@ function namePartFault(part, control, strict) {
   return strict && !required ? OPTIONAL_DATA_NAME : null;
 }
 
-/** A control's name parts: its `aria-label`'s, or else its content's. */
+/**
+ * Whether a content node is a decorative glyph, which names nothing: an `<i aria-hidden="true">`,
+ * bare or as the one child of an `{#if}` that guards it.
+ */
+function isHiddenGlyph(child) {
+  if (child.type === 'IfBlock') {
+    const [only, ...rest] = child.consequent.nodes;
+    return rest.length === 0 && !child.alternate && isHiddenGlyph(only);
+  }
+  const hidden =
+    child.type === 'RegularElement' && child.name === 'i' && attributeOf(child, 'aria-hidden');
+  return Boolean(hidden) && [hidden.value].flat().every((part) => part?.data === 'true');
+}
+
+/** A control's name parts: its `aria-label`'s, or else its content's, less any hidden glyph. */
 function nameParts(node) {
   const label = attributeOf(node, 'aria-label');
   if (label) return [label.value === true ? { type: 'Text' } : label.value].flat();
-  return node.fragment.nodes.filter((child) => child.type !== 'Text' || child.data.trim() !== '');
+  return node.fragment.nodes.filter(
+    (child) => (child.type !== 'Text' || child.data.trim() !== '') && !isHiddenGlyph(child)
+  );
 }
 
 /**
