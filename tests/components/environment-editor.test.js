@@ -722,7 +722,10 @@ describe('environment composition editor structure', () => {
     ],
     passesProps: [['ItemDropZone', 'onUnlink']],
     spells: ['data-overview-scene-linked'],
-    passesPropsNo: [['ItemDropZone', 'uuid']],
+    passesPropsNo: [
+      ['ItemDropZone', 'item'],
+      ['ItemDropZone', 'showUuid'],
+    ],
     namesNo: ['oncontextmenu'],
     calls: ['linkedScene'],
   });

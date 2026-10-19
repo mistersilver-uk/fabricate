@@ -1025,6 +1025,27 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       }
     });
 
+    it('names a missing macro by its uuid line alone, described by the subline only', async () => {
+      const { target } = await mountMissing();
+      const zone = target.querySelector('[data-item-drop-zone="complication-macro"]');
+      const uuidLines = [...zone.querySelectorAll('[data-item-drop-zone-uuid]')];
+      assert.ok(!zone.querySelector(':scope .manager-item-drop-zone-copy strong'), 'no name over it');
+      assert.deepEqual(
+        uuidLines.map((line) => line.textContent.trim()),
+        ['Macro.deleted'],
+        'one uuid line, reading the stored address'
+      );
+      assert.equal(uuidLines[0].id, zone.getAttribute('aria-labelledby'), 'which names the group');
+      assert.ok(
+        !zone.querySelector(
+          ':scope .manager-item-drop-zone-copy small:not([data-item-drop-zone-subline])'
+        ),
+        'and no hint repeats the address'
+      );
+      const subline = zone.querySelector('[data-item-drop-zone-subline]');
+      assert.equal(zone.getAttribute('aria-describedby'), subline.id, 'described by the subline');
+    });
+
     it('draws no Relink while the macro resolves', async () => {
       Object.assign(globalThis, { fromUuid: previous });
       const { target } = await mountSection({

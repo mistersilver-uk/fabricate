@@ -48,16 +48,16 @@
   import Medallion from './Medallion.svelte';
 
   let {
-    item = null,
+    value = null,
     title = '',
     hint = '',
-    uuid = '',
     subline = '',
     emptyIcon = 'fas fa-download',
     compact = false,
     kind = '',
     documentType = 'Item',
-    state = 'linked',
+    state,
+    showUuid = false,
     disabled = false,
     copyLabel = '',
     unlinkLabel = '',
@@ -70,8 +70,19 @@
     relinkLabel = '',
   } = $props();
 
-  const isMissing = $derived(Boolean(item) && state === 'missing');
-  const showRelink = $derived(isMissing && !compact && Boolean(onRelink));
+  const face = $derived.by(() => {
+    if (compact) return 'compact';
+    if (state === 'empty' || (!value?.uuid && !value?.name)) return 'empty';
+    return state === 'missing' ? 'missing' : 'linked';
+  });
+  const isMissing = $derived(face === 'missing');
+  const isLinked = $derived(face === 'linked' || isMissing);
+  // A name that is only the uuid is no name: the uuid line stands in its place.
+  const named = $derived(Boolean(value?.name) && value.name !== value.uuid);
+  const showUuidLine = $derived(
+    isLinked && Boolean(value.uuid) && (isMissing || showUuid || !named)
+  );
+  const showRelink = $derived(isMissing && Boolean(onRelink));
   const unlinkAttrs = $derived(unlinkDataAttr ? { [unlinkDataAttr]: true } : {});
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
   const nameId = $props.id();
@@ -94,7 +105,7 @@
 <div
   class="fabricate-link-field manager-item-drop-zone"
   class:is-compact={compact}
-  class:is-linked={Boolean(item) && !compact}
+  class:is-linked={isLinked}
   class:is-missing={isMissing}
   class:is-disabled={disabled}
   data-manager-item-drop-zone=""
@@ -106,12 +117,12 @@
   {...hooksFor('root')}
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
-  {#if item && !compact}
+  {#if isLinked}
     <Medallion
       size={38}
       variant="glyph-chip"
       alt=""
-      art={isMissing ? '' : item.img || ''}
+      art={isMissing ? '' : value.img || ''}
       icon={isMissing ? 'fas fa-triangle-exclamation' : emptyIcon}
       ink={isMissing ? 'danger' : ''}
     />
@@ -119,16 +130,19 @@
     <span class="manager-item-drop-zone-icon" aria-hidden="true"><i class={emptyIcon}></i></span>
   {/if}
   <span class="manager-item-drop-zone-copy">
-    <strong id={nameId}>{compact ? title : item?.name || title}</strong>
-    {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
-        >{uuid}</code
+    {#if !isLinked}<strong id={nameId}>{title}</strong>
+    {:else if named}<strong id={nameId}>{value.name}</strong>{/if}
+    {#if showUuidLine}<code
+        class="manager-item-drop-zone-uuid"
+        id={named ? undefined : nameId}
+        data-item-drop-zone-uuid>{value.uuid}</code
       >{/if}
     {#if hint}<small id={isMissing ? hintId : undefined} {...hooksFor('hint')}>{hint}</small>{/if}
     {#if subline}<small id={isMissing ? sublineId : undefined} data-item-drop-zone-subline
         >{subline}</small
       >{/if}
   </span>
-  {#if item && !compact && (showRelink || onCopy || onUnlink)}
+  {#if isLinked && (showRelink || onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
       {#if showRelink}
         <Button data-item-drop-zone-relink="" {disabled} onclick={() => onRelink()}
@@ -141,7 +155,7 @@
           title={copyLabel}
           {disabled}
           {...hooksFor('copy')}
-          onclick={() => onCopy(item)}
+          onclick={() => onCopy(value)}
         >
           <i class="fas fa-copy" aria-hidden="true"></i>
         </IconButton>
