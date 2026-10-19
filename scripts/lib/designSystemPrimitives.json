@@ -227,10 +227,10 @@
     {
       "path": "src/ui/svelte/components/ItemDropZone.svelte",
       "library": "<LinkField>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Named by the `<LinkField>` entry of `library.html`: \"How a Fabricate record points at a game-world document.\" 11 importing files over 12 render sites, every one under `src/ui/svelte/apps/manager/`, re-measured with `componentImporters.js` at issue 2466 against the 9 this row had said: the checks, component, essence, recipe-item, environment and world-scope editors, which is why no single frame is the honest evidence. ROOTED AT `fabricate-link-field` as of issue 1509 and MOVED to `src/ui/svelte/components/` in the same change, which also replaced its thirteen `kind ===` attribute branches with one `hookAttrs` bag over a closed region set. It declares NEITHER a font floor NOR a focus pair, and the pair is the sharper refusal of the two: both action buttons are `IconButton`’s, and `.fabricate-link-field button:focus-visible` at (0,2,1) would out-rank that primitive’s own ring at (0,2,0) and REPLACE it on both. `target` because the `value` and `showUuid` props and the `empty` state its entry states are not built; the entry’s delta and its planned-migrations row name each, and issue 2466 owns them."
+      "why": "Named by the `<LinkField>` entry of `library.html`: \"How a Fabricate record points at a game-world document.\" 11 importing files over 12 render sites, every one under `src/ui/svelte/apps/manager/`, re-measured with `componentImporters.js` at issue 2466 against the 9 this row had said: the checks, component, essence, recipe-item, environment and world-scope editors, which is why no single frame is the honest evidence. ROOTED AT `fabricate-link-field` as of issue 1509 and MOVED to `src/ui/svelte/components/` in the same change, which also replaced its thirteen `kind ===` attribute branches with one `hookAttrs` bag over a closed region set. It declares NEITHER a font floor NOR a focus pair, and the pair is the sharper refusal of the two: both action buttons are `IconButton`’s, and `.fabricate-link-field button:focus-visible` at (0,2,1) would out-rank that primitive’s own ring at (0,2,0) and REPLACE it on both. `shipped` at issue 2466: the file builds every prop and face the library’s `<LinkField>` entry states, and no caller passes the retired `item` or `uuid`, which `item-drop-zone-source-contract.test.js` pins."
     },
     {
       "path": "src/ui/svelte/components/Modal.svelte",

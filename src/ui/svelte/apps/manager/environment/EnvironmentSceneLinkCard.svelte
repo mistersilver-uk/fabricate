@@ -15,13 +15,13 @@
   );
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   const scene = linkedScene(() => sceneUuid);
-  // The address never renders: a pending scene reads as the card's title, a deleted one as missing.
+  // A pending scene reads as the card's title; a deleted one as missing, over its address.
   const name = $derived(
     scene.missing
       ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneNotFound', 'Scene not found')
       : scene.name || title
   );
-  const item = $derived(sceneUuid ? { name, img: scene.thumb } : null);
+  const value = $derived(sceneUuid ? { uuid: sceneUuid, name, img: scene.thumb } : null);
 
   function handleSceneDrop(data) {
     const { uuid, type } = resolveDropData(data);
@@ -33,7 +33,7 @@
 <section class="manager-environment-card" data-overview-section="scene">
   <h3 class="manager-card-title">{title}</h3>
   <ItemDropZone
-    {item}
+    {value}
     documentType="Scene"
     kind="scene"
     state={scene.missing ? 'missing' : 'linked'}

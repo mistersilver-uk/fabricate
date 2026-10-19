@@ -2408,9 +2408,9 @@ describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the c
 
   it('draws the art, the resolved name and the uuid with the prop unset', async () => {
     const target = await dropZoneHarness.mount({
-      item: LINKED_ITEM,
+      value: { ...LINKED_ITEM, uuid: 'Item.ingot-source' },
+      showUuid: true,
       title: 'Drop an item',
-      uuid: 'Item.ingot-source',
       kind: 'component-source',
     });
     const zone = target.querySelector('[data-item-drop-zone="component-source"]');
@@ -2440,9 +2440,9 @@ describe('ItemDropZone keeps its shipped LINKED form when nothing asks for the c
     // The control on the control: without this arm an `is-compact` that had stopped suppressing
     // anything would satisfy the assertions above and the negative would prove nothing.
     const target = await dropZoneHarness.mount({
-      item: LINKED_ITEM,
+      value: { ...LINKED_ITEM, uuid: 'Item.ingot-source' },
+      showUuid: true,
       title: 'Drop an item',
-      uuid: 'Item.ingot-source',
       kind: 'component-source',
       compact: true,
     });
