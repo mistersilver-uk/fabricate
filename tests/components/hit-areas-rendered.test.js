@@ -223,6 +223,18 @@ const MOUNTS = Object.freeze({
       ],
     },
   },
+  /** The same strip disabled, whose grip does not light under the pointer. */
+  rangeBarDisabled: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'fixed',
+      disabled: true,
+      bands: [
+        { id: 'slag', name: 'Slag', from: 1, to: 9 },
+        { id: 'rough', name: 'Rough', from: 10, to: 17 },
+      ],
+    },
+  },
   /**
    * The Times of day panel's bar, which spans the settings grid's full row: 543px of track at a
    * 1121px manager, and 248px once the grid folds to one column and the panel is narrow.
@@ -320,6 +332,7 @@ ${Object.values(PARENTS)
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
   <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
   <div data-case="rangeBarTicked" style="width:326px;margin:12px">${markup.rangeBarTicked}</div>
+  <div data-case="rangeBarDisabled" style="width:326px;margin:12px">${markup.rangeBarDisabled}</div>
   <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanel}</section><section class="manager-condition-panel">${markup.rangeBarFallback}</section></div></div></div>
   <div class="fabricate-manager" style="width:306px;height:auto"><div data-case="rangeBarPanelNarrow" style="width:306px"><div class="manager-gathering-settings" style="grid-template-columns:minmax(0,1fr)"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanelNarrow}</section></div></div></div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
@@ -1007,6 +1020,30 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
       ['10.5px', '10.5px'],
       "the ticks take the specimen's .k-count size"
     );
+  });
+
+  it('lights the grip under the pointer, but not on a disabled strip', async () => {
+    const gripUnder = async (caseId) => {
+      const handle = `[data-case="${caseId}"] [data-band-strip-handle="0"]`;
+      await tab.hover(handle);
+      const paint = await tab.evaluate((selector) => {
+        const grip = document.querySelector(`${selector} .fab-band-strip-grip`);
+        const probe = document.createElement('span');
+        grip.parentElement.append(probe);
+        const read = (token) => {
+          probe.style.color = `var(${token})`;
+          return getComputedStyle(probe).color;
+        };
+        const tokens = { accent: read('--fab-accent'), rest: read('--fab-text-secondary') };
+        probe.remove();
+        const fill = getComputedStyle(grip).backgroundColor;
+        return Object.keys(tokens).find((key) => tokens[key] === fill) ?? fill;
+      }, handle);
+      await tab.mouse.move(0, 0);
+      return paint;
+    };
+    assert.equal(await gripUnder('rangeBarTicked'), 'accent', 'a live grip lights on hover');
+    assert.equal(await gripUnder('rangeBarDisabled'), 'rest', 'a disabled grip stays at rest');
   });
 
   it('keeps the Times of day bar`s rail, dot and dividers apart across the full-width panel', async () => {

@@ -445,8 +445,8 @@
     background: var(--fab-text-secondary);
   }
 
-  .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
-  .fab-band-strip-handle:hover .fab-band-strip-grip {
+  .fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
+  .fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle:hover .fab-band-strip-grip {
     background: var(--fab-accent);
   }
 
