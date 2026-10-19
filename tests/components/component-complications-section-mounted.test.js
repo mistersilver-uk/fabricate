@@ -18,7 +18,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
@@ -981,12 +981,15 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   describe('Relink on a missing macro (issue 2466)', () => {
     const RELINK = '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]';
     const BROWSE = '[data-complication-macro-browse]';
+    const RELINK_KEY = 'FABRICATE.Admin.Manager.Component.Complications.Macro.Relink';
     let previous;
-    beforeEach(() => {
+    before(() => {
       previous = globalThis.fromUuid;
+    });
+    beforeEach(() => {
       Object.assign(globalThis, { fromUuid: async () => null });
     });
-    after(() => Object.assign(globalThis, { fromUuid: previous }));
+    afterEach(() => Object.assign(globalThis, { fromUuid: previous }));
 
     async function mountMissing(props = {}) {
       const mounted = await mountSection({
@@ -1000,18 +1003,26 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     }
 
     it('draws Relink above unlink, in the complication`s own words', async () => {
-      const { target } = await mountMissing();
-      const actions = [
-        ...target.querySelectorAll(
-          ':scope [data-item-drop-zone="complication-macro"] .manager-item-drop-zone-actions button'
-        ),
-      ];
-      assert.ok(actions[0]?.matches('[data-item-drop-zone-relink]'), 'Relink leads the column');
-      assert.equal(
-        actions[0].textContent.trim(),
-        LANG.lookup('FABRICATE.Admin.Manager.Component.Complications.Macro.Relink')
-      );
-      assert.ok(actions[1]?.classList.contains('is-danger'), 'and unlink sits under it');
+      // A translation that differs from the `text()` fallback, so the label is read from the lang
+      // file rather than written into the caller.
+      const i18n = globalThis.game.i18n;
+      globalThis.game.i18n = {
+        ...i18n,
+        localize: (key) => (key === RELINK_KEY ? 'Neu verknüpfen' : i18n.localize(key)),
+      };
+      try {
+        const { target } = await mountMissing();
+        const actions = [
+          ...target.querySelectorAll(
+            ':scope [data-item-drop-zone="complication-macro"] .manager-item-drop-zone-actions button'
+          ),
+        ];
+        assert.ok(actions[0]?.matches('[data-item-drop-zone-relink]'), 'Relink leads the column');
+        assert.equal(actions[0].textContent.trim(), 'Neu verknüpfen', 'the label is the lang value');
+        assert.ok(actions[1]?.classList.contains('is-danger'), 'and unlink sits under it');
+      } finally {
+        globalThis.game.i18n = i18n;
+      }
     });
 
     it('draws no Relink while the macro resolves', async () => {
@@ -1040,6 +1051,21 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       await flushRender();
       assert.equal(emitted.at(-1)?.[0]?.macroUuid, 'Macro.abc', 'the pick links the macro');
       assert.ok(document.activeElement === browse, 'focus lands on Browse, the list`s trigger');
+    });
+
+    it('closes the list on Escape after Relink and returns focus to Browse', async () => {
+      const { target } = await mountMissing();
+      const browse = target.querySelector(BROWSE);
+      target.querySelector(RELINK).click();
+      await flushRender();
+      assert.equal(browse.getAttribute('aria-expanded'), 'true', 'Relink opened the list');
+      (document.activeElement ?? document).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+      );
+      await flushRender();
+      assert.equal(browse.getAttribute('aria-expanded'), 'false', 'Escape shuts the list');
+      assert.ok(document.activeElement === browse, 'focus returns to Browse, the list`s trigger');
+      assert.ok(target.querySelector(RELINK), 'and the macro is still missing, so Relink stays');
     });
 
     it('disables Relink while the section saves', async () => {
