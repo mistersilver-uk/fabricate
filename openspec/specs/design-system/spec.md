@@ -999,6 +999,8 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
+A caller that marks selection inside the tile's own content (a swatch's inset ring) states its own ground as a descendant rule from its `popoverClass` (see the picker requirement), so the tile's ground does not compete with that mark.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
 So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
 Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
@@ -1623,6 +1625,13 @@ Which specimen capabilities remain UNBUILT is recorded with the measurement that
 A primitive that has cleared this bar BELONGS in the shared directory, and the picker was moved into `src/ui/svelte/components/` at issue 1500 to say so; a shared primitive left under one application's directory tells every reader, and the View Lab's broad-signal routing, that it is that application's component.
 The bar runs the other way too, and moved out of the same directory in the same change: a 506-line screen region with one caller is not a shared component, whichever primitives it reuses.
 
+The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:
+The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
+With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
+`keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
+A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
+It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
+
 #### Scenario: A converted menu renders no query field
 
 - **WHEN** a caller opens the shared picker with its search field suppressed
@@ -1641,6 +1650,24 @@ The bar runs the other way too, and moved out of the same directory in the same 
 - **THEN** it is routed onto the picker's multi-select mode rather than hand-rolled or recorded as a non-member
 - **AND** its panel announces a multi-selectable list
 - **AND** any register row that rested on the mode's absence records the measurement that settled it
+
+#### Scenario: A square tile is named without text
+
+- **WHEN** a caller opens the picker with `as="grid"` and `squareTiles`
+- **THEN** each option renders no text node and carries its label as both `aria-label` and `title`
+- **AND** ArrowDown moves the cursor by `columns` options
+
+#### Scenario: A panel opens from a caller's anchor
+
+- **WHEN** a caller binds `open` and passes an `anchor`
+- **THEN** no trigger renders and a pointer press on the anchor does not dismiss the panel
+- **AND** the primitive writes no `aria-haspopup` or `aria-expanded`, because no trigger exists
+- **AND** closing the panel returns focus to the anchor
+
+#### Scenario: A column count outside the supported range
+
+- **WHEN** a caller passes `as="grid"` with `columns` outside 2 to 6
+- **THEN** the grid draws one column and the cursor maps one column
 
 ### Requirement: The overflow action menu is a primitive of its own, and never a mode of the picker
 
