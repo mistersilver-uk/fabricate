@@ -6,7 +6,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { underSheet } from '../helpers/publishedComponentModules.js';
+import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls,
+  themePalettes,
+} from '../helpers/themePaletteContrast.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const emptyStateSource = readFileSync(
@@ -172,29 +179,10 @@ describe('1286 EmptyState — variant contract', () => {
     );
   });
 
-  // The two small-text variants ink at the muted tone, pinned on the source because the figure is
-  // per palette: the subtle tone clears 4.5:1 in `mythwright` alone and fails in the other six.
-  it('inks the note and filtered variants at the MUTED tone, not the reference`s subtle/disabled', () => {
-    for (const selector of ['.manager-empty.is-note h3', '.manager-empty.is-note p']) {
-      assert.match(
-        ruleBody(selector),
-        /color:\s*var\(--fab-text-muted\)/,
-        `${selector} inks at the muted tone: at 10px the subtle tone measures 3.69:1 on the ` +
-          'default theme, under the small-text floor'
-      );
-    }
-    for (const selector of ['.manager-empty.is-filtered', '.manager-empty.is-filtered p']) {
-      assert.match(
-        ruleBody(selector),
-        /color:\s*var\(--fab-text-muted\)/,
-        `${selector} inks at the muted tone: the disabled tone measures 2.66:1 on the default ` +
-          'theme, the worst reading in this family and the reference`s own value'
-      );
-    }
+  it('keeps the disabled tone out of the component, where the filtered reference inked it', () => {
     assert.ok(
       !/--fab-text-disabled/.test(emptyStateSource.split('<style>')[1] ?? ''),
-      'and the disabled tone is gone from this component entirely, rather than left on one ' +
-        'of the two rules the filtered variant declares'
+      'the reference`s disabled ink on the filtered sentence composites to 2.66:1 at 11.5px'
     );
   });
 
@@ -224,4 +212,49 @@ describe('1286 EmptyState — variant contract', () => {
     assert.equal(parent, 'ProbeBody');
     assert.equal(title, 'inherit', 'the note title reads no --font-primary');
   });
+});
+
+/**
+ * Issue 2178: every variant's small-text line inks a token that clears 4.5:1 in all seven palettes
+ * on each ground a panel sits on. The panel paints no ground of its own, so its host's is the
+ * ground; `--fab-text-subtle` fails it in six palettes.
+ */
+describe('2178 EmptyState — small-text ink clears 4.5:1 on its host grounds', () => {
+  const FILE = 'src/ui/svelte/components/EmptyState.svelte';
+  const corpus = collectStyleCorpus();
+  const rules = rulesIn(corpus[FILE]);
+  const themes = themePalettes(rulesIn(corpus['styles/fabricate.css']));
+  const GROUNDS = [
+    ['--fab-bg-0'],
+    ['--fab-bg-1'],
+    ['--fab-surface'],
+    ['--fab-bg-2'],
+    ['--fab-surface-soft', '--fab-bg-2'],
+  ];
+
+  it('paints no ground on the panel itself', () => {
+    const painted = rules
+      .filter((rule) => /^\.manager-empty(?:\.[\w-]+)*$/u.test(rule.selector))
+      .flatMap((rule) =>
+        [...propertiesOf(rule)]
+          .filter(([property, value]) => property.startsWith('background') && value !== 'none')
+          .map(([property, value]) => `${rule.selector} ${property}: ${value}`)
+      );
+    assert.deepEqual(painted, []);
+  });
+
+  for (const selector of [
+    '.manager-empty p',
+    '.manager-empty.is-note h3',
+    '.manager-empty.is-note p',
+    '.manager-empty.is-filtered p',
+  ]) {
+    it(`${selector} clears 4.5:1 on every host ground in every palette`, () => {
+      const ink = declaredToken(rules, selector, 'color', FILE);
+      assert.deepEqual(
+        GROUNDS.flatMap((stack) => shortfalls(themes, ink, stack)),
+        []
+      );
+    });
+  }
 });
