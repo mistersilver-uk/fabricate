@@ -163,6 +163,51 @@ describe('Button emits the element and classes its call sites are styled against
     assert.equal(button().className, 'fabricate-button fab-manager-button is-ghost');
   });
 
+  // ── THE BUSY STATE (issue 2540) ───────────────────────────────────────────────────────
+  it('writes aria-busy and aria-disabled for busy, and never disabled', async () => {
+    await harness.mount({ role: 'primary', busy: true });
+    const node = button();
+    assert.equal(node.getAttribute('aria-busy'), 'true');
+    assert.equal(node.getAttribute('aria-disabled'), 'true');
+    assert.equal(node.disabled, false, 'busy keeps the tab stop that `disabled` would drop');
+    assert.equal(node.className, 'fabricate-button fab-manager-button is-primary');
+  });
+
+  it('writes neither busy attribute while idle', async () => {
+    await harness.mount({});
+    assert.ok(!button().hasAttribute('aria-busy'), 'no aria-busy while idle');
+    assert.ok(!button().hasAttribute('aria-disabled'), 'no aria-disabled while idle');
+  });
+
+  it('swallows a press while busy and forwards it once settled', async () => {
+    const presses = [];
+    const onclick = () => {
+      presses.push('press');
+    };
+    await harness.mount({ busy: true, onclick });
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    button().dispatchEvent(event);
+    assert.deepEqual(presses, [], 'a busy press reaches no callback');
+    assert.equal(event.defaultPrevented, true, 'and its default (a submit, a link) is prevented');
+    harness.remount();
+    await harness.mount({ onclick });
+    button().click();
+    assert.deepEqual(presses, ['press']);
+  });
+
+  it('swallows an anchor press while busy, so the link does not navigate', async () => {
+    await harness.mount({ tag: 'a', href: '/docs', busy: true });
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    button().dispatchEvent(event);
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(button().getAttribute('aria-disabled'), 'true');
+  });
+
+  it('renders disabled when disabled and busy are both set', async () => {
+    await harness.mount({ busy: true, disabled: true });
+    assert.equal(button().disabled, true);
+  });
+
   it('appends the pass-through class after its own, never in place of them', async () => {
     await harness.mount({ role: 'ghost', class: 'is-subtle manager-thing' });
     // A `class` arriving through the rest spread would REPLACE the primitive's classes and

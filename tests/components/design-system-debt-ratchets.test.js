@@ -1340,7 +1340,7 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-success-strong)',
     'the primary verb deepens in its own family',
   ],
@@ -1352,13 +1352,13 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-danger:not(:disabled):hover, .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover, .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover",
     'var(--fab-danger-soft)',
     'the danger verb fills in the family it inks in',
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-warning-soft)',
     'the warning verb keeps its own fill',
   ],
@@ -1646,8 +1646,8 @@ test('no state rule in the sheet and every scoped block mixes two tint families'
 /** A hover that keeps a rung fill under a tinted edge, with the reason the edge is its own. */
 const HOVER_EDGE_TINTS = Object.freeze(
   [
-    '.fabricate-button.fabricate-button.is-dashed:not(:disabled):hover',
-    '.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
+    ".fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   ].map((selector) => [
     MODULE_SHEET,
     selector,
