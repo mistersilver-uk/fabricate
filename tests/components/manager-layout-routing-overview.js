@@ -1,7 +1,8 @@
 /**
  * The routing overview's skinned select and blocked row, measured in a real browser (issue 2513):
- * the tone skin yields the accent border to keyboard focus, and a blocked row's words wrap to at
- * most two lines without truncating.
+ * the tone skin yields the accent border to keyboard focus, a blocked row's words wrap to at
+ * most two lines without truncating, and a list with no marker column leaves no empty gutter right
+ * of its selects.
  * The hand-written DOM mirrors the classes `RoutingOverview` and `Select` emit, as
  * `manager-layout-select.js` does, so a class renamed there is renamed here.
  */
@@ -106,7 +107,7 @@ test('a blocked row’s words wrap to at most two lines and never truncate', asy
         <body>
           <div class="fabricate"><main class="fabricate-manager">
             <div class="fabricate-routing-overview" style="width: 640px">
-              <ul class="fabricate-routing-overview-list">
+              <ul class="fabricate-routing-overview-list" data-routing-overview-marked>
                 ${row('Rough', `<span class="fabricate-routing-overview-blocked">${BLOCKED}</span>`, 'blocked')}
               </ul>
             </div>
@@ -130,6 +131,47 @@ test('a blocked row’s words wrap to at most two lines and never truncate', asy
     assert.ok(measured.overflow <= 0, 'and nothing is clipped');
     assert.notEqual(measured.textOverflow, 'ellipsis');
     assert.notEqual(measured.whiteSpace, 'nowrap');
+  } finally {
+    await context.close();
+  }
+});
+
+test('an unmarked list ends at its selects, and a blocked row spans the slot alone', async () => {
+  const context = await openLayoutContext({ viewport: { width: 900, height: 400 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head><meta charset="utf-8"><style>@layer modules { ${css} } body { margin: 0; }</style></head>
+        <body>
+          <div class="fabricate"><main class="fabricate-manager">
+            <div class="fabricate-routing-overview" style="width: 640px">
+              <ul class="fabricate-routing-overview-list">
+                ${row('Fine', target('success').replace('<span class="fabricate-routing-overview-markers"></span>', ''))}
+                ${row('Rough', `<span class="fabricate-routing-overview-blocked">routing not permitted</span>`, 'blocked')}
+              </ul>
+            </div>
+          </main></div>
+        </body>
+      </html>`);
+    const measured = await page.evaluate(() => {
+      const edge = (selector, side) =>
+        document.querySelector(selector).getBoundingClientRect()[side];
+      const row = '[data-routing-overview-row="Fine"]';
+      return {
+        gutter: edge(row, 'right') - edge(`${row} .fabricate-routing-overview-target`, 'right'),
+        padding: Number.parseFloat(getComputedStyle(document.querySelector(row)).paddingRight),
+        border: Number.parseFloat(getComputedStyle(document.querySelector(row)).borderRightWidth),
+        blocked: edge('.fabricate-routing-overview-blocked', 'width'),
+      };
+    });
+    assert.equal(
+      measured.gutter,
+      measured.padding + measured.border,
+      'the select ends at the padding'
+    );
+    assert.equal(measured.blocked, 170, 'the blocked words span the slot');
   } finally {
     await context.close();
   }

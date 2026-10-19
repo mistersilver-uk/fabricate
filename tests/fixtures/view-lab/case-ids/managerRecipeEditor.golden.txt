@@ -84,6 +84,7 @@ manager-recipe-edit-overview-routing-default
 manager-recipe-edit-overview-routing-check
 manager-recipe-edit-overview-routing-check-narrow
 manager-recipe-edit-overview-routing-check-permitted
+manager-recipe-edit-overview-routing-distinct
 manager-recipe-edit-overview-routing-multistep
 manager-recipe-edit-access-rail
 manager-recipe-edit-access-inspector

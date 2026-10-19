@@ -1,5 +1,5 @@
 /**
- * `RoutingOverview` (issue 2513): the reserved marker column, the value-based select tone held off
+ * `RoutingOverview` (issue 2513): the marker column, drawn only while a row holds marker text, the value-based select tone held off
  * read-only and disabled triggers, blocked and gap rows, the badge, the select's name and
  * description, and `onChange(key, value)`.
  */
@@ -121,6 +121,22 @@ describe('RoutingOverview rows', () => {
     assert.deepEqual(markers('Set A'), []);
     assert.deepEqual(markers('Set B'), ['default', 'shared · 2']);
     assert.deepEqual(markers('Ruined'), ['only on a forced failure']);
+  });
+
+  it('draws no marker column in a list whose rows hold no marker text', async () => {
+    const rows = [sourceRow('Set A', { value: 'g1' }), sourceRow('Set B', { value: 'g2' })];
+    const { root, row } = await mountOverview({ rows });
+    const list = root.querySelector('.fabricate-routing-overview-list');
+    assert.equal(list.hasAttribute('data-routing-overview-marked'), false);
+    assert.equal(root.querySelectorAll('.fabricate-routing-overview-markers').length, 0);
+    assert.ok(Boolean(row('Set A').querySelector('.fabricate-select-trigger')), 'selects stay');
+    const { root: marked } = await remountWith([...rows, sourceRow('Set C', { shared: 2 })]);
+    assert.ok(
+      marked
+        .querySelector('.fabricate-routing-overview-list')
+        .hasAttribute('data-routing-overview-marked')
+    );
+    assert.equal(marked.querySelectorAll('.fabricate-routing-overview-markers').length, 3);
   });
 
   it('draws the source as a truncated row chip titled with its name, struck when blocked', async () => {

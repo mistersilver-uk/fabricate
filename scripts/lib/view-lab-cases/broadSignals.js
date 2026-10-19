@@ -466,6 +466,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-overview-routing-check',
     'manager-recipe-edit-overview-routing-check-narrow',
     'manager-recipe-edit-overview-routing-check-permitted',
+    'manager-recipe-edit-overview-routing-distinct',
     'manager-recipe-edit-overview-routing-multistep',
   ]),
   // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
