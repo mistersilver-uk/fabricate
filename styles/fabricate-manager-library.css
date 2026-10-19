@@ -501,6 +501,7 @@
 
 .fabricate-toggle-card .manager-recipe-status-title {
   margin: 0;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
@@ -1344,11 +1345,12 @@
   font: inherit;
 }
 
-/* Switch. The state colour now lives on the TRACK, and the button itself is a bare flex row rather than a tinted pill — so the control reads as a switch rather than a badge, and the row it sits in stays calm (issue 643). */
+/* Switch, drawn to the library's `<Toggle>` specimen. The state colour lives on the TRACK and the button is a bare flex row rather than a tinted pill, so the control reads as a switch rather than a badge (issue 643). The base defaults are the off face. */
 .fabricate-toggle.fabricate-toggle {
-  --fab-toggle-track: var(--fab-bg-3);
-  --fab-toggle-track-border: var(--fab-border-strong);
-  --fab-toggle-knob: var(--fab-text-secondary);
+  --fab-toggle-track: var(--fab-surface-soft);
+  --fab-toggle-track-border: var(--fab-control-outline);
+  --fab-toggle-knob: var(--fab-text-muted);
+  --fab-toggle-lift: var(--fab-text);
 
   appearance: none;
   -webkit-appearance: none;
@@ -1357,7 +1359,7 @@
   justify-content: flex-start;
   gap: var(--fab-space-2);
 
-  /* The switch never shrinks. As a flex item it defaults to `flex-shrink: 1`, and `min-width: 0` lets it squash below its content, so in a tight row the button narrows while the 34px track (`flex: 0 0 34px`) keeps its size and spills out to the right — over the parent's padding and into its border. */
+  /* The switch never shrinks: as a flex item with `min-width: 0` it would squash below its content in a tight row while the 38px track (`flex: 0 0 38px`) keeps its size and spills out over the parent's padding. */
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
@@ -1372,17 +1374,18 @@
   cursor: pointer;
 }
 
-/* ONE ACCENT FOR BOTH POSITIONS. The switch used to change HUE when it changed meaning: off drew a TAN knob on a neutral track and on drew a GREEN track, so the manager's most semantically loaded control said "off" in the accent family and "on" in the success family (issue 1373). */
+/* ONE ACCENT FOR BOTH MEANINGS: on is the accent whatever the switch means, so the manager's most semantically loaded control never says "on" in a second family (issue 1373). */
 .fabricate-toggle.fabricate-toggle.is-on {
   --fab-toggle-track: var(--fab-accent);
-  --fab-toggle-track-border: var(--fab-accent-border);
-  --fab-toggle-knob: var(--fab-on-accent);
+  --fab-toggle-track-border: var(--fab-accent);
+  --fab-toggle-knob: var(--fab-bg-1);
 }
 
+/* The off edge and knob each clear 3:1 against the ground and the track in every palette; `control-outline-contrast` holds both (issue 2492). */
 .fabricate-toggle.fabricate-toggle.is-off {
-  --fab-toggle-track: var(--fab-surface-raised);
-  --fab-toggle-track-border: var(--fab-border);
-  --fab-toggle-knob: var(--fab-text-subtle);
+  --fab-toggle-track: var(--fab-surface-soft);
+  --fab-toggle-track-border: var(--fab-control-outline);
+  --fab-toggle-knob: var(--fab-text-muted);
 
   color: var(--fab-text-muted);
 }
@@ -1396,10 +1399,13 @@
   color: var(--fab-danger-text);
 }
 
-/* Hover affordance. The switch sets `border: 0` on the BUTTON, which left the old hover rule (a `border-color` on the button itself) inert — every switch in the manager (components, essences, tools, gathering, environments, books, access) had no hover response at all (issues 643, 1096). */
-.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
-  border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
-  background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
+/* Hover, on an operable switch only. An on track lifts its fill toward `--fab-toggle-lift`; an off track, whose fill is a near-transparent wash, firms its edge instead. */
+.fabricate-toggle.fabricate-toggle.is-on:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track {
+  background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-toggle-lift));
+}
+
+.fabricate-toggle.fabricate-toggle.is-off:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track {
+  border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-toggle-lift));
 }
 
 .fabricate-toggle.fabricate-toggle:focus {
@@ -1413,34 +1419,90 @@
   box-shadow: none;
 }
 
-/* 34x20 track, 14x14 knob inset 2px — the knob travels 34 - 2 - 14 - 2 = 16px, i.e. left:2px -> left:16px. */
+/* 38x22 track with a 1px border and a 1px inset, so the 18px knob travels 38 - 2 - 2 - 18 = 16px. The fill stops at the padding box, so the edge reads against the ground rather than over the fill. */
 .fabricate-toggle .manager-status-toggle-track {
-  position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  width: 34px;
-  height: 20px;
-  flex: 0 0 34px;
-  padding: 0;
+  box-sizing: border-box;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 38px;
+  padding: 1px;
   border: 1px solid var(--fab-toggle-track-border);
   border-radius: 999px;
   background: var(--fab-toggle-track);
+  background-clip: padding-box;
   transition: background-color var(--fab-motion-control), border-color var(--fab-motion-control);
 }
 
 .fabricate-toggle .manager-status-toggle-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
   border-radius: 50%;
   background: var(--fab-toggle-knob);
-  transition: transform var(--fab-motion-control), background-color var(--fab-motion-control);
+  transition: margin-left var(--fab-motion-control), background-color var(--fab-motion-control);
 }
 
 .fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob {
-  transform: translateX(14px);
+  /* ratchet-exempt(design-system): knob travel derived from the track and knob sizes, not spacing */
+  margin-left: 16px;
+}
+
+/* Disabled, on every host: the button's attribute, the class form and the checkbox host's disabled input dim the whole switch and take no hover face (issue 2525). */
+.fabricate-toggle.fabricate-toggle.is-disabled,
+.fabricate-toggle.fabricate-toggle:disabled,
+.fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Forced colours (issue 2492): the reader's palette, not a token, paints the switch, and the track and knob opt out of the browser's repaint so on and off stay distinct. Each face points `--fab-toggle-lift` at its own colour, so hover holds the face still. */
+@media (forced-colors: active) {
+  .fabricate-toggle .manager-status-toggle-track,
+  .fabricate-toggle .manager-status-toggle-knob {
+    forced-color-adjust: none;
+  }
+
+  .fabricate-toggle.fabricate-toggle,
+  .fabricate-toggle.fabricate-toggle.is-off {
+    --fab-toggle-track: canvas;
+    --fab-toggle-track-border: canvastext;
+    --fab-toggle-knob: canvastext;
+    --fab-toggle-lift: canvastext;
+  }
+
+  .fabricate-toggle.fabricate-toggle.is-on {
+    --fab-toggle-track: highlight;
+    --fab-toggle-track-border: highlight;
+    --fab-toggle-knob: highlighttext;
+    --fab-toggle-lift: highlight;
+  }
+
+  .fabricate-toggle.fabricate-toggle.is-disabled,
+  .fabricate-toggle.fabricate-toggle:disabled,
+  .fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) {
+    --fab-toggle-track-border: graytext;
+    --fab-toggle-knob: graytext;
+
+    opacity: 1;
+  }
+
+  /* A disabled on switch fills its track, so filled-on against hollow-off survives in GrayText. */
+  .fabricate-toggle.fabricate-toggle.is-on.is-disabled,
+  .fabricate-toggle.fabricate-toggle.is-on:disabled,
+  .fabricate-toggle.fabricate-toggle.is-on:has(> .manager-tool-setting-toggle-input:disabled) {
+    --fab-toggle-track: graytext;
+    --fab-toggle-knob: canvas;
+  }
+
+  .fabricate-toggle.fabricate-toggle.is-disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle:disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) .manager-status-toggle-label {
+    color: graytext;
+  }
 }
 
 .fabricate-toggle .manager-status-toggle-label {

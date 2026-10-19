@@ -100,68 +100,66 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
     focusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus should keep a manager focus-visible ring'
   );
-  // ONE ACCENT FOR BOTH POSITIONS (issue 1373). This asserted the SUCCESS family for `on`,
-  // beside the note below asserting a neutral track and a `--fab-text-secondary` (tan) knob for
-  // `off` — so the manager's most semantically loaded control changed HUE when it changed
-  // meaning, and the off position was the louder of the two. On the Tool rules editor that is
-  // two accents for one control type on one screen: the enable switch sits inches from four
-  // inherit switches. The reference builds every switch it draws from one pair —
-  // `svTrack(on)` / `svKnob(on)` — which is the accent track with the on-accent knob when on,
-  // and a raised neutral track with a subtle knob when off.
+  // ONE ACCENT FOR BOTH MEANINGS (issue 1373): the library's `<Toggle>` specimen draws on as an
+  // accent track with a `--fab-bg-1` knob and off as a `--fab-surface-soft` track.
   assert.ok(
     onBlock.includes('var(--fab-accent)'),
     'the lit switch is the ACCENT family, which is the one accent this manager has'
   );
   assert.ok(
-    onBlock.includes('--fab-toggle-knob: var(--fab-on-accent);'),
+    onBlock.includes('--fab-toggle-knob: var(--fab-bg-1);'),
     'and its knob is the ink that family reads against'
   );
-  // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong).
+  // Issue 643: OFF is NEUTRAL.
   assert.ok(
-    offBlock.includes('var(--fab-surface-raised)'),
+    offBlock.includes('var(--fab-surface-soft)'),
     'disabled status should read as a neutral off switch, not a warning'
   );
-  assert.ok(offBlock.includes('var(--fab-border)'), 'the off track should keep a visible edge');
-  // AND ITS KNOB IS SUBTLE, NOT THE TAN SECONDARY INK (issue 1373). The off knob used to be the
-  // brightest part of the whole control, so the switch shouted loudest in the position that
-  // means "nothing is happening here".
   assert.ok(
-    offBlock.includes('--fab-toggle-knob: var(--fab-text-subtle);'),
+    offBlock.includes('var(--fab-control-outline)'),
+    'the off track keeps an edge at 3:1 on its ground (issue 2492)'
+  );
+  // The off knob is muted, not the tan secondary ink, and clears 3:1 on its track (issue 2492).
+  assert.ok(
+    offBlock.includes('--fab-toggle-knob: var(--fab-text-muted);'),
     'the off knob recedes; the lit position is the loud one'
   );
-  // The switch sets `border: 0` on the BUTTON.
-  const toggleHoverBlock = blockFor(
-    '.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
-  );
+  // The switch sets `border: 0` on the BUTTON, so hover paints the track: an on track lifts its
+  // fill, and an off track firms its edge alone.
+  const operable =
+    ':not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track';
+  const onHoverBlock = blockFor(`.fabricate-toggle.fabricate-toggle.is-on${operable}`);
+  const offHoverBlock = blockFor(`.fabricate-toggle.fabricate-toggle.is-off${operable}`);
   assert.ok(
-    toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
+    offHoverBlock.includes('border-color:') && onHoverBlock.includes('background:'),
     'hovering a switch must visibly change its track'
   );
+  assert.doesNotMatch(offHoverBlock, /background/u, 'an off switch hovers on its edge only');
   assert.equal(
     /\.fabricate-toggle:hover \{/.test(css),
     false,
     'a hover rule on the border-less button itself is dead code'
   );
   assert.ok(
-    trackBlock.includes('width: 34px;'),
-    'toggle track should use the 34x20 switch geometry'
+    trackBlock.includes('width: 38px;'),
+    'toggle track should use the 38x22 switch geometry'
   );
   assert.ok(
-    trackBlock.includes('height: 20px;'),
-    'toggle track should use the 34x20 switch geometry'
+    trackBlock.includes('height: 22px;'),
+    'toggle track should use the 38x22 switch geometry'
   );
   assert.ok(
     trackBlock.includes('background: var(--fab-toggle-track);'),
     'the track should carry the state colour'
   );
-  assert.ok(knobBlock.includes('width: 14px;'), 'toggle knob should use the 14x14 switch geometry');
+  assert.ok(knobBlock.includes('width: 18px;'), 'toggle knob should use the 18x18 switch geometry');
   assert.ok(
-    knobBlock.includes('transition: transform'),
+    knobBlock.includes('transition: margin-left'),
     'toggle knob should expose a clear state change'
   );
-  // 34px track - 2px inset - 14px knob - 2px inset = 14px of travel (left 2 -> 16).
+  // 38px track - 2px border - 2px inset - 18px knob = 16px of travel.
   assert.ok(
-    onKnobBlock.includes('transform: translateX(14px);'),
+    onKnobBlock.includes('margin-left: 16px;'),
     'enabled status should move the toggle knob on'
   );
 });

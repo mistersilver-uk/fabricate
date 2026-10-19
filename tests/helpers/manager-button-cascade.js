@@ -1336,8 +1336,8 @@ function describeBlindSpots({ sites, unbalanced, atRisk }) {
       'gate; this module tells it where to look.',
     'Custom-property indirection is NOT resolved, so a reported value change can still compute ' +
       'identically. `.fabricate-toggle.fabricate-toggle` declares ' +
-      '`--fab-toggle-track: var(--fab-bg-3)`, so a winner change between `--fab-toggle-track` ' +
-      'and `--fab-bg-3` is a zero-pixel change this report nevertheless prints as a change.',
+      '`--fab-toggle-track: var(--fab-surface-soft)`, so a winner change between `--fab-toggle-track` ' +
+      'and `--fab-surface-soft` is a zero-pixel change this report nevertheless prints as a change.',
     '`@media` and `@container` rules are scored like any other and carry their condition in the ' +
       'report, but whether the condition holds at a given viewport is not evaluated.',
     unbalanced.length === 0

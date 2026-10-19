@@ -1176,13 +1176,13 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-toggles-specimen': [
     {
       selector: `${labToggle('group')} > .manager-status-toggle-track`,
-      styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+      styles: 'width: 38px; height: 22px; background-color: var(--fab-surface-soft)',
     },
     {
       selector: `${labToggle('hide')} > .manager-status-toggle-track`,
       styles: 'background-color: var(--fab-accent)',
     },
-    { selector: labToggle('long'), styles: 'width: 34px' },
+    { selector: labToggle('long'), styles: 'width: 38px' },
     {
       selector: `${labToggle('key')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',

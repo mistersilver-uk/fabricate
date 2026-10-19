@@ -420,11 +420,11 @@ export const CASES = Object.freeze([
         // figure would pin the fixture rather than the contract.
         {
           selector: TOGGLE_TRACK('group'),
-          styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+          styles: 'width: 38px; height: 22px; background-color: var(--fab-surface-soft)',
         },
         { selector: TOGGLE_TRACK('hide'), styles: 'background-color: var(--fab-accent)' },
         // A label that wraps beside the switch leaves it its own width.
-        { selector: LAB_TOGGLE('long'), styles: 'width: 34px' },
+        { selector: LAB_TOGGLE('long'), styles: 'width: 38px' },
         // `:focus-visible` alone says focus, not a ring; its colour fades in under Foundry's
         // own transition, so only its shape is read.
         {

@@ -698,6 +698,7 @@ Neither is answerable by reading the source, so the method that settles both is 
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
 Every colour, spacing value and shadow MUST come from a `--fab-*` token.
+A `@media (forced-colors: active)` block MAY name CSS system colours (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`, `GrayText`) and set `forced-color-adjust: none`, because under forced colours the reader's palette, not a token, is the source.
 A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside the approved theme blocks fails `tests/components/theme-colour-contract.test.js`, so a literal is a gate failure rather than a style preference.
 
 Four background levels carry all depth: `--fab-bg-0` is the page ground, `--fab-bg-1` is rails, rows and wells, `--fab-bg-2` is cards and panels, and `--fab-bg-3` is icon chips.
@@ -707,12 +708,14 @@ Each semantic family — accent, success, info, warning, danger — ships `-text
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
 The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip that carries no tint of its own, and the tag row's `+ Tag`, ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1; a tinted chip keeps its tint's ink.
 A contrast claim about a translucent fill MUST name the ground it composites over, because `-soft` is an alpha and there are two.
-An unchecked selection control — a radio ring or a checkbox box — draws its outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
+An unchecked selection control — a radio ring or a checkbox box — and a switch's off track draw their outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
 That outline MUST meet WCAG 1.4.11's 3:1 against the control's surface in every palette: the fill it encloses where the control draws one — `--fab-bg-0` in a medium or large checkbox, `--fab-bg-1` in a radio card's dot — and otherwise the surface beneath it.
-Measured on the shipped surfaces it clears 3.34:1 at its weakest, where `--fab-border` and `--fab-border-strong`, which those outlines drew before, measured 1.52 to 2.21:1.
+A switch's off track is a translucent `--fab-surface-soft` wash clipped to its padding box rather than an enclosed fill, so its surface is the ground beneath it — `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2`, or `--fab-surface-soft` on `--fab-bg-2` (a card) — and its edge is measured there.
+Measured on the shipped surfaces it clears 3.34:1 at its weakest on a selection control and 3.11:1 on a switch's off track over a card in `ironblood-forge`, where `--fab-border` and `--fab-border-strong`, which those outlines drew before, measured 1.52 to 2.21:1.
 A FILLED control clips its fill to the padding box, so its outline composites over the surround rather than over its own fill.
 The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a radio card's dot on the gathering task editor's option cards measures 2.03:1 against that surround in `hearth-herb`, and a large checkbox on a selected row 2.76:1 in `hearth-herb`.
 `tests/components/control-outline-contrast.test.js` holds the single declaration, the 3:1 floor on `--fab-bg-0`, `--fab-bg-1` and `--fab-bg-2` in all seven palettes, every outline site, and the padding-box clip on every filled one.
+The switch's off knob is `--fab-text-muted` and MUST clear 3:1 against its off track, `--fab-surface-soft`, composited over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and over `--fab-surface-soft` on `--fab-bg-2` (a card), in every palette (issue 2492); `control-outline-contrast` holds it beside the outline floor.
 
 The recessive tones `secondary`, `neutral`, `subtle` and `muted` are a FOUR-RANK ORDERED ink ladder routed by MEANING: `secondary` names the rule the GM is reading, `neutral` a fact that is merely present, `subtle` a quiet non-actionable state, and `muted` unavailable.
 Each is measurably weaker than the last in every theme, and the ORDER is the invariant rather than any percentage: `fabricate` and `sovereign` express the ladder as one opaque hue at 74%, 56% and 42% of itself, `ironblood-forge`, `hearth-herb` and `starglass-arcana` as one opaque hue at 80%, 56% and 42% of itself, `mythwright` states the first three as three DIFFERENT opaque hues plus one alpha, and `foundry-native` uses 80% and 60% of its secondary triple, then a different base triple at 50%.
@@ -768,6 +771,11 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 - **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its five named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
 - **THEN** `text-muted-ground-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A palette edit drops the switch's off knob under its floor
+
+- **WHEN** a theme block's edit leaves the off knob under 3:1 on its track over one of the four named grounds
+- **THEN** `control-outline-contrast` fails and names the palette, the ground and the ratio
 
 ### Requirement: The token namespace is one generation and names its purpose
 
@@ -946,6 +954,9 @@ No text input draws a hover face.
 It declares `disabled`, which disables its input and every token together and leaves its reading drawn, and it takes the invalid state as `aria-invalid` on its rest spread.
 A host MUST stack the input and its row in a column that states the gap between them, as `Field` does at 6px, and MUST host the field outside a `<label>` when it passes `tokens` or `resolve`, because a label would take every token, the reading and the status text into the field's name.
 
+The switch dims to opacity 0.45 when disabled on all three hosts and draws no hover face; an enabled off switch's hover changes its border only.
+Under forced colours the track and knob set `forced-color-adjust: none`: off is a `Canvas` track with a `CanvasText` edge and knob, on is a `Highlight` track and edge with a `HighlightText` knob, and disabled is `GrayText` at opacity 1 — a disabled off switch keeps its `Canvas` track with a `GrayText` edge and knob, a disabled on switch fills its track `GrayText` with a `Canvas` knob, and its reading is `GrayText`.
+
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
 
@@ -993,6 +1004,16 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **WHEN** a change writes a literal duration or timing function on a transition or animation, or a scoped reduced-motion block
 - **THEN** `motion-token-gate` fails it
 - **AND** a control's state transition that names its property and reads `--fab-motion-control` passes
+
+#### Scenario: A switch is disabled
+
+- **WHEN** a switch is disabled outside forced colours
+- **THEN** it renders at opacity 0.45 and draws no hover face
+
+#### Scenario: Forced colours are active
+
+- **WHEN** forced colours are active
+- **THEN** a switch's on and off differ in track fill, knob colour and knob position, and a disabled switch draws in `GrayText` at full opacity, filled when on and hollow when off
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
