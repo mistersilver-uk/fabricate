@@ -658,9 +658,9 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     await flushAnnouncement();
     assert.equal(
       announcement(root),
-      'Overview',
-      'the region names the destination it reached; the zone carries no accessible name of its ' +
-        'own, so there is no control to name beside it'
+      'Overview — Drop a game-world Item here',
+      'the region names the destination it reached and then the zone, a group named by its title ' +
+        '(issue 2466)'
     );
   });
 

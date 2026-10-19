@@ -18,7 +18,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
@@ -101,6 +101,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     // The trigger clause and the dice-condition comparator render `Select.svelte` (issue 1510); an
@@ -975,6 +976,105 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     });
     await openFirstRow(target);
     assert.ok(!subline(target), 'a macro that resolves draws no subline');
+  });
+
+  describe('Relink on a missing macro (issue 2466)', () => {
+    const RELINK = '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]';
+    const BROWSE = '[data-complication-macro-browse]';
+    const RELINK_KEY = 'FABRICATE.Admin.Manager.Component.Complications.Macro.Relink';
+    let previous;
+    before(() => {
+      previous = globalThis.fromUuid;
+    });
+    beforeEach(() => {
+      Object.assign(globalThis, { fromUuid: async () => null });
+    });
+    afterEach(() => Object.assign(globalThis, { fromUuid: previous }));
+
+    async function mountMissing(props = {}) {
+      const mounted = await mountSection({
+        complications: [complication({ macroUuid: 'Macro.deleted' })],
+        macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+        ...props,
+      });
+      await flushRender();
+      await openFirstRow(mounted.target);
+      return mounted;
+    }
+
+    it('draws Relink above unlink, in the complication`s own words', async () => {
+      // A translation that differs from the `text()` fallback, so the label is read from the lang
+      // file rather than written into the caller.
+      const i18n = globalThis.game.i18n;
+      globalThis.game.i18n = {
+        ...i18n,
+        localize: (key) => (key === RELINK_KEY ? 'Neu verknüpfen' : i18n.localize(key)),
+      };
+      try {
+        const { target } = await mountMissing();
+        const actions = [
+          ...target.querySelectorAll(
+            ':scope [data-item-drop-zone="complication-macro"] .manager-item-drop-zone-actions button'
+          ),
+        ];
+        assert.ok(actions[0]?.matches('[data-item-drop-zone-relink]'), 'Relink leads the column');
+        assert.equal(actions[0].textContent.trim(), 'Neu verknüpfen', 'the label is the lang value');
+        assert.ok(actions[1]?.classList.contains('is-danger'), 'and unlink sits under it');
+      } finally {
+        globalThis.game.i18n = i18n;
+      }
+    });
+
+    it('draws no Relink while the macro resolves', async () => {
+      Object.assign(globalThis, { fromUuid: previous });
+      const { target } = await mountSection({
+        complications: [complication({ macroUuid: 'Macro.abc' })],
+        macroOptions: [{ uuid: 'Macro.abc', name: 'Shrapnel Burst' }],
+      });
+      await openFirstRow(target);
+      const zone = target.querySelector('[data-item-drop-zone="complication-macro"]');
+      assert.ok(zone.classList.contains('is-linked'), 'the zone is linked');
+      assert.ok(!target.querySelector(RELINK), 'and offers no Relink');
+    });
+
+    it('opens the Browse list, and a pick links the macro and returns focus to Browse', async () => {
+      const { target, emitted } = await mountMissing();
+      const browse = target.querySelector(BROWSE);
+      assert.equal(browse.getAttribute('aria-expanded'), 'false', 'Browse starts shut');
+      target.querySelector(RELINK).click();
+      await flushRender();
+      assert.equal(browse.getAttribute('aria-expanded'), 'true', 'Relink opens the Browse list');
+      const option = document.querySelector('[data-popover-option="Macro.abc"]');
+      assert.ok(Boolean(option), 'which lists the world`s script macros');
+      option.click();
+      await flushRender();
+      await flushRender();
+      assert.equal(emitted.at(-1)?.[0]?.macroUuid, 'Macro.abc', 'the pick links the macro');
+      assert.ok(document.activeElement === browse, 'focus lands on Browse, the list`s trigger');
+    });
+
+    it('closes the list on Escape after Relink and returns focus to Browse', async () => {
+      const { target } = await mountMissing();
+      const browse = target.querySelector(BROWSE);
+      target.querySelector(RELINK).click();
+      await flushRender();
+      assert.equal(browse.getAttribute('aria-expanded'), 'true', 'Relink opened the list');
+      (document.activeElement ?? document).dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+      );
+      await flushRender();
+      assert.equal(browse.getAttribute('aria-expanded'), 'false', 'Escape shuts the list');
+      assert.ok(document.activeElement === browse, 'focus returns to Browse, the list`s trigger');
+      assert.ok(target.querySelector(RELINK), 'and the macro is still missing, so Relink stays');
+    });
+
+    it('disables Relink while the section saves', async () => {
+      const { target } = await mountMissing();
+      assert.equal(target.querySelector(RELINK).disabled, false, 'Relink is live at rest');
+      await harness.setProps({ saving: true });
+      await flushRender();
+      assert.equal(target.querySelector(RELINK).disabled, true);
+    });
   });
 
   it('carries NO `Math.random()` literal, which is the whole reason `random` is a prop', () => {

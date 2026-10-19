@@ -142,6 +142,8 @@ function readParams() {
     depletedImage: params.get('depletedImage') === '1',
     // List the lab's script macro in `game.macros`, for a macro picker's option (issue 2466).
     scriptMacros: params.get('scriptMacros') === '1',
+    // Point Choking dust's macro at a uuid nothing answers, for the macro zone's missing face (issue 2466).
+    missingComplicationMacro: params.get('missingComplicationMacro') === '1',
     // Bend Horseshoe asks for any ingot, for the held-stack picker's frame (issue 1644).
     tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
@@ -994,6 +996,7 @@ async function boot() {
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,
         scriptMacros: params.scriptMacros,
+        missingComplicationMacro: params.missingComplicationMacro,
         tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);

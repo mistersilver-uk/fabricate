@@ -3823,7 +3823,8 @@
               "Unlink": "Remove macro",
               "NotScript": "That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.",
               "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium.",
-              "Missing": "This macro no longer resolves. Drop or browse another to replace it."
+              "Missing": "This macro no longer resolves. Drop or browse another to replace it.",
+              "Relink": "Relink"
             },
             "Summary": {
               "StageMissed": "the award is missed",

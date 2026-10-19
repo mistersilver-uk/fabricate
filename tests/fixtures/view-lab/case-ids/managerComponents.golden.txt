@@ -36,6 +36,7 @@ manager-component-complications-empty
 manager-component-complications-collapsed
 manager-component-complications-expanded
 manager-component-complications-macro-linked
+manager-component-complications-macro-missing
 manager-component-complications-check-trigger
 manager-component-complications-salvage-stage-strip
 manager-recipe-complications-stage-strip

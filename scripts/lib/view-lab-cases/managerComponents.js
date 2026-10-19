@@ -1116,6 +1116,39 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-component-complications-macro-missing',
+    label: 'Manager — Component complications macro missing',
+    // The macro zone's missing face and its Relink; `missingComplicationMacro` retires the macro.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', missingComplicationMacro: '1' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
+      },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
+      { selector: '[data-item-drop-zone="complication-macro"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The missing face lands a tick after mount, once `fromUuid` settles, so this is the wait.
+    expectSelector:
+      '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
+      '[data-item-drop-zone="complication-macro"].is-missing [data-item-drop-zone-relink]',
+    expectContained: [
+      {
+        container: '[data-item-drop-zone="complication-macro"]',
+        target: '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]',
+      },
+    ],
+    expectCenterHit: '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-component-complications-check-trigger',
     label: 'Manager — Component complications check trigger',
     // Beyond the smoke: the check-trigger Select appears only once a check-trigger condition is chosen on an open complication.
