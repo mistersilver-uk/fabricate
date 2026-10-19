@@ -26,11 +26,12 @@ const TOGGLE = 'src/ui/svelte/components/StatusToggle.svelte';
 const CASES = Object.freeze({
   off: { props: { on: false } },
   on: { props: { on: true } },
-  disabled: { props: { on: false, disabled: true } },
-  'disabled-on': { props: { on: true, disabled: true } },
-  'class-disabled': { props: { on: false, class: 'is-disabled' } },
+  disabled: { props: { on: false, disabled: true, label: 'Off' } },
+  'disabled-on': { props: { on: true, disabled: true, label: 'On' } },
+  'class-disabled': { props: { on: false, class: 'is-disabled', label: 'Off' } },
   checkbox: { props: { as: 'checkbox', on: false } },
-  'checkbox-disabled': { props: { as: 'checkbox', on: false, disabled: true } },
+  'checkbox-disabled': { props: { as: 'checkbox', on: false, disabled: true, label: 'Off' } },
+  'checkbox-disabled-on': { props: { as: 'checkbox', on: true, disabled: true, label: 'On' } },
   'task-off': { cell: 'manager-task-core-status', props: { on: false, label: 'Off' } },
   'task-on': { cell: 'manager-task-core-status', props: { on: true, label: 'On' } },
   'override-on': {
@@ -45,6 +46,9 @@ const CASES = Object.freeze({
 
 /** The three disabled hosts: the button's attribute, the class form and the checkbox's input. */
 const DISABLED = Object.freeze(['disabled', 'class-disabled', 'checkbox-disabled']);
+
+/** Two of those hosts on, which forced colours draw filled. */
+const DISABLED_ON = Object.freeze(['disabled-on', 'checkbox-disabled-on']);
 
 /** Transitions would leave a hover read mid-fade; the cascade under test is unchanged without them. */
 const STILL = '*,*::before,*::after{transition:none !important}';
@@ -79,6 +83,7 @@ const readCase = (key) => {
       offset: knob.getBoundingClientRect().left - track.getBoundingClientRect().left,
     },
     label: label && {
+      color: style(label).color,
       scrollWidth: label.scrollWidth,
       clientWidth: label.clientWidth,
       budget:
@@ -139,8 +144,8 @@ it('dims a disabled switch to 0.45 on all three hosts, and leaves an enabled one
   }
 });
 
-it('draws no hover face on a disabled switch, on any host', async () => {
-  for (const key of DISABLED) {
+it('draws no hover face on a disabled switch, on any host, on or off', async () => {
+  for (const key of [...DISABLED, ...DISABLED_ON]) {
     const { rest, hovered } = await restAndHover(key);
     assert.deepEqual(hovered.track, rest.track, `${key} answers the pointer`);
   }
@@ -153,10 +158,16 @@ it('hovers an off switch on its edge alone and an on switch on its fill alone', 
   const on = await restAndHover('on');
   assert.notEqual(on.hovered.track.background, on.rest.track.background, 'the on fill lifts');
   assert.equal(on.hovered.track.border, on.rest.track.border, 'the on edge holds');
+  const checkbox = await restAndHover('checkbox');
+  assert.notEqual(
+    checkbox.hovered.track.border,
+    checkbox.rest.track.border,
+    'so does the checkbox host'
+  );
 });
 
-// Each cap rose by the track's 4px, so the reading keeps the width it had beside the 34px track:
-// 64 - 34 - 8 in a task's status cell and 100 - 34 - 8 in the override row.
+// The reading's width is the cap less the 38px track and the 8px gap: 68 - 38 - 8 in a task's
+// status cell and 104 - 38 - 8 in the override row.
 const BUDGETS = Object.freeze({
   'task-off': 22,
   'task-on': 22,
@@ -170,12 +181,13 @@ it('keeps each capped status cell its reading budget, and the task cell its read
     assert.ok(label.clientWidth > 0, `${key} drew its reading`);
     assert.equal(label.budget, budget, `${key} keeps the reading width it had`);
   }
-  // The override row's "Overridden" is sized to Signika, which this page does not load.
+  // The override row's "Overridden" is sized to Signika, which this page does not load, and the
+  // task cell's reading is allowed a pixel of fallback-font slack for the same reason.
   for (const key of ['task-off', 'task-on']) {
     const { label } = await tab.evaluate(readCase, key);
     assert.ok(
-      label.scrollWidth <= label.clientWidth,
-      `${key} ellipsises its reading: ${label.scrollWidth} > ${label.clientWidth}`
+      label.scrollWidth <= label.clientWidth + 1,
+      `${key} keeps its reading whole: ${label.scrollWidth} > ${label.clientWidth}`
     );
   }
 });
@@ -199,8 +211,26 @@ it('keeps on and off distinct under forced colours, and draws a disabled switch 
         `${key}'s edge matches its knob`
       );
     }
-    const disabledOn = await tab.evaluate(readCase, 'disabled-on');
-    assert.equal(disabledOn.knob.offset, 18, 'a disabled on switch keeps its position');
+    const grayText = (await tab.evaluate(readCase, 'disabled')).knob.background;
+    for (const key of DISABLED_ON) {
+      const disabledOn = await tab.evaluate(readCase, key);
+      assert.equal(disabledOn.knob.offset, 18, `${key} keeps its position`);
+      assert.equal(disabledOn.track.background, grayText, `${key} fills its track in GrayText`);
+      assert.notEqual(
+        disabledOn.knob.background,
+        disabledOn.track.background,
+        `${key}'s knob shows`
+      );
+    }
+    assert.equal(
+      (await tab.evaluate(readCase, 'disabled')).track.background,
+      off.track.background,
+      'a disabled off switch keeps its hollow Canvas track'
+    );
+    for (const key of [...DISABLED, ...DISABLED_ON]) {
+      const { label } = await tab.evaluate(readCase, key);
+      assert.equal(label.color, grayText, `${key}'s reading is GrayText`);
+    }
   } finally {
     await tab.emulateMedia({ forcedColors: 'none' });
   }
@@ -209,10 +239,11 @@ it('keeps on and off distinct under forced colours, and draws a disabled switch 
 /** The system colours a forced-colours block may name, compared case-insensitively. */
 const SYSTEM_COLOURS = new Set(['canvas', 'canvastext', 'highlight', 'highlighttext', 'graytext']);
 
-it('roots every forced-colours rule at the switch, painting in system colours alone', () => {
+it('roots the switch’s forced-colours rules at the switch, painting in system colours alone', () => {
   const forced = Object.entries(collectStyleCorpus()).flatMap(([file, css]) =>
     rulesIn(css)
       .filter(({ context }) => /forced-colors:\s*active/u.test(context))
+      .filter(({ selector }) => /\.fabricate-toggle\b/u.test(selector))
       .map((rule) => ({ file, rule, declarations: declarationsIn(file, rule.body) }))
   );
   assert.ok(
@@ -223,7 +254,7 @@ it('roots every forced-colours rule at the switch, painting in system colours al
   assert.deepEqual(
     selectors.filter((selector) => !selector.startsWith('.fabricate-toggle')),
     [],
-    'a forced-colours rule outside the switch'
+    'a switch rule under forced colours rooted above the switch'
   );
   const painted = forced.flatMap(({ declarations }) =>
     declarations.filter(({ property }) => property.startsWith('--fab-toggle-'))

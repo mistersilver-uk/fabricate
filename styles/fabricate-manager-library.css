@@ -1488,6 +1488,20 @@
 
     opacity: 1;
   }
+
+  /* A disabled on switch fills its track, so filled-on against hollow-off survives in GrayText. */
+  .fabricate-toggle.fabricate-toggle.is-on.is-disabled,
+  .fabricate-toggle.fabricate-toggle.is-on:disabled,
+  .fabricate-toggle.fabricate-toggle.is-on:has(> .manager-tool-setting-toggle-input:disabled) {
+    --fab-toggle-track: graytext;
+    --fab-toggle-knob: canvas;
+  }
+
+  .fabricate-toggle.fabricate-toggle.is-disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle:disabled .manager-status-toggle-label,
+  .fabricate-toggle.fabricate-toggle:has(> .manager-tool-setting-toggle-input:disabled) .manager-status-toggle-label {
+    color: graytext;
+  }
 }
 
 .fabricate-toggle .manager-status-toggle-label {
