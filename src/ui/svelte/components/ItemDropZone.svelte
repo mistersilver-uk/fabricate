@@ -33,6 +33,8 @@
     `openspec/specs/design-system/spec.md`; one measured residue follows from the same spread, in
     that an element carrying one has its scope hash stamped defensively, so the hint `<small>`
     renders a `class` the compiled CSS never names.
+  - THE ROOT IS A GROUP NAMED BY ITS `<strong>`, and in `missing` described by its hint and subline,
+    so the state is announced as text as well as drawn in colour.
   - A MISSING CHIP DRAWS THE ALERT GLYPH, never the document's art or the caller's glyph, because a
     broken link must not look like a working one.
 -->
@@ -70,6 +72,14 @@
   const showRelink = $derived(isMissing && !compact && Boolean(onRelink));
   const unlinkAttrs = $derived(unlinkDataAttr ? { [unlinkDataAttr]: true } : {});
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
+  const nameId = $props.id();
+  const hintId = $derived(hookAttrs?.hint?.id || `${nameId}-hint`);
+  const sublineId = `${nameId}-subline`;
+  const describedBy = $derived(
+    isMissing
+      ? [hint && hintId, subline && sublineId].filter(Boolean).join(' ') || undefined
+      : undefined
+  );
 
   function handleDrop(data) {
     if (data?.type !== documentType) return;
@@ -88,6 +98,9 @@
   data-manager-item-drop-zone=""
   data-item-drop-zone={kind || undefined}
   data-item-drop-state={isMissing ? 'missing' : undefined}
+  role="group"
+  aria-labelledby={nameId}
+  aria-describedby={describedBy}
   {...hooksFor('root')}
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
@@ -104,12 +117,14 @@
     <span class="manager-item-drop-zone-icon" aria-hidden="true"><i class={emptyIcon}></i></span>
   {/if}
   <span class="manager-item-drop-zone-copy">
-    <strong>{compact ? title : item?.name || title}</strong>
+    <strong id={nameId}>{compact ? title : item?.name || title}</strong>
     {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
         >{uuid}</code
       >{/if}
-    {#if hint}<small {...hooksFor('hint')}>{hint}</small>{/if}
-    {#if subline}<small data-item-drop-zone-subline>{subline}</small>{/if}
+    {#if hint}<small id={isMissing ? hintId : undefined} {...hooksFor('hint')}>{hint}</small>{/if}
+    {#if subline}<small id={isMissing ? sublineId : undefined} data-item-drop-zone-subline
+        >{subline}</small
+      >{/if}
   </span>
   {#if item && !compact && (showRelink || onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">

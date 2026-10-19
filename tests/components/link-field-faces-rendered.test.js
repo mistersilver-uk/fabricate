@@ -1,7 +1,7 @@
 /**
  * The link field's faces as Chromium draws them (issue 2466): the 104px floor, the three grounds
  * and borders, the empty stack, the two-line caps, the action column, the compact face, the 38px
- * chip and the uuid line. The sheet sits in `@layer modules`, Foundry's `code` rule in `@layer
+ * chip, the uuid line and the named group. The sheet sits in `@layer modules`, Foundry's `code` rule in `@layer
  * elements` and the scoped blocks unlayered, as Foundry loads them, so each clause measures the
  * cascade a selector reading cannot.
  */
@@ -104,6 +104,14 @@ const CASES = Object.freeze({
   'disabled-missing': {
     width: 280,
     props: { ...MISSING, ...RELINK, unlinkLabel: 'Unlink', onUnlink: noop, disabled: true },
+  },
+  'missing-subline': {
+    width: 280,
+    props: { ...MISSING, hint: 'This document no longer resolves.', subline: 'Drop another.' },
+  },
+  'missing-hooked-hint': {
+    width: 280,
+    props: { ...MISSING, hint: 'Gone.', hookAttrs: { hint: { id: 'caller-hint' } } },
   },
 });
 
@@ -212,6 +220,19 @@ const readFaces = () => {
       text: button.textContent.trim(),
       classes: [...button.classList],
     }));
+    const zone = host.querySelector(PARTS.root);
+    const byId = (id) => host.querySelector(`[id="${id}"]`);
+    const labelledBy = zone.getAttribute('aria-labelledby');
+    const describedBy = zone.getAttribute('aria-describedby');
+    face.group = {
+      role: zone.getAttribute('role'),
+      labelIsName: Boolean(labelledBy) && byId(labelledBy) === host.querySelector(PARTS.name),
+      label: labelledBy ? (byId(labelledBy)?.textContent.trim() ?? '') : '',
+      described:
+        describedBy === null
+          ? null
+          : describedBy.split(' ').map((id) => byId(id)?.textContent.trim() ?? `#${id} unresolved`),
+    };
     face.glyphClass = host.querySelector('.fab-medallion > i')?.className ?? '';
     const uuidLine = doc.createRange();
     const uuidNode = host.querySelector(PARTS.uuid);
@@ -232,6 +253,7 @@ let browser;
 let tab;
 let faces;
 let tokens;
+let renamed;
 
 before(async () => {
   const harness = createMountedComponentHarness({
@@ -257,6 +279,11 @@ before(async () => {
       markup[key] = (await harness.mount(props)).innerHTML;
       harness.remount();
     }
+    const retitled = await harness.mount({ ...PROMPT, compact: true });
+    await harness.setProps({ title: 'Drop a macro here' });
+    const zone = retitled.querySelector('.manager-item-drop-zone');
+    renamed = retitled.querySelector(`[id="${zone.getAttribute('aria-labelledby')}"]`)?.textContent;
+    harness.remount();
   } finally {
     harness.teardown();
   }
@@ -469,6 +496,37 @@ it('disables every action of a disabled zone, and dims the zone to 0.55', () => 
     assert.equal(root.style.opacity, '0.55', `${key}: the zone dims`);
   }
   assert.ok(faces['disabled-missing'].actionButtons[0].relink, 'Relink is among them');
+});
+
+it('names every face a group by its title or its document`s name', () => {
+  const NAMES = {
+    empty: PROMPT.title,
+    linked: 'Blacksmith’s Compendium',
+    missing: 'Untitled',
+    compact: CASES.compact.props.title,
+    'missing-relink': 'Untitled',
+    'missing-art': 'Untitled',
+    'compact-missing': PROMPT.title,
+  };
+  for (const [key, face] of Object.entries(faces)) {
+    assert.equal(face.group.role, 'group', `${key}: the root is a group`);
+    assert.ok(face.group.labelIsName, `${key}: aria-labelledby resolves to the <strong>`);
+    if (NAMES[key]) assert.equal(face.group.label, NAMES[key], `${key}: named by its own line`);
+  }
+  assert.equal(renamed, 'Drop a macro here', 'the name follows a changed title');
+});
+
+it('describes a missing group by its hint and subline, and a linked one by nothing', () => {
+  assert.deepEqual(faces.missing.group.described, ['This document no longer resolves.']);
+  assert.deepEqual(faces['missing-subline'].group.described, [
+    'This document no longer resolves.',
+    'Drop another.',
+  ]);
+  assert.deepEqual(faces['missing-hooked-hint'].group.described, ['Gone.'], 'a caller`s hint id');
+  assert.equal(faces['missing-art'].group.described, null, 'a missing zone with no lines has none');
+  for (const key of ['linked', 'linked-art', 'empty', 'compact']) {
+    assert.equal(faces[key].group.described, null, `${key}: no description`);
+  }
 });
 
 it('lets a drag take the border, ground and ring of a linked, a missing and a compact zone', async () => {
