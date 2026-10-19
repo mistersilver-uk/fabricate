@@ -413,7 +413,7 @@ The group's header is one `role="group"` described by its help line, and its fir
 
 - How many it awards: a `Select` offering **Any one of** and **Up to N of**; up to N opens on a fixed N of two.
 - N, under up to N only: the amount slot's Fixed | Rolled control, a fixed N held at two or more, and a rolled N exactly one expression in its place.
-- Repeats, under up to N by roll only: a quiet status button naming its own state, **Unique** or **Repeats allowed**, after a `···` mark — 26px, on no edge, in secondary ink at 10.5px/500 — defaulting to unique, its slot as wide as its wider word.
+- Repeats, under up to N by roll only: a quiet status button naming its own state, **Unique** or **Repeats allowed**, after a `···` mark — 26px, on no edge, in secondary ink at 10.5px/500 — defaulting to unique, its slot as wide as its wider word, the shorter word starting where the wider one does so the mark stays one gap from either.
 - Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
 
 Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
