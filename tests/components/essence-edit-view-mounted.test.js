@@ -936,6 +936,11 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     const palette = root.querySelector('[data-manager-essence-colour]');
     assert.ok(palette, 'the identity screen HAS a colour control — the non-vacuity half');
+    assert.equal(
+      globalThis.document.querySelector('[data-manager-custom-color]'),
+      null,
+      'the essence tint picker offers the eight presets and no free hex field'
+    );
     palette.querySelector('[data-manager-color-none]').click();
     flushSync();
     root.querySelector('#manager-essence-edit-form').dispatchEvent(
