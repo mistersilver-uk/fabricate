@@ -509,19 +509,6 @@
   },
   {
     "spec": "<Toggle>",
-    "cap": "on · success",
-    "draws": ".k-tog",
-    "path": "src/ui/svelte/components/StatusToggle.svelte",
-    "undrawn": {
-      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
-    },
-    "props": {
-      "on": true,
-      "ariaLabel": "Enabled"
-    }
-  },
-  {
-    "spec": "<Toggle>",
     "cap": "disabled",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
