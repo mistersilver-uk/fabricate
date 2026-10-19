@@ -1,7 +1,8 @@
 /**
  * Issue 2532 — `Field` draws its first-child `<span>` caption as the kicker (8.5px/700, 0.11em,
  * upper case, muted) and its box carries the value type (12.5px/500), in any host, while a
- * caller's own caption class, a later span and a scoped rule keep what they declare.
+ * caller's own caption class, a later span and a scoped rule keep what they declare. Issue 2315:
+ * a `Select`'s note inks `--fab-text-muted`, which clears 4.5:1 on every ground it sits on.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,7 +17,9 @@ import {
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+import { collectStyleCorpus, rulesIn } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { declaredToken, shortfalls, themePalettes } from '../helpers/themePaletteContrast.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const BODY_PATH = 'src/ui/svelte/components/PickerRowRewardBody.svelte';
@@ -158,7 +161,11 @@ test('(c) caller classes, later spans and the rule row keep their own type', () 
     'select caption is the kicker'
   );
   const note = m['select-note'];
-  assert.deepEqual([note.fs, note.fw, note.tt], ['10.5px', '400', 'none'], 'select note');
+  assert.deepEqual(
+    [note.fs, note.fw, note.tt, note.c],
+    ['10.5px', '400', 'none', m['manager-muted'].c],
+    'select note inks muted at 10.5/400'
+  );
   assert.equal(m['search-shell'].tt, 'none', 'search shell span is not uppercased');
   assert.equal(m['search-in'].fs, VALUE.fs, 'search input reads at the value size');
   assert.deepEqual(
@@ -179,4 +186,21 @@ test('(c) caller classes, later spans and the rule row keep their own type', () 
 test('(d) world-tool-entry and interactable-config inputs read at 500', () => {
   assert.equal(m['tool-entry-in'].fw, VALUE.fw, 'world-tool-entry input');
   assert.equal(m['config-in'].fw, VALUE.fw, 'interactable-config input');
+});
+
+test('(e) the select note clears 4.5:1 on the four grounds in all seven themes', () => {
+  const rules = rulesIn(collectStyleCorpus()['styles/fabricate.css']);
+  const ink = declaredToken(
+    rules,
+    '.fabricate-select-note',
+    'color',
+    'styles/fabricate-select.css'
+  );
+  assert.equal(ink, '--fab-text-muted');
+  const themes = themePalettes(rules);
+  const grounds = ['--fab-bg-0', '--fab-bg-1', '--fab-bg-2', '--fab-surface'];
+  assert.deepEqual(
+    grounds.flatMap((ground) => shortfalls(themes, ink, [ground])),
+    []
+  );
 });
