@@ -1550,7 +1550,7 @@
           "ClaimOne": "Claim {name}",
           "ClaimMany": "Claim {count} rewards",
           "ClaimNone": "Choose a reward to claim",
-          "Busy": "Confirming…",
+          "Busy": "Claiming…",
           "Forfeit": "Close without a reward",
           "ForfeitDetail": "None of these rewards can be claimed by this character. Closing the choice awards nothing and moves the run to Finished.",
           "ReadOnly": "Only this character's owner or the GM can choose this reward.",
