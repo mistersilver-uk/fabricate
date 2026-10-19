@@ -283,6 +283,7 @@
 <style>
   .manager-recipe-award-repeats-words {
     display: inline-grid;
+    justify-items: start;
   }
 
   .manager-recipe-award-repeats-words > span {
