@@ -246,7 +246,6 @@
       <IconButton
         class="manager-environment-drop-adjustment-clear"
         ariaLabel={clearLabel}
-        title={clearLabel}
         disabled={!enabled || row.adjustment === 0}
         onclick={(event) => onClear(write, event)}
         icon="fas fa-rotate-left"

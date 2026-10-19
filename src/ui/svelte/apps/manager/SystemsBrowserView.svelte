@@ -328,7 +328,6 @@
                   '{name}',
                   systemDisplayLabel(system, systemLabels)
                 )}
-                title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')}
                 onclick={(event) => {
                   event.stopPropagation();
                   onEditSystem(system.id);
@@ -341,7 +340,6 @@
                   'FABRICATE.Admin.Manager.SystemActionsFor',
                   'System actions for {name}'
                 ).replace('{name}', systemDisplayLabel(system, systemLabels))}
-                triggerTitle={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
                 onSelect={(action) => {
                   if (action === 'export') onExportSystem(system.id);
                   else if (action === 'delete') onDeleteSystem(system.id);

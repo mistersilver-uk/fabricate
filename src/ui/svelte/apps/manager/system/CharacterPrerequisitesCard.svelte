@@ -202,7 +202,6 @@
               </button>
               <IconButton
                 ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
-                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                 data-move-prerequisite-up={entry.id}
                 disabled={index === 0}
                 onclick={() => onReorder(index, index - 1, entry.name)}
@@ -210,7 +209,6 @@
               />
               <IconButton
                 ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
-                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-move-prerequisite-down={entry.id}
                 disabled={index === library.length - 1}
                 onclick={() => onReorder(index, index + 1, entry.name)}
@@ -219,10 +217,6 @@
               {#if onCopyToModifier}
                 <IconButton
                   ariaLabel={text(
-                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
-                    'Copy to modifiers'
-                  )}
-                  data-tooltip={text(
                     'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
                     'Copy to modifiers'
                   )}

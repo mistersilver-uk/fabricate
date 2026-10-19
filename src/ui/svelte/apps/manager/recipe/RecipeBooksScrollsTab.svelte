@@ -156,7 +156,6 @@
             <IconButton
               role="danger"
               ariaLabel={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
-              title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               onclick={() => unlinkDefinition(def)}
               icon="fas fa-link-slash"
             />

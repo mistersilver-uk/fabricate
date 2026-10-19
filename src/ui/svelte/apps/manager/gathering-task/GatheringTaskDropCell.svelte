@@ -220,7 +220,6 @@
     <IconButton
       class="manager-drop-rank-button"
       ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
-      title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
       disabled={rankIndex <= 0}
       data-gathering-task-drop-move="up"
       onclick={(event) => {
@@ -234,7 +233,6 @@
     <IconButton
       class="manager-drop-rank-button"
       ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
-      title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
       disabled={rankIndex < 0 || rankIndex >= rowCount - 1}
       data-gathering-task-drop-move="down"
       onclick={(event) => {

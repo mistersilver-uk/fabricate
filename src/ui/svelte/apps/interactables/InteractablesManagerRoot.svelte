@@ -483,14 +483,12 @@
             <div class="fab-im-row-actions">
               <IconButton
                 ariaLabel={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
-                title={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
                 onclick={() => openConfig(row.ref)}
                 data-interactable-manager-open-config=""
                 icon="fas fa-sliders"
               />
               <IconButton
                 ariaLabel={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
-                title={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
                 onclick={() => jump(row.ref)}
                 data-interactable-manager-jump=""
                 icon="fas fa-location-crosshairs"
@@ -498,7 +496,6 @@
               <IconButton
                 role="danger"
                 ariaLabel={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
-                title={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
                 onclick={() => remove(row.ref)}
                 data-interactable-manager-delete=""
                 icon="fas fa-trash"

@@ -156,7 +156,6 @@
         <IconButton
           role="ghost-danger"
           data-complication-remove=""
-          title={deleteLabel || undefined}
           ariaLabel={deleteLabel || undefined}
           {disabled}
           onclick={() => onDelete()}

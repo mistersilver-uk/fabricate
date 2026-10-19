@@ -276,7 +276,6 @@
           <IconButton
             role={isSilentlyDeletable(row) ? 'danger' : 'neutral'}
             ariaLabel={removeNamedLabel.replace('{name}', row.name)}
-            title={removeLabel}
             onclick={() => requestRemove(row)}
             icon="fas fa-trash"
           />

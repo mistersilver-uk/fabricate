@@ -284,9 +284,7 @@
       : format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
           name: essence.name,
         })}
-    title={labelled
-      ? text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')
-      : text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
+    tooltip={labelled ? '' : undefined}
     icon={labelled ? '' : 'fas fa-pen'}
     onclick={(event) => {
       event.stopPropagation();

@@ -79,7 +79,6 @@
             data-essence-icon-reset=""
             disabled={saving || normalizedIcon === DEFAULT_ESSENCE_ICON}
             ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
-            title={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             onclick={() => onIconChange(DEFAULT_ESSENCE_ICON)}
             icon="fas fa-undo"
           />

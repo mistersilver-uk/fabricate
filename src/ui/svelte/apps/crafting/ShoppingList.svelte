@@ -292,7 +292,6 @@
                 role="ghost"
                 class="crafting-shopping-remove"
                 ariaLabel={localize('FABRICATE.App.Crafting.Shopping.Remove')}
-                title={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 onclick={() => onEntryRemove(entry.recipeId)}
                 icon="fas fa-xmark"
               />

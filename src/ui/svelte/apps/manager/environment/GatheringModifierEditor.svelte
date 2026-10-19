@@ -250,12 +250,8 @@
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
-        title={localizeOr(
-          'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-          'Add modifier'
-        )}
         disabled={availableConditions.length === 0 || !pickerSelection}
-        data-tooltip={availableConditions.length === 0 ? allConditionsAdded : null}
+        tooltip={availableConditions.length === 0 ? allConditionsAdded : undefined}
         onclick={() => onAddConditionModifier(kind, pickerSelection)}
         icon="fas fa-plus"
       />

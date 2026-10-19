@@ -100,7 +100,6 @@
     size="24"
     role="ghost"
     ariaLabel={hideLabel}
-    title={hideLabel}
     onclick={dismiss}
     data-premium-icons-ad-dismiss=""
     icon="fas fa-xmark"

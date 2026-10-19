@@ -659,7 +659,6 @@
               'FABRICATE.Admin.Manager.Environment.Events.SceneUnlink',
               'Unlink scene'
             )}
-            title={text('FABRICATE.Admin.Manager.Environment.Events.SceneUnlink', 'Unlink scene')}
             onclick={unlinkScene}
             icon="fas fa-link-slash"
           />

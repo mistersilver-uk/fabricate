@@ -713,7 +713,7 @@
                           recipe.locked ? 'Unlock {name}' : 'Lock {name}',
                           { name: recipe.name }
                         )}
-                        title={text(
+                        tooltip={text(
                           'FABRICATE.Admin.Manager.Recipe.LockHint',
                           'Locked recipes stay visible to players, but only a GM can craft them.'
                         )}
@@ -747,7 +747,6 @@
                           'Edit {name}',
                           { name: recipe.name }
                         )}
-                        title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}
                         onclick={() => onEditRecipe(recipe.id)}
                         icon="fas fa-pen"
                       />

@@ -303,17 +303,12 @@
                 <div class="fab-ib-row-actions">
                   <IconButton
                     ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('tool', tool.id)}
                     data-interactable-browser-place=""
                     icon="fas fa-cubes"
                   />
                   <IconButton
                     ariaLabel={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
-                    title={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}
@@ -369,17 +364,12 @@
                 <div class="fab-ib-row-actions">
                   <IconButton
                     ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('gatheringTask', task.id)}
                     data-interactable-browser-place=""
                     icon="fas fa-cubes"
                   />
                   <IconButton
                     ariaLabel={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
-                    title={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}

@@ -615,10 +615,6 @@
                         'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
                         'Unlink macro'
                       )}
-                      title={text(
-                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
-                        'Unlink macro'
-                      )}
                       onclick={(event) => {
                         event.stopPropagation();
                         onClearCurrencyMacro(field.key);
@@ -1039,7 +1035,6 @@
                   >
                   <IconButton
                     ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
-                    data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-move-currency-up={unit.id}
                     disabled={index === 0}
                     onclick={() =>
@@ -1054,10 +1049,6 @@
                   />
                   <IconButton
                     ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
-                    data-tooltip={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                      'Move down'
-                    )}
                     data-move-currency-down={unit.id}
                     disabled={index === currencyUnits.length - 1}
                     onclick={() =>

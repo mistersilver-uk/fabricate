@@ -477,7 +477,7 @@
                 {#if actor.rolled}
                   <IconButton
                     class="manager-economy-actor-roll"
-                    title={text(
+                    tooltip={text(
                       'FABRICATE.Admin.Manager.Economy.ResetHint',
                       'Re-roll this character’s pool from the max/start expressions'
                     )}
@@ -489,7 +489,7 @@
                 {:else}
                   <IconButton
                     class="manager-economy-actor-roll is-roll-needed"
-                    title={text(
+                    tooltip={text(
                       'FABRICATE.Admin.Manager.Economy.RollHint',
                       'Roll this character’s pool from the max/start expressions'
                     )}

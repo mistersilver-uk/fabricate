@@ -125,10 +125,6 @@
           'FABRICATE.Admin.Manager.Tools.Editor.UnlinkReplacement',
           'Unlink replacement component'
         )}
-        title={text(
-          'FABRICATE.Admin.Manager.Tools.Editor.UnlinkReplacement',
-          'Unlink replacement component'
-        )}
         onclick={() => onClear()}
         icon="fas fa-link-slash"
       />

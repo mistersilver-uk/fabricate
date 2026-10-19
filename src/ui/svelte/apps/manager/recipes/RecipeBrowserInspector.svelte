@@ -475,7 +475,6 @@
             class="manager-recipe-step-nav"
             data-recipe-step-prev=""
             ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
-            title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
             disabled={currentStepIndex === 0}
             onclick={() => goToStep(-1)}
             icon="fas fa-chevron-left"
@@ -492,7 +491,6 @@
             class="manager-recipe-step-nav"
             data-recipe-step-next=""
             ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
-            title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
             disabled={currentStepIndex === stepModel.length - 1}
             onclick={() => goToStep(1)}
             icon="fas fa-chevron-right"

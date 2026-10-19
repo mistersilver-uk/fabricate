@@ -530,10 +530,6 @@
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
                     'Remove'
                   )}
-                  title={localizeOr(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
-                    'Remove'
-                  )}
                   onclick={() => onExclude(kind, entry.id)}
                   icon="fas fa-ban"
                 />
@@ -597,10 +593,6 @@
                     data-quick-action="include"
                     data-action="include"
                     ariaLabel={localizeOr(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
-                      'Add'
-                    )}
-                    title={localizeOr(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
                       'Add'
                     )}

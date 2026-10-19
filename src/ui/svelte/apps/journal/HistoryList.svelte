@@ -108,7 +108,6 @@
         role="ghost"
         class="journal-history-dismiss"
         ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
-        title={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
         data-journal-dismiss={entry.id}
         onclick={() => onDismiss?.(entry.run)}
         icon="fas fa-xmark"

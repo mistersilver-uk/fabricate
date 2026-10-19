@@ -156,10 +156,6 @@
                   'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
                   'Add environment to realm'
                 )}
-                title={text(
-                  'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
-                  'Add environment to realm'
-                )}
                 disabled={saving}
                 onclick={() => onAdd(environment.id, realmId)}
                 icon="fas fa-plus"
@@ -228,10 +224,6 @@
                 role="danger"
                 class="manager-realm-env-remove"
                 ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
-                  'Remove environment from realm'
-                )}
-                title={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
                   'Remove environment from realm'
                 )}

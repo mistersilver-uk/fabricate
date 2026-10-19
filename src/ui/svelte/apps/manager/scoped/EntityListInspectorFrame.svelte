@@ -814,7 +814,6 @@
                         <IconButton
                           data-scoped-list-action={action.id}
                           ariaLabel={`${action.label} — ${name}`}
-                          title={action.label}
                           onclick={() => action.run(entry)}
                           icon={action.icon}
                         />

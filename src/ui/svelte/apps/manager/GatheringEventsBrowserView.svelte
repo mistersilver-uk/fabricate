@@ -556,7 +556,6 @@
                   'FABRICATE.Admin.Manager.Environment.Events.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', eventName(event))}
-                title={text('FABRICATE.Admin.Manager.Environment.Events.Edit', 'Edit event')}
                 onclick={() => onEditEvent(event.id)}
                 icon="fas fa-edit"
               />
@@ -573,10 +572,6 @@
                   'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
                   'Gathering event actions for {name}'
                 ).replace('{name}', eventName(event))}
-                triggerTitle={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
-                  'Gathering event actions'
-                )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
                   else if (action === 'delete') onDeleteEvent(selectedSystemId, event.id);
