@@ -32,7 +32,7 @@
   | `emptyHint` / `emptyDetail` / `noMatchesHint` | localized strings | `''` / `''` / `FABRICATE.Common.Picker.NoMatches` | THE TWO EMPTINESSES ARE DIFFERENT FACTS. `emptyHint` is for a list that holds NOTHING and feeds `EmptyState`'s `title` slot, so it stays SHORT; `emptyDetail` feeds the `hint` slot and is suppressed with `emptyHint`. A filtered emptiness gets `noMatchesHint`. This is the OPPOSITE slot mapping from `VocabularyPanel`. |
   | `filterOptions(options, query)` | function | label-substring | Replaces this component's own filter, called with the raw options and the normalized query. IT IS CALLED ON EVERY PASS, INCLUDING AN EMPTY QUERY, and the DEFAULT short-circuits rather than the seam, so a pinned resolved row is not silently dropped. It is the only place a caller can see the query, and so the only home for alias matching and ranking; it may return NEW row objects, and its result is coerced to an array. |
   | `measureListMetrics({ popover, list, search })` / `triggerOnKeydown` | functions | `undefined` | The first returns `{ rowPitch, rowGap, chromeHeight, listExtra }` on EVERY layout pass, measured from the rendered box rather than restated from stylesheet tokens, where `listExtra` is height rendered inside the list that no pitch can see, so it is subtracted from the budget and added back to the list's height. The second is a caller keydown handler COMPOSED AFTER this component's own — a prop rather than a spread key, because in the search-suppressed shape the trigger holds the key map and an overridden `onkeydown` would delete the focus model. |
-  | `open` | bindable boolean | `false` | Bind it to open the picker from something other than the trigger, or to force it shut from outside. |
+  | `open` / `anchor` | bindable boolean / element or resolver | `false` / `undefined` | Bind `open` to open the picker from something other than the trigger, or to force it shut from outside. With an `anchor` the caller owns, for a control whose opening gesture belongs to another, no trigger renders and every trigger prop is a no-op: the caller binds `open` and writes the anchor's own ARIA, the panel positions against the anchor, outside-click dismissal counts it inside, and `close()` returns focus to it while it is connected. Anchor mode is the prop's presence, not its truthiness: an element-form caller initialises its binding to `null`, which renders no trigger before the element mounts. An anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists; prefer the resolver form where the anchor can unmount. |
   | `onSelect(id)` | callback | no-op | The chosen option's id. Committing on select is the caller's business: the primitive holds no selection of its own and emits one call per click, in every mode. |
 
   Invariants:
@@ -82,6 +82,7 @@
     PENDING_SOURCE,
     activeCursorIndex,
     filteredCountLabel,
+    focusReturnTarget,
     gridColumnCount,
     groupedOptionBuckets,
     labelSubstringFilter,
@@ -93,6 +94,7 @@
     renderedOptionOrder,
     selectedOptionIds,
     spreadableTriggerAttributes,
+    watchAnchor,
   } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -166,6 +168,7 @@
     minWidth = 240,
     maxWidth = 340,
     bounds = pickerScrollerBounds,
+    anchor = undefined,
     open = $bindable(false),
     onSelect = () => {},
   } = $props();
@@ -180,6 +183,8 @@
   let popoverRoot = $state(null);
   let triggerElement = $state(null);
   let searchInput = $state(null);
+  const anchored = $derived(anchor !== undefined);
+  const anchorNode = () => (typeof anchor === 'function' ? anchor() : anchor) ?? null;
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
   let remote = $state(PENDING_SOURCE);
@@ -309,8 +314,8 @@
 
   function restoreTriggerFocus() {
     tick().then(() => {
-      const target = triggerElement ?? pickerRoot?.querySelector?.('button');
-      if (target?.isConnected !== false) target?.focus?.();
+      const origin = anchored ? { anchor: anchorNode() } : { trigger: triggerElement };
+      focusReturnTarget(origin, pickerRoot)?.focus?.();
     });
   }
 
@@ -320,6 +325,10 @@
     typeAheadBuffer = null;
     if (restoreFocus) restoreTriggerFocus();
   }
+
+  $effect(() => {
+    if (open && untrack(() => anchored)) return watchAnchor(anchorNode, () => close());
+  });
 
   $effect(() => {
     if (open) return;
@@ -412,10 +421,11 @@
 <div
   class={`fabricate-picker manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
+  style:display={anchored ? 'contents' : undefined}
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: () => close(),
-    additionalNodes: () => [popoverRoot],
+    additionalNodes: () => [popoverRoot, anchorNode()],
   }}
 >
   {#snippet triggerBody()}
@@ -436,7 +446,7 @@
       ></i>{/if}
   {/snippet}
 
-  {#if inlineSearchTrigger && open}
+  {#if anchored}{:else if inlineSearchTrigger && open}
     <div class="manager-travel-picker-inline">
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
       <input bind:this={searchInput} bind:value={search} {...searchProps} />
@@ -476,7 +486,7 @@
       bind:popover={popoverRoot}
       bind:search={searchInput}
       bind:query={search}
-      anchor={triggerElement ?? pickerRoot}
+      anchor={anchorNode() ?? triggerElement ?? pickerRoot}
       {popoverLayout}
       {popoverClass}
       {compactOptionRows}
@@ -525,13 +535,3 @@
     />
   {/if}
 </div>
-
-<style>
-  .manager-travel-picker-copy {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-width: 0;
-    text-align: left;
-  }
-</style>

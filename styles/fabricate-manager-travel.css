@@ -670,7 +670,15 @@
   min-width: 0;
 }
 
-/* The bare trigger's second line, moved out of the primitive's scoped block (issue 2459). */
+/* The bare trigger's two-line copy: its label over a mono meta line. */
+.fabricate-picker .manager-travel-picker-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
 .fabricate-picker .manager-travel-picker-meta {
   min-width: 0;
   margin-top: var(--fab-space-2xs);

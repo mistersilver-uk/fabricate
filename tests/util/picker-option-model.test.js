@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   activeCursorIndex,
   filteredCountLabel,
+  focusReturnTarget,
   gridColumnCount,
   groupedOptionBuckets,
   labelSubstringFilter,
@@ -19,6 +20,7 @@ import {
   sourceRows,
   spreadableTriggerAttributes,
   stagedMembership,
+  watchAnchor,
 } from '../../src/ui/svelte/util/pickerOptionModel.js';
 
 // The arithmetic a picker's option list is built from, unit-tested without mounting (issue 1719).
@@ -386,5 +388,84 @@ describe('gridColumnCount (issue 2459)', () => {
       1,
       'the list form has one column whatever it is passed'
     );
+  });
+});
+
+describe('focusReturnTarget (issue 2459)', () => {
+  const node = (isConnected, name) => ({ isConnected, name });
+  const root = (container, button) => ({
+    closest: (selector) => (selector === '[tabindex]' ? container : null),
+    querySelector: (selector) => (selector === 'button' ? button : null),
+  });
+
+  it('returns an anchored picker to its anchor only while it is connected', () => {
+    const anchor = node(true, 'anchor');
+    const container = node(true, 'container');
+    assert.equal(focusReturnTarget({ anchor }, root(container, null)), anchor);
+    assert.equal(
+      focusReturnTarget({ anchor: node(false, 'gone') }, root(container, null)),
+      container
+    );
+    assert.equal(focusReturnTarget({ anchor: null }, root(container, null)), container);
+    assert.equal(
+      focusReturnTarget({ anchor: null }, root(null, null)),
+      null,
+      'no [tabindex] container: focus is left to the browser'
+    );
+  });
+
+  it('returns a triggered picker to its trigger, else the root`s first button', () => {
+    const trigger = node(true, 'trigger');
+    const button = node(true, 'button');
+    assert.equal(focusReturnTarget({ trigger }, root(null, button)), trigger);
+    assert.equal(focusReturnTarget({ trigger: null }, root(null, button)), button);
+    assert.equal(focusReturnTarget({ trigger: node(false, 'gone') }, root(null, button)), null);
+    assert.equal(focusReturnTarget({ trigger: null }, null), null);
+  });
+});
+
+describe('watchAnchor (issue 2459)', () => {
+  /** A stand-in observer that records what it watches and fires when the test says so. */
+  function fakeObserver() {
+    const seen = { observed: null, options: null, disconnected: 0, fire: null };
+    class Observer {
+      constructor(callback) {
+        seen.fire = callback;
+      }
+
+      observe(root, options) {
+        seen.observed = root;
+        seen.options = options;
+      }
+
+      disconnect() {
+        seen.disconnected += 1;
+      }
+    }
+    return { seen, Observer };
+  }
+
+  it('calls onLost once a mutation leaves the anchor disconnected, and disconnects on return', () => {
+    const { seen, Observer } = fakeObserver();
+    const anchor = { isConnected: true };
+    const root = { name: 'root' };
+    let lost = 0;
+    const stop = watchAnchor(
+      () => anchor,
+      () => (lost += 1),
+      root,
+      Observer
+    );
+    assert.equal(seen.observed, root, 'it watches the root it was handed');
+    assert.deepEqual(seen.options, { childList: true, subtree: true });
+
+    seen.fire();
+    assert.equal(lost, 0, 'a mutation that leaves the anchor connected is not a loss');
+    anchor.isConnected = false;
+    seen.fire();
+    assert.equal(lost, 1, 'the disconnected anchor is reported once');
+
+    stop();
+    assert.equal(seen.disconnected, 1, 'the returned function disconnects the observer');
   });
 });

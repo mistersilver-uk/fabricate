@@ -88,38 +88,45 @@ export function rawSitesIn(source, filename, classPattern) {
  * @returns {AdoptionCallSite[]} one entry per call site
  */
 export function componentCallSites(tag) {
+  return Object.entries(SOURCES).flatMap(([file, source]) => callSitesIn(file, source, tag));
+}
+
+/**
+ * Every `<tag>` component node in one component source, which is also how a clause proves itself
+ * against a synthetic fixture.
+ * @param {string} file repo-relative path the source is reported under
+ * @param {string} source the component's source text
+ * @param {string} tag a component's tag name
+ * @returns {AdoptionCallSite[]} one entry per call site
+ */
+export function callSitesIn(file, source, tag) {
   const callSites = [];
-  for (const [file, source] of Object.entries(SOURCES)) {
-    walkTemplate(
-      parse(source, { modern: true, filename: join(repoRoot, file) }).fragment,
-      (node) => {
-        if (node.type !== 'Component' || node.name !== tag) return;
-        const attributes = (node.attributes ?? []).filter(
-          (attribute) => attribute.type === 'Attribute'
-        );
-        callSites.push({
-          file,
-          // THE NODE ITSELF, AND ITS SNIPPET CHILDREN (issue 1503).
-          node,
-          snippetSource: (name) => {
-            const snippet = (node.fragment?.nodes ?? []).find(
-              (child) => child.type === 'SnippetBlock' && child.expression?.name === name
-            );
-            return snippet ? source.slice(snippet.start, snippet.end) : null;
-          },
-          attribute: (name) => {
-            const found = attributes.find((attribute) => attribute.name === name);
-            return found ? source.slice(found.start, found.end) : null;
-          },
-          // `value === true` is the AST's marker for a VALUELESS attribute — `data-x` rather
-          // than `data-x=""` or the shorthand `{x}`, both of which carry a value node.
-          valueless: attributes
-            .filter((attribute) => attribute.value === true)
-            .map((attribute) => attribute.name),
-        });
-      }
+  walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
+    if (node.type !== 'Component' || node.name !== tag) return;
+    const attributes = (node.attributes ?? []).filter(
+      (attribute) => attribute.type === 'Attribute'
     );
-  }
+    callSites.push({
+      file,
+      // THE NODE ITSELF, AND ITS SNIPPET CHILDREN (issue 1503).
+      node,
+      snippetSource: (name) => {
+        const snippet = (node.fragment?.nodes ?? []).find(
+          (child) => child.type === 'SnippetBlock' && child.expression?.name === name
+        );
+        return snippet ? source.slice(snippet.start, snippet.end) : null;
+      },
+      attribute: (name) => {
+        const found = attributes.find((attribute) => attribute.name === name);
+        return found ? source.slice(found.start, found.end) : null;
+      },
+      // `value === true` is the AST's marker for a VALUELESS attribute — `data-x` rather
+      // than `data-x=""` or the shorthand `{x}`, both of which carry a value node.
+      valueless: attributes
+        .filter((attribute) => attribute.value === true)
+        .map((attribute) => attribute.name),
+    });
+  });
   return callSites;
 }
 
