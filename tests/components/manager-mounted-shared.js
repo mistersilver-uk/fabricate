@@ -132,6 +132,24 @@ export async function settleBetweenTests() {
   await new Promise((settled) => setImmediate(settled));
 }
 
+/**
+ * Every rendered icon button carrying a native `title`, read before a case tears its mount down.
+ * Since issue 2541 an icon button shows its name as `data-tooltip-text`, so a `title` would stack
+ * a second tooltip under the pointer and still show nothing to the keyboard.
+ *
+ * @returns {string[]} Each offender as `aria-label: title`, empty when the sweep holds.
+ */
+export function titledIconButtons() {
+  return [...document.querySelectorAll('.fabricate-icon-button[title]')].map(
+    (button) => `${button.getAttribute('aria-label')}: ${button.getAttribute('title')}`
+  );
+}
+
+/** Fail the case that rendered an icon button with a native `title`, after its teardown. */
+export function assertNoTitledIconButton(titled) {
+  assert.deepEqual(titled, [], 'an icon button shows its name as its tooltip, never a `title`');
+}
+
 /** One rendered hook, as a call rather than another query-and-assert pair (issue 1691). */
 export function assertHook(container, hook, message) {
   assert.ok(Boolean(container.querySelector(hook)), message ?? `the route renders ${hook}`);

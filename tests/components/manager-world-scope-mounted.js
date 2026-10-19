@@ -32,6 +32,8 @@ import {
   managerComponents,
   settle,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
 } from './manager-mounted-shared.js';
 
@@ -68,6 +70,7 @@ export function registerWorldScopeCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -75,6 +78,7 @@ export function registerWorldScopeCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
   // The card moved to World > Rules & Resources > Character prerequisites in issue 1311.

@@ -211,7 +211,8 @@ describe('world Component Catalogue (issue 1371)', () => {
         '[data-scoped-list-row="ingot"] [data-scoped-list-action="open-entry"]'
       );
       assert.ok(Boolean(pen), 'the row carries the action at all');
-      assert.equal(pen.getAttribute('title'), 'Open catalogue entry');
+      assert.equal(pen.getAttribute('data-tooltip-text'), pen.getAttribute('aria-label'));
+      assert.match(pen.getAttribute('aria-label'), /^Open catalogue entry — /);
       assert.ok(
         Boolean(pen.querySelector('i.fa-pen')),
         'and it is the icon control, not the 104px labelled button that shipped'
@@ -219,7 +220,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.equal(
         pen.textContent.trim(),
         '',
-        'a labelled button would print its verb; the reference draws a bare pen with a title'
+        'a labelled button would print its verb; the reference draws a bare pen named by its tooltip'
       );
       pen.click();
       await drain();

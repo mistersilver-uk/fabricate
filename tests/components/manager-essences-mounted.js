@@ -7,7 +7,12 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -36,6 +41,7 @@ export function registerEssencesCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -43,6 +49,7 @@ export function registerEssencesCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -516,7 +523,7 @@ export function registerEssencesCases() {
     // picker's row.
     const iconResetButton = target.querySelector('[data-essence-icon-reset]');
     assert.equal(iconResetButton.getAttribute('aria-label'), 'Clear icon');
-    assert.equal(iconResetButton.title, 'Clear icon');
+    assert.equal(iconResetButton.getAttribute('data-tooltip-text'), 'Clear icon');
     assert.ok(
       iconResetButton.closest('.manager-essence-icon-tile'),
       'the reset overlays the icon tile rather than sitting in the picker row'

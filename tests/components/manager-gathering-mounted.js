@@ -24,6 +24,8 @@ import {
   assertDropComponentCellKeyboardPath,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
@@ -70,6 +72,7 @@ export function registerGatheringCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -77,6 +80,7 @@ export function registerGatheringCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

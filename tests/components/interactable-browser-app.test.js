@@ -194,17 +194,14 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   // THE ICON-ONLY RULE, WHICH IS THE SUBSTANCE THIS CLAUSE ALWAYS CARRIED (issue 1520).
-  it('renders the place buttons icon-only with the localized title + aria-label, no visible text', () => {
-    // WHOLE ELEMENTS, not opening tags. The hook is written LAST among the props but the GLYPH
-    // is a CHILD, so a block cut at the hook carries the accessible name and not the face, and a
-    // block cut forwards FROM the hook carries the face and not the name. Splitting on the
-    // component tag and closing at `</IconButton>` is the only cut that holds both, which is
-    // what lets one clause assert the icon-only rule end to end.
+  it('renders the place buttons icon-only with the localized aria-label, no visible text', () => {
+    // WHOLE ELEMENTS, not a cut at the hook: the name and the `icon` sit on either side of it.
+    // Since issue 2541 the button self-closes, its glyph a prop and its name its tooltip.
     const elementsFor = (hook) =>
       rootSource
         .split('<IconButton')
         .slice(1)
-        .map((block) => block.slice(0, block.indexOf('</IconButton>')))
+        .map((block) => block.slice(0, block.search(/\/>|<\/IconButton>/)))
         .filter((block) => block.includes(hook));
 
     const placeTags = elementsFor('data-interactable-browser-place=""');
@@ -214,16 +211,13 @@ describe('InteractableBrowserRoot body', () => {
 
     // EVERY KEY PATTERN IS TERMINATED BY ITS CLOSING QUOTE, and that is not tidiness.
     for (const tag of placeTags) {
-      assert.ok(
-        /title=\{text\(\s*'FABRICATE\.Canvas\.Browser\.PlaceOnScene',/.test(tag),
-        'place button uses PlaceOnScene as the tooltip'
-      );
+      assert.ok(!/\btitle=/.test(tag), 'the name is the tooltip, so no native title stacks a second');
       assert.ok(
         /ariaLabel=\{text\(\s*'FABRICATE\.Canvas\.Browser\.PlaceOnScene',/.test(tag),
         'place button uses PlaceOnScene as the accessible name'
       );
-      assert.ok(tag.includes('<i class="fas fa-cubes" aria-hidden="true">'), 'face is the cubes icon');
-      // The face is a GLYPH and nothing else. `IconButton` renders `children` verbatim.
+      assert.ok(tag.includes('icon="fas fa-cubes"'), 'face is the cubes icon');
+      // The face is a GLYPH and nothing else.
       assert.ok(!tag.includes('<span'), 'no visible text rendered on the place button face');
     }
     for (const tag of regionTags) {
@@ -232,7 +226,7 @@ describe('InteractableBrowserRoot body', () => {
         'region-only button uses PlaceRegionOnly as the accessible name'
       );
       assert.ok(
-        tag.includes('<i class="fas fa-draw-polygon" aria-hidden="true">'),
+        tag.includes('icon="fas fa-draw-polygon"'),
         'face is the draw-polygon icon'
       );
       assert.ok(!tag.includes('<span'), 'no visible text rendered on the region-only button face');

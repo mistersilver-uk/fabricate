@@ -17,6 +17,8 @@ import {
   assertShippedString,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -450,6 +452,7 @@ export function registerRailCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -457,6 +460,7 @@ export function registerRailCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

@@ -21,6 +21,8 @@ import { DOWNTIME_NAV_CENSUS } from './manager-downtime-nav-census.js';
 import {
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
@@ -71,6 +73,7 @@ export function registerDowntimeCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -78,6 +81,7 @@ export function registerDowntimeCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

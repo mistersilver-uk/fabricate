@@ -19,6 +19,8 @@ import {
   assertDropComponentCellKeyboardPath,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
 import {
   assertSelectHasResolvedName,
@@ -137,6 +139,7 @@ export function registerEnvironmentsCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -144,6 +147,7 @@ export function registerEnvironmentsCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
   /** Mount on the Gathering route, with a switch for the selected system's gathering feature. */
@@ -2175,12 +2179,12 @@ export function registerEnvironmentsCases() {
       ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern'],
       'each row menu trigger is named for the record it acts on'
     );
-    // The hover tooltip stays generic: it appears beside the row the pointer is already on.
+    // Its tooltip is that name (issue 2541), shown under keyboard focus as well as the pointer.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
         row.querySelector('[aria-haspopup="menu"]').getAttribute('data-tooltip-text')
       ),
-      ['Environment actions', 'Environment actions']
+      ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern']
     );
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
@@ -2782,7 +2786,7 @@ export function registerEnvironmentsCases() {
     );
     assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
     assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear Moon Herb');
-    assert.equal(taskClearButton.getAttribute('title'), 'Clear Moon Herb');
+    assert.equal(taskClearButton.getAttribute('data-tooltip-text'), 'Clear Moon Herb');
     assert.equal(
       taskClearButton.textContent.trim(),
       '',

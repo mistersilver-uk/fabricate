@@ -179,7 +179,7 @@ describe('GatheringEventsBrowserView source contract', () => {
   it('localizes the event library labels', () => {
     const eventsNamespace = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.ok(eventsNamespace, 'lang/en.json should declare the Events namespace');
-    for (const key of ['Filters', 'SearchPlaceholder', 'Create', 'Edit', 'Duplicate', 'Delete', 'DangerTags', 'DropRate', 'Environments', 'EmptyTitle']) {
+    for (const key of ['Filters', 'SearchPlaceholder', 'Create', 'EditNamed', 'Duplicate', 'Delete', 'DangerTags', 'DropRate', 'Environments', 'EmptyTitle']) {
       assert.ok(eventsNamespace[key], `lang/en.json Events namespace should declare ${key}`);
     }
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle, 'Gathering events');

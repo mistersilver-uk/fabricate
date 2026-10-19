@@ -406,16 +406,17 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'the labelled variant names the essence AND the layer it opens'
     );
     // NON-VACUITY, and the reason the label could not simply replace the class.
-    // smoke reaches this control as `.fabricate-icon-button[title*="Edit" i]` behind a
-    // `count() > 0` guard, so a lost class or a retitled control would stop producing the
+    // smoke reaches this control as `.fabricate-icon-button[aria-label^="Edit" i]` behind a
+    // `count() > 0` guard, so a lost class or a renamed control would stop producing the
     // `manager-essence-edit-first-state` frame WITHOUT failing anything.
     assert.ok(
       edit.classList.contains('fabricate-icon-button'),
       'it is still the primitive three surfaces address it by'
     );
+    // Its visible words are its name, so it shows no tooltip (issue 2541's parked ruling).
     assert.ok(
-      edit.getAttribute('title').startsWith('Edit'),
-      'and its title still leads with Edit, which is what the smoke matches on'
+      !edit.hasAttribute('title') && !edit.hasAttribute('data-tooltip-text'),
+      'the labelled control repeats its visible text in no tooltip'
     );
     // The GRID card keeps the pencil.
     root.querySelector('[data-essence-view-option="grid"] input').click();
@@ -434,6 +435,11 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       card.querySelector('[data-essence-edit="aether"]').getAttribute('aria-label'),
       'Edit Aether',
       'the icon-only presentation is still named, and names the essence'
+    );
+    assert.equal(
+      card.querySelector('[data-essence-edit="aether"]').getAttribute('data-tooltip-text'),
+      'Edit Aether',
+      'and shows that name as its tooltip'
     );
     harness.remount();
   });

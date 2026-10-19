@@ -454,7 +454,7 @@ describe('CompositionList mounted layout', () => {
 
     const excludeQuick = quickAction('included', 'exclude');
     assert.ok(excludeQuick, 'included manual task rows render a quick remove action');
-    assert.equal(excludeQuick.getAttribute('title'), 'Remove');
+    assert.equal(excludeQuick.getAttribute('data-tooltip-text'), 'Remove');
     assert.equal(excludeQuick.getAttribute('aria-label'), 'Remove');
     assert.ok(excludeQuick.querySelector('.fa-ban'), 'quick remove uses the ban icon');
     excludeQuick.click();
@@ -469,7 +469,7 @@ describe('CompositionList mounted layout', () => {
 
     const includeQuick = quickAction('candidate', 'include');
     assert.ok(includeQuick, 'matching available task rows render a quick add action');
-    assert.equal(includeQuick.getAttribute('title'), 'Add');
+    assert.equal(includeQuick.getAttribute('data-tooltip-text'), 'Add');
     assert.equal(includeQuick.getAttribute('aria-label'), 'Add');
     assert.ok(includeQuick.querySelector('.fa-circle-plus'), 'quick add uses the circle-plus icon');
     includeQuick.click();
@@ -481,7 +481,7 @@ describe('CompositionList mounted layout', () => {
       nonMatchingQuick,
       'non-matching available task rows render the same quick add action'
     );
-    assert.equal(nonMatchingQuick.getAttribute('title'), 'Add');
+    assert.equal(nonMatchingQuick.getAttribute('data-tooltip-text'), 'Add');
     assert.equal(nonMatchingQuick.getAttribute('aria-label'), 'Add');
     nonMatchingQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'task', 'nonmatching']);
@@ -635,7 +635,7 @@ describe('CompositionList mounted layout', () => {
 
     const removeQuick = quickAction('included', 'exclude');
     assert.ok(removeQuick, 'included manual event rows render a quick remove action');
-    assert.equal(removeQuick.getAttribute('title'), 'Remove');
+    assert.equal(removeQuick.getAttribute('data-tooltip-text'), 'Remove');
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
     assert.equal(

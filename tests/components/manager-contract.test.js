@@ -877,7 +877,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Essences, 'Essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.Manager.Breadcrumbs, 'Breadcrumbs');
-    assert.equal(lang.FABRICATE.Admin.Manager.EditSystem, 'Edit system');
+    assert.equal(lang.FABRICATE.Admin.Manager.EditNamed, 'Edit {name}');
     assert.equal(lang.FABRICATE.Admin.Manager.ReturnToSystemLibrary, 'Return to System Library');
     assert.equal(lang.FABRICATE.Admin.Manager.StatusOn, 'On');
     assert.equal(lang.FABRICATE.Admin.Manager.StatusOff, 'Off');
@@ -1022,7 +1022,7 @@ describe('CraftingSystemManager source contract', () => {
   // Asked of the whole manager view set, because the action and the save live on two of its
   // pages: "in at least one of these", stated once.
   defineStructureContract('saves system details through the admin store', MANAGER_VIEWS, {
-    spellsExactly: ['FABRICATE.Admin.Manager.EditSystem'],
+    spellsExactly: ['FABRICATE.Admin.Manager.EditNamed'],
     reads: ['store.saveSystemDetails'],
     callsWith: [['setResolutionMode', 'nextMode']],
   });

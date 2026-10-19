@@ -4,21 +4,11 @@ import test from 'node:test';
 import path from 'node:path';
 
 import {
-  TEMPLATE_CORPUS,
-  assertFloor,
-  checkGate,
-  gateOver,
-  templatesOf,
-  workingTree,
-} from './helpers/designSystemRatchet.js';
-import { walkNodes } from './helpers/moduleAst.js';
-import {
   definePrimitiveSourceContract,
   defineSoleWriterClauses,
 } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { openingTagsNamed } from './helpers/svelteTagScan.js';
-import { lineOf } from './helpers/svelteTemplateScan.js';
 
 /**
  * The class only the primitive may write, and the root `styles/fabricate.css` paints the control
@@ -53,6 +43,16 @@ const CLASS_EXCEPTIONS = Object.freeze([
  * issue 1782 converted one and issue 1777 the last two, so the primitive is the only writer.
  */
 
+/** A role an icon button takes through `role` (issue 2541), never as a class. */
+const ROLE_CLASS = /\bis-(?:primary|ghost|danger)\b/;
+
+/** A `class` value, or an `ActionMenu`'s `triggerClass` value, quoted or braced. */
+const CLASS_VALUE = /(?:^|\s)class=("[^"]*"|\{[^}]*\})/;
+const TRIGGER_CLASS = /\btriggerClass=("[^"]*"|\{[^}]*\})/;
+
+/** A tooltip Foundry would show beside the one the primitive writes from `ariaLabel` or `tooltip`. */
+const HAND_WRITTEN_TOOLTIP = /(?:^|\s)(?:title|data-tooltip(?:-html|-text)?)=/;
+
 const contract = definePrimitiveSourceContract({
   label: 'icon-button',
   tag: 'IconButton',
@@ -71,14 +71,21 @@ const contract = definePrimitiveSourceContract({
       'policing a token that reaches nothing',
   },
 
-  // Three probes. `type` and `aria-label` would still WORK from a call site — both ride the rest
-  // spread, which lands last and therefore wins — which is exactly why they need a gate: a site
-  // that kept the old spelling would bypass the required-prop contract below while rendering
-  // identically.
+  // Each would still WORK from a call site — the rest spread lands last and `class` appends —
+  // which is why each needs a gate: the site renders identically and the contract is a convention
+  // again. A hand-written tooltip also stacks a native `title` or mutes the focus tooltip.
   restatements: Object.freeze([
     Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
     Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
     Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
+    Object.freeze({
+      name: 'a role class',
+      present: (tag) => ROLE_CLASS.test(CLASS_VALUE.exec(tag)?.[1] ?? ''),
+    }),
+    Object.freeze({
+      name: 'a hand-written tooltip',
+      present: (tag) => HAND_WRITTEN_TOOLTIP.test(tag),
+    }),
   ]),
 
   classOnlyRemedy:
@@ -88,9 +95,10 @@ const contract = definePrimitiveSourceContract({
     '`data-*` hook rides the rest spread — see `IconButton.svelte`',
 
   restatementRemedy:
-    'the primitive emits `type="button"` and `fabricate-icon-button` itself, and takes the ' +
-    'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
-    'convention this component exists to close',
+    'the primitive emits `type="button"` and `fabricate-icon-button` itself, takes the ' +
+    'accessible name as `ariaLabel` and shows it as its tooltip, and maps `role` to the ' +
+    '`is-primary`/`is-ghost`/`is-danger` classes; an information-bearing hint passes `tooltip`. ' +
+    'Restating any of them from a call site re-opens the convention this component exists to close',
 
   bareDataRemedy:
     'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on ' +
@@ -157,71 +165,6 @@ test('a tag NAMED in a `//` comment is not read as a call site', () => {
       'over `callSiteTags` is now accusing files of what their documentation says:\n  ' +
       readAsMarkup.join('\n  ')
   );
-});
-
-/** A role an icon button takes through `role` (issue 2541), never as a class. */
-const ROLE_CLASS = /\bis-(?:primary|ghost|danger)\b/;
-
-/** An `ActionMenu`'s `triggerClass` value, quoted or braced. */
-const TRIGGER_CLASS = /\btriggerClass=("[^"]*"|\{[^}]*\})/;
-
-/** The attributes through which a caller hand-writes a tooltip Foundry would show. */
-const HAND_WRITTEN_TOOLTIPS = new Set([
-  'title',
-  'data-tooltip',
-  'data-tooltip-html',
-  'data-tooltip-text',
-]);
-
-const ROLE_CLASS_SITE = 'an icon button role class on `class`';
-const TOOLTIP_SITE = 'an icon button hand-written tooltip';
-
-/** Each icon-button tag in one template that passes a role class or a hand-written tooltip. */
-function sweepDebtSites({ file, source, ast }) {
-  const sites = [];
-  for (const node of walkNodes(ast.fragment)) {
-    if (node.type !== 'Component' || node.name !== 'IconButton') continue;
-    const line = lineOf(source, node.start);
-    for (const attribute of node.attributes) {
-      const text = source.slice(attribute.start, attribute.end);
-      if (attribute.name === 'class' && ROLE_CLASS.test(text)) {
-        sites.push({ file, line, id: ROLE_CLASS_SITE });
-      }
-      if (HAND_WRITTEN_TOOLTIPS.has(attribute.name)) sites.push({ file, line, id: TOOLTIP_SITE });
-    }
-  }
-  return sites;
-}
-
-/**
- * Shrink-only against the merge base: PR 3b of issue 2541 sweeps the app files that still carry
- * these, and a site new to base fails unless a reasoned `ratchet-exempt(design-system)` excuses it.
- */
-const SWEEP_GATE = gateOver([TEMPLATE_CORPUS], (readFile, files) =>
-  templatesOf(readFile, files).flatMap(sweepDebtSites)
-);
-
-test('no icon button gains a role class or a hand-written tooltip against the base', (t) => {
-  contract.assertCallSitesAlive();
-  checkGate(
-    t,
-    SWEEP_GATE,
-    'an icon button takes `is-primary`, `is-ghost` or `is-danger` through `role` (`ghost-danger` ' +
-      'for both) and keeps only a state such as `is-locked` on `class`; it shows `ariaLabel` as ' +
-      'its tooltip, and an information-bearing hint passes `tooltip`, because a native `title` ' +
-      'stacks a second tooltip and is never shown to the keyboard'
-  );
-});
-
-test('the swept shared components carry no role class and no hand-written tooltip', () => {
-  const tree = workingTree(TEMPLATE_CORPUS);
-  const templates = templatesOf(tree.readFile, tree.listFiles());
-  assertFloor('templates', templates.length, 300);
-  const shared = templates
-    .filter(({ file }) => file.startsWith('src/ui/svelte/components/'))
-    .flatMap(sweepDebtSites)
-    .map(({ file, line, id }) => `${file}:${line} ${id}`);
-  assert.deepEqual(shared, [], 'issue 2541 swept every shared caller; keep them swept');
 });
 
 test('no ActionMenu trigger takes a role class on `triggerClass`', () => {
