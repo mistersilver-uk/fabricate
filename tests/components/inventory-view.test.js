@@ -3625,6 +3625,10 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       ['sys:b', 'subtle'],
       ['sys:c', 'subtle'],
     ]);
+    // The view names the destroy in flight; `Button`'s busy draws no label (issue 2540).
+    const destroy = target.querySelector('[data-inventory-bulk-destroy]');
+    assert.equal(destroy.getAttribute('aria-busy'), 'true');
+    assert.match(destroy.textContent, /Destroying…|Bulk\.DestroyBusy/u);
   });
 
   it('spends the pane’s one primary on the commit, and on Done once a report stands', async () => {
