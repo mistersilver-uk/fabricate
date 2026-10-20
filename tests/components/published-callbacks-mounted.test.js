@@ -3,8 +3,11 @@
  * drawing the test-only probe into bare companion-owned targets: the one forwarder a mount keeps,
  * the arguments it forwards and the copy it makes of each, its `untrack`, a callback that updates
  * or destroys its own mount from inside a press, and a mount destroyed while its click is still
- * being dispatched. The refusals, the liveness check and the failure report are
+ * being dispatched; then the published `Notice`'s dismissal through the shipped manifest, and the
+ * focus its `onDismiss` holds. The refusals, the liveness check and the failure report are
  * `published-component-callbacks.test.js`'s, on the fake runtime.
+ * Limit: happy-dom activates no button from a key, so a keyboard press here is `focus()` then
+ * `click()`, and the Enter and Space presses are the View Lab's.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -13,6 +16,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
+  CALLBACK_REPORT,
   PUBLISHED_ADAPTER as ADAPTER,
   PUBLISHED_COMPILED_MODULES,
   PUBLISHED_RAW_MODULES,
@@ -21,6 +25,7 @@ import {
   companionTarget,
   recordEscapes,
   settle,
+  shippedSeam,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -36,6 +41,7 @@ const harness = createMountedComponentHarness({
 });
 
 let runtime;
+let components;
 let createPublishedComponents;
 let probe;
 let reports;
@@ -45,7 +51,8 @@ let stopRecording;
 
 before(async () => {
   await harness.setup();
-  ({ publishedComponentRuntime: runtime } = await harness.loadRuneModule(ADAPTER));
+  ({ publishedComponentRuntime: runtime, COMPONENTS: components } =
+    await harness.loadRuneModule(ADAPTER));
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
   stopRecording = recordEscapes((error) => {
@@ -268,5 +275,150 @@ describe('a callback that acts on its own mount from inside a press', () => {
     assert.equal(seam.liveMountCount(), 0);
     assertStillPressed(beside);
     await settle();
+  });
+});
+
+describe("Notice's dismissal through the seam", () => {
+  const REFUSAL = 'Fabricate | published components: ';
+  const TITLE = 'Recipe saved.';
+  const LABEL = 'Dismiss the saved-recipe notice';
+  const DISMISSABLE = Object.freeze({ title: TITLE, dismissable: true, dismissLabel: LABEL });
+  const WHEN = 'Notice requires a non-empty "dismissLabel" when "dismissable" is truthy';
+
+  /** A dismissable notice in a bare target, beside a heading the companion owns, with its handle. */
+  function mountNotice(onDismiss) {
+    const report = (...args) => {
+      reports.push(args);
+    };
+    const ui = shippedSeam({ createPublishedComponents, runtime, components, report });
+    const target = companionTarget(targets);
+    const heading = target.ownerDocument.createElement('h2');
+    heading.tabIndex = -1;
+    target.before(heading);
+    const held = { ui, target, heading, faults: [] };
+    const onFault = (fault) => {
+      held.faults.push(fault);
+    };
+    held.handle = ui.mount('Notice', { target, props: { ...DISMISSABLE, onDismiss }, onFault });
+    held.dismiss = () => target.querySelector('[data-notice-dismiss]');
+    return held;
+  }
+
+  /** Focuses the dismiss control and presses it, as a keyboard press reaches it here. */
+  function press(held) {
+    const button = held.dismiss();
+    button.focus();
+    button.click();
+    return button;
+  }
+
+  it('calls onDismiss once, with no argument, inside the press while the control holds focus', async () => {
+    const seen = [];
+    const held = mountNotice((...args) => {
+      seen.push({ args, focused: document.activeElement === held.dismiss() });
+    });
+    await settle();
+    const button = press(held);
+    assert.deepEqual(seen, [{ args: [], focused: true }], 'before the flush removed it');
+    assert.ok(held.target.contains(button), 'still drawn when the press returns');
+    await settle();
+    assert.ok(!held.target.querySelector('.fab-notice'), 'the notice left the DOM');
+    held.handle.destroy();
+  });
+
+  it('calls onDismiss once for a second press before the flush', async () => {
+    const { calls, record } = recorder();
+    const held = mountNotice(record);
+    await settle();
+    press(held).click();
+    assert.equal(calls.length, 1, 'the second press calls nothing');
+    await settle();
+    held.handle.destroy();
+  });
+
+  it('dismisses nothing on Escape', async () => {
+    const { calls, record } = recorder();
+    const held = mountNotice(record);
+    await settle();
+    const button = held.dismiss();
+    button.focus();
+    const { KeyboardEvent } = held.target.ownerDocument.defaultView;
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle();
+    assert.equal(calls.length, 0);
+    assert.ok(held.dismiss() === button, 'still drawn');
+    held.handle.destroy();
+  });
+
+  it('leaves focus where onDismiss moved it, and its destroy there faults and reports nothing', async () => {
+    const held = mountNotice(() => {
+      held.heading.focus();
+      held.handle.destroy();
+    });
+    await settle();
+    press(held);
+    assert.equal(held.target.childNodes.length, 0, 'empty when the press returns');
+    assert.ok(document.activeElement === held.heading, 'focus is where the companion put it');
+    await settle();
+    assert.ok(document.activeElement === held.heading, 'and stays there after the flush');
+    assert.deepEqual(held.faults, []);
+    held.heading.remove();
+  });
+
+  it('reports an onDismiss that throws, and the notice is still dismissed', async () => {
+    const failure = new Error('the companion focus move failed');
+    const held = mountNotice(() => {
+      throw failure;
+    });
+    await settle();
+    press(held);
+    await settle();
+    assert.deepEqual(reports, [[CALLBACK_REPORT, 'Notice', 'onDismiss', failure]]);
+    reports.length = 0;
+    assert.ok(!held.target.querySelector('.fab-notice'), 'dismissed');
+    assert.equal(held.handle.update({ ...DISMISSABLE, onDismiss: () => {} }), true, 'still live');
+    assert.deepEqual(held.faults, []);
+    held.handle.destroy();
+  });
+
+  it('validates an update after dismissal, draws nothing, and holds the target until destroy', async () => {
+    const { record } = recorder();
+    const held = mountNotice(record);
+    await settle();
+    press(held);
+    await settle();
+    assert.throws(() => held.handle.update({ ...DISMISSABLE, dismissLabel: '' }), {
+      name: 'TypeError',
+      message: REFUSAL + WHEN,
+    });
+    assert.equal(held.handle.update({ ...DISMISSABLE, tone: 'info', onDismiss: record }), true);
+    await settle();
+    assert.ok(!held.target.querySelector('.fab-notice'), 'final for the mount');
+    const again = () => held.ui.mount('Notice', { target: held.target, props: { title: TITLE } });
+    assert.throws(again, {
+      name: 'TypeError',
+      message: `${REFUSAL}target already holds a published component`,
+    });
+    held.handle.destroy();
+    again().destroy();
+  });
+
+  it('refuses an update that drops dismissLabel, keeping the render and the onDismiss a press delivers', async () => {
+    const { calls, record } = recorder();
+    const held = mountNotice(record);
+    await settle();
+    const button = held.dismiss();
+    const { title, dismissable } = DISMISSABLE;
+    assert.throws(() => held.handle.update({ title, dismissable, onDismiss: () => {} }), {
+      name: 'TypeError',
+      message: REFUSAL + WHEN,
+    });
+    await settle();
+    assert.ok(held.dismiss() === button, 'the same control');
+    assert.equal(button.getAttribute('aria-label'), LABEL, 'the previous render');
+    press(held);
+    assert.equal(calls.length, 1, 'the previous onDismiss');
+    await settle();
+    held.handle.destroy();
   });
 });
