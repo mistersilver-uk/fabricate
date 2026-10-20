@@ -1327,6 +1327,37 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
+  /** Rule 9's element ids and faults over one synthetic file's `markup`. */
+  const idsOf = (markup) => {
+    const { ast } = templateOf('src/E.svelte', markup);
+    const { elements, faults } = focusableElements('src/E.svelte', ast);
+    return { ids: elements.map(({ id }) => id), faults };
+  };
+
+  it('tells two inputs that share a hook apart by their static type, and moves no unshared id', () => {
+    const markup =
+      '{#if a}<input type="text" data-in />{:else}<input type="number" data-in />{/if}';
+    assert.deepEqual(idsOf(`${markup}<input data-other />`), {
+      ids: [
+        'src/E.svelte: input[data-in][type="text"]',
+        'src/E.svelte: input[data-in][type="number"]',
+        'src/E.svelte: input[data-other]',
+      ],
+      faults: [],
+    });
+  });
+
+  for (const [claim, markup] of [
+    ['a pair with no static type', '<input data-in /><input type={kind} data-in />'],
+    ['a pair of one type', '<input type="number" data-in /><input type="number" data-in />'],
+  ]) {
+    it(`names ${claim} that shares a hook as a fault`, () => {
+      assert.deepEqual(idsOf(markup).faults, [
+        'src/E.svelte: input[data-in] names more than one element',
+      ]);
+    });
+  }
+
   const DYNAMIC = 'src/E.svelte: svelte:element';
   const MARKED = ' data-keyboard-focus="true"';
   const UNMARKED = `${DYNAMIC} does not state data-keyboard-focus="true"`;
