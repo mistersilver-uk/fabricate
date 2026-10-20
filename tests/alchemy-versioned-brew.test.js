@@ -14,6 +14,7 @@ import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { stageSelectionInputsComplete } from '../src/systems/stageReadiness.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 
+import { expandObject } from './helpers/foundryExpandObject.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 const SYS = 'brew-sys';
@@ -72,7 +73,8 @@ class BrewActor {
 
   async setFlag(namespace, key, value) {
     this.flags[namespace] ??= {};
-    this.flags[namespace][key] = mergeHistoryFlag(this.flags[namespace][key], value);
+    // Foundry dot-expands a written flag, so a UUID-keyed allocation is saved nested.
+    this.flags[namespace][key] = mergeHistoryFlag(this.flags[namespace][key], expandObject(value));
     return this;
   }
 
@@ -282,13 +284,18 @@ test('an essence-signature brew starts with a complete saved plan and executes i
   const source = new BrewActor('source', [embers]);
   const crafter = new BrewActor('crafter');
 
-  const { started } = await startBrew(world, { crafter, source, componentIds: ['ember', 'ember'] });
+  const { prepared, started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['ember', 'ember'],
+  });
 
   assert.equal(started.success, true, started.message);
-  const run = world.runManager.getActiveRun(crafter, started.runId);
   const step = brewRecipe([]).getExecutionSteps()[0];
   const set = world.engine.recipeManager.getRecipe('brew').ingredientSets[0];
-  assert.equal(stageSelectionInputsComplete(set, run.steps[0].selectionPlan, step.id), true);
+  assert.equal(stageSelectionInputsComplete(set, prepared.selectionPlan, step.id), true);
+  const saved = world.runManager.getActiveRun(crafter, started.runId).steps[0].selectionPlan;
+  assert.equal(Object.hasOwn(saved.ingredientEssenceAllocation.allocation, embers.uuid), false);
   assert.equal(embers.system.quantity, 1, 'exactly the two submitted units are spent');
   assert.equal(started.canExecuteImmediately, true);
 

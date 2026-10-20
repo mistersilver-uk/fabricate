@@ -1768,12 +1768,16 @@ export class CraftingEngine {
     if (run?.status === 'waitingTime' || run?.pauseState) return false;
     const stepIndex = Number(run?.currentStepIndex);
     const selectionPlan = run?.steps?.[stepIndex]?.selectionPlan ?? {};
-    if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) return false;
+    // A started stage is locked and spent, and its saved plan is Foundry dot-expanded, so only an
+    // unstarted one is asked whether its picks are complete.
+    const started = this._versionedStageStarted(run, stepIndex);
+    if (!started && !this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) {
+      return false;
+    }
     try {
-      // Asked through the shared phase seam: a started stage holds what it needs, and
-      // re-probing the inventory its own consumption emptied would answer "cannot execute".
+      // A started stage holds what it needs; re-probing its emptied inventory says "cannot execute".
       const prepared = await this._versionedStagePreparation({
-        started: this._versionedStageStarted(run, stepIndex),
+        started,
         run,
         actor,
         componentSourceActors,
