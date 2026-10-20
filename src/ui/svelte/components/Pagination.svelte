@@ -103,11 +103,10 @@
         <IconButton
           data-pagination-prev=""
           ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+          icon="fas fa-chevron-left"
           disabled={pageIndex === 0}
           onclick={() => goToPage(pageIndex - 1)}
-        >
-          <i class="fas fa-chevron-left" aria-hidden="true"></i>
-        </IconButton>
+        />
         <span
           class="manager-pagination-page"
           class:manager-pagination-hidden={compact}
@@ -121,11 +120,10 @@
         <IconButton
           data-pagination-next=""
           ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+          icon="fas fa-chevron-right"
           disabled={pageIndex >= totalPages - 1}
           onclick={() => goToPage(pageIndex + 1)}
-        >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        </IconButton>
+        />
       </nav>
     {/if}
     {#if showPageSize}

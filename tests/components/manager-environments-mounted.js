@@ -2178,7 +2178,7 @@ export function registerEnvironmentsCases() {
     // The hover tooltip stays generic: it appears beside the row the pointer is already on.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
-        row.querySelector('[aria-haspopup="menu"]').getAttribute('title')
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('data-tooltip-text')
       ),
       ['Environment actions', 'Environment actions']
     );

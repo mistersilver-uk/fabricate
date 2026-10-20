@@ -238,7 +238,10 @@ describe('run primitives mounted behavior', () => {
     target.querySelector('[data-run-action="pause"]').click();
     assert.deepEqual(calls.shift(), ['pause']);
 
-    target.querySelector('[data-run-action="cancel-arm"]').click();
+    const cancelArm = target.querySelector('[data-run-action="cancel-arm"]');
+    assert.equal(cancelArm.getAttribute('data-tooltip-text'), 'Cancel Forge Iron Rivets');
+    assert.ok(!cancelArm.hasAttribute('title'), 'the cancel’s name is its tooltip (issue 2541)');
+    cancelArm.click();
     await flushRender();
     assert.ok(target.querySelector('[data-run-cancel-decision]'), 'cancel decision appears in the bar');
     assert.ok(!target.querySelector('[data-run-action="primary"]'), 'primary withdraws while cancel is armed');
@@ -320,6 +323,19 @@ describe('run primitives mounted behavior', () => {
       /border:\s*1px solid var\(--fab-border\)/u,
       /background:\s*var\(--fab-bg-1\)/u,
     ]);
+  });
+
+  it('routes `cancel.title` to the cancel’s tooltip rather than a native title', async () => {
+    const target = await runActionHarness.mount({
+      run: { id: 'run-1' },
+      runLabel: 'Minor Elixir of Mending',
+      primary: { label: 'Roll check', enabled: true },
+      cancel: { title: 'Cancel and refund the stamina' },
+    });
+    const cancelArm = target.querySelector('[data-run-action="cancel-arm"]');
+    assert.equal(cancelArm.getAttribute('data-tooltip-text'), 'Cancel and refund the stamina');
+    assert.equal(cancelArm.getAttribute('aria-label'), 'Minor Elixir of Mending');
+    assert.ok(!cancelArm.hasAttribute('title'));
   });
 
   /** UX2-7. Arming UNMOUNTS the control that was activated and replaces the whole row. */

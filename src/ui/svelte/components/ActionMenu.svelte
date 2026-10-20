@@ -11,7 +11,7 @@
   | --- | --- | --- | --- |
   | `items` | `[{ id, label, icon?, disabled?, danger?, tone?, data? }]` | `[]` | `label` is ALREADY-LOCALIZED; `danger` emits `is-danger` and `tone` emits `is-<tone>`, whose sheet rule tints the item's glyph and never its label; `data` is stamped verbatim on that item's button and spread FIRST, so a caller can never override this component's own `type`, `role`, `tabindex` or `onclick`. |
   | `ariaLabel` | pre-localized string | `''` | The trigger's accessible name, required in the sense `design-system/spec.md` requires it of any icon-only control. A caller rendering one menu per row names the record in it; the menu items stay generic, because the trigger the menu was opened from is what identifies the row. |
-  | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerProps` | strings / attribute object | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger is `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
+  | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerProps` | strings / attribute object | `''` / `{}` | The trigger's extra class, glyph, tooltip (`IconButton`'s `tooltip`, else its name) and hooks. The trigger is `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
   | `panelLabel` / `menuClass` | string / class string | `ariaLabel` / `''` | The panel's accessible name, and an extra class on the portaled panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
   | `heading` | pre-localized string | `''` | A `<Kicker>` atop the panel and outside its `role="menu"`, which it names through `aria-labelledby` in place of `panelLabel`. |
   | `align` | `'end'` \| `'start'` | `'end'` | The trigger edge the panel lines up with: `end` for a kebab at a row's end, `start` for an adder at a list's start. Either is clamped inside the host. |
@@ -216,15 +216,14 @@
       class={triggerClass}
       {ariaLabel}
       {disabled}
+      icon={triggerIcon}
       {...triggerProps}
       aria-haspopup="menu"
       aria-expanded={open}
-      title={triggerTitle || undefined}
+      tooltip={triggerTitle || undefined}
       onclick={toggleFromTrigger}
       onkeydown={onTriggerKeydown}
-    >
-      <i class={triggerIcon} aria-hidden="true"></i>
-    </IconButton>
+    />
   {/if}
 
   {#snippet menuItems()}

@@ -163,12 +163,11 @@
         </div>
         <IconButton
           data-manager-modal-close=""
-          size={26}
+          size="26"
           ariaLabel={closeLabel}
+          icon="fas fa-xmark"
           onclick={() => onClose()}
-        >
-          <i class="fas fa-xmark" aria-hidden="true"></i>
-        </IconButton>
+        />
       </div>
 
       {#if onSubmit}

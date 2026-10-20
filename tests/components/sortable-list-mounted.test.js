@@ -590,7 +590,12 @@ describe('SortableList — the rocker and the delete are the list`s own trailing
     const remove = row.querySelector('[data-sortable-remove]');
     assert.ok(Boolean(remove), 'the list draws the delete itself');
     assert.equal(remove.getAttribute('data-caller-remove'), 'b', 'carrying the caller`s own hook');
-    assert.equal(remove.getAttribute('title'), 'Remove it', 'and its title');
+    assert.ok(!remove.hasAttribute('title'), 'a caller `title` is retired (issue 2541)');
+    assert.equal(
+      remove.getAttribute('data-tooltip-text'),
+      remove.getAttribute('aria-label'),
+      'the delete’s tooltip is its name'
+    );
 
     // `content · rocker · delete` is the specimen's order; a hand-rolled delete sat in the content.
     const rocker = row.querySelector('.fabricate-sortable-list-rocker');

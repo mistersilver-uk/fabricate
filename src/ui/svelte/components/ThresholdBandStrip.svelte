@@ -315,17 +315,16 @@
         {#each seeds as seed, position (seed.band.id || position)}
           <span class="fab-band-strip-rail-slot" style={`left: ${percentOf(seed.value)}%;`}>
             <IconButton
-              size={24}
+              size="24"
               ariaLabel={addLabel(seed.band)}
+              icon="fas fa-plus"
               {disabled}
               tabindex={position === railAt ? 0 : -1}
               data-keyboard-focus="true"
               data-band-strip-add={seed.band.id || position}
               onfocus={() => (railStop = position)}
               onclick={() => onAdd({ index: seed.band.index, value: seed.value })}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-            </IconButton>
+            />
           </span>
         {/each}
       </div>

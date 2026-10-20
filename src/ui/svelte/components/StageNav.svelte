@@ -41,12 +41,11 @@
     <IconButton
       class="fab-stage-nav-arrow"
       ariaLabel={previousLabel}
+      icon="fas fa-chevron-left"
       disabled={safeView === 0}
       data-stage-nav-previous=""
       onclick={() => select(safeView - 1)}
-    >
-      <i class="fas fa-chevron-left" aria-hidden="true"></i>
-    </IconButton>
+    />
     {#each visible as stage, offset (stage?.id ?? start + offset)}
       {@const index = start + offset}
       <button
@@ -65,12 +64,11 @@
     <IconButton
       class="fab-stage-nav-arrow"
       ariaLabel={nextLabel}
+      icon="fas fa-chevron-right"
       disabled={safeView === count - 1}
       data-stage-nav-next=""
       onclick={() => select(safeView + 1)}
-    >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-    </IconButton>
+    />
     {#if positionLabel(safeView, count)}
       <span class="fab-stage-nav-position">{positionLabel(safeView, count)}</span>
     {/if}
