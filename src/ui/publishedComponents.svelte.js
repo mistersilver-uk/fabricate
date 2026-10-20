@@ -1,9 +1,10 @@
 /**
- * The published component seam's Svelte runtime (issue 2426): Fabricate's own `mount`, `unmount`
- * and boundary host, with each manifest `path` bound to its component. `main.js` imports it for
+ * The published component seam's Svelte runtime (issue 2426): Fabricate's own `mount`, `unmount`,
+ * boundary host and the `flush` a value key's resync runs (issue 2453), with each manifest `path`
+ * bound to its component. `main.js` imports it for
  * the registration side effect, so the plain seam never imports Svelte.
  */
-import { mount, unmount, untrack } from 'svelte';
+import { flushSync, mount, unmount, untrack } from 'svelte';
 
 import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
@@ -52,6 +53,7 @@ export const publishedComponentRuntime = Object.freeze({
   // Svelte's own Promise, never an `async` wrapper or `{ outro: true }`: the seam reports its
   // rejection, and either would move that report after `onFault` or let the throw escape.
   unmount: (instance) => unmount(instance),
+  flush: () => flushSync(),
 });
 
 // ratchet-exempt(lint): main.js imports this module for its registration, as appFactory's apps do.
