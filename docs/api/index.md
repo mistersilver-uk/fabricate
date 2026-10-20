@@ -2242,7 +2242,7 @@ It is the way out of the dead end, a control or a link; what is drawn there is y
 Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so state the ink of any text you draw there.
 It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is yours.
 It draws no fill, so it sits on `target`'s ground.
-The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+The title inks `--fab-text`, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2`, `--fab-surface-soft` over `--fab-bg-2` and `--fab-bg-3` in every palette.
 The hint inks `--fab-text-muted` on every variant, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2` in every palette.
 The title states its own serif face, and the hint inherits `target`'s.
 The panel's own figures are private.
