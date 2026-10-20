@@ -144,8 +144,8 @@ function buildEquivalentEssenceCorpus() {
         {
           id: 'sys-b',
           components: [{ id: 'comp-9', refs: ['Item.aaa'] }],
-          // A `crypto.randomUUID()`-shaped id, which is what `adminStore.addEssence` mints and
-          // which is why `1.30.0`'s group-by-id left this world with two "Iron" world essences.
+          // A `crypto.randomUUID()`-shaped id, which is what the retired system-side essence create
+          // minted and which is why `1.30.0`'s group-by-id left this world with two "Iron" world essences.
           essences: [{ id: 'kTz9QpLm2xR4vB1a', name: 'Iron' }],
           tools: [],
         },

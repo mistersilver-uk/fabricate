@@ -630,7 +630,7 @@ export function registerEssencesCases() {
     );
 
     // ── NO CREATE ON THIS ROUTE (issue 1372, maintainer parity round 8) ─────────────────────
-    // The header's `+ Create essence` opened a system-scope draft that `store.addEssence` wrote
+    // The header's `+ Create essence` opened a system-scope draft that the store wrote
     // straight into `system.essenceDefinitions` — a system-owned essence with its own name, icon
     // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
     // reference's Essence Rules header carries nothing on the right at all.
@@ -1002,5 +1002,40 @@ export function registerEssencesCases() {
     // `+ Create essence`; an essence's identity is a world record and the create that authors one
     // is the Essence Catalogue's. The two cases above still cover what this file is about — a
     // failed and a rejected save both KEEP the draft — over the update path that survives.
+  });
+
+  it('returns to the essence browser when the edited essence leaves the system (issue 2554)', async () => {
+    const calls = [];
+    const store = createStore(calls);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essence Rules').click();
+    await tick();
+    flushSync();
+    target.querySelector(':scope [data-essence-id="water"] [data-essence-edit="water"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.ok(Boolean(target.querySelector('#manager-essence-edit-name')), 'the editor is open');
+
+    store.viewState.update((state) => ({
+      ...state,
+      essenceCards: state.essenceCards.filter((card) => card.id !== 'water'),
+    }));
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+    assert.ok(
+      !target.querySelector('#manager-essence-edit-name'),
+      'no system-side create form stands in for the vanished essence'
+    );
+    assert.ok(!target.querySelector('[data-essence-id="water"]'), 'the browser lists what remains');
   });
 }

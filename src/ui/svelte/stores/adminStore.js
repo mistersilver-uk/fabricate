@@ -4356,41 +4356,6 @@ export function createAdminStore(services) {
     };
   }
 
-  // `colorToken` is the optional GM-authored per-essence colour (issue 917), a bare `--fab-tag-*`
-  // key or null, with palette validation owned by `CraftingSystemManager`.
-  async function addEssence(name, description, icon, sourceComponentId, colorToken, extra = {}) {
-    const normalizedName = String(name || '').trim();
-    if (!normalizedName) return false;
-    const context = _selectedSystemEssences();
-    if (!context) return false;
-    const { systemManager, sysId, system, existing } = context;
-
-    if (_essenceNameTaken(existing, normalizedName)) {
-      services.notify.warn(`Essence "${normalizedName}" already exists in this system.`);
-      return false;
-    }
-
-    const sourceFields = _sourceFieldsForEssenceSelection(system, sourceComponentId || null);
-    const options = extra && typeof extra === 'object' ? extra : {};
-    const has = (key) => Object.prototype.hasOwnProperty.call(options, key);
-    const essenceDefinitions = [
-      ...existing,
-      {
-        id: crypto.randomUUID(),
-        name: normalizedName,
-        description: String(description || ''),
-        icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
-        colorToken: colorToken || null,
-        ...(has('enabled') && { enabled: options.enabled !== false }),
-        ...(has('propertyMacroUuid') && { propertyMacroUuid: options.propertyMacroUuid || null }),
-        ...sourceFields,
-      },
-    ];
-    await systemManager.updateSystem(sysId, { essenceDefinitions });
-    await refresh();
-    return true;
-  }
-
   /** The patched definition one `updateEssence` call produces. */
   function _patchedEssenceDefinition(current, updates, system, resolved) {
     const has = (key) => Object.prototype.hasOwnProperty.call(updates, key);
@@ -6917,7 +6882,6 @@ export function createAdminStore(services) {
     setComponentCategoryIcon,
     addTag,
     removeTag,
-    addEssence,
     updateEssence,
     setEssenceEnabled,
     applyEssenceBulkEdit,
