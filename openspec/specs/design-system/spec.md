@@ -945,6 +945,7 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 
 `EmptyState`'s hero (central) panel MUST draw the `<Empty>` specimen: a 1px dashed `--fab-border-strong` edge at radius 11 padded `--fab-space-4`, a 38px radius-9 `--fab-bg-3` tile carrying a 15px `--fab-text-secondary` glyph, a serif 15px/600 `--fab-text` title, and a 10.5px hint capped at 34ch (maintainer ruling, 2026-10-20).
 Its `filtered` panel MUST draw the specimen's hint-and-way-out panel, with no tile or title, on the same edge, radius, padding and stack gap, in `--fab-text-muted`, and its hint is plain text carrying no emphasis.
+`compact`, `inline`, `note`, `field` and `fill` MUST each match a drawn unit of the `<Empty>` entry.
 A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY place it (width, grid column, minimum height); a caller that mirrors a form for a sibling state follows that form's geometry and inks and varies only the state's hue.
 
 #### Scenario: The hero panel is measured against its specimen

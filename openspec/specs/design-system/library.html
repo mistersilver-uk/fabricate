@@ -267,6 +267,21 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .k-notice.success .i,.k-notice.success .ttl{color:var(--fab-success-text)}
 .k-empty{border:1px dashed var(--fab-border-strong);border-radius:11px;padding:var(--fab-space-4);text-align:center;color:var(--fab-text-subtle);display:grid;gap:var(--fab-space-2);justify-items:center}
 .k-empty .k-hint{color:var(--fab-text-muted)}
+.k-empty .ttl{font-family:var(--fab-font-serif);font-size:15px;font-weight:600;line-height:1.25;color:var(--fab-text)}
+.k-empty.compact{padding:var(--fab-space-4) var(--fab-space-3);gap:var(--fab-space-chip)}
+.k-empty.compact .k-ic{width:32px;height:32px;border-radius:9px}
+.k-empty.compact .k-ic .i{width:14px;height:14px}
+.k-empty.compact .ttl{font-size:12px}
+.k-empty.compact .k-hint{max-width:34ch}
+.k-empty.inline{display:flex;align-items:center;gap:var(--fab-space-3);text-align:left}
+.k-empty.inline>.i{width:13px;height:13px;flex:none;color:var(--fab-text-secondary)}
+.k-empty.inline .k-hint{font-size:11.5px}
+.k-empty.field{height:34px;border-radius:9px;padding:var(--fab-space-1) var(--fab-space-2)}
+.k-empty.fill{width:100%;height:100%;align-content:center}
+.k-empty.note{border:0;border-radius:0;padding:var(--fab-space-chip);gap:var(--fab-space-2xs);justify-items:start;text-align:left;color:var(--fab-text-muted)}
+.k-empty.note .i{width:10px;height:10px;color:var(--fab-text-muted)}
+.k-empty.note .ttl{font-family:inherit;font-size:10px;font-weight:500;line-height:1.4;color:var(--fab-text-muted)}
+.k-empty.note .k-hint{font-size:10px;line-height:1.4}
 .k-strip{border-radius:9px;padding:var(--fab-space-3);background:var(--fab-bg-1);border:1px solid var(--fab-border)}
 .k-facts{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:8px}
 .k-fact{display:flex;align-items:center;gap:7px;color:var(--fab-text-subtle)}
@@ -1389,12 +1404,22 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div class="unit"><span class="cap">empty &mdash; says what the emptiness means</span>
         <div style="display:grid;gap:12px">
           <div class="k-empty"><div class="k-ic s38"><svg class="i"><use href="#i-book"/></svg></div><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600;color:var(--fab-text)">No businesses yet</div><div class="k-hint" style="max-width:34ch">Businesses produce and consume goods. Add one and it becomes available to every settlement on this template.</div><button class="k-btn primary" style="height:34px;min-height:34px;padding:0 16px;border-radius:9px">New business</button></div>
-          <div class="k-empty"><div class="k-hint" style="max-width:34ch">No recipes match <b style="color:var(--fab-text)">&ldquo;ingot&rdquo;</b> in this system.</div><button class="k-btn" style="height:34px;min-height:34px;border-radius:9px">Clear filters</button></div>
+          <div class="k-empty"><div class="k-hint" style="max-width:34ch">No recipes match &ldquo;ingot&rdquo; in this system.</div><button class="k-btn" style="height:34px;min-height:34px;border-radius:9px">Clear filters</button></div>
         </div>
-        <span class="k-hint"><code>filtered</code> is a real prop: &ldquo;no results for this filter&rdquo; and &ldquo;nothing exists yet&rdquo; are different sentences with different actions. 42 shipped callers.</span></div>
-      <div class="unit"><span class="cap">EmptyState field API &mdash; opt-in geometry (issue 1649)</span>
-        <span class="k-hint"><code>field: boolean = false</code> sizes a short placeholder to <b>width 100% &middot; height 34px &middot; border-box</b>, with <code>--fab-space-1</code> vertical and <code>--fab-space-2</code> horizontal padding. Use <code>&lt;EmptyState inline field hint={localizedHint} /&gt;</code> beneath an availability dropdown. The existing inline typography, muted text and dashed non-interactive panel remain; ordinary inline, compact, note, filtered and hero panels retain their defaults. This documents the shipped field extension, not a promotion of the target hero specimen above.</span></div>
-      <div class="unit"><span class="cap">EmptyState fill API — opt-in bounded allocation (issue 1648)</span><span class="k-hint"><code>fill: boolean = false</code> stretches the border-box to its bounded host's 100% width/height with min-height 0. Journal list bodies own stable allocations and use <code>compact fill</code>; the panel retains compact padding, centered content and its dashed edge. Other callers remain padding-driven. Empty remains target for its broader specimen.</span></div>
+        <span class="k-hint"><code>filtered</code> is a real prop: &ldquo;no results for this filter&rdquo; and &ldquo;nothing exists yet&rdquo; are different sentences with different actions.</span></div>
+      <div class="unit" style="width:260px"><span class="cap">compact &mdash; a 32 tile and tighter padding, for a sidebar or a slot</span>
+        <div class="k-empty compact"><div class="k-ic"><svg class="i"><use href="#i-circle"/></svg></div><div class="ttl">No travel actor</div><div class="k-hint">Pick the actor that represents this party on the map.</div></div></div>
+      <div class="unit" style="width:420px"><span class="cap">inline &mdash; one line, the tile released into a bare glyph</span>
+        <div class="k-empty inline"><svg class="i"><use href="#i-alert"/></svg><span class="k-hint">Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence.</span></div></div>
+      <div class="unit" style="width:240px"><span class="cap">note &mdash; the popover line, with no panel</span>
+        <div class="k-empty note"><div class="ttl">No actor matches your search.</div></div></div>
+      <div class="unit" style="width:260px"><span class="cap">field &mdash; inline at the width of a control, 34px high (issue 1649)</span>
+        <div class="k-field" style="height:34px"><span class="ph">Add a weather condition</span><svg class="i chev"><use href="#i-cd"/></svg></div>
+        <div class="k-empty inline field"><span class="k-hint">Any Weather</span></div>
+        <span class="k-hint"><code>field</code> sizes a short placeholder to the full control width at 34px, padded <code>--fab-space-1</code> by <code>--fab-space-2</code>, beneath an availability dropdown.</span></div>
+      <div class="unit" style="width:260px"><span class="cap">fill &mdash; the whole box of a bounded host (issue 1648)</span>
+        <div style="height:120px"><div class="k-empty compact fill"><div class="k-ic"><svg class="i"><use href="#i-clock"/></svg></div><div class="k-hint">No completed runs yet.</div></div></div>
+        <span class="k-hint"><code>fill</code> stretches the border box to a bounded host&rsquo;s whole width and height with no minimum height; journal list bodies use <code>compact fill</code>.</span></div>
     </div>
     <div class="notes">
       <div><h5>The routing rule</h5><ul><li><b>Callout</b> — documentation. Always true, stays put.</li><li><b>Notice</b> — state. Just happened, goes away.</li><li><b>InfoStrip</b> — current values. Read-only facts in mono.</li><li><b>Empty</b> — nothing to show, and why.</li></ul></div>
