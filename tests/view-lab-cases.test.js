@@ -3487,10 +3487,15 @@ test('a change confined to a new checks module selects the frames it determines'
 });
 
 // The time-of-day bar's modules (issue 2431): each selects the bar's frame, and the range bar's
-// pure geometry also selects the two check-strip frames, since a util is not a broad signal.
+// pure geometry and its words (issue 2435) also select the two check-strip frames, since a util is
+// not a broad signal.
 const TIME_OF_DAY_BAR_MODULES = [
   [
     'src/ui/svelte/util/rangeBarGeometry.js',
+    ['manager-checks-simple-two-band-strip', 'coverage-mode-routed-check-checks'],
+  ],
+  [
+    'src/ui/svelte/util/rangeBarText.js',
     ['manager-checks-simple-two-band-strip', 'coverage-mode-routed-check-checks'],
   ],
   ['src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js', []],

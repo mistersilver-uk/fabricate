@@ -347,7 +347,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
-      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|worldTimeLabel)\.js$/,
+      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|rangeBarText|worldTimeLabel)\.js$/,
     ],
   }),
   // A rail "+" activated: Dusk's midpoint seeds the add form's Starts at, and its name takes focus.

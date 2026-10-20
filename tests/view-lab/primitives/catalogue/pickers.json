@@ -2,7 +2,7 @@
   {
     "spec": "<RangeBar>",
     "cap": "outcome bands — 46px, fixed",
-    "draws": ":scope > div:first-of-type",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
     "undrawn": {
       "Smith's Tools": "the previewed record, read into the strip’s accessible name; the drawing draws no name",
@@ -16,8 +16,8 @@
           "name": "Fumble",
           "color": "color-mix(in oklab, var(--fab-danger) 26%, var(--fab-bg-0))",
           "ink": "var(--fab-danger-text)",
-          "from": 1,
-          "to": 9,
+          "from": 0,
+          "to": 10,
           "index": 0
         },
         {
@@ -25,8 +25,8 @@
           "name": "Failure",
           "color": "color-mix(in oklab, var(--fab-warning) 26%, var(--fab-bg-0))",
           "ink": "var(--fab-warning-text)",
-          "from": 10,
-          "to": 14,
+          "from": 11,
+          "to": 23,
           "index": 1
         },
         {
@@ -34,8 +34,8 @@
           "name": "Success",
           "color": "color-mix(in oklab, var(--fab-success) 26%, var(--fab-bg-0))",
           "ink": "var(--fab-success-text)",
-          "from": 15,
-          "to": 19,
+          "from": 24,
+          "to": 39,
           "index": 2
         },
         {
@@ -43,14 +43,14 @@
           "name": "Critical",
           "color": "color-mix(in oklab, var(--fab-accent) 26%, var(--fab-bg-0))",
           "ink": "var(--fab-accent-text)",
-          "from": 20,
+          "from": 40,
           "index": 3
         }
       ],
-      "previewDc": 15,
+      "previewDc": 24,
       "previewLabel": "Smith's Tools",
-      "min": 1,
-      "max": 30,
+      "min": 0,
+      "max": 50,
       "fallbackNote": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers below; the strip returns once the ranges meet."
     }
   },
@@ -153,7 +153,7 @@
   {
     "spec": "<RangeBar>",
     "cap": "read-only picture — roll under against 55",
-    "draws": "[role=\"group\"]",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
     "props": {
       "readonly": true,
@@ -192,7 +192,7 @@
         }
       ]
     },
-    "note": "A fixed binding over 1–55, so each band takes the drawing's share of the track. The read-only strip also draws its boundary ticks, 12 and 28, under the track; the drawing draws none."
+    "note": "A fixed binding over 1–55, so each band takes the drawing's share of the track and its boundary ticks, 12 and 28, sit under the drawn dividers."
   },
   {
     "spec": "<LinkField>",
@@ -222,7 +222,9 @@
       "unlinkLabel": "Unlink"
     },
     "fixture": "LinkFieldActions",
-    "data": { "copy": true }
+    "data": {
+      "copy": true
+    }
   },
   {
     "spec": "<LinkField>",
@@ -240,7 +242,9 @@
       "unlinkLabel": "Unlink"
     },
     "fixture": "LinkFieldActions",
-    "data": { "relink": true }
+    "data": {
+      "relink": true
+    }
   },
   {
     "spec": "<LinkField>",

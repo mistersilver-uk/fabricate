@@ -84,6 +84,14 @@
         "Presets": "Colour presets",
         "CustomHex": "Custom hex",
         "None": "No colour"
+      },
+      "RangeBar": {
+        "Label": "Outcome bands",
+        "LabelWithRecord": "{label} — {record}",
+        "Boundary": "{from} / {to}",
+        "ValueText": "{value} — {record}",
+        "RelativeValueText": "{value} — DC {offset}",
+        "RelativeValueTextAgainst": "{value} — DC {offset} against {record}"
       }
     },
     "Migration": {

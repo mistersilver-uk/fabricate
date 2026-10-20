@@ -11,7 +11,7 @@
   | `bands` | `{ id, name, color, ink, from, to?, index? }[]` | `[]` | ABSOLUTE track values, whatever the binding underneath. `to` is derived from the next band's `from` when omitted. `ink` travels with `color` because the two are ONE decision: the name is drawn ON the fill, so whoever picks the fill is the only party that can know what stays readable on it. Bands are DRAWN in value order and WRITTEN through `index`, the position in the caller's own AUTHORED array; the two differ for a descending tier list, and sorting the authored array instead would reorder the tier rows from a drag. |
   | `previewDc` / `previewLabel` | number / string | `0` / `''` | The previewed record. Only `relative` reads the DC, to convert absolute ↔ offset. |
   | `step` / `pageStep` / `min` / `max` | numbers or `null` | `1` / `5` / `null` / `null` | The keyboard increments and snap grid, and the track domain overrides `simple` passes the DC stepper's own range through. |
-  | `ariaLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, composed with `previewLabel`, and the accessible name of the handle between two bands. |
+  | `ariaLabel` / `boundaryLabel(band, next)` | string / function | `FABRICATE.Common.RangeBar.Label` / name pair | The group's accessible name, composed with `previewLabel`, and the accessible name of the handle between two bands. The default KEY is localized by `util/rangeBarText.js`; a caller's string is already localized and passes through. |
   | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so the tier rows are left as the only editor. |
   | `disabled` / `class` | boolean / class string | `false` / `''` | The handles go inert, and an extra class appended to the root's own. |
   | `leadingTick` | string | `''` | A label under the track's start, before the boundary ticks: a count strip passes `<0` under its Botch band. |
@@ -68,6 +68,7 @@
     trackMaxOf,
     valueAtClientX,
   } from '../util/rangeBarGeometry.js';
+  import { LABEL_KEY, boundaryName, groupName, handleValueText } from '../util/rangeBarText.js';
 
   let {
     binding = 'relative',
@@ -78,8 +79,8 @@
     pageStep = 5,
     min = null,
     max = null,
-    ariaLabel = 'Outcome bands',
-    boundaryLabel = (band, nextBand) => `${band?.name || ''} / ${nextBand?.name || ''}`,
+    ariaLabel = LABEL_KEY,
+    boundaryLabel = boundaryName,
     fallbackNote = '',
     disabled = false,
     readonly = false,
@@ -120,6 +121,7 @@
     addable && !readonly && resolved ? railSeeds(resolved, trackMax, step, trackWidth / span) : []
   );
   const railAt = $derived(Math.min(railStop, seeds.length - 1));
+  const groupLabel = $derived(groupName(ariaLabel, previewLabel));
 
   /** A gesture's last drag, re-emitted as its commit on release (issue 2431). */
   let pendingCommit = null;
@@ -190,17 +192,13 @@
     event.currentTarget.querySelectorAll('[data-band-strip-add]')[next]?.focus();
   }
 
-  function valueText(index) {
-    const absolute = formatValue(boundaries[index]);
-    if (binding !== 'relative') {
-      return previewLabel ? `${absolute} — ${previewLabel}` : absolute;
-    }
-    const offset = boundaries[index] - previewDc;
-    const signed = offset >= 0 ? `+${offset}` : String(offset);
-    return previewLabel
-      ? `${absolute} — DC ${signed} against ${previewLabel}`
-      : `${absolute} — DC ${signed}`;
-  }
+  const valueText = (index) =>
+    handleValueText({
+      binding,
+      value: formatValue(boundaries[index]),
+      offset: boundaries[index] - previewDc,
+      record: previewLabel,
+    });
 </script>
 
 {#if !resolved}
@@ -227,7 +225,7 @@
       bind:this={trackElement}
       bind:clientWidth={trackWidth}
       role="group"
-      aria-label={previewLabel ? `${ariaLabel} — ${previewLabel}` : ariaLabel}
+      aria-label={groupLabel}
       aria-describedby={described ? bandListId : undefined}
       data-band-strip-track
     >
@@ -429,7 +427,7 @@
     height: 24px;
     transform: translate(-50%, -50%);
     border-radius: 6px;
-    cursor: ew-resize;
+    cursor: col-resize;
     touch-action: none;
   }
 
@@ -438,19 +436,18 @@
     outline-offset: 1px;
   }
 
+  /* The specimen's 2×16 seam, its r1 drawn as the pill a 2px width makes it, in `--fab-text-secondary` at full opacity: it clears 3:1 on every band fill in every palette (`time-of-day-bar-contrast.test.js`, issue 2435). */
   .fab-band-strip-grip {
     display: block;
-    width: 6px;
-    height: 20px;
-    border: 1px solid var(--fab-border-strong);
+    width: 2px;
+    height: 16px;
     border-radius: 999px;
-    background: var(--fab-surface);
+    background: var(--fab-text-secondary);
   }
 
-  .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
-  .fab-band-strip-handle:hover .fab-band-strip-grip {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
+  .fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
+  .fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle:hover .fab-band-strip-grip {
+    background: var(--fab-accent);
   }
 
   .fab-band-strip-track.is-disabled .fab-band-strip-handle {
@@ -468,7 +465,7 @@
     transform: translateX(-50%);
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
-    font-size: 0.66rem;
+    font-size: 10.5px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }

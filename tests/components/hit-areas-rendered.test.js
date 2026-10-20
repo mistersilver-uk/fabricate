@@ -14,6 +14,10 @@ import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -207,6 +211,30 @@ const MOUNTS = Object.freeze({
       ],
     },
   },
+  /** A check strip's shape, ticks on, for the specimen's grip, cursor and tick type (issue 2435). */
+  rangeBarTicked: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'fixed',
+      bands: [
+        { id: 'slag', name: 'Slag', from: 1, to: 9 },
+        { id: 'rough', name: 'Rough', from: 10, to: 17 },
+        { id: 'fine', name: 'Fine', from: 18, to: 26 },
+      ],
+    },
+  },
+  /** The same strip disabled, whose grip does not light under the pointer. */
+  rangeBarDisabled: {
+    name: 'ThresholdBandStrip',
+    props: {
+      binding: 'fixed',
+      disabled: true,
+      bands: [
+        { id: 'slag', name: 'Slag', from: 1, to: 9 },
+        { id: 'rough', name: 'Rough', from: 10, to: 17 },
+      ],
+    },
+  },
   /**
    * The Times of day panel's bar, which spans the settings grid's full row: 543px of track at a
    * 1121px manager, and 248px once the grid folds to one column and the panel is narrow.
@@ -239,7 +267,12 @@ const MOUNTS = Object.freeze({
 /** What a mounted primitive renders besides itself, by name. */
 const MOUNT_DEPENDENCIES = Object.freeze({
   ThresholdBandStrip: {
-    rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
+    rawModules: [
+      'src/ui/svelte/util/rangeBarGeometry.js',
+      'src/ui/svelte/util/rangeBarText.js',
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+    ],
     compiledModules: [component('RangeBarMarker'), component('IconButton')],
   },
 });
@@ -298,6 +331,8 @@ ${Object.values(PARENTS)
   <div data-case="truncChip" class="row">${markup.truncChip}</div>
   <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
   <div data-case="rangeBar" style="width:326px;margin:12px">${markup.rangeBar}</div>
+  <div data-case="rangeBarTicked" style="width:326px;margin:12px">${markup.rangeBarTicked}</div>
+  <div data-case="rangeBarDisabled" style="width:326px;margin:12px">${markup.rangeBarDisabled}</div>
   <div class="fabricate-manager" style="width:1121px;height:auto"><div data-case="rangeBarPanel" style="width:601px"><div class="manager-gathering-settings"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanel}</section><section class="manager-condition-panel">${markup.rangeBarFallback}</section></div></div></div>
   <div class="fabricate-manager" style="width:306px;height:auto"><div data-case="rangeBarPanelNarrow" style="width:306px"><div class="manager-gathering-settings" style="grid-template-columns:minmax(0,1fr)"><section class="manager-condition-panel is-time-of-day">${markup.rangeBarPanelNarrow}</section></div></div></div>
   <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
@@ -943,6 +978,73 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
       );
     }
   };
+
+  it("draws the range bar's specimen grip, cursor and tick type over a 24px handle", async () => {
+    const drawn = await tab.evaluate(() => {
+      const root = document.querySelector('[data-case="rangeBarTicked"]');
+      const handle = root.querySelector('[data-band-strip-handle]');
+      const grip = handle.querySelector('.fab-band-strip-grip');
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--fab-text-secondary)';
+      root.append(probe);
+      const secondary = getComputedStyle(probe).color;
+      probe.remove();
+      const style = getComputedStyle(grip);
+      const box = (element) => {
+        const { width, height } = element.getBoundingClientRect();
+        return { width, height };
+      };
+      return {
+        handle: box(handle),
+        cursor: getComputedStyle(handle).cursor,
+        grip: box(grip),
+        radius: style.borderTopLeftRadius,
+        border: style.borderTopWidth,
+        opacity: style.opacity,
+        paint: style.backgroundColor === secondary,
+        ticks: [...root.querySelectorAll('.fab-band-strip-tick')].map(
+          (tick) => getComputedStyle(tick).fontSize
+        ),
+      };
+    });
+    assert.deepEqual(drawn.handle, { width: 24, height: 24 }, 'the hit area is unchanged');
+    assert.equal(drawn.cursor, 'col-resize');
+    assert.deepEqual(drawn.grip, { width: 2, height: 16 }, 'the specimen 2×16 seam');
+    // A pill on a 2px width, which renders the specimen's radius 1.
+    assert.equal(drawn.radius, '999px');
+    assert.equal(drawn.border, '0px', 'the grip draws no border');
+    assert.equal(drawn.opacity, '1', 'the seam is not faded: .35 fails 3:1 on the tints');
+    assert.ok(drawn.paint, 'the seam is painted in --fab-text-secondary');
+    assert.deepEqual(
+      drawn.ticks,
+      ['10.5px', '10.5px'],
+      "the ticks take the specimen's .k-count size"
+    );
+  });
+
+  it('lights the grip under the pointer, but not on a disabled strip', async () => {
+    const gripUnder = async (caseId) => {
+      const handle = `[data-case="${caseId}"] [data-band-strip-handle="0"]`;
+      await tab.hover(handle);
+      const paint = await tab.evaluate((selector) => {
+        const grip = document.querySelector(`${selector} .fab-band-strip-grip`);
+        const probe = document.createElement('span');
+        grip.parentElement.append(probe);
+        const read = (token) => {
+          probe.style.color = `var(${token})`;
+          return getComputedStyle(probe).color;
+        };
+        const tokens = { accent: read('--fab-accent'), rest: read('--fab-text-secondary') };
+        probe.remove();
+        const fill = getComputedStyle(grip).backgroundColor;
+        return Object.keys(tokens).find((key) => tokens[key] === fill) ?? fill;
+      }, handle);
+      await tab.mouse.move(0, 0);
+      return paint;
+    };
+    assert.equal(await gripUnder('rangeBarTicked'), 'accent', 'a live grip lights on hover');
+    assert.equal(await gripUnder('rangeBarDisabled'), 'rest', 'a disabled grip stays at rest');
+  });
 
   it('keeps the Times of day bar`s rail, dot and dividers apart across the full-width panel', async () => {
     assertPanelBarApart(await measurePanelBar('rangeBarPanel'), 543, RAILS_ALL);
