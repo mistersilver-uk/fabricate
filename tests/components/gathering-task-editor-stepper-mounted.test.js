@@ -297,7 +297,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
     assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
     assert.ok(
-      addModifier.classList.contains('fab-manager-button'),
+      addModifier.classList.contains('fabricate-button'),
       `Add modifier renders through the Button primitive, got ${addModifier.className}`
     );
     assert.ok(
@@ -313,7 +313,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const addDrop = root.querySelector('[data-gathering-add-drop="toolbar"]');
     assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
     assert.ok(
-      addDrop.classList.contains('fab-manager-button'),
+      addDrop.classList.contains('fabricate-button'),
       `Add drop rule renders through the Button primitive, got ${addDrop.className}`
     );
     assert.ok(

@@ -173,7 +173,7 @@ describe('SystemOverviewView (mounted)', () => {
     for (const link of links) {
       const kind = link.getAttribute('data-overview-link');
       assert.ok(
-        link.classList.contains('fab-manager-button'),
+        link.classList.contains('fabricate-button'),
         `the ${kind} deep link renders through the Button primitive, got ${link.className}`
       );
       assert.ok(

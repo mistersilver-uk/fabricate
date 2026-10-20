@@ -646,7 +646,7 @@ export function registerBulkCases() {
     const remove = inspector.querySelector('[data-recipe-action="delete"]');
     assert.ok(Boolean(remove), 'the inspector renders its Delete');
     assert.ok(
-      remove.classList.contains('fab-manager-button'),
+      remove.classList.contains('fabricate-button'),
       'Delete renders through the Button primitive, not a hand-written class'
     );
     assert.ok(
@@ -663,7 +663,7 @@ export function registerBulkCases() {
       const sibling = inspector.querySelector(`[data-recipe-action="${action}"]`);
       assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
       assert.ok(
-        sibling.classList.contains('fab-manager-button'),
+        sibling.classList.contains('fabricate-button'),
         `${action} renders through the primitive too`
       );
       assert.ok(

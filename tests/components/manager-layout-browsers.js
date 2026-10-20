@@ -486,7 +486,7 @@ test('manager components browser defines drop target and compact responsive list
   // three here is what makes `blockFor` read the whole group: it anchors on `{`, so a selector
   // appended to the list leaves a two-selector lookup matching nothing and failing silently.
   const sortDirectionBlock = blockFor(
-    '.fabricate-button.fabricate-button.manager-recipe-sort-direction,\n.fabricate-button.fabricate-button.manager-component-sort-direction,\n.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]'
+    '.fabricate-button.fabricate-button.manager-recipe-sort-direction,\n.fabricate-button.fabricate-button.manager-component-sort-direction,\n.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]'
   );
   assert.ok(
     sortDirectionBlock.includes('border-radius: 9px;'),

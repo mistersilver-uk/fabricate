@@ -446,8 +446,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       ['Done', done],
     ]) {
       assert.ok(
-        button.classList.contains('fabricate-button') &&
-          button.classList.contains('fab-manager-button'),
+        button.classList.contains('fabricate-button'),
         `${name} renders through the shared primitive, not a hand-written class string`
       );
       assert.equal(button.getAttribute('type'), 'button', `${name} never submits`);
@@ -466,7 +465,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
 
     assert.equal(actions.length, 2, 'Add modifier and Seed presets');
     assert.ok(
-      actions.every((button) => button.classList.contains('fab-manager-button')),
+      actions.every((button) => button.classList.contains('fabricate-button')),
       'both header verbs are the shared primitive'
     );
     assert.ok(actions[0].classList.contains('is-primary'), 'Add modifier stays the loud verb');

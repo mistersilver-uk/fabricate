@@ -1831,7 +1831,7 @@ export function registerEnvironmentsCases() {
       const add = target.querySelector(hook);
       assert.ok(Boolean(add), `the gathering settings tab should render an add control at ${hook}`);
       assert.ok(
-        add.classList.contains('fab-manager-button'),
+        add.classList.contains('fabricate-button'),
         `${hook} should render through the Button primitive, not a hand-written class`
       );
       assert.ok(
@@ -3128,7 +3128,7 @@ export function registerEnvironmentsCases() {
       const action = target.querySelector(`[data-environment-issue-action="${kind}"]`);
       assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
       assert.ok(
-        action.classList.contains('fab-manager-button'),
+        action.classList.contains('fabricate-button'),
         `the View ${kind} link renders through the Button primitive, got ${action.className}`
       );
       assert.ok(

@@ -550,7 +550,7 @@ export function registerComponentsCases() {
     // `ComponentEditorHeader`'s conversion.
     assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
     assert.ok(
-      saveButton.classList.contains('fab-manager-button'),
+      saveButton.classList.contains('fabricate-button'),
       `the header Save renders through the Button primitive, got ${saveButton.className}`
     );
     assert.ok(

@@ -123,9 +123,8 @@ function panelFixture(kind) {
     '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
     '<label class="fabricate-field"><span class="manager-field-label">Name</span>' +
-    // `fab-manager-button` is the primitive's OWN class.
     '<input type="text"></label>' +
-    '<button class="fabricate-button fab-manager-button">Add</button></div></form>' +
+    '<button class="fabricate-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
     '<label class="fabricate-search"><input type="text"></label>' +
     '<span class="manager-chip">3 entries</span></div>' +

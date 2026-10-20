@@ -413,7 +413,6 @@ const NOTICE = Object.freeze({
 const BUTTON = Object.freeze({
   root: 'fabricate-button',
   writable: new Set([
-    'fab-manager-button',
     'is-primary',
     'is-ghost',
     'is-danger',
@@ -474,14 +473,14 @@ const unsafeChipSelectors = (file, css) =>
 
 /** The 26 sheet rules that draw a published button, each one compound with nothing above it. */
 const BUTTON_FAMILY_RULES = Object.freeze([
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-primary',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled)',
-  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled)',
-  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-full-width',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled)',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled)',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
   'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled)',
   "styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed',
@@ -512,7 +511,7 @@ const BUTTON_UNMATCHED_RULES = Object.freeze([
 ]);
 /** The sheet rule a button matches only through a `data-*` hook Fabricate writes. */
 const BUTTON_DATA_HOOK_RULES = Object.freeze([
-  'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
+  'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]',
 ]);
 
 /**
@@ -2665,7 +2664,7 @@ describe('the module sheet and every component style against the published Butto
   for (const [claim, selector] of [
     ['a class no published key writes', '.fabricate-button.is-size-38'],
     ['the armed state, which no published key writes', '.fabricate-button.is-danger.is-armed'],
-    ['a per-site class', '.fabricate-button.fab-manager-button.manager-recipe-sort-direction'],
+    ['a per-site class', '.fabricate-button.fabricate-button.manager-recipe-sort-direction'],
     ['a pinned ancestor', '.fabricate-manager .manager-header-actions .fabricate-button'],
     ['a classed child', '.fabricate-button .fa-plus'],
   ]) {

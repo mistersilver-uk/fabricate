@@ -1196,7 +1196,7 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const STATE_TINTS = Object.freeze([
   [
     `${MANAGER}/BulkEditPanelShell.svelte`,
-    ':global( .fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover )',
+    ':global( .fabricate-manager .fabricate-button.fabricate-button.fab-bulk-edit-apply:not(:disabled):hover )',
     'var(--fab-accent-strong)',
     'an accent verb deepens in its own family',
   ],
@@ -1298,7 +1298,7 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible',
+    '.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:focus-visible, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:focus-visible',
     'var(--fab-accent-strong)',
     'an accent verb deepens in its own family',
   ],
@@ -1388,7 +1388,7 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible',
+    '.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete:focus-visible, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete:focus-visible',
     'var(--fab-danger-soft)',
     'a destructive verb’s focus face, the danger fill its hover takes',
   ],
@@ -1647,7 +1647,7 @@ test('no state rule in the sheet and every scoped block mixes two tint families'
 const HOVER_EDGE_TINTS = Object.freeze(
   [
     ".fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
-    ".fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
+    ".fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   ].map((selector) => [
     MODULE_SHEET,
     selector,

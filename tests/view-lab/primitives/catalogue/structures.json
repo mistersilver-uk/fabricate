@@ -203,7 +203,7 @@
           "tag": "button",
           "attrs": {
             "type": "button",
-            "class": "fabricate-button fab-manager-button is-ghost",
+            "class": "fabricate-button is-ghost",
             "data-keyboard-focus": "true"
           },
           "text": "Cancel"
@@ -212,7 +212,7 @@
           "tag": "button",
           "attrs": {
             "type": "button",
-            "class": "fabricate-button fab-manager-button is-primary",
+            "class": "fabricate-button is-primary",
             "data-keyboard-focus": "true"
           },
           "text": "Import 412 records"
@@ -468,7 +468,7 @@
               "tag": "button",
               "attrs": {
                 "type": "button",
-                "class": "fabricate-button fab-manager-button is-ghost",
+                "class": "fabricate-button is-ghost",
                 "data-keyboard-focus": "true"
               },
               "children": [
@@ -486,7 +486,7 @@
               "tag": "button",
               "attrs": {
                 "type": "button",
-                "class": "fabricate-button fab-manager-button is-primary",
+                "class": "fabricate-button is-primary",
                 "data-keyboard-focus": "true"
               },
               "children": ["Save"]

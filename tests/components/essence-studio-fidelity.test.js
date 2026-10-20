@@ -263,7 +263,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // The paint is the global sheet's, so the rail and every other manager cluster agree.
     assert.match(
       globalCss,
-      /\.fabricate-button\.fabricate-button\.fab-manager-button \{[^}]*font-size: 0\.72rem;/,
+      /\.fabricate-button\.fabricate-button\.fabricate-button \{[^}]*font-size: 0\.72rem;/,
       'at the Tool Studio header label size, which is the treatment the maintainer named'
     );
     assert.match(
@@ -276,7 +276,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // edge, so it wears the family's resting fill like every other manager danger verb.
     assert.match(
       globalCss,
-      /\.fabricate-button\.fabricate-button\.fab-manager-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
+      /\.fabricate-button\.fabricate-button\.fabricate-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
       'the ghost verb sits ON the pane, bounded by --fab-border'
     );
     const danger =

@@ -88,7 +88,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/interactablesWindowContract.js': 'ast',
   'tests/helpers/langBackedI18n.js': 'fixture',
   'tests/helpers/logicalStylesheet.js': 'corpus',
-  'tests/helpers/manager-button-cascade.js': 'legacy-scan',
   'tests/helpers/manager/managerCompile.js': 'fixture',
   'tests/helpers/manager/managerLocalization.js': 'fixture',
   'tests/helpers/mergeBaseRatchet.js': 'corpus',

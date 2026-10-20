@@ -846,7 +846,7 @@ describe('CompositionList mounted layout', () => {
     );
     assert.ok(forceAdd.textContent.includes('Force add'));
     assert.ok(
-      forceAdd.classList.contains('fab-manager-button'),
+      forceAdd.classList.contains('fabricate-button'),
       `the labelled Force add renders through the Button primitive, got ${forceAdd.className}`
     );
     assert.ok(

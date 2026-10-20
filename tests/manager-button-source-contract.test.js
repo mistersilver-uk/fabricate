@@ -9,15 +9,11 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { FIXTURE_ALLOWLIST } from './helpers/managerButtonFixtureAllowlist.js';
-
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(repoRoot, 'src');
-const TESTS = join(repoRoot, 'tests');
 
 /** The family root, and since issue 1507 the one class a hand-written button would have to spell. */
 const ROOT_CLASS = 'fabricate-button';
-const PRIMITIVE_CLASS = 'fab-manager-button';
 const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
 const PRIMITIVE_FILE = 'src/ui/svelte/components/Button.svelte';
 
@@ -117,6 +113,21 @@ test('no .svelte under src writes the fabricate-button class literal', () => {
   }
 });
 
+test('no SearchablePopover trigger hands the button root over as a triggerClass string', () => {
+  // Issue 2540 moved the nine such sites onto `triggerButton`, so the trigger IS the primitive.
+  const sources = filesUnder(SRC)
+    .filter((path) => path.endsWith('.svelte'))
+    .map((path) => [path, readFileSync(join(repoRoot, path), 'utf8')]);
+  const converted = sources.flatMap(([, text]) => text.match(/\btriggerButton=\{/g) ?? []);
+  assert.ok(converted.length >= 10, `only ${converted.length} triggerButton sites were found`);
+  const offenders = sources.flatMap(([path, text]) =>
+    [...text.matchAll(/\btriggerClass="([^"]*)"/g)]
+      .filter((match) => match[1].split(/\s+/).includes(ROOT_CLASS))
+      .map((match) => `${path}: triggerClass="${match[1]}"`)
+  );
+  assert.deepEqual(offenders, [], 'render the trigger through `triggerButton={{ role }}`');
+});
+
 test('the primitive emits the family root and the keyboard-focus attribute', () => {
   // NOTHING ELSE PINS EITHER EMISSION (issue 1502).
   const source = readFileSync(join(repoRoot, PRIMITIVE_FILE), 'utf8');
@@ -137,17 +148,12 @@ test('the primitive emits the family root and the keyboard-focus attribute', () 
       'the whole family is rooted at it in `styles/fabricate.css`, so without it every rule ' +
       `misses and the button renders as a bare Foundry control. Found: ${literals.join(', ')}`
   );
-  assert.equal(
-    literals[0],
-    ROOT_CLASS,
-    `\`${ROOT_CLASS}\` is the family ROOT and leads the array, ahead of \`${PRIMITIVE_CLASS}\`, ` +
-      'so the rendered attribute reads root-first like every hand-written carrier of the same ' +
-      'contract.'
-  );
-  assert.ok(
-    literals.includes(PRIMITIVE_CLASS),
-    `${PRIMITIVE_FILE} stopped emitting \`${PRIMITIVE_CLASS}\`, which every primitive rule in the ` +
-      'family names beside the root.'
+  // Issue 2540 retired the second family token, so the root is the ONE unconditional literal: a
+  // rule that wants the primitive's rung names the root again rather than a class beside it.
+  assert.deepEqual(
+    literals,
+    [ROOT_CLASS],
+    `${PRIMITIVE_FILE} must emit \`${ROOT_CLASS}\` as its only unconditional class literal`
   );
 
   assert.ok(
@@ -182,62 +188,4 @@ test('no tracked file under src contains a raw NUL byte', () => {
       'and it does not make the file invisible to every recursive grep in the repository:\n  ' +
       offenders.join('\n  ')
   );
-});
-
-test('no test fixture models a manager button the product no longer renders', () => {
-  const found = new Map();
-  let attributesScanned = 0;
-
-  const suites = filesUnder(TESTS).filter((file) => file.endsWith('.js'));
-  for (const path of suites) {
-    for (const attribute of classAttributesIn(readFileSync(join(repoRoot, path), 'utf8'))) {
-      const tokens = attribute.split(/\s+/).filter(Boolean);
-      if (!tokens.includes(ROOT_CLASS)) continue;
-      attributesScanned += 1;
-      if (tokens.includes(PRIMITIVE_CLASS)) continue;
-      const key = `${path} ${attribute}`;
-      found.set(key, (found.get(key) ?? 0) + 1);
-    }
-  }
-
-  // Non-vacuity: the scan must be reaching real fixture markup.
-  assert.ok(
-    attributesScanned > 20,
-    `only ${attributesScanned} fabricate-button class attributes found under tests/`
-  );
-
-  const expected = new Map(
-    FIXTURE_ALLOWLIST.map((entry) => [`${entry.file} ${entry.classes}`, entry.count])
-  );
-  const describe = (entries) =>
-    [...entries]
-      .map(([key, count]) => `${count}× ${key.replace(' ', ': ')}`)
-      .sort((left, right) => (left === right ? 0 : left < right ? -1 : 1));
-
-  assert.deepEqual(
-    describe(found),
-    describe(expected),
-    'a fixture writing `fabricate-button` without `fab-manager-button` is measuring markup ' +
-      'the product may have stopped emitting — the component stopped, the fixture did not, and ' +
-      'the suite stayed green. Add the primitive class to the fixture, or allowlist it HERE ' +
-      'with the reason it is deliberately pre-conversion (a population-B `triggerClass` ' +
-      'trigger, an `ArmedDangerButton`, or one half of a converted/unconverted probe pair).'
-  );
-
-  for (const entry of FIXTURE_ALLOWLIST) {
-    assert.ok(
-      entry.why && entry.why.length > 40,
-      `${entry.file} allowlists \`${entry.classes}\` with no stated reason`
-    );
-
-    // An entry claiming the PRODUCT still renders its string says so with a path and a literal, and
-    // the claim is read rather than believed.
-    if (!entry.stillRenderedBy) continue;
-    const { file, literal } = entry.stillRenderedBy;
-    assert.ok(
-      readFileSync(join(repoRoot, file), 'utf8').includes(literal),
-      `${entry.file} allowlists \`${entry.classes}\` because ${file} writes \`${literal}\`, ` +
-        'and it no longer does — re-earn the exemption or drop it'
-    );
-  }
 });
