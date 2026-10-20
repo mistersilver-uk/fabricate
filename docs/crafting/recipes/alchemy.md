@@ -82,8 +82,8 @@ You cannot rename them or assign anything to them, because the check picks them 
 The failure set has a danger-colored border.
 A passed roll produces the success set.
 A failed roll produces the failure set, if the recipe has one.
-A failed check is still a genuine outcome, not a fizzle, so the components are consumed and the recipe can still be learned.
-The failure set may be left empty, in which case a failed brew consumes the components and produces nothing, but it is still recorded as a failed brew rather than a fizzle.
+A failed check is still a genuine outcome, not a fizzle, so the recipe can still be learned, and the components are consumed unless the system's [Consume on Fail](#consume-on-fail) setting is off.
+The failure set may be left empty, in which case a failed brew produces nothing (and consumes the components while Consume on Fail is on), but it is still recorded as a failed brew rather than a fizzle.
 An empty failure set shows a note saying so, rather than a warning.
 
 If the system's **Produce a result on a failed check** setting is **Never**, for a recipe with no failure set the toggle is disabled and a note explains why.
