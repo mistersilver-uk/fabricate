@@ -89,7 +89,7 @@ function carrierAllocation(submittedItems, components, essenceIds) {
   const allocation = {};
   for (const record of submittedItems) {
     const carried = essencesOfItem(record.item, () => byId.get(record.componentId) ?? null);
-    if (![...essenceIds].some((id) => carried[id] > 0)) continue;
+    if ([...essenceIds].every((id) => !(carried[id] > 0))) continue;
     const key = itemKeyOf(record.item);
     allocation[key] = (allocation[key] ?? 0) + 1;
   }
@@ -130,7 +130,7 @@ function submittedUnits(trusted, sourceActors) {
     (sourceActors ?? []).flatMap((actor) => [...(actor?.items ?? [])]).map((i) => [itemKeyOf(i), i])
   );
   const submission = new Map();
-  uuids.forEach((uuid, index) => {
+  for (const [index, uuid] of uuids.entries()) {
     const entry = submission.get(uuid) ?? {
       item: held.get(uuid),
       units: 0,
@@ -138,7 +138,7 @@ function submittedUnits(trusted, sourceActors) {
     };
     entry.units += 1;
     submission.set(uuid, entry);
-  });
+  }
   for (const { item, units } of submission.values()) {
     if (!item || units > readStackQuantity(item)) {
       throw new CraftingLifecycleExecutionError(

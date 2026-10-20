@@ -377,3 +377,79 @@ test('a matched brew the submission cannot fund is refused with nothing spent an
   assert.deepEqual(world.runManager.getActiveRuns(crafter), []);
   assert.deepEqual(world.runManager.getRunHistory(crafter), []);
 });
+
+/** A one-herb brew started under `options`, ready for its execute. */
+async function startedHerbBrew(options = {}) {
+  const world = brewWorld(
+    brewRecipe([{ id: 'base', options: [component('herb')] }], { resultGroups: [SUCCESS, FAILURE] }),
+    options
+  );
+  const herb = item('herb', 'Herb');
+  const source = new BrewActor('source', [herb]);
+  const crafter = new BrewActor('crafter');
+  const { started } = await startBrew(world, { crafter, source, componentIds: ['herb'] });
+  assert.equal(started.success, true, started.message);
+  assert.equal(herb.deleted, true, 'the start spends the bench');
+  return { world, crafter, source, started };
+}
+
+const SIMPLE = { checkMode: 'simple' };
+const FAILED = { success: false, outcome: 'fail', value: 3, message: 'The brew failed' };
+
+test('a passed brew executed later learns the recipe from its system, not from the grant', async () => {
+  const brew = await startedHerbBrew();
+  const settled = await executeBrew(brew.world, brew);
+  assert.equal(settled.success, true, settled.message);
+  assert.deepEqual(brew.world.visibility.learned, ['brew']);
+  assert.equal(brew.world.visibility.used, 1);
+});
+
+test('a matched Simple brew that fails learns, records use and awards the reserved failure group', async () => {
+  const brew = await startedHerbBrew({ alchemy: SIMPLE });
+  const settled = await executeBrew(brew.world, { ...brew, checkResult: FAILED });
+  assert.equal(settled.success, false);
+  assert.equal(settled.disposition, 'failed');
+  assert.deepEqual(brew.world.visibility.learned, ['brew']);
+  assert.equal(brew.world.visibility.used, 1);
+  assert.equal(settled.createdResultUuids.length, 1);
+  assert.deepEqual(brew.crafter.created.map((made) => made.name), ['Sludge']);
+});
+
+test('consumeOnFail false returns a failed Simple brew\'s start spend over the generic policy', async () => {
+  const brew = await startedHerbBrew({
+    alchemy: { ...SIMPLE, consumeOnFail: false },
+    craftingCheck: { consumption: { consumeIngredientsOnFail: true } },
+  });
+  await executeBrew(brew.world, { ...brew, checkResult: FAILED });
+  const history = brew.world.runManager.getRunHistory(brew.crafter)[0];
+  const refund = history.executionJournal.effects.find((effect) => effect.effectId === 'refund-start-consumption');
+  assert.ok(refund, 'the refund is journalled');
+  assert.equal(refund.receipt.restoredCount, 1);
+  assert.ok(brew.crafter.created.some((made) => made.name === 'Herb'), 'the herb is restored');
+});
+
+test('a Tiered brew that fails keeps the generic consumption policy', async () => {
+  const brew = await startedHerbBrew({
+    alchemy: { checkMode: 'tiered', consumeOnFail: false },
+    craftingCheck: { consumption: { consumeIngredientsOnFail: true } },
+  });
+  await executeBrew(brew.world, { ...brew, checkResult: FAILED });
+  const history = brew.world.runManager.getRunHistory(brew.crafter)[0];
+  const effects = history.executionJournal.effects.map((effect) => effect.effectId);
+  assert.equal(effects.includes('refund-start-consumption'), false);
+  assert.equal(brew.crafter.created.length, 0, 'nothing is restored or awarded');
+});
+
+test('a resumed journal with a consume-alchemy-extras receipt still hydrates its consumption', () => {
+  const { engine } = brewWorld(brewRecipe([]));
+  const state = { consumedItems: [], resolvedEssences: null, essenceEnabled: null };
+  engine._hydrateVersionedStageState(state, {
+    'consume-alchemy-extras': {
+      items: [{ actorUuid: 'Actor.source', itemUuid: 'Actor.source.Item.herb', quantity: 1 }],
+      resolvedEssences: { fire: 2 },
+      essenceEnabled: { fire: true },
+    },
+  });
+  assert.equal(state.consumedItems.length, 1);
+  assert.deepEqual(state.resolvedEssences, { fire: 2 });
+});

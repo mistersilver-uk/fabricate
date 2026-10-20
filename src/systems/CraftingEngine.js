@@ -2008,11 +2008,8 @@ export class CraftingEngine {
             },
           }
         : historySnapshots;
-    const isAlchemy = trusted.activityKind === 'alchemy';
-    const alchemySubmittedItems = isAlchemy ? trusted.alchemySubmittedItems : null;
-    if (isAlchemy) {
-      this._assertVersionedAlchemyItems(componentSourceActors, alchemySubmittedItems);
-    }
+    // From the run's recipe system, never the grant: an execute grant carries no alchemy context.
+    const isAlchemy = this._getRecipeSystem(recipe)?.resolutionMode === 'alchemy';
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const resultValid =
@@ -2051,13 +2048,11 @@ export class CraftingEngine {
     if (spentAtStart) seedStartedStageState(state, spentAtStart);
     const effects = this._versionedStageInputEffects({
       actor,
-      componentSourceActors,
       prepared,
       state,
       historySnapshots: executedHistorySnapshots,
       spentAtStart,
       shouldConsume,
-      alchemySubmittedItems: isAlchemy ? alchemySubmittedItems : null,
     });
 
     // ratchet-exempt(world-scope): not-a-system
@@ -2234,13 +2229,11 @@ export class CraftingEngine {
    * failed under `consumeIngredientsOnFail: false` — return what it spent (issue 1648, F3). */
   _versionedStageInputEffects({
     actor,
-    componentSourceActors,
     prepared,
     state,
     historySnapshots,
     spentAtStart,
     shouldConsume,
-    alchemySubmittedItems,
   }) {
     const receipt = () =>
       this._versionedConsumptionReceipt(
@@ -2264,20 +2257,6 @@ export class CraftingEngine {
         },
       },
     ];
-    if (alchemySubmittedItems?.length > 0) {
-      effects.push({
-        effectId: 'consume-alchemy-extras',
-        kind: 'consumeAlchemyExtras',
-        planned: alchemySubmittedItems.map((item) => ({ itemUuid: item.uuid })),
-        apply: async () => {
-          await this._consumeAlchemyExtraItems(state.consumedItems, componentSourceActors, {
-            isAlchemyAttempt: true,
-            alchemySubmittedItems,
-          });
-          return receipt();
-        },
-      });
-    }
     if (prepared.currencySpends.length > 0) {
       effects.push({
         effectId: 'spend-currency',
@@ -2329,6 +2308,7 @@ export class CraftingEngine {
   }
 
   _hydrateVersionedStageState(state, receipts) {
+    // A journal planned before issue 2574 may still carry the execute-side extras receipt.
     const consumption = receipts['consume-alchemy-extras'] ?? receipts['consume-ingredients'];
     if (consumption) {
       const snapshots = consumption.consumedItems ?? consumption.items ?? [];
@@ -2521,24 +2501,6 @@ export class CraftingEngine {
       );
     }
     return run;
-  }
-
-  _assertVersionedAlchemyItems(componentSourceActors, submittedItems) {
-    if (!Array.isArray(submittedItems)) {
-      throw new CraftingLifecycleExecutionError(
-        'Trusted alchemy submissions are required',
-        'STALE_ALCHEMY_SUBMISSION'
-      );
-    }
-    const liveItems = new Set(
-      (componentSourceActors || []).flatMap((source) => [...(source?.items || [])])
-    );
-    if (submittedItems.some((item) => !item?.uuid || !liveItems.has(item))) {
-      throw new CraftingLifecycleExecutionError(
-        'Trusted alchemy submissions are stale',
-        'STALE_ALCHEMY_SUBMISSION'
-      );
-    }
   }
 
   _assertAlchemySubmissionDocuments(actor, sourceActors, submittedItems) {
