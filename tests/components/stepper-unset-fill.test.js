@@ -11,7 +11,7 @@ const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-stepper-unset-',
-  // Import-free leaf by design, so it needs no `rawModules` and nothing else compiled.
+  // It imports nothing but Svelte, so it needs no `rawModules` and nothing else compiled.
   compiledModules: [STEPPER],
   componentPath: STEPPER
 });
@@ -147,6 +147,41 @@ describe('Stepper unset-value state (issue 1050)', () => {
   it('still lets a placeholder passed through inputProps reach the input', async () => {
     const { input } = await mountStepper({ inputProps: { placeholder: 'spread' } });
     assert.equal(input.getAttribute('placeholder'), 'spread');
+  });
+});
+
+/** Past Svelte's flush, which the snap-back on blur waits for. */
+const flushed = () => new Promise((done) => setTimeout(done, 0));
+
+describe('Stepper snap-back on blur (issue 2452)', () => {
+  it('replaces a refused typed value with the held value once the input loses focus', async () => {
+    const { input, calls } = await mountStepper({ value: 2, min: 0, max: 10 });
+    input.focus();
+    type(input, '7');
+    assert.equal(input.value, '7', 'what the user typed shows until blur');
+    input.blur();
+    await flushed();
+    assert.deepEqual(calls, [7, 7], 'the edit, then the blur re-reports the refused number');
+    assert.equal(input.value, '2', 'the held value replaces the refused one');
+  });
+
+  it('rewrites nothing while the input still holds focus', async () => {
+    const { input } = await mountStepper({ value: 2 });
+    input.focus();
+    type(input, '9');
+    input.dispatchEvent(new globalThis.Event('blur'));
+    await flushed();
+    assert.equal(input.value, '9', 'a window blur leaves the focused input as typed');
+  });
+
+  it('snaps a cleared allowUnset field back to a value the caller kept', async () => {
+    const { input, calls } = await mountStepper({ allowUnset: true, value: 5 });
+    input.focus();
+    type(input, '');
+    input.blur();
+    await flushed();
+    assert.deepEqual(calls, [null]);
+    assert.equal(input.value, '5', 'the early-return path snaps back too');
   });
 });
 

@@ -1,8 +1,8 @@
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts, not the only
-  path. A click-only stepper is a keyboard regression, so the input always stays editable. An
-  import-free leaf: props only, no util imports.
+  path. A click-only stepper is a keyboard regression, so the input always stays editable. It
+  imports nothing but Svelte: props only, no util imports.
 
   Props:
   | prop | values | default | contract |
@@ -30,6 +30,9 @@
     which means an `oninput` or `onblur` routed through it silently REPLACES the commit path: the
     control keeps rendering and stepping and simply stops reporting edits. Put behaviour in
     `onChange`.
+  - A REFUSED VALUE SNAPS BACK ON BLUR: Svelte leaves an `<input>` whose `value` never changed as
+    typed, so after the next flush a blurred input still connected and unfocused is rewritten to
+    the held value.
   - `disabled` is the TOP-LEVEL prop, never an `inputProps` key: the adjuncts read the top-level
     prop, so `inputProps={{ disabled: … }}` would leave −/+ live on a control the caller believes is
     off while every DOM assertion checking `input.disabled` still passed.
@@ -45,6 +48,8 @@
     until stepped; `tests/components/stepper-formatted-mounted.test.js`.
 -->
 <script>
+  import { tick } from 'svelte';
+
   let {
     value = null,
     min = null,
@@ -108,13 +113,18 @@
     commit(Number(raw));
   }
 
-  function onBlur(event) {
-    const raw = event.currentTarget.value;
-    if (raw === '' && allowUnset) return;
-    const parsed = Number(raw);
-    const next = raw === '' || !Number.isFinite(parsed) ? numericValue : clamp(parsed);
-    event.currentTarget.value = String(next);
-    if (next !== numericValue) onChange(next);
+  async function onBlur(event) {
+    const input = event.currentTarget;
+    const raw = input.value;
+    if (raw !== '' || !allowUnset) {
+      const parsed = Number(raw);
+      const next = raw === '' || !Number.isFinite(parsed) ? numericValue : clamp(parsed);
+      input.value = String(next);
+      if (next !== numericValue) onChange(next);
+    }
+    await tick();
+    if (!input.isConnected || input.ownerDocument.activeElement === input) return;
+    if (input.value !== String(displayValue)) input.value = String(displayValue);
   }
 
   const isBlank = (candidate) => candidate === null || candidate === undefined || candidate === '';
