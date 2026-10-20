@@ -152,7 +152,6 @@
       layout="inline"
       allowNone
       allowCustom={false}
-      manageDismiss={false}
       colorToken={colorToken || ''}
       unset={!colorToken}
       customColor=""

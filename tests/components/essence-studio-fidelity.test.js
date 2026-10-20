@@ -9,6 +9,7 @@ import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
 import { renderedNodes } from '../helpers/structureShapes.js';
 import {
+  attributeExpression,
   attributeValue,
   declaresAttribute,
   importsModule,
@@ -21,7 +22,8 @@ const repoRoot = resolve(__dirname, '../..');
 
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-const colourPopoverSource = read('src/ui/svelte/components/TintPicker.svelte');
+const TINT_PICKER = 'src/ui/svelte/components/TintPicker.svelte';
+const colourPopoverSource = read(TINT_PICKER);
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
 // The GRID card's anatomy and look now live in the shared studio-library primitive.
@@ -80,9 +82,14 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'over auto-fit tracks, which is one row in the editor and two in the rail'
     );
 
-    // The POPOVER call sites are untouched.
-    assert.ok(
-      globalCss.includes('grid-template-columns: repeat(4, 1fr);'),
+    // The popover is the picker's grid form at four columns (issue 2459), read from its call site.
+    const [grid] = renderedNodes(componentAstOf(TINT_PICKER), 'SearchablePopover');
+    assert.ok(Boolean(grid), 'the popover renders the search popover');
+    assert.equal(attributeValue(grid, 'as'), 'grid', 'as its grid form');
+    const columns = attributeExpression(grid, 'columns');
+    assert.deepEqual(
+      [columns?.type, columns?.value],
+      ['Literal', 4],
       'the popover keeps the shipped four-column grid'
     );
   });

@@ -15,8 +15,9 @@ const BIOME_COLOUR_OPEN = [
   { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
 ];
 const BIOME_COLOUR_SOURCES = [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/];
-const biomeSwatch = (token) =>
-  `[data-manager-color-picker-popover] [data-manager-color-token="${token}"]`;
+// The tint popover's panel; the inline strip carries the first class alone (issue 2459).
+const BIOME_COLOUR_PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
+const biomeSwatch = (token) => `${BIOME_COLOUR_PANEL} [data-manager-color-token="${token}"]`;
 const biomeSwatchPressed = (token, value) => ({
   selector: biomeSwatch(token),
   name: 'aria-pressed',
@@ -415,7 +416,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: BIOME_COLOUR_OPEN,
     expectView: 'environments',
-    expectSelector: '.fabricate-manager [data-manager-color-picker-popover] [role="group"]',
+    expectSelector: `.fabricate-manager ${BIOME_COLOUR_PANEL} [role="listbox"]`,
     expectAttributes: [biomeSwatchPressed('sage', 'true')],
     kinds: ['manager', 'environments'],
     sourceMatches: BIOME_COLOUR_SOURCES,

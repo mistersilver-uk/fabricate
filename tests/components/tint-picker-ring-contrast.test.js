@@ -1,4 +1,7 @@
-/** Issues 2257 D3 and 2416: the tint palette's selected ring and keyboard cursor, declared and measured. */
+/**
+ * Issues 2257 D3, 2416 and 2459: the tint palette's selected ring and keyboard cursor, declared and
+ * measured, on the inline strip's cells and on the popover's square tiles.
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -24,6 +27,8 @@ const themes = themePalettes(sheet);
 
 const SWATCH_RING =
   '.fabricate-color-picker-popover .manager-color-preset.is-selected .manager-color-swatch';
+const TILE_RING =
+  ".fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-option[aria-selected='true'] .manager-color-swatch";
 const NONE_RING =
   '.fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch';
 
@@ -73,6 +78,7 @@ test('a colour swatch rings in the dark ink at 3:1 on all eight swatches in ever
   const { lowest, short } = measure(ink, fills);
   t.diagnostic(`lowest swatch ring ratio ${lowest.toFixed(2)}:1`);
   assert.deepEqual(short, [], 'a selected swatch would be under WCAG 1.4.11');
+  assert.equal(ringInk(TILE_RING), ink, "the popover's selected tile rings in the same ink");
 });
 
 test('the No-colour cell rings in the text ink at 3:1 on its own fill in every theme', (t) => {
@@ -96,7 +102,7 @@ const PICKER_CURSOR =
 const outlineOf = (selector) =>
   ['outline', 'outline-offset'].map((property) => declared(SHEET, selector, property));
 
-test("the swatch's keyboard cursor declares the picker cursor's outline (issue 2416)", () => {
+test("the inline strip's keyboard cursor declares the picker cursor's outline (issue 2416)", () => {
   assert.deepEqual(outlineOf(CURSOR), outlineOf(PICKER_CURSOR));
 });
 
@@ -119,8 +125,8 @@ test("the library draws the shipped popover's cursor and hover as the sheet decl
 });
 
 /** The cursor's ink on `stack` in each palette: the palettes under 3:1, and every ratio in words. */
-function cursorOn(stack) {
-  const ink = declared(SHEET, CURSOR, 'outline').match(/^2px solid var\((--fab-[\w-]+)\)$/u)?.[1];
+function cursorOn(stack, cursor = CURSOR) {
+  const ink = declared(SHEET, cursor, 'outline').match(/^2px solid var\((--fab-[\w-]+)\)$/u)?.[1];
   assert.ok(ink, 'the cursor is not a 2px outline in one palette token');
   assert.equal(themes.size, 7, `the sheet declares ${themes.size} palettes, not seven`);
   const ratios = [...themes].map(([theme, tokens]) => [
@@ -137,21 +143,21 @@ function cursorOn(stack) {
   };
 }
 
-test('the cursor is under 3:1 on the popover ground in two palettes, debt owned by issue 2368', (t) => {
-  const ground = declaredToken(
-    sheet,
-    '.fabricate-color-picker-popover.manager-color-picker-popover',
-    'background',
-    SHEET
-  );
-  const { short, lowest, figures } = cursorOn([ground]);
-  t.diagnostic(`lowest cursor ratio on ${ground} ${lowest}:1 (${figures})`);
-  assert.deepEqual(
-    short,
-    ['hearth-herb', 'ironblood-forge'],
-    'the palettes where the cursor is under WCAG 1.4.11 on the popover moved; issue 2368 owns ' +
-      'that ground, so restate the library hint and this list together'
-  );
+// The popover's cursor sits on a square tile's soft ground over the panel's bg-0, beside the bg-0
+// gap between tiles (issue 2459); the bg-3 box it used to sit on is gone.
+const PANEL_GROUND = '.fabricate-picker-popover.manager-travel-popover';
+const TILE_GROUND =
+  ".fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true']";
+
+test('the popover cursor clears 3:1 on the tile ground and on the panel ground, in every palette', (t) => {
+  const panel = declaredToken(sheet, PANEL_GROUND, 'background', SHEET);
+  const tile = declaredToken(sheet, TILE_GROUND, 'background', SHEET);
+  assert.deepEqual([tile, panel], ['--fab-surface-soft', '--fab-bg-0']);
+  for (const stack of [[tile, panel], [panel]]) {
+    const { short, lowest, figures } = cursorOn(stack, PICKER_CURSOR);
+    t.diagnostic(`lowest cursor ratio on ${stack.join(' over ')} ${lowest}:1 (${figures})`);
+    assert.deepEqual(short, [], `the popover cursor would be under WCAG 1.4.11 on ${stack}`);
+  }
 });
 
 /**
