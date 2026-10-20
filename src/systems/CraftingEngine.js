@@ -894,7 +894,8 @@ export class CraftingEngine {
   }
 
   /** Why a versioned run may not start, `null` when it may: no recipe or actor, a viewer it is not
-   * craftable for (unless a grant attests an alchemy match), or `validateCraft`'s refusal. */
+   * craftable for or an undiscovered alchemy recipe (unless a grant attests an alchemy match), or
+   * `validateCraft`'s refusal. */
   _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted, runManager }) {
     if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
     if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
@@ -915,7 +916,10 @@ export class CraftingEngine {
               componentSourceActors: sourceActors,
             })
           : null;
-      if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
+      // An undiscovered alchemy recipe is brewed only through the attested match (issue 2574).
+      if (guard?.craftable !== true || guard.reason === 'alchemy-unrevealed') {
+        return versionedFailure('Crafting is unavailable.');
+      }
     }
     const validation = validateCraft(recipe, actor, this.resolutionModeService, this._refusals());
     if (validation.valid) return null;

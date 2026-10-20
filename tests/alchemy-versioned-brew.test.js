@@ -697,3 +697,46 @@ test('a component and an essence requirement on the same carrier fund from two u
   const settled = await executeBrew(world, { crafter, source, started });
   assert.equal(settled.createdResultUuids.length, 1);
 });
+
+/** A crafting-kind start, unattested by the alchemy prepare, under `access` from the guard. */
+async function craftingKindStart(access) {
+  const world = brewWorld(brewRecipe([{ id: 'base', options: [component('herb')] }]));
+  world.visibility.guardCraftStart = () => access;
+  const herb = item('herb', 'Herb');
+  const source = new BrewActor('source', [herb]);
+  const crafter = new BrewActor('crafter');
+  world.engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: 'crafting-start' }),
+  });
+  const started = await world.engine.startVersionedRun({
+    viewer: { id: 'player', isGM: false },
+    actor: crafter,
+    sourceActors: [source],
+    recipeId: 'brew',
+    selectionPlan: { selectedIngredientSetId: 'brew-set' },
+    executionGrant: 'start-grant',
+    requestId: 'start-request',
+  });
+  return { world, herb, crafter, started };
+}
+
+test('a crafting-kind start of an undiscovered alchemy recipe is refused with nothing spent', async () => {
+  const { world, herb, crafter, started } = await craftingKindStart({
+    visible: false,
+    craftable: true,
+    reason: 'alchemy-unrevealed',
+  });
+  assert.equal(started.success, false);
+  assert.equal(herb.deleted, false, 'nothing is spent');
+  assert.deepEqual(world.runManager.getActiveRuns(crafter), []);
+  assert.deepEqual(world.runManager.getRunHistory(crafter), []);
+});
+
+test('a crafting-kind start of a revealed alchemy recipe still starts', async () => {
+  const { started } = await craftingKindStart({
+    visible: true,
+    craftable: true,
+    reason: 'alchemy-revealed',
+  });
+  assert.equal(started.success, true, started.message);
+});

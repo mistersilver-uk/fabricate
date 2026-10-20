@@ -214,6 +214,7 @@ It honors the existing consume-on-failure policy and history visibility rules wi
 - A matched version-1 alchemy start MUST carry a complete selection plan derived by the authority from the canonical submission: for every multi-option group, an option under which the submitted units fund the matched set when one exists, and an essence allocation scoped to the matched set's stage over the submitted carriers.
 Foundry dot-expands the persisted allocation's UUID keys when it writes the run, so no decision after the start commits re-reads it: a started stage is locked and resolves from its start-time consumption record.
 A caller-supplied selection plan is ignored.
+A non-GM start of an undiscovered alchemy recipe that no alchemy match attests is refused with nothing spent, so discovery is reached only by brewing; a revealed one may still be started as a craft.
 - A version-1 alchemy start MUST draw consumption only from the submitted units, and MUST consume every submitted unit the plan does not draw.
 When the derived plan cannot be funded from the submission, the start is refused with nothing spent and no run left.
 - Version-1 alchemy execution MUST apply the alchemy tail, identified from the run's recipe crafting system, never from command context: brew-discovery per `learnOnCraft`, and, on a matched Simple failure, the reserved `role: 'failure'` group and `alchemy.consumeOnFail`.
