@@ -324,9 +324,9 @@ The Manager rail's trailing-track marker vocabulary is one FAMILY, not four unre
 
 #### World Component / World Essence / World Tool
 
-The world-scoped record holding one entity's IDENTITY — name, description, icon, colour and source item link — exactly once for the whole world, never editable from a crafting system.
-A component import REGISTERS each imported component as a World Component its system HOLDS — the world entity plus a `(component, system)` **System Membership Record** — and a system that takes membership of one that already exists ADOPTS it (issue 2218).
-A component whose system holds no such pair is "a component with no World Component", never "record-less".
+The world-scoped record holding one entity's IDENTITY — name, description, icon, colour and source item link — exactly once for the whole world, never editable from a crafting system; the world entity owns identity, its **System Membership Record** owns enablement and overrides.
+A system REGISTERS what it HOLDS — every imported component (issue 2218) and, at the save chokepoint and the `1.36.0` Scoped Identity Reconciliation, every Essence and Tool row (issue 2554) — by CREATING the world entity under the row's own id or ADOPTING the one that already answers for it, plus its `(entity, system)` membership; a row whose id or source another entity already owns, whose essence id is retired, or whose empty override no membership can express is CONFLICTING (a Tool matching several, AMBIGUOUS), stays UNREGISTERED and is reported.
+An entity whose system holds no such pair is "a component (essence, tool) with no World Component (Essence, Tool)", never "record-less" and never "orphaned", both of which name other states.
 
 [Notes](docs/domain/records.md#world-component--world-essence--world-tool)
 
@@ -346,7 +346,7 @@ ONE world setting, `fabricate.worldVocabulary`, holding THREE INDEPENDENT vocabu
 #### System Membership Record
 
 **LIVE** (modelled at issue 1358, persisted at issue 1359, written by the `1.30.0` migration of issue 1363, read through the **Scoped Entity Read Seam** since issue 1370, and deciding which layer answers a section since issue 1372): its presence is the membership filter, and its `inherit` map selects the world default or the in-system record per section.
-HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue and a component import (issue 2218) write one that inherits every section, the import with the two exceptions its notes state.
+HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue, a component import (issue 2218) and Essence or Tool registration CREATING its entity (issue 2554) write one that inherits every section, the import with the two exceptions its notes state, and registration ADOPTING an entity overrides only the sections whose world default would change the row; a record whose `systemId` names no current system is a membership of a deleted system (`orphanedSystemMemberships` at `1.36.0`), reported and never deleted.
 The third layer of `## Scoped Entity Definitions`: one record per `(entity, system)` carrying `{ entityId, systemId, inherit, <overrides>, enabled? }`.
 
 [Notes](docs/domain/records.md#system-membership-record)
@@ -371,7 +371,7 @@ The ONE door every non-UI reader of a crafting system's `components`, `essenceDe
 
 #### World Identity Snapshot
 
-The WORLD copy of an entity's identity, taken from the in-system record by the `1.30.0` migration and, for a component, by the import that registers it (issue 2218).
+The WORLD copy of an entity's identity, taken from the in-system record by the `1.30.0` migration, for a component by the import that registers it (issue 2218), and for an Essence or Tool by the registration that creates it, a component-backed Tool's completed from its component (issue 2554).
 **IT HAS A WRITER AS OF ISSUE 1371** — the three world entry editors, which write onto the world record itself — so it is no longer a copy nothing touches, and divergence is reachable from BOTH directions: an in-system edit the snapshot has not seen, or a world-catalogue edit no crafting system reads.
 
 [Notes](docs/domain/records.md#world-identity-snapshot)

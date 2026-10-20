@@ -380,6 +380,8 @@ Dropping rather than re-keying is stated deliberately: re-keying and relying on 
 Tool and essence identifiers are unaffected by COPY-MODE REBINDING — copy mode never regenerated them — and an id collision on either is REPORTED rather than repaired, except the single-exact-source-match Tool rebind below.
 
 **In copy mode only, an incoming Tool whose source references intersect exactly ONE destination world Tool under a different id is rebound to that id** (issue 2554), injectively in incoming order, with every in-payload reference — the system, recipes, gathering slice, and the `toolScope` slice's `defaults` and `membership` records — rewritten key-aware through the same shared walk.
+Binding is injective: a destination id already claimed by an earlier incoming Tool, or held by another incoming Tool, is not bound again, and that Tool keeps its incoming id.
+Source references are read by the registration accessor (`data-models/spec.md` -> Tool scope requirement 7), so the rebind and the destination's save chokepoint never decide one Tool differently.
 A matched incoming Tool's roster record is DROPPED rather than re-keyed, as for a component.
 This is the only Tool re-key copy mode performs, and it supersedes the report-only handling of an id collision for that one case, so the collision report runs after it.
 Keep and replace modes never re-key a Tool; zero matches keep the incoming id, and a match against several world Tools keeps it and is reported as `worldEntityCollision`.
