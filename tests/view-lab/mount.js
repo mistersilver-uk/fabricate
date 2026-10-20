@@ -724,6 +724,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
   // Issue 2452: notices whose action reports each press through a callback, by the same seam.
   'published-controls': () => import('./fixtures/PublishedControls.svelte'),
+  // Issue 2452: steppers whose edits report each number through a callback, by the same seam.
+  'published-values': () => import('./fixtures/PublishedValues.svelte'),
 });
 // view-lab-region:end
 

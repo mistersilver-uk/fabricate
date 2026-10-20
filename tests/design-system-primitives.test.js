@@ -810,6 +810,25 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
   }
 });
 
+test('(a) a Stepper change publishes its two frames, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/Stepper.svelte';
+  const frames = [
+    'manager-gathering-economy-actors',
+    'manager-checks-parity-outcomes-multiply',
+    'manager-published-steppers-specimen',
+    'manager-published-steppers-button-focus',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Stepper change does not select '${caseId}'`);
+  }
+});
+
 test('(a) a Notice change publishes the three specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
