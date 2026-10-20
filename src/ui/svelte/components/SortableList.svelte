@@ -71,7 +71,7 @@
   const REORDER_KEY = 'FABRICATE.Common.SortableList.Reorder';
   const REMOVE_KEY = 'FABRICATE.Common.SortableList.Remove';
 
-  const CONTROL_SIZE = 24;
+  const CONTROL_SIZE = '24';
   const GRIP_ATTR = 'data-sortable-grip';
   const GRIP_SELECTOR = `[${GRIP_ATTR}]`;
 
@@ -136,11 +136,14 @@
     return map && typeof map === 'object' ? map : {};
   }
 
-  // Spread last onto the delete, so a caller's own `data-*` hook, `title` or `disabled` wins: each
-  // converted surface addresses its delete by a hook of its own (issue 1512).
+  // Spread last onto the delete, so a caller's own `data-*` hook or `disabled` wins: each converted
+  // surface addresses its delete by a hook of its own (issue 1512). A `title` is retired, because
+  // the delete's tooltip is its name (issue 2541).
   function removeAttributes(item) {
     const map = removeData(item);
-    return map && typeof map === 'object' ? map : {};
+    const attributes = map && typeof map === 'object' ? { ...map } : {};
+    delete attributes.title;
+    return attributes;
   }
 
   function toggle(item) {
@@ -276,10 +279,9 @@
             draggable={true}
             data-sortable-grip={idOf(item)}
             ariaLabel={named(REORDER_KEY, 'Reorder {name} — use the up and down arrow keys', item)}
+            icon="fas fa-grip-vertical"
             onkeydown={(event) => onGripKeydown(event, index)}
-          >
-            <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          </IconButton>
+          />
         {/if}
 
         {#if numbered}
@@ -308,35 +310,33 @@
               size={CONTROL_SIZE}
               data-sortable-move="up"
               ariaLabel={named(MOVE_UP_KEY, 'Move {name} up', item)}
+              icon="fas fa-chevron-up"
               disabled={index === 0}
               onclick={() => moveByRocker(index, -1)}
-            >
-              <i class="fas fa-chevron-up" aria-hidden="true"></i>
-            </IconButton>
+            />
             <IconButton
               class="fabricate-sortable-list-move"
               size={CONTROL_SIZE}
               data-sortable-move="down"
               ariaLabel={named(MOVE_DOWN_KEY, 'Move {name} down', item)}
+              icon="fas fa-chevron-down"
               disabled={index === list.length - 1}
               onclick={() => moveByRocker(index, 1)}
-            >
-              <i class="fas fa-chevron-down" aria-hidden="true"></i>
-            </IconButton>
+            />
           </span>
         {/if}
 
         {#if removable}
           <IconButton
-            class="is-danger fabricate-sortable-list-remove"
+            role="danger"
+            class="fabricate-sortable-list-remove"
             size={CONTROL_SIZE}
             data-sortable-remove={idOf(item)}
             ariaLabel={named(REMOVE_KEY, 'Remove {name}', item)}
+            icon="fas fa-xmark"
             onclick={() => onRemove(item)}
             {...removeAttributes(item)}
-          >
-            <i class="fas fa-xmark" aria-hidden="true"></i>
-          </IconButton>
+          />
         {/if}
       </div>
 

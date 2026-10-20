@@ -111,6 +111,16 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     harness.remount();
   });
 
+  it('the trigger’s tooltip is `triggerTitle`, else its name, and never a native title', async () => {
+    const titled = trigger(await harness.mount({ ...props(), triggerTitle: 'Row actions' }));
+    assert.equal(titled.getAttribute('data-tooltip-text'), 'Row actions');
+    assert.ok(!titled.hasAttribute('title'), '`triggerTitle` routes to the tooltip (issue 2541)');
+    harness.remount();
+    const named = trigger(await harness.mount(props()));
+    assert.equal(named.getAttribute('data-tooltip-text'), 'More actions');
+    harness.remount();
+  });
+
   it('the panel is a named menu of menuitems, and carries NO selection vocabulary', async () => {
     const target = await open(await harness.mount(props()));
     const menu = panel(target);

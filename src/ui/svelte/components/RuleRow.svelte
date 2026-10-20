@@ -97,13 +97,13 @@
 
 {#snippet removeButton()}
   <IconButton
-    class="is-danger fabricate-rule-row-remove"
+    role="danger"
+    class="fabricate-rule-row-remove"
     data-rule-row-remove=""
     ariaLabel={removeLabel}
+    icon="fas fa-trash"
     onclick={remove}
-  >
-    <i class="fas fa-trash" aria-hidden="true"></i>
-  </IconButton>
+  />
 {/snippet}
 
 {#if value == null}

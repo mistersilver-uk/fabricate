@@ -13,6 +13,8 @@ import {
   CALLER_SPREAD,
   COMPONENTS_DIR,
   REST,
+  ROLE_OUTSIDE_REGISTER,
+  VERB_ROLE_PRIMITIVES,
   applyRegister,
   bannedKeys,
   callerReport,
@@ -313,6 +315,14 @@ describe('the shared primitives and their callers follow the API convention', ()
     assert.deepEqual(unreasoned, [], 'an EXCEPTIONS entry states no reason');
   });
 
+  it('every primitive in the verb-role register declares the `role` it is admitted for', () => {
+    const declared = declarations();
+    const missing = VERB_ROLE_PRIMITIVES.filter(
+      (name) => !declared.get(name)?.names.includes('role')
+    );
+    assert.deepEqual(missing, [], 'a register entry admits a `role` prop nobody declares; drop it');
+  });
+
   it('no caller passes a primitive a name it does not take', () => {
     const declared = declarations();
     const violations = [];
@@ -393,6 +403,14 @@ describe('the convention gate fails on each thing it rules out', () => {
     assert.deepEqual(faultsOf(primitive('compact = false', '<div></div>')), [
       'compact is allowed only through the register',
     ]);
+  });
+
+  it('a verb `role` prop outside the closed register, which admits Button and IconButton', () => {
+    const declares = primitive(`role = 'neutral', ${WITH_REST}`);
+    assert.deepEqual(faultsOf(declares), [`role ${ROLE_OUTSIDE_REGISTER}`]);
+    for (const name of VERB_ROLE_PRIMITIVES) {
+      assert.deepEqual(faultsOf(declares, `${COMPONENTS_DIR}/${name}.svelte`), [], name);
+    }
   });
 
   for (const suffix of ['Attr', 'Attrs', 'Attribute', 'Attributes', 'Data', 'AriaLabel']) {

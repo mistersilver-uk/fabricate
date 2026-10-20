@@ -310,6 +310,29 @@ const LAB_EXTRA_PLAYER_USERS = Object.freeze([
   { id: 'user-lab-player-hallis', name: 'Hallis Tarn', role: 1, css: '#f4a261' },
 ]);
 
+/**
+ * Foundry's `TooltipManager` as far as a focus test reads it: one active element, activating
+ * another deactivates the first, and `aria-describedby="tooltip"` while shown. Every call is
+ * recorded on `calls` as `[verb, element, options?]`.
+ */
+export function createLabTooltipManager() {
+  return {
+    element: null,
+    calls: [],
+    activate(element, options = {}) {
+      if (this.element && this.element !== element) this.deactivate();
+      this.calls.push(['activate', element, options]);
+      this.element = element;
+      element.setAttribute('aria-describedby', 'tooltip');
+    },
+    deactivate() {
+      this.calls.push(['deactivate', this.element]);
+      this.element?.removeAttribute('aria-describedby');
+      this.element = null;
+    },
+  };
+}
+
 export function installFoundryShim(world) {
   const random = installLabRandom({ seed: world.seed });
   const utils = createUtils(random.randomID);
@@ -397,6 +420,7 @@ export function installFoundryShim(world) {
     // this null until the real facade is installed proves nothing reaches around the seam layer.
     fabricate: null,
     keybindings: { register: () => {} },
+    tooltip: createLabTooltipManager(),
     socket: null,
   };
 
