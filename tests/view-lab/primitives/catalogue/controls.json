@@ -266,17 +266,9 @@
       "Link a world item": "the icon button’s accessible name; the drawing draws its glyph"
     },
     "props": {
-      "ariaLabel": "Link a world item"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-link",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "ariaLabel": "Link a world item",
+      "icon": "fas fa-link"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
@@ -287,17 +279,9 @@
       "More actions": "the icon button’s accessible name; the drawing draws its glyph"
     },
     "props": {
-      "ariaLabel": "More actions"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-ellipsis",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "ariaLabel": "More actions",
+      "icon": "fas fa-ellipsis"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
@@ -308,37 +292,21 @@
       "Remove this row": "the icon button’s accessible name; the drawing draws its glyph"
     },
     "props": {
-      "ariaLabel": "Remove this row"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "ariaLabel": "Remove this row",
+      "icon": "fas fa-xmark"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 24 · numeric size, issue 1648",
+    "cap": "icon 24 · a dense row’s control, issue 1648",
     "draws": "button",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "props": {
-      "size": 24,
-      "ariaLabel": "Dismiss finished run"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ],
-    "note": "The shipped `HistoryList` caller also adds `is-ghost`."
+      "size": "24",
+      "role": "ghost",
+      "ariaLabel": "Dismiss finished run",
+      "icon": "fas fa-xmark"
+    }
   },
   {
     "spec": "<Button> <IconButton>",

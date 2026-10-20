@@ -715,6 +715,11 @@ test('TierTrack, which issue 2424 built, reads shipped in the library', () => {
   assert.equal(PER_NAME_STATUS.get('TierTrack'), 'shipped');
 });
 
+test('IconButton, which issue 2541 published, reads shipped in the library', () => {
+  // A member row the status clause already reads; pinned so its block cannot slip back to target.
+  assert.equal(PER_NAME_STATUS.get('IconButton'), 'shipped');
+});
+
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
     assert.equal(
