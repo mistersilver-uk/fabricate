@@ -69,16 +69,20 @@ afterEach(() => {
   assert.deepEqual(reports, [], 'nothing was reported');
 });
 
-/** The probe mounted into a bare target over a counting `flush`, with what the suite reads of it. */
-function mountProbe(props, entry = PROBE_ENTRY) {
+/**
+ * The probe mounted into a bare target over a counting `flush`, or with no adapter `flush` when
+ * `flushed` is false, with what the suite reads of it.
+ */
+function mountProbe(props, entry = PROBE_ENTRY, flushed = true) {
   const flushes = { count: 0 };
+  const counting = () => {
+    flushes.count += 1;
+    runtime.flush();
+  };
   const seam = createPublishedComponents({
     table: [{ ...entry, component: probe.default }],
     ...runtime,
-    flush() {
-      flushes.count += 1;
-      runtime.flush();
-    },
+    flush: flushed ? counting : undefined,
     isReady: () => true,
     report: (...args) => {
       reports.push(args);
@@ -295,16 +299,20 @@ describe('the value refusals and the dead handle', () => {
     );
   });
 
-  it('answers undefined after destroy, and a write then calls and flushes nothing', async () => {
-    const change = changes();
-    const { handle, query, flushes } = mountProbe({ query: 'q', onQueryChange: change.record });
+  it('answers undefined from value after destroy', async () => {
+    const { handle } = mountProbe({ query: 'q' });
     await settle();
-    const input = query();
     handle.destroy();
     assert.equal(handle.value('query'), undefined);
     assert.equal(handle.value('nothing'), undefined);
-    type(input, 'late');
-    assert.deepEqual(change.calls, []);
-    assert.equal(flushes.count, 0);
+  });
+
+  it('still calls back for a write when the adapter registered no flush', async () => {
+    const change = changes();
+    const { handle, query } = mountProbe({ onQueryChange: change.record }, PROBE_ENTRY, false);
+    await settle();
+    type(query(), 'w');
+    assert.deepEqual(change.calls, [['w', '']]);
+    assert.equal(handle.value('query'), 'w');
   });
 });

@@ -197,6 +197,23 @@ describe('the delivery a value key answers', () => {
     hostProps.flush();
     assert.equal(flushes, 1);
   });
+
+  it('runs no flush, and throws none, when the adapter registered none', () => {
+    const fake = fakeRuntime();
+    const seam = createPublishedComponents({ table: [VALUED], isReady: () => true, ...fake.runtime });
+    seam.publicApi.mount('Valued', { target: new FakeTarget(), props: {} });
+    const [{ props: hostProps }] = fake.mounts;
+    assert.doesNotThrow(() => hostProps.flush());
+  });
+
+  it('delivers nothing once the mount is destroyed', () => {
+    const late = recorder();
+    const { handle, hostProps } = mounted({ onQueryChange: late.record });
+    const { deliver } = hostProps.callbacks('query');
+    handle.destroy();
+    deliver(['late', '']);
+    assert.deepEqual(late.calls, []);
+  });
 });
 
 describe('handle.value', () => {

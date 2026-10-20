@@ -169,7 +169,7 @@ function underRoot(target, selector, hasAncestor, owner) {
 /**
  * What the host receives beside its component; `values` holds each value key's value, `slots`
  * answers a requested key's element, `callbacks` a callback or value key's `{ arity, deliver }`,
- * and `flush` runs the runtime's flush while the mount is live.
+ * and `flush` runs the runtime's flush, if it registered one, while the mount is live.
  */
 function hostPropsFor({ entry, record, initial, values, onfault, report, flush }) {
   return {
@@ -180,7 +180,7 @@ function hostPropsFor({ entry, record, initial, values, onfault, report, flush }
     slots: (key) => record.slots.get(key) ?? null,
     callbacks: callbackFor(entry, record, report),
     flush: () => {
-      if (record.live) flush();
+      if (record.live) flush?.();
     },
   };
 }
