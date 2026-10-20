@@ -6,7 +6,7 @@
 /* Every Fabricate window: heading normalisation, the module's one reduced-motion block (it also reaches the chat cards, dice tiles and canvas prompt), the player app shell root and its resize floor, the module focus-ring pair with its text-field and validation-focus variants, and the module utilities (fab-truncate, fab-stack, fab-cluster). Strays: the nav rail's count pip and the journal fact-card heading. */
 @import url("fabricate-base.css");
 
-/* The manager's frame: the manager root and its host resets (font floor, text-field baseline), the titlebar, the page header and its action cluster, the body grid with the rail and its collapsed form, and each route's .manager-main row template. Shared family kept here: the manager button treatment (fab-manager-button: the 34px rung, ghost, dashed, full-width, and the save-failed alert). */
+/* The manager's frame: the manager root and its host resets (font floor, text-field baseline), the titlebar, the page header and its action cluster, the body grid with the rail and its collapsed form, and each route's .manager-main row template. Shared family kept here: the manager button treatment (the fabricate-button root's 34px rung, ghost, dashed, full-width, and the save-failed alert). */
 @import url("fabricate-manager-shell.css");
 
 /* The Checks Studio (cards, mode callout, difficulty, outcome tiers, triggers, formula card, rail, Validation and On failure screens), then the world Prerequisites, Modifiers and Currency libraries and the character-modifier and condition-modifier editors. Shared family kept here: the rule row (fabricate-rule-row). Strays: the environment editor's gutters and tab strip, the drop inspector, and the Tool bonus and prerequisite entry rows. */

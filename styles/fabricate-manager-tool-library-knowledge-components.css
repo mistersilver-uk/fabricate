@@ -1292,7 +1292,7 @@
 }
 
 /* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-2);
@@ -1302,7 +1302,7 @@
 }
 
 /* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires: switching a control off must take its colours from `.fabricate-button:disabled` and keep the shape it had when enabled. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
@@ -1435,7 +1435,7 @@
 }
 
 /* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
-.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fabricate-button {
   flex: 0 0 auto;
   height: 30px;
   min-height: 30px;
@@ -1448,7 +1448,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border-strong);
   color: var(--fab-text);
@@ -1568,7 +1568,7 @@
   gap: var(--fab-space-chip);
 }
 
-.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -1579,14 +1579,14 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
 }
 
 /* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3 drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
-.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -1597,7 +1597,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fabricate-button:not(:disabled) {
   background: transparent;
   border-color: var(--fab-border-strong);
   color: var(--fab-text-secondary);
@@ -2173,8 +2173,8 @@
 
 /* `proto:1316`: the callout's one exit — a 30px control on `--fab-bg-1` behind a `border-strong` hairline. */
 
-/* `.fab-manager-button` IS CHAINED, and it is load-bearing rather than tidiness. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-identity-exit {
+/* The root is TRIPLED, and it is load-bearing rather than tidiness. */
+.fabricate-button.fabricate-button.fabricate-button.manager-component-identity-exit {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);
   height: 30px;
@@ -2566,7 +2566,7 @@
 /* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ── The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint can be written here, at any specificity (issue 1506). */
 
 /* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ── Copy and Unlink share one geometry and one surface, and the reference separates them by INK alone: Unlink carries the danger edge and the danger text while it is still linked, and falls back to the neutral pair once there is nothing left to unlink. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-source-unlink]:not(
     :disabled
   ) {
   border-color: var(--fab-danger-border);
@@ -2574,13 +2574,13 @@
 }
 
 /* `Add alias` STATES WHETHER IT WILL DO ANYTHING (`proto:5436-5438`). With an empty field the reference draws it transparent on a plain hairline in the disabled ink; with a uuid typed it lifts onto `surface-soft` behind a strong edge in the full text ink. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-alias-add]:disabled {
   background: transparent;
   border-color: var(--fab-border);
   color: var(--fab-text-disabled);
 }
 
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-alias-add]:not(
     :disabled
   ) {
   background: var(--fab-surface-soft);
@@ -2613,9 +2613,9 @@
 
 /* === issue 1371 r8-prim — the shared primitives' opt-in sizes, and the two corners the M12a edit would otherwise have moved off the ladder. === */
 
-/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.fabricate-button.fab-manager-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters,
-.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
+/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.fabricate-button.fabricate-button.fabricate-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
+.fabricate-button.fabricate-button.fabricate-button.manager-clear-filters,
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fabricate-button {
   border-radius: 7px;
 }
 
@@ -2678,12 +2678,12 @@
 /* === issue 1371 r9-prim2 — the manager button's opt-in 38px rung. === */
 
 /* ── THE 38px BUTTON (issue 1371, gap-list rows 1 and 22) ── 38 IS A RUNG (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the world component catalogue's `+ Register item` (`proto:570`) and the system's `+ Add from catalogue` (`proto:1046`) at 38 against the 34 this control ships at. */
-.fabricate-button.fabricate-button.fab-manager-button.is-size-38 {
+.fabricate-button.fabricate-button.fabricate-button.is-size-38 {
   min-height: 38px;
 }
 
 /* The 28px rung (issue 2515): a choice group's `Alternative` adder, at the stepper's 28. It pins the height the `dashed` role pins, and takes the 26-32 band's corner. */
-.fabricate-button.fabricate-button.fab-manager-button.is-size-28 {
+.fabricate-button.fabricate-button.fabricate-button.is-size-28 {
   height: 28px;
   min-height: 28px;
   border-radius: 7px;
@@ -2698,7 +2698,7 @@
 
 /* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. */
 .fabricate-manager[data-manager-view="components"]
-  .fabricate-button.fab-manager-button.manager-component-sort-direction {
+  .fabricate-button.fabricate-button.manager-component-sort-direction {
   color: var(--fab-text-secondary);
   font-size: 11px;
 }

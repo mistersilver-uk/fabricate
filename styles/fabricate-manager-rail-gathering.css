@@ -268,7 +268,7 @@
 }
 
 /* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
+.fabricate-button.fabricate-button.fabricate-button.manager-downtime-unlock {
   padding: 0 var(--fab-space-4);
   border-radius: 9px;
   font-size: 11.5px;
@@ -276,7 +276,7 @@
 }
 
 /* Split from the geometry above for the invariant at `.fabricate-button:disabled`. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-downtime-unlock:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
@@ -2445,7 +2445,7 @@
 }
 
 /* The inspector's controls run at 28px, a notch under the standard 34px control, because they sit in a 300px column beside a rate slider (issue 1118). */
-.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fabricate-button {
   min-height: 28px;
   border-radius: 7px;
   padding: 0 var(--fab-space-2);

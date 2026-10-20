@@ -199,36 +199,36 @@
   font-weight: 700;
 }
 
-/* ── The tool studio's treatment, released from its ancestor ── `Button.svelte` emits `fab-manager-button` beside `fabricate-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
+/* ── The tool studio's treatment, released from its ancestor ── the rules below re-declare the tool studio's values on the `fabricate-button` root alone, tripled so they keep the (0,3,0) they held before issue 2540, with NO ancestor requirement (issue 1096). */
 
 /* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.fabricate-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
-.fabricate-button.fabricate-button.fab-manager-button {
+.fabricate-button.fabricate-button.fabricate-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
   font-size: 0.72rem;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.is-primary {
+.fabricate-button.fabricate-button.fabricate-button.is-primary {
   padding: 0 var(--fab-space-4);
   font-weight: 700;
 }
 
 /* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is borderless until hover, while the tool studio's Back button keeps a border so it reads as a button before the pointer arrives (§F6) (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled) {
   border-color: var(--fab-border);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled, [aria-disabled='true']):hover {
+.fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
 /* The `dashed` role (issue 1096): the append action at the foot of a list (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.is-dashed {
+.fabricate-button.fabricate-button.fabricate-button.is-dashed {
   display: flex;
 
   /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a `min-height` alone let the button stand one pixel over the prototype's 34. */
@@ -245,20 +245,20 @@
 }
 
 /* Paint only, and qualified: see the invariant at `.fabricate-button:disabled` below. */
-.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled) {
   border-color: var(--fab-border-strong);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled, [aria-disabled='true']):hover {
+.fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
 /* `fullWidth`, split out of the `dashed` role that used to carry it (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.is-full-width {
+.fabricate-button.fabricate-button.fabricate-button.is-full-width {
   width: 100%;
 }
 

@@ -159,7 +159,7 @@
 }
 
 /* The deep-link out of a recipe tab to the canonical authoring screen — "Manage access" on the Access tab, "Open Books & Scrolls" on the Books & Scrolls tab (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-tab-action {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-tab-action {
   align-self: flex-start;
 }
 
@@ -1449,7 +1449,7 @@
 }
 
 /* Repeats (library `<PickerRow> <ChoiceGroup>` "up to N, by roll"): a quiet 26px status button, a `···` mark then its state word on no edge. (0,5,0) beats the family's 34px rules, and the resting paint is `:not(:disabled)` so the disabled invariant holds. */
-.fabricate-manager .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-award-repeats {
+.fabricate-manager .fabricate-button.fabricate-button.fabricate-button.manager-recipe-award-repeats {
   height: 26px;
   min-height: 26px;
   padding: 0 var(--fab-space-3);
@@ -1458,7 +1458,7 @@
   font-weight: 500;
 }
 
-.fabricate-manager .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-award-repeats:not(:disabled) {
+.fabricate-manager .fabricate-button.fabricate-button.fabricate-button.manager-recipe-award-repeats:not(:disabled) {
   border-color: transparent;
   color: var(--fab-text-secondary);
 }
