@@ -191,11 +191,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
+ * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452 and 2453
  * headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -278,6 +278,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Button',
       'StatusToggle',
       'Stepper',
+      'SearchField',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -447,6 +448,17 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onChange: { kind: 'callback', required: true },
         },
         rest: false,
+        root: 'fabricate',
+      },
+      SearchField: {
+        version: 1,
+        props: {
+          value: { kind: 'value', required: false },
+          onValueChange: { kind: 'callback', required: false },
+          placeholder: optional,
+          ariaLabel: required,
+        },
+        rest: true,
         root: 'fabricate',
       },
     });
