@@ -1,6 +1,6 @@
 /** The GM notice for the `1.36.0` scoped identity reconciliation (issue 2554): counts in the toast,
  * names in the console detail. Silent when every list is empty, informational when the pass only
- * created or adopted, a permanent warning otherwise. Pure composition. */
+ * created, adopted or found links to a deleted system, a permanent warning otherwise. Pure. */
 import { composeFindingsNotice } from '../migration/migrationNoticeDetail.js';
 
 function arrayOf(value) {
@@ -61,6 +61,15 @@ const FINDINGS = Object.freeze([
       '{count} world link(s) name an essence or tool their crafting system no longer holds: {names}. Nothing was removed.',
   },
   {
+    list: 'orphanedSystemMemberships',
+    key: 'FABRICATE.Migration.ScopedIdentityReconcile.OrphanedSystemMemberships',
+    detailKey: 'FABRICATE.Migration.ScopedIdentityReconcile.OrphanedSystemMembershipsDetail',
+    describe: inSystem,
+    fallback: '{count} world link(s) name a crafting system that no longer exists.',
+    detailFallback:
+      '{count} world link(s) name a crafting system that no longer exists: {names}. Nothing was removed.',
+  },
+  {
     list: 'equivalentEssenceCandidates',
     key: 'FABRICATE.Migration.ScopedIdentityReconcile.EquivalentEssenceCandidates',
     detailKey: 'FABRICATE.Migration.ScopedIdentityReconcile.EquivalentEssenceCandidatesDetail',
@@ -73,8 +82,9 @@ const FINDINGS = Object.freeze([
   },
 ]);
 
-/** Lists whose presence alone keeps the notice informational. */
-const INFORMATIONAL = new Set(['created', 'adopted']);
+/** Lists whose presence alone keeps the notice informational: a link to a deleted system needs no
+ * GM action. */
+const INFORMATIONAL = new Set(['created', 'adopted', 'orphanedSystemMemberships']);
 
 /** `{ message, detail, severity }`; `message` is empty when the pass found nothing. */
 export function buildScopedIdentityReconcileNotice(report, localize) {

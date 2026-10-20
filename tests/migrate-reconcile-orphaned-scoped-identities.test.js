@@ -20,8 +20,11 @@ const REPORT_LISTS = Object.freeze([
   'conflicting',
   'ambiguous',
   'unresolvedMemberships',
+  'orphanedSystemMemberships',
   'equivalentEssenceCandidates',
 ]);
+/** The lists whose presence alone keeps the notice informational. */
+const INFO_LISTS = Object.freeze(['created', 'adopted', 'orphanedSystemMemberships']);
 
 const system = (id, { essences = [], tools = [], components = [] } = {}) => ({
   id,
@@ -221,19 +224,50 @@ test('a same-id tool sharing a source is adopted, and a source-less tool gets it
   );
 });
 
-test('a membership with no in-system row is reported and kept', () => {
+test('a membership with no in-system row is kept, split by whether its system still exists', () => {
   const data = {
     systems: [system('sys-a')],
     essenceScope: scope([{ id: 'iron', name: 'Iron' }], {
+      [membershipKey('iron', 'sys-a')]: { entityId: 'iron', systemId: 'sys-a', inherit: {} },
       [membershipKey('iron', 'sys-gone')]: { entityId: 'iron', systemId: 'sys-gone', inherit: {} },
     }),
     toolScope: {},
   };
   const result = reconcile(data);
   assert.equal(result.essenceScope, data.essenceScope, 'nothing is deleted');
-  assert.deepEqual(result._scopedIdentityReconcileReport.unresolvedMemberships, [
+  const report = result._scopedIdentityReconcileReport;
+  assert.deepEqual(report.unresolvedMemberships, [
+    { entityType: 'essences', entityId: 'iron', systemId: 'sys-a', name: 'Iron' },
+  ]);
+  assert.deepEqual(report.orphanedSystemMemberships, [
     { entityType: 'essences', entityId: 'iron', systemId: 'sys-gone', name: 'Iron' },
   ]);
+  const notice = buildScopedIdentityReconcileNotice(
+    { ...report, unresolvedMemberships: [] },
+    noLocalizer
+  );
+  assert.equal(notice.severity, 'info', 'a link to a deleted system is never a warning');
+});
+
+test('two systems holding one orphan essence id share one entity: created, then adopted', () => {
+  const data = {
+    systems: [
+      system('sys-a', { essences: [{ id: 'ash', name: 'Ash' }] }),
+      system('sys-b', { essences: [{ id: 'ash', name: 'Ash' }] }),
+    ],
+    essenceScope: {},
+    toolScope: {},
+  };
+  const result = reconcile(data);
+  assert.deepEqual(
+    result.essenceScope.entities.map((entity) => entity.id),
+    ['ash']
+  );
+  const report = result._scopedIdentityReconcileReport;
+  assert.deepEqual(ids(report.created), ['sys-a/ash']);
+  assert.deepEqual(ids(report.adopted), ['sys-b/ash']);
+  assert.ok(result.essenceScope.membership[membershipKey('ash', 'sys-a')]);
+  assert.ok(result.essenceScope.membership[membershipKey('ash', 'sys-b')]);
 });
 
 test('equivalent-looking orphans in two systems are created apart and reported as candidates', () => {
@@ -329,7 +363,10 @@ function fullReport() {
     conflicting: [entry('Clashing Hammer', { reason: 'idCollision' })],
     ambiguous: [entry('Ambiguous Saw', { reason: 'sourceCollision', matchedIds: ['w1', 'w2'] })],
     unresolvedMemberships: [
-      { entityType: 'essences', entityId: 'ghost', systemId: 'sys-gone', name: 'Ghost Essence' },
+      { entityType: 'essences', entityId: 'ghost', systemId: 'sys-a', name: 'Ghost Essence' },
+    ],
+    orphanedSystemMemberships: [
+      { entityType: 'tools', entityId: 'gone', systemId: 'sys-gone', name: 'Gone Link' },
     ],
     equivalentEssenceCandidates: [
       { name: 'Twin Iron', ids: ['iron-a', 'iron-b'], systemIds: ['sys-a', 'sys-b'] },
@@ -339,7 +376,7 @@ function fullReport() {
 
 const emptyReport = () => Object.fromEntries(REPORT_LISTS.map((list) => [list, []]));
 
-test('the notice is silent when all six lists are empty, and total on junk', () => {
+test('the notice is silent when all seven lists are empty, and total on junk', () => {
   for (const report of [emptyReport(), null, {}, { created: 'junk' }]) {
     const notice = buildScopedIdentityReconcileNotice(report, noLocalizer);
     assert.equal(notice.message, '');
@@ -347,15 +384,11 @@ test('the notice is silent when all six lists are empty, and total on junk', () 
   }
 });
 
-test('created or adopted alone is informational; any other list is a warning', () => {
-  for (const list of ['created', 'adopted']) {
-    const report = { ...emptyReport(), [list]: fullReport()[list] };
-    assert.equal(buildScopedIdentityReconcileNotice(report, noLocalizer).severity, 'info', list);
-  }
-  for (const list of REPORT_LISTS.slice(2)) {
+test('created, adopted or a deleted-system link alone is informational; any other list warns', () => {
+  for (const list of REPORT_LISTS) {
     const report = { ...emptyReport(), created: fullReport().created, [list]: fullReport()[list] };
     const notice = buildScopedIdentityReconcileNotice(report, noLocalizer);
-    assert.equal(notice.severity, 'warn', list);
+    assert.equal(notice.severity, INFO_LISTS.includes(list) ? 'info' : 'warn', list);
     assert.ok(notice.message.length > 0, list);
   }
 });
@@ -368,6 +401,7 @@ test('the toast counts and the console detail names every entry', () => {
     'Clashing Hammer',
     'Ambiguous Saw',
     'Ghost Essence',
+    'Gone Link',
     'Twin Iron',
   ];
   for (const name of names) {
@@ -392,7 +426,7 @@ test('every requested key exists in lang/en.json and composes the same notice as
   const ours = [...requested].filter((key) =>
     key.startsWith('FABRICATE.Migration.ScopedIdentityReconcile.')
   );
-  assert.equal(ours.length, 12, 'a toast and a detail key for each of the six lists');
+  assert.equal(ours.length, 14, 'a toast and a detail key for each of the seven lists');
   for (const key of requested) assert.equal(typeof localizeLang(key, {}), 'string', key);
   assert.deepEqual(shipped, fallback);
 });

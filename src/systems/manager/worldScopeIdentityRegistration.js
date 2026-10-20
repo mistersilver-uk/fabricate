@@ -7,13 +7,18 @@ import {
   toolBonusOverride,
   toolPrerequisitesOverride,
 } from '../../migration/migrateWorldScopeEntities.js';
-import { cloneJson, isPlainObject, trimString } from '../../utils/scalars.js';
+import { arrayOrEmpty, cloneJson, isPlainObject, trimString } from '../../utils/scalars.js';
 import { getItemMatchUuids, isEmbeddedItemUuid } from '../../utils/sourceReferenceUnion.js';
 import { ESSENCE_SECTIONS, resolveEssence } from '../essenceScope.js';
 import { membershipKey } from '../scopedDefinitions.js';
 import { subKeyEntries, unionScopedDefinitions } from '../scopedDefinitionStore.js';
 import { resolveTool, TOOL_SECTIONS } from '../toolScope.js';
-import { ESSENCE_EFFECT_SOURCE_FIELDS, identityOf } from '../worldScopeEntityGrouping.js';
+import {
+  ESSENCE_EFFECT_SOURCE_FIELDS,
+  identityOf,
+  sourceReferencesOf,
+  toolSourceReferences,
+} from '../worldScopeEntityGrouping.js';
 
 import {
   addToRoster,
@@ -51,10 +56,51 @@ export function registrationRows(system, entityType) {
   return distinct;
 }
 
-/** A Tool's matchable references: its own source links minus embedded Item uuids, fail-closed. */
+/** A world Tool's matchable references: its own source links minus embedded Item uuids,
+ * fail-closed. */
 export function toolReferencesOf(parseUuid) {
   return (record) =>
     getItemMatchUuids(record).filter((uuid) => !isEmbeddedItemUuid(uuid, parseUuid));
+}
+
+/** A Tool row's matchable references: its own, else its same-system component's, minus embedded
+ * Item uuids, fail-closed. The one row reading registration, the `1.36.0` migration, copy-mode
+ * import and `upsertTool` share (issue 2554). */
+export function toolRowReferences(row, system, parseUuid) {
+  const components = system?.components; // ratchet-exempt(world-scope): basis — a Tool's sources fall back to its own system's component
+  return toolSourceReferences(row, components).filter(
+    (uuid) => !isEmbeddedItemUuid(uuid, parseUuid)
+  );
+}
+
+function isMatchable(uuid, parseUuid) {
+  return Boolean(trimString(uuid)) && !isEmbeddedItemUuid(uuid, parseUuid);
+}
+
+/** A created Tool's identity: the row's, completed from its component where the row has no source
+ * of its own, and carrying every reference the row matches by, so the next plan finds it. */
+function toolIdentity(row, system, parseUuid) {
+  const identity = identityOf(row, 'tools');
+  const componentId = sourceReferencesOf(row).length === 0 ? trimString(row.componentId) : '';
+  const components = system?.components; // ratchet-exempt(world-scope): basis — the component a source-less Tool row reads its sources from
+  const component = componentId
+    ? arrayOrEmpty(components).find(
+        (entry) => isPlainObject(entry) && String(entry.id) === componentId
+      )
+    : null;
+  if (component) {
+    if (!trimString(identity.name) && trimString(component.name)) identity.name = component.name;
+    if (!trimString(identity.img) && trimString(component.img)) identity.img = component.img;
+    for (const field of ['originItemUuid', 'registeredItemUuid']) {
+      if (isMatchable(component[field], parseUuid)) identity[field] = component[field].trim();
+    }
+  }
+  const carried = new Set(getItemMatchUuids(identity));
+  const missing = toolRowReferences(row, system, parseUuid).filter((uuid) => !carried.has(uuid));
+  if (missing.length > 0) {
+    identity.aliasItemUuids = [...arrayOrEmpty(identity.aliasItemUuids), ...missing];
+  }
+  return identity;
 }
 
 function sameValue(left, right) {
@@ -140,7 +186,9 @@ function seededMembership(seed, id, systemId) {
 
 /** The decision for one Tool row against the roster; `adopt` and `create` carry no shape yet. */
 function decideTool(context, row, entity) {
-  const keys = sourceKeys(row, context.rowReferences);
+  const keys = sourceKeys(row, (record) =>
+    toolRowReferences(record, context.system, context.parseUuid)
+  );
   if (entity) {
     const shares =
       keys.size === 0
@@ -177,7 +225,13 @@ function decideRow(context, systemId, id, row) {
     entityType === 'tools' ? decideTool(context, row, entity) : decideEssence(context, id, entity);
   if (base.decision === 'conflicting') return base;
   const decided = { ...base };
-  if (base.decision === 'create') decided.entity = { id, ...identityOf(row, entityType) };
+  if (base.decision === 'create') {
+    const identity =
+      entityType === 'tools'
+        ? toolIdentity(row, context.system, context.parseUuid)
+        : identityOf(row, entityType);
+    decided.entity = { id, ...identity };
+  }
   if (member) return decided;
   const seed = context.seeds?.[id];
   if (isPlainObject(seed)) {
@@ -210,8 +264,9 @@ function planContext({ entityType, payload, retiredIds, parseUuid }) {
     members,
     defaults,
     retiredIds: new Set(retiredIds),
+    parseUuid,
+    system: null,
     seeds: null,
-    rowReferences: referencesOf,
   };
 }
 
@@ -220,8 +275,8 @@ function planContext({ entityType, payload, retiredIds, parseUuid }) {
  * `{ decision, systemId, id, name, reason?, matchedIds?, entity?, membership? }`. A row decided
  * earlier counts as registered for every later one. `seeds` is `{ systemId, essences?, tools? }`,
  * each an `entityId -> membership` map replacing the membership shape of that system's
- * `create`/`adopt` decisions; `parseUuid` is `foundry.utils.parseUuid`. `rowReferencesOf(row,
- * system)` replaces a Tool row's own references, where the row reads its system's components.
+ * `create`/`adopt` decisions; `parseUuid` is `foundry.utils.parseUuid`. A Tool row matches by
+ * `toolRowReferences`.
  */
 export function planWorldScopeIdentityRegistration({
   entityType,
@@ -230,7 +285,6 @@ export function planWorldScopeIdentityRegistration({
   retiredIds = null,
   parseUuid = null,
   seeds = null,
-  rowReferencesOf = null,
 }) {
   const decisions = [];
   const context = planContext({ entityType, payload, retiredIds, parseUuid });
@@ -238,12 +292,11 @@ export function planWorldScopeIdentityRegistration({
     const systemId = trimString(system?.id);
     if (!systemId) continue;
     context.seeds = seeds?.systemId === systemId ? seeds[entityType] : null;
-    context.rowReferences = rowReferencesOf
-      ? (row) => rowReferencesOf(row, system)
-      : context.referencesOf;
+    context.system = system;
     for (const [id, row] of registrationRows(system, entityType)) {
       const decided = decideRow(context, systemId, id, row);
-      decisions.push({ ...decided, systemId, id, name: trimString(row.name) || id });
+      const name = trimString(row.name) || trimString(decided.entity?.name) || id;
+      decisions.push({ ...decided, systemId, id, name });
       if (decided.entity) addToRoster(context.roster, decided.entity);
       if (decided.membership) context.members.add(membershipKey(id, systemId));
     }

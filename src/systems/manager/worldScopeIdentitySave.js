@@ -82,10 +82,14 @@ async function withdraw(written) {
   return errors;
 }
 
+/** The failures thrown after this module wrote a scope, so `saveOrRestore` announces the restore. */
+const AFTER_SCOPE_WRITE = new WeakSet();
+
 async function withdrawAndThrow(written, failure, message) {
   const errors = await withdraw(written);
-  if (errors.length > 0) throw new AggregateError([failure, ...errors], message);
-  throw failure;
+  const thrown = errors.length > 0 ? new AggregateError([failure, ...errors], message) : failure;
+  if (written.length > 0 && Object(thrown) === thrown) AFTER_SCOPE_WRITE.add(thrown);
+  throw thrown;
 }
 
 function isActive(io) {
@@ -183,16 +187,19 @@ export async function registerWorldScopeIdentities(io, change) {
 }
 
 /** Persist `change.put` through `manager.save` with `options.scopeMembershipSeeds`, restoring
- * `previous` (or forgetting the record) when that save throws; a later failure keeps the
+ * `previous` (by default the record held before staging, else forgetting it) when that save
+ * throws, and announcing the restore when a scope was written; a later failure keeps the
  * persisted record in memory. */
 export async function saveOrRestore(manager, previous, change, { scopeMembershipSeeds } = {}) {
   const { id } = change.put;
+  const restored = previous ?? manager.systems.get(id) ?? null;
   manager.systems.set(id, change.put);
   try {
     return await manager.save(scopeMembershipSeeds ? { ...change, scopeMembershipSeeds } : change);
   } catch (error) {
-    if (previous) manager.systems.set(id, previous);
+    if (restored) manager.systems.set(id, restored);
     else manager.systems.delete(id);
+    if (AFTER_SCOPE_WRITE.has(error)) manager._notifySystemsChanged();
     throw error;
   }
 }

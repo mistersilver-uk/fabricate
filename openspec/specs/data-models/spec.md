@@ -2512,12 +2512,13 @@ SystemMembershipRecord = {
     An unseeded scope is seeded by its first registration write, which only widens the Valid Id Basis of requirement 16.
     A rejected scope write reloads that store, removes what that call already registered in an earlier scope write, and throws a recoverable `WorldScopeRegistrationError` (`code: "worldWrite"`, the original error as `cause`) before any system write; a failed system write removes only what that call registered and rethrows.
     Removal re-reads each store at that moment and never restores a pre-call snapshot, and a removal that itself fails throws `AggregateError`.
-    `createSystem` and `updateSystem` restore their previous in-memory record when their first save throws, and keep the persisted record after it resolved.
+    `createSystem` and `updateSystem` restore the in-memory record they replaced when their first save throws, announcing the restore when that save had written a scope, and keep the persisted record after it resolved.
     A `conflicting` row never blocks the save: the GM is warned once per client session per `(systemId, entityType, rowId)`, naming at most five rows, with the full list in the console.
     The in-system arrays remain the read projection and are not pruned.
 
     17a.
     **Membership shape** (precedent `### Component scope` requirement 6a).
+    A created entity carries the row's identity, a Tool's completed from its component as `### Tool scope` requirement 7 states.
     A created entity's membership inherits every section and carries the row's own `enabled`, plus for a Tool a copy of the row's `repairRequirements`.
     An adopted entity's membership is the `1.30.0` fully overriding shape, flipped back to inherit for each section whose world default is absent or whose world default, written through the read union's inherited-section writer, leaves the row's shipped fields unchanged; `effectSource` compares as its whole three-field block, `macro` against `propertyMacroUuid`, and `prerequisites` and `bonus` after their override normalization.
     This departs from the `1.30.0` shape and `### Essence scope` requirement 5 on purpose: those bind the migration, not registration.
@@ -2827,12 +2828,14 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
    `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 7. **Registration** (issue 2554, `## Scoped Entity Definitions` requirement 17).
-   A Tool's source keys are its own source references, compared without a pack Item's document-type segment and without embedded Item uuids; a Tool whose only references are embedded counts as source-less.
+   A Tool row's source keys are its own source references, else those of the component its `componentId` names in the same system, compared without a pack Item's document-type segment and without embedded Item uuids; a Tool whose only references are embedded counts as source-less.
+   Registration, the `1.36.0` migration, copy-mode import and `toolSources.upsertTool` read that one accessor (`toolRowReferences`), and a world Tool matches by its own references minus embedded Item uuids, so no two of them decide one row differently.
    A Tool row adopts the same-id world Tool when the two share a source or both are source-less.
    That departs from `destructive-changes-and-migrations/spec.md` -> World-Scope Entity Migration requirement 2 on purpose: Tool ids are minted with `randomID()`, so two source-less Tools share an id only by copying, and creating one is impossible while the id is taken.
    `toolSources.upsertTool` gives a new Tool the id of the single world Tool sharing its source, aliases included, before minting one, unless the system already holds a row under that id.
    A same-id world Tool with disjoint sources, and a different-id world Tool sharing a source, leave the row unregistered and reported `conflicting`.
    A source-less Tool with no same-id world Tool gets its own world identity.
+   A world Tool created for a row whose sources come only from its component carries those references, and the component's `name` and `img` where the row has none.
    A row leaving `breakage` or `onBreak` unauthored where the world default authors it stays unregistered, because no membership can express that empty override.
 
 ## World Vocabulary

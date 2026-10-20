@@ -11,9 +11,7 @@ import {
 } from '../systems/manager/worldScopeIdentityRegistration.js';
 import { membershipKey } from '../systems/scopedDefinitions.js';
 import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
-import { toolSourceReferences } from '../systems/worldScopeEntityGrouping.js';
 import { trimString } from '../utils/scalars.js';
-import { isEmbeddedItemUuid } from '../utils/sourceReferenceUnion.js';
 
 import { normalizeEssenceMergeMap } from './mergeEquivalentWorldEssences.js';
 import { readScopePayload } from './migrateWorldScopeEntities.js';
@@ -22,14 +20,6 @@ import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
 
 const SCOPE_KEYS = Object.freeze({ essences: 'essenceScope', tools: 'toolScope' });
 const DECISION_BUCKETS = Object.freeze({ create: 'created', adopt: 'adopted' });
-
-/** A Tool row's references as `1.30.0` grouped them, minus embedded Item uuids, fail-closed. */
-function toolRowReferences(parseUuid) {
-  return (row, system) =>
-    toolSourceReferences(row, system?.components).filter(
-      (uuid) => !isEmbeddedItemUuid(uuid, parseUuid)
-    );
-}
 
 function reportEntry(entityType, decided) {
   const entry = { entityType, systemId: decided.systemId, id: decided.id, name: decided.name };
@@ -46,25 +36,33 @@ function bucketOf(decided) {
   return ambiguous ? 'ambiguous' : 'conflicting';
 }
 
-/** Memberships naming no in-system row: reported, never deleted. */
-function unresolvedMemberships(entityType, payload, systems) {
+/** Memberships naming no in-system row, reported and never deleted: `unresolvedMemberships` for a
+ * live system missing the row, `orphanedSystemMemberships` for a system that no longer exists. */
+function reportMembershipsWithoutRows(report, entityType, payload, systems) {
   const rows = new Set();
+  const systemIds = new Set();
   for (const system of systems) {
     const systemId = trimString(system?.id);
+    systemIds.add(systemId);
     for (const id of registrationRows(system, entityType).keys()) {
       rows.add(membershipKey(id, systemId));
     }
   }
   const names = new Map(payload.entities.map((entity) => [entity?.id, trimString(entity?.name)]));
-  return subKeyEntries(payload.membership)
-    .filter((record) => isPlainObject(record))
-    .filter((record) => !rows.has(membershipKey(record.entityId, record.systemId)))
-    .map((record) => ({
+  for (const record of subKeyEntries(payload.membership)) {
+    if (!isPlainObject(record) || rows.has(membershipKey(record.entityId, record.systemId))) {
+      continue;
+    }
+    const list = systemIds.has(trimString(record.systemId))
+      ? 'unresolvedMemberships'
+      : 'orphanedSystemMemberships';
+    report[list].push({
       entityType,
       entityId: record.entityId,
       systemId: record.systemId,
       name: names.get(record.entityId) || record.entityId,
-    }));
+    });
+  }
 }
 
 /** The groups the `1.34.0` equivalence would merge or refuse that hold an essence created here. */
@@ -95,6 +93,7 @@ export function reconcileOrphanedScopedIdentities(data, { parseUuid = null } = {
     conflicting: [],
     ambiguous: [],
     unresolvedMemberships: [],
+    orphanedSystemMemberships: [],
     equivalentEssenceCandidates: [],
   };
   const result = {};
@@ -107,7 +106,6 @@ export function reconcileOrphanedScopedIdentities(data, { parseUuid = null } = {
       systems,
       retiredIds: entityType === 'essences' ? retiredIds : null,
       parseUuid,
-      rowReferencesOf: entityType === 'tools' ? toolRowReferences(parseUuid) : null,
     });
     for (const decided of decisions) {
       const bucket = bucketOf(decided);
@@ -115,7 +113,7 @@ export function reconcileOrphanedScopedIdentities(data, { parseUuid = null } = {
     }
     const writes = decisions.filter((decided) => decided.entity || decided.membership);
     result[key] = writes.length > 0 ? applyRegistrationDecisions(payload, writes) : data[key];
-    report.unresolvedMemberships.push(...unresolvedMemberships(entityType, payload, systems));
+    reportMembershipsWithoutRows(report, entityType, payload, systems);
   }
   const createdEssenceIds = new Set(
     report.created.filter((entry) => entry.entityType === 'essences').map((entry) => entry.id)

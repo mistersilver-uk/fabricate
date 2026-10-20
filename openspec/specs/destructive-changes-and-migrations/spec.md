@@ -1068,13 +1068,15 @@ Issue 2554 makes every distinct Essence and Tool id a crafting system holds own 
 The pass (`src/migration/reconcileOrphanedScopedIdentities.js`) registers the rows that predate the chokepoint, and reports what it did and what it could not do.
 
 1. **ONE PLANNER.** The pass runs the chokepoint's own planner (`src/systems/manager/worldScopeIdentityRegistration.js`) over `systems`, `essenceScope`, `toolScope` and `worldEssenceMergeMap`, in stored corpus order, so a row decided earlier counts as registered for every later one.
-   A Tool row's source keys are `toolSourceReferences(tool, system.components)`, as `1.30.0` grouping reads them, minus embedded Item uuids.
+   A Tool row's source keys are the chokepoint's own `toolRowReferences`: `toolSourceReferences(tool, system.components)`, as `1.30.0` grouping reads them, minus embedded Item uuids, so a row this pass reports `conflicting` stays `conflicting` at the next save.
 2. **IT REGISTERS, AND NOTHING ELSE.** It re-keys, merges and deletes nothing; it never reissues an id in `worldEssenceMergeMap`'s `retired` leg; and it registers into an unseeded scope that has rows, which only widens the Valid Id Basis.
 3. **REFUSAL.** A row the planner reports `conflicting` stays unregistered; a Tool whose sources match two or more world entities is refused as `ambiguous`.
-   A membership with no in-system row is reported, never deleted, and no issue-1654 equivalence merge runs: equivalent-looking essences this pass created are reported as candidates.
+   A membership with no in-system row is reported, never deleted: under `unresolvedMemberships` when its system still exists, and under `orphanedSystemMemberships` when no current system has its `systemId`.
+   No issue-1654 equivalence merge runs: equivalent-looking essences this pass created are reported as candidates.
 4. **AN UNCHANGED LEG IS RETURNED BY REFERENCE**, so a rerun or a world with nothing to reconcile writes no setting.
-5. **THE TRANSIENT REPORT** `_scopedIdentityReconcileReport` carries `created`, `adopted`, `conflicting`, `ambiguous`, `unresolvedMemberships` and `equivalentEssenceCandidates`; the runner captures it as `summary.scopedIdentityReconcileReport` and deletes it.
-   The GM notice (`src/systems/scopedIdentityReconcileNotice.js`) is silent when all six are empty, informational when only `created` or `adopted` is non-empty, and a permanent warning otherwise, with counts in the toast and names in the console detail.
+5. **THE TRANSIENT REPORT** `_scopedIdentityReconcileReport` carries `created`, `adopted`, `conflicting`, `ambiguous`, `unresolvedMemberships`, `orphanedSystemMemberships` and `equivalentEssenceCandidates`; the runner captures it as `summary.scopedIdentityReconcileReport` and deletes it.
+   The GM notice (`src/systems/scopedIdentityReconcileNotice.js`) is silent when all seven are empty, informational when only `created`, `adopted` or `orphanedSystemMemberships` is non-empty, and a permanent warning otherwise, with counts in the toast and names in the console detail.
+   A link to a deleted system needs no GM action, so it never raises the warning.
 6. **Lossless downgrade.** `downgradeLosesData: false`, because `1.35.0` reads the added entities and memberships under unchanged rules.
 
 ### Subject Modifier Mark Seed (`1.33.0`, `downgradeTo: '1.32.0'`, pure, clone-first, idempotent)

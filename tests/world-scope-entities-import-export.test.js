@@ -1946,6 +1946,44 @@ test('2554: copy mode rebinds a Tool whose source matches exactly one world Tool
   assert.equal(reported(summary, REFERENCE_KINDS.WORLD_ENTITY_COLLISION).length, 0);
 });
 
+test('2554: copy mode never rebinds through an embedded alias, and the Tool still registers', async () => {
+  const world = await registeringWorld({
+    componentScope: emptySeededScope(),
+    essenceScope: emptySeededScope(),
+    toolScope: {
+      entities: [
+        {
+          id: 'world-saw',
+          name: 'Saw',
+          registeredItemUuid: 'Item.w',
+          aliasItemUuids: ['Actor.a.Item.saw'],
+        },
+      ],
+      defaults: {},
+      membership: {},
+    },
+  });
+  const payload = envelope({
+    system: {
+      tools: [
+        {
+          id: 't1',
+          name: 'Saw',
+          registeredItemUuid: 'Item.x',
+          aliasItemUuids: ['Actor.a.Item.saw'],
+        },
+      ],
+    },
+  });
+
+  const { packData, summary } = await runImport(world, payload, { mode: 'copy' });
+
+  assert.equal(packData.system.tools[0].id, 't1', 'the incoming id is kept');
+  const persisted = world.persisted('tools');
+  assert.ok(persisted.membership[`t1|${summary.system.id}`], 'registered, not conflicting');
+  assert.equal(persisted.membership[`world-saw|${summary.system.id}`], undefined);
+});
+
 test('2554: keep mode never re-keys a Tool, and registration seeds an unseeded scope', async () => {
   const world = await registeringWorld({
     toolScope: {

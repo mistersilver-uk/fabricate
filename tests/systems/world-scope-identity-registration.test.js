@@ -20,6 +20,8 @@ const { planWorldScopeIdentityRegistration } =
 const { WorldScopeRegistrationError } =
   await import('../../src/systems/manager/worldScopeIdentitySave.js');
 const { COMPONENT_FACTS } = await import('../../src/systems/manager/collaborators.js');
+const { reconcileOrphanedScopedIdentities } =
+  await import('../../src/migration/reconcileOrphanedScopedIdentities.js');
 
 /** `foundry.utils.parseUuid`'s `embedded` answer for the uuid spellings these fixtures use. */
 function parseUuid(uuid) {
@@ -260,11 +262,12 @@ describe('the save chokepoint', () => {
     assert.ok(membershipOf(w.persisted('toolScope'), 'world-saw', 'sysA'));
   });
 
-  it('gives a source-less Tool its own world identity', async () => {
+  it('gives a source-less Tool its own world identity, named from its component', async () => {
     const w = world();
     await w.manager.createSystem({ id: 'sysA', name: 'A', components: [{ id: 'c1', name: 'C' }] });
     const { item } = await w.manager.upsertTool('sysA', { componentId: 'c1', label: 'Saw' });
     assert.deepEqual(entityIds(w.persisted('toolScope')), [item.id]);
+    assert.equal(w.persisted('toolScope').entities[0].name, 'C');
   });
 
   it('compensates a failed stampSourceIdentity', async () => {
@@ -403,5 +406,142 @@ describe('the save chokepoint', () => {
     assert.match(w.warnings[0], /1 row\(s\) in Forge/);
     assert.equal(w.persisted('craftingSystems')[0].tools[0].id, 't1');
     assert.equal(membershipOf(w.persisted('toolScope'), 't1', 'sysA'), null);
+  });
+});
+
+describe('one Tool source reading across registration, migration and import', () => {
+  const sawComponent = (id) => ({
+    id,
+    name: 'Saw',
+    img: 'saw.webp',
+    registeredItemUuid: 'Item.saw',
+  });
+
+  it('keeps a row the migration reports conflicting conflicting at the next save', async () => {
+    const toolScope = {
+      entities: [{ id: 'world-saw', name: 'Saw', registeredItemUuid: 'Item.saw' }],
+      defaults: {},
+      membership: {},
+    };
+    const sysA = {
+      id: 'sysA',
+      name: 'A',
+      components: [sawComponent('c1')],
+      tools: [{ id: 't1', componentId: 'c1' }],
+    };
+    const migrated = reconcileOrphanedScopedIdentities(
+      { systems: [sysA], essenceScope: {}, toolScope },
+      { parseUuid }
+    );
+    const report = migrated._scopedIdentityReconcileReport;
+    assert.deepEqual(
+      report.conflicting.map((entry) => [entry.id, entry.reason]),
+      [['t1', 'sourceCollision']]
+    );
+    const w = world({ toolScope: migrated.toolScope });
+    // The persisted record as the migration read it, saved without renormalization.
+    const persisted = structuredClone(sysA);
+    w.manager.systems.set('sysA', persisted);
+    await w.manager.save({ put: persisted });
+    assert.deepEqual(entityIds(w.persisted('toolScope')), ['world-saw'], 'no duplicate entity');
+    assert.equal(membershipOf(w.persisted('toolScope'), 't1', 'sysA'), null);
+    assert.equal(w.warnings.length, 1);
+  });
+
+  it('two systems upserting a component-sourced Tool share one named world Tool', async () => {
+    const w = world({ toolScope: {} });
+    await w.manager.createSystem({ id: 'sysA', name: 'A', components: [sawComponent('c1')] });
+    await w.manager.createSystem({ id: 'sysB', name: 'B', components: [sawComponent('c2')] });
+    const first = await w.manager.upsertTool('sysA', { componentId: 'c1' });
+    const second = await w.manager.upsertTool('sysB', { componentId: 'c2' });
+    assert.equal(second.item.id, first.item.id);
+    const scope = w.persisted('toolScope');
+    assert.deepEqual(entityIds(scope), [first.item.id]);
+    assert.equal(scope.entities[0].name, 'Saw');
+    assert.equal(scope.entities[0].img, 'saw.webp');
+    assert.equal(scope.entities[0].registeredItemUuid, 'Item.saw');
+    assert.ok(membershipOf(scope, first.item.id, 'sysA'));
+    assert.ok(membershipOf(scope, first.item.id, 'sysB'));
+    assert.deepEqual(w.warnings, []);
+  });
+
+  it('the migration creates a component-sourced Tool carrying its component identity', () => {
+    const sysA = {
+      id: 'sysA',
+      components: [sawComponent('c1')],
+      tools: [{ id: 't1', componentId: 'c1' }],
+    };
+    const { toolScope } = reconcileOrphanedScopedIdentities(
+      { systems: [sysA], essenceScope: {}, toolScope: {} },
+      { parseUuid }
+    );
+    assert.deepEqual(toolScope.entities, [
+      { id: 't1', name: 'Saw', img: 'saw.webp', registeredItemUuid: 'Item.saw' },
+    ]);
+  });
+});
+
+describe('the save chokepoint, pinned further', () => {
+  it('never registers a retired essence id, warning exactly once', async () => {
+    const w = world({ essenceScope: {}, mergeMap: { retired: { ash: { name: 'Ash' } } } });
+    await w.manager.createSystem({ id: 'sysA', name: 'A', essenceDefinitions: [essence('ash')] });
+    const scope = w.persisted('essenceScope');
+    assert.deepEqual(entityIds(scope ?? {}), []);
+    assert.equal(membershipOf(scope, 'ash', 'sysA'), null);
+    assert.equal(w.warnings.length, 1);
+  });
+
+  it("copies a created Tool row's repairRequirements onto its membership", async () => {
+    const w = world({ toolScope: {} });
+    const repairRequirements = [
+      { id: 'g1', name: 'Mend', options: [{ componentId: 'c1', quantity: 1 }] },
+    ];
+    await w.manager.createSystem({
+      id: 'sysA',
+      name: 'A',
+      components: [{ id: 'c1', name: 'C' }],
+      tools: [{ id: 't1', name: 'Saw', componentId: 'c1', repairRequirements }],
+    });
+    const membership = membershipOf(w.persisted('toolScope'), 't1', 'sysA');
+    const persisted = w.persisted('craftingSystems')[0].tools[0].repairRequirements;
+    assert.ok(persisted.length > 0);
+    assert.deepEqual(membership.repairRequirements, persisted);
+  });
+
+  it('registers every system a batch save writes', async () => {
+    const w = world({ version: '1.35.0' });
+    await w.manager.createSystem({ id: 'sysA', name: 'A', essenceDefinitions: [essence('fire')] });
+    await w.manager.createSystem({ id: 'sysB', name: 'B', essenceDefinitions: [essence('ash')] });
+    w.env.settings.set('migrationVersion', '1.36.0');
+    await w.manager.save({ batch: [w.manager.getSystem('sysA'), w.manager.getSystem('sysB')] });
+    assert.deepEqual(entityIds(w.persisted('essenceScope')), ['fire', 'ash']);
+    assert.deepEqual(unregisteredRows(w), []);
+  });
+
+  it('a failed createSystem over an existing id keeps the live system in memory', async () => {
+    const w = world({ essenceScope: {} });
+    await w.manager.createSystem({ id: 'sysA', name: 'A' });
+    w.reject('essenceScope', new Error('refused'));
+    await assert.rejects(
+      w.manager.createSystem({ id: 'sysA', name: 'Other', essenceDefinitions: [essence('fire')] }),
+      WorldScopeRegistrationError
+    );
+    assert.equal(w.manager.getSystem('sysA').name, 'A');
+  });
+
+  it('announces the restore only when a scope was written before the failure', async () => {
+    const w = world({ essenceScope: {}, toolScope: {} });
+    await w.manager.createSystem({ id: 'sysA', name: 'A' });
+    let announced = 0;
+    w.manager._notifySystemsChanged = () => {
+      announced += 1;
+    };
+    w.reject('essenceScope', new Error('refused'));
+    await assert.rejects(w.manager.updateSystem('sysA', { essenceDefinitions: [essence('fire')] }));
+    assert.equal(announced, 0, 'nothing was written');
+    w.reject('craftingSystems', new Error('systems refused'));
+    await assert.rejects(w.manager.updateSystem('sysA', { essenceDefinitions: [essence('fire')] }));
+    assert.equal(announced, 1, 'the essence scope was written, then withdrawn');
+    assert.deepEqual(w.manager.getSystem('sysA').essenceDefinitions, []);
   });
 });

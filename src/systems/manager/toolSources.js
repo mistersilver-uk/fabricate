@@ -13,7 +13,11 @@ import { findRegisteredDefinition, settleCompendiumClaim } from '../../utils/sou
 
 import { baseCollaborators, TOOL_FACTS } from './collaborators.js';
 import { resolveStoreSeam } from './scopeStoreSeams.js';
-import { registrationRows, toolReferencesOf } from './worldScopeIdentityRegistration.js';
+import {
+  registrationRows,
+  toolReferencesOf,
+  toolRowReferences,
+} from './worldScopeIdentityRegistration.js';
 import { allSharing, indexRoster, sourceKeys } from './worldScopeRoster.js';
 
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
@@ -36,10 +40,13 @@ export function toolSourcesCollaborators(manager) {
 /** The id of the single world Tool sharing `candidate`'s source (issue 2554), or `null` when none
  * or several do, or `system` already holds a row under it. */
 function worldToolIdFor(io, system, candidate) {
-  const referencesOf = toolReferencesOf(io.parseUuid());
-  const keys = sourceKeys(candidate, referencesOf);
+  const parseUuid = io.parseUuid();
+  const keys = sourceKeys(candidate, (row) => toolRowReferences(row, system, parseUuid));
   if (keys.size === 0) return null;
-  const sharing = allSharing(indexRoster(io.worldToolEntities(), referencesOf), keys);
+  const sharing = allSharing(
+    indexRoster(io.worldToolEntities(), toolReferencesOf(parseUuid)),
+    keys
+  );
   if (sharing.length !== 1) return null;
   const id = sharing[0].id;
   return registrationRows(system, 'tools').has(id) ? null : id;

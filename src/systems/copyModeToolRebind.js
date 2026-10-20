@@ -14,7 +14,7 @@ import {
   systemSlice,
   WORLD_SCOPE_SLICE_KEYS,
 } from './importReferenceResolver.js';
-import { sourceReferencesOf, toolSourceReferences } from './worldScopeEntityGrouping.js';
+import { toolReferencesOf, toolRowReferences } from './manager/worldScopeIdentityRegistration.js';
 import {
   keyedRemapper,
   rewriteGatheringSliceReferences,
@@ -30,22 +30,23 @@ function keySet(references) {
   return new Set(references.map(sourceReferenceKey));
 }
 
-/** The destination world Tools, each with its source keys. */
-function destinationTools(worldEntityIndex) {
+/** The destination world Tools, each with the source keys registration matches them by. */
+function destinationTools(worldEntityIndex, parseUuid) {
+  const referencesOf = toolReferencesOf(parseUuid);
   // ratchet-exempt(world-scope): not-a-system — the destination roster index
   return arrayOf(worldEntityIndex?.tools)
     .filter((entity) => isPlainObject(entity) && typeof entity.id === 'string' && entity.id.trim())
-    .map((entity) => ({ id: entity.id.trim(), keys: keySet(sourceReferencesOf(entity)) }));
+    .map((entity) => ({ id: entity.id.trim(), keys: keySet(referencesOf(entity)) }));
 }
 
 /** Old incoming Tool id -> destination id, reporting each multi-match. */
-function toolIdMap(tools, components, roster, report) {
+function toolIdMap(system, tools, roster, { report, parseUuid }) {
   const idMap = {};
   const incomingIds = new Set(tools.map((tool) => tool?.id));
   const claimed = new Set();
   for (const tool of tools) {
     if (!isPlainObject(tool) || !tool.id) continue;
-    const keys = keySet(toolSourceReferences(tool, components));
+    const keys = keySet(toolRowReferences(tool, system, parseUuid));
     const matches = roster.filter((entity) => [...keys].some((key) => entity.keys.has(key)));
     if (matches.length > 1 && Array.isArray(report)) {
       const ids = matches.map((match) => match.id).join(', ');
@@ -76,13 +77,17 @@ function rewriteToolScopeSlice(prepared, idMap, remapTool) {
   }
 }
 
-/** Rebind in place; `worldEntityIndex` is the destination roster and `report` collects entries. */
-export function rebindCopyToolIds(prepared, { worldEntityIndex = null, report = null } = {}) {
+/** Rebind in place; `worldEntityIndex` is the destination roster, `report` collects entries and
+ * `parseUuid` is `foundry.utils.parseUuid`, without which no source matches. */
+export function rebindCopyToolIds(
+  prepared,
+  { worldEntityIndex = null, report = null, parseUuid = globalThis.foundry?.utils?.parseUuid } = {}
+) {
   if (!isPlainObject(prepared)) return prepared;
   const { system, recipes, gatheringConfig } = prepared;
   const tools = arrayOf(system?.tools); // ratchet-exempt(world-scope): import
-  const components = arrayOf(system?.components); // ratchet-exempt(world-scope): import
-  const idMap = toolIdMap(tools, components, destinationTools(worldEntityIndex), report);
+  const roster = destinationTools(worldEntityIndex, parseUuid);
+  const idMap = toolIdMap(system, tools, roster, { report, parseUuid });
   if (Object.keys(idMap).length === 0) return prepared;
   const remapTool = keyedRemapper(idMap);
   for (const tool of tools) {
