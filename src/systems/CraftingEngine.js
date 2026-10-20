@@ -24,11 +24,7 @@ import { planComplications } from '../utils/complicationPlan.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
-import {
-  accumulateSubmissionEssences,
-  findMatchingComponent,
-  resolveItemEssences,
-} from '../utils/essenceResolver.js';
+import { findMatchingComponent, resolveItemEssences } from '../utils/essenceResolver.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
@@ -36,6 +32,11 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import {
+  deriveAlchemySelectionPlan,
+  submissionFundedSet,
+  submissionOptionRule,
+} from './alchemyStartSelection.js';
 import { automaticStageBlocker, stageIngredientSet } from './automaticStageBlocker.js';
 import { AWARD_CHOICE_PENDING, AwardChoiceSettler } from './awardChoiceSettle.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
@@ -642,8 +643,16 @@ export class CraftingEngine {
       matched: true,
       activityKind: 'alchemy',
       recipeId: matchResult.recipe.id,
-      selectionPlan: { selectedIngredientSetId: matchResult.ingredientSetId },
+      selectionPlan: deriveAlchemySelectionPlan({
+        steps: this._executionSteps(matchResult.recipe),
+        ingredientSetId: matchResult.ingredientSetId,
+        submittedItems,
+        components,
+        signatureValidator,
+        system,
+      }),
       submittedItemUuids,
+      submittedComponentIds: submittedItems.map((entry) => entry.componentId),
     };
   }
 
@@ -790,7 +799,7 @@ export class CraftingEngine {
         recipe,
         step,
         stepIndex,
-        selectedSet,
+        selectedSet: submissionFundedSet(selectedSet, trusted, sourceActors),
         selectionPlan: stagePlan,
         historySnapshots,
         trusted,
@@ -4035,65 +4044,17 @@ export class CraftingEngine {
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
     const system = options?.system;
-
-    // The component id each submission was bucketed to at the collector (issue 572); re-resolving
-    // per candidate would double-count a submission matching several components of one group.
-    const resolvedComponentIds = submittedItems.map((record) => record?.componentId ?? null);
-
-    // Submissions resolved to one of these ids; each contributes at most one unit to a group.
-    const availableForComponentIds = (componentIds) => {
-      const idSet = componentIds instanceof Set ? componentIds : new Set(componentIds);
-      let available = 0;
-      for (const resolvedId of resolvedComponentIds) {
-        if (resolvedId != null && idSet.has(resolvedId)) available += 1;
-      }
-      return available;
-    };
-
     const essencesEnabled = system?.features?.essences === true;
-
-    // Essences accumulate from the collector's `componentId` (duplicates count again), keeping
-    // essence attribution on the id group counting reads rather than tier-4-blind matching.
-    let submittedEssences = null;
-    if (essencesEnabled) {
-      submittedEssences = accumulateSubmissionEssences(submittedItems, {
-        components,
-        systemId: system?.id,
-      });
-    }
+    // One rule with the start's derived plan, so the option a match credits is the one it records.
+    const rule = submissionOptionRule({ submittedItems, components, signatureValidator, system });
+    const submittedEssences = rule.essences;
+    const groupSatisfied = rule.groupMet;
 
     // A group is essence-only iff every one of its options is an essence match. When
     // essences are disabled, such a group is inert (issue 649 group-granular rule).
     const isEssenceOnlyGroup = (group) => {
       const opts = Array.isArray(group?.options) ? group.options : [];
       return opts.length > 0 && opts.every((option) => option?.match?.type === 'essence');
-    };
-
-    // A group is satisfied by any one option. An essence option is amount-based and ignored
-    // under `skipEssence`, so the group falls to its other options.
-    const groupSatisfied = (group, groupComponentIds, skipEssence) => {
-      const groupOptions = Array.isArray(group?.options) ? group.options : [];
-      if (groupOptions.length === 0) {
-        // No structured options (defensive): fall back to mere presence in the
-        // merged component-ID set for this group.
-        return availableForComponentIds(groupComponentIds) > 0;
-      }
-      return groupOptions.some((option) => {
-        if (option?.match?.type === 'essence') {
-          if (skipEssence) return false;
-          const essenceId = String(option.match.essenceId || '').trim();
-          const amount = Math.max(0, Number(option.match.amount) || 0);
-          // A no-op essence option (id-less / zero amount) is trivially satisfied.
-          if (!essenceId || amount <= 0) return true;
-          return (submittedEssences?.[essenceId] || 0) >= amount;
-        }
-        const optionComponentIds = signatureValidator.expandIngredientToComponentIds(
-          option,
-          components
-        );
-        const required = Math.max(1, Number(option?.quantity) || 1);
-        return availableForComponentIds(optionComponentIds) >= required;
-      });
     };
 
     // Collect every matching set, then pick the unique most-specific one (issue 774): a superset
