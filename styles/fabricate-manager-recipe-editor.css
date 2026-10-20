@@ -292,44 +292,6 @@
   background: var(--fab-border);
 }
 
-/* Quiet ghost button (used by the header Back and the Validation "View" links) (issue 1118). */
-.fabricate-button.fabricate-button.is-ghost:not(:disabled) {
-  border-color: transparent;
-  color: var(--fab-text-muted);
-  background: transparent;
-}
-
-.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover {
-  border-color: var(--fab-border);
-  color: var(--fab-text);
-  background: var(--fab-surface-raised);
-}
-
-/* The dashed add-button, RECONCILED with the primitive's `dashed` role (issue 1118). */
-.fabricate-button.fabricate-button.is-dashed {
-  display: flex;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 var(--fab-space-3);
-  border-width: 1px;
-  border-style: dashed;
-  border-radius: 9px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.fabricate-button.fabricate-button.is-dashed:not(:disabled) {
-  border-color: var(--fab-border-strong);
-  color: var(--fab-text-muted);
-  background: transparent;
-}
-
-.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover {
-  border-color: var(--fab-accent-border);
-  color: var(--fab-text);
-  background: var(--fab-surface-raised);
-}
-
 /* ── The Validation tab's aggregate header ── Rehomed from the deleted RecipeContextRail, which showed it only while this tab was open (issues 676, 1509, 1507). */
 .fabricate-validation .manager-recipe-validation-summary-row {
   display: flex;

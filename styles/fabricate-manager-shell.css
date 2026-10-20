@@ -187,18 +187,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Header actions (Back, Delete, Save/Create) share one compact scale: a label a notch below body text so the toolbar reads as chrome, not content (issue 1118). */
-.fabricate-manager .manager-header-actions .fabricate-button {
-  /* 0.72rem (~11.5px) matches the prototype's header buttons (issue 643 audit). */
-  font-size: 0.72rem;
-}
-
-/* The page's single loudest action (Create recipe, Create system) keeps the heavier weight and roomier padding so the green Save wins the eye (§F6). */
-.fabricate-manager .manager-header-actions .fabricate-button.is-primary {
-  padding: 0 var(--fab-space-4);
-  font-weight: 700;
-}
-
 /* ── The tool studio's treatment, released from its ancestor ── the rules below re-declare the tool studio's values on the `fabricate-button` root alone, tripled so they keep the (0,3,0) they held before issue 2540, with NO ancestor requirement (issue 1096). */
 
 /* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.fabricate-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
