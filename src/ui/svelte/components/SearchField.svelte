@@ -25,7 +25,7 @@
   - `{...rest}` lands on the root. The input's own `type`, `value`, name, `oninput` and
     `onkeydown` are written after `inputProps`; a caller's `oninput` runs AFTER `onChange`, and
     its `onkeydown` after the Enter guard, rather than replacing them.
-  - IT NEVER SUBMITS ITS FORM: Enter in the input, outside IME composition, cancels the implicit
+  - It never submits its form: Enter in the input, outside IME composition, cancels the implicit
     submission of the form the input is in (issue 2453).
   - It writes no scoped `<style>`: `styles/fabricate.css` owns the `fabricate-search` family.
 -->

@@ -1215,6 +1215,10 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-search-specimen': [
     { selector: labSearch('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
     { selector: `${labSearch('transform', 'input')}:focus`, styles: 'outline-style: none' },
+    {
+      selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
+      styles: 'border-color: var(--fab-accent)',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(

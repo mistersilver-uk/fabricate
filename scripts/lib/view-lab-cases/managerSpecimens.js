@@ -572,6 +572,11 @@ export const CASES = Object.freeze([
         // The default shell's declared corner, and the focused input's want of a ring of its own.
         { selector: LAB_SEARCH('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
         { selector: `${LAB_SEARCH('transform', 'input')}:focus`, styles: 'outline-style: none' },
+        // The focused field's shell takes the accent, the keyboard mark a field whose wrapper draws the box.
+        {
+          selector: `${LAB_SEARCH('transform', '.fabricate-search')}:focus-within`,
+          styles: 'border-color: var(--fab-accent)',
+        },
       ],
     },
     position: SEARCH_WINDOW,
