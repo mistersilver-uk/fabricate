@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveChromeCache } from '../scripts/lib/foundryChromeCache.js';
 
 import { buildDemoContent, DEMO_ACTORS } from './view-lab/demo/demoContent.js';
-import { buildLabActors } from './view-lab/world/labActors.js';
+import { buildCastActors } from './view-lab/world/labActors.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MOUNT = '/@foundry-chrome/';
@@ -94,7 +94,7 @@ test('the actors hold only things the world defines, and salvage resolves too', 
 });
 
 test('every demo image is a core icon present in the harvested cache', { skip }, () => {
-  const paths = assetPaths([content, buildLabActors(content, DEMO_ACTORS)]);
+  const paths = assetPaths([content, buildCastActors(content, DEMO_ACTORS)]);
   assert.ok(paths.size >= 23, `expected the demo world to name its icons, found ${paths.size}`);
   const missing = [...paths].filter((path) => {
     assert.ok(path.startsWith(`${MOUNT}icons/`), `${path} is not a Foundry core icon`);

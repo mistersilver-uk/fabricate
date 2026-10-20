@@ -1,7 +1,7 @@
 /** Assemble the hero-demo world (issue 2571) and boot the real Fabricate runtime against it. */
 import { settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
-import { buildDocumentIndex, buildLabActors } from '../world/labActors.js';
+import { buildCastActors, buildDocumentIndex } from '../world/labActors.js';
 import { seedFabricateFlag } from '../world/labFlags.js';
 import { bootLabRuntime, LAB_WORLD_TIME } from '../world/labWorld.js';
 
@@ -36,7 +36,7 @@ function demoSettings(content, actors, managedSystemId) {
  */
 export async function buildDemoWorld({ managedSystemId = null, seed = DEMO_SEED } = {}) {
   const content = buildDemoContent();
-  const actors = buildLabActors(content, DEMO_ACTORS);
+  const actors = buildCastActors(content, DEMO_ACTORS);
   // Two of the still's three brews already learned, so the bench can name the one it matches.
   seedFabricateFlag(actors[0], ['fabricate', 'learnedRecipes'], {
     'hm-r-mending': { sourceItemUuid: null, learnedAt: LAB_WORLD_TIME - 86_400 },
