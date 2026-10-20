@@ -77,7 +77,8 @@ Recipe book membership is carried across to the regenerated recipe identifiers, 
 ### Essences and Tools on import
 
 Importing registers every essence and Tool in the world catalogue, because any system save does.
-An incoming essence or Tool adopts a catalogue entry with the same id, or is added to the catalogue.
+An incoming essence adopts the catalogue entry with the same id, or is added to the catalogue under that id.
+An incoming Tool adopts the world Tool with the same id when both come from the same source Item, or neither has one, and is otherwise added to the catalogue unless another world Tool already claims its id or source Item.
 The membership records in the file, which hold the enabled switch and overrides, are kept.
 A row that cannot be linked, because the same id or source already describes something else, is imported and works in that system only.
 It is reported with a one-per-session warning.

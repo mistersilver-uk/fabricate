@@ -157,8 +157,8 @@ Fabricate never matches an essence by name, and never changes an essence's id to
 Occasionally a system holds an essence that Fabricate cannot link to the catalogue, because the id was retired by the 1.34.0 merge above.
 That essence keeps working in that system only, and nothing is deleted.
 The save still succeeds.
-Fabricate shows one warning per session for each affected system and essence, naming up to five and counting the rest, and the full list is in the browser console.
-To review them, open the system's Essence Rules screen and the Essence Catalogue, then recreate the essence in the catalogue and reselect it where you need it.
+After the save, Fabricate shows one warning for each affected system, naming up to five essences and counting the rest, and warns about each essence only once per session; the full list, with the reason, is in the browser console.
+A retired id is never reused, so to bring such an essence back into the catalogue, create it there with **+ New essence**, choose **Add to this system**, and assign the new essence on the components and recipes that used the old one.
 
 ### Upgrading to 1.36.0
 
@@ -167,17 +167,18 @@ On first load after upgrading to 1.36.0, Fabricate registers each of those in th
 The notice is for GMs only, and the full detail is in the browser console.
 Nothing is deleted, renamed, re-keyed or merged, and running it again changes nothing.
 
-The notice lists up to six groups.
+The notice covers essences and Tools together and lists up to seven groups.
 
 - **Created** are essences that were added to the catalogue.
 - **Adopted** are essences that already existed in the catalogue and are now linked to the system that held a copy.
-- **Could not be linked** are essences whose id was retired, which keep working in their own system only.
-- **Ambiguous** are rows that match more than one catalogue entry, so Fabricate would not guess.
+- **Could not be linked** are essences whose id was retired by the 1.34.0 merge, and Tools a world Tool already claims, which keep working in their own system only.
+- **Ambiguous** are Tools whose source Item matches more than one world Tool, so Fabricate would not guess. An essence is never ambiguous.
 - **Memberships with no matching row** are links to essences their system no longer holds, which are reported and kept.
+- **Memberships of a deleted system** are links that name a crafting system that no longer exists, which are reported and kept.
 - **Look like the same essence** are essences in different systems that appear to be one essence but were kept separate.
 Review them under World › Essences if you want to join them yourself.
 
-The notice is a brief information message when it only created or adopted essences.
+The notice is a brief information message when it only created or adopted essences and Tools, or found links to a crafting system that no longer exists.
 Otherwise it stays on screen until you dismiss it.
 
 ## Assigning Essences to Components

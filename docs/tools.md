@@ -77,18 +77,18 @@ Because the library is a draft-and-save surface, your edits are held until you s
 
 A Tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
 The Save button stays disabled until every Tool is valid; hover it to see the first failing reason.
-Tools belong to the crafting system that owns them and cannot be shared across systems, although each one shares its identity with a world Tool.
+Each crafting system keeps its own rules for a Tool, but the Tool itself is a world Tool, so several systems can hold the same one, each with its own enabled switch and overrides.
 A gathering task, recipe, or salvage configuration only references them.
 See [Tools]({% link gathering/tasks.md %}#tools) for how a gathering task does that.
 
 ### Tools that cannot be linked
 
-A Tool cannot be linked to the world catalogue when a world Tool with the same id or the same source Item already describes something else.
+A Tool cannot be linked to the world catalogue when a world Tool with the same id or the same source Item already describes something else, or when the Tool leaves breakage or what happens on a break unset while the world Tool sets a default for it.
 It keeps working in its own crafting system only, and the save still succeeds.
-Fabricate shows one warning per session for each system and Tool, naming up to five and counting the rest, and the full list is in the browser console.
+After the save, Fabricate shows one warning for each affected system, naming up to five Tools and counting the rest, and warns about each Tool only once per session; the full list is in the browser console.
 Review them under World › Tools.
 
-On first load after upgrading to 1.36.0, Fabricate registers the Tools older versions left only inside a system, and posts a GM notice that lists what it created, adopted, could not link, and found ambiguous.
+On first load after upgrading to 1.36.0, Fabricate registers the Tools older versions left only inside a system, and posts a GM notice that lists what it created, adopted, could not link, found ambiguous, and kept as links to a row or system that no longer exists.
 Nothing is deleted or merged.
 
 ## Presence and prerequisites
