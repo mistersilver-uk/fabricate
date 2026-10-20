@@ -278,11 +278,12 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
-    // A brew's start refuses a submission claiming more units than the stack holds (issue 2574).
+    // A brew's start refuses a submission claiming more units than the stack stores (issue 2574).
     site: 'alchemyStartSelection stale-submission guard',
     file: 'src/systems/alchemyStartSelection.js',
-    accessor: 'readStackQuantity',
+    accessor: 'readStoredStackQuantity',
     sites: 1,
+    absentDefault: 1,
   },
   {
     site: 'AlchemyListingBuilder held counts',

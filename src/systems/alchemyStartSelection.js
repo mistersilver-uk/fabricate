@@ -9,9 +9,10 @@ import { essencesOfItem } from '../utils/itemEssences.js';
 
 import { stageIngredientSet } from './automaticStageBlocker.js';
 import { CraftingLifecycleExecutionError } from './CraftingLifecycleExecutor.js';
-import { readStackQuantity } from './itemStackQuantity.js';
+import { readStoredStackQuantity } from './itemStackQuantity.js';
 
-const UNFUNDED_MESSAGE = 'The submitted ingredients cannot fund this brew.';
+/** The unfunded refusal is a lang key, so the banner and toast localize it (issue 2574). */
+const UNFUNDED_MESSAGE = 'FABRICATE.App.Journal.Reason.AlchemySubmissionUnfunded';
 
 /**
  * The matcher's rule over `{ item, componentId }` records: counting is per occurrence, by the
@@ -49,38 +50,65 @@ export function submissionOptionRule({ submittedItems, components, signatureVali
 }
 
 /**
- * The plan a matched start commits: the first option the submission meets for each multi-option
- * group, and, when the set needs essence, an allocation of every submitted carrier's units,
- * scoped to the first step and the matched set. A recipe without that set gets the set id alone.
+ * The plan a matched start commits, scoped to the first step and the matched set: for each
+ * multi-option group the option `resolveFunded(set)` drew from the submitted units, else the first
+ * the submission meets, and an essence allocation over the submitted carriers.
+ * A recipe without that set gets the set id alone.
  */
-export function deriveAlchemySelectionPlan({ steps, ingredientSetId, ...match }) {
+export function deriveAlchemySelectionPlan({
+  steps,
+  ingredientSetId,
+  submittedItems,
+  components,
+  signatureValidator,
+  system,
+  resolveFunded = null,
+}) {
   const plan = { selectedIngredientSetId: ingredientSetId };
   const step = Array.isArray(steps) ? steps[0] : null;
   const set = stageIngredientSet(step, ingredientSetId);
   if (!set || set.id !== ingredientSetId) return plan;
-  const rule = submissionOptionRule(match);
-  const skipEssence = match.system?.features?.essences !== true;
+  const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
+  const funded = fundedSelection(resolveFunded, set);
+  const rule = submissionOptionRule({ submittedItems, components, signatureValidator, system });
+  const skipEssence = system?.features?.essences !== true;
   const overrides = {};
   const essenceIds = new Set(Object.keys(set.essences ?? {}));
-  for (const group of Array.isArray(set.ingredientGroups) ? set.ingredientGroups : []) {
+  for (const [index, group] of groups.entries()) {
     const options = Array.isArray(group?.options) ? group.options : [];
-    let index = 0;
-    if (options.length > 1 && group?.id != null) {
-      index = options.findIndex((option) => rule.optionMet(option, skipEssence));
-      if (index >= 0) overrides[group.id] = { optionIndex: index };
+    const chosen = funded
+      ? funded.selectedIngredients?.[index]
+      : options.find((option) => rule.optionMet(option, skipEssence));
+    const picked = options.indexOf(chosen);
+    if (options.length > 1 && group?.id != null && picked !== -1) {
+      overrides[group.id] = { optionIndex: picked };
     }
-    const chosen = options[index]?.match;
-    if (chosen?.type === 'essence' && String(chosen.essenceId ?? '').trim()) {
-      essenceIds.add(String(chosen.essenceId).trim());
+    const match = options[Math.max(picked, 0)]?.match;
+    if (!funded && match?.type === 'essence' && String(match.essenceId ?? '').trim()) {
+      essenceIds.add(String(match.essenceId).trim());
     }
   }
   if (Object.keys(overrides).length > 0) plan.ingredientOptionOverrides = overrides;
-  // ratchet-exempt(world-scope): parameter
-  const allocation = carrierAllocation(match.submittedItems, match.components, essenceIds);
-  if (allocation) {
+  const allocation = {
+    ...carrierAllocation(submittedItems, components, essenceIds),
+    ...funded?.essenceAllocation,
+  };
+  if (Object.keys(allocation).length > 0) {
     plan.ingredientEssenceAllocation = { stepId: step.id ?? null, ingredientSetId, allocation };
   }
   return plan;
+}
+
+/** The funded resolution, or null when the submitted units cannot fund the set. */
+function fundedSelection(resolveFunded, set) {
+  if (typeof resolveFunded !== 'function') return null;
+  try {
+    const selection = resolveFunded(set);
+    return selection?.success === true ? selection : null;
+  } catch (error) {
+    if (error instanceof CraftingLifecycleExecutionError) return null;
+    throw error;
+  }
 }
 
 /** `{ [itemKey]: submitted units }` over the records carrying any of `essenceIds`, or null. */
@@ -141,7 +169,7 @@ function submittedUnits(trusted, sourceActors) {
     submission.set(uuid, entry);
   }
   for (const { item, units } of submission.values()) {
-    if (!item || units > readStackQuantity(item)) {
+    if (!item || units > readStoredStackQuantity(item, { absentDefault: 1 })) {
       throw new CraftingLifecycleExecutionError(
         'The submitted alchemy ingredients are stale.',
         'STALE_ALCHEMY_SUBMISSION'
@@ -154,7 +182,10 @@ function submittedUnits(trusted, sourceActors) {
 /** The selection with the undrawn submitted units appended, or an unfunded throw. */
 function withResidual(selection, submission) {
   if (selection?.success !== true) {
-    throw new CraftingLifecycleExecutionError(UNFUNDED_MESSAGE, 'ALCHEMY_SUBMISSION_UNFUNDED');
+    throw Object.assign(
+      new CraftingLifecycleExecutionError(UNFUNDED_MESSAGE, 'ALCHEMY_SUBMISSION_UNFUNDED'),
+      { reason: 'alchemy-submission-unfunded' }
+    );
   }
   const plan = Array.isArray(selection.plan) ? selection.plan : [];
   const drawn = new Map();

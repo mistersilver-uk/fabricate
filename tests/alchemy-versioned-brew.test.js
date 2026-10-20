@@ -422,7 +422,8 @@ test('a matched brew the submission cannot fund is refused with nothing spent an
   const { started } = await startBrew(world, { crafter, source, componentIds: ['ember'] });
 
   assert.equal(started.success, false);
-  assert.equal(started.message, 'The submitted ingredients cannot fund this brew.');
+  assert.equal(started.reason, 'alchemy-submission-unfunded');
+  assert.equal(started.message, 'FABRICATE.App.Journal.Reason.AlchemySubmissionUnfunded');
   assert.equal(ember.system.quantity, 3, 'nothing is spent');
   assert.deepEqual(world.runManager.getActiveRuns(crafter), []);
   assert.deepEqual(world.runManager.getRunHistory(crafter), []);
@@ -512,4 +513,69 @@ test('a resumed journal with a consume-alchemy-extras receipt still hydrates its
   });
   assert.equal(state.consumedItems.length, 1);
   assert.deepEqual(state.resolvedEssences, { fire: 2 });
+});
+
+test('an alternative the submission fits but cannot spare is not pinned over one that funds', async () => {
+  const world = brewWorld(
+    brewRecipe([
+      { id: 'greens', options: [tag(['green']), component('salt')] },
+      { id: 'base', options: [component('herb')] },
+    ])
+  );
+  const herb = item('herb', 'Herb');
+  const salt = item('salt', 'Salt');
+  const source = new BrewActor('source', [herb, salt]);
+  const crafter = new BrewActor('crafter');
+
+  const { prepared, started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['herb', 'salt'],
+  });
+
+  assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, { greens: { optionIndex: 1 } });
+  assert.equal(started.success, true, started.message);
+  assert.equal(herb.deleted && salt.deleted, true);
+});
+
+test('an essence alternative whose carrier another group claims falls to the option that funds', async () => {
+  const world = brewWorld(
+    brewRecipe([
+      { id: 'core', options: [component('ember')] },
+      { id: 'heat', options: [essence('fire', 2), component('herb')] },
+    ])
+  );
+  const ember = item('ember', 'Ember');
+  const herb = item('herb', 'Herb');
+  const source = new BrewActor('source', [ember, herb]);
+  const crafter = new BrewActor('crafter');
+
+  const { prepared, started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['ember', 'herb'],
+  });
+
+  assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, { heat: { optionIndex: 1 } });
+  assert.equal(started.success, true, started.message);
+});
+
+test('an essence-only alternative group the matcher ignores never refuses as an unmade choice', async () => {
+  const world = brewWorld(
+    brewRecipe([
+      { id: 'base', options: [component('herb')] },
+      { id: 'heat', options: [essence('fire', 2), essence('frost', 1)] },
+    ]),
+    { essences: false }
+  );
+  const herb = item('herb', 'Herb');
+  const ember = item('ember', 'Ember');
+  const source = new BrewActor('source', [herb, ember]);
+  const crafter = new BrewActor('crafter');
+
+  const { started } = await startBrew(world, { crafter, source, componentIds: ['herb', 'ember'] });
+
+  assert.notEqual(started.message, 'Choose the crafting requirements before executing this step.');
+  assert.equal(started.success, true, started.message);
+  assert.equal(herb.deleted && ember.deleted, true, 'the whole bench is spent');
 });

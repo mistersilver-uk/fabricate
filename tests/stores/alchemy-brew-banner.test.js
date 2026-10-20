@@ -1,5 +1,6 @@
 /** Every reply shape the Workbench banner classifies (issue 2574). */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { serializedOperationResult } from '../../src/systems/journalRunReply.js';
@@ -117,4 +118,20 @@ test('a discovery rides every banner but a fizzle and a refusal', () => {
     read({ success: false, disposition: 'no-match' }, { discovered: 'Elixir' }).lastBrew.discovered,
     null
   );
+});
+
+test('an unfunded brew reaches the banner as a refusal in player wording', () => {
+  const en = JSON.parse(readFileSync(new URL('../../lang/en.json', import.meta.url), 'utf8'));
+  const leaf = (key) => key.split('.').reduce((node, part) => node?.[part], en);
+  const reply = {
+    success: false,
+    reason: 'alchemy-submission-unfunded',
+    message: 'FABRICATE.App.Journal.Reason.AlchemySubmissionUnfunded',
+  };
+  for (const shape of [reply, { ...reply, message: null }]) {
+    const { lastBrew, notice } = classifyBrewReply(shape, { localize: leaf, generic: 'Generic' });
+    assert.equal(lastBrew.status, 'refused');
+    assert.equal(lastBrew.message, 'The ingredients on the bench cannot cover this recipe.');
+    assert.equal(notice, lastBrew.message);
+  }
 });

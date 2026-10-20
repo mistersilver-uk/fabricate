@@ -638,21 +638,37 @@ export class CraftingEngine {
         submittedItemUuids,
       };
     }
+    const submittedComponentIds = submittedItems.map((entry) => entry.componentId);
+    const funding = {
+      matched: true,
+      activityKind: 'alchemy',
+      submittedItemUuids,
+      submittedComponentIds,
+    };
+    const steps = this._executionSteps(matchResult.recipe);
     return {
       success: true,
       matched: true,
       activityKind: 'alchemy',
       recipeId: matchResult.recipe.id,
       selectionPlan: deriveAlchemySelectionPlan({
-        steps: this._executionSteps(matchResult.recipe),
+        steps,
         ingredientSetId: matchResult.ingredientSetId,
         submittedItems,
         components,
         signatureValidator,
         system,
+        resolveFunded: (set) =>
+          this._resolveCraftSelection(
+            sourceActors,
+            submissionFundedSet(set, funding, sourceActors),
+            this._buildStepRecipeView(matchResult.recipe, steps[0]),
+            actor,
+            resolveAlchemySubmissionComponent
+          ),
       }),
       submittedItemUuids,
-      submittedComponentIds: submittedItems.map((entry) => entry.componentId),
+      submittedComponentIds,
     };
   }
 
@@ -873,7 +889,8 @@ export class CraftingEngine {
   async _discardFailedVersionedStart(actor, runId, error) {
     const discarded = await this._craftingRunManager().discardUnappliedRun(actor, runId);
     if (!discarded) throw error;
-    return versionedFailure(error?.message || 'The crafting stage could not be started.');
+    const failure = versionedFailure(error?.message || 'The crafting stage could not be started.');
+    return error?.reason ? { ...failure, reason: error.reason } : failure;
   }
 
   /** Why a versioned run may not start, `null` when it may: no recipe or actor, a viewer it is not
