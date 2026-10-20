@@ -242,12 +242,20 @@ test('submitAlchemyAttempt: a ready matched brew executes in the same call (issu
     user: OWNER,
     actors: [targetActor()],
     systems: [{ system: SYSTEM, recipes: [VIGOR, TOXIN] }],
-    craftAlchemyResult: versionedBrewStartReply({ status: 'inProgress', canExecuteImmediately: true }),
+    craftAlchemyResult: versionedBrewStartReply({
+      status: 'inProgress',
+      canExecuteImmediately: true,
+    }),
   });
   const commands = [];
   facade.executeJournalRunCommand = async (command, options) => {
     commands.push({ command, options });
-    return { success: true, disposition: 'succeeded', runId: command.runId, createdResultUuids: ['Item.made'] };
+    return {
+      success: true,
+      disposition: 'succeeded',
+      runId: command.runId,
+      createdResultUuids: ['Item.made'],
+    };
   };
   const result = await facade.submitAlchemyAttempt({
     actorId: 'pc',

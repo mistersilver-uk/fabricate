@@ -222,7 +222,10 @@ export function makeFacadeManagers(entries) {
  * A version-1 alchemy start reply in the shape the command layer serializes: waiting on world time
  * by default, so the facade returns it without an execute.
  */
-export function versionedBrewStartReply({ status = 'waitingTime', canExecuteImmediately = false } = {}) {
+export function versionedBrewStartReply({
+  status = 'waitingTime',
+  canExecuteImmediately = false,
+} = {}) {
   const run = { id: 'brew-run', status, runRevision: 2, currentStepIndex: 0 };
   return serializedOperationResult({
     ...versionedTransitionResult(run, { success: true, disposition: 'started' }),
