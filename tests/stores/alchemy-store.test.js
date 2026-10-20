@@ -775,18 +775,25 @@ describe('alchemyStore', () => {
   });
 
   // Issue 2574: the start spent the bench, so the reply reads as the live run it left.
-  const liveRunReplies = {
-    'a roll dismissed after the start': afterStart({
-      success: false,
-      cancelled: true,
-      reason: 'roll-cancelled',
-    }),
-    'an execute refused after the start': afterStart({ success: false, reason: 'stale-run' }),
-    'a start the call did not resolve': startReply('inProgress', false),
-    'a start waiting on world time': startReply('waitingTime', false),
-  };
-  for (const [label, reply] of Object.entries(liveRunReplies)) {
-    it(`${label} clears the bench and banners the live run as brewing`, async () => {
+  const INTERRUPTED = 'FABRICATE.App.Alchemy.Banner.Interrupted';
+  const liveRunReplies = [
+    [
+      'a roll dismissed after the start',
+      afterStart({ success: false, cancelled: true, reason: 'roll-cancelled' }),
+      'interrupted',
+      [],
+    ],
+    [
+      'an execute refused after the start',
+      afterStart({ success: false, reason: 'stale-run' }),
+      'interrupted',
+      [INTERRUPTED],
+    ],
+    ['a start the call did not resolve', startReply('inProgress', false), 'started', []],
+    ['a start waiting on world time', startReply('waitingTime', false), 'brewing', []],
+  ];
+  for (const [label, reply, status, toastKeys] of liveRunReplies) {
+    it(`${label} clears the bench and banners the live run as ${status}`, async () => {
       const harness = makeServices({ submitAlchemyAttempt: async () => reply });
       const store = createAlchemyStore({ services: harness.services });
       await store.load();
@@ -796,12 +803,54 @@ describe('alchemyStore', () => {
       await store.brew();
       flushSync();
       assert.equal(store.benchEmpty, true, 'the spent bench is cleared');
-      assert.equal(store.lastBrew.status, 'brewing', 'never a success or a refusal');
+      assert.equal(store.lastBrew.status, status, 'never a success or a refusal');
       assert.equal(harness.calls.list.length, 2, 'the listing reloads');
-      const toasts = reply.reason && !reply.cancelled ? 1 : 0;
-      assert.equal(harness.calls.notify.length, toasts);
+      assert.deepEqual(harness.calls.notify, toastKeys.map(langLeaf));
+      for (const key of toastKeys) assert.ok(langLeaf(key), `${key} is shipped`);
     });
   }
+
+  it('a brew that throws keeps the bench, reloads, and claims nothing about consumption', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => {
+        throw new Error('raw socket failure');
+      },
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+    const worded = langLeaf('FABRICATE.App.Alchemy.Banner.Unknown');
+    assert.ok(worded, 'the neutral copy is shipped');
+    assert.equal(store.benchEmpty, false, 'the outcome is unknown, so the bench stays');
+    assert.equal(harness.calls.list.length, 2, 'holdings refresh');
+    assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', worded]);
+    assert.deepEqual(harness.calls.notify, [worded]);
+  });
+
+  it('does not switch discipline while a brew is in flight', async () => {
+    let settle;
+    const system = (id, name) => ({ id, name, img: null, description: '', knownCount: 0 });
+    const harness = makeServices({
+      listing: baseListing({ systems: [system('sys-a', 'Herbalism'), system('sys-b', 'Venoms')] }),
+      submitAlchemyAttempt: () => new Promise((resolve) => (settle = resolve)),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    const brewing = store.brew();
+    flushSync();
+    store.switchDiscipline();
+    flushSync();
+    assert.equal(store.activeSystemId, 'sys-a', 'the discipline is kept mid-brew');
+    settle(afterStart(executeReply({ success: true, disposition: 'succeeded' })));
+    await brewing;
+  });
 
   for (const [success, status] of [
     [true, 'success'],

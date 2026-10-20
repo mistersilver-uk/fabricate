@@ -1,10 +1,14 @@
 /**
  * The Workbench's reading of one `submitAlchemyAttempt` reply (issue 2574). Statuses:
  * `success` and `tiered-tier` for a passed brew; `produced-on-failure` for a failed check that
- * yielded results; `check-failed` for a failed check; `brewing` for a run the call left live;
- * `no-match-fizzle` for `disposition: 'no-match'` only; `refused` for anything else.
+ * yielded results; `check-failed` for a failed check; `brewing` for a run waiting on world time;
+ * `started` for a start the call did not resolve; `interrupted` for an execute that did not finish
+ * after its start; `no-match-fizzle` for `disposition: 'no-match'` only; `refused` otherwise.
  * A version-1 start spends the bench, so a reply carrying its run never reads as a refusal.
  */
+
+const INTERRUPTED_KEY = 'FABRICATE.App.Alchemy.Banner.Interrupted';
+const UNRESOLVED_STATUSES = new Set(['inProgress', 'waitingTime']);
 import { journalCommandRefusal } from '../../presenters/additionalDicePrompt.js';
 import { isResolvedFailureOutcome } from '../util/journalRunReasons.js';
 
@@ -46,8 +50,9 @@ export function classifyBrewReply(
 ) {
   const banner = (status, message = '') => ({ status, discovered, message });
   if (result?.success === true) {
-    if (startedRun(result) && result.disposition === 'started') {
-      return { lastBrew: banner('brewing'), notice: '' };
+    if (result.status === 'waitingTime') return { lastBrew: banner('brewing'), notice: '' };
+    if (result.disposition === 'started' || UNRESOLVED_STATUSES.has(result.status)) {
+      return { lastBrew: banner('started'), notice: '' };
     }
     const status = tiered ? 'tiered-tier' : 'success';
     return { lastBrew: banner(status, wordedMessage(result, localize)), notice: '' };
@@ -72,13 +77,18 @@ export function classifyBrewReply(
       notice: '',
     };
   }
+  // Bought dice already raised their one warning, and a dismissed roll is the player's choice.
+  const quiet = result?.additionalDiceRefusal || result?.cancelled === true;
+  if (startedRun(result)) {
+    // The start spent the bench, so no reason text may claim nothing was consumed.
+    const interrupted = typeof localize === 'function' ? localize(INTERRUPTED_KEY) : '';
+    return { lastBrew: banner('interrupted'), notice: quiet ? '' : interrupted || INTERRUPTED_KEY };
+  }
   const refusal = journalCommandRefusal(
     { ...result, message: wordedMessage(result, localize) },
     localize,
     generic
   );
-  // Bought dice already raised their one warning, and a dismissed roll is the player's choice.
-  const notice = result?.additionalDiceRefusal || result?.cancelled === true ? '' : refusal;
-  if (startedRun(result)) return { lastBrew: banner('brewing'), notice };
+  const notice = quiet ? '' : refusal;
   return { lastBrew: { status: 'refused', discovered: null, message: refusal }, notice };
 }

@@ -381,7 +381,7 @@ export function createAlchemyStore({ services } = {}) {
 
   /** Return to the chooser, resetting workbench/selection/last-brew/search. */
   function switchDiscipline() {
-    if (!canSwitch) return;
+    if (!canSwitch || brewInFlight) return;
     activeSystemId = null;
     services?.setSelectedAlchemySystemId?.('');
     resetBench();
@@ -512,8 +512,11 @@ export function createAlchemyStore({ services } = {}) {
       if (banner.notice) services?.notify?.(banner.notice);
       return result ?? null;
     } catch (err) {
-      services?.notify?.(services?.craftErrorMessage?.() ?? '');
-      lastBrew = { status: 'refused', discovered: null, message: err?.message ?? String(err) };
+      // The start may already have spent the bench, so the bench stays and no copy claims either.
+      const unknown = services?.localize?.('FABRICATE.App.Alchemy.Banner.Unknown') ?? '';
+      services?.notify?.(unknown);
+      lastBrew = { status: 'refused', discovered: null, message: unknown };
+      await load(true);
       return { success: false, results: null, message: err?.message ?? String(err) };
     } finally {
       brewInFlight = false;

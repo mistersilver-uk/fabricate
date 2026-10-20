@@ -43,7 +43,13 @@ const cases = [
     '',
     { tiered: true },
   ],
-  ['an unresolved start', started('inProgress', false), 'brewing', ''],
+  ['an unresolved start', started('inProgress', false), 'started', ''],
+  [
+    'a success reply whose run is still in progress',
+    { ...started(), disposition: null },
+    'started',
+    '',
+  ],
   ['a start waiting on time', started('waitingTime', false), 'brewing', ''],
   [
     'the legacy timed start',
@@ -73,14 +79,20 @@ const cases = [
   [
     'a dismissed roll after the start',
     { ...started(), success: false, cancelled: true, reason: 'roll-cancelled' },
-    'brewing',
+    'interrupted',
     '',
   ],
   [
     'an execute refused after the start',
     { ...started(), success: false, reason: 'stale-run' },
-    'brewing',
-    'worded:FABRICATE.App.Journal.Reason.StaleRun',
+    'interrupted',
+    'worded:FABRICATE.App.Alchemy.Banner.Interrupted',
+  ],
+  [
+    'an execute that failed after the start, naming nothing',
+    { ...started(), success: false, reason: 'operation-failed' },
+    'interrupted',
+    'worded:FABRICATE.App.Alchemy.Banner.Interrupted',
   ],
   [
     'an authority refusal',
@@ -131,7 +143,10 @@ test('an unfunded brew reaches the banner as a refusal in player wording', () =>
   for (const shape of [reply, { ...reply, message: null }]) {
     const { lastBrew, notice } = classifyBrewReply(shape, { localize: leaf, generic: 'Generic' });
     assert.equal(lastBrew.status, 'refused');
-    assert.equal(lastBrew.message, 'The ingredients on the bench cannot cover this recipe.');
+    assert.equal(
+      lastBrew.message,
+      'These ingredients cannot be combined as placed. Nothing was spent.'
+    );
     assert.equal(notice, lastBrew.message);
   }
 });
