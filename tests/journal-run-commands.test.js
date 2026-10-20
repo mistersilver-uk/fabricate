@@ -359,6 +359,56 @@ describe('journal run command protocol', () => {
     }
   }
 
+  for (const kind of ['matched', 'fizzle']) {
+    it(`prepares a ${kind} alchemy start whose trusted context is plain data (issue 2574)`, async () => {
+      const oldGlobals = { game: globalThis.game };
+      try {
+        // Foundry Documents keep `uuid`, `id` and `parent` on the prototype, so a clone drops them.
+        class PrototypeItem {
+          constructor(id, parent) {
+            this._id = id;
+            this._parent = parent;
+            this.name = 'Herb';
+            this.system = { quantity: 2 };
+          }
+          get id() { return this._id; }
+          get uuid() { return `${this._parent.uuid}.Item.${this._id}`; }
+          get parent() { return this._parent; }
+        }
+        const actor = { id: 'a', uuid: 'Actor.a', items: [] };
+        const item = new PrototypeItem('herb', actor);
+        actor.items = [item];
+        const system = { id: 'system', resolutionMode: 'alchemy', features: { essences: true },
+          components: [{ id: 'herb', name: 'Herb', essences: { life: 1 } }], alchemy: {} };
+        let recipes = [];
+        globalThis.game = { fabricate: {
+          getCraftingSystemManager: () => ({ getSystem: () => system }),
+          getRecipeManager: () => ({ getRecipes: () => recipes }),
+        } };
+        const set = new IngredientSet({ id: 'set', ingredientGroups: [{ id: 'g',
+          options: [{ match: { type: 'essence', essenceId: 'life', amount: 2 }, quantity: 1 }] }] });
+        const recipe = new Recipe({ id: 'recipe', name: 'Brew', craftingSystemId: 'system',
+          enabled: true, ingredientSets: [set] });
+        recipes = kind === 'matched' ? [recipe] : [];
+        const engine = new CraftingEngine({ getRecipes: () => recipes });
+        engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({ operationId: 'p' }) });
+        const operations = loadCraftingOperations()({ craftingEngine: engine,
+          craftingSystemManager: { getSystem: () => system } }, () => null);
+        const prepared = await operations.prepareStart({ actor, preparationGrant: 'grant',
+          requestId: 'prepare', payload: { activityKind: 'alchemy', craftingSystemId: 'system',
+            submittedItems: [{ itemUuid: item.uuid, componentId: 'herb' },
+              { itemUuid: item.uuid, componentId: 'herb' }] } });
+
+        assert.equal(prepared.success, true, prepared.reason);
+        assert.equal(prepared.trustedContext.matched, kind === 'matched');
+        assert.deepStrictEqual(structuredClone(prepared.trustedContext), prepared.trustedContext);
+        assert.deepStrictEqual(structuredClone(prepared.payload), prepared.payload);
+      } finally {
+        Object.assign(globalThis, oldGlobals);
+      }
+    });
+  }
+
   it('redacts initial crafting prompts for the attested sender rather than the executing GM', async () => {
     const originalGame = globalThis.game;
     const originalFromUuid = globalThis.fromUuid;
