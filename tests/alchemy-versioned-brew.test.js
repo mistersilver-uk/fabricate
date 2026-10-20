@@ -514,7 +514,10 @@ test('consumeOnFail false also returns the residual units the start spent', asyn
     (effect) => effect.effectId === 'refund-start-consumption'
   );
   assert.equal(refund.receipt.restoredCount, 2);
-  assert.deepEqual(brew.source.created.map((made) => made.name).sort(), ['Herb', 'Salt']);
+  assert.deepEqual(
+    brew.source.created.map((made) => made.name).sort((a, b) => a.localeCompare(b)),
+    ['Herb', 'Salt']
+  );
 });
 
 test('cancelling a started brew returns its residual units as well', async () => {
@@ -532,7 +535,10 @@ test('cancelling a started brew returns its residual units as well', async () =>
   });
   assert.equal(cancelled.refunded, true);
   assert.equal(cancelled.restoredCount, 2);
-  assert.deepEqual(brew.source.created.map((made) => made.name).sort(), ['Herb', 'Salt']);
+  assert.deepEqual(
+    brew.source.created.map((made) => made.name).sort((a, b) => a.localeCompare(b)),
+    ['Herb', 'Salt']
+  );
 });
 
 test('a Tiered brew that fails keeps the generic consumption policy', async () => {
