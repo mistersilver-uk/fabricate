@@ -2286,6 +2286,7 @@ The button's label is part of the live region: an `update` that changes it is an
 An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
 An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so where it does, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The action button is the first `button` inside `target` and the dismiss control the last, so `target.querySelector('button')` reaches the action and the last of `target.querySelectorAll('button')` the dismissal.
+Reach them by that order and not by a `data-notice-*` name, which is the notice's own and private.
 In a host that replaces its content on render (DialogV2, a Handlebars part) the action button is a new element after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus the action button.
 The keyboard ring is the accent, 2px outside each button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
 `dismissable` is optional, `true` or `false`, and draws a dismiss control after the action.
@@ -2295,6 +2296,7 @@ Escape dismisses nothing.
 The control's face is the xmark glyph alone; no tooltip shows its name.
 Dismissal is final for the mount.
 In `onDismiss`, move focus to the destination [Ownership and theme](#ownership-and-theme) orders, starting at the next control, since the press leads nowhere, and then call `destroy`.
+Where no sensible next control exists, focus `target`'s container or the control that opened the notice.
 Removing the focused dismiss button drops focus to `body`, where Foundry's Escape closes every open window, so move focus to a control before `onDismiss` returns.
 An `update` after dismissal is validated, returns `true` and draws nothing.
 Until `destroy`, `target` still holds the mount, so a `mount` into it throws `target already holds a published component`.
@@ -2661,7 +2663,7 @@ A `text` prop that is `undefined`, absent or `''` is omitted, so the component's
 A `slot` prop is a content slot, a place where the component draws your own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it, and it is never required.
 A `callback` prop takes a function, and `undefined` or absence omits it, so the component's own default applies.
-A required `callback` prop, or one `requiredWhen` names a prop that is truthy, refuses absence and `undefined` with `<name> requires a non-empty "<key>"`, and any value that is not a function, `''` included, with `"<key>" must be a function`.
+A required `callback` prop refuses absence and `undefined` with `<name> requires a non-empty "<key>"`, and one whose `requiredWhen` names a prop that is truthy refuses them with `<name> requires a non-empty "<key>" when "<other>" is truthy`; either refuses any value that is not a function, `''` included, with `"<key>" must be a function`.
 The component holds one stable stand-in for your function for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
 Fabricate calls your function with the arguments the component's section states, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
 The call is synchronous, inside the user's event, after the component has finished its own state change; a published callback is never called while Fabricate renders or runs an effect.

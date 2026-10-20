@@ -718,7 +718,7 @@ Each group states the accepted values of every key that entry publishes.
   - The control's face is the xmark glyph alone; no tooltip shows its name.
   - Dismissal is final for the mount.
     In `onDismiss` the companion moves focus to the destination "Fabricate moves no focus" orders, starting at the next control, since the press leads nowhere, and then calls `destroy`.
-    Removing the focused dismiss button drops focus to `body`, where Foundry's Escape closes every open window, so `onDismiss` moves focus to a control before it returns.
+    Removing the focused dismiss button drops focus to `body`, where Foundry's Escape closes every open window; `onDismiss` must move focus to a control before it returns.
     An `update` after dismissal is validated, returns `true` and draws nothing.
     Until `destroy`, `target` still holds the mount, so a `mount` into it throws M5.
     A notice is shown again only by a new `mount`, which is a new announcement.
