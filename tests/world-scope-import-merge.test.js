@@ -10,6 +10,7 @@ import {
   mergedEntityIds,
   mergedMembershipUnion,
   recheckWorldDefault,
+  scopeMembershipSeeds,
   sliceRecords,
 } from '../src/systems/worldScopeImportMerge.js';
 
@@ -75,7 +76,10 @@ const PRECONDITION_CASES = [
     // The positive half, so no arm above can pass by declining everything.
     entityType: 'components',
     record: { id: 'c1', category: 'ore' },
-    members: [member('c1', 'sys-a', { category: 'metal' }), member('c1', 'sys-b', { category: 'ore' })],
+    members: [
+      member('c1', 'sys-a', { category: 'metal' }),
+      member('c1', 'sys-b', { category: 'ore' }),
+    ],
     expectSections: ['category'],
     expectDeclined: [],
   },
@@ -223,7 +227,8 @@ for (const scenario of [
     );
     // A record left carrying only its `id` is NOT written at all, applying the election's own
     // rule; a record with something left keeps its id.
-    if (scenario.expectSections.length === 0) assert.ok(!record, 'an id-only record is not written');
+    if (scenario.expectSections.length === 0)
+      assert.ok(!record, 'an id-only record is not written');
     else assert.equal(record.id, scenario.record.id, 'and a surviving record keeps its id');
   });
 }
@@ -308,8 +313,31 @@ test('membershipKeySet: keys the union with the shipped separator', () => {
   // Constraint (d) asks its question in `(componentId, systemId)` space, so this set has to agree
   // with the store's own key derivation rather than with a second spelling of it.
   assert.deepEqual(
-    [...membershipKeySet([{ entityId: 'c1', systemId: 'sys-a' }, { entityId: 'c1', systemId: 'sys-b' }])],
+    [
+      ...membershipKeySet([
+        { entityId: 'c1', systemId: 'sys-a' },
+        { entityId: 'c1', systemId: 'sys-b' },
+      ]),
+    ],
     [membershipKey('c1', 'sys-a'), membershipKey('c1', 'sys-b')],
     'one key per pair, derived exactly as the store derives it'
   );
+});
+
+test('scopeMembershipSeeds: the essence and tool memberships by entity id, first record wins', () => {
+  // Issue 2554: the manager rewrites each seed's `systemId`; components register elsewhere.
+  const first = { entityId: 't1', systemId: 'payload-sys', inherit: { bonus: false } };
+  const seeds = scopeMembershipSeeds({
+    componentScope: { membership: [{ entityId: 'c1', systemId: 'payload-sys' }] },
+    essenceScope: {
+      membership: { 'fire|payload-sys': { entityId: 'fire', systemId: 'payload-sys' } },
+    },
+    toolScope: { membership: [first, { entityId: 't1', systemId: 'other' }, { systemId: 'x' }] },
+  });
+  assert.deepEqual(seeds, {
+    essences: { fire: { entityId: 'fire', systemId: 'payload-sys' } },
+    tools: { t1: first },
+  });
+  assert.notEqual(seeds.tools.t1, first, 'a copy, so the payload is never reached');
+  assert.deepEqual(scopeMembershipSeeds(null), { essences: {}, tools: {} });
 });

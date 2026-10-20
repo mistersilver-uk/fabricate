@@ -111,7 +111,7 @@ function intersectionSize(refs, candidateRefs) {
   return size;
 }
 
-function reportEntry(kind, ownerType, owner, referenceValue) {
+export function reportEntry(kind, ownerType, owner, referenceValue) {
   return {
     kind,
     ownerType,
@@ -767,7 +767,7 @@ function eventLinkIds(env) {
   return ids;
 }
 
-function systemSlice(gatheringConfig) {
+export function systemSlice(gatheringConfig) {
   if (!gatheringConfig || typeof gatheringConfig !== 'object') return {};
   // Export shape: { system: <slice>, shared: {...} }.
   if (gatheringConfig.system && typeof gatheringConfig.system === 'object') {

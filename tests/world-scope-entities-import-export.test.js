@@ -6,26 +6,19 @@ import test from 'node:test';
 import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHarness.js';
 
-
 installFoundryUtilsEnv();
 
-const { buildExportPayload, prepareForImport, validateImportData } = await import(
-  '../src/systems/CraftingSystemExporter.js'
-);
+const { buildExportPayload, prepareForImport, validateImportData } =
+  await import('../src/systems/CraftingSystemExporter.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { reportWorldIdentityDrift } = await import('../src/systems/worldIdentityDrift.js');
 const { REFERENCE_KINDS } = await import('../src/systems/importReferenceResolver.js');
-const { buildWorldScopeGrouping } = await import(
-  '../src/systems/worldScopeEntityGrouping.js'
-);
-const { migrateWorldScopeEntities } = await import(
-  '../src/migration/migrateWorldScopeEntities.js'
-);
+const { buildWorldScopeGrouping } = await import('../src/systems/worldScopeEntityGrouping.js');
+const { migrateWorldScopeEntities } = await import('../src/migration/migrateWorldScopeEntities.js');
 const { resolveComponentScope } = await import('../src/systems/componentScope.js');
-const { CompendiumImporter, scopeStoreDelegate } = await import(
-  '../src/systems/CompendiumImporter.js'
-);
+const { CompendiumImporter, scopeStoreDelegate } =
+  await import('../src/systems/CompendiumImporter.js');
 const { bindFabricateGlobal } = await import('../src/bootstrap/publicApi.js');
 const { createManagerServices } = await import('../src/ui/managerServices.js');
 
@@ -450,7 +443,7 @@ test('14: the DEFAULTS and MEMBERSHIP destination-wins guards, with a COLLIDING 
   assert.equal(
     persisted.membership[`c1|${SOURCE_SYSTEM_ID}`].category,
     'destination-member',
-    "a COLLIDING membership record loses to the destination, hand edits and all"
+    'a COLLIDING membership record loses to the destination, hand edits and all'
   );
 
   // The positive half, so neither assertion above can pass because the merge simply did nothing.
@@ -681,7 +674,11 @@ test('13: every membership record the import writes names the DESTINATION system
   const overwritten = Object.values(world.persisted('components').membership);
   assert.ok(overwritten.length > 0, 'the overwrite wrote a membership record');
   for (const record of overwritten) {
-    assert.equal(record.systemId, 'dest-sys', 'the record follows the RESOLVED id, not the payload');
+    assert.equal(
+      record.systemId,
+      'dest-sys',
+      'the record follows the RESOLVED id, not the payload'
+    );
   }
   assert.equal(
     overwritten.filter((record) => record.systemId === SOURCE_SYSTEM_ID).length,
@@ -923,7 +920,12 @@ test('19: a multi-match binds to the largest intersection, reports the losers, a
     envelope({
       system: {
         components: [
-          { id: 'incoming', name: 'Incoming', originItemUuid: 'Item.x', aliasItemUuids: ['Item.y'] },
+          {
+            id: 'incoming',
+            name: 'Incoming',
+            originItemUuid: 'Item.x',
+            aliasItemUuids: ['Item.y'],
+          },
         ],
       },
     });
@@ -1318,16 +1320,27 @@ test('11: both import call sites bind against the destination index their access
     getGatheringEnvironmentStore: () => null,
   };
   globalThis.foundry.applications = {
-    api: { DialogV2: { prompt: async () => ({ file: { text: async () => text }, conflictMode: 'copy' }) } },
+    api: {
+      DialogV2: {
+        prompt: async () => ({ file: { text: async () => text }, conflictMode: 'copy' }),
+      },
+    },
   };
-  globalThis.ui = { notifications: { info() {}, warn() {}, error: (message) => assert.fail(message) } };
+  globalThis.ui = {
+    notifications: { info() {}, warn() {}, error: (message) => assert.fail(message) },
+  };
   const manager = await captureImport(() =>
-    createManagerServices({ adminStore: () => ({ refresh: async () => {} }) }).renderSystemImportDialog()
+    createManagerServices({
+      adminStore: () => ({ refresh: async () => {} }),
+    }).renderSystemImportDialog()
   );
 
   // Each leg against its OWN store: the ids are disjoint across kinds, so a dropped or cross-wired
   // essence or tool leg loses its collision entry.
-  for (const [site, [{ packData }]] of [['the public API', published], ['the Manager', manager]]) {
+  for (const [site, [{ packData }]] of [
+    ['the public API', published],
+    ['the Manager', manager],
+  ]) {
     assert.deepEqual(
       packData.system.components.map((entry) => entry.id),
       ['dest-1'],
@@ -1667,12 +1680,21 @@ test('16(f): with the component scope UNSEEDED, a component-referencing section 
     essenceScope: emptySeededScope(),
     toolScope: emptySeededScope(),
   });
-  assert.equal(world.stores.components.isSeeded('entities'), false, 'the component scope is UNSEEDED');
+  assert.equal(
+    world.stores.components.isSeeded('entities'),
+    false,
+    'the component scope is UNSEEDED'
+  );
 
   const { summary } = await runImport(
     world,
     envelope({
-      system: { tools: [{ id: 't1', name: 'Hammer' }, { id: 't2', name: 'Anvil' }] },
+      system: {
+        tools: [
+          { id: 't1', name: 'Hammer' },
+          { id: 't2', name: 'Anvil' },
+        ],
+      },
       toolScope: slice({
         entities: [
           { id: 't1', name: 'Hammer' },
@@ -1759,9 +1781,18 @@ test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system
     }
   );
 
-  assert.deepEqual(payload.componentScope.membership.map((r) => r.entityId), ['mine']);
-  assert.deepEqual(payload.componentScope.entities.map((r) => r.id), ['mine']);
-  assert.deepEqual(payload.componentScope.defaults.map((r) => r.id), ['mine']);
+  assert.deepEqual(
+    payload.componentScope.membership.map((r) => r.entityId),
+    ['mine']
+  );
+  assert.deepEqual(
+    payload.componentScope.entities.map((r) => r.id),
+    ['mine']
+  );
+  assert.deepEqual(
+    payload.componentScope.defaults.map((r) => r.id),
+    ['mine']
+  );
 });
 // The 1.34.0 equivalent-essence merge over the bundle (issue 1654)
 
@@ -1836,4 +1867,118 @@ test('1654: a bundle with nothing to merge is untouched, and grows no key it did
   });
   assert.deepEqual(sparse.gatheringConfig, { shared: {} }, 'no `system` slice is invented');
   assert.equal('recipes' in sparse, false, 'and no `recipes` array is invented');
+});
+
+// Issue 2554 — registration at the save chokepoint, in a world at `1.36.0`
+
+/** `foundry.utils.parseUuid`'s `embedded` answer for the uuid spellings these fixtures use. */
+function parseUuid(uuid) {
+  const parts = String(uuid).split('.');
+  return { embedded: parts.slice(parts[0] === 'Compendium' ? 5 : 2) };
+}
+
+/** A destination world that registers at the chokepoint. */
+async function registeringWorld(options) {
+  const world = await destinationWorld(options);
+  world.settings.set('migrationVersion', '1.36.0');
+  globalThis.foundry.utils.parseUuid = parseUuid;
+  return world;
+}
+
+test('2554: an incoming membership seeds registration, so the later merge adds nothing', async () => {
+  const world = await registeringWorld({
+    componentScope: emptySeededScope(),
+    essenceScope: emptySeededScope(),
+    toolScope: emptySeededScope(),
+  });
+  const seed = membershipRecord('fire', SOURCE_SYSTEM_ID, {
+    inherit: { macro: false },
+    macro: 'Macro.own',
+    enabled: false,
+  });
+  const payload = envelope({
+    system: { essenceDefinitions: [{ id: 'fire', name: 'Fire' }] },
+    essenceScope: slice({ entities: [{ id: 'fire', name: 'Fire' }], membership: [seed] }),
+  });
+
+  const { summary } = await runImport(world, payload);
+
+  const record = world.persisted('essences').membership[`fire|${summary.system.id}`];
+  assert.deepEqual(record.inherit, { macro: false }, 'the seed, not a registration-built shape');
+  assert.equal(record.macro, 'Macro.own');
+  assert.equal(record.enabled, false);
+  assert.equal(Object.keys(world.persisted('essences').membership).length, 1);
+});
+
+test('2554: copy mode rebinds a Tool whose source matches exactly one world Tool', async () => {
+  const world = await registeringWorld({
+    componentScope: emptySeededScope(),
+    essenceScope: emptySeededScope(),
+    toolScope: {
+      entities: [{ id: 'world-saw', name: 'Saw', registeredItemUuid: 'Item.saw' }],
+      defaults: {},
+      membership: {},
+    },
+  });
+  const resultGroups = [{ id: 'g1', results: [{ componentId: 'c1', quantity: 1 }] }];
+  const payload = envelope({
+    system: {
+      components: [component('c1', { salvage: { enabled: true, toolIds: ['t1'], resultGroups } })],
+      tools: [{ id: 't1', name: 'Saw', registeredItemUuid: 'Item.saw' }],
+    },
+  });
+
+  const { packData, summary } = await runImport(world, payload, { mode: 'copy' });
+
+  assert.equal(packData.system.tools[0].id, 'world-saw');
+  assert.deepEqual(packData.system.components[0].salvage.toolIds, ['world-saw']);
+  assert.deepEqual(
+    packData.toolScope.entities.map((entity) => entity.id),
+    [],
+    'the matched incoming roster record is dropped'
+  );
+  const persisted = world.persisted('tools');
+  assert.deepEqual(
+    persisted.entities.map((entity) => entity.id),
+    ['world-saw']
+  );
+  assert.ok(persisted.membership[`world-saw|${summary.system.id}`]);
+  assert.equal(reported(summary, REFERENCE_KINDS.WORLD_ENTITY_COLLISION).length, 0);
+});
+
+test('2554: keep mode never re-keys a Tool, and registration seeds an unseeded scope', async () => {
+  const world = await registeringWorld({
+    toolScope: {
+      entities: [{ id: 'world-saw', name: 'Saw', registeredItemUuid: 'Item.saw' }],
+      defaults: {},
+      membership: {},
+    },
+  });
+  const payload = envelope({
+    system: {
+      essenceDefinitions: [{ id: 'fire', name: 'Fire' }],
+      tools: [
+        { id: 't1', name: 'Saw', registeredItemUuid: 'Item.saw' },
+        { id: 't2', name: 'Awl', registeredItemUuid: 'Item.awl' },
+      ],
+    },
+  });
+
+  const { packData, summary } = await runImport(world, payload);
+
+  assert.deepEqual(
+    packData.system.tools.map((tool) => tool.id),
+    ['t1', 't2']
+  );
+  const essences = world.persisted('essences');
+  assert.deepEqual(
+    essences.entities.map((entity) => entity.id),
+    ['fire'],
+    'an unseeded essence scope is seeded by registration'
+  );
+  assert.ok(essences.membership[`fire|${summary.system.id}`]);
+  const tools = world.persisted('tools');
+  for (const id of ['t1', 't2']) {
+    assert.ok(tools.membership[`${id}|${summary.system.id}`], `${id} is registered under its id`);
+  }
 });

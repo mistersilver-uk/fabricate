@@ -12,6 +12,9 @@ import { Tool } from '../../models/Tool.js';
 import { findRegisteredDefinition, settleCompendiumClaim } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, TOOL_FACTS } from './collaborators.js';
+import { resolveStoreSeam } from './scopeStoreSeams.js';
+import { registrationRows, toolReferencesOf } from './worldScopeIdentityRegistration.js';
+import { allSharing, indexRoster, sourceKeys } from './worldScopeRoster.js';
 
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
@@ -25,7 +28,21 @@ export function toolSourcesCollaborators(manager) {
     buildToolSourceSnapshot: (itemUuid, source) =>
       manager._buildToolSourceSnapshot(itemUuid, source),
     stampSourceIdentity: (source, flagKey, id) => manager._stampSourceIdentity(source, flagKey, id),
+    worldToolEntities: () => resolveStoreSeam(manager._toolScopeStore)?.listEntities?.() ?? [],
+    parseUuid: () => globalThis.foundry?.utils?.parseUuid,
   };
+}
+
+/** The id of the single world Tool sharing `candidate`'s source (issue 2554), or `null` when none
+ * or several do, or `system` already holds a row under it. */
+function worldToolIdFor(io, system, candidate) {
+  const referencesOf = toolReferencesOf(io.parseUuid());
+  const keys = sourceKeys(candidate, referencesOf);
+  if (keys.size === 0) return null;
+  const sharing = allSharing(indexRoster(io.worldToolEntities(), referencesOf), keys);
+  if (sharing.length !== 1) return null;
+  const id = sharing[0].id;
+  return registrationRows(system, 'tools').has(id) ? null : id;
 }
 
 async function resolveToolSourceItem(itemUuid) {
@@ -101,7 +118,7 @@ async function restoreSourceProvenance({ source, provenance }) {
   if (Object.keys(patch).length > 0) await source.update(patch);
 }
 
-async function rollbackToolTransaction(io, system, previousTools, sourceFlagStates, cause) {
+async function rollbackToolTransaction(io, system, previousTools, sourceFlagStates, cause, saved) {
   const errors = [cause];
   system.tools = previousTools; // ratchet-exempt(world-scope): writer
   for (let index = sourceFlagStates.length - 1; index >= 0; index -= 1) {
@@ -122,6 +139,11 @@ async function rollbackToolTransaction(io, system, previousTools, sourceFlagStat
   } catch (error) {
     errors.push(error);
   }
+  try {
+    await saved?.compensate?.();
+  } catch (error) {
+    errors.push(error);
+  }
   if (errors.length > 1) {
     throw new AggregateError(errors, 'Tool transaction failed and rollback was incomplete');
   }
@@ -130,7 +152,7 @@ async function rollbackToolTransaction(io, system, previousTools, sourceFlagStat
 
 async function applyToolSourceFlagChanges(
   io,
-  { system, previousTools, source, previousSourceUuid, nextSourceUuid, flagKey, toolId }
+  { system, previousTools, source, previousSourceUuid, nextSourceUuid, flagKey, toolId, saved }
 ) {
   if (!source || !flagKey) return;
   const sourceFlagStates = [];
@@ -147,7 +169,7 @@ async function applyToolSourceFlagChanges(
       await previousSourceState.source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
     }
   } catch (error) {
-    await rollbackToolTransaction(io, system, previousTools, sourceFlagStates, error);
+    await rollbackToolTransaction(io, system, previousTools, sourceFlagStates, error, saved);
   }
 }
 
@@ -168,12 +190,19 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
   // bypasses `_normalizeSystem`, and a real-but-empty Set here would strip every tool's
   // prerequisites in a healthy migrated world.
   const { prerequisiteIds: validPrerequisiteIds } = io.characterLibraryBasis(system);
+  const candidate = {
+    ...existing,
+    ...(data && typeof data === 'object' ? data : null),
+    ...snapshot,
+  };
   const staged = io.normalizeTool(
     {
-      ...existing,
-      ...(data && typeof data === 'object' ? data : null),
-      ...snapshot,
-      id: existing?.id || data?.id || foundry.utils.randomID(),
+      ...candidate,
+      id:
+        existing?.id ||
+        data?.id ||
+        worldToolIdFor(io, system, candidate) ||
+        foundry.utils.randomID(),
       ...(source && { componentId: null }),
     },
     { validPrerequisiteIds }
@@ -186,8 +215,9 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
     : [...tools, staged]; // ratchet-exempt(world-scope): writer
   const previousTools = system.tools; // ratchet-exempt(world-scope): writer
   system.tools = nextTools; // ratchet-exempt(world-scope): writer
+  let saved;
   try {
-    await io.saveSystems({ put: system, domains: TOOL_FACTS });
+    saved = await io.saveSystems({ put: system, domains: TOOL_FACTS });
   } catch (error) {
     system.tools = previousTools; // ratchet-exempt(world-scope): writer
     throw error;
@@ -202,6 +232,7 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
     nextSourceUuid: staged.registeredItemUuid,
     flagKey,
     toolId: staged.id,
+    saved,
   });
   return { item: staged, action: existing ? 'updated' : 'added' };
 }
@@ -236,7 +267,7 @@ export async function deleteTool(io, systemId, toolId) {
         await state.source.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
       }
     } catch (error) {
-      await rollbackToolTransaction(io, system, previousTools, sourceFlagStates, error);
+      await rollbackToolTransaction(io, system, previousTools, sourceFlagStates, error, null);
     }
   }
   return { deleted: true };

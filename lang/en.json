@@ -1,6 +1,12 @@
 {
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
+    "Notifications": {
+      "ScopedIdentity": {
+        "Conflicting": "Fabricate | Saved. {count} row(s) in {system} could not be linked to the world catalogue because a world entry with the same id or source already describes something else: {names}. They keep working in this system only; review them under World › Tools or World › Essences.",
+        "ConflictingMore": "and {more} more"
+      }
+    },
     "Common": {
       "General": "General",
       "Picker": {
