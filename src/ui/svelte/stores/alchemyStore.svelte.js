@@ -81,11 +81,7 @@ export function createAlchemyStore({ services } = {}) {
     const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
     const query = search.trim().toLowerCase();
     const filtered = query
-      ? recipes.filter((recipe) =>
-          String(recipe?.name ?? '')
-            .toLowerCase()
-            .includes(query)
-        )
+      ? recipes.filter((recipe) => String(recipe?.name ?? '').toLowerCase().includes(query))
       : recipes;
     return [...filtered].sort((left, right) =>
       String(left?.name ?? '').localeCompare(String(right?.name ?? ''))
@@ -94,9 +90,7 @@ export function createAlchemyStore({ services } = {}) {
 
   const knownCount = $derived(Array.isArray(listing?.recipes) ? listing.recipes.length : 0);
   const undiscoveredCount = $derived(Number(listing?.undiscoveredCount ?? 0));
-  const fizzleKeys = $derived(
-    new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : [])
-  );
+  const fizzleKeys = $derived(new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : []));
 
   // True when the actor owns any component in this discipline, regardless of the
   // component-name search. The column uses this to tell the onboarding "acquire
@@ -128,11 +122,7 @@ export function createAlchemyStore({ services } = {}) {
     });
     const query = componentSearch.trim().toLowerCase();
     return query
-      ? rows.filter((row) =>
-          String(row.name ?? '')
-            .toLowerCase()
-            .includes(query)
-        )
+      ? rows.filter((row) => String(row.name ?? '').toLowerCase().includes(query))
       : rows;
   });
 
@@ -274,8 +264,7 @@ export function createAlchemyStore({ services } = {}) {
     if (candidates.length === 1) return candidates[0];
     const maximal = candidates.filter((candidate) =>
       candidates.every(
-        (other) =>
-          other === candidate || !concreteStrictlyContains(other.concrete, candidate.concrete)
+        (other) => other === candidate || !concreteStrictlyContains(other.concrete, candidate.concrete)
       )
     );
     return maximal.length === 1 ? maximal[0] : null;
@@ -494,9 +483,7 @@ export function createAlchemyStore({ services } = {}) {
   async function brew() {
     if (brewInFlight || !brewEnabled) return null;
     brewInFlight = true;
-    const priorKnown = new Set(
-      (Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id)
-    );
+    const priorKnown = new Set((Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id));
     // The pre-brew target/selection still flags a Tiered success once the bench clears.
     const priorTarget = target;
     const priorSelected = selectedRecipe;
