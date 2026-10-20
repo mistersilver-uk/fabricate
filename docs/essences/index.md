@@ -33,16 +33,17 @@ Each library row shows the essence's icon, name, colour, an **Effects** pill and
 A component that carries this essence only because it inherits the value from the world Component catalogue counts here too, alongside one that authors it directly in this system.
 Choose **List** or **Grid** to change how the library is presented, search or filter by status to narrow it, and select a row to inspect it in the panel on the right.
 The inspector’s system roster uses **Rules** links to open another system.
-Add an essence from that destination system's Essence Rules screen.
+Essences are not created here; a new essence starts in the [World Essence Catalogue](#where-an-essence-comes-from).
 Choose **Edit** to open the essence editor.
 
 Your search, filters, presentation choice, page position, and selected essence all survive opening the editor and coming back.
 
 {% include screenshot.html case="manager-essences-normal" caption="The essence library in its list presentation, with one essence selected." %}
 
-## Create or edit an essence
+## Edit an essence's rules
 
-Choose **Create essence** to start a new one, or **Edit rules** on an existing row.
+Choose **Edit rules** on a row to open its editor.
+The Essence Rules screen has no create button, because a crafting system only uses essences that already exist in the world.
 
 An essence's **name, icon, colour and description are shared by every crafting system that has it**, so they are not edited here.
 The editor opens with a card naming that shared definition, and **Edit shared definition** takes you to the Essence Catalogue entry that owns those fields.
@@ -65,7 +66,7 @@ A live preview panel shows how the essence appears and what it currently does, u
 Choose **Save rules** when you are done.
 An essence always saves, even with warnings, unless it has a blocking issue such as a missing name or icon.
 
-A brand-new essence is the one exception: it has no shared definition yet, so its editor still carries an **Identity** tab for the name, icon, description and colour you are authoring.
+If the essence is removed from the system while you are editing it, Fabricate returns you to the essence library instead of opening a blank form.
 
 ### Example essences
 
@@ -98,8 +99,8 @@ The name is compared without regard to case, so Iron and iron are the same name.
 A colour, an icon and a description are presentation, so they never decide whether two essences are the same.
 
 {: .note }
-> Fabricate does not join essences together as you author them.
-> Creating a Fire essence in a second system gives that system its own essence, and nothing merges it with the first.
+> Fabricate does not join essences together by name as you author them.
+> Two essences you create separately in the catalogue stay separate, even if both are called Fire, and nothing merges them.
 > The one time Fabricate consolidates essences for you is the upgrade below.
 
 ### Upgrading from a version before 1.34.0
@@ -123,7 +124,7 @@ Where two component essence values land on the same essence, they are added toge
 Where a merge cannot be proved safe, the whole set is left exactly as it was and named in the notice.
 Two cases reach this: two matching essences inside one crafting system, and an active effect source Fabricate cannot prove names the same component in both systems.
 Nothing changes for those essences, and the refusal is not retried on a later load.
-To merge a refused set yourself, delete the duplicate essence from the offending system's Essences screen.
+To merge a refused set yourself, delete the duplicate essence from the offending system's Essence Rules screen.
 - **Essences your systems disagree about are left alone.**
 Where the systems using one record disagree about its macro on craft or its active effect source, Fabricate cannot tell whether they are one essence or several.
 It changes nothing and names them for you to review in the Essence Catalogue.
@@ -135,6 +136,49 @@ It covers names, images, descriptions and source links only, never behaviour.
 Fabricate reaches the items your characters are carrying.
 It does not reach a world item, an item in a compendium, or a token copy that was never saved as a world actor.
 See [An item stopped contributing an essence after updating]({% link help/troubleshooting.md %}#an-item-stopped-contributing-an-essence-after-updating).
+
+## Where an essence comes from
+
+The world defines an essence and each crafting system decides how it uses it.
+The World Essence Catalogue owns the essence's identity: its name, description, icon and colour.
+A crafting system's membership of that essence owns the enabled switch and any overrides of what the essence does on craft there.
+
+The catalogue is the only place an essence is created.
+Open **Essence Catalogue** in the World section of the rail and choose **+ New essence**.
+
+Any essence that a crafting system saves is registered in the catalogue automatically.
+This covers an essence that arrives by importing a system, by a module or macro that edits a system, or by any other save.
+If the catalogue already holds that essence, the system adopts it.
+Otherwise Fabricate adds it to the catalogue under the same id.
+Fabricate never matches an essence by name, and never changes an essence's id to make it fit.
+
+### Rows that cannot be linked
+
+Occasionally a system holds an essence that Fabricate cannot link to the catalogue, because the id was retired by the 1.34.0 merge above.
+That essence keeps working in that system only, and nothing is deleted.
+The save still succeeds.
+Fabricate shows one warning per session for each affected system and essence, naming up to five and counting the rest, and the full list is in the browser console.
+To review them, open the system's Essence Rules screen and the Essence Catalogue, then recreate the essence in the catalogue and reselect it where you need it.
+
+### Upgrading to 1.36.0
+
+Older versions let a crafting system hold an essence the catalogue knew nothing about.
+On first load after upgrading to 1.36.0, Fabricate registers each of those in the catalogue and reports what it did.
+The notice is for GMs only, and the full detail is in the browser console.
+Nothing is deleted, renamed, re-keyed or merged, and running it again changes nothing.
+
+The notice lists up to six groups.
+
+- **Created** are essences that were added to the catalogue.
+- **Adopted** are essences that already existed in the catalogue and are now linked to the system that held a copy.
+- **Could not be linked** are essences whose id was retired, which keep working in their own system only.
+- **Ambiguous** are rows that match more than one catalogue entry, so Fabricate would not guess.
+- **Memberships with no matching row** are links to essences their system no longer holds, which are reported and kept.
+- **Look like the same essence** are essences in different systems that appear to be one essence but were kept separate.
+Review them under World › Essences if you want to join them yourself.
+
+The notice is a brief information message when it only created or adopted essences.
+Otherwise it stays on screen until you dismiss it.
 
 ## Assigning Essences to Components
 
