@@ -277,6 +277,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Notice',
       'Button',
       'StatusToggle',
+      'Stepper',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -431,6 +432,21 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
+        root: 'fabricate',
+      },
+      Stepper: {
+        version: 1,
+        props: {
+          value: required,
+          min: optional,
+          max: optional,
+          step: optional,
+          ariaLabel: required,
+          decrementLabel: required,
+          incrementLabel: required,
+          onChange: { kind: 'callback', required: true },
+        },
+        rest: false,
         root: 'fabricate',
       },
     });

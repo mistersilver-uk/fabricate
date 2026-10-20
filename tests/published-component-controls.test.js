@@ -1,11 +1,12 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over each entry's import
- * closure: every `callback` key is called from a click handler; every focusable element is pinned
+ * closure: every `callback` key is called from an admitted event handler; every focusable element is pinned
  * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
  * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
  * companion; an entry that publishes `aria-labelledby` names each reached control by a required
- * key; a closure that takes a window's ring states no focus rule of its own, and its reached
- * control no inline style; and no rule outside the published `Notice` styles its action button.
+ * key; a closure that takes a window's ring states no focus rule of its own but the pinned scoped
+ * rings, and its reached control no inline style; and no rule outside the published `Notice`
+ * styles its action button.
  * The test-only probe runs beside the shipped entries. A key's kind and `args` are
  * `published-component-manifest.test.js`'s.
  * Limit: reach follows a guard through a plain `const` and `$derived` to the props it reads; a
@@ -16,8 +17,11 @@
  * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file and to
  * what each closure file passes it; the `type` of a dynamic button is
  * `components/published-button-mounted.test.js`'s.
- * Limit: a handler declared in `<script>` and named by an attribute fails closed, as does a
- * callback handed to a child component.
+ * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
+ * function every reference to which is an admitted attribute's value, a call inside one, or a
+ * call inside another such function; inside one, a deferred call is not seen. A callback handed
+ * to a child component, an exported function and one also called from `onMount` fail closed.
+ * Limit: a scoped ring pin is matched by its selector as written, and judged by its declarations.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
  * whether a name is drawn in every state is the mounted suite's.
@@ -25,6 +29,8 @@
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
@@ -50,6 +56,7 @@ import {
   nameSources,
   propLocals,
   publishedLocals,
+  sameDeclarations,
   selectorsNaming,
   selectorsOnAttribute,
   staticText,
@@ -57,6 +64,7 @@ import {
   unheldClauses,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
+import { repoRoot } from './helpers/sourceScan.js';
 import { styleRules } from './helpers/svelteStructureContract.js';
 
 const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
@@ -80,6 +88,16 @@ const FOCUSABLE_REACH = Object.freeze({
   },
   // Drawn only when `as`, which the entry does not publish, is `'checkbox'`.
   'src/ui/svelte/components/StatusToggle.svelte: input': null,
+  // In snippets both branches of `{#if isVertical}` render, which reach reads as unguarded.
+  'src/ui/svelte/components/Stepper.svelte: button[data-stepper-decrement]': 'always',
+  'src/ui/svelte/components/Stepper.svelte: button[data-stepper-increment]': 'always',
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="number"]': {
+    defaults: ['formatValue', 'parseValue'],
+    heldBy:
+      'tests/components/published-stepper-mounted.test.js: the default draws the number field',
+  },
+  // The formatted mode's, drawn only when `formatValue` and `parseValue`, which the entry does not publish, are set.
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
 });
 
@@ -102,17 +120,103 @@ const isFunction = (node) =>
 
 /** The template nodes that draw one DOM element, so an `on…` attribute on one is an event listener. */
 const DOM_ELEMENTS = new Set(['RegularElement', 'SvelteElement']);
-/** The one event a published callback is called from: a press acts as a `click`, never on pointer down. */
-const PRESS_ATTRIBUTE = 'onclick';
+/**
+ * The events a published callback is called from, by attribute, beside the one tag each is
+ * admitted on or `null` for any: a press acts as a `click`, never on pointer down, and an
+ * `<input>` reports an edit, a key and losing focus.
+ */
+const CALLBACK_EVENTS = Object.freeze({
+  onclick: null,
+  oninput: 'input',
+  onblur: 'input',
+  onkeydown: 'input',
+});
 
-/** Whether a reference is an `onclick` attribute's whole value on a DOM element, or inside a function that is. */
+/** Whether a reference is an admitted event attribute's whole value on a DOM element, or inside a function that is. */
 function isEventReference(ancestors) {
   const at = ancestors.findLastIndex(
-    (ancestor) => ancestor.type === 'Attribute' && ancestor.name === PRESS_ATTRIBUTE
+    (ancestor) => ancestor.type === 'Attribute' && Object.hasOwn(CALLBACK_EVENTS, ancestor.name)
   );
   if (at < 1 || !DOM_ELEMENTS.has(ancestors[at - 1].type)) return false;
+  const only = CALLBACK_EVENTS[ancestors[at].name];
+  if (only !== null && ancestors[at - 1].name !== only) return false;
   const [tag, value] = ancestors.slice(at + 1);
   return tag?.type === 'ExpressionTag' && (value === undefined || isFunction(value));
+}
+
+/** Each top-level function of the instance script, a declaration or a `const` arrow or function, by name. */
+function scriptFunctions(ast) {
+  const functions = new Map();
+  for (const statement of ast.instance?.content.body ?? []) {
+    if (statement.type === 'FunctionDeclaration') functions.set(statement.id.name, statement);
+    if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue;
+    for (const { id, init } of statement.declarations) {
+      if (id.type === 'Identifier' && isFunction(init)) functions.set(id.name, init);
+    }
+  }
+  return functions;
+}
+
+/**
+ * Where one reference to a script function sits: an admitted event attribute's whole value or a
+ * call inside one (`'entry'`), a call inside a script function (that function's name), or else
+ * `'other'`.
+ */
+function functionSite(node, ancestors, bodies) {
+  const parent = ancestors.at(-1);
+  const called = parent?.type === 'CallExpression' && parent.callee === node;
+  if (isEventReference(ancestors)) {
+    return parent?.type === 'ExpressionTag' || called ? 'entry' : 'other';
+  }
+  const body = ancestors.findLast((ancestor) => bodies.has(ancestor));
+  return called && body ? bodies.get(body) : 'other';
+}
+
+/** Every reference's `functionSite`, by the script function it names; a declaring name is none. */
+function functionReferences(ast, functions) {
+  const bodies = new Map([...functions].map(([name, node]) => [node, name]));
+  const found = new Map([...functions.keys()].map((name) => [name, []]));
+  for (const root of [ast.module, ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || !found.has(node.name)) return;
+      const parent = ancestors.at(-1);
+      const declares = parent?.id === node;
+      const member = parent?.type === 'MemberExpression' && parent.property === node;
+      if (declares || (member && !parent.computed)) return;
+      found.get(node.name).push(functionSite(node, ancestors, bodies));
+    });
+  }
+  return found;
+}
+
+/**
+ * The script functions only events reach, by node: the greatest set none of whose members is
+ * referenced but as an event entry or a call from a member, then those of it an entry reaches.
+ */
+function eventOnlyFunctions(ast) {
+  const functions = scriptFunctions(ast);
+  const references = functionReferences(ast, functions);
+  const kept = new Set(references.keys());
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const name of kept) {
+      const sites = references.get(name);
+      if (sites.every((site) => site === 'entry' || kept.has(site))) continue;
+      kept.delete(name);
+      changed = true;
+    }
+  }
+  const live = new Set([...kept].filter((name) => references.get(name).includes('entry')));
+  for (let grown = true; grown; ) {
+    grown = false;
+    for (const name of kept) {
+      if (live.has(name) || references.get(name).every((site) => !live.has(site))) continue;
+      live.add(name);
+      grown = true;
+    }
+  }
+  return new Set([...live].map((name) => functions.get(name)));
 }
 
 const CALLS = new Set(['CallExpression', 'NewExpression', 'TaggedTemplateExpression']);
@@ -126,9 +230,13 @@ function isGuardRead(node, ancestors) {
   return path.every((step) => !CALLS.has(step.type));
 }
 
-/** Where each reference to `local` sits: `'event'`, `'guard'` or `'other'`; its own declaration is none. */
+/**
+ * Where each reference to `local` sits: `'event'` in an admitted event attribute or a script
+ * function only events reach, `'guard'` or `'other'`; its own declaration is none.
+ */
 function referenceSites(ast, local) {
   const sites = [];
+  const live = eventOnlyFunctions(ast);
   const declares = (ancestor) =>
     ancestor.type === 'VariableDeclarator' && ancestor.init?.callee?.name === '$props';
   for (const root of [ast.module, ast.instance, ast.fragment]) {
@@ -139,7 +247,8 @@ function referenceSites(ast, local) {
         return;
       }
       if (ancestors.some(declares)) return;
-      if (isEventReference(ancestors)) sites.push('event');
+      const event = isEventReference(ancestors) || ancestors.some((ancestor) => live.has(ancestor));
+      if (event) sites.push('event');
       else sites.push(isGuardRead(node, ancestors) ? 'guard' : 'other');
     });
   }
@@ -419,22 +528,120 @@ const declaresUnderRing = (property) => `declares ${property} under a root that 
 const INLINE_STYLE = 'states an inline style under a root that supplies the ring';
 
 /**
+ * The focus rules a closure file draws for its own controls in place of the window's ring, by
+ * file: each as its selector is written, beside its declarations. A file's design-system entry
+ * states the variant in `statedBy`.
+ */
+const SCOPED_RINGS = Object.freeze({
+  'src/ui/svelte/components/Stepper.svelte': {
+    statedBy:
+      "The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.",
+    rules: [
+      {
+        selector:
+          '.fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible',
+        declarations: [['outline-offset', '0']],
+      },
+      {
+        selector: '.fab-stepper-input[data-stepper-endpoint]:not(:focus-visible)',
+        declarations: [['color', 'var(--fab-text-muted)']],
+      },
+      {
+        selector: '.fab-stepper-input:focus-visible',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '1px'],
+        ],
+      },
+      {
+        selector: '.fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input:focus-visible',
+        declarations: [['outline-offset', '0']],
+      },
+      {
+        selector: '.fab-stepper-adjunct:focus-visible',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '1px'],
+        ],
+      },
+    ],
+  },
+});
+
+/** What a scoped ring pin may declare: the module ring's outline, an offset, and a colour. */
+const RING_PROPERTIES = new Set(['outline', 'outline-offset', 'color']);
+
+/** A rule's whole selector list as its stylesheet writes it. */
+const writtenPrelude = (css, rule) =>
+  css.content.styles.slice(
+    rule.prelude.start - css.content.start,
+    rule.prelude.end - css.content.start
+  );
+
+/**
+ * The rules of one file's `<style>` its scoped ring pins exempt, and what each pin breaks: no rule
+ * so written (stale), a focus pseudo-class other than `:focus-visible` or none, declarations
+ * other than pinned, a property outside `RING_PROPERTIES`, and an `outline` not the module ring's.
+ */
+function scopedRingFaults(file, css, pinned = [], moduleRule = moduleRing()) {
+  const rules = css ? [...walkNodes(css)].filter((node) => node.type === 'Rule') : [];
+  const exempt = new Set();
+  const faults = pinned.flatMap(({ selector, declarations }) => {
+    const matched = rules.filter((rule) => writtenPrelude(css, rule) === selector);
+    if (matched.length === 0) return [`${file} pins ${selector}, which no rule writes`];
+    return matched.flatMap((rule) => {
+      exempt.add(rule);
+      const focus = [...walkNodes(rule.prelude)].filter(
+        (node) => node.type === 'PseudoClassSelector' && FOCUS_PSEUDO_CLASSES.has(node.name)
+      );
+      const drawn = declarationsOf(rule);
+      return [
+        ...(focus.length > 0 && focus.every(({ name }) => name === 'focus-visible')
+          ? []
+          : [`${file} pins ${selector}, which carries a focus pseudo-class but :focus-visible`]),
+        ...(sameDeclarations(rule, declarations)
+          ? []
+          : [`${file} pins ${selector}, whose declarations are not its pin's`]),
+        ...drawn
+          .filter(([property]) => !RING_PROPERTIES.has(property))
+          .map(([property]) => `${file} pins ${selector}, which declares ${property}`),
+        ...drawn
+          .filter(([property, value]) => property === 'outline' && value !== moduleRule.outline)
+          .map(() => `${file} pins ${selector}, whose outline is not the module ring's`),
+      ];
+    });
+  });
+  return { exempt, faults };
+}
+
+/**
  * What a closure whose reached control takes a window's ring breaks: no file of it holds a selector
  * that carries a focus pseudo-class anywhere, in or out of an at-rule, scoped or `:global`, none
  * declares `all` or a property whose name starts `outline`, and no reached control states a
- * `style` attribute or a `style:` directive. Vacuous at `any`, and for a closure that draws no
- * reached control.
+ * `style` attribute or a `style:` directive. A rule `rings` pins for its file is exempt as
+ * `scopedRingFaults` judges it. Vacuous for a closure that draws no reached control, and at
+ * `any` but for a pin, which that root never takes.
  */
-function focusRuleFaults(entry, controls, pins, reader) {
+function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
+  const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
   const reached = controls.filter((control) => isReached(control, pins));
-  if (entry.root === 'any' || reached.length === 0) return [];
+  if (entry.root === 'any') {
+    return components
+      .filter((file) => Object.hasOwn(rings, file))
+      .map((file) => `${file} pins a scoped ring under an entry whose root is any`);
+  }
+  if (reached.length === 0) return [];
   const styled = reached.filter(({ node }) =>
     node.attributes.some(({ type, name }) => type === 'StyleDirective' || name === 'style')
   );
   const inline = styled.map(({ id }) => `${id} ${INLINE_STYLE}`);
-  const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
   const ruled = components.flatMap((file) => {
-    const nodes = [...walkNodes(reader.component(file).css)];
+    const { css } = reader.component(file);
+    const scoped = scopedRingFaults(file, css, rings[file]?.rules);
+    const nodes = [];
+    walkWithAncestors(css, (node, ancestors) => {
+      if (ancestors.every((ancestor) => !scoped.exempt.has(ancestor))) nodes.push(node);
+    });
     const own = nodes.some(
       (node) => node.type === 'PseudoClassSelector' && FOCUS_PSEUDO_CLASSES.has(node.name)
     );
@@ -443,13 +650,22 @@ function focusRuleFaults(entry, controls, pins, reader) {
       .map((node) => node.property)
       .filter((property) => property === 'all' || property.startsWith('outline'));
     const faults = [...new Set(declared)].map((property) => declaresUnderRing(property));
-    return [...(own ? [OWN_FOCUS_RULE] : []), ...faults].map((fault) => `${file} ${fault}`);
+    return [
+      ...[...(own ? [OWN_FOCUS_RULE] : []), ...faults].map((fault) => `${file} ${fault}`),
+      ...scoped.faults,
+    ];
   });
   return [...inline, ...ruled];
 }
 
 /** Every fault of every control an entry draws, against `pins`, then of its closure's focus rules. */
-function controlFaults(entry, pins, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS) {
+function controlFaults(
+  entry,
+  pins,
+  reader = SHIPPED,
+  dynamic = DYNAMIC_ELEMENTS,
+  rings = SCOPED_RINGS
+) {
   const controls = controlsOf(entry, reader, dynamic);
   const faults = controls.flatMap((control) => [
     ...reachFaults(control, pins),
@@ -460,7 +676,7 @@ function controlFaults(entry, pins, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS
   return [
     ...faults,
     ...labelledByFaults(entry, controls, pins),
-    ...focusRuleFaults(entry, controls, pins, reader),
+    ...focusRuleFaults(entry, controls, pins, reader, rings),
   ];
 }
 
@@ -521,6 +737,20 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual(partSelectors(everyStylesheet(), NOTICE_ACTION, own), []);
   });
 
+  it('pins scoped rings only on a file a shipped entry draws, whose design-system entry states its own ring', () => {
+    const drawn = new Set(
+      PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => [...importClosure(entry.path, SHIPPED)])
+    );
+    const spec = resolve(repoRoot, 'openspec/specs/design-system/spec.md');
+    const stated = readFileSync(spec, 'utf8').split('\n');
+    const pinned = Object.entries(SCOPED_RINGS);
+    assert.ok(pinned.length > 0, 'the stepper is pinned');
+    for (const [file, { statedBy }] of pinned) {
+      assert.ok(drawn.has(file), `${file} is drawn by a shipped entry`);
+      assert.ok(stated.includes(statedBy), `${file}: the design-system spec states ${statedBy}`);
+    }
+  });
+
   it('reads a module ring from the sheet that names button and draws an outline at an offset', () => {
     const { tags, outline, offset } = moduleRing();
     assert.ok(tags.includes('button'), 'the ring names button');
@@ -547,11 +777,12 @@ const button = (content = LABEL, open = '') =>
 /** The control faults of a synthetic entry over `markup`, publishing `props` at `root`, with its one button pinned `pin`. */
 function syntheticFaults(
   markup,
-  { props = { label: { kind: 'data', required: true } }, pin, root = 'any' }
+  { props = { label: { kind: 'data', required: true } }, pin, root = 'any', rings }
 ) {
   const entry = { name: 'E', path: E, root, props };
   const pins = pin === undefined ? {} : { [PRESS]: pin };
-  const faults = controlFaults(entry, pins, syntheticReader({ [E]: markup }));
+  const reader = syntheticReader({ [E]: markup });
+  const faults = controlFaults(entry, pins, reader, DYNAMIC_ELEMENTS, rings);
   return faults.map((fault) => fault.replace(`${PRESS} `, ''));
 }
 
@@ -923,6 +1154,90 @@ describe('the focus rule clause', () => {
   });
 });
 
+describe('the scoped ring clause', () => {
+  const SELECTOR = '.wrap .press:focus-visible';
+  const ringed = (declarations) => `${SELECTOR} { ${declarations} }`;
+  const DRAWN = [
+    ['outline', moduleRing().outline],
+    ['outline-offset', '0'],
+  ];
+  const RINGED = ringed(`outline: ${moduleRing().outline}; outline-offset: 0;`);
+  /** The faults of one marked button at `root` whose sheet is `css`, its file's rings pinned to `rules`. */
+  const scoped = (css, rules = [{ selector: SELECTOR, declarations: DRAWN }], root = 'fabricate') =>
+    syntheticFaults(script('label') + button() + styled(css), {
+      pin: 'always',
+      root,
+      rings: { [E]: { statedBy: 'a design-system sentence', rules } },
+    });
+  const pinFault = (fault) => `${E} pins ${SELECTOR}, ${fault}`;
+
+  it('exempts a pinned :focus-visible rule drawing the module ring at its pinned offset', () => {
+    assert.deepEqual(scoped(RINGED), []);
+    const muted = '.press[data-x]:not(:focus-visible) { color: red; }';
+    const rules = [
+      { selector: '.press[data-x]:not(:focus-visible)', declarations: [['color', 'red']] },
+    ];
+    assert.deepEqual(scoped(muted, rules), [], 'a colour at rest');
+  });
+
+  for (const [claim, css, rules, faults] of [
+    [
+      'an unpinned rule',
+      RINGED,
+      [],
+      [
+        `${E} states a focus rule of its own under a root that supplies the ring`,
+        `${E} declares outline under a root that supplies the ring`,
+        `${E} declares outline-offset under a root that supplies the ring`,
+      ],
+    ],
+    ['a stale pin', '.press { color: red; }', undefined, [pinFault('which no rule writes')]],
+    [
+      'an outline that differs from the module ring’s',
+      ringed('outline: 9px dotted red; outline-offset: 0;'),
+      [
+        {
+          selector: SELECTOR,
+          declarations: [
+            ['outline', '9px dotted red'],
+            ['outline-offset', '0'],
+          ],
+        },
+      ],
+      [pinFault("whose outline is not the module ring's")],
+    ],
+    [
+      'box-shadow on a pinned rule',
+      ringed(`outline: ${moduleRing().outline}; outline-offset: 0; box-shadow: none;`),
+      [{ selector: SELECTOR, declarations: [...DRAWN, ['box-shadow', 'none']] }],
+      [pinFault('which declares box-shadow')],
+    ],
+    [
+      'declarations other than its pin’s',
+      ringed(`outline: ${moduleRing().outline}; outline-offset: 1px;`),
+      undefined,
+      [pinFault("whose declarations are not its pin's")],
+    ],
+  ]) {
+    it(`names ${claim} as a fault`, () => {
+      assert.deepEqual(scoped(css, rules), faults);
+    });
+  }
+
+  it('names a pinned :focus rule as a fault', () => {
+    const css = `.press:focus { outline: ${moduleRing().outline}; }`;
+    const rules = [{ selector: '.press:focus', declarations: [['outline', moduleRing().outline]] }];
+    assert.deepEqual(scoped(css, rules), [
+      `${E} pins .press:focus, which carries a focus pseudo-class but :focus-visible`,
+    ]);
+  });
+
+  it('names a pin at any as a fault', () => {
+    const faults = scoped(`${PAIR} ${RINGED}`, undefined, 'any');
+    assert.ok(faults.includes(`${E} pins a scoped ring under an entry whose root is any`));
+  });
+});
+
 describe('the parts clause', () => {
   const sheet = (css, file = 'sheet.css') => [
     [file, templateOf(file, `<style>${css}</style>`).ast.css],
@@ -996,6 +1311,21 @@ describe('the name clause', () => {
   it('names a control with no content and no aria-label as a fault', () => {
     assert.deepEqual(named(''), ['has no name']);
   });
+
+  const shadowedProps = { label: props.label, rows: { kind: 'data' } };
+  for (const [claim, open, close, pin] of [
+    ['an {#each} context', '{#each rows as label (label)}', '{/each}', 'rows'],
+    ['an {#each} index', '{#each rows as row, label (row)}', '{/each}', 'rows'],
+    ['a {@const}', '{#if rows}{@const label = rows}', '{/if}', 'rows'],
+    ['a {:then} value', '{#await rows then label}', '{/await}', 'always'],
+    ['a {:catch} error', '{#await rows}<p></p>{:catch label}', '{/await}', 'always'],
+    ['a snippet parameter', '{#snippet row(label)}', '{/snippet}{@render row(label)}', 'always'],
+  ]) {
+    it(`names a name rooted at a published key that ${claim} shadows as a fault`, () => {
+      const markup = [script('label, rows'), open, button(), close, styled(PAIR)].join('');
+      assert.deepEqual(syntheticFaults(markup, { props: shadowedProps, pin }), [UNPUBLISHED_NAME]);
+    });
+  }
 
   /** The name faults of a button pinned `pin` whose `aria-label` reads `accessibleName`, declared by `body`. */
   const derivedName = (body, { pin = 'always', label = props.label } = {}) =>
@@ -1177,15 +1507,69 @@ describe('the called-from-an-event clause', () => {
 
   const closed = (declared, markup) =>
     ['<script>let { onPress } = $props();', declared, '</script>', markup].join('');
+  const PRESSES = ' function press() { onPress?.(1); }';
+  for (const [claim, markup] of [
+    ['a function declaration', closed(PRESSES, '<button type="button" onclick={press}>x</button>')],
+    [
+      'a const arrow called inside a handler',
+      closed(
+        ' const press = () => onPress?.();',
+        '<button type="button" onclick={() => press()}>x</button>'
+      ),
+    ],
+    [
+      'a chain of functions from an input event',
+      closed(
+        ' function inner(value) { onPress?.(value); } function outer(event) { inner(event.currentTarget.value); }',
+        '<input oninput={outer} />'
+      ),
+    ],
+    ['a key on an input’s blur', closed('', '<input onblur={onPress} />')],
+    ['a key called on an input’s keydown', closed('', '<input onkeydown={() => onPress?.()} />')],
+  ]) {
+    it(`passes a key reached from an admitted event through ${claim}`, () => {
+      const { ast } = templateOf('Reached.svelte', markup);
+      assert.deepEqual(eventFaults({ props: { onPress: callback } }, ast), []);
+    });
+  }
+
   for (const [claim, markup] of [
     [
-      'a handler declared in <script>',
+      'a function also called from an $effect',
       closed(
-        ' function press() { onPress?.(); }',
+        `${PRESSES} $effect(() => { press(); });`,
         '<button type="button" onclick={press}>x</button>'
       ),
     ],
+    [
+      'a function handed to setTimeout',
+      closed(PRESSES, '<button type="button" onclick={() => setTimeout(press)}>x</button>'),
+    ],
+    ['a function reached only from onfocus', closed(PRESSES, '<input onfocus={press} />')],
+    [
+      'a cycle of functions no event reaches',
+      closed(' function a() { b(); onPress?.(); } function b() { a(); }', '<p></p>'),
+    ],
+    ['oninput on a button', closed('', '<button type="button" oninput={onPress}>x</button>')],
     ['a callback handed to a child component', closed('', '<Child onclick={onPress} />')],
+    [
+      'an exported function, which a parent can call',
+      closed(
+        ' export function press() { onPress?.(1); }',
+        '<button type="button" onclick={press}>x</button>'
+      ),
+    ],
+    [
+      'a function also called from onMount',
+      closed(
+        `${PRESSES} onMount(() => press());`,
+        '<button type="button" onclick={press}>x</button>'
+      ),
+    ],
+    [
+      'a function also handed to a child component',
+      closed(PRESSES, '<button type="button" onclick={press}>x</button><Child cb={press} />'),
+    ],
     ['a handler on svelte:window', closed('', '<svelte:window onclick={onPress} />')],
     [
       'a pointer-entry handler',
