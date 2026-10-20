@@ -18,8 +18,9 @@
  * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file and to
  * what each closure file passes it; the `type` of a dynamic button is
  * `components/published-button-mounted.test.js`'s.
- * Limit: a value write is an assignment, an update or a `bind:` directive naming the key's own
- * local, so a write through an alias or a shadowing name is not seen.
+ * Limit: a value write is an assignment, an update, a `for…of` or `for…in` head or a `bind:`
+ * directive naming the key's own local, so a write through an alias or a shadowing name is not
+ * seen.
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
@@ -282,11 +283,16 @@ const WRITTEN_OUTSIDE = Object.freeze({
   PublishedProbe: [`mirror ${WRITTEN_OUTSIDE_AN_EVENT}`],
 });
 
-/** Whether a reference to a local writes it: assigned, updated, or bound by a `bind:` directive. */
+const WRITING_HEADS = new Set(['AssignmentExpression', 'ForOfStatement', 'ForInStatement']);
+
+/**
+ * Whether a reference to a local writes it: assigned, updated, bound by a `bind:` directive, or
+ * named in a `for…of` or `for…in` head, a declaring one included, which fails closed.
+ */
 function isWrite(node, ancestors) {
   const parent = ancestors.at(-1);
   if (parent?.type === 'UpdateExpression' || parent?.type === 'BindDirective') return true;
-  const at = ancestors.findLastIndex((ancestor) => ancestor.type === 'AssignmentExpression');
+  const at = ancestors.findLastIndex((ancestor) => WRITING_HEADS.has(ancestor.type));
   return at !== -1 && (ancestors[at + 1] ?? node) === ancestors[at].left;
 }
 
@@ -1695,6 +1701,10 @@ describe('the written-from-an-event clause', () => {
     ['an update expression in $effect', ' $effect(() => { query++; });', ''],
     ['a destructuring write in $effect', ' $effect(() => { [query] = ["x"]; });', ''],
     ['a write at init', ' query = "x";', ''],
+    ['a for…of head at init', ' for (query of ["x"]) {}', ''],
+    ['a for…in head in $effect', ' $effect(() => { for (query in { x: 1 }) {} });', ''],
+    ['a destructuring for…of head', ' for ([query] of [["x"]]) {}', ''],
+    ['a declaring for…of head', ' for (const query of ["x"]) {}', ''],
     ['bind:value', '', '<input bind:value={query} />'],
     [
       'a function also called from an $effect',
