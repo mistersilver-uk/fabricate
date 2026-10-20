@@ -381,10 +381,10 @@ describe('journal run command protocol', () => {
         const system = { id: 'system', resolutionMode: 'alchemy', features: { essences: true },
           components: [{ id: 'herb', name: 'Herb', essences: { life: 1 } }], alchemy: {} };
         let recipes = [];
-        globalThis.game = { fabricate: {
+        Object.assign(globalThis, { game: { fabricate: {
           getCraftingSystemManager: () => ({ getSystem: () => system }),
           getRecipeManager: () => ({ getRecipes: () => recipes }),
-        } };
+        } } });
         const set = new IngredientSet({ id: 'set', ingredientGroups: [{ id: 'g',
           options: [{ match: { type: 'essence', essenceId: 'life', amount: 2 }, quantity: 1 }] }] });
         const recipe = new Recipe({ id: 'recipe', name: 'Brew', craftingSystemId: 'system',

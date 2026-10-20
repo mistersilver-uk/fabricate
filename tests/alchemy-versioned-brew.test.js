@@ -3,8 +3,8 @@
  * submission, the start funds and spends from the submitted units alone, and the execute applies
  * the alchemy tail. Real `IngredientSet`, `RecipeManager.canCraft` and `CraftingRunManager`.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
@@ -13,6 +13,7 @@ import { RecipeManager } from '../src/systems/RecipeManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { stageSelectionInputsComplete } from '../src/systems/stageReadiness.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
+
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 const SYS = 'brew-sys';
@@ -103,10 +104,17 @@ const component = (componentId, quantity = 1) => ({
   match: { type: 'component', componentId },
   quantity,
 });
-const essence = (essenceId, amount) => ({ match: { type: 'essence', essenceId, amount }, quantity: 1 });
+const essence = (essenceId, amount) => ({
+  match: { type: 'essence', essenceId, amount },
+  quantity: 1,
+});
 const tag = (tags, quantity = 1) => ({ match: { type: 'tags', tags }, quantity });
 
-const SUCCESS = { id: 'ok', name: 'On success', results: [{ id: 'r-ok', componentId: 'elixir', quantity: 1 }] };
+const SUCCESS = {
+  id: 'ok',
+  name: 'On success',
+  results: [{ id: 'r-ok', componentId: 'elixir', quantity: 1 }],
+};
 const FAILURE = {
   id: 'fail',
   name: 'On a failed check',
@@ -150,7 +158,9 @@ function brewWorld(recipe, { alchemy = {}, craftingCheck = {}, essences = true }
     craftingCheck,
     components: components(),
   };
-  const resolutionService = new ResolutionModeService({ getSystem: (id) => (id === SYS ? system : null) });
+  const resolutionService = new ResolutionModeService({
+    getSystem: (id) => (id === SYS ? system : null),
+  });
   const recipeManager = new RecipeManager();
   recipeManager.getRecipes = () => [recipe];
   recipeManager.getRecipe = (id) => (id === recipe.id ? recipe : null);
@@ -166,12 +176,21 @@ function brewWorld(recipe, { alchemy = {}, craftingCheck = {}, essences = true }
       this.learned.push(learned.id);
     },
   };
-  globalThis.foundry = { utils: { randomID: (() => { let id = 0; return () => `id-${++id}`; })() } };
-  globalThis.fromUuid = async (uuid) => {
-    const made = components().find((entry) => entry.registeredItemUuid === uuid);
-    return made ? { toObject: () => ({ name: made.name, type: 'loot', system: {} }), effects: [] } : null;
+  const foundry = {
+    utils: {
+      randomID: (() => {
+        let id = 0;
+        return () => `id-${++id}`;
+      })(),
+    },
   };
-  globalThis.game = {
+  const fromUuid = async (uuid) => {
+    const made = components().find((entry) => entry.registeredItemUuid === uuid);
+    return made
+      ? { toObject: () => ({ name: made.name, type: 'loot', system: {} }), effects: [] }
+      : null;
+  };
+  const game = {
     user: { id: 'gm', isGM: true },
     time: { worldTime: 1000 },
     actors: [],
@@ -184,11 +203,13 @@ function brewWorld(recipe, { alchemy = {}, craftingCheck = {}, essences = true }
       getCraftingRunManager: () => runManager,
     },
   };
+  Object.assign(globalThis, { foundry, fromUuid, game });
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
   return { engine, runManager, visibility, system };
 }
 
-const item = (id, sourceName, quantity = 1) => new OwnedItem(id, sourceName, `Item.${sourceName}`, quantity);
+const item = (id, sourceName, quantity = 1) =>
+  new OwnedItem(id, sourceName, `Item.${sourceName}`, quantity);
 
 /**
  * Prepare and start through the engine as the authority does, the start grant holding the
@@ -197,11 +218,17 @@ const item = (id, sourceName, quantity = 1) => new OwnedItem(id, sourceName, `It
 async function startBrew(world, { crafter, source, componentIds = [], records = null }) {
   const submittedItems =
     records ?? resolveAlchemySubmissions([source], components(), componentIds, SYS);
-  assert.equal(submittedItems.length, records?.length ?? componentIds.length, 'every unit resolves');
+  assert.equal(
+    submittedItems.length,
+    records?.length ?? componentIds.length,
+    'every unit resolves'
+  );
   let startContext = null;
   world.engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) =>
-      context.operation === 'start' ? structuredClone(startContext) : { operationId: context.operation },
+      context.operation === 'start'
+        ? structuredClone(startContext)
+        : { operationId: context.operation },
   });
   const prepared = await world.engine.prepareVersionedAlchemyStart({
     actor: crafter,
@@ -230,7 +257,13 @@ async function executeBrew(world, { crafter, source, started, checkResult = { su
   world.engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
       operationId: `${context.operation}-operation`,
-      resolvedCheckResult: { outcome: null, value: null, data: {}, engineEvaluated: true, ...checkResult },
+      resolvedCheckResult: {
+        outcome: null,
+        value: null,
+        data: {},
+        engineEvaluated: true,
+        ...checkResult,
+      },
     }),
   });
   return world.engine.executeVersionedStage({
@@ -267,7 +300,9 @@ test('an essence-signature brew starts with a complete saved plan and executes i
 });
 
 test('an alternative-option brew records the option the submission satisfies', async () => {
-  const world = brewWorld(brewRecipe([{ id: 'base', options: [component('salt'), component('herb')] }]));
+  const world = brewWorld(
+    brewRecipe([{ id: 'base', options: [component('salt'), component('herb')] }])
+  );
   const herb = item('herb', 'Herb');
   const salt = item('salt', 'Salt');
   const source = new BrewActor('source', [salt, herb]);
@@ -308,7 +343,11 @@ test('a mixed component and essence brew spends the component and the essence ca
   const source = new BrewActor('source', [herb, ember]);
   const crafter = new BrewActor('crafter');
 
-  const { prepared, started } = await startBrew(world, { crafter, source, componentIds: ['herb', 'ember'] });
+  const { prepared, started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['herb', 'ember'],
+  });
 
   assert.deepEqual(prepared.selectionPlan.ingredientEssenceAllocation, {
     stepId: 'implicit-step',
@@ -341,7 +380,11 @@ test('the start also spends every submitted unit the plan does not draw', async 
   const source = new BrewActor('source', [herbs, salt]);
   const crafter = new BrewActor('crafter');
 
-  const { started } = await startBrew(world, { crafter, source, componentIds: ['herb', 'herb', 'salt'] });
+  const { started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['herb', 'herb', 'salt'],
+  });
 
   assert.equal(started.success, true, started.message);
   assert.equal(herbs.system.quantity, 3, 'the extra unit of the signature component is spent');
@@ -381,7 +424,9 @@ test('a matched brew the submission cannot fund is refused with nothing spent an
 /** A one-herb brew started under `options`, ready for its execute. */
 async function startedHerbBrew(options = {}) {
   const world = brewWorld(
-    brewRecipe([{ id: 'base', options: [component('herb')] }], { resultGroups: [SUCCESS, FAILURE] }),
+    brewRecipe([{ id: 'base', options: [component('herb')] }], {
+      resultGroups: [SUCCESS, FAILURE],
+    }),
     options
   );
   const herb = item('herb', 'Herb');
@@ -412,20 +457,28 @@ test('a matched Simple brew that fails learns, records use and awards the reserv
   assert.deepEqual(brew.world.visibility.learned, ['brew']);
   assert.equal(brew.world.visibility.used, 1);
   assert.equal(settled.createdResultUuids.length, 1);
-  assert.deepEqual(brew.crafter.created.map((made) => made.name), ['Sludge']);
+  assert.deepEqual(
+    brew.crafter.created.map((made) => made.name),
+    ['Sludge']
+  );
 });
 
-test('consumeOnFail false returns a failed Simple brew\'s start spend over the generic policy', async () => {
+test("consumeOnFail false returns a failed Simple brew's start spend over the generic policy", async () => {
   const brew = await startedHerbBrew({
     alchemy: { ...SIMPLE, consumeOnFail: false },
     craftingCheck: { consumption: { consumeIngredientsOnFail: true } },
   });
   await executeBrew(brew.world, { ...brew, checkResult: FAILED });
   const history = brew.world.runManager.getRunHistory(brew.crafter)[0];
-  const refund = history.executionJournal.effects.find((effect) => effect.effectId === 'refund-start-consumption');
+  const refund = history.executionJournal.effects.find(
+    (effect) => effect.effectId === 'refund-start-consumption'
+  );
   assert.ok(refund, 'the refund is journalled');
   assert.equal(refund.receipt.restoredCount, 1);
-  assert.ok(brew.crafter.created.some((made) => made.name === 'Herb'), 'the herb is restored');
+  assert.ok(
+    brew.crafter.created.some((made) => made.name === 'Herb'),
+    'the herb is restored'
+  );
 });
 
 test('a Tiered brew that fails keeps the generic consumption policy', async () => {

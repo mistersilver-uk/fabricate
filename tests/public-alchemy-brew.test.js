@@ -1,9 +1,9 @@
 /** One-call version-1 brewing through `submitAlchemyAttempt` (issue 2574). */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { executePublicAlchemy } from '../src/systems/publicAlchemyBrew.js';
 import { serializedOperationResult } from '../src/systems/journalRunReply.js';
+import { executePublicAlchemy } from '../src/systems/publicAlchemyBrew.js';
 import { versionedTransitionResult } from '../src/systems/versionedCommandResults.js';
 
 const actor = { uuid: 'Actor.alchemist' };
@@ -21,7 +21,12 @@ function startReply({ status = 'inProgress', canExecuteImmediately = true } = {}
 }
 
 function executeReply(outcome) {
-  const run = { id: 'run-1', status: outcome.success ? 'succeeded' : 'failed', runRevision: 5, currentStepIndex: null };
+  const run = {
+    id: 'run-1',
+    status: outcome.success ? 'succeeded' : 'failed',
+    runRevision: 5,
+    currentStepIndex: null,
+  };
   return serializedOperationResult(versionedTransitionResult(run, outcome));
 }
 
@@ -43,8 +48,12 @@ function brew({ started, settled = null, interactive = false, executeCommand } =
   return { reply, commands };
 }
 
-test('a ready matched brew executes once with the started revision and the caller\'s flag', async () => {
-  const settled = executeReply({ success: true, disposition: 'succeeded', createdResultUuids: ['Actor.alchemist.Item.elixir'] });
+test("a ready matched brew executes once with the started revision and the caller's flag", async () => {
+  const settled = executeReply({
+    success: true,
+    disposition: 'succeeded',
+    createdResultUuids: ['Actor.alchemist.Item.elixir'],
+  });
   const { reply, commands } = brew({ started: startReply(), settled, interactive: true });
   const result = await reply;
 
@@ -67,18 +76,24 @@ test('a ready matched brew executes once with the started revision and the calle
 });
 
 test('the public API default keeps the execute non-interactive', async () => {
-  const { reply, commands } = brew({ started: startReply(), settled: executeReply({ success: true }) });
+  const { reply, commands } = brew({
+    started: startReply(),
+    settled: executeReply({ success: true }),
+  });
   await reply;
   assert.deepEqual(commands[0].options, { interactive: false });
 });
 
 test('waiting, unready, fizzled and refused starts are returned unchanged', async () => {
   const fizzle = serializedOperationResult(
-    versionedTransitionResult({ id: 'run-2', status: 'failed', runRevision: 1, currentStepIndex: null }, {
-      success: false,
-      disposition: 'no-match',
-      consumed: true,
-    })
+    versionedTransitionResult(
+      { id: 'run-2', status: 'failed', runRevision: 1, currentStepIndex: null },
+      {
+        success: false,
+        disposition: 'no-match',
+        consumed: true,
+      }
+    )
   );
   const refusal = { success: false, reason: 'alchemy-submission-invalid' };
   for (const started of [

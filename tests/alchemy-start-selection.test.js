@@ -1,6 +1,6 @@
 /** The version-1 brew's derived start plan and submission-funded set (issue 2574). */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import {
@@ -30,18 +30,31 @@ function plan(set, submittedItems, system = essencesOn) {
 }
 
 const component = (componentId) => ({ match: { type: 'component', componentId }, quantity: 1 });
-const essence = (essenceId, amount) => ({ match: { type: 'essence', essenceId, amount }, quantity: 1 });
+const essence = (essenceId, amount) => ({
+  match: { type: 'essence', essenceId, amount },
+  quantity: 1,
+});
 
 test('a recipe without the matched set yields the set id alone', () => {
-  assert.deepEqual(plan(null, [{ item: herb, componentId: 'herb' }]), { selectedIngredientSetId: 'set' });
+  assert.deepEqual(plan(null, [{ item: herb, componentId: 'herb' }]), {
+    selectedIngredientSetId: 'set',
+  });
   assert.deepEqual(
-    deriveAlchemySelectionPlan({ steps: [], ingredientSetId: 'set', submittedItems: [], components }),
+    deriveAlchemySelectionPlan({
+      steps: [],
+      ingredientSetId: 'set',
+      submittedItems: [],
+      components,
+    }),
     { selectedIngredientSetId: 'set' }
   );
 });
 
 test('a single-option component set emits no override or allocation key', () => {
-  const set = new IngredientSet({ id: 'set', ingredientGroups: [{ id: 'g', options: [component('herb')] }] });
+  const set = new IngredientSet({
+    id: 'set',
+    ingredientGroups: [{ id: 'g', options: [component('herb')] }],
+  });
   const derived = plan(set, [{ item: herb, componentId: 'herb' }]);
   assert.deepEqual(derived, { selectedIngredientSetId: 'set' });
   assert.equal(Object.values(derived).includes(undefined), false);
