@@ -456,7 +456,7 @@ export const DEMO_ACTORS = Object.freeze({
       'ed-iron-ore': 6,
       'ed-charcoal': 5,
       'ed-iron-ingot': 2,
-      'ed-steel-ingot': 2,
+      'ed-steel-ingot': 4,
       'ed-longsword': 2,
       'ed-tool-crucible': 1,
       'ed-tool-hammer': 1,
@@ -469,7 +469,7 @@ export const DEMO_ACTORS = Object.freeze({
       'hm-empty-phial': 4,
     },
     'demo-actor-maren': {
-      'ed-oiled-grip': 1,
+      'ed-oiled-grip': 2,
     },
   },
 });

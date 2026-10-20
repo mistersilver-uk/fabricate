@@ -31,6 +31,8 @@ const DEFAULT_SCALE = 2 / 3;
 const FORGE = 'demo-emberdeep-forge';
 const PLAYER = 'fabricate-app';
 const MANAGER = 'fabricate-crafting-system-manager';
+/** Cut on one screen after the forge, each through the production `applyFabricateTheme`. */
+const PALETTE_CUTS = ['fabricate', 'mythwright', 'starglass-arcana', 'sovereign', 'hearth-herb'];
 const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 /** The lab's own environment notices, tolerated exactly as `view-lab-screenshots.mjs` does. */
 const TOLERATED_WARNINGS = [
@@ -230,15 +232,13 @@ class Take {
   }
 }
 
-/** (a)-(b): the forge in Ironblood Forge, a routed craft to its tier, then the palette cut. */
+/** (a): the forge in Ironblood Forge, a routed craft to its tier and the blade in the pack. */
 async function forgeScene(take, open) {
   await open({ app: PLAYER, theme: 'ironblood-forge', query: { tab: 'crafting' } });
-  await take.hold(1600, 'forge: the recipe browser');
   await take.click('[data-crafting-system-filter]');
-  await take.hold(500, 'forge: filter by crafting system');
   await take.click(`[data-popover-option="${FORGE}"]`);
   await take.click('.crafting-recipe-row[data-recipe-id="ed-r-longsword"]');
-  await take.hold(1600, 'forge: Forge Longsword, the grip is in another pack');
+  await take.hold(2200, 'forge: Forge Longsword, the grip is in another pack');
   await take.click('.actor-bar-trigger');
   await take.hold(900, 'forge: choose the crafting actor');
   await take.click('.actor-bar-trigger');
@@ -251,7 +251,6 @@ async function forgeScene(take, open) {
     '[data-crafting-craft][data-crafting-craft-disabled="false"]',
     'Forge Longsword is not craftable after adding the source'
   );
-  await take.hold(600, 'forge: ready to craft');
   await take.glide('[data-recipe-section="outcome-tiers"]', 'forge: the outcome tiers');
   await take.hold(1700, 'forge: three blades, one roll');
   await take.click('[data-crafting-craft][data-crafting-craft-disabled="false"]');
@@ -264,24 +263,28 @@ async function forgeScene(take, open) {
   await take.glide('[data-outcome-tier="ed-masterwork"]', 'forge: the roll lands on Masterwork', {
     steps: 4,
   });
-  await take.hold(2200, 'forge: Masterwork Longsword');
-  for (const theme of [
-    'fabricate',
-    'mythwright',
-    'starglass-arcana',
-    'sovereign',
-    'foundry-native',
-  ]) {
+  await take.hold(1500, 'forge: your roll, Masterwork');
+  await take.click('[data-player-nav-tab="inventory"]');
+  await take.fill('[data-inventory-search]', 'sword');
+  await take.click(
+    `.inventory-card[data-inventory-card="${FORGE}:ed-masterwork-longsword"] .inventory-card-button`
+  );
+  await take.hold(2600, 'forge: the Masterwork Longsword in the pack');
+}
+
+/** (b): the palette cut, on the pack with the new blade selected. */
+async function paletteScene(take) {
+  // The whole pack, so each palette is judged across the grid and the selected blade together.
+  await take.fill('[data-inventory-search]', '');
+  for (const theme of PALETTE_CUTS) {
     await take.palette(theme);
-    await take.hold(900, `palette: ${theme}`);
+    await take.hold(1000, `palette: ${theme}`);
   }
-  await take.palette('ironblood-forge');
-  await take.hold(700, 'palette: back to ironblood-forge');
 }
 
 /** (c): the GM recipe editor, routing the check's tiers to result sets. */
 async function editorScene(take, open) {
-  await open({ app: MANAGER, theme: 'mythwright', query: { system: FORGE } });
+  await open({ app: MANAGER, theme: 'foundry-native', query: { system: FORGE } });
   await take.click('.manager-nav-button:has-text("Crafting")');
   await take.hold(1100, 'editor: the forge recipes');
   await take.click('[data-recipe-edit="ed-r-longsword"]');
@@ -303,7 +306,7 @@ async function stillScene(take, open) {
   await take.hold(700, 'still: moonbell');
   await take.click('[data-alchemy-inventory-row="hm-empty-phial"]');
   await take.expect('[data-alchemy-brew]:not([disabled])', 'the bench did not recognise the brew');
-  await take.hold(2200, 'still: Draught of Mending, ready to brew');
+  await take.hold(2500, 'still: Draught of Mending, ready to brew');
 }
 
 /** (e): salvage a Longsword back to its stock. */
@@ -318,7 +321,7 @@ async function salvageScene(take, open) {
   await take.hold(1500, 'salvage: what a Longsword breaks down into');
   await take.click('[data-inventory-salvage-action]');
   await take.expect('[data-inventory-salvage-summary="success"]', 'the salvage did not complete');
-  await take.hold(2400, 'salvage: steel and leather back in the pack');
+  await take.hold(2600, 'salvage: steel and leather back in the pack');
 }
 
 async function main() {
@@ -334,7 +337,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
   try {
     const open = (scene) => take.open(browser, server.baseUrl, { seed: options.seed, ...scene });
-    for (const scene of [forgeScene, editorScene, stillScene, salvageScene]) {
+    for (const scene of [forgeScene, paletteScene, editorScene, stillScene, salvageScene]) {
       await scene(take, open);
     }
   } finally {
