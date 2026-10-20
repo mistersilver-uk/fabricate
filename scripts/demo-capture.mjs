@@ -3,7 +3,7 @@
  * The hero-demo capture (issue 2571): walk the View Lab's `world=demo` through a scripted journey
  * and write numbered PNG frames plus a `manifest.json` of per-frame durations for encoding.
  *
- *   node scripts/demo-capture.mjs [output-dir] [--seed <n>] [--scale <factor>]
+ *   node scripts/demo-capture.mjs [output-dir] [--seed <n>] [--scale <factor>] [--no-captions]
  *
  * The output defaults to `tmp/demo-frames/` (gitignored); only its `NNNN.png` frames and
  * `manifest.json` are ever replaced. The lab server binds port 0, so a lab already serving 5273 in
@@ -49,18 +49,54 @@ const MANAGER = 'fabricate-crafting-system-manager';
 const PALETTE_CUTS = ['fabricate', 'mythwright', 'starglass-arcana', 'sovereign', 'hearth-herb'];
 const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 
+/**
+ * One lower-third caption per beat: a mono kicker over a serif line, drawn into the page so the type
+ * stays crisp. `top` lifts it clear of a beat whose subject sits at the bottom of the window.
+ */
+const CAPTIONS = Object.freeze({
+  forge: { kicker: 'Routed by check', text: 'Craft by recipe. Quality by roll.', position: 'top' },
+  pack: { kicker: 'Masterwork', text: 'Straight from the anvil to the pack.', position: 'bottom' },
+  palettes: { kicker: 'Seven palettes', text: 'Seven palettes. Pick yours.', position: 'top' },
+  editor: { kicker: 'Recipe editor', text: 'Every outcome tier, authored.', position: 'top' },
+  still: { kicker: 'Essence alchemy', text: 'Brew by essence, not by list.', position: 'top' },
+  salvage: { kicker: 'Salvage', text: 'Break it back down.', position: 'top' },
+});
+/** A caption's fade-in after its beat starts: each step's opacity and how long it holds. */
+const CAPTION_FADE = Object.freeze([
+  [0, 120],
+  [0.4, 80],
+  [0.75, 80],
+]);
+/** Beats shorter than this show their caption at once rather than spending them on a fade. */
+const CAPTION_FADE_MIN_MS = 600;
+
 function parseArgs(argv) {
   const options = {
     output: join(ROOT, 'tmp', 'demo-frames'),
     seed: DEMO_SEED,
     scale: DEFAULT_SCALE,
+    captions: true,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--seed') options.seed = Number(argv[(index += 1)]);
-    else if (arg === '--scale') options.scale = Number(argv[(index += 1)]);
-    else if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
-    else options.output = resolve(arg);
+    switch (arg) {
+      case '--seed': {
+        options.seed = Number(argv[(index += 1)]);
+        break;
+      }
+      case '--scale': {
+        options.scale = Number(argv[(index += 1)]);
+        break;
+      }
+      case '--no-captions': {
+        options.captions = false;
+        break;
+      }
+      default: {
+        if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
+        options.output = resolve(arg);
+      }
+    }
   }
   if (!Number.isInteger(options.seed)) throw new Error('--seed needs an integer');
   if (!(options.scale > 0 && options.scale <= 2)) {
@@ -106,15 +142,76 @@ async function closeQuietly(resource, what) {
 
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
+/**
+ * Draw, update or clear the caption in the window frame, in Fabricate's own faces and the active
+ * palette's tokens. Fails when a face falls back, since a frame in a fallback serif is not the product.
+ */
+async function drawCaption(page, caption, opacity) {
+  const fallen = await page.evaluate(
+    async ({ spec, alpha }) => {
+      const doc = globalThis.document;
+      const frame = doc.querySelector('[data-view-lab-frame]');
+      let node = frame.querySelector('[data-demo-caption]');
+      if (!spec) {
+        node?.remove();
+        return [];
+      }
+      const faces = ['600 24px Spectral', '500 11px "JetBrains Mono"'];
+      await Promise.all(faces.map((face) => doc.fonts.load(face)));
+      const missing = faces.filter((face) => !doc.fonts.check(face));
+      if (!node) {
+        node = doc.createElement('div');
+        node.dataset.demoCaption = '';
+        node.style.cssText =
+          'position:absolute;left:50%;transform:translateX(-50%);z-index:100000;' +
+          'pointer-events:none;text-align:center;white-space:nowrap;padding:10px 26px 12px;' +
+          'border-radius:14px;border:1px solid var(--fab-accent-border);' +
+          'background:color-mix(in srgb, var(--fab-bg-0) 86%, transparent);' +
+          'box-shadow:0 8px 28px var(--fab-overlay-dark-24);';
+        const kicker = doc.createElement('div');
+        kicker.dataset.demoCaptionKicker = '';
+        kicker.style.cssText =
+          'font:500 11px/1.3 var(--fab-font-mono);letter-spacing:0.16em;' +
+          'text-transform:uppercase;color:var(--fab-accent);margin-bottom:3px;';
+        const line = doc.createElement('div');
+        line.dataset.demoCaptionText = '';
+        line.style.cssText = 'font:600 24px/1.25 var(--fab-font-serif);color:var(--fab-text);';
+        node.append(kicker, line);
+        frame.append(node);
+      }
+      node.querySelector('[data-demo-caption-kicker]').textContent = spec.kicker;
+      node.querySelector('[data-demo-caption-text]').textContent = spec.text;
+      node.style.top = spec.position === 'top' ? '44px' : 'auto';
+      node.style.bottom = spec.position === 'top' ? 'auto' : '28px';
+      node.style.opacity = String(alpha);
+      return missing;
+    },
+    { spec: caption, alpha: opacity }
+  );
+  if (fallen.length > 0) {
+    throw new Error(`caption faces fell back in the lab page: ${fallen.join(', ')}`);
+  }
+}
+
 /** The frames one run writes, and the page actions that lead to them. */
 class Take {
-  constructor({ output, frames, scale }) {
+  constructor({ output, frames, scale, captions }) {
     this.output = output;
     this.frames = frames;
     this.scale = scale;
+    this.captions = captions;
     this.page = null;
     this.theme = null;
     this.problems = [];
+    this.caption = null;
+    this.captionShown = false;
+  }
+
+  /** Show `key`'s caption from the next beat on, fading in on the first beat long enough for it. */
+  captionFor(key) {
+    if (!CAPTIONS[key]) throw new Error(`no caption for "${key}"`);
+    this.caption = key;
+    this.captionShown = false;
   }
 
   async open(browser, baseUrl, { app, theme, seed, query = {} }) {
@@ -139,6 +236,7 @@ class Take {
       demoSeed: String(seed),
       ...query,
     });
+    this.caption = null;
     await this.page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, { timeout: NAVIGATION_TIMEOUT_MS });
     await this.page.waitForFunction(() => {
       const { viewLabReady, viewLabError } = globalThis.document.body.dataset;
@@ -186,8 +284,22 @@ class Take {
     if ((await this.page.locator(selector).count()) === 0) throw new Error(why);
   }
 
-  /** Write one frame, held for `ms`. A palette is re-applied first, for roots that mounted since. */
+  /** Write one beat, held for `ms`, fading its caption in when it is the caption's first long beat. */
   async hold(ms, beat) {
+    const fading = this.captions && this.caption && !this.captionShown && ms >= CAPTION_FADE_MIN_MS;
+    let remaining = ms;
+    if (fading) {
+      for (const [opacity, stepMs] of CAPTION_FADE) {
+        await this.frame(stepMs, beat, opacity);
+        remaining -= stepMs;
+      }
+    }
+    if (this.caption && (fading || ms >= CAPTION_FADE_MIN_MS)) this.captionShown = true;
+    await this.frame(remaining, beat, this.captionShown ? 1 : 0);
+  }
+
+  /** Write one frame. A palette is re-applied first, for roots that mounted since. */
+  async frame(ms, beat, captionOpacity) {
     const problems = this.problems.filter((problem) =>
       TOLERATED_WARNINGS.every((pattern) => !pattern.test(problem))
     );
@@ -198,6 +310,8 @@ class Take {
       async ({ module, id }) => (await import(module)).applyFabricateTheme(id),
       { module: THEME_MODULE, id: this.theme }
     );
+    const caption = this.captions && this.caption ? CAPTIONS[this.caption] : null;
+    await drawCaption(this.page, caption, captionOpacity);
     const file = `${String(this.frames.length + 1).padStart(4, '0')}.png`;
     const frame = this.page.locator('[data-view-lab-frame]');
     // A cold image cache would otherwise photograph a blank tile.
@@ -209,7 +323,13 @@ class Take {
       animations: 'disabled',
       caret: 'hide',
     });
-    this.frames.push({ file, durationMs: ms, beat, theme: this.theme });
+    this.frames.push({
+      file,
+      durationMs: ms,
+      beat,
+      theme: this.theme,
+      caption: caption && captionOpacity > 0 ? this.caption : null,
+    });
   }
 
   /** Ease the element's scroll container until `selector` sits near its top, a frame per step. */
@@ -252,6 +372,7 @@ class Take {
 /** (a): the forge in Ironblood Forge, a routed craft to its tier and the blade in the pack. */
 async function forgeScene(take, open) {
   await open({ app: PLAYER, theme: 'ironblood-forge', query: { tab: 'crafting' } });
+  take.captionFor('forge');
   await take.click('[data-crafting-system-filter]');
   await take.click(`[data-popover-option="${FORGE}"]`);
   await take.click('.crafting-recipe-row[data-recipe-id="ed-r-longsword"]');
@@ -282,6 +403,7 @@ async function forgeScene(take, open) {
   });
   await take.hold(1500, 'forge: your roll, Masterwork');
   await take.click('[data-player-nav-tab="inventory"]');
+  take.captionFor('pack');
   await take.fill('[data-inventory-search]', 'sword');
   await take.click(
     `.inventory-card[data-inventory-card="${FORGE}:ed-masterwork-longsword"] .inventory-card-button`
@@ -293,6 +415,7 @@ async function forgeScene(take, open) {
 async function paletteScene(take) {
   // The whole pack, so each palette is judged across the grid and the selected blade together.
   await take.fill('[data-inventory-search]', '');
+  take.captionFor('palettes');
   for (const theme of PALETTE_CUTS) {
     await take.palette(theme);
     await take.hold(1000, `palette: ${theme}`);
@@ -302,6 +425,7 @@ async function paletteScene(take) {
 /** (c): the GM recipe editor, routing the check's tiers to result sets. */
 async function editorScene(take, open) {
   await open({ app: MANAGER, theme: 'foundry-native', query: { system: FORGE } });
+  take.captionFor('editor');
   await take.click('.manager-nav-button:has-text("Crafting")');
   await take.hold(1100, 'editor: the forge recipes');
   await take.click('[data-recipe-edit="ed-r-longsword"]');
@@ -312,9 +436,10 @@ async function editorScene(take, open) {
   await take.hold(1600, 'editor: results by outcome');
 }
 
-/** (d): the still in Hearth & Herb, reagents combined by essence up to a known brew. */
+/** (d): the still in Hearth & Herb, reagents combined by essence and brewed on a real check. */
 async function stillScene(take, open) {
   await open({ app: PLAYER, theme: 'hearth-herb', query: { tab: 'alchemy' } });
+  take.captionFor('still');
   await take.hold(1200, 'still: the workbench');
   await take.click('[data-alchemy-recipe="hm-r-mending"]');
   await take.click('[data-alchemy-inventory-row="hm-bitterfern"]');
@@ -323,12 +448,25 @@ async function stillScene(take, open) {
   await take.hold(700, 'still: moonbell');
   await take.click('[data-alchemy-inventory-row="hm-empty-phial"]');
   await take.expect('[data-alchemy-brew]:not([disabled])', 'the bench did not recognise the brew');
-  await take.hold(2500, 'still: Draught of Mending, ready to brew');
+  await take.hold(1800, 'still: Draught of Mending, ready to brew');
+  await take.click('[data-alchemy-brew]');
+  await take.hold(1200, 'still: the brewing check');
+  await take.click(`${PROMPT} button[type="submit"]`);
+  await take.expect(
+    '[data-alchemy-banner-status="success"]',
+    'the brew did not succeed; re-tune the journey with --seed (see DEMO_SEED)'
+  );
+  await take.expect(
+    '[data-alchemy-inventory-row="hm-draught-mending"]',
+    'the brewed draught is not in the pack'
+  );
+  await take.hold(2600, 'still: brewed, and the draught is in the pack');
 }
 
 /** (e): salvage a Longsword back to its stock. */
 async function salvageScene(take, open) {
   await open({ app: PLAYER, theme: 'starglass-arcana', query: { tab: 'inventory' } });
+  take.captionFor('salvage');
   await take.hold(1100, 'salvage: the inventory');
   await take.fill('[data-inventory-search]', 'Longsword');
   await take.click(
@@ -351,7 +489,12 @@ async function main() {
   const staging = mkdtempSync(join(options.output, '.demo-capture-'));
 
   const frames = [];
-  const take = new Take({ output: staging, frames, scale: options.scale });
+  const take = new Take({
+    output: staging,
+    frames,
+    scale: options.scale,
+    captions: options.captions,
+  });
   let server = null;
   let browser = null;
   try {
@@ -371,6 +514,7 @@ async function main() {
         height: Math.round(WINDOW.height * options.scale),
       },
       seed: options.seed,
+      captions: options.captions,
       loop: true,
       totalMs,
       frames,
