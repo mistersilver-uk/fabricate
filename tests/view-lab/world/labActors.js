@@ -300,14 +300,19 @@ const ACTOR_DEFINITIONS = [
  * Build the lab's actors with their inventories.
  *
  * @param {object} content Output of `buildLabContent()`.
+ * @param {object} [cast] Another world's actor definitions and inventories, as the demo world
+ *   passes its own (issue 2571); the lab's tables are keyed by lab actor ids and match none of them.
  * @returns {object[]} Duck-typed actors.
  */
-export function buildLabActors(content) {
+export function buildLabActors(
+  content,
+  { definitions = ACTOR_DEFINITIONS, inventories = INVENTORIES } = {}
+) {
   const componentsById = new Map(content.components.map((component) => [component.id, component]));
   for (const tool of content.tools) componentsById.set(tool.id, tool);
 
-  return ACTOR_DEFINITIONS.map((definition) => {
-    const stacks = INVENTORIES[definition.id] ?? {};
+  return definitions.map((definition) => {
+    const stacks = inventories[definition.id] ?? {};
     const broken = new Set(BROKEN_STACKS[definition.id] ?? []);
     const items = Object.entries(stacks).map(([componentId, quantity], index) => {
       const item = ownedItem(componentId, componentsById.get(componentId), quantity, index);
