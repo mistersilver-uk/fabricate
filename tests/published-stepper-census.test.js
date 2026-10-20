@@ -152,19 +152,40 @@ function stepperSelectors(sheets, ancestors = STEPPER_ANCESTORS) {
 
 const unquoted = (value) => String(value ?? '').replaceAll(/^["']|["']$/g, '');
 
+/**
+ * Whether a `:not()` lists, as one of its alternatives, a lone simple selector `test` accepts: a
+ * compound or complex alternative excludes the field only in some states or places, so it is none.
+ */
+const negatesAlone = (part, test) =>
+  part.name === 'not' &&
+  (part.args?.children ?? []).some(
+    (complex) =>
+      complex.children.length === 1 &&
+      complex.children[0].selectors.length === 1 &&
+      test(complex.children[0].selectors[0])
+  );
+
 /** Whether a `:not()` holds `[type]` alone, so the element it qualifies states no type. */
 const negatesType = (part) =>
-  part.name === 'not' &&
-  [...walkNodes(part.args)].some(
+  negatesAlone(
+    part,
     (inner) => inner.type === 'AttributeSelector' && inner.name === 'type' && !inner.matcher
   );
 
-/** Whether a `:not()` holds the field's own class, which the published number field always carries. */
+/** Whether a `:not()` holds the field's own class alone, which the published number field always carries. */
 const negatesField = (part) =>
-  part.name === 'not' &&
-  [...walkNodes(part.args)].some(
+  negatesAlone(
+    part,
     (inner) => inner.type === 'ClassSelector' && inner.name === 'fab-stepper-input'
   );
+
+/**
+ * Whether a `type` matcher requires a type other than `number`: only `=` and `~=` name a whole
+ * value, and the attribute's value is matched without case, so a prefix, suffix, substring or
+ * dash matcher may still take `number`.
+ */
+const refusesNumber = (part) =>
+  ['=', '~='].includes(part.matcher) && unquoted(part.value).toLowerCase() !== 'number';
 
 /**
  * Whether an `input` compound cannot match the published number field: it requires an attribute
@@ -176,7 +197,7 @@ function unmatchable(compound) {
     if (part.type === 'AttributeSelector') {
       const name = part.name.toLowerCase();
       if (!FIELD_ATTRIBUTES.has(name)) return true;
-      return name === 'type' && Boolean(part.matcher) && unquoted(part.value) !== 'number';
+      return name === 'type' && refusesNumber(part);
     }
     if (part.type !== 'PseudoClassSelector') return false;
     return part.name === 'disabled' || negatesType(part) || negatesField(part);
@@ -329,6 +350,9 @@ describe('the stepper census, synthetic', () => {
     '.host-row input',
     '.host-row :is(input, textarea)',
     '.a input.manager-name',
+    '.a input[type~="text"]',
+    '.a input:not([type], .b)',
+    '.a input:not(.fab-stepper-input)',
   ]) {
     it(`admits the bare input rule ${selector}`, () => {
       assert.deepEqual(inputsIn(`${selector} { gap: 0 }`), []);
@@ -341,6 +365,17 @@ describe('the stepper census, synthetic', () => {
     '.a input:is([type="text"], [type="number"])',
     '.a :is(input, textarea)',
     '.a input.fab-stepper-input',
+    // A type matcher that names part of a value, or the value in another case, may take `number`.
+    '.a input[type^="num"]',
+    '.a input[type$="ber"]',
+    '.a input[type*="umb"]',
+    '.a input[type|="number"]',
+    '.a input[type="NUMBER"]',
+    // A `:not()` whose alternative is compound or complex excludes the field only in some states or places.
+    '.a input:not([type]:hover)',
+    '.a input:not(.b [type])',
+    '.a input:not(.fab-stepper-input:focus)',
+    '.a input:not(.b .fab-stepper-input)',
   ]) {
     it(`refuses the bare input rule ${selector}`, () => {
       assert.deepEqual(inputsIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);
