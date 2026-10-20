@@ -535,7 +535,7 @@ const INLINE_STYLE = 'states an inline style under a root that supplies the ring
 const SCOPED_RINGS = Object.freeze({
   'src/ui/svelte/components/Stepper.svelte': {
     statedBy:
-      'The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.',
+      "The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.",
     rules: [
       {
         selector:
