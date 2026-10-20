@@ -1,5 +1,5 @@
 /**
- * The admin store's public shape, pinned key by key (issue 1708). The 237-key set, each member's
+ * The admin store's public shape, pinned key by key (issue 1708). The 236-key set, each member's
  * kind and each action's function name are the contract the section split must preserve; a key
  * bound to the wrong section member changes neither the key set nor any kind, so the name
  * assertion is the only guard that sees it.
@@ -70,7 +70,6 @@ const ACTION_MEMBERS = [
   'setComponentCategoryIcon',
   'addTag',
   'removeTag',
-  'addEssence',
   'updateEssence',
   'setEssenceEnabled',
   'applyEssenceBulkEdit',
@@ -258,11 +257,11 @@ const ACTION_MEMBERS = [
 const RENAMED_ACTIONS = { randomID: '_randomID' };
 
 describe('adminStore public shape', () => {
-  it('exposes exactly 237 members, split into 7 stores and 230 actions', async () => {
+  it('exposes exactly 236 members, split into 7 stores and 229 actions', async () => {
     const harness = await createSectionHarness();
     try {
-      assert.equal(STORE_MEMBERS.length + ACTION_MEMBERS.length, 237);
-      assert.equal(Object.keys(harness.store).length, 237);
+      assert.equal(STORE_MEMBERS.length + ACTION_MEMBERS.length, 236);
+      assert.equal(Object.keys(harness.store).length, 236);
       assert.deepEqual(
         storeMemberKinds(harness.store),
         expectedMemberKinds({ stores: STORE_MEMBERS, methods: ACTION_MEMBERS })

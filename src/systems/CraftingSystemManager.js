@@ -65,8 +65,17 @@ import {
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import {
+  resolveStoreCorpus as _resolveStoreCorpus,
+  resolveStoreSeam as _resolveStoreSeam,
+} from './manager/scopeStoreSeams.js';
 import { sourceSnapshotCollaborators } from './manager/sourceSnapshotCollaborators.js';
 import { deleteTool, toolSourcesCollaborators, upsertTool } from './manager/toolSources.js';
+import {
+  registerWorldScopeIdentities,
+  saveOrRestore,
+  worldScopeIdentityCollaborators,
+} from './manager/worldScopeIdentitySave.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizeComponent } from './normalize/components.js';
@@ -152,29 +161,6 @@ import {
 } from './sourceIdentitySnapshots.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
-
-/** Resolve an injected store seam, given as the store or as a lazy getter (the production shape,
- * since `game.fabricate` is unpopulated at construction). A throwing getter answers `null`, an
- * unknown basis, rather than breaking the normalizer (issue 970). */
-function _resolveStoreSeam(seam) {
-  if (!seam) return null;
-  try {
-    return typeof seam === 'function' ? (seam() ?? null) : seam;
-  } catch {
-    return null;
-  }
-}
-
-/** One scope store's published corpus, or `null` when no world half is readable, catching a
- * throwing `corpus()` too. `## Scoped Entity Definitions` requirement 16: an unreadable world
- * half answers the in-system array itself. */
-function _resolveStoreCorpus(seam) {
-  try {
-    return _resolveStoreSeam(seam)?.corpus?.() ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** The Valid Id Basis for one world-scope entity type (issue 1359): the world roster unioned with
  * the system's in-system array, or `null` when neither can vouch. The world half counts when
@@ -666,8 +652,13 @@ export class CraftingSystemManager {
 
   /** Persist a crafting-system mutation through the repository (issue 1089). Argument-less
    * `save()` is the whole-corpus write; other sites name what they touched, scoping the revision
-   * advance (issue 1078). No `domains` means every domain; a `batch` may key them per record. */
+   * advance (issue 1078). No `domains` means every domain; a `batch` may key them per record.
+   * World identities register first (issue 2554); resolves to the registration receipt. */
   async save(change = null) {
+    const registration = await registerWorldScopeIdentities(
+      worldScopeIdentityCollaborators(this),
+      change
+    );
     // The systems-scope revision advance (issue 1076), announced once at this chokepoint; a
     // whole-corpus save advances every system.
     const touched = this._savedSystemIds(change);
@@ -675,7 +666,9 @@ export class CraftingSystemManager {
     for (const systemId of touched) {
       this._attributeChange(domainsForRecord(change, systemId), systemId);
     }
-    await applyDefinitionChange(this._repository, change, this.systems.values());
+    return registration.settle(
+      applyDefinitionChange(this._repository, change, this.systems.values())
+    );
   }
 
   /** The system ids one {@link save} touched. */
@@ -861,13 +854,12 @@ export class CraftingSystemManager {
     return migrateLegacyRecipeItems(itemSourcesCollaborators(this));
   }
 
-  async createSystem(data = {}) {
+  async createSystem(data = {}, options = {}) {
     this._assertGM('create crafting system');
     const system = this._normalizeSystem(data);
     this._assertValidSystemId(system.id);
     this._assertUniqueComponentSourcesForSystem(system);
-    this.systems.set(system.id, system);
-    await this.save({ put: system, domains: ALL_INVALIDATION_DOMAINS });
+    await saveOrRestore(this, null, { put: system, domains: ALL_INVALIDATION_DOMAINS }, options);
     this._notifySystemsChanged();
     return system;
   }
@@ -1067,7 +1059,7 @@ export class CraftingSystemManager {
     return merged;
   }
 
-  async updateSystem(systemId, updates = {}) {
+  async updateSystem(systemId, updates = {}, options = {}) {
     this._assertGM('update crafting system');
     const current = this.getSystem(systemId);
     if (!current) throw new Error(`Crafting system not found: ${systemId}`);
@@ -1128,8 +1120,8 @@ export class CraftingSystemManager {
     }
 
     // Persist first so recipe migration and validation read the new mode.
-    this.systems.set(systemId, merged);
-    await this.save({ put: merged, domains: this._domainsForSystemEdit(current, merged) });
+    const editDomains = this._domainsForSystemEdit(current, merged);
+    await saveOrRestore(this, current, { put: merged, domains: editDomains }, options);
 
     // Migration-first mode change: delete only recipes a per-recipe structural constraint of the
     // new mode rules out; system-level gaps gate visibility through validation instead.

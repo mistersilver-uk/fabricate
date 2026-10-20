@@ -244,7 +244,10 @@ A single object-level merge would let a destination holding entities but no defa
 `membership` MUST be merged AFTER it, because the destination's system id does not exist until then — copy-mode import removes the payload's id, and a keep-mode overwrite may resolve an existing system by NAME under a different id — and every incoming membership record's `systemId` MUST be REWRITTEN to the resolved destination system id.
 The persisted map key follows for free, because it is re-derived from the record on every normalize.
 
-The two writes are NOT atomic, and the intermediate state is stated rather than hidden: a set of world entities with no membership record for the imported system.
+**System creation receives the incoming Essence and Tool membership records as registration seeds** (issue 2554), keyed by entity id with each `systemId` rewritten to the destination's, so the save chokepoint of `data-models/spec.md` -> Scoped Entity Definitions requirement 17 writes them in place of a registration-built shape and the later membership merge finds them already written.
+Rows the payload carries no membership for are registered by that chokepoint, and a merge that skipped an unseeded scope does not stop registration seeding it.
+
+The two writes are NOT atomic, and the intermediate state is stated rather than hidden, but in a world that registers at the chokepoint it narrows to Essence and Tool rows whose payload carried no membership and whose registration was reported `conflicting`, plus the component layer: a set of world entities with no membership record for the imported system.
 That state is INERT, because requirement 3 makes an absent membership record a REFUSAL and never a prune and the basis union is deliberately not membership-filtered.
 Re-running a KEEP-mode import repairs it, because the destination-wins merge makes the second run additive.
 A COPY-mode re-run does NOT repair it: it creates a second system rather than completing the torn one, and the torn one keeps its memberless world entities until a GM deletes them.
@@ -374,7 +377,14 @@ The map MUST additionally rewrite every component reference INSIDE the three wor
 A MATCHED entity's roster record MUST be DROPPED from the incoming roster rather than added under its pre-import id, which would create a second world record for an item the destination already holds and would leave every membership record naming a world entity absent from the merged roster.
 Dropping rather than re-keying is stated deliberately: re-keying and relying on the merge's destination-wins collision rule is observationally equivalent under a CORRECT merge, and choosing it would make this rule's correctness depend on that one being right.
 
-Tool and essence identifiers are unaffected by COPY-MODE REBINDING — copy mode never regenerated them — and an id collision on either is REPORTED rather than repaired.
+Tool and essence identifiers are unaffected by COPY-MODE REBINDING — copy mode never regenerated them — and an id collision on either is REPORTED rather than repaired, except the single-exact-source-match Tool rebind below.
+
+**In copy mode only, an incoming Tool whose source references intersect exactly ONE destination world Tool under a different id is rebound to that id** (issue 2554), injectively in incoming order, with every in-payload reference — the system, recipes, gathering slice, and the `toolScope` slice's `defaults` and `membership` records — rewritten key-aware through the same shared walk.
+Binding is injective: a destination id already claimed by an earlier incoming Tool, or held by another incoming Tool, is not bound again, and that Tool keeps its incoming id.
+Source references are read by the registration accessor (`data-models/spec.md` -> Tool scope requirement 7), so the rebind and the destination's save chokepoint never decide one Tool differently.
+A matched incoming Tool's roster record is DROPPED rather than re-keyed, as for a component.
+This is the only Tool re-key copy mode performs, and it supersedes the report-only handling of an id collision for that one case, so the collision report runs after it.
+Keep and replace modes never re-key a Tool; zero matches keep the incoming id, and a match against several world Tools keeps it and is reported as `worldEntityCollision`.
 That is a statement about REBINDING alone: the `1.34.0` upcast may MERGE two equivalent essences inside the bundle BEFORE copy mode runs, and such a merge is REPORTED rather than silent.
 
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.

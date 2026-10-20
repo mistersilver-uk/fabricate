@@ -18,6 +18,7 @@ import {
   mergedEntityIds,
   mergedMembershipUnion,
   recheckWorldDefault,
+  scopeMembershipSeeds,
   sliceRecords,
 } from './worldScopeImportMerge.js';
 
@@ -316,23 +317,21 @@ export class CompendiumImporter {
       summary.unresolvedReferences.push(...arrayOfRecords(packData.worldScopeReferences));
       await this._persistScopedEntityRosters(packData, summary);
 
-      let system;
+      const seeds = { scopeMembershipSeeds: scopeMembershipSeeds(packData) };
+      const system =
+        existingSystem && overwriteExisting
+          ? await this._craftingSystemManager.updateSystem(existingSystem.id, systemInput, seeds)
+          : await this._craftingSystemManager.createSystem(systemInput, seeds);
+      summary.system.id = system.id;
+      summary.system.name = system.name;
       if (existingSystem && overwriteExisting) {
-        system = await this._craftingSystemManager.updateSystem(existingSystem.id, systemInput);
-        summary.system.id = system.id;
-        summary.system.name = system.name;
         summary.collisions.push({
           type: 'system',
           id: system.id,
           name: system.name,
           resolution: 'overwritten',
         });
-      } else {
-        system = await this._craftingSystemManager.createSystem(systemInput);
-        summary.system.id = system.id;
-        summary.system.name = system.name;
-        summary.system.created = true;
-      }
+      } else summary.system.created = true;
 
       // Every membership's `systemId` is rewritten to the destination's in BOTH modes: copy mode
       // removed the payload's id, and a keep-mode overwrite may have matched a system by NAME.

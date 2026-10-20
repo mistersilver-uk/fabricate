@@ -725,11 +725,12 @@ Only shown when essences are enabled.
 **IDENTITY IS NOT AUTHORED AT SYSTEM SCOPE.**
 An essence's name, glyph, colour and description belong to its WORLD record, which every crafting system holding the essence resolves the same one of, so the system-scope Essence Rules editor renders no control that writes them — see `ui-world-scope/spec.md` `## GM World Essence Screens` requirement 10.
 The identity capabilities below are the WORLD essence entry editor's, and the system-scope route reaches them only through that editor.
-The one surface at system scope that still authors identity is a CREATE draft, whose in-system record is the only record there is and which therefore has no shared definition to contradict.
+No system-scope create exists (issue 2554): the world Essence Catalogue's `+ New essence` is the only create, and every system-scope write of an essence row registers its world identity at the save chokepoint (`data-models/spec.md` -> Scoped Entity Definitions requirement 17).
+The one surface at system scope that still authors identity is the three-tab editor rendered where the world corpus cannot answer for the essence, whose in-system record is then the only record readable and which therefore has no shared definition to contradict.
 
 Capabilities:
 
-- Browse, create, duplicate when supported, and delete essence definitions; edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
+- Browse essence definitions, add a world essence to this system and delete one from it, with no system-scope create or duplicate (`ui-world-scope/spec.md` `## GM World Essence Screens` requirement 13); edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
@@ -776,7 +777,7 @@ Capabilities:
   Both were removed because the row already states its own enabled state as a pill and its own source breakage in the summary line, the search box reads the source name, and the sort key groups by enabled-ness; a second and a third way to narrow a six-row list is chrome the reference does not draw.
   The presentation toggle is NOT a filter and stays, because it is the only route to the grid above.
 - Manager hides source columns, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in a create draft — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
+  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in the three-tab editor rendered where the world corpus cannot answer — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.

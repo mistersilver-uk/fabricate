@@ -20,6 +20,7 @@ import { migrateToolRequirementSections } from './migrateToolRequirementSections
 import { migrateTravelToWorldScope } from './migrateTravelToWorldScope.js';
 import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateWorldScopeEntities } from './migrateWorldScopeEntities.js';
+import { reconcileOrphanedScopedIdentities } from './reconcileOrphanedScopedIdentities.js';
 import { SEALED_MIGRATIONS } from './sealedMigrationRegistry.js';
 
 /** The entries from 1.18.0, every one carrying a `downgradeTo` for GM recovery guidance. */
@@ -376,6 +377,26 @@ const CURRENT_MIGRATIONS = [
     // on downgrade and the field simply survives for a re-upgrade.
     downgradeLosesData: false,
     migrate: (data) => migrateAlchemyBreakToolsOnFail(data),
+  },
+  {
+    version: '1.36.0',
+    label:
+      'Give every essence and tool a crafting system holds its entry in the world catalogue ' +
+      '(issue 2554). Until now a system could hold an essence or tool that existed only inside ' +
+      'that system, invisible under World › Essences and World › Tools. Each one now gets its ' +
+      'world entry and its link to the system, joining an existing world entry with the same id ' +
+      '(and, for a tool, the same source item) where there is one. NOTHING IS RENAMED, MERGED ' +
+      'OR DELETED, and every system keeps exactly the behaviour it had. A row that could not be ' +
+      'linked safely — a world entry with the same id or source already describes something ' +
+      'else, or its source matches more than one world entry — is left working in its system ' +
+      'only and listed for you by name. DOWNGRADING IS LOSSLESS: 1.35.0 reads the added world ' +
+      'entries and links with unchanged rules',
+    downgradeTo: '1.35.0',
+    // The added records are read by `1.35.0` under unchanged rules.
+    downgradeLosesData: false,
+    // Reports through `_scopedIdentityReconcileReport`.
+    migrate: (data) =>
+      reconcileOrphanedScopedIdentities(data, { parseUuid: globalThis.foundry?.utils?.parseUuid }),
   },
 ];
 

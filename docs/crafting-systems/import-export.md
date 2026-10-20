@@ -74,6 +74,23 @@ Copy mode regenerates the system, environment, and recipe identifiers while pres
 Realm identifiers are deliberately left alone: realms are world-level and shared, and regenerating them would give the destination two records for one place and break every environment, party override and discovery flag that names it.
 Recipe book membership is carried across to the regenerated recipe identifiers, so every book in the copy still lists the same recipes.
 
+### Essences and Tools on import
+
+Importing registers every essence and Tool in the world catalogue, because any system save does.
+An incoming essence adopts the catalogue entry with the same id, or is added to the catalogue under that id.
+An incoming Tool adopts the world Tool with the same id when both come from the same source Item, or neither has one, and is otherwise added to the catalogue unless another world Tool already claims its id or source Item.
+The membership records in the file, which hold the enabled switch and overrides, are kept.
+A row that cannot be linked, because the same id or source already describes something else, is imported and works in that system only.
+It is reported with a one-per-session warning.
+
+In Copy mode only, a Tool whose source Item matches exactly one Tool in the destination world is relinked to that world Tool, and every reference to it in the copy follows.
+Skip and Overwrite never relink a Tool.
+A Tool with no match, or with more than one, keeps its own id.
+
+{: .note }
+> Components created directly in a system, rather than by an import, are not yet held to the same rule.
+> That is planned as a follow-up.
+
 {: .note }
 > A crafting system's identifier may only contain letters, digits, hyphens, and underscores.
 > Fabricate generates a valid identifier for every system you create, so any system you authored in Fabricate and exported imports cleanly.

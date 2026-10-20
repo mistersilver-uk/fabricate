@@ -11,7 +11,7 @@ import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
 import { buildEssenceMergeCorpus, malformedCorpus } from './helpers/worldScopeCorpus.js';
 
-/** A `crypto.randomUUID()`-shaped id, which is what `adminStore.addEssence` actually mints. */
+/** A `crypto.randomUUID()`-shaped id, which is what the retired system-side essence create minted. */
 const MINTED = 'kTz9QpLm2xR4vB1a';
 
 /** An explicit string comparator, so a sort's order is stated rather than defaulted. */

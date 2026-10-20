@@ -16,6 +16,7 @@ import {
   assembleScopedEntityBundle,
   assembleTravelAuthoringBundle,
 } from './authoringExport.js';
+import { rebindCopyToolIds } from './copyModeToolRebind.js';
 import {
   rebindCopyContainerIds,
   rebindCopyComponentIds,
@@ -289,7 +290,6 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
   // ORDERING: the upcast already derived the slices under the bundle's own ids, so the copy map
   // below rewrites them too; deriving after rebinding would strand them at pre-rebind ids.
   const worldEntityIndex = options?.worldEntityIndex ?? null;
-  worldScopeReferences.push(...reportWorldEntityCollisions(prepared, worldEntityIndex, mode));
 
   if (mode === 'copy') {
     if (!worldEntityIndex || typeof worldEntityIndex !== 'object') {
@@ -303,16 +303,23 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     // Append "(Copy)" to the name so the user can distinguish it
     system.name = `${system.name || 'Crafting System'} (Copy)`;
 
-    // Eagerly, so reference resolution sees the regenerated recipe ids (issue 701).
-    rebindCopyRecipeIds(prepared);
-
-    rebindCopyContainerIds(prepared);
-
-    // Match-or-mint over components, rewriting the world-scope slices too (issue 1364).
-    rebindCopyComponentIds(prepared, { worldEntityIndex, report: worldScopeReferences });
+    rebindCopyIdentifiers(prepared, worldEntityIndex, worldScopeReferences);
   }
 
+  // After the rebinds, so a Tool the copy rebound is no longer reported as an id collision.
+  worldScopeReferences.push(...reportWorldEntityCollisions(prepared, worldEntityIndex, mode));
+
   return prepared;
+}
+
+/** Copy mode's rebinds, in order: recipe ids eagerly, so reference resolution sees them (issue
+ * 701); containers; components by match-or-mint, slices included (issue 1364); then the one Tool
+ * re-key (issue 2554). */
+function rebindCopyIdentifiers(prepared, worldEntityIndex, report) {
+  rebindCopyRecipeIds(prepared);
+  rebindCopyContainerIds(prepared);
+  rebindCopyComponentIds(prepared, { worldEntityIndex, report });
+  rebindCopyToolIds(prepared, { worldEntityIndex, report });
 }
 
 /** `fabricate-<slug>-<yyyy-mm-dd>.json`. */

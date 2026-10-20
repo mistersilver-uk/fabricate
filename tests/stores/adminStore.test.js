@@ -1915,48 +1915,7 @@ describe('createAdminStore', () => {
       return (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.id === essenceId);
     }
 
-    it('addEssence appends to essenceDefinitions', async () => {
-      let savedEssences = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
-      assert.ok(savedEssences !== null);
-      assert.ok(savedEssences.some((e) => e.name === 'Fire'));
-      const newEssence = savedEssences.find((e) => e.name === 'Fire');
-      assert.ok(newEssence.id, 'new essence should have an id');
-      assert.equal(typeof newEssence.id, 'string');
-    });
-
-    it('addEssence uses the default icon when none is provided', async () => {
-      let savedEssences = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Water', 'Flowing essence', '', null);
-
-      const newEssence = savedEssences?.find((e) => e.name === 'Water');
-      assert.ok(newEssence, 'new essence should be persisted');
-      assert.equal(newEssence.icon, DEFAULT_ESSENCE_ICON);
-    });
-
-    it('addEssence persists the selected component id and resolved source item UUID', async () => {
+    it('updateEssence persists the selected component id and resolved source item UUID', async () => {
       let savedEssences = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -1970,6 +1929,7 @@ describe('createAdminStore', () => {
             originItemUuid: 'Compendium.fabricate.items.sunleaf',
           }),
         ];
+        sys.essenceDefinitions = [{ id: 'radiance', name: 'Radiance', description: '', icon: '' }];
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -1980,10 +1940,10 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
+      await store.updateEssence('radiance', { sourceComponentId: 'comp-1' });
 
       const newEssence = savedEssences?.find((e) => e.name === 'Radiance');
-      assert.ok(newEssence, 'new essence should be persisted');
+      assert.ok(newEssence, 'the linked essence should be persisted');
       assert.equal(newEssence.sourceComponentId, 'comp-1');
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.equal(newEssence.associatedSystemItemId, 'comp-1');
@@ -2006,6 +1966,7 @@ describe('createAdminStore', () => {
             originItemUuid: 'Compendium.fabricate.items.sunleaf',
           }),
         ];
+        sys.essenceDefinitions = [{ id: 'radiance', name: 'Radiance', description: '', icon: '' }];
         // Prove there are NO legacy keys on the component projection.
         assert.ok(!('sourceUuid' in sys.components[0]));
         assert.ok(!('sourceItemUuid' in sys.components[0]));
@@ -2019,83 +1980,15 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
+      await store.updateEssence('radiance', { sourceComponentId: 'comp-1' });
 
       const newEssence = savedEssences?.find((e) => e.name === 'Radiance');
-      assert.ok(newEssence, 'new essence should be persisted');
+      assert.ok(newEssence, 'the linked essence should be persisted');
       // The essence resolved its source through the component's NEW field name.
       assert.equal(newEssence.sourceComponentId, 'comp-1');
       // The essence's OWN output key stays `sourceItemUuid` (kept).
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.ok(!('originItemUuid' in newEssence));
-    });
-
-    it('addEssence persists the authored colour token (issue 917)', async () => {
-      const { services, manager, captured } = createEssenceColourRig();
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null, 'rose');
-
-      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
-      assert.ok(saved, 'new essence should be persisted');
-      assert.equal(saved.colorToken, 'rose');
-      assert.equal(
-        (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.name === 'Fire')
-          ?.colorToken,
-        'rose'
-      );
-    });
-
-    it('addEssence stores a null colour token when none is authored (issue 917)', async () => {
-      const { services, captured } = createEssenceColourRig();
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
-
-      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
-      assert.ok(saved, 'new essence should be persisted');
-      assert.equal(saved.colorToken, null);
-    });
-
-    it('addEssence rejects duplicate name', async () => {
-      let warnMsg = null;
-      const services = createMockServices({
-        notify: {
-          info: () => {},
-          warn: (m) => {
-            warnMsg = m;
-          },
-          error: () => {},
-        },
-      });
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) {
-        sys.essenceDefinitions = [
-          { id: 'ess1', name: 'Fire', description: '', icon: '', sourceItemUuid: null },
-        ];
-      }
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Fire', 'Another fire', '', null);
-      assert.ok(warnMsg !== null, 'should warn about duplicate');
-    });
-
-    it('addEssence rejects empty name', async () => {
-      let updateCalled = false;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          updateCalled = true;
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('', '', '', null);
-      assert.ok(!updateCalled, 'updateSystem should not be called for empty name');
     });
 
     it('deleteEssence shows confirm before deleting', async () => {
@@ -2441,38 +2334,6 @@ describe('createAdminStore', () => {
       assert.equal(didSave, false);
       assert.ok(warnMsg, 'duplicate rename should warn');
       assert.equal(updateCalled, false, 'duplicate rename should not persist');
-    });
-
-    it('addEssence followed by deleteEssence round-trips correctly', async () => {
-      let lastSavedEssences = null;
-      const services = createMockServices();
-      const origManager = services.getCraftingSystemManager();
-      const sys = origManager.getSystem('sys1');
-      if (sys) sys.essenceDefinitions = [];
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        updateSystem: async (id, updates) => {
-          if (updates.essenceDefinitions) {
-            lastSavedEssences = updates.essenceDefinitions;
-            const s = origManager.getSystem(id);
-            if (s) s.essenceDefinitions = updates.essenceDefinitions;
-          }
-          await origManager.updateSystem(id, updates);
-        },
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.addEssence('Fire', 'Burning', 'fas fa-fire', null);
-      assert.ok(lastSavedEssences !== null);
-      const addedEssence = lastSavedEssences.find((e) => e.name === 'Fire');
-      assert.ok(addedEssence, 'essence should exist after add');
-      assert.ok(addedEssence.id, 'essence should have an id');
-      await store.deleteEssence(addedEssence.id);
-      const remaining = origManager.getSystem('sys1').essenceDefinitions;
-      assert.ok(
-        !remaining.some((e) => e.id === addedEssence.id),
-        'essence should be removed after deleteEssence'
-      );
     });
   });
 
@@ -4433,7 +4294,6 @@ describe('createAdminStore', () => {
         'removeCategory',
         'addTag',
         'removeTag',
-        'addEssence',
         'setEssenceEnabled',
         'applyEssenceBulkEdit',
         'deleteEssence',

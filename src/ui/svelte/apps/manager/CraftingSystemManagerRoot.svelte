@@ -1845,6 +1845,15 @@
     resetEssenceSelectionFor(selectedSystemId);
   });
 
+  // Commits the vanished-essence redirect before the browser mounts, or its first-row auto-select
+  // reopens the editor on another essence (issue 2554).
+  $effect.pre(() => {
+    if (activeView !== 'essence-edit' || currentView !== 'essences') return;
+    essenceEditDirty = false;
+    essenceEditDraft = null;
+    activeView = 'essences';
+  });
+
   $effect(() => gathering.resetOnSystemSwitch());
   $effect(() => gathering.resetTabOffRoute());
   $effect(() => gathering.reselectTask());
@@ -1984,6 +1993,7 @@
     )
       return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
+    if (view === 'essence-edit' && !selectedEssenceStrict) return 'essences';
     return view;
   }
 
@@ -3433,29 +3443,12 @@
     return store.removeTag?.(tag);
   }
 
+  // Only the World Essence Catalogue creates an essence, so an id-less save refuses (issue 2554).
   async function saveEssenceEdit(essenceId, updates) {
-    if (essenceEditSaving) return false;
+    if (!essenceId || essenceEditSaving) return false;
     essenceEditSaving = true;
     try {
-      const result = essenceId
-        ? await store.updateEssence?.(essenceId, updates)
-        : await store.addEssence?.(
-            updates.name,
-            updates.description,
-            updates.icon,
-            showEssenceSourceUi ? updates.sourceComponentId || null : null,
-            // The authored colour (issue 917) has to travel with the create call too, or a
-            // new essence loses the colour the GM picked before its first save.
-            updates.colorToken || null,
-            // …and so do the two fields issue 1036 added, for exactly the same reason: the editor
-            // can author both BEFORE the first save.
-            {
-              enabled: updates.enabled !== false,
-              ...(showEssencePropertyMacroUi
-                ? { propertyMacroUuid: updates.propertyMacroUuid || null }
-                : {}),
-            }
-          );
+      const result = await store.updateEssence?.(essenceId, updates);
       if (result === false) return false;
       essenceEditDirty = false;
       essenceEditDraft = null;
@@ -4797,7 +4790,7 @@
     {:else if currentView === 'essence-edit' && selectedSystem}
       <EssenceEditView
         {...essenceScopeProps}
-        essence={selectedEssenceId ? selectedEssenceStrict : null}
+        essence={selectedEssenceStrict}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         showSourceUi={showEssenceSourceUi}
         showPropertyMacroUi={showEssencePropertyMacroUi}
@@ -5359,23 +5352,16 @@
             <EmptyState
               fill
               icon="fas fa-mortar-pestle"
-              title={currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
-                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
-              hint={currentView === 'essence-edit'
+              title={text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
+              hint={showEssenceSourceUi
                 ? text(
-                    'FABRICATE.Admin.Manager.Essence.CreateInspectorHint',
-                    'The inspector will show the essence ID after the draft is saved.'
+                    'FABRICATE.Admin.Manager.Essence.InspectorHint',
+                    'The inspector shows source linkage and component usage for the selected essence.'
                   )
-                : showEssenceSourceUi
-                  ? text(
-                      'FABRICATE.Admin.Manager.Essence.InspectorHint',
-                      'The inspector shows source linkage and component usage for the selected essence.'
-                    )
-                  : text(
-                      'FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint',
-                      'The inspector shows identity and component usage for the selected essence.'
-                    )}
+                : text(
+                    'FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint',
+                    'The inspector shows identity and component usage for the selected essence.'
+                  )}
             />
           {/if}
         {:else if currentView === 'components'}

@@ -271,18 +271,21 @@ test('1036: a recipe reference is reported through its OWN key, never as a block
 // carrying its own name, icon and colour, minted from the rail whose own banner says name, icon and
 // colour come from the Essence Catalogue and are shared by every system.
 
-test('1372: the store publishes no essence duplicate verb', async () => {
+// `addEssence` is retired too (issue 2554): an essence is created only in the World Essence
+// Catalogue, which registers its world identity.
+test('1372/2554: the store publishes no essence duplicate or system-side create verb', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire', name: 'Fire' })],
   });
   const store = await openStore(harness);
 
   assert.equal(
-    typeof store.addEssence,
+    typeof store.updateEssence,
     'function',
     'NON-VACUITY: the essence write family is on the store at all'
   );
   assert.equal(store.duplicateEssence, undefined, 'and duplicate is not one of its verbs');
+  assert.equal(store.addEssence, undefined, 'and neither is a system-side create');
 });
 
 // `worldScope.essence.addToSystem` WRITES BOTH HALVES (issue 1372, maintainer parity round 8). The

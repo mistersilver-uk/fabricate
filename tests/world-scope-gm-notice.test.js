@@ -317,8 +317,8 @@ test('each clause of the essence remap notice appears independently of the other
   assert.doesNotMatch(failedOnly, /merged essence set|refused the update/);
 });
 
-// The `1.34.0` equivalent-essence merge notice (issue 1654). `adminStore.addEssence` mints an
-// essence id with `crypto.randomUUID()`, so these assertions hold the toast to readable names: no
+// The `1.34.0` equivalent-essence merge notice (issue 1654). The system-side essence create minted
+// essence ids with `crypto.randomUUID()`, so these assertions hold the toast to readable names: no
 // id enumeration, and no `oldId → newId` arrow of the kind the `Renames` clause prints.
 
 /** A merge report with one of everything, in the shape `buildWorldEssenceEquivalence` emits. */

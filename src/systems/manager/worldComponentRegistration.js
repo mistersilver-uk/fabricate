@@ -4,18 +4,17 @@
  * § Component scope requirement 6. */
 import { isGeneralComponentCategory } from '../../utils/componentCategories.js';
 import { arrayOrEmpty, trimString } from '../../utils/scalars.js';
-import { getItemMatchUuids, sourceReferenceKey } from '../../utils/sourceReferenceUnion.js';
 import { componentEssenceMapsEqual, normalizeComponentEssenceMap } from '../componentScope.js';
 import { membershipKey } from '../scopedDefinitions.js';
 import { identityOf } from '../worldScopeEntityGrouping.js';
 
-function sourceKeys(record) {
-  return new Set(getItemMatchUuids(record).map(sourceReferenceKey));
-}
-
-function sharesSource(record, keys) {
-  return getItemMatchUuids(record).some((reference) => keys.has(sourceReferenceKey(reference)));
-}
+import {
+  addToRoster,
+  firstSharing,
+  indexRoster,
+  sharesSource,
+  sourceKeys,
+} from './worldScopeRoster.js';
 
 function rowById(rows, id) {
   return arrayOrEmpty(rows).find((row) => row?.id === id) ?? null;
@@ -26,34 +25,6 @@ function rowsById(rows) {
   const index = new Map();
   for (const row of arrayOrEmpty(rows)) if (!index.has(row?.id)) index.set(row?.id, row);
   return index;
-}
-
-/** A roster index: each entity by id, first-wins, and under each source key the first entity in
- * roster order that carries it. */
-function indexRoster(entities) {
-  const roster = { byId: new Map(), byKey: new Map(), size: 0 };
-  for (const entity of arrayOrEmpty(entities)) addToRoster(roster, entity);
-  return roster;
-}
-
-function addToRoster(roster, entity) {
-  const entry = { entity, order: roster.size };
-  roster.size += 1;
-  if (!roster.byId.has(entity?.id)) roster.byId.set(entity?.id, entity);
-  for (const reference of getItemMatchUuids(entity)) {
-    const key = sourceReferenceKey(reference);
-    if (!roster.byKey.has(key)) roster.byKey.set(key, entry);
-  }
-}
-
-/** The first entity in roster order carrying one of `keys`, or `null`. */
-function firstSharing(roster, keys) {
-  let first = null;
-  for (const key of keys) {
-    const entry = roster.byKey.get(key);
-    if (entry && (!first || entry.order < first.order)) first = entry;
-  }
-  return first?.entity ?? null;
 }
 
 const RUN_ROSTERS = new WeakMap();

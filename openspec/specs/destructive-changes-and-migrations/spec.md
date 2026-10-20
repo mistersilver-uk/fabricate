@@ -895,7 +895,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
 
 1. **WHY IT IS A FOURTH PASS RATHER THAN A WIDER `1.30.0`.**
    § World-Scope Entity Migration requirement 1 grouped essences by trimmed `id` on the premise that an essence id is a stable semantic slug, and THAT PREMISE IS FALSE.
-   An essence id is MINTED PER SYSTEM by one of two routes — `crypto.randomUUID()` in `adminStore.addEssence`, or a name-derived slug from `mintEssenceId` (`src/ui/svelte/apps/manager/scoped/essenceScoped.js:535-549`) — and `_normalizeEssenceDefinition` then lowercases and per-system-uniquifies whatever it finds (`src/systems/normalize/essences.js`).
+   An essence id was MINTED PER SYSTEM by one of two routes — `crypto.randomUUID()` in the system-side essence create, since removed (issue 2554), or a name-derived slug from `mintEssenceId` (`src/ui/svelte/apps/manager/scoped/essenceScoped.js:535-549`) — and `_normalizeEssenceDefinition` then lowercases and per-system-uniquifies whatever it finds (`src/systems/normalize/essences.js`).
    So two systems' equivalent essences share no id at all on the commonest authoring route, each was lifted to its OWN world essence, and the duplication issue 1654 reports is exactly what `1.30.0` left behind.
    `1.30.0`'s grouping, its id-claim ladder, its refusal fixed point and its donor election are NOT changed here, and a world that has already migrated needs the repair whether or not they ever were — so the repair is a SEPARATE pass, exactly as `1.31.0` and `1.32.0` are.
 2. **THE EQUIVALENCE KEY IS THE CANONICALISED TRIPLE `(name, macro, effectSource)`**, read from the world essence's identity snapshot and from the unanimous RESOLVED value requirement 4 establishes.
@@ -1062,6 +1062,23 @@ The `1.35.0` settings-data migration (`src/migration/migrateAlchemyBreakToolsOnF
 5. **Mirrored on import**, the same as the Modifier Pick Cap Migration: `migrateExportPayload` applies the identical per-system transform (`applyAlchemyBreakToolsOnFailDefault`, shared with the settings-data migration) to an imported bundle, branch-independently, for the same reason — the field's absence is orthogonal to the export envelope's schema version.
 6. **Lossless downgrade.** `downgradeTo: '1.34.0'` is lossless: the pre-change build never read `breakToolsOnFail` for an alchemy check at all, so the stamped value is inert on downgrade and simply survives, unread, for a re-upgrade.
 
+### Scoped Identity Reconciliation (`1.36.0`, `downgradeTo: '1.35.0'`, pure, non-mutating, idempotent)
+
+Issue 2554 makes every distinct Essence and Tool id a crafting system holds own exactly one world entity and one `(entityId, systemId)` membership (`data-models/spec.md` § Scoped Entity Definitions requirement 17), and the save chokepoint enforces it only from `1.36.0`.
+The pass (`src/migration/reconcileOrphanedScopedIdentities.js`) registers the rows that predate the chokepoint, and reports what it did and what it could not do.
+
+1. **ONE PLANNER.** The pass runs the chokepoint's own planner (`src/systems/manager/worldScopeIdentityRegistration.js`) over `systems`, `essenceScope`, `toolScope` and `worldEssenceMergeMap`, in stored corpus order, so a row decided earlier counts as registered for every later one.
+   A Tool row's source keys are the chokepoint's own `toolRowReferences`: `toolSourceReferences(tool, system.components)`, as `1.30.0` grouping reads them, minus embedded Item uuids, so a row this pass reports `conflicting` stays `conflicting` at the next save.
+2. **IT REGISTERS, AND NOTHING ELSE.** It re-keys, merges and deletes nothing; it never reissues an id in `worldEssenceMergeMap`'s `retired` leg; and it registers into an unseeded scope that has rows, which only widens the Valid Id Basis.
+3. **REFUSAL.** A row the planner reports `conflicting` stays unregistered; a Tool whose sources match two or more world entities is refused as `ambiguous`.
+   A membership with no in-system row is reported, never deleted: under `unresolvedMemberships` when its system still exists, and under `orphanedSystemMemberships` when no current system has its `systemId`.
+   No issue-1654 equivalence merge runs: equivalent-looking essences this pass created are reported as candidates.
+4. **AN UNCHANGED LEG IS RETURNED BY REFERENCE**, so a rerun or a world with nothing to reconcile writes no setting.
+5. **THE TRANSIENT REPORT** `_scopedIdentityReconcileReport` carries `created`, `adopted`, `conflicting`, `ambiguous`, `unresolvedMemberships`, `orphanedSystemMemberships` and `equivalentEssenceCandidates`; the runner captures it as `summary.scopedIdentityReconcileReport` and deletes it.
+   The GM notice (`src/systems/scopedIdentityReconcileNotice.js`) is silent when all seven are empty, informational when only `created`, `adopted` or `orphanedSystemMemberships` is non-empty, and a permanent warning otherwise, with counts in the toast and names in the console detail.
+   A link to a deleted system needs no GM action, so it never raises the warning.
+6. **Lossless downgrade.** `downgradeLosesData: false`, because `1.35.0` reads the added entities and memberships under unchanged rules.
+
 ### Subject Modifier Mark Seed (`1.33.0`, `downgradeTo: '1.32.0'`, pure, clone-first, idempotent)
 
 Records the mark that keeps every existing subject check-modifier pick rolling, now that under `bySubject` an activity check's `defaultModifierIds` BOUNDS the subject's pick rather than merely defaulting it (`resolution-modes/spec.md`, issue 1608).
@@ -1164,7 +1181,7 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
    The key is deliberately not a single canonical field, because two systems that registered the same Item by different routes carry different ones — so the pass unions over `{originItemUuid, registeredItemUuid, ...aliasItemUuids}` and their pre-#560 aliases.
    Union-find is permutation-invariant, so the entity PARTITION is set-equal under a shuffled corpus.
    A tool with no source references of its own resolves through its `componentId`, applying the same derivation the crafting-system normalizer applies on load; the migration must do it itself, because it runs on raw settings before any manager load.
-   An essence has no source item, so there is no reference set to close over; its id is instead a PER-SYSTEM MINTED IDENTIFIER whose shape depends on the authoring route — a `crypto.randomUUID()` from the admin store, or a name-derived slug from `mintEssenceId`, either one lowercased and per-system-uniquified by `_normalizeEssenceDefinition`.
+   An essence has no source item, so there is no reference set to close over; its id is instead a PER-SYSTEM MINTED IDENTIFIER whose shape depends on the authoring route — a `crypto.randomUUID()` from the admin store's system-side create (removed by issue 2554), or a name-derived slug from `mintEssenceId`, either one lowercased and per-system-uniquified by `_normalizeEssenceDefinition`.
    **THIS PASS THEREFORE GROUPS ONLY THE IDS THAT LITERALLY COINCIDE AND RE-KEYS NONE OF THEM**, so no essence reference is rewritten here and this pass's re-key map carries no essence leg.
    Behavioural equivalence ACROSS systems — two systems' `fire`, which on the commonest authoring route were never going to share an id — is not decided here at all: § Equivalent World Essence Merge (`1.34.0`) resolves it, and its requirement 1 states why the stable-slug premise this requirement used to assert had to be retracted.
 2. **AN UNLINKED DEFINITION BECOMES ITS OWN WORLD ENTITY AND IS NEVER MERGED** — not with another unlinked definition of the same name, and not with a linked one.
