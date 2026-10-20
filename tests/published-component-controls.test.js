@@ -20,7 +20,7 @@
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
- * to a child component fails closed.
+ * to a child component, an exported function and one also called from `onMount` fail closed.
  * Limit: a scoped ring pin is matched by its selector as written, and judged by its declarations.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
@@ -1552,6 +1552,24 @@ describe('the called-from-an-event clause', () => {
     ],
     ['oninput on a button', closed('', '<button type="button" oninput={onPress}>x</button>')],
     ['a callback handed to a child component', closed('', '<Child onclick={onPress} />')],
+    [
+      'an exported function, which a parent can call',
+      closed(
+        ' export function press() { onPress?.(1); }',
+        '<button type="button" onclick={press}>x</button>'
+      ),
+    ],
+    [
+      'a function also called from onMount',
+      closed(
+        `${PRESSES} onMount(() => press());`,
+        '<button type="button" onclick={press}>x</button>'
+      ),
+    ],
+    [
+      'a function also handed to a child component',
+      closed(PRESSES, '<button type="button" onclick={press}>x</button><Child cb={press} />'),
+    ],
     ['a handler on svelte:window', closed('', '<svelte:window onclick={onPress} />')],
     [
       'a pointer-entry handler',
