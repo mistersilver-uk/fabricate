@@ -6,7 +6,11 @@
       "Picker": {
         "NoMatches": "No matches",
         "Loading": "Loading…",
-        "Error": "The list could not load"
+        "Error": "The list could not load",
+        "KeyHints": {
+          "List": "↑↓ move · ↵ pick · esc close",
+          "Grid": "←↑↓→ move · ↵ pick · esc close"
+        }
       },
       "SetPicker": {
         "Add": "Add",

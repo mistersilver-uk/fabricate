@@ -144,8 +144,11 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
   it('refuses to open while `disabled`, exactly as the bare button does', async () => {
     await mountPicker({ triggerButton: { size: '38' }, disabled: true });
     const trigger = harness.target.querySelector('button');
-    assert.ok(trigger.disabled, '`disabled` is a NAMED prop on the primitive, so the spread ' +
-      'has to reach it as one rather than landing in the rest attributes');
+    assert.ok(
+      trigger.disabled,
+      '`disabled` is a NAMED prop on the primitive, so the spread ' +
+        'has to reach it as one rather than landing in the rest attributes'
+    );
     trigger.click();
     flushSync();
     assert.ok(!harness.target.querySelector('.fabricate-picker-popover'));
@@ -154,7 +157,11 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
 
   it('leaves `triggerChip` in charge where a call site asks for both', async () => {
     // The forms are branches of one `{#if}`.
-    await mountPicker({ triggerChip: true, triggerButton: { size: '38' }, triggerClass: 'is-dashed' });
+    await mountPicker({
+      triggerChip: true,
+      triggerButton: { size: '38' },
+      triggerClass: 'is-dashed',
+    });
     assert.deepEqual(triggerClasses(), ['manager-chip', 'is-dashed']);
     harness.remount();
   });
@@ -177,10 +184,10 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
     );
     assert.match(
       popover,
-      /anchor=\{triggerElement \?\? pickerRoot\}/,
+      /anchor=\{anchorNode\(\) \?\? triggerElement \?\? pickerRoot\}/,
       'and THAT state must be what the panel is anchored on: `triggerButton` is the FORM prop ' +
         'now, so anchoring on it would hand the action an options object or null. The panel half ' +
-        'of the same chain — `anchoredPopover`\'s `trigger` being exactly this anchor — is pinned ' +
+        "of the same chain — `anchoredPopover`'s `trigger` being exactly this anchor — is pinned " +
         'in `searchable-popover-source-contract.test.js`, which reads both files without adding a ' +
         'source-pin site'
     );
@@ -212,6 +219,25 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
       trigger,
       'focus must come back to the control the GM pressed'
     );
+    harness.remount();
+  });
+});
+
+describe('2459 SearchablePopover — anchor mode is the prop`s presence', () => {
+  before(harness.setup);
+  after(harness.teardown);
+
+  it('renders no trigger for an element-form anchor whose binding is still null', async () => {
+    await mountPicker({ anchor: null, open: false });
+    assert.equal(
+      harness.target.querySelectorAll('button').length,
+      0,
+      'a caller binding its anchor element starts at null, and must not get the primitive`s ' +
+        'own trigger before the element mounts'
+    );
+    harness.remount();
+    await mountPicker({});
+    assert.equal(harness.target.querySelectorAll('button').length, 1, 'an omitted anchor does');
     harness.remount();
   });
 });

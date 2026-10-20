@@ -360,6 +360,80 @@
     }
   },
   {
+    "spec": "<SearchPopover>",
+    "cap": "grid form — an icon search",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
+    "fixture": "SearchPopoverIconGrid",
+    "slot": {
+      "width": 332,
+      "height": 220
+    },
+    "note": "The panel stands alone, as the drawing does, opened from a Button the fixture renders where the parent’s trigger would stand, 16px in like the list form’s, so it is positioned and portaled exactly as against a caller’s anchor. Its width is pinned to the drawing’s 300, so the box is 332 wide to open it unclamped at that inset, and 220 tall for the anchor, the 6px gap and the whole panel under its height cap.",
+    "undrawn": {
+      "hammer": "the selected option’s id, not its words",
+      "icon-search-listbox": "the listbox’s id, which the query field controls, not its words",
+      "icon-search-option-0": "the cursor tile’s id, the query field’s active descendant, not its words",
+      "Choose an icon": "the anchor’s, the panel’s and the listbox’s accessible name; the drawing draws no anchor and no name",
+      "Search icons": "the query field’s name and placeholder; the drawing shows the field holding a query",
+      "dialog": "the anchor’s aria-haspopup token, caller-owned ARIA, not words",
+      "true": "the anchor’s aria-expanded token while the panel is open, not words"
+    },
+    "data": {
+      "value": "hammer",
+      "anchorIcon": "fas fa-hammer",
+      "anchorLabel": "Choose an icon",
+      "anchorHasPopup": "dialog",
+      "anchorExpanded": "true",
+      "anchorStyle": "margin-left: 16px"
+    },
+    "props": {
+      "dialogNameAttribute": "Choose an icon",
+      "minWidth": 300,
+      "maxWidth": 300,
+      "showFilteredCount": true,
+      "filteredCount": "6 of 750",
+      "query": "Hammer",
+      "searchProps": {
+        "type": "text",
+        "role": "combobox",
+        "aria-expanded": true,
+        "aria-controls": "icon-search-listbox",
+        "aria-activedescendant": "icon-search-option-0",
+        "placeholder": "Search icons",
+        "aria-label": "Search icons"
+      },
+      "listId": "icon-search-listbox",
+      "instanceId": "icon-search",
+      "as": "grid",
+      "isGrid": true,
+      "gridColumns": 6,
+      "squareTiles": true,
+      "keyHints": true,
+      "footerAction": {
+        "label": "Open catalogue"
+      },
+      "activeIndex": 0,
+      "totalCount": 750,
+      "filteredOptions": [
+        { "id": "hammer", "label": "Hammer", "icon": "fas fa-hammer" },
+        { "id": "flask", "label": "Flask", "icon": "fas fa-flask" },
+        { "id": "book", "label": "Book", "icon": "fas fa-book" },
+        { "id": "star", "label": "Star", "icon": "fas fa-star" },
+        { "id": "dice", "label": "Dice", "icon": "fas fa-dice" },
+        { "id": "target", "label": "Target", "icon": "fas fa-bullseye" }
+      ],
+      "renderedOptions": [
+        { "id": "hammer", "label": "Hammer", "icon": "fas fa-hammer" },
+        { "id": "flask", "label": "Flask", "icon": "fas fa-flask" },
+        { "id": "book", "label": "Book", "icon": "fas fa-book" },
+        { "id": "star", "label": "Star", "icon": "fas fa-star" },
+        { "id": "dice", "label": "Dice", "icon": "fas fa-dice" },
+        { "id": "target", "label": "Target", "icon": "fas fa-bullseye" }
+      ]
+    }
+  },
+  {
     "spec": "<TintPicker> <Menu>",
     "cap": "popover — shipped",
     "draws": ":scope > div",

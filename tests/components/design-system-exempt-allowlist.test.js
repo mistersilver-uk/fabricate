@@ -122,6 +122,10 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
+    "the hover ring's reach (2px outline at a 1px offset), not spacing",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
     "the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row " +
       "stays target only until the panel is recomposed onto the search popover's grid form, " +
       'owned by issue 2459 (library.html, the target popover specimen)',
