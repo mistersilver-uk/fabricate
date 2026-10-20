@@ -9,6 +9,8 @@ import RecipeDurationEditor from '../../../src/ui/svelte/apps/manager/recipe/Rec
 import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
 import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
+import AnchoredPopoverHost from './AnchoredPopoverHost.svelte';
+
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';
 const componentKind = params.get('component') ?? 'popover';
@@ -120,7 +122,7 @@ function actorBarStore() {
   };
 }
 
-/** The seven overlay subjects this fixture can mount, by `?component=` (issue 1470). */
+/** The eight overlay subjects this fixture can mount, by `?component=` (issue 1470). */
 const COMPONENTS = {
   icon: [IconPicker, { value: 'fas fa-fire', ariaLabel: 'Choose an icon' }],
   source: [
@@ -180,6 +182,8 @@ const COMPONENTS = {
   // THE PRIMITIVE'S FIRST PLAYER-WINDOW ADOPTER (issue 1475), and the reason it is a whole product
   // surface rather than another bare picker: the entry above proves `SearchablePopover` CAN land in
   // `.fabricate-app`, and nothing in the product depended on that.
+  // The picker opened from a caller's anchor rather than its own trigger (issue 2459).
+  'anchored-popover': [AnchoredPopoverHost, { form: params.get('form') ?? 'element' }],
   actorbar: [
     ActorSelectTopBar,
     {

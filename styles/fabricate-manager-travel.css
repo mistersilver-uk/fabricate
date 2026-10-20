@@ -670,6 +670,28 @@
   min-width: 0;
 }
 
+/* The bare trigger's two-line copy: its label over a mono meta line. */
+.fabricate-picker .manager-travel-picker-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.fabricate-picker .manager-travel-picker-meta {
+  min-width: 0;
+  margin-top: var(--fab-space-2xs);
+  overflow: hidden;
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-size: 0.6rem;
+  font-weight: 400;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The recipe bulk panel's book picker. Its trigger sits in a 300px rail whose other controls are full-width selects, so a content-hugging button would read as a stray chip in a column of fields (issue 1010); it takes their `form` rung's 38 for the same reason. */
 .fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger {
   width: 100%;
@@ -755,6 +777,67 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='4'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='5'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-columns='6'] {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+/* The square tile (issue 2459). `squareTiles` makes each cell a text-free glyph or image named by its tooltip, so selection is the `--fab-surface-active` ground, the cursor the inset outline below and hover an outset outline that never fills. The list insets its own scroll box by that outline's 3px reach, so a corner tile's ring draws whole while the tiles stay flush with the query field. */
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] {
+  gap: var(--fab-space-chip);
+
+  /* ratchet-exempt(design-system): the hover ring's reach (2px outline at a 1px offset), not spacing */
+  margin: -3px;
+
+  /* ratchet-exempt(design-system): the hover ring's reach (2px outline at a 1px offset), not spacing */
+  padding: 3px;
+}
+
+/* Foundry core's 0.5s button transition is cancelled, as on every other picker cell (issue 2416). */
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option {
+  aspect-ratio: 1;
+  justify-content: center;
+  min-height: 0;
+  height: auto;
+  padding: var(--fab-space-2xs);
+  border-color: var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text-secondary);
+  transition: none;
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option > i {
+  font-size: 18px;
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true'] {
+  background: var(--fab-surface-active);
+  color: var(--fab-text);
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option:hover:not([data-active-option='true']) {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 1px;
+}
+
+.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-portrait {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+}
+
 .fabricate-picker-popover .manager-travel-popover-empty {
   flex: 0 0 auto;
   min-width: 0;
@@ -810,6 +893,38 @@
 
 .fabricate-picker-popover .manager-travel-option:hover {
   background: var(--fab-surface-raised);
+}
+
+/* The key-hint row (issue 2459). `keyHints` draws the hints for the cursor's key map under a hairline, beneath any caller footer, and the one `footerAction` at the row's end. Its inline size is contained, so a long hint wraps rather than widening the panel. */
+.fabricate-picker-popover .fabricate-picker-key-hints {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-1);
+  border-top: 1px solid var(--fab-border);
+  contain: inline-size;
+}
+
+.fabricate-picker-popover .fabricate-picker-key-hints-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.3;
+}
+
+/* The action keeps the accent ink over the ghost's own hover ground, so it reads as the panel's one link-like verb; its pass-through class outranks the ghost role's (0,5,0) rest and (0,6,0) hover from the panel's own root. */
+.fabricate-picker-popover .fabricate-picker-key-hints .fabricate-picker-footer-action.is-ghost.is-size-28:not(:disabled) {
+  flex: none;
+  padding-inline: var(--fab-space-2);
+  color: var(--fab-accent);
+  white-space: nowrap;
+}
+
+.fabricate-picker-popover .fabricate-picker-key-hints .fabricate-picker-footer-action.is-ghost.is-size-28:not(:disabled):hover {
+  color: var(--fab-accent);
 }
 
 /* THE KEYBOARD CURSOR. DOM focus stays on the search field — or on the trigger, where there is none — and the list is driven with `aria-activedescendant`, so the row the arrow keys are on has no focus of its own to paint with (issue 1503). */

@@ -78,6 +78,34 @@ export function filteredCountLabel(template, matched, total) {
   return String(template).replace('{matched}', String(matched)).replace('{total}', String(total));
 }
 
+/** A grid's cells per row: 2 to 6, the counts the sheet draws, and 1 for any other value or the list form. */
+export function gridColumnCount(as, columns) {
+  return as === 'grid' && Number.isInteger(columns) && columns >= 2 && columns <= 6 ? columns : 1;
+}
+
+/** Where `close()` returns focus: an anchored picker's anchor while connected, else the nearest `[tabindex]` container when one exists (none: focus is left to the browser); otherwise the trigger. */
+export function focusReturnTarget(origin, root) {
+  if ('anchor' in origin) {
+    return origin.anchor?.isConnected ? origin.anchor : (root?.closest?.('[tabindex]') ?? null);
+  }
+  const target = origin.trigger ?? root?.querySelector?.('button');
+  return target?.isConnected === false ? null : (target ?? null);
+}
+
+/** Calls `onLost` when a mutation under `root` leaves `resolve()` answering no connected anchor; returns the disconnect. */
+export function watchAnchor(
+  resolve,
+  onLost,
+  root = globalThis.document,
+  Observer = globalThis.MutationObserver
+) {
+  const observer = new Observer(() => {
+    if (!resolve()?.isConnected) onLost();
+  });
+  observer.observe(root, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
 /** A list holding nothing takes the caller's hint and detail; a list the query emptied takes the no-matches line and no detail. */
 export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, emptyDetail }) {
   const filteredToNothing = total > 0 && matched === 0;
