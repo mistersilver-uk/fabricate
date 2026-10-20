@@ -30,7 +30,7 @@
     which means an `oninput` or `onblur` routed through it silently REPLACES the commit path: the
     control keeps rendering and stepping and simply stops reporting edits. Put behaviour in
     `onChange`.
-  - A REFUSED VALUE SNAPS BACK ON BLUR: Svelte leaves an `<input>` whose `value` never changed as
+  - A refused value snaps back on blur: Svelte leaves an `<input>` whose `value` never changed as
     typed, so after the next flush a blurred input still connected and unfocused is rewritten to
     the held value.
   - `disabled` is the TOP-LEVEL prop, never an `inputProps` key: the adjuncts read the top-level
