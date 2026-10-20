@@ -12,6 +12,8 @@ import {
   labCaseSelector,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
@@ -58,6 +60,7 @@ export function registerChecksCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -65,6 +68,7 @@ export function registerChecksCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

@@ -11,7 +11,12 @@ import { get } from 'svelte/store';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+} from './manager-mounted-shared.js';
 import { normalizeVocabularyKey } from '../../src/ui/model/vocabularyUsage.js';
 
 let Component;
@@ -48,6 +53,7 @@ export function registerTagsCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -55,6 +61,7 @@ export function registerTagsCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

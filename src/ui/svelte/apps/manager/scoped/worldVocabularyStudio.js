@@ -179,7 +179,6 @@ export function worldPanelProps(panel, { rows, text, routeIcon = '', onAdd, onRe
       searchPlaceholder: panelText(panel, 'SearchPlaceholder', text),
       searchLabel: panelText(panel, 'SearchLabel', text),
       searchMissTitle: panelText(panel, 'SearchMiss', text, 'No matches for "{query}".'),
-      removeLabel: panelText(panel, 'RemoveLabel', text),
       removeNamedLabel: panelText(panel, 'RemoveNamedLabel', text, '{name}'),
       removeConfirmHint: panelText(panel, 'RemoveConfirm', text),
       confirmRemoveLabel: text(

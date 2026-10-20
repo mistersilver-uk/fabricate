@@ -111,6 +111,30 @@ for (const subject of ['drop', 'event']) {
 }
 
 for (const subject of ['drop', 'event']) {
+  describe(`the ${subject} subject's condition-modifier add button (issue 2541)`, () => {
+    const selector = `[data-gathering-${subject}-condition-modifier-picker="biome"] .fabricate-icon-button`;
+
+    it('says why it is refused, as its tooltip, once every condition is added', async () => {
+      const root = await harness.mount({ subject });
+      const add = root.querySelector(selector);
+      assert.equal(add.disabled, true);
+      assert.equal(add.getAttribute('data-tooltip-text'), 'All conditions already added.');
+      assert.ok(!add.hasAttribute('title') && !add.hasAttribute('data-tooltip'));
+    });
+
+    it('shows its name as its tooltip while a condition is left to add', async () => {
+      const root = await harness.mount({
+        subject,
+        gatheringConditionAvailableOptions: () => [{ id: 'forest', label: 'Forest' }],
+      });
+      const add = root.querySelector(selector);
+      assert.equal(add.getAttribute('data-tooltip-text'), add.getAttribute('aria-label'));
+      assert.equal(add.getAttribute('aria-label'), 'Add modifier');
+    });
+  });
+}
+
+for (const subject of ['drop', 'event']) {
   describe(`the ${subject} subject's character-modifier search (issue 1782)`, () => {
     const selector = `[data-gathering-${subject}-character-modifier-search] input`;
 

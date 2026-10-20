@@ -218,7 +218,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
   defineStructureContract('carries the linked-list a11y contract and the missing state', BOOKS_TAB, {
     writes: ['data-recipe-item-links', 'aria-label'],
     renders: ['IconButton'],
-    passesValues: [['IconButton', 'class', 'is-danger']],
+    passesValues: [['IconButton', 'role', 'danger']],
     names: ['onOpenItem'],
     spells: ['FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'],
   });

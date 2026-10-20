@@ -483,29 +483,23 @@
             <div class="fab-im-row-actions">
               <IconButton
                 ariaLabel={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
-                title={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
                 onclick={() => openConfig(row.ref)}
                 data-interactable-manager-open-config=""
-              >
-                <i class="fas fa-sliders" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-sliders"
+              />
               <IconButton
                 ariaLabel={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
-                title={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
                 onclick={() => jump(row.ref)}
                 data-interactable-manager-jump=""
-              >
-                <i class="fas fa-location-crosshairs" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-location-crosshairs"
+              />
               <IconButton
-                class="is-danger"
+                role="danger"
                 ariaLabel={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
-                title={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
                 onclick={() => remove(row.ref)}
                 data-interactable-manager-delete=""
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-trash"
+              />
             </div>
           </li>
         {/each}

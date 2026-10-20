@@ -556,11 +556,9 @@
                   'FABRICATE.Admin.Manager.Environment.Events.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', eventName(event))}
-                title={text('FABRICATE.Admin.Manager.Environment.Events.Edit', 'Edit event')}
                 onclick={() => onEditEvent(event.id)}
-              >
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-edit"
+              />
               <!--
                 THE ROW MENU IS NAMED FOR WHAT IT ACTS ON (issue 1515), mirroring the sibling
                 gathering-task browser. `Column.Actions` is the COLUMN's name and is right in the
@@ -574,10 +572,6 @@
                   'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
                   'Gathering event actions for {name}'
                 ).replace('{name}', eventName(event))}
-                triggerTitle={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
-                  'Gathering event actions'
-                )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
                   else if (action === 'delete') onDeleteEvent(selectedSystemId, event.id);

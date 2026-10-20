@@ -20,7 +20,6 @@
     toggleKey,
     items = [],
     menuForKey,
-    menuKey,
   } = $props();
 
   const menuItems = $derived(items.map((item) => ({ ...item, label: localize(item.labelKey) })));
@@ -44,7 +43,6 @@
   <ActionMenu
     items={menuItems}
     ariaLabel={format(menuForKey, { name: props.name })}
-    triggerTitle={localize(menuKey)}
     onSelect={ignore}
   />
 {/snippet}

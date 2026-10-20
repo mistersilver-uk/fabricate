@@ -530,24 +530,15 @@
                   'FABRICATE.Admin.Manager.Environment.Tasks.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', taskName(task))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Edit',
-                  'Edit gathering task'
-                )}
                 onclick={() => onEditTask(task.id)}
-              >
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-edit"
+              />
               <ActionMenu
                 items={rowMenuItems()}
                 ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ActionsFor',
                   'Gathering task actions for {name}'
                 ).replace('{name}', taskName(task))}
-                triggerTitle={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
-                  'Gathering task actions'
-                )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateTask(selectedSystemId, task.id);
                   else if (action === 'delete') onDeleteTask(selectedSystemId, task.id);
