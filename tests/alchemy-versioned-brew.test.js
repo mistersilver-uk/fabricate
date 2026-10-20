@@ -665,10 +665,9 @@ for (const [label, quantity] of [
     const herbs = item('herbs', 'Herb', quantity);
     const source = new BrewActor('source', [herbs]);
     const crafter = new BrewActor('crafter');
-    const records = [
-      { item: herbs, componentId: 'herb' },
-      { item: herbs, componentId: 'herb' },
-    ];
+    // One unit against a stored zero, which a present-item read would count as one.
+    const unit = { item: herbs, componentId: 'herb' };
+    const records = quantity === 0 ? [unit] : [unit, unit];
 
     const { started } = await startBrew(world, { crafter, source, records });
 
