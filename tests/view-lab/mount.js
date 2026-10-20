@@ -231,7 +231,24 @@ function readParams() {
     // Dock a chat log in the window, so a case can photograph the result card it posts: `1` on
     // the right, `left` over the recipe list when the right column is what the case names.
     chatLog: ['1', 'left'].includes(params.get('chatLog')) ? params.get('chatLog') : null,
+    // The hero-demo world in place of the lab's (issue 2571); the lab's world flags do not apply.
+    demoWorld: params.get('world') === 'demo',
+    // The demo world's roll seed, for re-tuning its scripted journey.
+    demoSeed: readDemoSeed(params),
   };
+}
+
+/** The demo world's `demoSeed`, an integer when given (0 included), else the world's own seed. */
+function readDemoSeed(params) {
+  const raw = params.get('demoSeed')?.trim() ?? '';
+  const seed = raw === '' ? null : Number(raw);
+  return Number.isInteger(seed) ? seed : undefined;
+}
+
+/** Build the hero-demo world, loaded only when a page asks for it. */
+async function buildDemoWorld(params) {
+  const { buildDemoWorld: build } = await import('./demo/demoWorld.js');
+  return build({ managedSystemId: params.system, seed: params.demoSeed });
 }
 
 /**
@@ -364,12 +381,16 @@ async function mountPlayerApp(content, params) {
     // same injectable edge the registry's own hooks travel on.
     playerExtensions,
   };
-  const instance = mount(FabricateAppRoot, { target: content, props });
+  // The demo world's journey moves between tabs, which every lab case holds still.
+  const mounted = params.demoWorld
+    ? (await import('./demo/demoTabs.svelte.js')).switchableTabs(props)
+    : props;
+  const instance = mount(FabricateAppRoot, { target: content, props: mounted });
   if (params.companionRoll) {
     const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
     installLabCompanionRoll(content.ownerDocument, params.companionRoll);
   }
-  return { instance, services, props };
+  return { instance, services, props: mounted };
 }
 
 function installJournalCaseServiceSeam(services, state) {
@@ -975,9 +996,10 @@ async function boot() {
 
   const determinismStyle = installDeterminismStyles();
 
+  const buildWorld = params.demoWorld ? () => buildDemoWorld(params) : buildLabWorld;
   const world = params.chromeOnly
     ? null
-    : await buildLabWorld({
+    : await buildWorld({
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
         clearSystem: params.clearSystem,
