@@ -924,7 +924,7 @@ A card never contains a card.
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
 Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
-Ordinary empty panels retain their existing geometry (the hero `EmptyState` pads `--fab-space-4`, 16, on every side; issue 2257 D9).
+Ordinary empty panels draw the `<Empty>` specimen for their form.
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
 #### Scenario: A gathering availability selection is empty
@@ -940,6 +940,18 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 - **THEN** its empty placeholder matches that select in full width and 34px height
 - **AND** adding a member replaces the placeholder with a removable chip, and removing the last member restores it
 - **AND** the separate guidance shown when no realms exist retains its existing presentation without a dropdown
+
+### Requirement: The no-state panel draws its library specimen
+
+`EmptyState`'s hero (central) panel MUST draw the `<Empty>` specimen: a 1px dashed `--fab-border-strong` edge at radius 11 padded `--fab-space-4`, a 38px radius-9 `--fab-bg-3` tile carrying a 15px `--fab-text-secondary` glyph, a serif 15px/600 `--fab-text` title, and a 10.5px hint capped at 34ch (maintainer ruling, 2026-10-20).
+Its `filtered` panel MUST draw the specimen's hint-and-way-out panel, with no tile or title, on the same edge, radius, padding and stack gap, in `--fab-text-muted`, and its hint is plain text carrying no emphasis.
+A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY place it (width, grid column, minimum height); a caller that mirrors a form for a sibling state follows that form's geometry and inks and varies only the state's hue.
+
+#### Scenario: The hero panel is measured against its specimen
+
+- **WHEN** `manager-published-leaves-specimen` renders the hero and filtered panels
+- **THEN** the hero's edge is 1px `--fab-border-strong`, its tile 38px on `--fab-bg-3`, and its title 15px in `--fab-text`
+- **AND** the filtered panel pads 16px on the same 1px `--fab-border-strong` edge with an 8px stack gap and a 10.5px muted hint
 
 ### Requirement: Every interactive primitive declares its full state set
 

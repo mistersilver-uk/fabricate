@@ -2235,7 +2235,7 @@ Where no level-3 heading fits, draw your own heading above the panel and pass `h
 `hint` is optional final display text, the sentence beneath the title.
 Pass a title, a hint or both; with neither the panel is an empty box.
 `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
-`filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
+`filtered` is `true` or `false`: `true` draws the plain panel, in the muted ink, with no tile or title, for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
 The hint is plain text, so a search term in it takes no emphasis.
 `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
 It is the way out of the dead end, a control or a link; what is drawn there is your own, and a control you draw there is named by you.
