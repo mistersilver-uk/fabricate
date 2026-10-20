@@ -604,6 +604,45 @@ npm run lab:parity   # compare every unreplaced element with library.html opened
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+## Hero demo GIF (`scripts/demo-capture.mjs`)
+
+The README hero (`docs/img/fabricate-demo.gif`) is captured from the View Lab's demo world (`world=demo`) and encoded locally.
+Capture needs the harvested chrome (`npm run viewlab:chrome:harvest`) and no Docker:
+
+```sh
+node scripts/demo-capture.mjs tmp/demo-frames
+```
+
+The driver writes `0001.png` onwards and a `manifest.json` carrying each frame's `durationMs`, and replaces only those files in the directory it is given.
+If the forge roll no longer reaches Masterwork after a product change, it fails and names `--seed` for re-tuning `DEMO_SEED`.
+
+Encoding uses Pillow, a local tool and not a repository dependency:
+
+```python
+import json
+from pathlib import Path
+from PIL import Image
+
+src = Path("tmp/demo-frames")
+manifest = json.loads((src / "manifest.json").read_text())
+frames = [
+    Image.open(src / f["file"]).convert("RGB").quantize(
+        colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
+    )
+    for f in manifest["frames"]
+]
+durations = [f["durationMs"] for f in manifest["frames"]]
+frames[0].save(
+    "docs/img/fabricate-demo.gif",
+    save_all=True,
+    append_images=frames[1:],
+    duration=durations,
+    loop=0,
+    optimize=True,
+    disposal=1,
+)
+```
+
 ## Foundry integration (smoke) tests
 
 The smoke harness boots a real Foundry VTT instance in Docker, loads the built module, and walks the Crafting System Manager UI and the unified Fabricate shell end-to-end with Playwright.
