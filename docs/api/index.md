@@ -258,7 +258,9 @@ Hooks.once('fabricate.ready', async () => {
   `actorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
 - `submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, componentSourceActorIds, interactive })` brews the submitted components as an attempt for the resolved actor.
   It is owner-scoped like `listAlchemyForActor` and delegates to the authoritative engine, which matches the submission against all enabled recipes in the system, known and undiscovered alike.
-  On a match the recipe is discovered and the ingredients are consumed.
+  On a match the recipe is discovered and every submitted unit is consumed, drawn only from the submitted items.
+  A matched brew that can resolve now resolves in this call, as `craftRecipe` does; a time-gated brew starts and returns the run for later completion in the Journal.
+  A match the submitted units cannot fund is refused with nothing consumed.
   The system's alchemy check mode decides the result: `none` always produces the success set, a `simple` check produces the success set on a pass and the reserved failure set on a fail, and a `tiered` check routes to the result set for the rolled outcome tier.
   A failed `simple` check still counts as a match, so it consumes, produces the failure set, and discovers the recipe.
   Otherwise the attempt fizzles with no check and no roll, consuming the components only when the system's Consume on Fail setting is on.

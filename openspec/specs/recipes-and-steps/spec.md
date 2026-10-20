@@ -161,6 +161,9 @@ The versioned rules in this section supersede legacy arming and cancellation beh
 
 Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
 New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
+One-call execution also binds `submitAlchemyAttempt`, with the caller's `interactive` flag threaded into the execute as `executePublicCraft` threads it.
+A matched brew whose stage can execute immediately resolves in that call.
+A time-gated or otherwise unresolved brew starts and resolves later from the Journal.
 A stage that has not started keeps its choices editable in the Journal and has spent nothing; only a later stage of a multi-step run can be in that state, because run start commits the first one.
 Journal start controls may create a run for later manual completion rather than promising immediate execution.
 
@@ -208,6 +211,12 @@ A stage START is not an attempt, so a cancelled run's started-but-unresolved sta
 Legacy consumption and refund behavior and salvage remain unchanged.
 - A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
 It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
+- A matched version-1 alchemy start MUST carry a complete selection plan derived by the authority from the canonical submission: an option for every multi-option group and an essence allocation scoped to the matched set's stage over the submitted carriers.
+A caller-supplied selection plan is ignored.
+- A version-1 alchemy start MUST draw consumption only from the submitted units, and MUST consume every submitted unit the plan does not draw.
+When the derived plan cannot be funded from the submission, the start is refused with nothing spent and no run left.
+- Version-1 alchemy execution MUST apply the alchemy tail, identified from the run's recipe crafting system, never from command context: brew-discovery per `learnOnCraft`, the reserved `role: 'failure'` group on a matched Simple failure, and `alchemy.consumeOnFail`.
+On a version-1 brew `consumeOnFail` keeps the start spend, or, when `false`, returns it through the shared refund.
 
 ### A begun run keeps its accepted terms
 
