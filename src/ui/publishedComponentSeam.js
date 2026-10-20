@@ -30,7 +30,9 @@ const reportToConsole = (...args) => console.error(...args);
 function describeEntry(entry) {
   const props = {};
   for (const [key, spec] of Object.entries(entry.props)) {
-    props[key] = Object.freeze({ kind: spec.kind, required: spec.required === true });
+    const described = { kind: spec.kind, required: spec.required === true };
+    if (spec.requiredWhen !== undefined) described.requiredWhen = spec.requiredWhen;
+    props[key] = Object.freeze(described);
   }
   return Object.freeze({
     version: entry.version,
@@ -40,10 +42,36 @@ function describeEntry(entry) {
   });
 }
 
+// The kinds that may state `requiredWhen`: a `slot` or `aria` key is never required.
+const CONDITIONAL_KINDS = new Set(['data', 'text', 'callback']);
+
+/**
+ * Whether a key's `requiredWhen` is sound: a string naming another `data` key of the entry that is
+ * neither `required` nor `requiredWhen` itself, on a key of a conditional kind that states no
+ * `required` (issue 2452).
+ */
+function isSoundGuard(entry, key, spec) {
+  const name = spec.requiredWhen;
+  const guard = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
+  return (
+    Boolean(guard) &&
+    name !== key &&
+    guard.kind === 'data' &&
+    guard.required !== true &&
+    guard.requiredWhen === undefined &&
+    CONDITIONAL_KINDS.has(spec.kind) &&
+    spec.required === undefined
+  );
+}
+
 function assertKnownEntry(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
       throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown kind "${spec.kind}"`);
+    }
+    if (spec.requiredWhen !== undefined && !isSoundGuard(entry, key, spec)) {
+      const other = String(spec.requiredWhen);
+      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown requiredWhen "${other}"`);
     }
   }
   if (!Object.hasOwn(ROOTS, entry.root)) {

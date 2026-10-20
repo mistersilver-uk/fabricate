@@ -112,6 +112,21 @@ function assertRestKey(entry, key, value) {
 }
 
 /**
+ * M9 over a validated copy, in manifest order: a `required` key absent or `''`, or a `requiredWhen`
+ * one so while the data key it names is truthy (issue 2452).
+ */
+function assertRequired(entry, copy) {
+  for (const [key, spec] of Object.entries(entry.props)) {
+    if (copy[key] !== undefined && copy[key] !== '') continue;
+    if (spec.required === true) throw refuse(`${entry.name} requires a non-empty "${key}"`);
+    const guard = spec.requiredWhen;
+    if (guard !== undefined && copy[guard]) {
+      throw refuse(`${entry.name} requires a non-empty "${key}" when "${guard}" is truthy`);
+    }
+  }
+}
+
+/**
  * The validated copy one mount or update renders: M7, M8, M10-M15 and M17, then M9. Each key is
  * configurable, so the seam can drop an absent callback key from it.
  */
@@ -126,10 +141,6 @@ export function copyProps(entry, props) {
     const own = { value, enumerable: true, writable: true, configurable: true };
     Object.defineProperty(copy, key, own);
   }
-  for (const [key, spec] of Object.entries(entry.props)) {
-    if (spec.required === true && (copy[key] === undefined || copy[key] === '')) {
-      throw refuse(`${entry.name} requires a non-empty "${key}"`);
-    }
-  }
+  assertRequired(entry, copy);
   return copy;
 }
