@@ -161,21 +161,55 @@ const tool = (id, name, icon, description) => ({
 });
 
 const FORGE_TOOLS = [
-  tool('ed-tool-crucible', 'Crucible', 'tools/smithing/crucible.webp', 'Fireclay, cracked once and banded with iron.'),
+  tool(
+    'ed-tool-crucible',
+    'Crucible',
+    'tools/smithing/crucible.webp',
+    'Fireclay, cracked once and banded with iron.'
+  ),
   tool(
     'ed-tool-hammer',
     'Smith’s Hammer',
     'tools/smithing/hammer-sledge-steel-grey.webp',
     'A cross-pein hammer whose haft has outlived three smiths.'
   ),
-  tool('ed-tool-anvil', 'Anvil', 'tools/smithing/anvil.webp', 'Set into living rock at the heart of the forge.'),
+  tool(
+    'ed-tool-anvil',
+    'Anvil',
+    'tools/smithing/anvil.webp',
+    'Set into living rock at the heart of the forge.'
+  ),
 ];
 
 const ESSENCES = [
-  { id: 'life', name: 'Life', description: 'Sap, blood and the will to mend.', icon: 'fas fa-seedling', colorToken: 'sage' },
-  { id: 'water', name: 'Water', description: 'Mist, tarn and cold.', icon: 'fas fa-droplet', colorToken: 'aqua' },
-  { id: 'fire', name: 'Fire', description: 'Ember, vent and forge-heat.', icon: 'fas fa-fire', colorToken: 'peach' },
-  { id: 'earth', name: 'Earth', description: 'Granite, ore and root.', icon: 'fas fa-mountain', colorToken: 'butter' },
+  {
+    id: 'life',
+    name: 'Life',
+    description: 'Sap, blood and the will to mend.',
+    icon: 'fas fa-seedling',
+    colorToken: 'sage',
+  },
+  {
+    id: 'water',
+    name: 'Water',
+    description: 'Mist, tarn and cold.',
+    icon: 'fas fa-droplet',
+    colorToken: 'aqua',
+  },
+  {
+    id: 'fire',
+    name: 'Fire',
+    description: 'Ember, vent and forge-heat.',
+    icon: 'fas fa-fire',
+    colorToken: 'peach',
+  },
+  {
+    id: 'earth',
+    name: 'Earth',
+    description: 'Granite, ore and root.',
+    icon: 'fas fa-mountain',
+    colorToken: 'butter',
+  },
 ];
 
 /** The forge's routed check: the roll's tier picks the blade, and a ruined heat yields nothing. */
@@ -230,61 +264,81 @@ function brew(id, name, icon, description, [first, second], resultId, extra = {}
       { id: `${id}-rg`, results: [{ componentId: resultId, quantity: 1 }] },
       ...(extra.failure ?? []),
     ],
-    check: { enabled: true, rollFormula: '1d20 + @abilities.int.mod', thresholds: { success: extra.dc ?? 10 } },
+    check: {
+      enabled: true,
+      rollFormula: '1d20 + @abilities.int.mod',
+      thresholds: { success: extra.dc ?? 10 },
+    },
   });
 }
 
 const FORGE_RECIPES = [
-  recipe('ed-r-iron-ingot', 'Smelt Iron Ingot', DEMO_SYSTEM_IDS.FORGE, 'commodities/metal/ingot-worn-iron.webp', {
-    description: 'Black ore and a hot bed of charcoal, coaxed down into one honest bar.',
-    categories: ['Smelting'],
-    ingredientSets: [simpleSet('s1', { 'ed-iron-ore': 2, 'ed-charcoal': 1 })],
-    resultGroups: [{ id: 'rg', name: 'Ingot', results: [{ componentId: 'ed-iron-ingot', quantity: 1 }] }],
-    toolIds: ['ed-tool-crucible'],
-  }),
+  recipe(
+    'ed-r-iron-ingot',
+    'Smelt Iron Ingot',
+    DEMO_SYSTEM_IDS.FORGE,
+    'commodities/metal/ingot-worn-iron.webp',
+    {
+      description: 'Black ore and a hot bed of charcoal, coaxed down into one honest bar.',
+      categories: ['Smelting'],
+      ingredientSets: [simpleSet('s1', { 'ed-iron-ore': 2, 'ed-charcoal': 1 })],
+      resultGroups: [
+        { id: 'rg', name: 'Ingot', results: [{ componentId: 'ed-iron-ingot', quantity: 1 }] },
+      ],
+      toolIds: ['ed-tool-crucible'],
+    }
+  ),
   recipe('ed-r-steel', 'Fold Steel', DEMO_SYSTEM_IDS.FORGE, 'commodities/metal/ingot-steel.webp', {
     description: 'Fold, draw and quench until the iron forgets it was ever soft.',
     categories: ['Smelting'],
     ingredientSets: [simpleSet('s1', { 'ed-iron-ingot': 2, 'ed-charcoal': 2 })],
-    resultGroups: [{ id: 'rg', name: 'Steel', results: [{ componentId: 'ed-steel-ingot', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'rg', name: 'Steel', results: [{ componentId: 'ed-steel-ingot', quantity: 1 }] },
+    ],
     toolIds: ['ed-tool-hammer'],
   }),
-  recipe('ed-r-longsword', 'Forge Longsword', DEMO_SYSTEM_IDS.FORGE, 'weapons/swords/sword-guard.webp', {
-    description: 'One blank, one heat: the roll decides what leaves the anvil.',
-    categories: ['Bladesmithing'],
-    complex: true,
-    ingredientSets: [
-      {
-        id: 'ed-set-blade',
-        name: 'Blade stock',
-        ingredientGroups: [
-          group('ed-set-blade-g1', 'Steel', { componentId: 'ed-steel-ingot', quantity: 2 }),
-          group('ed-set-blade-g2', 'Grip', { componentId: 'ed-oiled-grip', quantity: 1 }),
-        ],
-      },
-    ],
-    resultGroups: [
-      {
-        id: 'ed-grp-masterwork',
-        name: 'Masterwork blade',
-        checkOutcomeIds: ['ed-masterwork'],
-        results: [{ componentId: 'ed-masterwork-longsword', quantity: 1 }],
-      },
-      {
-        id: 'ed-grp-sound',
-        name: 'Sound blade',
-        checkOutcomeIds: ['ed-standard'],
-        results: [{ componentId: 'ed-longsword', quantity: 1 }],
-      },
-      {
-        id: 'ed-grp-flawed',
-        name: 'Flawed blade',
-        checkOutcomeIds: ['ed-flawed'],
-        results: [{ componentId: 'ed-flawed-longsword', quantity: 1 }],
-      },
-    ],
-    toolIds: ['ed-tool-hammer', 'ed-tool-anvil'],
-  }),
+  recipe(
+    'ed-r-longsword',
+    'Forge Longsword',
+    DEMO_SYSTEM_IDS.FORGE,
+    'weapons/swords/sword-guard.webp',
+    {
+      description: 'One blank, one heat: the roll decides what leaves the anvil.',
+      categories: ['Bladesmithing'],
+      complex: true,
+      ingredientSets: [
+        {
+          id: 'ed-set-blade',
+          name: 'Blade stock',
+          ingredientGroups: [
+            group('ed-set-blade-g1', 'Steel', { componentId: 'ed-steel-ingot', quantity: 2 }),
+            group('ed-set-blade-g2', 'Grip', { componentId: 'ed-oiled-grip', quantity: 1 }),
+          ],
+        },
+      ],
+      resultGroups: [
+        {
+          id: 'ed-grp-masterwork',
+          name: 'Masterwork blade',
+          checkOutcomeIds: ['ed-masterwork'],
+          results: [{ componentId: 'ed-masterwork-longsword', quantity: 1 }],
+        },
+        {
+          id: 'ed-grp-sound',
+          name: 'Sound blade',
+          checkOutcomeIds: ['ed-standard'],
+          results: [{ componentId: 'ed-longsword', quantity: 1 }],
+        },
+        {
+          id: 'ed-grp-flawed',
+          name: 'Flawed blade',
+          checkOutcomeIds: ['ed-flawed'],
+          results: [{ componentId: 'ed-flawed-longsword', quantity: 1 }],
+        },
+      ],
+      toolIds: ['ed-tool-hammer', 'ed-tool-anvil'],
+    }
+  ),
 ];
 
 const STILL_RECIPES = [
@@ -293,7 +347,10 @@ const STILL_RECIPES = [
     'Draught of Mending',
     'consumables/potions/potion-bottle-corked-labeled-red.webp',
     'Fern for the flesh, moonbell for the fever.',
-    [['Life', 2], ['Water', 1]],
+    [
+      ['Life', 2],
+      ['Water', 1],
+    ],
     'hm-draught-mending'
   ),
   brew(
@@ -301,7 +358,10 @@ const STILL_RECIPES = [
     'Alchemist’s Fire',
     'consumables/potions/bottle-bulb-corked-glowing-red.webp',
     'Embercap and brimstone, sealed before they wake.',
-    [['Fire', 2], ['Earth', 1]],
+    [
+      ['Fire', 2],
+      ['Earth', 1],
+    ],
     'hm-alchemists-fire'
   ),
   brew(
@@ -309,7 +369,10 @@ const STILL_RECIPES = [
     'Elixir of Stoneskin',
     'consumables/potions/bottle-round-corked-orange.webp',
     'Two measures of stonecrop, and fern to keep the heart beating.',
-    [['Earth', 2], ['Life', 1]],
+    [
+      ['Earth', 2],
+      ['Life', 1],
+    ],
     'hm-elixir-stoneskin',
     {
       dc: 14,
@@ -374,7 +437,7 @@ function buildSystems() {
   ];
 }
 
-/** The smith who crafts, and the still-keeper whose pack is a second component source. */
+/** The smith who crafts and brews, and the still-keeper whose pack holds the one missing grip. */
 export const DEMO_ACTORS = Object.freeze({
   definitions: [
     {
@@ -398,15 +461,15 @@ export const DEMO_ACTORS = Object.freeze({
       'ed-tool-crucible': 1,
       'ed-tool-hammer': 1,
       'ed-tool-anvil': 1,
-    },
-    'demo-actor-maren': {
-      'ed-oiled-grip': 1,
       'hm-bitterfern': 3,
       'hm-moonbell': 2,
       'hm-embercap': 2,
       'hm-stonecrop': 3,
       'hm-brimstone': 2,
       'hm-empty-phial': 4,
+    },
+    'demo-actor-maren': {
+      'ed-oiled-grip': 1,
     },
   },
 });

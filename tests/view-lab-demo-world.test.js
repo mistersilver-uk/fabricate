@@ -55,7 +55,10 @@ test('every demo recipe ingredient, result and tool resolves in its own system',
     for (const group of recipe.ingredientSets.flatMap((set) => set.ingredientGroups)) {
       for (const { match } of group.options) {
         if (match?.type === 'essence') {
-          assert.ok(essenceIds.has(match.essenceId), `${recipe.id} names essence ${match.essenceId}`);
+          assert.ok(
+            essenceIds.has(match.essenceId),
+            `${recipe.id} names essence ${match.essenceId}`
+          );
         }
       }
     }
@@ -65,10 +68,11 @@ test('every demo recipe ingredient, result and tool resolves in its own system',
 test('every routed result set claims a tier the forge check defines', () => {
   const forge = content.systems.find((entry) => entry.resolutionMode === 'routedByCheck');
   const tiers = new Set(forge.craftingCheck.routed.relativeOutcomes.map((tier) => tier.id));
-  const claimed = content.recipes
-    .filter((recipe) => recipe.craftingSystemId === forge.id)
-    .flatMap((recipe) => recipe.resultGroups)
-    .flatMap((group) => group.checkOutcomeIds ?? []);
+  const claimed = content.recipes.flatMap((recipe) =>
+    recipe.craftingSystemId === forge.id
+      ? recipe.resultGroups.flatMap((group) => group.checkOutcomeIds ?? [])
+      : []
+  );
   assert.ok(claimed.length >= 3, 'the longsword routes its three blades by tier');
   for (const id of claimed) assert.ok(tiers.has(id), `a result set claims unknown tier ${id}`);
 });
@@ -76,7 +80,8 @@ test('every routed result set claims a tier the forge check defines', () => {
 test('the actors hold only things the world defines, and salvage resolves too', () => {
   const known = new Set([...content.components, ...content.tools].map((entry) => entry.id));
   for (const [actorId, stacks] of Object.entries(DEMO_ACTORS.inventories)) {
-    for (const id of Object.keys(stacks)) assert.ok(known.has(id), `${actorId} holds unknown ${id}`);
+    for (const id of Object.keys(stacks))
+      assert.ok(known.has(id), `${actorId} holds unknown ${id}`);
   }
   const salvage = content.components.filter((entry) => entry.salvage?.enabled);
   assert.ok(salvage.length > 0, 'at least one component salvages');

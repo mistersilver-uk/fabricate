@@ -8,7 +8,7 @@ import { bootLabRuntime, LAB_WORLD_TIME } from '../world/labWorld.js';
 import { buildDemoContent, DEMO_ACTORS, DEMO_SYSTEM_IDS } from './demoContent.js';
 
 /** The roll stream the scripted journey was tuned against; a new seed re-tunes every beat. */
-export const DEMO_SEED = 20_261_020;
+export const DEMO_SEED = 4;
 
 function demoSettings(content, actors, managedSystemId) {
   const settings = new Map();
