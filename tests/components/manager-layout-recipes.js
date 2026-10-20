@@ -911,7 +911,7 @@ test("the tag catalogue's new-tag footer keeps a long name inside the 300px pane
             ${withScopeHash(
               `<div class="fabricate-picker-popover manager-travel-popover" data-probe="panel" style="width: 300px; min-width: 300px; max-width: 300px">
                 <div class="manager-recipe-tag-create" data-probe="footer">
-                  <button type="button" class="fabricate-button fab-manager-button is-ghost is-full-width" data-recipe-tag-create title="New tag “${name}”">
+                  <button type="button" class="fabricate-button is-ghost is-full-width" data-recipe-tag-create title="New tag “${name}”">
                     <i class="fa-solid fa-plus"></i><span data-probe="label">New tag “${name}”</span>
                   </button>
                 </div>
@@ -2037,7 +2037,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
 
 test('Repeats is the "up to N, by roll" drawing\'s quiet 26px status button (issue 2534)', async () => {
   const button = (hook, disabled = '') =>
-    `<button type="button" class="fabricate-button fab-manager-button manager-recipe-award-repeats" ${hook} ${disabled}><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Unique</span></button>`;
+    `<button type="button" class="fabricate-button manager-recipe-award-repeats" ${hook} ${disabled}><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Unique</span></button>`;
   const context = await openLayoutContext({
     viewport: { width: 640, height: 200 },
     deviceScaleFactor: 1,
@@ -2064,7 +2064,7 @@ test('Repeats is the "up to N, by roll" drawing\'s quiet 26px status button (iss
           <main class="fabricate-manager">
             ${button('data-repeats')}
             ${button('data-repeats-off', 'disabled')}
-            <button type="button" class="fabricate-button fab-manager-button" data-family-off disabled>Off</button>
+            <button type="button" class="fabricate-button" data-family-off disabled>Off</button>
           </main>
         </body>
       </html>

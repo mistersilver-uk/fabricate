@@ -29,7 +29,7 @@ export async function readRenderedToolGeometry(width, view) {
     const editor =
       view === 'tool-edit'
         ? `<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
-          <header class="fabricate-page-header manager-tool-edit-header" data-tool-editor-header><nav class="manager-breadcrumbs"><button type="button">Crafting Systems</button><span>Smith's Hammer</span></nav><div class="manager-heading"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2 class="manager-title">Smith's Hammer with a deliberately long localized identity</h2><p class="manager-subtitle">Linked game-world Item</p></div></div></div><div class="manager-header-actions manager-tool-edit-actions"><button class="fabricate-button fab-manager-button is-ghost is-size-38">Back</button><button class="fabricate-button fab-manager-button is-danger is-size-38">Delete</button><button class="fabricate-button fab-manager-button is-primary is-size-38" data-tool-editor-save>Save Tool</button></div></header>
+          <header class="fabricate-page-header manager-tool-edit-header" data-tool-editor-header><nav class="manager-breadcrumbs"><button type="button">Crafting Systems</button><span>Smith's Hammer</span></nav><div class="manager-heading"><div class="manager-tool-edit-identity"><div class="manager-tool-edit-identity-copy"><h2 class="manager-title">Smith's Hammer with a deliberately long localized identity</h2><p class="manager-subtitle">Linked game-world Item</p></div></div></div><div class="manager-header-actions manager-tool-edit-actions"><button class="fabricate-button is-ghost is-size-38">Back</button><button class="fabricate-button is-danger is-size-38">Delete</button><button class="fabricate-button is-primary is-size-38" data-tool-editor-save>Save Tool</button></div></header>
           <div class="fabricate-tabs manager-tool-editor-tabs manager-editor-tabs" role="tablist"><button type="button" role="tab" id="tool-tab-breakage" class="manager-editor-tab-button is-active" aria-selected="true"><span>Breakage</span></button><button type="button" role="tab" id="tool-tab-requirements" class="manager-editor-tab-button" aria-selected="false"><span>Requirements</span><span class="manager-editor-tab-count">2</span></button><button type="button" role="tab" id="tool-tab-validation" class="manager-editor-tab-button" aria-selected="false"><span>Validation</span><span class="manager-chip is-neutral is-mono is-inspector manager-editor-tab-badge">✓</span></button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
@@ -168,7 +168,7 @@ export async function checksRollEdges(page, tiersWrapperClass) {
                     <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
                   </div>
                 </div>
-                <button type="button" class="fabricate-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+                <button type="button" class="fabricate-button is-danger manager-checks-tier-remove" data-remove-tier>
                   <i class="fas fa-trash"></i>
                 </button>
               </div>
@@ -179,7 +179,7 @@ export async function checksRollEdges(page, tiersWrapperClass) {
             </div>
           </li>
           <li class="manager-checks-tier-add">
-            <button type="button" class="fabricate-button fab-manager-button is-dashed" data-add-tier>
+            <button type="button" class="fabricate-button is-dashed" data-add-tier>
               <i class="fas fa-plus"></i><span>Add difficulty tier</span>
             </button>
           </li>

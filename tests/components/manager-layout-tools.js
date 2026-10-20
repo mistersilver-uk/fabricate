@@ -1430,11 +1430,11 @@ test('a Modifiers card button renders like the tool studio button of the same ro
       (role) =>
         `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="card-${role}"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>`
     ).join('');
-    // The NEGATIVE CONTROL: the class string this card shipped before the conversion. If it
-    // measured the same as the converted one, the primitive would be changing nothing and
-    // every assertion below would pass vacuously.
+    // The NEGATIVE CONTROL: the same button without the family root. Its pre-conversion class
+    // string is the converted one since issue 2540 retired the primitive token, so the root is
+    // what is withheld. If it measured the same, every assertion below would pass vacuously.
     const unconverted =
-      '<button type="button" class="fabricate-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+      '<button type="button" class="is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
 
     await page.setContent(`
       <!doctype html>
@@ -1603,11 +1603,11 @@ test('the Checks rail states its own control type scale instead of inheriting on
                       <section class="fabricate-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
-                            class="fabricate-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            class="fabricate-button is-primary manager-checks-simulator-roll">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                           <button type="button" data-probe="roll-unconverted"
-                            class="fabricate-button is-primary">
+                            class="is-primary">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                         </div>
@@ -1724,7 +1724,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
     assert.equal(
       measured['roll-unconverted'].fontSize,
       '14px',
-      'the unconverted class string still bleeds Foundry’s 14px app base'
+      'a button without the family root still bleeds Foundry’s 14px app base'
     );
     assert.notEqual(
       measured.roll.fontSize,

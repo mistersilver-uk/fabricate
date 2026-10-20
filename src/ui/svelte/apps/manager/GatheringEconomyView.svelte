@@ -776,11 +776,11 @@
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
      Then chained, because at (0,2,0) this rule did not beat
-     `.fabricate-button.fabricate-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
+     `.fabricate-button.fabricate-button.fabricate-button` (0,3,0) at all. Naming the ancestor and
      the primitive's classes takes it to (0,5,0), which wins on specificity rather than on where the
      sheet happens to be injected. */
   :global(
-    .fabricate-manager .fabricate-button.fab-manager-button.is-primary.manager-economy-bulk-save
+    .fabricate-manager .fabricate-button.fabricate-button.is-primary.manager-economy-bulk-save
   ) {
     width: auto;
     justify-self: center;

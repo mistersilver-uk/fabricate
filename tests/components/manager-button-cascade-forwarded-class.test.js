@@ -1,45 +1,70 @@
-/** The cascade credits an ancestor class a caller forwards through `class` (issue 1483). */
+/**
+ * A popover trigger reaches the button cascade through the primitive, not a class string (issue
+ * 2540). The nine `triggerClass` sites that wrote `fabricate-button` moved onto `triggerButton`,
+ * so the root and role come from `Button` and the caller's classes are forwarded as its `class`.
+ */
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
-import { managerButtonCascade } from '../helpers/manager-button-cascade.js';
+import {
+  SEARCHABLE_POPOVER_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
-const CALLER = 'src/ui/svelte/probe/Caller.svelte';
-const CHILD = 'src/ui/svelte/probe/Child.svelte';
-const OTHER = 'src/ui/svelte/probe/Other.svelte';
-const SHEET = 'styles/fabricate.css';
-const RULE = `${SHEET}#.probe-row .fabricate-button`;
+const repoRoot = resolve(import.meta.dirname, '../..');
+const ROOT = 'fabricate-button';
 
-/** `Caller` renders `<tag class="row" />`; `Child` puts its `class` on the box around a button. */
-function cascadeOver({ tag = 'Child', row = 'probe-row' } = {}) {
-  const sources = {
-    [CALLER]:
-      `<script>\n  import ${tag} from './${tag}.svelte';\n</script>\n\n` +
-      `<${tag} class="${row}" />\n`,
-    [CHILD]:
-      "<script>\n  let { class: className = '' } = $props();\n</script>\n\n" +
-      '<div class={className}>' +
-      '<button class="fabricate-button fab-manager-button">Go</button></div>\n',
-    [OTHER]: '<div class="other"></div>\n',
-    [SHEET]: '.probe-row .fabricate-button { font-size: 0.72rem; }\n',
-  };
-  return managerButtonCascade({
-    corpus: { files: [CALLER, CHILD, OTHER], sources, sheet: sources[SHEET] },
+const harness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-forwarded-trigger-class-',
+  rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
+  compiledModules: SEARCHABLE_POPOVER_COMPILED_MODULES,
+  componentPath: 'src/ui/svelte/components/SearchablePopover.svelte',
+});
+
+/** Every `.svelte` under `src/`, as `[path, text]`. */
+function svelteSources(directory = 'src') {
+  return readdirSync(join(repoRoot, directory), { withFileTypes: true }).flatMap((entry) => {
+    const child = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return svelteSources(child);
+    return entry.name.endsWith('.svelte')
+      ? [[child, readFileSync(join(repoRoot, child), 'utf8')]]
+      : [];
   });
 }
 
-test('a class forwarded to the child rendering the site leaves the rule unresolved', () => {
-  const candidate = cascadeOver().candidateFor(RULE);
-  assert.ok(candidate, `${RULE} dropped out of candidates although Caller can supply .probe-row`);
-  assert.deepEqual(
-    candidate.matches.map(({ state, providers }) => ({ state, providers })),
-    [{ state: 'unresolved', providers: [`${CALLER}:5`] }]
-  );
-});
+describe('2540 a popover trigger forwards its class onto the button primitive', () => {
+  before(harness.setup);
+  after(harness.teardown);
 
-test('another forwarded class, or one on a component not rendering the site, provides none', () => {
-  const otherRow = cascadeOver({ row: 'other-row' });
-  assert.ok(otherRow.ruleFor(RULE), 'the rule is still parsed');
-  assert.ok(!otherRow.candidateFor(RULE), 'another class provides nothing');
-  assert.ok(!cascadeOver({ tag: 'Other' }).candidateFor(RULE), 'Other never renders Child');
+  it('draws the dashed adder as the primitive, the caller class appended after the role', async () => {
+    await harness.mount({
+      options: [{ id: 'hammer', label: 'Hammer' }],
+      triggerButton: { role: 'dashed' },
+      triggerClass: 'manager-recipe-tools-trigger',
+      triggerLabel: 'Add tool',
+      ariaLabel: 'Add tool',
+      panelLabel: 'Add tool',
+      onSelect: () => {},
+    });
+    const trigger = harness.target.querySelector('button');
+    assert.ok(Boolean(trigger), 'the picker renders its trigger');
+    assert.equal(trigger.className, `${ROOT} is-dashed manager-recipe-tools-trigger`);
+    assert.equal(trigger.dataset.keyboardFocus, 'true', 'the primitive’s own Foundry focus flag');
+  });
+
+  it('leaves no triggerClass handing the button root over as a string', () => {
+    const sources = svelteSources();
+    const converted = sources.flatMap(([, text]) => text.match(/\btriggerButton=\{/g) ?? []);
+    assert.ok(converted.length >= 10, `only ${converted.length} triggerButton sites were found`);
+    const offenders = sources.flatMap(([path, text]) =>
+      [...text.matchAll(/\btriggerClass="([^"]*)"/g)]
+        .filter((match) => match[1].split(/\s+/).includes(ROOT))
+        .map((match) => `${path}: triggerClass="${match[1]}"`)
+    );
+    assert.deepEqual(offenders, [], 'render the trigger through `triggerButton={{ role }}`');
+  });
 });

@@ -111,7 +111,7 @@
 }
 
 /* The head's action, LINK-STYLED. `Button` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -136,15 +136,15 @@
 }
 
 /* The INK is split out and qualified, and the split states which of the declarations above are a RESET and which is paint (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link:not(:disabled) {
   color: var(--fab-accent);
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link > i {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link > i {
   font-size: 9px;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link:not(:disabled):hover {
   color: var(--fab-text);
   background: none;
   text-decoration: underline;
@@ -502,8 +502,8 @@
   min-width: 0;
 }
 
-/* (0,4,0), which is what it takes to beat `.fabricate-button.fab-manager-button.is-dashed`'s 34px height (issue 1118). */
-.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fab-manager-button.is-dashed {
+/* (0,4,0), which is what it takes to beat `.fabricate-button.fabricate-button.fabricate-button.is-dashed`'s 34px height (issue 1118). */
+.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fabricate-button.is-dashed {
   flex: 0 1 auto;
   height: 30px;
   min-height: 0;
@@ -514,7 +514,7 @@
 /* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). */
 .fabricate-manager
   .manager-checks-trigger-presets
-  .fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
+  .fabricate-button.fabricate-button.is-dashed:not(:disabled) {
   background: var(--fab-bg-0);
 }
 
@@ -894,7 +894,7 @@
 }
 
 /* The simulator's roll action. It renders through `Button`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-simulator-roll {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-simulator-roll {
   justify-content: center;
   width: 100%;
   height: auto;

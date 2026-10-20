@@ -194,17 +194,6 @@ test('all three browser sort-direction toggles render as one control', async () 
     // the essence toggle measured before this rule, so if it matched the three below, the
     // rule would be reaching nothing and every equality here would hold trivially.
     const bare = `<button type="button" class="${base}" data-probe="bare"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
-    // AND A SECOND CONTROL, added when the primitive's own control rule took the 34-38px band's
-    // 9px corner (issue 1371, maintainer ruling M12a). Before that, `borderRadius` was the
-    // discriminator this test used to prove the toolbar rule had reached its fixture at all: 9px
-    // against the bare primitive's 6px. The primitive is 9px now, so that half of the control has
-    // been superseded rather than lost — `fontWeight` still discriminates (600 against 700), and
-    // this probe carries the family ROOT and `fabricate-button` WITHOUT `fab-manager-button`, which
-    // is what an unconverted hand-written button is and is still on the base rule's 6px. So the
-    // corner is measured in a real browser on both sides of the conversion boundary instead.
-    // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button"`
-    // to `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
-    const unconverted = `<button type="button" class="fabricate-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
       <!doctype html>
@@ -219,7 +208,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-filter-bar">${toggles}${bare}${unconverted}</div>
+            <div class="fabricate-filter-bar">${toggles}${bare}</div>
           </main>
         </body>
       </html>
@@ -240,14 +229,14 @@ test('all three browser sort-direction toggles render as one control', async () 
         };
       };
       return Object.fromEntries(
-        ['recipe', 'component', 'essence', 'bare', 'unconverted'].map((probe) => [
+        ['recipe', 'component', 'essence', 'bare'].map((probe) => [
           probe,
           read(probe)
         ])
       );
     });
 
-    for (const probe of ['recipe', 'component', 'essence', 'bare', 'unconverted']) {
+    for (const probe of ['recipe', 'component', 'essence', 'bare']) {
       assert.ok(measured[probe], `the ${probe} probe rendered`);
     }
 
@@ -260,14 +249,10 @@ test('all three browser sort-direction toggles render as one control', async () 
       'so the bare probe still discriminates — an equality that held for every property would mean the rule was reaching nothing'
     );
 
-    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner, and so is the
-    // unconverted hand-written button, from the base rule that sizes it at 34.
+    // M12a, measured: the converted control is on the 34-38px band's 9px corner. The unconverted
+    // hand-written probe beside it retired with the primitive token (issue 2540), which left it
+    // writing the same class list as the converted one.
     assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
-    assert.equal(
-      measured.unconverted.borderRadius,
-      '9px',
-      'and an unconverted hand-written one takes the same corner from the base rule that sizes it'
-    );
 
     for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
       assert.equal(

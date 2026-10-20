@@ -745,9 +745,9 @@
 }
 
 /* The direction toggle sat at the base `.fabricate-button` scale (16px/700, 6px radius) — bold and boxy next to the compact 0.72rem segmented toggles and the SORT BY micro-label, so it read as oversized (issues 676, 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-sort-direction,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-sort-direction,
-.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction] {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-sort-direction,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-sort-direction,
+.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction] {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
@@ -823,12 +823,12 @@
   min-width: 0;
 }
 
-/* These chain the doubled root and `fab-manager-button` into the selector (0,4,0) so they beat the base `.fabricate-button.fabricate-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
+/* These triple the root in the selector (0,4,0) so they beat the base `.fabricate-button.fabricate-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
 
 /* Dark secondary: the panel surface, a subtle border, normal text. The font-size and weight match the Edit button so all three action buttons read at one size. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-copy,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-unlink {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-duplicate,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-copy,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-unlink {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -836,16 +836,16 @@
   font-weight: 700;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-copy:not(:disabled),
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-unlink:not(:disabled) {
   border-color: var(--fab-border);
   background: var(--fab-bg-2);
 }
 
 /* Accent primary: the loudest control on the panel. Both rows stay role-LESS (issue 1118): the accent fill is this panel's own treatment, not the `primary` role's Save green. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -853,24 +853,24 @@
   font-weight: 700;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:not(:disabled),
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:focus-visible,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
 
 /* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly danger-tinted border so it reads as destructive without shouting louder than Edit (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -878,14 +878,14 @@
   font-weight: 700;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete:not(:disabled),
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete:not(:disabled) {
   background: var(--fab-bg-2);
 }
 
 /* `:focus-visible` ONLY. The hover half was byte-identical to `.fabricate-button.is-danger:not(:disabled):hover`, which states the same three values at (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the one state the pair still has to declare for itself. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
+.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete:focus-visible,
+.fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);

@@ -49,7 +49,8 @@
   options={picker.options}
   {disabled}
   pickerClass="manager-travel-parties-override"
-  triggerClass="fabricate-button manager-travel-picker-trigger manager-travel-parties-override-trigger"
+  triggerButton={{ role: 'neutral' }}
+  triggerClass="manager-travel-picker-trigger manager-travel-parties-override-trigger"
   triggerIcon="fas fa-location-crosshairs"
   triggerLabel={picker.selectedName}
   valueClass="manager-travel-parties-override-value"

@@ -40,7 +40,8 @@
   options={picker.options}
   {disabled}
   pickerClass="manager-map-link-picker"
-  triggerClass="fabricate-button manager-travel-picker-trigger manager-map-link-trigger"
+  triggerButton={{ role: 'neutral' }}
+  triggerClass="manager-travel-picker-trigger manager-map-link-trigger"
   triggerIcon="fas fa-link"
   triggerLabel={picker.selectedName}
   valueClass="manager-map-link-value"

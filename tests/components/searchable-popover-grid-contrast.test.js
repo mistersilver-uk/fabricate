@@ -19,7 +19,7 @@ const HINT = '.fabricate-picker-popover .fabricate-picker-key-hints-text';
 const ACTION =
   '.fabricate-picker-popover .fabricate-picker-key-hints .fabricate-picker-footer-action.is-ghost.is-size-28:not(:disabled)';
 const GHOST_HOVER =
-  ".fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled, [aria-disabled='true']):hover";
+  ".fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover";
 
 test('the key hints are muted ink that clears 4.5:1 on the panel in every palette', () => {
   const ground = token(PANEL, 'background');

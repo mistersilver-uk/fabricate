@@ -515,8 +515,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     const globalCss = readStylesheet();
     // Both selectors moved in issue 1502.
     for (const selector of [
-      '.fabricate-button.fabricate-button.fab-manager-button.is-dashed',
-      '.fabricate-button.fabricate-button.fab-manager-button.is-full-width',
+      '.fabricate-button.fabricate-button.fabricate-button.is-dashed',
+      '.fabricate-button.fabricate-button.fabricate-button.is-full-width',
     ]) {
       const block = blockIn(globalCss, selector);
       // NON-VACUITY, stated at the call site rather than left to `blockIn`. A
@@ -887,7 +887,6 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.ok(add, 'the hook resolves to an element');
     assert.equal(add.tagName, 'BUTTON', 'Button renders a real <button> by default');
     assert.ok(add.classList.contains('fabricate-button'), 'the manager control contract');
-    assert.ok(add.classList.contains('fab-manager-button'), 'the primitive`s own class');
     assert.ok(add.classList.contains('is-dashed'), 'the append-a-row role');
     assert.ok(add.classList.contains('is-full-width'), 'it spans the panel`s single-column grid');
   });

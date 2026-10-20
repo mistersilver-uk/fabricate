@@ -34,6 +34,7 @@ Core renders an `href` action as an external anchor with `target="_blank"` and `
 - **`tone` selects one of Core's own Manager header button treatments** — `primary`, `ghost`, `danger`, or `neutral` — so a companion's Back, Delete and Save render through the same classes as the recipe editor's rather than as a companion-only lookalike.
 `primary: true` is the shipped spelling of `tone: 'primary'` and keeps working; a descriptor declaring both is refused rather than silently resolved.
 `primary` and `disabled` are validated as booleans, so no provider field on this seam reaches the renderer unvalidated.
+Every header action carries `fabricate-button is-size-38`, and also `fab-manager-button`, a compat token deprecated at issue 2540: no Fabricate rule names it, and it is removed after at least one minor release, announced in the release notes.
 - Core's own `Unlock with Premium` header action belongs to Core's preview and is never rendered over a registered provider's screens.
 - A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
@@ -208,6 +209,14 @@ The set widens only by naming a new member here and in the frozen test set toget
 - The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
 - A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
 - A companion attempts registration during its own `init`, uses one idempotent `Hooks.once('ready', tryRegister)` fallback only when the API is absent, retains exactly one unregister handle, and treats `tryRegister` as a no-op after success.
+
+### Header action compat token
+
+#### Scenario: A header action keeps its deprecated token
+
+- **WHEN** an extension registers a header action
+- **THEN** it still carries `fab-manager-button`
+- **AND** no Fabricate rule names it
 
 ### Experimental gate
 

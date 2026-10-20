@@ -25,15 +25,15 @@ const FIXTURE = `
         </div>
         </div>
         <div class="manager-header-actions" role="group" aria-label="Actions">
-          <!-- Carries fab-manager-button because the shipped Back button does (issue 1118).
-               The number below does not move: .manager-header-actions .fabricate-button and the
-               primitive both state 0.72rem, which is exactly why the header rule's type scale
-               survived while its 38px height was retired. What moves is which rule this
-               fixture proves — the container's, or the one the product will match. The resting
+          <!-- Carries the shipped Back button's class list (issue 1118), the root alone since
+               issue 2540.
+               The number below does not move: the container's own 0.72rem rule stated what the
+               primitive states, and issue 2540 deleted it once the tripled root always beat it,
+               so this fixture proves the rule the product matches. The resting
                BORDER moved too: .manager-header-actions .fabricate-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
-          <button class="fabricate-button fab-manager-button is-size-38 is-ghost" data-m="header-button"><span>Back</span></button>
+          <button class="fabricate-button is-size-38 is-ghost" data-m="header-button"><span>Back</span></button>
         </div></header>
         <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
@@ -48,10 +48,10 @@ const FIXTURE = `
           <span class="manager-nav-count" data-m="nav-count">105</span>
         </div></div>
         <div class="fabricate-set-card-adder">
-          <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
+          <!-- Carries the shipped control's class list (issue 1118; the root alone since issue 2540), and
                see the expected value below: this is the one row in this file that changed
                size. -->
-          <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Ingredient</span></button>
+          <button class="fabricate-button is-dashed" data-m="dashed-add"><span>Ingredient</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
         <!-- A flat result row names its component in the requirement row's subject cell (issue 1516),
@@ -263,13 +263,13 @@ const FIXTURE = `
                shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
                child of the panel would go on measuring a box the product no longer renders. -->
           <div class="fab-bulk-edit-dock">
-            <!-- Carrying fab-manager-button since issue 1118 converted BulkEditPanelShell.
+            <!-- Carrying the primitive's class list since issue 1118 converted BulkEditPanelShell.
                  The marking and the re-chain landed in ONE commit, and had to: while the
                  scoped .fab-bulk-edit-apply rule was (0,2,0), the primitive's (0,3,0) control
                  would have handed this box 34px/0.72rem while the shipped control had not
-                 moved. That rule now names .fabricate-button.fab-manager-button and compiles to
+                 moved. That rule now names .fabricate-button.fabricate-button and compiles to
                  (0,4,0), so the box is the same box it always was. -->
-            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+            <button type="button" class="fabricate-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
           </div>
         </section>
       </div>

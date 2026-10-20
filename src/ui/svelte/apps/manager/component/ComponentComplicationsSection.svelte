@@ -985,7 +985,7 @@
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
-                        triggerClass="fabricate-button"
+                        triggerButton={{ role: 'neutral' }}
                         triggerIcon="fas fa-scroll"
                         triggerLabel={browseLabel}
                         triggerProps={{ 'data-complication-macro-browse': 'true' }}
