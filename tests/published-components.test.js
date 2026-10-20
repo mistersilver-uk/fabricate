@@ -574,11 +574,14 @@ describe('a live mount', () => {
     assert.deepEqual(Object.keys(hostProps), [
       'component',
       'initial',
+      'values',
       'onfault',
       'kinds',
       'slots',
       'callbacks',
+      'flush',
     ]);
+    assert.deepEqual(hostProps.values, {}, 'a data-only entry has no value key');
     assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
     assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
@@ -586,7 +589,7 @@ describe('a live mount', () => {
     assert.notEqual(hostProps.initial.items, props.items, 'copied at every depth');
     props.items[0].id = 'mutated';
     assert.equal(hostProps.initial.items[0].id, 'a', 'copied at call time');
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot', 'value']);
     assert.ok(Object.isFrozen(handle));
   });
 
@@ -821,9 +824,10 @@ describe('a faulted mount', () => {
     const target = new FakeTarget();
     const handle = ui.mount('Zeta', { target, props: zetaProps() });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot', 'value']);
     assert.ok(Object.isFrozen(handle));
     assert.equal(handle.update(zetaProps()), false);
+    assert.equal(handle.value('label'), undefined, 'the inert handle reads no value');
     handle.destroy();
     assert.equal(unmounts.length, 0);
     assert.equal(target.childNodes.length, 0);
@@ -983,7 +987,7 @@ describe('a mount made with onFault', () => {
 });
 
 describe('registration', () => {
-  for (const kind of ['snippet', 'value']) {
+  for (const kind of ['snippet', 'bindable']) {
     it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
       const unknown = { ...ALPHA, props: { body: { kind } } };
       const seam = createPublishedComponents({ table: [unknown], isReady: () => true });

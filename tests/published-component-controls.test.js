@@ -1,6 +1,7 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over each entry's import
- * closure: every `callback` key is called from an admitted event handler; every focusable element is pinned
+ * closure: every `callback` key is called from an admitted event handler, and every `value` key is
+ * written only from one (issue 2453); every focusable element is pinned
  * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
  * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
  * companion; an entry that publishes `aria-labelledby` names each reached control by a required
@@ -17,6 +18,8 @@
  * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file and to
  * what each closure file passes it; the `type` of a dynamic button is
  * `components/published-button-mounted.test.js`'s.
+ * Limit: a value write is an assignment, an update or a `bind:` directive naming the key's own
+ * local, so a write through an alias or a shadowing name is not seen.
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
@@ -99,11 +102,15 @@ const FOCUSABLE_REACH = Object.freeze({
   // The formatted mode's, drawn only when `formatValue` and `parseValue`, which the entry does not publish, are set.
   'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
 });
 
-/** The one control drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
+/** The controls drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
 const OPTIONAL_NAME_PINS = Object.freeze([
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]',
 ]);
 
 const OUTSIDE_AN_EVENT = 'is a callback key referenced outside an event handler';
@@ -265,6 +272,44 @@ function eventFaults(entry, ast) {
       ...(sites.includes('event') ? [] : [`${key} ${NOTHING_CALLS}`]),
     ];
   });
+}
+
+const WRITTEN_OUTSIDE_AN_EVENT = 'is a value key written outside an event handler';
+
+/** The only value key written outside an event handler: the probe's, which exists to prove why. */
+const WRITTEN_OUTSIDE = Object.freeze({
+  // An effect writes `mirror` once per distinct `mirrorAt`.
+  PublishedProbe: [`mirror ${WRITTEN_OUTSIDE_AN_EVENT}`],
+});
+
+/** Whether a reference to a local writes it: assigned, updated, or bound by a `bind:` directive. */
+function isWrite(node, ancestors) {
+  const parent = ancestors.at(-1);
+  if (parent?.type === 'UpdateExpression' || parent?.type === 'BindDirective') return true;
+  const at = ancestors.findLastIndex((ancestor) => ancestor.type === 'AssignmentExpression');
+  return at !== -1 && (ancestors[at + 1] ?? node) === ancestors[at].left;
+}
+
+/** Where each write of `local` sits: `'event'` as `referenceSites` reads one, else `'other'`. */
+function writeSites(ast, local) {
+  const sites = [];
+  const live = eventOnlyFunctions(ast);
+  for (const root of [ast.module, ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== local || !isWrite(node, ancestors)) return;
+      const event = isEventReference(ancestors) || ancestors.some((ancestor) => live.has(ancestor));
+      sites.push(event ? 'event' : 'other');
+    });
+  }
+  return sites;
+}
+
+/** What each `value` key of an entry breaks: written outside an event handler. */
+function valueWriteFaults(entry, ast) {
+  const values = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'value');
+  return values.flatMap(({ key, local }) =>
+    writeSites(ast, local).includes('other') ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`] : []
+  );
 }
 
 /**
@@ -705,6 +750,13 @@ describe('each published entry that draws a control', () => {
       assert.deepEqual(
         eventFaults(entry, SHIPPED.component(entry.path)),
         CALLED_OUTSIDE_AN_EVENT[entry.name] ?? []
+      );
+    });
+
+    it(`${entry.name} writes each value key from an event handler, and nowhere else`, () => {
+      assert.deepEqual(
+        valueWriteFaults(entry, SHIPPED.component(entry.path)),
+        WRITTEN_OUTSIDE[entry.name] ?? []
       );
     });
 
@@ -1381,7 +1433,7 @@ describe('the name clause', () => {
     ]);
   });
 
-  it('exempts only the control OPTIONAL_NAME_PINS names, the probe button, which mounts unlabelled', () => {
+  it('exempts only the controls OPTIONAL_NAME_PINS names, the probe controls, which mount unlabelled', () => {
     const always = { [PRESS]: 'always' };
     const entry = { name: 'E', path: E, root: 'any', props: { label: { kind: 'data' } } };
     const [control] = controlsOf(entry, syntheticReader({ [E]: script('label') + button() }));
@@ -1608,4 +1660,56 @@ describe('the called-from-an-event clause', () => {
   it('judges no key that is not a published callback', () => {
     assert.deepEqual(eventFaults({ props: { inEffect: { kind: 'data' } } }, SYNTHETIC), []);
   });
+});
+
+describe('the written-from-an-event clause', () => {
+  const value = { kind: 'value', initial: '' };
+  const faultsOf = (declared, markup) => {
+    const source = [
+      "<script>let { query = $bindable(''), unpublished = $bindable('') } = $props();",
+      declared,
+      '</script>',
+      markup,
+    ].join('');
+    return valueWriteFaults({ props: { query: value } }, templateOf('Value.svelte', source).ast);
+  };
+  const WRITTEN = [`query ${WRITTEN_OUTSIDE_AN_EVENT}`];
+
+  for (const [claim, declared, markup] of [
+    ['a read alone', '', '<output>{query}</output>'],
+    ['an input handler', '', '<input oninput={(event) => (query = event.currentTarget.value)} />'],
+    [
+      'a function only an event reaches',
+      ' function clear() { query = ""; }',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    ['a write of a key the entry does not publish', ' $effect(() => { unpublished = "x"; });', ''],
+  ]) {
+    it(`passes ${claim}`, () => {
+      assert.deepEqual(faultsOf(declared, markup), []);
+    });
+  }
+
+  for (const [claim, declared, markup] of [
+    ['a write in $effect', ' $effect(() => { query = "x"; });', ''],
+    ['an update expression in $effect', ' $effect(() => { query++; });', ''],
+    ['a destructuring write in $effect', ' $effect(() => { [query] = ["x"]; });', ''],
+    ['a write at init', ' query = "x";', ''],
+    ['bind:value', '', '<input bind:value={query} />'],
+    [
+      'a function also called from an $effect',
+      ' function clear() { query = ""; } $effect(() => { clear(); });',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    [
+      'an exported function',
+      ' export function clear() { query = ""; }',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    ['a focus handler', '', '<input onfocus={() => (query = "")} />'],
+  ]) {
+    it(`fails closed on ${claim}`, () => {
+      assert.deepEqual(faultsOf(declared, markup), WRITTEN);
+    });
+  }
 });
