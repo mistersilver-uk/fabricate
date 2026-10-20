@@ -95,13 +95,12 @@
     <IconButton
       class="fab-run-action-control fab-run-action-cancel"
       ariaLabel={cancel.ariaLabel || runLabel}
+      icon={cancel.icon || 'fas fa-ban'}
       disabled={busy || cancel.disabled === true}
       data-run-action="cancel-arm"
-      title={cancel.title || undefined}
+      tooltip={cancel.title || undefined}
       onclick={() => (armed = true)}
-    >
-      <i class={cancel.icon || 'fas fa-ban'} aria-hidden="true"></i>
-    </IconButton>
+    />
 
     {#if paused}
       <Button

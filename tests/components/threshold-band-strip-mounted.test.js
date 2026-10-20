@@ -12,13 +12,22 @@ import {
   CHECK_CALLER_STRIPS,
   canonicalStrip,
 } from '../fixtures/threshold-band-strip/checkCallerStrips.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-band-strip-',
-  rawModules: ['src/ui/svelte/util/rangeBarGeometry.js'],
+  rawModules: [
+    'src/ui/svelte/util/rangeBarGeometry.js',
+    'src/ui/svelte/util/rangeBarText.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+  ],
   compiledModules: [
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/components/RangeBarMarker.svelte',
@@ -103,6 +112,82 @@ describe('ThresholdBandStrip: geometry and handles', () => {
       root.querySelector('[data-band-strip-track]').getAttribute('aria-label'),
       /Outcome bands — Uncommon Craft/
     );
+  });
+});
+
+describe('ThresholdBandStrip: its own words come from lang keys (issue 2435)', () => {
+  const groupOf = (root) => root.querySelector('[data-band-strip-track]');
+  const announced = (root) => handles(root).map((handle) => handle.getAttribute('aria-valuetext'));
+  /** A loaded lang, its templates reworded so a translated read is told from the fallback. */
+  const WORDS = {
+    'FABRICATE.Common.RangeBar.Label': 'Ergebnisbänder',
+    'FABRICATE.Common.RangeBar.LabelWithRecord': '{label} · {record}',
+    'FABRICATE.Common.RangeBar.Boundary': '{from} bis {to}',
+    'FABRICATE.Common.RangeBar.ValueText': '{value} · {record}',
+    'FABRICATE.Common.RangeBar.RelativeValueText': '{value} · SG {offset}',
+    'FABRICATE.Common.RangeBar.RelativeValueTextAgainst': '{value} · SG {offset} gegen {record}',
+  };
+  let shipped;
+  before(() => {
+    shipped = globalThis.game.i18n.localize;
+  });
+  afterEach(() => {
+    globalThis.game.i18n.localize = shipped;
+  });
+
+  it('falls back to English with no lang loaded, byte for byte as before', async () => {
+    const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    assert.equal(groupOf(root).getAttribute('aria-label'), 'Outcome bands');
+    assert.equal(handles(root)[0].getAttribute('aria-label'), 'Ruined / Flawed');
+    assert.deepEqual(announced(root), ['7 — DC -5', '12 — DC +0', '17 — DC +5', '22 — DC +10']);
+
+    await harness.remount();
+    const previewed = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      previewLabel: 'Uncommon Craft',
+    });
+    assert.equal(groupOf(previewed).getAttribute('aria-label'), 'Outcome bands — Uncommon Craft');
+    assert.equal(announced(previewed)[0], '7 — DC -5 against Uncommon Craft');
+
+    await harness.remount();
+    const fixed = await harness.mount({
+      binding: 'fixed',
+      bands: FIXED_BANDS,
+      previewLabel: 'Rough Ore',
+    });
+    assert.equal(announced(fixed)[0], '10 — Rough Ore');
+  });
+
+  it('reads every default through its key once a lang is loaded', async () => {
+    globalThis.game.i18n.localize = (key) => WORDS[key] ?? key;
+    const root = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      previewLabel: 'Uncommon Craft',
+    });
+    assert.equal(groupOf(root).getAttribute('aria-label'), 'Ergebnisbänder · Uncommon Craft');
+    assert.equal(handles(root)[0].getAttribute('aria-label'), 'Ruined bis Flawed');
+    assert.equal(announced(root)[0], '7 · SG -5 gegen Uncommon Craft');
+
+    await harness.remount();
+    const bare = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    assert.equal(groupOf(bare).getAttribute('aria-label'), 'Ergebnisbänder');
+    assert.equal(announced(bare)[1], '12 · SG +0');
+
+    await harness.remount();
+    const fixed = await harness.mount({
+      binding: 'fixed',
+      bands: FIXED_BANDS,
+      previewLabel: 'Rough Ore',
+    });
+    assert.equal(announced(fixed)[0], '10 · Rough Ore');
+  });
+
+  it("passes a caller's already-localized name through untouched", async () => {
+    globalThis.game.i18n.localize = (key) => WORDS[key] ?? key;
+    const root = await harness.mount({ bands: RELATIVE_BANDS, ariaLabel: 'Tageszeit' });
+    assert.equal(groupOf(root).getAttribute('aria-label'), 'Tageszeit');
   });
 });
 

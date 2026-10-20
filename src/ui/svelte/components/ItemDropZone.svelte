@@ -167,26 +167,22 @@
       {#if onCopy}
         <IconButton
           ariaLabel={copyLabel}
-          title={copyLabel}
+          icon="fas fa-copy"
           {disabled}
           {...hooksFor('copy')}
           onclick={() => onCopy(value)}
-        >
-          <i class="fas fa-copy" aria-hidden="true"></i>
-        </IconButton>
+        />
       {/if}
       {#if onUnlink}
         <IconButton
-          class="is-danger"
+          role="danger"
           ariaLabel={unlinkLabel}
-          title={unlinkLabel}
+          icon="fas fa-link-slash"
           {disabled}
           {...hooksFor('unlink')}
           {...unlinkAttrs}
           onclick={onUnlink}
-        >
-          <i class="fas fa-link-slash" aria-hidden="true"></i>
-        </IconButton>
+        />
       {/if}
     </span>
   {/if}

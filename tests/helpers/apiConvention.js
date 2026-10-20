@@ -58,6 +58,15 @@ export const BANNED_NAMES = Object.freeze([
 /** Names a declaration may carry only through the exceptions register. */
 export const REGISTER_ONLY_NAMES = Object.freeze(['compact', 'onChoose']);
 
+/**
+ * The closed register of primitives whose `role` prop is a verb role (issue 2541). An ARIA `role`
+ * reaches any other primitive's root through `...rest`, so a declared `role` elsewhere is a fault.
+ */
+export const VERB_ROLE_PRIMITIVES = Object.freeze(['Button', 'IconButton']);
+
+/** The fault a `role` prop declared outside `VERB_ROLE_PRIMITIVES` is reported with. */
+export const ROLE_OUTSIDE_REGISTER = 'is a verb role outside the closed role register';
+
 /** A spelling retired on one primitive that stays the convention's own word on others. */
 export const RETIRED_BY_COMPONENT = Object.freeze({
   ActionMenu: Object.freeze(['triggerLabel']),
@@ -256,6 +265,9 @@ function nameFaults(component, name) {
   if (BANNED_NAMES.includes(name)) faults.push('is a retired spelling');
   if (RETIRED_BY_COMPONENT[component]?.includes(name)) faults.push('is retired on this primitive');
   if (REGISTER_ONLY_NAMES.includes(name)) faults.push('is allowed only through the register');
+  if (name === 'role' && !VERB_ROLE_PRIMITIVES.includes(component)) {
+    faults.push(ROLE_OUTSIDE_REGISTER);
+  }
   for (const { suffix, unless } of BANNED_SUFFIXES) {
     if (name.endsWith(suffix) && !(unless && name.endsWith(unless))) {
       faults.push(`ends in the banned suffix \`${suffix}\``);

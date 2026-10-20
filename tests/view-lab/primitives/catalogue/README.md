@@ -59,7 +59,7 @@ name's own status.
 
 Rows sharing a `(spec, cap, draws)` address are paired **positionally** against
 the elements that selector matches, in document order.
-Three `.k-btn` rows under `"icon 28"` therefore replace the first, second and
+Three `.k-btn` rows under `"icon 34"` therefore replace the first, second and
 third button in that unit, in the order the rows appear in the file — so row
 order is load-bearing, not cosmetic.
 
