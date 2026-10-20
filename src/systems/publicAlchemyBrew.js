@@ -1,6 +1,8 @@
 /**
  * One-call brewing for `submitAlchemyAttempt` (issue 2574), as `executePublicCraft` is for crafting:
  * a matched version-1 start whose stage can execute now is executed in the same call.
+ * Kept apart from `executePublicCraft`, because sharing its ready-start test would grow the
+ * oversized `journalRunCommands.js`.
  */
 import { actorUuidList, executeCommandUnavailable } from './journalRunCommands.js';
 import { validText } from './journalRunReply.js';
@@ -10,7 +12,7 @@ import { validText } from './journalRunReply.js';
  * return unchanged; otherwise the execute reply lies over the start, so a cancelled or refused
  * execute still names the run the start left live. `interactive` is the caller's flag.
  */
-export async function executePublicAlchemy({
+export async function executePublicBrew({
   requestStart,
   actor,
   sourceActors,
@@ -27,17 +29,21 @@ export async function executePublicAlchemy({
     return started;
   }
   if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
-  const settled = await executeCommand(
-    {
-      actorUuid: actor?.uuid,
-      runType: 'crafting',
-      runId: started.runId,
-      expectedRevision: started.runRevision,
-      action: 'execute',
-      // No client selection plan: the start already locked the plan the authority derived.
-      payload: { trigger: 'manual', sourceActorUuids: actorUuidList(sourceActors) },
-    },
-    { interactive: interactive === true }
-  );
+  const command = {
+    actorUuid: actor?.uuid,
+    runType: 'crafting',
+    runId: started.runId,
+    expectedRevision: started.runRevision,
+    action: 'execute',
+    // No client selection plan: the start already locked the plan the authority derived.
+    payload: { trigger: 'manual', sourceActorUuids: actorUuidList(sourceActors) },
+  };
+  let settled;
+  try {
+    settled = await executeCommand(command, { interactive: interactive === true });
+  } catch {
+    // The start already spent the bench, so a lost execute still answers the live run.
+    settled = { success: false, reason: 'operation-failed' };
+  }
   return { ...started, ...settled };
 }

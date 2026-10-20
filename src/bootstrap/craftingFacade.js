@@ -8,7 +8,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { resolveAdvanceSources } from '../systems/advanceCraftingSources.js';
 import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
-import { executePublicAlchemy } from '../systems/publicAlchemyBrew.js';
+import { executePublicBrew } from '../systems/publicAlchemyBrew.js';
 import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { withStationPresence } from '../systems/stationPresence.js';
@@ -361,7 +361,7 @@ export const craftingFacade = {
         disposition: 'error',
       };
     }
-    return executePublicAlchemy({
+    return executePublicBrew({
       requestStart: () =>
         this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
           craftingSystemId,

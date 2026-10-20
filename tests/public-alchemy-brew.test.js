@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { serializedOperationResult } from '../src/systems/journalRunReply.js';
-import { executePublicAlchemy } from '../src/systems/publicAlchemyBrew.js';
+import { executePublicBrew } from '../src/systems/publicAlchemyBrew.js';
 import { versionedTransitionResult } from '../src/systems/versionedCommandResults.js';
 
 const actor = { uuid: 'Actor.alchemist' };
@@ -32,7 +32,7 @@ function executeReply(outcome) {
 
 function brew({ started, settled = null, interactive = false, executeCommand } = {}) {
   const commands = [];
-  const reply = executePublicAlchemy({
+  const reply = executePublicBrew({
     requestStart: async () => started,
     actor,
     sourceActors,
@@ -121,6 +121,17 @@ test('a roll dismissed after the start keeps the started run on the reply', asyn
   const result = await brew({ started: startReply(), settled }).reply;
   assert.equal(result.success, false);
   assert.equal(result.cancelled, true);
+  assert.equal(result.runId, 'run-1');
+  assert.equal(result.requiresExecution, true);
+});
+
+test('an execute that rejects after the start answers the live run instead of throwing', async () => {
+  const executeCommand = async () => {
+    throw new Error('socket closed');
+  };
+  const result = await brew({ started: startReply(), executeCommand }).reply;
+  assert.equal(result.success, false);
+  assert.equal(result.reason, 'operation-failed');
   assert.equal(result.runId, 'run-1');
   assert.equal(result.requiresExecution, true);
 });
