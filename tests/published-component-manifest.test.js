@@ -275,7 +275,7 @@ function requiredWhenFaults(key, spec, entry) {
   const faults = [];
   if (!guard || name === key) faults.push(`${named}, which is no other key of the entry`);
   else if (guard.kind !== 'data') faults.push(`${named}, which is no data key`);
-  else if (guard.required !== undefined || guard.requiredWhen !== undefined) {
+  else if (guard.required === true || guard.requiredWhen !== undefined) {
     faults.push(`${named}, which is itself required or requiredWhen`);
   }
   if (spec.kind === 'slot' || spec.kind === 'aria') {
@@ -999,6 +999,12 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(faultsOf({ label: data, body, note: { kind: 'text' } }), []);
     const when = { kind: 'text', requiredWhen: 'label' };
     assert.deepEqual(faultsOf({ label: data, note: when }), [], 'a key required while label is');
+    const optional = { kind: 'data', required: false };
+    assert.deepEqual(
+      faultsOf({ label: optional, note: when }),
+      [],
+      'a guard that states required: false is not itself required'
+    );
   });
 
   it('admits an unpublished prop that is $bindable, or rendered with and without an argument', () => {

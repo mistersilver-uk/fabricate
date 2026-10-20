@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -642,6 +643,40 @@ describe('a requiredWhen key', () => {
       () => mountOf(ui, { dismissLabel: 'Dismiss', dismissable: true, title: 'Saved' }),
       refusal(WHEN('onDismiss'))
     );
+  });
+
+  it("names Notice's first failing requiredWhen key in manifest order when both fail together", () => {
+    const shipped = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === 'Notice');
+    const notice = { ...shipped, component: Object.freeze({ role: 'Notice' }) };
+    const guarded = Object.keys(notice.props).filter(
+      (key) => notice.props[key].requiredWhen === 'dismissable'
+    );
+    assert.deepEqual(guarded, ['dismissLabel', 'onDismiss'], 'the label precedes the callback');
+    const named = (entry, key) =>
+      `${entry.name} requires a non-empty "${key}" when "dismissable" is truthy`;
+    const failingBoth = [
+      { title: 'Saved', dismissable: true },
+      { onDismiss: undefined, title: 'Saved', dismissable: true },
+      { onDismiss: undefined, dismissLabel: '', dismissable: true, title: 'Saved' },
+    ];
+    const { ui } = seamWith({ table: [notice] });
+    for (const props of failingBoth) {
+      assert.throws(
+        () => ui.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(notice, guarded[0]))
+      );
+    }
+    // The same keys listed the other way round name the callback, so the order is the manifest's
+    // and not a pass over one kind before another.
+    const { dismissLabel, onDismiss, ...rest } = notice.props;
+    const reversed = { ...notice, props: { ...rest, onDismiss, dismissLabel } };
+    const flipped = seamWith({ table: [reversed] }).ui;
+    for (const props of failingBoth) {
+      assert.throws(
+        () => flipped.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(reversed, 'onDismiss'))
+      );
+    }
   });
 
   it('refuses an update atomically: the earlier props and the earlier callback stay', () => {
