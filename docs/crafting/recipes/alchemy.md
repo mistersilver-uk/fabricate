@@ -261,9 +261,11 @@ When that option is off, a combination that makes nothing keeps reading as **Unt
 **Brew** submits the components on the bench as an attempt for the selected character.
 
 - If the combination matches a recipe, that recipe is brewed.
-Everything on the bench is consumed, including extra components the recipe does not need, its results are created, and a newly discovered recipe is added to your Known recipes list.
+Everything on the bench is consumed when the brew starts, including extra components the recipe does not need.
+The recipe's results are created, and when the system's [Learn on Craft](#learn-on-craft) setting is on, a newly discovered recipe is added to your Known recipes list.
 The brew draws only on the units you placed on the bench, never on other items the character holds.
 If the placed units cannot cover the recipe, for example because one component is needed both as itself and for its essence, the brew is refused and nothing is consumed.
+A refused brew is not recorded as a fizzle and does not discover the recipe.
 - A recipe with a time requirement starts when you brew it and finishes later from the Journal, and the banner says the mixture is set to work.
 - If the combination matches nothing, the attempt fizzles.
 Whether the components are consumed then depends on the system's [Consume on Fail](#consume-on-fail) setting.
@@ -274,8 +276,8 @@ A failed Simple check produces the recipe's failure result set instead of its su
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
 A banner confirms the outcome after each brew.
-It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, set a brew to work, or the mixture fizzled.
-A brew that started but did not finish, for example because you dismissed the roll, has already consumed the bench, so the banner reads as set to work and you can finish it from the Journal.
+It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, failed its check with nothing produced, set a brew to work, was refused, or the mixture fizzled.
+A brew that started but did not finish, for example because you dismissed the roll or the brew was refused after it started, has already consumed the bench, so the banner reads as set to work and you can finish it from the Journal.
 
 A failed brew is also recorded in the character's Journal history, whether it failed its check or fizzled with no match.
 A fizzle is listed there as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal a recipe you have not yet discovered.
