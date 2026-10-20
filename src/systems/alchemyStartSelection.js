@@ -75,6 +75,7 @@ export function deriveAlchemySelectionPlan({ steps, ingredientSetId, ...match })
     }
   }
   if (Object.keys(overrides).length > 0) plan.ingredientOptionOverrides = overrides;
+  // ratchet-exempt(world-scope): parameter
   const allocation = carrierAllocation(match.submittedItems, match.components, essenceIds);
   if (allocation) {
     plan.ingredientEssenceAllocation = { stepId: step.id ?? null, ingredientSetId, allocation };
