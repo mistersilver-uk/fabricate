@@ -8,6 +8,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { resolveAdvanceSources } from '../systems/advanceCraftingSources.js';
 import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
+import { executePublicAlchemy } from '../systems/publicAlchemyBrew.js';
 import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { withStationPresence } from '../systems/stationPresence.js';
@@ -321,6 +322,7 @@ export const craftingFacade = {
   /**
    * Owner-scoped like `craftRecipe`; `CraftingEngine#craftAlchemy` matches every enabled recipe,
    * known or not, and otherwise fizzles with no roll. `interactive` prompts on a matched brew only.
+   * A matched brew whose stage can execute now resolves in this call, as `craftRecipe` does.
    */
   async submitAlchemyAttempt({
     actorId = null,
@@ -359,9 +361,16 @@ export const craftingFacade = {
         disposition: 'error',
       };
     }
-    return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
-      craftingSystemId,
-      lifecycleVersion: 1,
+    return executePublicAlchemy({
+      requestStart: () =>
+        this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
+          craftingSystemId,
+          lifecycleVersion: 1,
+          interactive,
+        }),
+      actor: craftingActor,
+      sourceActors: sources,
+      executeCommand: (command, options) => this.executeJournalRunCommand(command, options),
       interactive,
     });
   },

@@ -7,6 +7,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { Fabricate } from '../../src/bootstrap/Fabricate.js';
+import { serializedOperationResult } from '../../src/systems/journalRunReply.js';
+import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 import { AlchemyListingBuilder } from '../../src/ui/presenters/AlchemyListingBuilder.js';
 
 /** Minimal `foundry.utils` shim the builder's flag reads use at call time. */
@@ -217,6 +219,20 @@ export function makeFacadeManagers(entries) {
 }
 
 /**
+ * A version-1 alchemy start reply in the shape the command layer serializes: waiting on world time
+ * by default, so the facade returns it without an execute.
+ */
+export function versionedBrewStartReply({ status = 'waitingTime', canExecuteImmediately = false } = {}) {
+  const run = { id: 'brew-run', status, runRevision: 2, currentStepIndex: 0 };
+  return serializedOperationResult({
+    ...versionedTransitionResult(run, { success: true, disposition: 'started' }),
+    started: true,
+    requiresExecution: status !== 'waitingTime',
+    canExecuteImmediately,
+  });
+}
+
+/**
  * Stand up the facade under test with the REAL `AlchemyListingBuilder` wired to the supplied
  * managers, plus a spy crafting engine whose `craftAlchemy` calls are recorded so a test can assert
  * the submit path never reaches the engine for a non-owner (no mutation).
@@ -237,7 +253,7 @@ export function createFabricateFacadeHarness({
   actors = [],
   systems = [],
   recipeVisibility = null,
-  craftAlchemyResult = { success: true, disposition: 'success', results: [] },
+  craftAlchemyResult = versionedBrewStartReply(),
   selectedCraftingActorId = null,
   componentSourceActorIds = [],
   ready = true,

@@ -3,7 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createFabricateFacadeHarness, makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
+import {
+  createFabricateFacadeHarness,
+  makeFacadeActor,
+  versionedBrewStartReply,
+} from './helpers/fabricateFacadeHarness.js';
 
 // Fixtures — a single alchemy system with two recipes so a non-GM owner sees one learned recipe (+
 // one undiscovered count) while a GM sees both.
@@ -231,6 +235,32 @@ test('submitAlchemyAttempt: GM viewer reaches the engine (bypass)', async () => 
   });
   assert.equal(craftAlchemyCalls.length, 1, 'the GM brew reaches the engine');
   assert.equal(result.success, true);
+});
+
+test('submitAlchemyAttempt: a ready matched brew executes in the same call (issue 2574)', async () => {
+  const { facade, craftAlchemyCalls } = createFabricateFacadeHarness({
+    user: OWNER,
+    actors: [targetActor()],
+    systems: [{ system: SYSTEM, recipes: [VIGOR, TOXIN] }],
+    craftAlchemyResult: versionedBrewStartReply({ status: 'inProgress', canExecuteImmediately: true }),
+  });
+  const commands = [];
+  facade.executeJournalRunCommand = async (command, options) => {
+    commands.push({ command, options });
+    return { success: true, disposition: 'succeeded', runId: command.runId, createdResultUuids: ['Item.made'] };
+  };
+  const result = await facade.submitAlchemyAttempt({
+    actorId: 'pc',
+    craftingSystemId: 'sys-a',
+    submittedComponentIds: ['emberroot'],
+    interactive: true,
+  });
+  assert.equal(craftAlchemyCalls.length, 1);
+  assert.equal(commands.length, 1, 'the started run is executed');
+  assert.equal(commands[0].command.action, 'execute');
+  assert.equal(commands[0].command.expectedRevision, 2);
+  assert.deepEqual(commands[0].options, { interactive: true });
+  assert.equal(result.disposition, 'succeeded');
 });
 
 test('listAlchemyForActor: an id naming no world actor resolves to nothing, even for a GM', () => {
