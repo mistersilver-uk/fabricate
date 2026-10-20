@@ -511,12 +511,33 @@ function judgedAs(node, pin) {
 }
 
 /**
+ * Judged elements whose ids collide each take their static `type` as a suffix,
+ * `<id>[type="<type>"]`; a collision a static `type` cannot resolve is the fault
+ * `<id> names more than one element`.
+ */
+function distinctIds(elements) {
+  const shared = Map.groupBy(elements, ({ id }) => id);
+  const faults = [];
+  for (const [id, group] of shared) {
+    const types = group.map(({ node }) => staticText(attributeOf(node, 'type')));
+    const resolved = !types.includes(undefined) && new Set(types).size === types.length;
+    if (group.length > 1 && !resolved) faults.push(`${id} names more than one element`);
+  }
+  const typed = elements.map((element) => {
+    const type = staticText(attributeOf(element.node, 'type'));
+    const suffixed = shared.get(element.id).length > 1 && type !== undefined;
+    return suffixed ? { ...element, id: `${element.id}[type="${type}"]` } : element;
+  });
+  return { elements: typed, faults };
+}
+
+/**
  * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
  * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
  * `name`. A `svelte:element` is judged once, as the union of its pinned tags, and one with no pin
  * is a fault; its `type` is a mounted suite's. Answers each element it judged beside each fault,
  * both as `<file>: <tag> …`, and each judged element as `{ id, node, guards, tags }`, its `id`
- * being `<file>: <tag>[<hook>]`.
+ * being `<file>: <tag>[<hook>]`, as `distinctIds` resolves two that share one.
  */
 export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
   const judged = [];
@@ -539,7 +560,8 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
     }
     if (as.control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
   });
-  return { judged, faults, elements };
+  const distinct = distinctIds(elements);
+  return { judged, faults: [...faults, ...distinct.faults], elements: distinct.elements };
 }
 
 /** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */

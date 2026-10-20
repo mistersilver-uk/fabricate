@@ -24,7 +24,14 @@ import {
   createManagerQueries,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settle, settleBetweenTests, compareStrings } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settle,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+  compareStrings,
+} from './manager-mounted-shared.js';
 
 let Component;
 let SystemEditViewComponent;
@@ -62,6 +69,7 @@ export function registerSystemsCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -69,6 +77,7 @@ export function registerSystemsCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

@@ -271,7 +271,7 @@ function navDeclarationScope(sources, template) {
  * compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
-const PRESS_KEYS = ['Enter', 'Space', 'Tab'];
+const PRESS_KEYS = ['Enter', 'Space', 'Tab', 'ArrowUp', 'ArrowDown'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -388,13 +388,15 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
- * mount page, its companion stand-in, and the one specimen fixture whose case acts on what it mounts.
+ * mount page, its companion stand-in, and the two specimen fixtures whose cases act on what they
+ * mount.
  */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedControls.svelte',
+  'tests/view-lab/fixtures/PublishedValues.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -826,6 +828,9 @@ const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button`;
 /** One published switch of the same fixture, by its section's key. */
 const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
+/** A part of one published stepper of the values fixture, by its section's key. */
+const labStepper = (key, part) => `[data-lab-values] [data-lab-stepper="${key}"] ${part}`;
+const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1186,6 +1191,20 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labToggle('key')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The published steppers (issue 2452): the group's declared corner, the value's type size, and
+  // the focused field's ring by its shape alone, at its own edge.
+  'manager-published-steppers-specimen': [
+    { selector: labStepper('credit', '.fab-stepper'), styles: 'border-radius: 7px' },
+    { selector: labStepper('credit', 'input'), styles: 'font-size: 11.5px' },
+    { selector: `${labStepper('limit', 'input')}:focus-visible`, styles: STEPPER_RING },
+  ],
+  // The same fixture with keyboard focus on a plus on the darker strip, its ring at its own edge.
+  'manager-published-steppers-button-focus': [
+    {
+      selector: `${labStepper('card', 'button[data-stepper-increment]')}:focus-visible`,
+      styles: STEPPER_RING,
     },
   ],
 });
@@ -5743,7 +5762,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the five specimens it mounts', () => {
+test('every published component seam module, and the host, selects the seven specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5759,16 +5778,18 @@ test('every published component seam module, and the host, selects the five spec
       'manager-published-controls-specimen',
       'manager-published-buttons-specimen',
       'manager-published-toggles-specimen',
+      'manager-published-steppers-specimen',
+      'manager-published-steppers-button-focus',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, and the controls fixture's switch. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, and the values fixture's stepper. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper']);
 
-test('the leaves specimen mounts every published component but TierTrack and StatusToggle and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle and Stepper and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6036,6 +6057,72 @@ test('the toggles specimen presses two published switches of the controls fixtur
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
     'the same twenty-seven containments as the fixture’s other cases'
+  );
+});
+
+test('the steppers specimen cases act on what the values fixture mounts through the seam', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedValues.svelte';
+  const { instance, fragment } = componentAstOf(FIXTURE);
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Stepper'
+    ),
+    'the fixture mounts Stepper through the seam’s mount'
+  );
+  for (const hook of ['data-lab-values', 'data-lab-stepper', 'data-lab-value', 'data-lab-shown']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the cases' selectors name`
+    );
+  }
+  const stepped = getCaseById('manager-published-steppers-specimen');
+  assert.deepEqual(
+    stepped.steps.map((step) => step.press ?? (step.fill === undefined ? 'click' : 'fill')),
+    ['click', 'Space', 'fill', 'Tab', 'ArrowDown', 'ArrowUp'],
+    'a pointer press, a keyboard press, a refused typed number and its blur, then both arrow keys'
+  );
+  assert.deepEqual(
+    stepped.steps.map((step) => /\[data-lab-stepper="([a-z]+)"\]/.exec(step.selector)?.[1]),
+    ['credit', 'count', 'even', 'even', 'card', 'limit'],
+    'each step acts on a stepper the fixture mounted'
+  );
+  assert.ok(
+    stepped.expectSelector.includes('[data-lab-value="2"][data-lab-shown="2"]'),
+    'the frame is taken only once the refused number snapped back to the held one'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'Property' &&
+        node.key?.name === 'shown' &&
+        node.value?.type === 'Literal' &&
+        node.value.value === ''
+    ),
+    'data-lab-shown starts empty, so it reads "2" only after the blur step records it'
+  );
+  assert.ok(
+    stepped.expectSelector.endsWith(
+      ':has(button[data-stepper-increment]:disabled) input:focus-visible'
+    ),
+    'the frame is taken with keyboard focus on the field the Up arrow took to its bound'
+  );
+  const ringed = getCaseById('manager-published-steppers-button-focus');
+  assert.deepEqual(ringed.query, stepped.query);
+  assert.deepEqual(ringed.expectContained, stepped.expectContained);
+  assert.ok(
+    ringed.expectSelector.endsWith(
+      '[data-lab-stepper="card"] button[data-stepper-increment]:focus-visible'
+    ),
+    'the frame is taken with keyboard focus on the plus on the darker strip'
   );
 });
 

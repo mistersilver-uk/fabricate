@@ -413,7 +413,7 @@ The picker is therefore held to the geometry as well as the markup — its panel
 The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
 A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
 `Button` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
-`Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
+`Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised both directly, by the journal history and the shopping list, and transitively, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
 The player window is the second application for `EmptyState`, `Avatar` and `SegmentedControl`, and it deepens the `Medallion`, `Kicker`, `FillBar`, `Callout` and `Notice` adoptions that preceded it.
@@ -958,7 +958,7 @@ The variant adds no glow and no second line: a field whose wrapper draws the box
 The `Field` family, the compact search field and the chance slider's percent half copy that variant rather than the outset ring — the default search field is a wrapper-drawn field, whose shell takes the full accent on `:focus-within` — and every input that is not text-like — a checkbox, a radio, a range, a colour, a file and the four button types — keeps the outset one.
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
-The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.
+The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
 A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.

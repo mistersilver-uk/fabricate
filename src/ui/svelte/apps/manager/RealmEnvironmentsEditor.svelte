@@ -156,15 +156,10 @@
                   'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
                   'Add environment to realm'
                 )}
-                title={text(
-                  'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
-                  'Add environment to realm'
-                )}
                 disabled={saving}
                 onclick={() => onAdd(environment.id, realmId)}
-              >
-                <i class="fas fa-plus" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-plus"
+              />
             </li>
           {/each}
         </ul>
@@ -226,20 +221,16 @@
                 >
               {/if}
               <IconButton
-                class="is-danger manager-realm-env-remove"
+                role="danger"
+                class="manager-realm-env-remove"
                 ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
-                  'Remove environment from realm'
-                )}
-                title={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
                   'Remove environment from realm'
                 )}
                 disabled={saving}
                 onclick={() => onRemove(environment.id, realmId)}
-              >
-                <i class="fas fa-xmark" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-xmark"
+              />
             </li>
           {/each}
         </ul>

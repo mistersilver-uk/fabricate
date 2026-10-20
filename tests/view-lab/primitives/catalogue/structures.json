@@ -504,8 +504,7 @@
     "fixture": "ListRowDefaultBrowse",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
-      "Delete system": "a menu item’s label; the drawing draws the menu closed",
-      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+      "Delete system": "a menu item’s label; the drawing draws the menu closed"
     },
     "props": {
       "name": "Riverbridge",
@@ -583,7 +582,6 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions",
       "on": true,
       "statusKey": "FABRICATE.Admin.Manager.StatusOn",
       "toggleKey": "FABRICATE.Admin.Manager.DisableSystemNamed"
@@ -598,8 +596,7 @@
     "fixture": "ListRowDefaultBrowse",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
-      "Delete system": "a menu item’s label; the drawing draws the menu closed",
-      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+      "Delete system": "a menu item’s label; the drawing draws the menu closed"
     },
     "props": {
       "name": "Oakhollow",
@@ -660,7 +657,6 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions",
       "on": false,
       "statusKey": "FABRICATE.Admin.Manager.StatusOff",
       "toggleKey": "FABRICATE.Admin.Manager.EnableSystemNamed"
@@ -1357,18 +1353,11 @@
         }
       ]
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ],
     "data": {
       "dismissKey": "FABRICATE.App.Journal.History.Dismiss",
-      "class": "is-ghost"
+      "size": "24",
+      "role": "ghost",
+      "icon": "fas fa-xmark"
     },
     "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`. Drawn differently: the dismiss glyph takes the ghost `IconButton`’s text-subtle ink where the drawing’s is text-muted."
   },

@@ -390,6 +390,12 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     );
     assert.ok(unrolledRoll.classList.contains('is-roll-needed'));
     assert.ok(unrolledRoll.querySelector('.fa-dice-d20'));
+    // Its hint, not its name, is the tooltip (issue 2541): the name says the verb, the hint how.
+    assert.equal(
+      unrolledRoll.getAttribute('data-tooltip-text'),
+      'Roll this character’s pool from the max/start expressions'
+    );
+    assert.ok(!unrolledRoll.hasAttribute('title'), 'and no native title stacks a second');
 
     // Rolled: inputs enabled, the button is a reset (arrows-rotate), not emphasised.
     const rolledCurrent = target.querySelector(
@@ -401,6 +407,10 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     );
     assert.equal(rolledRoll.classList.contains('is-roll-needed'), false);
     assert.ok(rolledRoll.querySelector('.fa-arrows-rotate'));
+    assert.equal(
+      rolledRoll.getAttribute('data-tooltip-text'),
+      'Re-roll this character’s pool from the max/start expressions'
+    );
     unmount(mounted);
     mounted = null;
     target.remove();

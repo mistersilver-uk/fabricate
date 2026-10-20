@@ -7,7 +7,12 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -36,6 +41,7 @@ export function registerEssencesCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -43,6 +49,7 @@ export function registerEssencesCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -214,11 +221,12 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.fabricate-icon-button` in the row must remain the Edit pencil.
+    // The row's edit control, a `Button` since it is labelled (issue 2541), carries the hook the
+    // capture and the smoke navigate by.
     assert.equal(
-      earthRow.querySelector('.fabricate-icon-button').getAttribute('data-essence-edit'),
+      earthRow.querySelector('[data-essence-edit]').getAttribute('data-essence-edit'),
       'earth',
-      'the first icon button in a row is still the Edit pencil'
+      'the row carries its edit control under its own hook'
     );
 
     // The row toggle routes through the ONE manager write, not through updateEssence.
@@ -516,7 +524,7 @@ export function registerEssencesCases() {
     // picker's row.
     const iconResetButton = target.querySelector('[data-essence-icon-reset]');
     assert.equal(iconResetButton.getAttribute('aria-label'), 'Clear icon');
-    assert.equal(iconResetButton.title, 'Clear icon');
+    assert.equal(iconResetButton.getAttribute('data-tooltip-text'), 'Clear icon');
     assert.ok(
       iconResetButton.closest('.manager-essence-icon-tile'),
       'the reset overlays the icon tile rather than sitting in the picker row'

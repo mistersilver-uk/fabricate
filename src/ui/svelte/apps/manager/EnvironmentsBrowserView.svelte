@@ -870,21 +870,15 @@
                         'FABRICATE.Admin.Manager.Environment.EditNamed',
                         'Edit {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
-                      title={text('FABRICATE.Admin.Manager.Environment.Edit', 'Edit environment')}
                       onclick={() => onEditEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-edit" aria-hidden="true"></i>
-                    </IconButton>
+                      icon="fas fa-edit"
+                    />
                     <ActionMenu
                       items={rowMenuItems()}
                       ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.ActionsFor',
                         'Environment actions for {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
-                      triggerTitle={text(
-                        'FABRICATE.Admin.Manager.Environment.Actions',
-                        'Environment actions'
-                      )}
                       onSelect={(action) => {
                         if (action === 'duplicate') onDuplicateEnvironment(environment.id);
                         else if (action === 'delete') onDeleteEnvironment(environment.id);

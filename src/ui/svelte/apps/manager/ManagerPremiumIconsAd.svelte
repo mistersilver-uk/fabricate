@@ -97,15 +97,13 @@
     <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
   </Button>
   <IconButton
-    size={24}
-    class="is-ghost"
+    size="24"
+    role="ghost"
     ariaLabel={hideLabel}
-    title={hideLabel}
     onclick={dismiss}
     data-premium-icons-ad-dismiss=""
-  >
-    <i class="fas fa-xmark" aria-hidden="true"></i>
-  </IconButton>
+    icon="fas fa-xmark"
+  />
 </div>
 
 <style>

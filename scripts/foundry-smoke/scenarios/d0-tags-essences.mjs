@@ -95,7 +95,7 @@ export default {
       await setManagerWindowSize(page, { width: 1280, height: 820 });
       const essenceRow = page.locator('.fabricate-manager .manager-essence-row');
       if ((await essenceRow.count()) > 0) {
-        const editButton = essenceRow.first().locator('.fabricate-icon-button[title*="Edit" i]');
+        const editButton = essenceRow.first().locator('[data-essence-edit]');
         if ((await editButton.count()) > 0) {
           await editButton.first().click();
           await page

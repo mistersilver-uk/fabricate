@@ -223,10 +223,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
-  // the outcome tiers' Failure row is its formatted null endpoint (issue 2357).
+  // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
+  // specimens that mount it through the published seam (issue 2452).
   'src/ui/svelte/components/Stepper.svelte': Object.freeze([
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
+    'manager-published-steppers-specimen',
+    'manager-published-steppers-button-focus',
   ]),
   // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([

@@ -475,11 +475,10 @@
             class="manager-recipe-step-nav"
             data-recipe-step-prev=""
             ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
-            title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
             disabled={currentStepIndex === 0}
             onclick={() => goToStep(-1)}
-            ><i class="fas fa-chevron-left" aria-hidden="true"></i></IconButton
-          >
+            icon="fas fa-chevron-left"
+          />
           <div class="manager-recipe-step-pager-copy">
             <span class="manager-recipe-step-pager-name" data-recipe-step-name
               >{currentStepName}</span
@@ -492,11 +491,10 @@
             class="manager-recipe-step-nav"
             data-recipe-step-next=""
             ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
-            title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
             disabled={currentStepIndex === stepModel.length - 1}
             onclick={() => goToStep(1)}
-            ><i class="fas fa-chevron-right" aria-hidden="true"></i></IconButton
-          >
+            icon="fas fa-chevron-right"
+          />
         </div>
       {/if}
 

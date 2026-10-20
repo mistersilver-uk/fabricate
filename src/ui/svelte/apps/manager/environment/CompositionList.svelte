@@ -522,21 +522,17 @@
             <div class="manager-environment-comp-actions">
               {#if mode === 'manual'}
                 <IconButton
-                  class="is-danger manager-environment-comp-quick-action"
+                  role="danger"
+                  class="manager-environment-comp-quick-action"
                   data-quick-action="exclude"
                   data-action="exclude"
                   ariaLabel={localizeOr(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
                     'Remove'
                   )}
-                  title={localizeOr(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
-                    'Remove'
-                  )}
                   onclick={() => onExclude(kind, entry.id)}
-                >
-                  <i class="fas fa-ban" aria-hidden="true"></i>
-                </IconButton>
+                  icon="fas fa-ban"
+                />
               {/if}
               <ActionMenu
                 items={includedMenuItems()}
@@ -592,21 +588,17 @@
               <div class="manager-environment-comp-actions">
                 {#if availableRowAction(entry) === 'include'}
                   <IconButton
-                    class="is-primary manager-environment-comp-quick-action"
+                    role="primary"
+                    class="manager-environment-comp-quick-action"
                     data-quick-action="include"
                     data-action="include"
                     ariaLabel={localizeOr(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
                       'Add'
                     )}
-                    title={localizeOr(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
-                      'Add'
-                    )}
                     onclick={() => onInclude(kind, entry.id)}
-                  >
-                    <i class="fas fa-circle-plus" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-circle-plus"
+                  />
                 {/if}
                 <ActionMenu
                   items={availableMenuItems(entry)}
@@ -760,9 +752,8 @@
                   <IconButton
                     ariaLabel={openSourceLabel()}
                     onclick={() => onOpenSource(kind, entry.id)}
-                  >
-                    <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-up-right-from-square"
+                  />
                 {/if}
               </div>
               {@render rowBody(entry)}
