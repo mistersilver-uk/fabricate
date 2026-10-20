@@ -41,7 +41,6 @@
     searchPlaceholder = '',
     searchLabel = '',
     searchMissTitle = '',
-    removeLabel = '',
     removeNamedLabel = '',
     // Live hint machine: (rawValue) => { tone: 'info'|'success'|'danger'|'', message, blocked }.
     // `blocked` refuses submit; `tone` drives the hint styling and icon.

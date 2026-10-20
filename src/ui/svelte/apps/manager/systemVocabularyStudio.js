@@ -61,7 +61,6 @@ export const SYSTEM_VOCABULARY_PANELS = Object.freeze([
         'FABRICATE.Admin.Manager.TagsCategories.NoCategoryMatches',
         'No matches for "{query}".',
       ],
-      RemoveLabel: ['FABRICATE.Admin.Manager.TagsCategories.RemoveCategory', 'Remove category'],
       RemoveNamedLabel: [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryNamed',
         'Remove category {name}',
@@ -121,10 +120,6 @@ export const SYSTEM_VOCABULARY_PANELS = Object.freeze([
         'FABRICATE.Admin.Manager.TagsCategories.NoComponentCategoryMatches',
         'No matches for "{query}".',
       ],
-      RemoveLabel: [
-        'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategory',
-        'Remove component category',
-      ],
       RemoveNamedLabel: [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryNamed',
         'Remove component category {name}',
@@ -170,7 +165,6 @@ export const SYSTEM_VOCABULARY_PANELS = Object.freeze([
         'FABRICATE.Admin.Manager.TagsCategories.NoTagMatches',
         'No matches for "{query}".',
       ],
-      RemoveLabel: ['FABRICATE.Admin.Manager.TagsCategories.RemoveTag', 'Remove tag'],
       RemoveNamedLabel: [
         'FABRICATE.Admin.Manager.TagsCategories.RemoveTagNamed',
         'Remove tag {name}',
@@ -199,7 +193,6 @@ const COPY_PROPS = Object.freeze({
   SearchPlaceholder: 'searchPlaceholder',
   SearchLabel: 'searchLabel',
   SearchMiss: 'searchMissTitle',
-  RemoveLabel: 'removeLabel',
   RemoveNamedLabel: 'removeNamedLabel',
   RemoveConfirm: 'removeConfirmHint',
   AddFailedFeedback: 'addFailedFeedback',
