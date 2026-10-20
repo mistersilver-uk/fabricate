@@ -61,7 +61,7 @@ export function assertInspectorVerbs(rail, verbs) {
   for (const [selector, role] of verbs) {
     const verb = rail.querySelector(selector);
     assert.ok(Boolean(verb), `${selector} renders in the rail`);
-    for (const required of ['fabricate-button', 'fab-manager-button', 'is-full-width']) {
+    for (const required of ['fabricate-button', 'is-full-width']) {
       assert.ok(verb.classList.contains(required), `${selector} carries ${required}`);
     }
     const roles = Object.values(INSPECTOR_VERB_ROLE_CLASSES).filter((name) =>
@@ -70,7 +70,7 @@ export function assertInspectorVerbs(rail, verbs) {
     assert.deepEqual(roles, [INSPECTOR_VERB_ROLE_CLASSES[role]], `${selector} is ${role} alone`);
   }
   assert.equal(
-    rail.querySelectorAll('.fab-manager-button.is-primary').length,
+    rail.querySelectorAll('.fabricate-button.is-primary').length,
     1,
     'the rail carries exactly one primary'
   );

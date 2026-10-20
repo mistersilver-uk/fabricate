@@ -33,7 +33,7 @@ export function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-const CHAINED_MANAGER_BUTTON = String.raw`\.fabricate-button(?:\.fab-manager-button)?`;
+const CHAINED_MANAGER_BUTTON = String.raw`\.fabricate-button(?:\.fabricate-button)*`;
 const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
 
 function selectorPattern(selector) {
@@ -132,14 +132,14 @@ const managerButtonRoleClasses = (() => {
   );
 })();
 
-// The three unconditional classes, likewise read out of the component rather than restated.
+// The unconditional root, likewise read out of the component rather than restated.
 const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'Button declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
-    base.includes('fabricate-button') && base.includes('fab-manager-button'),
-    `Button must emit the family root and the primitive class, got ${base.join(' ')}`
+    base.includes('fabricate-button'),
+    `Button must emit the family root, got ${base.join(' ')}`
   );
   return base;
 })();

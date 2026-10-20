@@ -116,7 +116,6 @@
   type="button"
   class="fabricate-button is-danger"
   data-keyboard-focus="true"
-  class:fab-manager-button={atRung38}
   class:is-size-38={atRung38}
   class:is-armed={armed}
   data-armed={armed ? 'true' : 'false'}

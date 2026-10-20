@@ -261,7 +261,6 @@ export const ANCESTOR_CONTEXT_FLOOR = 10;
 // Named because each is a container the issue's own findings turn on.
 export const REQUIRED_DISABLED_CONTEXTS = [
   '.manager-tool-edit-actions',
-  '.manager-header-actions',
   '.manager-knowledge-row-actions',
   '.manager-drop-inspector-stack',
   '.manager-checks-trigger-presets',

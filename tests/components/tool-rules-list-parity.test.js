@@ -210,10 +210,10 @@ const listScreen = (rows = SIX_ROWS) => `
           </div>
         </section>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
         <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">
-          <button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
+          <button type="button" class="fabricate-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
         </div>
       </section>
     </aside>
@@ -328,8 +328,8 @@ function inspectorColumn(sections, footState) {
   ).join('');
   const foot =
     footState === 'member'
-      ? `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
-      : `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
+      ? `<button type="button" class="fabricate-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
+      : `<button type="button" class="fabricate-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
   return `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body" style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; height: 600px">
@@ -340,7 +340,7 @@ function inspectorColumn(sections, footState) {
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
         </div>
         <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">${foot}</div>
       </section>

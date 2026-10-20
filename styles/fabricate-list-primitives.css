@@ -256,8 +256,8 @@
   pointer-events: none;
 }
 
-/* Chained onto `fab-manager-button` (0,4,0) in issue 1118, for the reason `.fabricate-button.fab-manager-button.manager-checks-card-head-link` gives verbatim: a bare `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control, which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its compact padding to the standard control's — six times over, in six browser toolbars. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters {
+/* Chained to (0,4,0) in issue 1118 and spelled on the tripled root since issue 2540, for the reason `.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link` gives verbatim: a bare `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control, which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its compact padding to the standard control's — six times over, in six browser toolbars. */
+.fabricate-button.fabricate-button.fabricate-button.manager-clear-filters {
   margin-left: auto;
   padding: 0 var(--fab-space-2);
   min-height: 30px;
@@ -266,7 +266,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-clear-filters:not(:disabled) {
   color: var(--fab-text-muted);
   background: transparent;
 }

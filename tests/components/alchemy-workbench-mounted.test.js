@@ -95,12 +95,12 @@ describe('Workbench (mounted)', () => {
       brewEnabled: true,
     });
     const brew = brewButton(target);
-    for (const name of ['fab-manager-button', 'is-primary', 'is-full-width']) {
+    for (const name of ['fabricate-button', 'is-primary', 'is-full-width']) {
       assert.ok(brew.classList.contains(name), `Brew carries ${name}`);
     }
     assert.equal(target.querySelectorAll('.fabricate-button.is-primary').length, 1, 'one primary');
     const clear = target.querySelector('[data-alchemy-clear]');
-    assert.ok(clear.classList.contains('fab-manager-button') && clear.classList.contains('is-ghost'));
+    assert.ok(clear.classList.contains('fabricate-button') && clear.classList.contains('is-ghost'));
     assert.equal(clear.disabled, false);
     assert.ok(!/brewpulse|@keyframes/.test(injectedCss()), 'no ready pulse is declared');
   });

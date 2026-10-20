@@ -186,7 +186,7 @@ test('the class reader excludes conditional literals from default-control fixtur
 });
 
 test('the fifteen class strings under measurement are the ones the primitives emit', () => {
-  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button fab-manager-button');
+  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination');
   assert.equal(FIELD_CLASSES, 'fabricate-field');
@@ -293,7 +293,7 @@ const CONTROLS = Object.freeze([
     id: 'button',
     classes: MANAGER_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="fabricate-button fab-manager-button" data-probe="${host}-button"><span>Save</span></button>`,
+      `<button type="button" class="fabricate-button" data-probe="${host}-button"><span>Save</span></button>`,
   }),
   Object.freeze({
     id: 'icon-button',
@@ -1602,7 +1602,7 @@ test('the values the comparison holds over are the ones the family declares, not
 
   // The four properties acceptance 2 says DO resolve.
   assert.equal(bare('button')['box-sizing'], 'border-box');
-  // 9px, not the shared base block's 6: the probe carries `fab-manager-button`.
+  // 9px, not the shared base block's 6: the tripled root reaches the probe.
   assert.equal(bare('button')['border-radius'], '9px');
   assert.equal(bare('button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');

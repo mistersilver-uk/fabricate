@@ -404,7 +404,8 @@
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="fabricate-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+      triggerButton={{ role: 'dashed' }}
+      triggerClass="manager-recipe-add-component-trigger manager-recipe-add-result"
       triggerIcon="fas fa-plus"
       triggerLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
       ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}

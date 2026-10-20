@@ -21,22 +21,20 @@ afterEach(() => harness.remount());
 
 const button = () => document.body.querySelector('.fabricate-button');
 
-describe('ArmedDangerButton joins the manager button only at the 38 rung', () => {
+describe('ArmedDangerButton writes the button rung and adds only the 38 class', () => {
   it('writes the bare family root and danger role by default', async () => {
     await harness.mount({ token: 'delete:a', idleLabel: 'Delete' });
     assert.equal(button().className, 'fabricate-button is-danger');
   });
 
-  it('stands among the page header actions at size 38', async () => {
+  it('adds only is-size-38 at size 38', async () => {
     await harness.mount({ token: 'delete:a', idleLabel: 'Delete', size: '38' });
-    assert.ok(button().classList.contains('fab-manager-button'), button().className);
-    assert.ok(button().classList.contains('is-size-38'), button().className);
+    assert.equal(button().className, 'fabricate-button is-danger is-size-38');
   });
 
   it('keeps the family 34 for any other size', async () => {
     await harness.mount({ token: 'delete:a', idleLabel: 'Delete', size: '34' });
-    assert.ok(!button().classList.contains('fab-manager-button'), button().className);
-    assert.ok(!button().classList.contains('is-size-38'), button().className);
+    assert.equal(button().className, 'fabricate-button is-danger');
   });
 });
 

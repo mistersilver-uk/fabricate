@@ -580,7 +580,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
             <span class="manager-callout-actions"
               ><button
                 type="button"
-                class="fabricate-button fab-manager-button"
+                class="fabricate-button"
                 data-probe="callout-action"
                 ><i class="fas fa-globe" aria-hidden="true"></i><span>World Tool</span></button
               ></span

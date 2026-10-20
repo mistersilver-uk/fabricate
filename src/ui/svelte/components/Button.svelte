@@ -28,7 +28,7 @@
   Invariants:
   - `manager-layout.test.js` READS `ROLE_CLASSES` and the `classes` array literal out of this file
     to build its browser probes, so the mapping stays a named object outside the array and the
-    array's literals stay the three unconditional classes; an inline conditional there puts its
+    array's one literal stays the unconditional root; an inline conditional there puts its
     tokens into every probe and the gate goes green while measuring markup nothing emits.
   - THE ROLE SET IS CLOSED and a caller routes by MEANING: `danger` is the DESTRUCTIVE verb, which
     removes a record or breaks a reference together with data re-making it would not restore;
@@ -100,14 +100,7 @@
   );
 
   const classes = $derived(
-    [
-      'fabricate-button',
-      'fab-manager-button',
-      roleClass,
-      fullWidth ? FULL_WIDTH_CLASS : '',
-      sizeClass,
-      extraClass,
-    ]
+    ['fabricate-button', roleClass, fullWidth ? FULL_WIDTH_CLASS : '', sizeClass, extraClass]
       .filter(Boolean)
       .join(' ')
   );

@@ -402,8 +402,8 @@
      default 34px so the commit action stays the heaviest thing in the footer. `:global()` is
      load-bearing: the row carries this component's hash and the buttons inside it do not. At
      (0,3,0) this rule TIED the primitive's own compound and kept its 28px only on injection order,
-     so naming that class takes it to (0,4,0) (issue 1118). */
-  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button) {
+     so naming the root again takes it to (0,4,0) (issues 1118, 2540). */
+  .manager-import-mapping-row :global(.fabricate-button.fabricate-button) {
     min-height: 28px;
     border-radius: 7px;
     padding: 0 var(--fab-space-2);
@@ -413,7 +413,7 @@
   /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
      (0,4,0) and is settled by injection order, so the row's compact padding is restated one class
      higher. Only `padding`: the other two are uncontested. */
-  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button.is-primary) {
+  .manager-import-mapping-row :global(.fabricate-button.fabricate-button.is-primary) {
     padding: 0 var(--fab-space-2);
   }
 

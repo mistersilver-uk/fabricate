@@ -802,7 +802,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         ? 'data-add-salvage-group'
         : 'data-add-salvage-result';
       assert.ok(
-        add.classList.contains('fab-manager-button'),
+        add.classList.contains('fabricate-button'),
         `${named} renders through the Button primitive, got ${add.className}`
       );
       assert.ok(

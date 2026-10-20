@@ -31,7 +31,8 @@ const BOOLEAN_ACTION_FIELDS = Object.freeze(['primary', 'disabled']);
 // Named after the treatment rather than a colour, so a theme may repaint one without renaming it.
 export const ACTION_TONES = Object.freeze(['primary', 'ghost', 'danger', 'neutral']);
 // The classes `Button size="38"` writes, so a companion action stands on the page header's 38px
-// rung beside Core's own (issue 2257 D10).
+// rung beside Core's own (issue 2257 D10). `fab-manager-button` is an inert compat token, deprecated
+// at issue 2540: no rule names it, and it goes after one minor release announced in the notes.
 const HEADER_ACTION_BASE_CLASSES = 'fabricate-button fab-manager-button is-size-38';
 
 // Beside the tones, not in the renderer, so adding a tone without its class is a visible omission.

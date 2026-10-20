@@ -32,8 +32,8 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const REFUSAL = 'Fabricate | published components: ';
 const LABEL = 'Clear filters';
-const FAMILY = ['fabricate-button', 'fab-manager-button'];
-/** Each published visual role and the one class it writes beside the family's two. */
+const FAMILY = ['fabricate-button'];
+/** Each published visual role and the one class it writes beside the family root. */
 const ROLES = Object.freeze([
   ['neutral', []],
   ['primary', ['is-primary']],

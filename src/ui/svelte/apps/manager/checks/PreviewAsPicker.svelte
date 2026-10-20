@@ -52,7 +52,8 @@
   {value}
   {options}
   pickerClass="manager-checks-preview-actor"
-  triggerClass="fabricate-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
+  triggerButton={{ role: 'neutral' }}
+  triggerClass="manager-travel-picker-trigger manager-checks-preview-actor-trigger"
   triggerProps={triggerData}
   triggerIcon={selected ? '' : 'fas fa-user-slash'}
   triggerImg={selected?.img || ''}

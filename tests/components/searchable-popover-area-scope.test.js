@@ -5,10 +5,6 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-import {
-  FIXTURE_ALLOWLIST,
-  FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
-} from '../helpers/managerButtonFixtureAllowlist.js';
 import { collectWorkingTreeSources, repoRoot, stripComments } from '../helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../helpers/styleBlockScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
@@ -167,20 +163,18 @@ const PRIMITIVES = Object.freeze([
     name: 'Button',
     components: Object.freeze(['src/ui/svelte/components/Button.svelte']),
     roots: Object.freeze(['fabricate-button']),
-    // Two exact class names, not a shared prefix.
-    family: 'fabricate-button|fab-manager-button',
-    anchors: Object.freeze(['fabricate-button', 'fab-manager-button']),
+    // One exact class name, not a shared prefix: issue 2540 retired its second token.
+    family: 'fabricate-button',
+    anchors: Object.freeze(['fabricate-button']),
     // COMPOSES its family in `const classes = $derived([…])` (`Button.svelte`) rather
     // than in markup — `classesWrittenBy` and the root-emission clause's `attributes` local both
     // read `composedClassRegion` for this entry as well as the (here, empty) markup region.
     composesClasses: true,
-    // Measured today: 2 written (the array holds no other unconditional family literal).
-    writtenFloor: 2,
+    // Measured today: 1 written (the array holds no other unconditional family literal).
+    writtenFloor: 1,
     familyFloor: 75,
     ownedFloor: 26,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'fab-manager-button', root: 'fabricate-button' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     name: 'IconButton',
@@ -1048,7 +1042,7 @@ function pickerSelectors(written, primitive) {
  * A COMPOUND that names a caller's own container by an application root QUALIFIED BY AN
  * ATTRIBUTE — `.fabricate-manager[data-manager-view='essences']` — rather than by a caller CLASS.
  * Narrow on purpose: an attribute that qualifies the FAMILY's own compound —
- * `.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]` — is not an
+ * `.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]` — is not an
  * application root at all, and this must not fire on it; that selector stays gate-owned and
  * re-rooted like its unattributed siblings.
  *
@@ -1361,9 +1355,8 @@ test('the composed-class region is read from the actual array literal, not the m
   const managerButton = PRIMITIVES.find((entry) => entry.name === 'Button');
   const managerButtonRegion = composedClassRegion(managerButton.components[0]);
   assert.ok(
-    managerButtonRegion.includes("'fabricate-button'") &&
-      managerButtonRegion.includes("'fab-manager-button'"),
-    `${managerButton.components[0]}'s composed-class array no longer contains the literals ` +
+    managerButtonRegion.includes("'fabricate-button'"),
+    `${managerButton.components[0]}'s composed-class array no longer contains the literal ` +
       '`classesWrittenBy` reads for Button, so a reader that stops finding the array ' +
       'would examine an empty family instead of reporting the regression'
   );
@@ -1678,7 +1671,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   // family compound, which must stay gate-owned and re-rooted like its unattributed siblings.
   assert.ok(
     !namesCallersOwnContainer(
-      '.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
+      '.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]',
       managerButton
     ),
     'the clause fires on an attribute that qualifies the family’s own compound rather than an ' +
@@ -1720,7 +1713,7 @@ test('another entry’s root is a caller container only when no application root
       'demand the pager drop its root from its own rule'
   );
   for (const [name, selector] of [
-    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fab-manager-button'],
+    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fabricate-button'],
     ['StatusToggle', '.fabricate-manager .fabricate-sortable-list .fabricate-toggle'],
   ]) {
     assert.ok(
@@ -1815,26 +1808,6 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'passes over a tree that could have any number.',
   }),
 ]);
-
-/**
- * The subset of `FIXTURE_ALLOWLIST` that is ROOT-LESS.
- * `FIXTURE_ALLOWLIST` is the ledger of fixtures that model a deliberately UNCONVERTED control, and
- * since issue 1502 most of those fixtures DO carry their family root: a population-B trigger
- * without `fabricate-button` matches no rule in the sheet, so the fixtures that measure geometry
- * gained it. Those entries are irrelevant here — they are never offenders — and only the entries
- * still writing a family class with no root of any primitive can register a hit. Derived once at
- * module level because both clauses need the same subset, and two copies of one filter is the
- * duplication `tests/helpers/primitiveSourceContract.js` exists to have stopped repeating.
- *
- * @type {ReadonlyArray<import('../helpers/managerButtonFixtureAllowlist.js').ButtonFixtureExemption>}
- */
-const ROOT_LESS_FIXTURE_EXEMPTIONS = Object.freeze(
-  FIXTURE_ALLOWLIST.filter((entry) =>
-    PRIMITIVES.every((primitive) =>
-      primitive.roots.every((root) => !entry.classes.split(/\s+/).includes(root))
-    )
-  )
-);
 
 // A literal imperative class write: `.className =` a quoted or `${`-free backtick string, or
 // `classList.add(…)` with literal arguments only. A dynamic write is not read.
@@ -2046,7 +2019,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   );
   const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
   const exemptHits = new Map();
-  const allowlistHits = new Map();
   const offenders = [];
   let attributes = 0;
 
@@ -2056,13 +2028,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
         for (const { root, offends } of attributeOffence(primitive, value)) {
           attributes += 1;
           if (!offends) continue;
-          const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
-            (entry) => entry.file === file && entry.classes === value
-          );
-          if (allowlisted) {
-            allowlistHits.set(allowlisted, (allowlistHits.get(allowlisted) ?? 0) + 1);
-            continue;
-          }
           const key = `${file}|${primitive.name}`;
           if (exempt.has(key)) {
             exemptHits.set(key, (exemptHits.get(key) ?? 0) + 1);
@@ -2133,27 +2098,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
         `against ${entry.primitive} and has ${hits}. Reason on record: ${entry.why}`
     );
   }
-
-  // The Button unconverted-probe exemptions are a SEPARATE, larger ledger.
-  const expectedAllowlistAttributeCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
-  const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
-  assert.equal(
-    totalAllowlistHits,
-    expectedAllowlistAttributeCount,
-    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistAttributeCount} ` +
-      '`FIXTURE_ALLOWLIST` attributes recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
-      'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
-      'without updating the ledger.'
-  );
-  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
-    const hits = allowlistHits.get(entry) ?? 0;
-    assert.equal(
-      hits,
-      entry.count,
-      `${entry.file} is allowlisted for ${entry.count} occurrence(s) of ` +
-        `class="${entry.classes}" and this gate found ${hits}. Reason on record: ${entry.why}`
-    );
-  }
 });
 
 test('every fixture element in a picker’s family sits under one of its namespace roots', () => {
@@ -2167,7 +2111,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
     DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
   );
   const exemptHits = new Map();
-  const allowlistHits = new Map();
   const offenders = [];
   let elements = 0;
 
@@ -2178,13 +2121,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
         if (copied.length === 0) continue;
         elements += 1;
         if (rooted) continue;
-        const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
-          (entry) => entry.file === file && entry.classes === element.classes.join(' ')
-        );
-        if (allowlisted) {
-          allowlistHits.set(allowlisted, (allowlistHits.get(allowlisted) ?? 0) + 1);
-          continue;
-        }
         const key = `${file}|${primitive.name}`;
         if (exempt.has(key)) {
           exemptHits.set(key, (exemptHits.get(key) ?? 0) + 1);
@@ -2259,37 +2195,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
       entry.elementCount,
       `${entry.file} is exempted for ${entry.elementCount} rootless fixture element(s) against ` +
         `${entry.primitive} and has ${hits}. Reason on record: ${entry.why}`
-    );
-  }
-
-  const expectedAllowlistElementCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
-  // The SPLIT ITSELF, guarded rather than narrated.
-  assert.ok(
-    ROOT_LESS_FIXTURE_EXEMPTIONS.length < FIXTURE_ALLOWLIST.length &&
-      expectedAllowlistElementCount < FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
-    `the root-less subset is ${ROOT_LESS_FIXTURE_EXEMPTIONS.length} of ` +
-      `${FIXTURE_ALLOWLIST.length} entries and ${expectedAllowlistElementCount} of ` +
-      `${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} attributes, which is not a strict subset: the ` +
-      'root-carrying population-B entries issue 1502 introduced have stopped being filtered ' +
-      'out, so this clause is holding over the whole allowlist rather than the part of it that ' +
-      'can register a hit'
-  );
-  const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
-  assert.equal(
-    totalAllowlistHits,
-    expectedAllowlistElementCount,
-    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistElementCount} ` +
-      '`FIXTURE_ALLOWLIST` elements recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
-      'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
-      'without updating the ledger.'
-  );
-  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
-    const hits = allowlistHits.get(entry) ?? 0;
-    assert.equal(
-      hits,
-      entry.count,
-      `${entry.file} is allowlisted for ${entry.count} occurrence(s) of ` +
-        `class="${entry.classes}" and this gate found ${hits}. Reason on record: ${entry.why}`
     );
   }
 

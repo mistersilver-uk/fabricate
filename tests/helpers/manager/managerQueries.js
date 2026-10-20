@@ -340,7 +340,7 @@ export function createManagerQueries(getTarget) {
     const back = getTarget().querySelector(`.manager-header-actions ${hook}`);
     assert.ok(Boolean(back), `${route} should render its header Back control at ${hook}`);
     assert.ok(
-      back.classList.contains('fab-manager-button'),
+      back.classList.contains('fabricate-button'),
       `${route}'s Back should render through the Button primitive, not a hand-written class`
     );
     assert.ok(

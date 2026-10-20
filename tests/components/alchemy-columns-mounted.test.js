@@ -256,7 +256,7 @@ describe('KnownRecipesColumn (mounted)', () => {
       canSwitch: true
     });
     const switchBtn = target.querySelector('[data-alchemy-switch]');
-    assert.ok(switchBtn.classList.contains('fab-manager-button'), 'the shared button, neutral');
+    assert.ok(switchBtn.classList.contains('fabricate-button'), 'the shared button, neutral');
     assert.ok(!/is-(primary|ghost|danger)/.test(switchBtn.className));
     const title = target.querySelector('.alchemy-known-title');
     assert.ok(switchBtn && title, 'both the Switch and the heading render');
