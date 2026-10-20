@@ -276,8 +276,10 @@ A failed Simple check produces the recipe's failure result set instead of its su
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
 A banner confirms the outcome after each brew.
-It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, failed its check with nothing produced, set a brew to work, was refused, or the mixture fizzled.
-A brew that started but did not finish, for example because you dismissed the roll or the brew was refused after it started, has already consumed the bench, so the banner reads as set to work and you can finish it from the Journal.
+It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, failed its check with nothing produced, set a time-gated brew to work, left a brew waiting in your Journal, stopped a brew after it started, was refused, or the mixture fizzled.
+A brew that started but did not finish has already used the bench.
+When it is waiting for its check or a choice, the banner says the brew is waiting in your Journal.
+When you dismissed the roll or the brew was refused after it started, the banner says the brew did not finish, and you can finish or cancel it from the Journal.
 
 A failed brew is also recorded in the character's Journal history, whether it failed its check or fizzled with no match.
 A fizzle is listed there as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal a recipe you have not yet discovered.
