@@ -1646,7 +1646,6 @@ test('no state rule in the sheet and every scoped block mixes two tint families'
 /** A hover that keeps a rung fill under a tinted edge, with the reason the edge is its own. */
 const HOVER_EDGE_TINTS = Object.freeze(
   [
-    ".fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
     ".fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   ].map((selector) => [
     MODULE_SHEET,

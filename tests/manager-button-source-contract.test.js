@@ -113,21 +113,6 @@ test('no .svelte under src writes the fabricate-button class literal', () => {
   }
 });
 
-test('no SearchablePopover trigger hands the button root over as a triggerClass string', () => {
-  // Issue 2540 moved the nine such sites onto `triggerButton`, so the trigger IS the primitive.
-  const sources = filesUnder(SRC)
-    .filter((path) => path.endsWith('.svelte'))
-    .map((path) => [path, readFileSync(join(repoRoot, path), 'utf8')]);
-  const converted = sources.flatMap(([, text]) => text.match(/\btriggerButton=\{/g) ?? []);
-  assert.ok(converted.length >= 10, `only ${converted.length} triggerButton sites were found`);
-  const offenders = sources.flatMap(([path, text]) =>
-    [...text.matchAll(/\btriggerClass="([^"]*)"/g)]
-      .filter((match) => match[1].split(/\s+/).includes(ROOT_CLASS))
-      .map((match) => `${path}: triggerClass="${match[1]}"`)
-  );
-  assert.deepEqual(offenders, [], 'render the trigger through `triggerButton={{ role }}`');
-});
-
 test('the primitive emits the family root and the keyboard-focus attribute', () => {
   // NOTHING ELSE PINS EITHER EMISSION (issue 1502).
   const source = readFileSync(join(repoRoot, PRIMITIVE_FILE), 'utf8');

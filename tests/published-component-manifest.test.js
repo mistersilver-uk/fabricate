@@ -430,7 +430,6 @@ const BUTTON = Object.freeze({
     'fab-bulk-edit-dock',
     'manager-tool-edit-actions',
     'manager-environment-drop-adjustment-row',
-    'manager-header-actions',
     'manager-checks-tier-add',
     'manager-salvage-stage-add',
     'fabricate-filter-bar',
@@ -471,7 +470,7 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 26 sheet rules that draw a published button, each one compound with nothing above it. */
+/** The 21 sheet rules that draw a published button, each one compound with nothing above it. */
 const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
@@ -481,11 +480,6 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled)',
   "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled)',
-  "styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled)',
-  "styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
@@ -2458,7 +2452,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 30 selectors: 26 that draw it, three it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 25 selectors: 21 that draw it, three it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -2665,7 +2659,7 @@ describe('the module sheet and every component style against the published Butto
     ['a class no published key writes', '.fabricate-button.is-size-38'],
     ['the armed state, which no published key writes', '.fabricate-button.is-danger.is-armed'],
     ['a per-site class', '.fabricate-button.fabricate-button.manager-recipe-sort-direction'],
-    ['a pinned ancestor', '.fabricate-manager .manager-header-actions .fabricate-button'],
+    ['a pinned ancestor', '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button'],
     ['a classed child', '.fabricate-button .fa-plus'],
   ]) {
     it(`admits a selector that needs ${claim}`, () => {
@@ -2702,9 +2696,13 @@ describe('the module sheet and every component style against the published Butto
   });
 
   it('names a pinned ancestor that keeps no selector off the button as stale', () => {
-    const census = buttonCensus('.manager-header-actions .fabricate-button { gap: 0 }');
+    const census = buttonCensus('.manager-knowledge-reset-actions .fabricate-button { gap: 0 }');
     const stale = staleAncestors(BUTTON, census, SPELLED);
-    assert.equal(stale.includes('manager-header-actions'), false, 'the one the selector names');
+    assert.equal(
+      stale.includes('manager-knowledge-reset-actions'),
+      false,
+      'the one the selector names'
+    );
     assert.equal(stale.length, BUTTON.ancestors.size - 1, 'every other is stale');
   });
 

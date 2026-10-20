@@ -131,16 +131,9 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
   );
 });
 
-/** A `major.minor.patch` version as three numbers, ignoring any prerelease tag. */
-const versionParts = (version) => version.split('-', 1)[0].split('.').map(Number);
-
-/** Whether `left` is an earlier release than `right`. */
-function isBefore(left, right) {
-  const [earlier, later] = [versionParts(left), versionParts(right)];
-  const at = earlier.findIndex((part, index) => part !== later[index]);
-  return at !== -1 && earlier[at] < later[at];
-}
-
+// The removal itself is not enforced here: the tracked `package.json` stays at its development
+// placeholder and CI checks out no tags, so no version this test can read moves with a release.
+// The follow-up issue the delta names removes the token; this test keeps the lines honest until then.
 test('the header-action compat lines state why they survive and the release removing them', () => {
   assert.ok(COMPAT_LINES.length > 0, 'the compat seam still writes the token somewhere');
   for (const entry of COMPAT_LINES) {
@@ -148,12 +141,6 @@ test('the header-action compat lines state why they survive and the release remo
     assert.equal(entry.removeIn, HEADER_ACTION_COMPAT_REMOVE_IN, `${entry.file} names the release`);
   }
   assert.match(HEADER_ACTION_COMPAT_REMOVE_IN, /^\d+\.\d+\.0$/, 'removal lands on a minor release');
-  const { version } = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
-  assert.ok(
-    isBefore(version, HEADER_ACTION_COMPAT_REMOVE_IN),
-    `package.json is at ${version}, which has reached ${HEADER_ACTION_COMPAT_REMOVE_IN}: remove ` +
-      '`fab-manager-button` from the header-action seam and drop `COMPAT_LINES`'
-  );
 });
 
 /** Every class token a template writes on an element, a composed `classes` array included. */

@@ -208,7 +208,10 @@ export const HEADER_ACTION_COMPAT_WHY =
   'the deprecated header-action compat token: extension header actions still carry it, no ' +
   'Fabricate rule names it, and it goes after at least one minor release announced in the notes';
 
-/** The release that removes the compat token, at least one minor after issue 2540's. */
+/**
+ * The release that removes the compat token: issue 2540 ships in the 1.14 line (`main` cuts
+ * `v1.14.0-beta.*`, the last stable tag is `v1.13.0`), so 1.15.0 is one minor after it.
+ */
 export const HEADER_ACTION_COMPAT_REMOVE_IN = '1.15.0';
 
 const COMPAT = Object.freeze({

@@ -2,28 +2,29 @@
  * Every reviewed override of the button rung still wins, measured in Chromium (issue 2540).
  * Retiring `fab-manager-button` put `ArmedDangerButton` and the converted popover triggers under
  * the tripled root's (0,3,0) rung, which they never matched before. Each rule below was reviewed
- * to restate that rung on its carrier, so each is drawn on markup its own selector builds and must
- * render every property it declares: a probe that computes another value lost the cascade.
+ * to restate that rung on its carrier, and every sheet rule naming the root twice or more, plus
+ * every scoped rule issue 2540 re-spelled, is derived beside them; each is drawn on markup its own
+ * selector builds and must render every property it declares, by winning the cascade or by a tie
+ * that renders the value it states.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { after, before, test } from 'node:test';
 
 import { chromium } from 'playwright';
-import { compile } from 'svelte/compiler';
 
-import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-
-const repoRoot = resolve(import.meta.dirname, '../..');
-const read = (path) => readFileSync(join(repoRoot, path), 'utf8');
+import {
+  ROOT,
+  cascadeMembers,
+  isProbeable,
+  openCascadePage,
+  probeMembers,
+} from '../helpers/buttonCascadeProbe.js';
 
 /**
  * The classes each carrier writes at rest, which `armed-danger-button-mounted.test.js` and
  * `manager-button-mounted.test.js` pin by mounting each component.
  */
-const ARMED_DANGER_CLASSES = 'fabricate-button is-danger';
-const BUTTON_ROOT = 'fabricate-button';
+const CARRIERS = Object.freeze({ ArmedDangerButton: `${ROOT} is-danger`, Button: ROOT });
 
 /** The sheet rules reviewed as overrides of the rung, each on the carrier it was reviewed for. */
 const SHEET_OVERRIDES = Object.freeze([
@@ -54,8 +55,6 @@ const SHEET_OVERRIDES = Object.freeze([
   ],
   ['.fabricate-button.fabricate-button.manager-travel-parties-override-trigger', 'Button'],
   ['.fabricate-picker .manager-travel-picker-trigger', 'Button'],
-  ['.fabricate-manager .manager-header-actions .fabricate-button', 'Button'],
-  ['.fabricate-manager .manager-header-actions .fabricate-button.is-primary', 'Button'],
   ['.fabricate-manager .manager-knowledge-reset-actions .fabricate-button', 'Button'],
   [
     '.fabricate-manager[data-manager-view="components"] .fabricate-filter-bar .fabricate-button',
@@ -68,6 +67,11 @@ const SHEET_OVERRIDES = Object.freeze([
 
 /** Scoped overrides, keyed on the compiled selector with its scoping hash removed. */
 const SCOPED_OVERRIDES = Object.freeze([
+  [
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
+    '.fabricate-card.fab-bulk-delete-card .fabricate-button',
+    'ArmedDangerButton',
+  ],
   [
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     '.manager-scoped-roster-system .fabricate-button.is-danger',
@@ -96,160 +100,92 @@ const RESPELLED_BLOCKS = Object.freeze([
 
 const SCOPED_FILES = [...new Set([...SCOPED_OVERRIDES.map(([file]) => file), ...RESPELLED_BLOCKS])];
 
-const compiledCss = (file) =>
-  compile(read(file), { filename: join(repoRoot, file), css: 'external', generate: 'client' }).css
-    .code;
-
 let browser;
 let page;
 
 before(async () => {
   browser = await chromium.launch();
-  page = await browser.newPage();
-  const styles = [readStylesheet(), ...SCOPED_FILES.map(compiledCss)]
-    .map((css) => `<style>${css}</style>`)
-    .join('');
-  await page.setContent(`<!doctype html><html><head>${styles}</head><body></body></html>`);
+  page = await openCascadePage(browser, SCOPED_FILES);
 });
 
 after(async () => browser?.close());
 
+/** How many times a member names the root as a class. */
+const rootCount = (member) =>
+  member.match(new RegExp(String.raw`\.${ROOT}(?![\w-])`, 'g'))?.length ?? 0;
+
 /**
- * In the page: every rule member matching `wanted`, drawn and measured against an inline twin.
- *
- * @param {{ wanted: string[], derive: boolean, carriers: Record<string, string> }} input the keys
- *   (hash-free selector members) and their carriers' classes; with `derive`, every resting member
- *   naming the tripled root, or a scoped block's doubled root, is added on `Button`'s root
- * @returns {Array<{ key: string, losses: string[], matched: boolean, properties: number }>}
+ * The base family's own doubled-root rules — the root and its roles, with nothing else — which the
+ * primitive's tripled rung is designed to beat; `manager-button-cascade-inventory.test.js` holds
+ * that each still wins something.
  */
-function measureInPage({ wanted, derive, carriers }) {
-  const HASH = /:where\(\.svelte-[\w-]+\)|\.svelte-[\w-]+/g;
-  const DOUBLED = '.fabricate-button.fabricate-button';
-  const TRIPLED = `${DOUBLED}.fabricate-button`;
-  const canonical = (selector) => {
-    const sheet = new CSSStyleSheet();
-    sheet.insertRule(`${selector} {}`);
-    return sheet.cssRules[0].selectorText;
-  };
-  const membersOf = (list) => {
-    const members = [];
-    let depth = 0;
-    let start = 0;
-    for (let index = 0; index < list.length; index += 1) {
-      if ('(['.includes(list[index])) depth += 1;
-      else if (')]'.includes(list[index])) depth -= 1;
-      else if (list[index] === ',' && depth === 0) {
-        members.push(list.slice(start, index).trim());
-        start = index + 1;
-      }
-    }
-    return [...members, list.slice(start).trim()];
-  };
-  const resting = (member) =>
-    !/:(?!not\(|where\(|is\()/.test(member.replaceAll(/:not\([^)]*\)/g, ''));
-  const compounds = (member) => member.split(/\s*>\s*|\s+/).filter(Boolean);
-  const draw = (compound, tag) => {
-    const named = /^[a-z][\w-]*/i.exec(compound)?.[0];
-    const element = document.createElement(named ?? tag);
-    const plain = compound
-      .replaceAll(/:not\([^)]*\)/g, '')
-      .replaceAll(/:(?:where|is)\(([^)]*)\)/g, '$1');
-    for (const [, name] of plain.matchAll(/\.([\w-]+)/g)) element.classList.add(name);
-    for (const [, name, value] of plain.matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)) {
-      element.setAttribute(name, value ?? '');
-    }
-    return element;
-  };
-  const flatten = (list) =>
-    [...list].flatMap((rule) => {
-      if (rule instanceof CSSStyleRule) return [rule];
-      if (rule instanceof CSSMediaRule && !matchMedia(rule.conditionText).matches) return [];
-      return rule.cssRules ? flatten(rule.cssRules) : [];
-    });
-  const keys = new Map(wanted.map((key) => [canonical(key), { key, carrier: carriers[key] }]));
-  const found = [];
-  for (const [index, sheet] of [...document.styleSheets].entries()) {
-    // The first sheet is the module's; the rest are compiled component blocks.
-    const respelled = index === 0 ? TRIPLED : DOUBLED;
-    for (const rule of flatten(sheet.cssRules)) {
-      for (const member of membersOf(rule.selectorText)) {
-        const bare = member.replaceAll(HASH, '');
-        const derived = derive && resting(member) && bare.includes(respelled);
-        const entry = keys.get(bare) ?? (derived ? { key: bare, carrier: carriers.derived } : null);
-        if (entry) found.push({ rule, member, ...entry });
-      }
-    }
-  }
-  return found.map(({ rule, member, key, carrier }) => {
-    const parts = compounds(member);
-    let parent = document.body;
-    let subject;
-    for (const [index, part] of parts.entries()) {
-      const last = index === parts.length - 1;
-      const element = draw(part, last ? 'button' : 'div');
-      if (last) {
-        for (const name of carrier.split(/\s+/)) element.classList.add(name);
-        element.textContent = 'Delete';
-        subject = element;
-      }
-      parent.append(element);
-      parent = element;
-    }
-    const twin = subject.cloneNode(true);
-    twin.style.cssText = rule.style.cssText;
-    subject.after(twin);
-    const losses = [];
-    const probe = getComputedStyle(subject);
-    const stated = getComputedStyle(twin);
-    for (const property of rule.style) {
-      if (property.startsWith('--')) continue;
-      const rendered = probe.getPropertyValue(property);
-      const declared = stated.getPropertyValue(property);
-      if (rendered !== declared) losses.push(`${property} renders ${rendered}, states ${declared}`);
-    }
-    const matched = subject.matches(member);
-    document.body.replaceChildren();
-    return { key, losses, matched, properties: rule.style.length };
-  });
-}
+const BASE_FAMILY = /^(?:\.fabricate-button){2}(?:\.is-[\w-]+|:not\([^)]*\)|:hover|:is\(a\))*$/;
 
-/** Measures `keys` in the page and returns one result per rule member that names a key. */
-async function measure(keys, { derive = false } = {}) {
-  const carriers = Object.fromEntries(keys.map(([key, carrier]) => [key, classesOf(carrier)]));
-  carriers.derived = BUTTON_ROOT;
-  return page.evaluate(measureInPage, { wanted: keys.map(([key]) => key), derive, carriers });
-}
-
-function classesOf(carrier) {
-  return carrier === 'ArmedDangerButton' ? ARMED_DANGER_CLASSES : BUTTON_ROOT;
-}
+/** The longhands a probe lost: neither won nor tied on the value it states. */
+const lossesOf = ({ member, longhands, hovered }) =>
+  longhands
+    .filter(({ wins, rendered, declared }) => !wins && (hovered || rendered !== declared))
+    .map(({ property, winner }) => `${member}: ${property} lost to ${winner}`);
 
 test('every reviewed override still renders each property it declares', async () => {
-  const keys = [...SHEET_OVERRIDES, ...SCOPED_OVERRIDES.map(([, key, carrier]) => [key, carrier])];
-  const results = await measure(keys);
-  const seen = new Set(results.map(({ key }) => key));
+  const keys = new Map(
+    [...SHEET_OVERRIDES, ...SCOPED_OVERRIDES.map(([, key, carrier]) => [key, carrier])].map(
+      ([key, carrier]) => [key, CARRIERS[carrier]]
+    )
+  );
+  const members = await cascadeMembers(page);
+  const canonical = await page.evaluate(
+    (list) =>
+      list.map((key) => {
+        const sheet = new CSSStyleSheet();
+        sheet.insertRule(`${key} {}`);
+        return sheet.cssRules[0].selectorText;
+      }),
+    [...keys.keys()]
+  );
+  const byCanonical = new Map(
+    [...keys].map(([key, carrier], at) => [canonical[at], { key, carrier }])
+  );
+  const targets = members
+    .filter(({ bare }) => byCanonical.has(bare))
+    .map(({ order, member, bare }) => ({ order, member, carrier: byCanonical.get(bare).carrier }));
+  const seen = new Set(
+    members.filter(({ bare }) => byCanonical.has(bare)).map(({ bare }) => byCanonical.get(bare).key)
+  );
   assert.deepEqual(
-    keys.map(([key]) => key).filter((key) => !seen.has(key)),
+    [...keys.keys()].filter((key) => !seen.has(key)),
     [],
     'every reviewed override is still a rule in the sheet or its component'
   );
-  for (const { key, matched, properties } of results) {
-    assert.ok(matched, `${key}: the markup its selector builds must match it`);
-    assert.ok(properties > 0, `${key} declares something`);
+  const results = await probeMembers(page, targets);
+  for (const { member, matched, longhands } of results) {
+    assert.ok(matched, `${member}: the markup its selector builds must match it`);
+    assert.ok(longhands.length > 0, `${member} declares something`);
   }
   assert.deepEqual(
-    results.flatMap(({ key, losses }) => losses.map((loss) => `${key}: ${loss}`)),
+    results.flatMap(lossesOf),
     [],
     'an override the tripled root now beats has stopped painting its carrier'
   );
 });
 
-test('every resting rule spelled on the tripled or re-spelled root still wins on Button', async () => {
-  const results = (await measure([], { derive: true })).filter(({ properties }) => properties > 0);
-  assert.ok(results.length >= 40, `only ${results.length} re-spelled rules were derived`);
-  for (const { key, matched } of results) assert.ok(matched, `${key}: its markup must match it`);
+test('every rule naming the root twice or more, or re-spelled in a scoped block, still wins', async () => {
+  // The first sheet is the module's; the rest are compiled component blocks, each re-spelled
+  // rule of which names the root at least twice too.
+  const targets = (await cascadeMembers(page))
+    .filter(({ bare }) => rootCount(bare) >= 2 && !BASE_FAMILY.test(bare) && isProbeable(bare))
+    .map(({ order, member }) => ({ order, member, carrier: ROOT }));
+  const results = (await probeMembers(page, targets)).filter(({ longhands }) => longhands.length);
+  assert.ok(results.length >= 60, `only ${results.length} rules naming the root twice were drawn`);
+  for (const { member, matched } of results)
+    assert.ok(matched, `${member}: its markup must match it`);
+  const split = results.filter(({ member }) => !member.includes(`.${ROOT}.${ROOT}.${ROOT}`));
+  assert.ok(
+    split.length >= 10,
+    `the doubled and split re-spellings are measured too: ${split.length}`
+  );
   assert.deepEqual(
-    results.flatMap(({ key, losses }) => losses.map((loss) => `${key}: ${loss}`)),
+    results.flatMap(lossesOf),
     [],
     'a rule re-spelled on the root has stopped painting the button it names'
   );

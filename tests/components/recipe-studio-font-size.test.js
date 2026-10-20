@@ -27,10 +27,9 @@ const FIXTURE = `
         <div class="manager-header-actions" role="group" aria-label="Actions">
           <!-- Carries the shipped Back button's class list (issue 1118), the root alone since
                issue 2540.
-               The number below does not move: .manager-header-actions .fabricate-button and the
-               primitive both state 0.72rem, which is exactly why the header rule's type scale
-               survived while its 38px height was retired. What moves is which rule this
-               fixture proves — the container's, or the one the product will match. The resting
+               The number below does not move: the container's own 0.72rem rule stated what the
+               primitive states, and issue 2540 deleted it once the tripled root always beat it,
+               so this fixture proves the rule the product matches. The resting
                BORDER moved too: .manager-header-actions .fabricate-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
