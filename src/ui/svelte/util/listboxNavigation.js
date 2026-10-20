@@ -239,3 +239,9 @@ export function activeOptionId(prefix, index) {
   if (!Number.isInteger(index) || index < 0) return;
   return `${prefix}-option-${index}`;
 }
+
+/** A square tile's whole name, being text-free: its label, joined to a gated tile's reason. */
+export function squareTileName(option) {
+  const label = String(option?.label ?? '');
+  return option?.disabled && option.disabledReason ? `${label} — ${option.disabledReason}` : label;
+}

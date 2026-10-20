@@ -46,6 +46,9 @@ const IMPORTABLE = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/util/statusChipTone.js',
+  // The layout pair `SearchablePopover` imports, which its standing-alone panel is handed (issue 2459).
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/iconPickerPopover.js',
 ]);
 
 /** The calls a `<script module>` literal may be an argument to: a query, an attribute read, a wait's description. */
