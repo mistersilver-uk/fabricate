@@ -20,7 +20,8 @@
     `value = next`, never `bind:value`; `count` reads its input as a number, so `-0` is written.
   - `mirror` — a bound value an effect writes once per distinct `mirrorAt`, `null` writing
     `undefined`, which no shipped component may do: `tests/published-component-controls.test.js`
-    pins it as the exception.
+    pins it as the exception. A `Delete` key down in the `query` input writes `undefined` to it
+    from an event handler, the same pin's second exception.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
@@ -132,6 +133,9 @@
     aria-label={label}
     value={query}
     oninput={(event) => (query = event.currentTarget.value)}
+    onkeydown={(event) => {
+      if (event.key === 'Delete') mirror = undefined;
+    }}
   />
   <input
     class="probe-value"

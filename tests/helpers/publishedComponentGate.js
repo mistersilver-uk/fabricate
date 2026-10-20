@@ -161,6 +161,8 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
   // `SearchField` draws it only under its unpublished `label`, and passes `as="label"`.
+  // With no `as` it falls back to `div`; `field-source-contract` holds that hole by requiring a literal
+  // `as` on every `<Field>`, and neither tag is focusable.
   'src/ui/svelte/components/Field.svelte: svelte:element': { tags: ['label'], keys: [] },
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
     tags: ['h3', 'p', 'span'],

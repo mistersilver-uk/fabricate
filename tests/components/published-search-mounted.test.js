@@ -221,7 +221,15 @@ describe('a query typed into the published SearchField', () => {
       },
     });
     await settle();
+    const seen = [];
+    const ancestor = mounted.target.parentElement;
+    const read = () => {
+      seen.push(mounted.input().value);
+    };
+    ancestor.addEventListener('input', read);
     fill(mounted.input(), ' IRON');
+    ancestor.removeEventListener('input', read);
+    assert.deepEqual(seen, ['iron'], 'drawn before the event finished dispatching to an ancestor');
     assert.equal(mounted.input().value, 'iron', 'drawn before the event returned');
     assert.deepEqual(calls, [[' IRON', '']], 'no second call for the transform');
     assert.equal(mounted.handle.value('value'), 'iron');

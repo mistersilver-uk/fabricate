@@ -1353,6 +1353,12 @@ describe('the name clause', () => {
     assert.deepEqual(syntheticFaults(markup, { props, pin: 'always' }), []);
   });
 
+  it('names a name that reads only undefined as a fault, for it reaches no published key', () => {
+    assert.deepEqual(named('<i></i>', ' aria-label={other ? undefined : undefined}'), [
+      UNPUBLISHED_NAME,
+    ]);
+  });
+
   it('reads the render tag inside a svelte:element as it reads one inside a button', () => {
     assert.deepEqual(dynamicFaults(['button'], '{@render caption?.()}', props), []);
     assert.deepEqual(dynamicFaults(['button'], '{@render note?.()}', props), [OPTIONAL_NAME]);
