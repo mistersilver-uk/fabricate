@@ -68,11 +68,7 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
     });
     assert.deepEqual(
       triggerClasses(),
-      [
-        'fabricate-button',
-        'is-size-38',
-        'manager-world-component-register-action',
-      ],
+      ['fabricate-button', 'is-size-38', 'manager-world-component-register-action'],
       '`triggerClass` reaches `Button`s `class` prop, which APPENDS — a caller class ' +
         'that REPLACED the primitive`s own would unstyle the button while every data-* ' +
         'selector kept resolving'
@@ -82,11 +78,7 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
 
   it('takes the role and the full-width flag from the same object', async () => {
     await mountPicker({ triggerButton: { role: 'danger', fullWidth: true } });
-    assert.deepEqual(triggerClasses(), [
-      'fabricate-button',
-      'is-danger',
-      'is-full-width',
-    ]);
+    assert.deepEqual(triggerClasses(), ['fabricate-button', 'is-danger', 'is-full-width']);
     harness.remount();
   });
 
