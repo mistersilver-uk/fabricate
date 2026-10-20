@@ -9,22 +9,21 @@
  * `manifest.json` are ever replaced. The lab server binds port 0, so a lab already serving 5273 in
  * another session is left alone. Encoding is a separate local step (`scripts/README.md`).
  */
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
 import { DEMO_SEED } from '../tests/view-lab/demo/demoContent.js';
 
+import {
+  assertSafeOutput,
+  MANIFEST_FILE,
+  publishFrames,
+  removeStaleStaging,
+  STAGING_PREFIX,
+} from './lib/demoCaptureOutput.js';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { collectPageFailures, LAUNCH_ARGS } from './lib/primitiveLabBrowser.js';
 import { startLabServer } from './lib/primitiveLabSmoke.js';
@@ -37,10 +36,8 @@ const THEME_MODULE = '/src/ui/theme.js';
 const NAVIGATION_TIMEOUT_MS = 150_000;
 /** The window every scene draws, in CSS pixels; `--scale` maps it to the frame's device pixels. */
 const WINDOW = Object.freeze({ width: 1200, height: 750 });
-const DEFAULT_SCALE = 2 / 3;
-/** The only files this tool writes, and so the only ones it ever replaces. */
-const FRAME_FILE = /^\d{4}\.png$/;
-const MANIFEST_FILE = 'manifest.json';
+/** 4/3, so the default frame is 1600x1000: whole pixels from the 1200x750 window. */
+const DEFAULT_SCALE = 4 / 3;
 
 const FORGE = 'demo-emberdeep-forge';
 const PLAYER = 'fabricate-app';
@@ -55,8 +52,8 @@ const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
  */
 const CAPTIONS = Object.freeze({
   forge: { kicker: 'Routed by check', text: 'Craft by recipe. Quality by roll.', position: 'top' },
-  pack: { kicker: 'Masterwork', text: 'Straight from the anvil to the pack.', position: 'bottom' },
-  palettes: { kicker: 'Seven palettes', text: 'Seven palettes. Pick yours.', position: 'top' },
+  pack: { kicker: 'Masterwork', text: 'Straight from the anvil to the pack.', position: 'top' },
+  palettes: { kicker: 'Seven palettes', text: 'Every theme, one click.', position: 'top' },
   editor: { kicker: 'Recipe editor', text: 'Every outcome tier, authored.', position: 'top' },
   still: { kicker: 'Essence alchemy', text: 'Brew by essence, not by list.', position: 'top' },
   salvage: { kicker: 'Salvage', text: 'Break it back down.', position: 'top' },
@@ -103,32 +100,6 @@ function parseArgs(argv) {
     throw new Error('--scale needs a factor in (0, 2]');
   }
   return options;
-}
-
-/**
- * Refuse an output directory this tool could not have written: the repository root or one of its
- * ancestors, or a non-empty directory holding neither a manifest nor a numbered frame.
- */
-function assertSafeOutput(output) {
-  // An absolute answer means another drive, which cannot contain the repository.
-  const toRoot = relative(output, ROOT);
-  if (toRoot === '' || !(toRoot.startsWith('..') || isAbsolute(toRoot))) {
-    throw new Error(`refusing to write into ${output}: it is the repository root or contains it`);
-  }
-  if (!existsSync(output)) return;
-  const entries = readdirSync(output);
-  const ours = entries.some((name) => name === MANIFEST_FILE || FRAME_FILE.test(name));
-  if (entries.length > 0 && !ours) {
-    throw new Error(`refusing to write into ${output}: it holds files this tool did not write`);
-  }
-}
-
-/** Replace the previous set's frames and manifest with the new set, touching nothing else. */
-function publishFrames(staging, output) {
-  for (const name of readdirSync(output)) {
-    if (name === MANIFEST_FILE || FRAME_FILE.test(name)) rmSync(join(output, name));
-  }
-  for (const name of readdirSync(staging)) renameSync(join(staging, name), join(output, name));
 }
 
 /** Close one resource, reporting rather than throwing, so the next one still closes. */
@@ -481,12 +452,13 @@ async function salvageScene(take, open) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  assertSafeOutput(options.output, ROOT);
   const cache = resolveChromeCache(ROOT);
   if (!cache) throw new Error(missingChromeMessage(ROOT));
-  assertSafeOutput(options.output);
   mkdirSync(options.output, { recursive: true });
+  removeStaleStaging(options.output);
   // The new set is built beside the old one, which survives until the new set is complete.
-  const staging = mkdtempSync(join(options.output, '.demo-capture-'));
+  const staging = mkdtempSync(join(options.output, STAGING_PREFIX));
 
   const frames = [];
   const take = new Take({

@@ -614,12 +614,16 @@ node scripts/demo-capture.mjs tmp/demo-frames
 ```
 
 The driver writes `0001.png` onwards and a `manifest.json` carrying each frame's `durationMs`, and replaces only those files in the directory it is given.
+It refuses the repository root, an ancestor of it, and any directory holding files it did not write.
+A run stages its frames in a `.demo-capture-*` directory inside the output directory and removes it on exit.
+Every scene draws a 1200x750 window, and `--scale` sets the device pixel ratio (default 4/3), so a default frame is 1600x1000.
 If the forge roll no longer reaches Masterwork, or the still's brew no longer passes its check, after a product change, it fails and names `--seed` for re-tuning `DEMO_SEED`.
 Each beat carries a caption from the driver's `CAPTIONS` table, drawn into the page in Fabricate's own Spectral and JetBrains Mono faces and the active palette's tokens.
 The run fails if either face falls back.
 Pass `--no-captions` for a caption-free set; `manifest.json` records which one it holds under `captions`.
 
-Encoding uses Pillow, a local tool and not a repository dependency:
+Encoding uses Pillow (`pip install pillow`), a local tool and not a repository dependency.
+At the default frame size the captioned GIF comes to about 7 MB:
 
 ```python
 import json
