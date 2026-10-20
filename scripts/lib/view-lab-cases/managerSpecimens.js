@@ -183,6 +183,39 @@ const CONTROLS_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 592px ground and the height of its notices, buttons and switches. */
 const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 830 });
 
+/** The values fixture's ground, one of its sections by key, and a part of that section's stepper. */
+const VALUES_GROUND = '[data-lab-values]';
+const STEPPER_SECTION = (key) => `[data-lab-stepper="${key}"]`;
+const LAB_STEPPER = (key, part) => `${VALUES_GROUND} ${STEPPER_SECTION(key)} ${part}`;
+const INCREMENT = 'button[data-stepper-increment]';
+
+/** Each stepper `tests/view-lab/fixtures/PublishedValues.svelte` mounts, by its section's key. */
+const STEPPER_KEYS = Object.freeze(['credit', 'count', 'even', 'limit', 'card']);
+
+/**
+ * The ground once the steppers case's first five steps have acted: `credit` and `count` stepped up,
+ * `even` holding 2 and showing it after refusing a typed 3, and `card` stepped down by its key.
+ */
+const STEPPED_VALUES = [
+  VALUES_GROUND,
+  `:has(> ${STEPPER_SECTION('credit')}[data-lab-value="4"])`,
+  `:has(> ${STEPPER_SECTION('count')}[data-lab-value="3"])`,
+  `:has(> ${STEPPER_SECTION('even')}[data-lab-value="2"][data-lab-shown="2"]:not([data-lab-refused="0"]))`,
+  `:has(${STEPPER_SECTION('card')}[data-lab-value="3"])`,
+].join('');
+
+/** Each stepper inside the ground, and the ground inside the window. */
+const VALUES_CONTAINMENT = Object.freeze([
+  ...STEPPER_KEYS.map((key) => ({ container: VALUES_GROUND, target: LAB_STEPPER(key, 'input') })),
+  { container: '.window-content', target: VALUES_GROUND },
+]);
+
+/** The 2px accent ring at the focused part's own edge, by its shape alone. */
+const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
+
+/** Sized to the fixture's 320px ground and the height of its five rows. */
+const VALUES_WINDOW = Object.freeze({ width: 480, height: 520 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -437,6 +470,63 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES`
     // entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-steppers-specimen',
+    label:
+      'Specimen, mounted through the published seam — five steppers, each beside its label, after six steps that edit what the fixture mounts: a click on the plus of Days to credit, whose callback passed 4 back; Space on the plus of Crafters at the bench, which passed 3 back; 3 typed into Pairs of gloves, whose callback refused the odd number and said why beneath it; Tab from that field, which reported the 3 again, refused it again, and snapped the field back to 2; the Down arrow on Rations carried, on the darker strip, which stepped it to 3; and the Up arrow on Attempts allowed, which stepped it from 9 to its bound of 10. Reading top to bottom: Days to credit 4; Crafters at the bench 3; Pairs of gloves 2 over its reason; Attempts allowed 10 with its plus dimmed and its field carrying the accent keyboard ring at its own edge; and Rations carried 3. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each edit.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-values' },
+    steps: [
+      { selector: LAB_STEPPER('credit', INCREMENT) },
+      { selector: LAB_STEPPER('count', INCREMENT), press: 'Space' },
+      { selector: LAB_STEPPER('even', 'input'), fill: '3' },
+      { selector: LAB_STEPPER('even', 'input'), press: 'Tab' },
+      { selector: LAB_STEPPER('card', 'input'), press: 'ArrowDown' },
+      { selector: LAB_STEPPER('limit', 'input'), press: 'ArrowUp' },
+    ],
+    // Every edited state, none of which exists before its step, the refused field snapped back,
+    // and keyboard focus on the field the Up arrow took to its bound, whose plus is disabled.
+    expectSelector: `${STEPPED_VALUES} > ${STEPPER_SECTION('limit')}[data-lab-value="10"]:has(${INCREMENT}:disabled) input:focus-visible`,
+    expectCenterHit: LAB_STEPPER('limit', 'input'),
+    expectContained: VALUES_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The sheet's declared group corner and value type; no host height: the stepper's box is
+        // its own, so a lab figure would pin the fixture rather than the contract.
+        { selector: LAB_STEPPER('credit', '.fab-stepper'), styles: 'border-radius: 7px' },
+        { selector: LAB_STEPPER('credit', 'input'), styles: 'font-size: 11.5px' },
+        { selector: `${LAB_STEPPER('limit', 'input')}:focus-visible`, styles: STEPPER_RING },
+      ],
+    },
+    position: VALUES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Stepper.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-steppers-button-focus',
+    label:
+      'Specimen, mounted through the published seam — the same five steppers at rest after one step: Tab from the field of Rations carried, on the darker strip, which put keyboard focus on its plus. That button carries the accent keyboard ring, 2px wide at its own edge and inside the stepper’s outer edge; no other ring is drawn and every number is the one the fixture started at. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-values' },
+    steps: [{ selector: LAB_STEPPER('card', 'input'), press: 'Tab' }],
+    expectSelector: `${LAB_STEPPER('card', INCREMENT)}:focus-visible`,
+    expectCenterHit: LAB_STEPPER('card', INCREMENT),
+    expectContained: VALUES_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        { selector: `${LAB_STEPPER('card', INCREMENT)}:focus-visible`, styles: STEPPER_RING },
+      ],
+    },
+    position: VALUES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Stepper.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

@@ -826,7 +826,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges seven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, and the probe button', () => {
+  it('judges eleven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -842,6 +842,10 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: input',
+      'src/ui/svelte/components/Stepper.svelte: button',
+      'src/ui/svelte/components/Stepper.svelte: button',
+      'src/ui/svelte/components/Stepper.svelte: input',
+      'src/ui/svelte/components/Stepper.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
     ]);
   });
@@ -873,7 +877,7 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0'],
+      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0', 'Stepper.onChange: 1'],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -1324,6 +1328,37 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names ${claim} as a rule 9 fault`, () => {
       assert.deepEqual(focusOf(markup).faults, [`src/E.svelte: ${fault}`]);
+    });
+  }
+
+  /** Rule 9's element ids and faults over one synthetic file's `markup`. */
+  const idsOf = (markup) => {
+    const { ast } = templateOf('src/E.svelte', markup);
+    const { elements, faults } = focusableElements('src/E.svelte', ast);
+    return { ids: elements.map(({ id }) => id), faults };
+  };
+
+  it('tells two inputs that share a hook apart by their static type, and moves no unshared id', () => {
+    const markup =
+      '{#if a}<input type="text" data-in />{:else}<input type="number" data-in />{/if}';
+    assert.deepEqual(idsOf(`${markup}<input data-other />`), {
+      ids: [
+        'src/E.svelte: input[data-in][type="text"]',
+        'src/E.svelte: input[data-in][type="number"]',
+        'src/E.svelte: input[data-other]',
+      ],
+      faults: [],
+    });
+  });
+
+  for (const [claim, markup] of [
+    ['a pair with no static type', '<input data-in /><input type={kind} data-in />'],
+    ['a pair of one type', '<input type="number" data-in /><input type="number" data-in />'],
+  ]) {
+    it(`names ${claim} that shares a hook as a fault`, () => {
+      assert.deepEqual(idsOf(markup).faults, [
+        'src/E.svelte: input[data-in] names more than one element',
+      ]);
     });
   }
 
@@ -2239,7 +2274,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 17, 'the census at issue 2315');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button', 'StatusToggle'],
+      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(

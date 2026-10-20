@@ -234,4 +234,21 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'fabricate',
     restOn: 'control',
   }),
+  Object.freeze({
+    name: 'Stepper',
+    path: 'src/ui/svelte/components/Stepper.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'data', required: true }),
+      min: Object.freeze({ kind: 'data' }),
+      max: Object.freeze({ kind: 'data' }),
+      step: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      decrementLabel: Object.freeze({ kind: 'data', required: true }),
+      incrementLabel: Object.freeze({ kind: 'data', required: true }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+    }),
+    rest: false,
+    root: 'fabricate',
+  }),
 ]);

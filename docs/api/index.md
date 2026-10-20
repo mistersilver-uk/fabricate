@@ -2045,6 +2045,7 @@ The published components, in publication order:
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback) | yes |
 | `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
+| `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2520,6 +2521,92 @@ const props = () => ({
 const toggle = fabUi.mount('StatusToggle', { target, props: props() });
 ```
 
+### Stepper
+
+`Stepper` draws the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+The input is the control, so the number is always typeable.
+`value` is required and is the finite number the stepper holds.
+A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
+`ariaLabel` is required and is the input's name, final display text naming the quantity, as "Days to credit".
+`decrementLabel` and `incrementLabel` are required and name the two buttons from the same words: "Decrease days to credit", "Increase days to credit".
+The buttons' faces are a minus and a plus glyph alone, and no tooltip shows either name.
+Draw the quantity's name as visible text beside the stepper, and make `ariaLabel` contain those words.
+A name of white space alone leaves the control with no name, so never pass one.
+To return focus to a stepper, focus its input, `target.querySelector('input')`.
+`min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
+`step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
+Outside this, what is drawn for `min`, `max` or `step` is private.
+The arrow keys and the wheel step to the next point on the grid from `min`, which is not always `value ± step`, so check what you are given.
+`onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so if you refused the earlier call you are told again.
+Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so do not assume the window is open when `onChange` runs; a mount you have destroyed reports nothing.
+The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so if you hold whole numbers, round it and pass your own value back.
+Pass an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
+An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
+`onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
+The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when your `update` passes it.
+To refuse a number, pass `value` unchanged.
+The input shows what was typed until it loses focus, and Fabricate then replaces it with `value`, so say why in a live region of your own.
+Fabricate announces nothing when it restores a refused value; explain a refusal in your own live region.
+At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
+Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, move focus to the input, `target.querySelector('input')`, in the same handler.
+The stepper has no unavailable state at version 1 beyond its bounds.
+Do not draw a quantity the user cannot change right now as a stepper: destroy it, moving focus first if one of its parts holds it, and show the number as text of your own.
+Answer a refused edit in text of your own, in a live region.
+The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
+The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
+`Stepper` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Stepper`.
+`Stepper` needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager and the player window; give `target` `display: flex` and align your own label to the stepper by centring.
+Your own window or dialog carries no Fabricate root, so the stepper is refused there with `Stepper needs a Fabricate window ancestor`.
+The input and the two buttons are the only focusable elements inside `target`.
+An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so leave no room for it, provided nothing of your own clips inside the stepper's box.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max` are private.
+
+A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
+
+```javascript
+// After `load(['Stepper'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the stepper describes none: draw your own number field there.
+if (fabUi?.describe?.('Stepper')?.props.onChange?.kind !== 'callback') return;
+
+// Your label beside `target`, in the same Fabricate window: <span>Days to credit</span>,
+// and a live region of your own for a refusal: <p id="acme-credit-note" aria-live="polite"></p>.
+const note = target.ownerDocument.getElementById('acme-credit-note');
+target.style.display = 'flex';
+target.style.alignItems = 'center';
+const MOST_DAYS = 30;
+let days = acmeCredit.days;
+const props = () => ({
+  value: days,
+  max: MOST_DAYS,
+  ariaLabel: 'Days to credit', // The words your label draws.
+  decrementLabel: 'Decrease days to credit',
+  incrementLabel: 'Increase days to credit',
+  onChange: (next) => {
+    const whole = Math.round(next); // The argument is not rounded to the step.
+    if (whole < 1) {
+      // Pass nothing new: the input shows the typed number until it loses focus, then `days`.
+      // Fabricate announces nothing as it restores `days`, so your live region says why.
+      note.textContent = 'Credit at least one day.';
+      return;
+    }
+    note.textContent = '';
+    const input = target.querySelector('input');
+    const focused = target.ownerDocument.activeElement;
+    // The increment button disables at the bound, so move focus off it first.
+    if (whole === MOST_DAYS && focused !== input && target.contains(focused)) input.focus();
+    days = whole;
+    acmeCredit.days = days; // Your own state first.
+    // Every prop again, with the new `value`, in this handler and before any `await`:
+    // a later `update` draws after the field has shown the held value.
+    stepper.update(props());
+  },
+});
+const stepper = fabUi.mount('Stepper', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2714,7 +2801,7 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -2724,7 +2811,7 @@ A published component draws a control only where its section says so, and each c
 - A control consumes only the keys the platform gives its native element, and its section names any other.
   Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
-- A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
+- A control draws its own mark for keyboard focus where the component's `root` is `any`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.

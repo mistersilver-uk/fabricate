@@ -1,5 +1,5 @@
 // One combined suite for the four Recipe Studio behavioural primitives (issue 643
-// §7). They are import-free leaves, so each mounts from a one-entry harness; the
+// §7). They are leaves importing nothing but Svelte, so each mounts from a one-entry harness; the
 // harnesses are built from a table rather than four near-identical files, because
 // `tests/**` duplication counts against the SonarCloud new-code gate.
 import { describe, it, before, after, afterEach } from 'node:test';
@@ -11,7 +11,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// Every primitive is a leaf: no rawModules.
+// Every primitive is a leaf: no rawModules (a named `svelte` import needs none).
 const PRIMITIVES = ['Stepper', 'Medallion', 'CollapsibleGroupHeader'];
 
 const harnesses = new Map(
@@ -29,6 +29,17 @@ const harnesses = new Map(
   })
 );
 
+// A named import from the bare `svelte` package never enters a mount-harness allowlist (the
+// harness's dependency closure follows only relative specifiers), so it is the one import a leaf
+// may carry; every other import line is returned as a violation.
+const SVELTE_NAMED_IMPORT = /^\s*import\s*\{[\w\s,]*\}\s*from\s*(?:'svelte'|"svelte");?\s*$/;
+
+function localImports(source) {
+  return (source.match(/^\s*import\s.*$/gm) || []).filter(
+    (line) => !SVELTE_NAMED_IMPORT.test(line)
+  );
+}
+
 function harnessFor(name) {
   return harnesses.get(name);
 }
@@ -43,18 +54,39 @@ afterEach(() => {
   for (const harness of harnesses.values()) harness.remount();
 });
 
-describe('Recipe Studio primitives are import-free leaves', () => {
+describe('Recipe Studio primitives are leaves importing nothing but Svelte', () => {
   it('never imports foundryBridge, a model, or a util', () => {
     for (const name of PRIMITIVES) {
       const source = readFileSync(
         resolve(repoRoot, `src/ui/svelte/components/${name}.svelte`),
         'utf8'
       );
-      const imports = source.match(/^\s*import\s.*$/gm) || [];
       assert.deepEqual(
-        imports,
+        localImports(source),
         [],
-        `${name}.svelte must stay props-only — an import here propagates a required raw-module entry into every mount-harness allowlist`
+        `${name}.svelte must stay props-only — any import but a named one from the svelte package propagates a required raw-module entry into every mount-harness allowlist`
+      );
+    }
+  });
+
+  it('admits only named imports from the svelte package (synthetic controls)', () => {
+    assert.deepEqual(localImports("<script>\n  import { tick } from 'svelte';\n</script>"), []);
+    assert.deepEqual(
+      localImports('<script>\n  import { onMount, tick } from "svelte";\n</script>'),
+      []
+    );
+    for (const line of [
+      "  import { localize } from '../../foundryBridge.js';",
+      "  import { clamp } from '../utils/clamp.js';",
+      "  import Chip from './Chip.svelte';",
+      "  import { fade } from 'svelte/transition';",
+      "  import * as svelte from 'svelte';",
+      "  import svelte from 'svelte';",
+    ]) {
+      assert.deepEqual(
+        localImports(`<script>\n${line}\n</script>`),
+        [line],
+        `must fail closed: ${line}`
       );
     }
   });
