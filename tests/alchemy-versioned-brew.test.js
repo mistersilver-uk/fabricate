@@ -55,6 +55,9 @@ class OwnedItem {
   }
 }
 
+/** Every fake actor by uuid, so a refund resolves its recorded source actor as Foundry would. */
+const ACTORS = new Map();
+
 class BrewActor {
   constructor(id, items = []) {
     this.id = id;
@@ -65,6 +68,7 @@ class BrewActor {
     for (const item of items) item._parent = this;
     this.flags = {};
     this.created = [];
+    ACTORS.set(this.uuid, this);
   }
 
   getFlag(namespace, key) {
@@ -205,7 +209,8 @@ function brewWorld(recipe, { alchemy = {}, craftingCheck = {}, essences = true }
       getCraftingRunManager: () => runManager,
     },
   };
-  Object.assign(globalThis, { foundry, fromUuid, game });
+  const fromUuidSync = (uuid) => ACTORS.get(uuid) ?? null;
+  Object.assign(globalThis, { foundry, fromUuid, fromUuidSync, game });
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
   return { engine, runManager, visibility, system };
 }
@@ -430,7 +435,7 @@ test('a matched brew the submission cannot fund is refused with nothing spent an
 });
 
 /** A one-herb brew started under `options`, ready for its execute. */
-async function startedHerbBrew(options = {}) {
+async function startedHerbBrew(options = {}, componentIds = ['herb']) {
   const world = brewWorld(
     brewRecipe([{ id: 'base', options: [component('herb')] }], {
       resultGroups: [SUCCESS, FAILURE],
@@ -438,9 +443,10 @@ async function startedHerbBrew(options = {}) {
     options
   );
   const herb = item('herb', 'Herb');
-  const source = new BrewActor('source', [herb]);
+  const salt = item('salt', 'Salt');
+  const source = new BrewActor('source', [herb, salt]);
   const crafter = new BrewActor('crafter');
-  const { started } = await startBrew(world, { crafter, source, componentIds: ['herb'] });
+  const { started } = await startBrew(world, { crafter, source, componentIds });
   assert.equal(started.success, true, started.message);
   assert.equal(herb.deleted, true, 'the start spends the bench');
   return { world, crafter, source, started };
@@ -483,10 +489,50 @@ test("consumeOnFail false returns a failed Simple brew's start spend over the ge
   );
   assert.ok(refund, 'the refund is journalled');
   assert.equal(refund.receipt.restoredCount, 1);
-  assert.ok(
-    brew.crafter.created.some((made) => made.name === 'Herb'),
-    'the herb is restored'
+  assert.deepEqual(
+    brew.source.created.map((made) => made.name),
+    ['Herb'],
+    'the herb returns to the actor it came from'
   );
+  assert.deepEqual(
+    brew.crafter.created.map((made) => made.name),
+    ['Sludge'],
+    'the crafter receives only the failure result'
+  );
+});
+
+const ONE_FAIL_REFUND = {
+  alchemy: { ...SIMPLE, consumeOnFail: false },
+  craftingCheck: { consumption: { consumeIngredientsOnFail: true } },
+};
+
+test('consumeOnFail false also returns the residual units the start spent', async () => {
+  const brew = await startedHerbBrew(ONE_FAIL_REFUND, ['herb', 'salt']);
+  await executeBrew(brew.world, { ...brew, checkResult: FAILED });
+  const history = brew.world.runManager.getRunHistory(brew.crafter)[0];
+  const refund = history.executionJournal.effects.find(
+    (effect) => effect.effectId === 'refund-start-consumption'
+  );
+  assert.equal(refund.receipt.restoredCount, 2);
+  assert.deepEqual(brew.source.created.map((made) => made.name).sort(), ['Herb', 'Salt']);
+});
+
+test('cancelling a started brew returns its residual units as well', async () => {
+  const brew = await startedHerbBrew({ alchemy: SIMPLE }, ['herb', 'salt']);
+  brew.world.engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: 'cancel-operation' }),
+  });
+  const cancelled = await brew.world.engine.cancelVersionedRun({
+    actor: brew.crafter,
+    runId: brew.started.runId,
+    expectedRevision: brew.world.runManager.getActiveRun(brew.crafter, brew.started.runId)
+      .runRevision,
+    executionGrant: 'cancel-grant',
+    requestId: 'cancel-request',
+  });
+  assert.equal(cancelled.refunded, true);
+  assert.equal(cancelled.restoredCount, 2);
+  assert.deepEqual(brew.source.created.map((made) => made.name).sort(), ['Herb', 'Salt']);
 });
 
 test('a Tiered brew that fails keeps the generic consumption policy', async () => {
@@ -533,7 +579,9 @@ test('an alternative the submission fits but cannot spare is not pinned over one
     componentIds: ['herb', 'salt'],
   });
 
-  assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, { greens: { optionIndex: 1 } });
+  assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, {
+    greens: { optionIndex: 1 },
+  });
   assert.equal(started.success, true, started.message);
   assert.equal(herb.deleted && salt.deleted, true);
 });
@@ -600,4 +648,46 @@ test('a later alternative group is not pinned to a tag the earlier group needs',
 
   assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, { b: { optionIndex: 1 } });
   assert.equal(started.success, true, started.message);
+});
+
+for (const [label, quantity] of [
+  ['more units than the stack holds', 1],
+  ['a stack stored at zero', 0],
+]) {
+  test(`a submission claiming ${label} is refused with nothing spent`, async () => {
+    const world = brewWorld(brewRecipe([{ id: 'base', options: [component('herb')] }]));
+    const herbs = item('herbs', 'Herb', quantity);
+    const source = new BrewActor('source', [herbs]);
+    const crafter = new BrewActor('crafter');
+    const records = [
+      { item: herbs, componentId: 'herb' },
+      { item: herbs, componentId: 'herb' },
+    ];
+
+    const { started } = await startBrew(world, { crafter, source, records });
+
+    assert.equal(started.success, false);
+    assert.equal(started.message, 'The submitted alchemy ingredients are stale.');
+    assert.equal(herbs.system.quantity, quantity, 'nothing is spent');
+    assert.deepEqual(world.runManager.getActiveRuns(crafter), []);
+  });
+}
+
+test('a component and an essence requirement on the same carrier fund from two units', async () => {
+  const world = brewWorld(
+    brewRecipe([
+      { id: 'core', options: [component('ember')] },
+      { id: 'heat', options: [essence('fire', 2)] },
+    ])
+  );
+  const embers = item('embers', 'Ember', 3);
+  const source = new BrewActor('source', [embers]);
+  const crafter = new BrewActor('crafter');
+
+  const { started } = await startBrew(world, { crafter, source, componentIds: ['ember', 'ember'] });
+
+  assert.equal(started.success, true, started.message);
+  assert.equal(embers.system.quantity, 1, 'one unit for the component, one for the essence');
+  const settled = await executeBrew(world, { crafter, source, started });
+  assert.equal(settled.createdResultUuids.length, 1);
 });

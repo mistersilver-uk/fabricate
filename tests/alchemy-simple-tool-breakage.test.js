@@ -601,6 +601,8 @@ async function runVersionedAlchemyFailure(breakToolsOnFail, { withTrigger = fals
     return [];
   };
   // Each grant carries what the authority binds for its operation: only the start is attested.
+  // The set is duck-typed (`matchIngredients` only), so the start skips submission funding and
+  // the grant needs no submitted units: this suite pins tool breakage, not the funded start.
   engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) =>
       context.operation === 'start'
