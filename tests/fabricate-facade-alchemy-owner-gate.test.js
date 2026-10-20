@@ -3,6 +3,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { serializedOperationResult } from '../src/systems/journalRunReply.js';
+import { versionedTransitionResult } from '../src/systems/versionedCommandResults.js';
+
 import {
   createFabricateFacadeHarness,
   makeFacadeActor,
@@ -250,12 +253,14 @@ test('submitAlchemyAttempt: a ready matched brew executes in the same call (issu
   const commands = [];
   facade.executeJournalRunCommand = async (command, options) => {
     commands.push({ command, options });
-    return {
-      success: true,
-      disposition: 'succeeded',
-      runId: command.runId,
-      createdResultUuids: ['Item.made'],
-    };
+    const run = { id: command.runId, status: 'succeeded', runRevision: 4, currentStepIndex: null };
+    return serializedOperationResult(
+      versionedTransitionResult(run, {
+        success: true,
+        disposition: 'succeeded',
+        createdResultUuids: ['Item.made'],
+      })
+    );
   };
   const result = await facade.submitAlchemyAttempt({
     actorId: 'pc',

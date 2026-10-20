@@ -45,5 +45,8 @@ export async function executePublicBrew({
     // The start already spent the bench, so a lost execute still answers the live run.
     settled = { success: false, reason: 'operation-failed' };
   }
-  return { ...started, ...settled };
+  // The execute reply speaks for the outcome; a secret one names none, so the start's own
+  // `disposition` and created results must not stand in for it.
+  const { disposition: _started, createdResultUuids: _none, ...run } = started;
+  return { ...run, ...settled };
 }

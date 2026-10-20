@@ -135,3 +135,16 @@ test('an execute that rejects after the start answers the live run instead of th
   assert.equal(result.runId, 'run-1');
   assert.equal(result.requiresExecution, true);
 });
+
+test('a secret execute reply replaces the start disposition and created results', async () => {
+  const run = { id: 'run-1', status: 'succeeded', runRevision: 5, currentStepIndex: null };
+  const settled = serializedOperationResult(versionedTransitionResult(run, { success: true }), {
+    secret: true,
+  });
+  const result = await brew({ started: startReply(), settled }).reply;
+  assert.equal(result.success, true);
+  assert.equal(result.secret, true);
+  assert.equal(result.runId, 'run-1');
+  assert.equal(Object.hasOwn(result, 'disposition'), false, 'not the start disposition');
+  assert.equal(Object.hasOwn(result, 'createdResultUuids'), false);
+});

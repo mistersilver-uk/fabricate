@@ -52,6 +52,10 @@ export function classifyBrewReply(
     const status = tiered ? 'tiered-tier' : 'success';
     return { lastBrew: banner(status, wordedMessage(result, localize)), notice: '' };
   }
+  // A check kept secret from the player names no outcome, only where the run ended.
+  if (result?.secret === true && result.status === 'failed') {
+    return { lastBrew: banner('check-failed'), notice: '' };
+  }
   const failed = failureStatus(result);
   if (failed === 'produced-on-failure') {
     return { lastBrew: banner(failed, wordedMessage(result, localize)), notice: '' };

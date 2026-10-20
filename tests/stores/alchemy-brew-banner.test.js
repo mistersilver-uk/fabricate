@@ -135,3 +135,30 @@ test('an unfunded brew reaches the banner as a refusal in player wording', () =>
     assert.equal(notice, lastBrew.message);
   }
 });
+
+/** A started brew whose execute ran a check secret from the player: the reply names no outcome. */
+const secretlyExecuted = (success) => {
+  const ran = {
+    id: 'run-1',
+    status: success ? 'succeeded' : 'failed',
+    runRevision: 4,
+    currentStepIndex: null,
+  };
+  const { disposition: _spent, createdResultUuids: _stale, ...live } = started();
+  return {
+    ...live,
+    ...serializedOperationResult(versionedTransitionResult(ran, { success }), { secret: true }),
+  };
+};
+
+test('a secretly checked brew that passed reads success', () => {
+  assert.deepEqual(
+    [read(secretlyExecuted(true)).lastBrew.status, read(secretlyExecuted(true)).notice],
+    ['success', '']
+  );
+});
+
+test('a secretly checked brew that failed reads check-failed and raises nothing', () => {
+  const { lastBrew, notice } = read(secretlyExecuted(false));
+  assert.deepEqual([lastBrew.status, notice], ['check-failed', '']);
+});
