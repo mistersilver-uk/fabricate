@@ -18,8 +18,9 @@
   Values (issue 2453):
   - `query` and `count` — bound values, each written by its own input's `oninput` through
     `value = next`, never `bind:value`; `count` reads its input as a number, so `-0` is written.
-  - `mirror` — a bound value an effect writes once per distinct `mirrorAt`, which no shipped
-    component may do: `tests/published-component-controls.test.js` pins it as the exception.
+  - `mirror` — a bound value an effect writes once per distinct `mirrorAt`, `null` writing
+    `undefined`, which no shipped component may do: `tests/published-component-controls.test.js`
+    pins it as the exception.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
@@ -77,7 +78,7 @@
   });
 
   $effect(() => {
-    if (mirroredAt !== undefined) mirror = mirroredAt;
+    if (mirroredAt !== undefined) mirror = mirroredAt ?? undefined;
   });
 
   if (untrack(() => throwAt) === 'init') throw PROBE_FAULTS.init;

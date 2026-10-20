@@ -10,8 +10,9 @@
   first `arity` arguments under `untrack` (issue 2452). `values` holds each `value` key's value,
   which every drawn props object carries as one stable accessor pair for the life of the mount; a
   write from the component calls the seam's `flush` before and, when the delivery changed the
-  value, after its `on<Key>Change` delivery, outside an effect only. `setProps(next, values)` sets
-  only the value keys `values` holds, and `getValue(key)` reads one (issue 2453).
+  value, after its `on<Key>Change` delivery, outside an effect only; a write of `undefined` records
+  the key's `initial`. `setProps(next, values)` sets only the value keys `values` holds, and
+  `getValue(key)` reads one (issue 2453).
   The outer boundary takes what the inner one throws while it tears a faulted component down,
   which Svelte hands to the next boundary up.
 -->
@@ -75,7 +76,8 @@
 
   // The flush before delivery draws the write, so a value put back inside the callback differs
   // from what the DOM last drew; an effect's write is drawn by the flush already running it.
-  function write(key, deliver, next) {
+  function write(key, { deliver, initial }, written) {
+    const next = written === undefined ? initial : written;
     const previous = untrack(() => held[key]);
     if (Object.is(next, previous)) return;
     const resync = !$effect.tracking();
@@ -91,8 +93,8 @@
   const accessors = untrack(() =>
     Object.fromEntries(
       Object.keys(values).map((key) => {
-        const { deliver } = callbackOf(key);
-        const set = (next) => write(key, deliver, next);
+        const delivery = callbackOf(key);
+        const set = (next) => write(key, delivery, next);
         return [key, { enumerable: true, configurable: true, get: () => held[key], set }];
       })
     )

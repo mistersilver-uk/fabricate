@@ -20,6 +20,7 @@ import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
 import Notice from './svelte/components/Notice.svelte';
 import Rail from './svelte/components/Rail.svelte';
+import SearchField from './svelte/components/SearchField.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
@@ -45,6 +46,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Button.svelte': Button,
   'src/ui/svelte/components/StatusToggle.svelte': StatusToggle,
   'src/ui/svelte/components/Stepper.svelte': Stepper,
+  'src/ui/svelte/components/SearchField.svelte': SearchField,
 });
 
 export const publishedComponentRuntime = Object.freeze({

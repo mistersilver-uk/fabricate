@@ -267,6 +267,16 @@ describe('a value key written by an effect', () => {
     assert.equal(flushes.count, 0, 'never inside an effect');
     assert.equal(handle.value('mirror'), 'm');
   });
+
+  it('records a write of undefined as the key’s initial', async () => {
+    const change = changes();
+    const { handle } = mountProbe({ mirror: 'held', onMirrorChange: change.record });
+    await settle();
+    assert.equal(handle.update({ mirrorAt: null, onMirrorChange: change.record }), true);
+    await settle();
+    assert.deepEqual(change.calls, [['', 'held']]);
+    assert.equal(handle.value('mirror'), '');
+  });
 });
 
 describe('the value refusals and the dead handle', () => {

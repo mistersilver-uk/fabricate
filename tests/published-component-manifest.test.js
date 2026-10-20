@@ -705,6 +705,13 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * then, the tags of those it keeps undrawn, and in `heldBy` the mounted clause that holds both.
  */
 const REST_LANDINGS = Object.freeze({
+  'src/ui/svelte/components/SearchField.svelte': {
+    drawn: 'label',
+    undrawn: ['Field'],
+    defaults: ['label'],
+    heldBy:
+      'tests/components/published-search-mounted.test.js: the default draws the label root alone',
+  },
   'src/ui/svelte/components/StatusToggle.svelte': {
     drawn: 'button',
     undrawn: ['input', 'span'],
@@ -755,7 +762,8 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
 /**
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
- * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
+ * is, and a rest the gate sees on no element, reads anywhere but in those spreads, or hands to a
+ * child component its pin does not name undrawn, fails closed.
  * An entry `landings` pins is judged by its drawn landing alone, and every entry by the twin rule.
  * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
  * the entry's `aria` keys among it.
@@ -763,11 +771,14 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
 function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
   const every = restElements(ast);
-  if (every.length === 0) return [NO_REST_ELEMENT];
+  if (every.every(({ node }) => node.type === 'Component')) return [NO_REST_ELEMENT];
   const pin = landings[entry.path];
   const pinned = pin ? landingPinFaults(entry, ast, every, pin) : [];
   const landed = pin ? every.filter(({ node }) => node.name === pin.drawn) : every;
   const shape = [...pinned, ...branchTwinFaults(ast)];
+  const handed = every.filter(
+    ({ node }) => node.type === 'Component' && !pin?.undrawn.includes(node.name)
+  );
   const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
   const controls = landed.filter(({ node }) => judged.includes(node));
   if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
@@ -775,7 +786,7 @@ function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS)
   const stated = entry.restOn === 'control';
   return [
     ...shape,
-    ...(restReads(ast) > every.length ? [UNFOLLOWED_REST] : []),
+    ...(restReads(ast) > every.length || handed.length > 0 ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
     ...controls.flatMap((control) =>
@@ -853,7 +864,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges thirteen focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges fourteen focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -867,6 +878,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/SearchField.svelte: input',
       'src/ui/svelte/components/StatusToggle.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: button',
@@ -892,8 +904,11 @@ describe('each entry matches its component declaration', () => {
     const held = Object.values(REST_LANDINGS).map(({ heldBy }) => heldBy);
     assert.deepEqual(
       Object.keys(REST_LANDINGS),
-      ['src/ui/svelte/components/StatusToggle.svelte'],
-      'the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
+      [
+        'src/ui/svelte/components/SearchField.svelte',
+        'src/ui/svelte/components/StatusToggle.svelte',
+      ],
+      'the search field, whose unpublished label keeps its Field root undrawn, and the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
     );
     assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
   });
@@ -1629,12 +1644,12 @@ describe('each entry matches its component declaration', () => {
   const CHILD = 'src/E.svelte';
   const UNKEYED = { [DYNAMIC]: { tags: ['span'], keys: [] } };
   /** The pin faults of a child whose tag reads its prop `tagProp`, beside a parent that draws it as `drawn`. */
-  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag') => {
+  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag', parentKeys = new Map()) => {
     const sources = {
       [CHILD]: `<script>let { ${tagProp} = 'span', ...rest } = $props();</script><svelte:element this={${tagProp}}></svelte:element>`,
-      'src/Parent.svelte': `<script>import Child from './E.svelte';</script>${drawn}`,
+      'src/Parent.svelte': `<script>import Child from './E.svelte'; let { label, ...rest } = $props();</script>${drawn}`,
     };
-    const published = { [CHILD]: new Map([['as', 'as']]) };
+    const published = { [CHILD]: new Map([['as', 'as']]), 'src/Parent.svelte': parentKeys };
     const files = Object.entries(sources).map(([file, source]) => ({
       file,
       ast: templateOf(file, source).ast,
@@ -1651,8 +1666,15 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(passedFaultsOf('<Child as="p" {...more} />', keyed, 'as'), []);
   });
 
+  it('passes a parent that names a pinned tag by a literal, and an entry that spreads its own rest', () => {
+    assert.deepEqual(passedFaultsOf('<Child tag="span" />'), []);
+    const entry = new Map([['label', 'label']]);
+    assert.deepEqual(passedFaultsOf('<Child {...rest} />', UNKEYED, 'tag', entry), []);
+  });
+
   for (const [claim, drawn, faults] of [
     ['the prop by name', '<Child tag="button" />', [PASSED('tag')]],
+    ['its rest, from a file that is no entry', '<Child {...rest} />', [PASSED('a spread')]],
     ['the prop from an expression', '<Child tag={kind} />', [PASSED('tag')]],
     ['the prop by a binding', '<Child bind:tag={kind} />', [PASSED('tag')]],
     ['a spread', '<Child {...more} />', [PASSED('a spread')]],
@@ -2352,7 +2374,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 17, 'the census at issue 2315');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper'],
+      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper', 'SearchField'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(

@@ -22,8 +22,11 @@
     `<label class="fabricate-search">` wrapping a glyph and the input, which has no text of its
     own. `tests/components/manager-filter-bar-source-contract.test.js` holds every call site to
     exactly one, and this component warns when it is given none or several.
-  - `{...rest}` lands on the root. The input's own `type`, `value`, name and `oninput` are written
-    after `inputProps`, and a caller's `oninput` runs AFTER `onChange` rather than replacing it.
+  - `{...rest}` lands on the root. The input's own `type`, `value`, name, `oninput` and
+    `onkeydown` are written after `inputProps`; a caller's `oninput` runs AFTER `onChange`, and
+    its `onkeydown` after the Enter guard, rather than replacing them.
+  - IT NEVER SUBMITS ITS FORM: Enter in the input, outside IME composition, cancels the implicit
+    submission of the form the input is in (issue 2453).
   - It writes no scoped `<style>`: `styles/fabricate.css` owns the `fabricate-search` family.
 -->
 <script>
@@ -48,7 +51,11 @@
   );
   const fieldClasses = $derived(['fabricate-search-field', extraClass].filter(Boolean).join(' '));
 
-  const { oninput: callerInput = undefined, ...inputAttributes } = $derived(inputProps ?? {});
+  const {
+    oninput: callerInput = undefined,
+    onkeydown: callerKeydown = undefined,
+    ...inputAttributes
+  } = $derived(inputProps ?? {});
 
   const namingRoutes = $derived([label, ariaLabel, ariaLabelledBy].filter(Boolean).length);
 
@@ -66,6 +73,13 @@
     onChange?.(next, event);
     callerInput?.(event);
   }
+
+  function handleKeydown(event) {
+    if (event.key === 'Enter' && !event.isComposing && event.currentTarget.form) {
+      event.preventDefault();
+    }
+    callerKeydown?.(event);
+  }
 </script>
 
 {#snippet control()}
@@ -78,6 +92,7 @@
     aria-label={label ? undefined : ariaLabel || undefined}
     aria-labelledby={label ? undefined : ariaLabelledBy || undefined}
     oninput={handleInput}
+    onkeydown={handleKeydown}
   />
 {/snippet}
 
