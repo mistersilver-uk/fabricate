@@ -708,7 +708,14 @@ describe('RecipesBrowserView lock and enable controls', () => {
 
     for (const id of ['r1', 'r2']) {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
-      assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
+      const lock = row.querySelector('[data-recipe-lock]');
+      assert.ok(lock, 'the lock control is present');
+      // Its hint, not its name, is the tooltip (issue 2541): what a lock does, in both states.
+      assert.equal(
+        lock.getAttribute('data-tooltip-text'),
+        'Locked recipes stay visible to players, but only a GM can craft them.'
+      );
+      assert.ok(!lock.hasAttribute('title'), 'and no native title stacks a second');
       assert.ok(row.querySelector('.fabricate-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643).
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
