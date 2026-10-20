@@ -82,8 +82,8 @@ You cannot rename them or assign anything to them, because the check picks them 
 The failure set has a danger-colored border.
 A passed roll produces the success set.
 A failed roll produces the failure set, if the recipe has one.
-A failed check is still a genuine outcome, not a fizzle, so the components are consumed and the recipe can still be learned.
-The failure set may be left empty, in which case a failed brew consumes the components and produces nothing, but it is still recorded as a failed brew rather than a fizzle.
+A failed check is still a genuine outcome, not a fizzle, so the recipe can still be learned, and the components are consumed unless the system's [Consume on Fail](#consume-on-fail) setting is off.
+The failure set may be left empty, in which case a failed brew produces nothing (and consumes the components while Consume on Fail is on), but it is still recorded as a failed brew rather than a fizzle.
 An empty failure set shows a note saying so, rather than a warning.
 
 If the system's **Produce a result on a failed check** setting is **Never**, for a recipe with no failure set the toggle is disabled and a note explains why.
@@ -111,7 +111,8 @@ You can change this with the system's Consume on Fail setting.
 
 You set this with the **Consume ingredients on a failed brew** toggle, on the **Alchemy behaviour** card of the **On failure** section of **Checks › Crafting**.
 It is on by default.
-The same toggle also governs a matched brew that fails its check, which consumes its ingredients the same way a fizzle does.
+The same toggle also governs a matched brew that fails a Simple check.
+A brew spends its bench when it starts, so with the toggle off a failed Simple brew returns those ingredients.
 You can also update it through the [System Manager API reference]({% link api/system-manager.md %}).
 
 ---
@@ -260,7 +261,12 @@ When that option is off, a combination that makes nothing keeps reading as **Unt
 **Brew** submits the components on the bench as an attempt for the selected character.
 
 - If the combination matches a recipe, that recipe is brewed.
-Its ingredients are consumed, its results are created, and a newly discovered recipe is added to your Known recipes list.
+Everything on the bench is consumed when the brew starts, including extra components the recipe does not need.
+The recipe's results are created, and when the system's [Learn on Craft](#learn-on-craft) setting is on, a newly discovered recipe is added to your Known recipes list.
+The brew draws only on the units you placed on the bench, never on other items the character holds.
+If the placed units cannot cover the recipe, for example because one component is needed both as itself and for its essence, the brew is refused and nothing is consumed.
+A refused brew is not recorded as a fizzle and does not discover the recipe.
+- A recipe with a time requirement starts when you brew it and finishes later from the Journal, and the banner says the mixture is set to work.
 - If the combination matches nothing, the attempt fizzles.
 Whether the components are consumed then depends on the system's [Consume on Fail](#consume-on-fail) setting.
 
@@ -270,7 +276,10 @@ A failed Simple check produces the recipe's failure result set instead of its su
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
 A banner confirms the outcome after each brew.
-It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, or the mixture fizzled.
+It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, failed its check with nothing produced, set a time-gated brew to work, left a brew waiting in your Journal, stopped a brew after it started, was refused, or the mixture fizzled.
+A brew that started but did not finish has already used the bench.
+When it is waiting for its check or a choice, the banner says the brew is waiting in your Journal.
+When you dismissed the roll or the brew was refused after it started, the banner says the brew did not finish, and you can finish or cancel it from the Journal.
 
 A failed brew is also recorded in the character's Journal history, whether it failed its check or fizzled with no match.
 A fizzle is listed there as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal a recipe you have not yet discovered.

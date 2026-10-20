@@ -144,11 +144,13 @@ export class IngredientSet {
     return selection.success ? selection.plan : [];
   }
 
-  /** The option per group, the item plan and, given a currency probe, the spends. */
+  /** The option per group, the item plan and, given a currency probe, the spends. A supplied
+   * `options.seedRemaining` sets the units each item offers in place of its stack quantity. */
   resolveIngredientSelection(availableItems, matcher = null, options = {}) {
     return createIngredientSolver({
       ingredientGroups: this.ingredientGroups,
       ingredientSetId: this.id,
+      ...(options.seedRemaining && { seedRemaining: options.seedRemaining }),
     }).resolve(availableItems, matcher, options);
   }
 

@@ -1634,7 +1634,7 @@ Displayed as compact entries with quantity badges.
 Components move between the component inventory and the workbench.
 Derived state, not persisted.
 Owned by the new `alchemyStore` (NOT `craftingStore`).
-Submitting brews via the engine (`submitAlchemyAttempt` -> `craftAlchemy`), which is authoritative.
+Submitting brews via the engine (`submitAlchemyAttempt` -> `executePublicBrew` -> `craftAlchemy` start, then execute when ready), which is authoritative; a matched version-1 brew spends every submitted unit at start, from the submission only.
 
 Canonical mapping: `alchemyStore.workbench` (`src/ui/svelte/stores/alchemyStore.svelte.js`); `src/ui/svelte/apps/alchemy/Workbench.svelte`
 

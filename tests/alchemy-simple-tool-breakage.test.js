@@ -600,20 +600,24 @@ async function runVersionedAlchemyFailure(breakToolsOnFail, { withTrigger = fals
     if (delegate) return originalApplyToolBreakage.call(engine, ...args);
     return [];
   };
+  // Each grant carries what the authority binds for its operation: only the start is attested.
+  // The set is duck-typed (`matchIngredients` only), so the start skips submission funding and
+  // the grant needs no submitted units: this suite pins tool breakage, not the funded start.
   engine.installVersionedRunAuthority({
-    consumeExecutionGrant: async (_grant, context) => ({
-      operationId: `${context.operation}-operation`,
-      resolvedCheckResult: {
-        success: false,
-        message: 'Alchemy check failed',
-        outcome: 'fail',
-        value: 4,
-        data: { total: 4 },
-        engineEvaluated: true,
-      },
-      activityKind: 'alchemy',
-      alchemySubmittedItems: [],
-    }),
+    consumeExecutionGrant: async (_grant, context) =>
+      context.operation === 'start'
+        ? { operationId: 'start-operation', matched: true, activityKind: 'alchemy', recipeId: recipe.id }
+        : {
+            operationId: `${context.operation}-operation`,
+            resolvedCheckResult: {
+              success: false,
+              message: 'Alchemy check failed',
+              outcome: 'fail',
+              value: 4,
+              data: { total: 4 },
+              engineEvaluated: true,
+            },
+          },
   });
   const started = await engine.startVersionedRun({
     viewer: game.user,

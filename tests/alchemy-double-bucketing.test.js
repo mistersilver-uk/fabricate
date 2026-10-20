@@ -23,6 +23,7 @@ globalThis.game = { user: { isGM: true }, actors: [], fabricate: {} };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { versionedBrewStartReply } = await import('./helpers/fabricateFacadeHarness.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { resolveAlchemySubmissions } = await import('../src/utils/alchemySubmissions.js');
@@ -179,7 +180,7 @@ test('the real facade threads craftingSystemId into the collector, so the palett
     craftingEngine: {
       craftAlchemy: async (actor, sources, submitted, options) => {
         brews.push({ submitted, options });
-        return { success: true };
+        return versionedBrewStartReply();
       },
     },
   });

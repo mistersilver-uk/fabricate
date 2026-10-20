@@ -108,50 +108,45 @@
   const showUnknown = $derived(mode === 'untried');
   const showMissing = $derived(mode === 'assembling' && missing.length > 0);
 
-  // Brew status enum → banner tone + icon. `produced-on-failure` and `check-failed` are
-  // distinct WARNING states — a brew whose check FAILED, with or without a failure result
-  // set — never success-green and never the danger tone a fizzle takes; a discovery composes
-  // with either. `brewing` is INFORMATIONAL — a time-gated brew that started successfully and
-  // now waits on world time — and must never take the fizzle branch's danger tone (issue 966).
+  // Brew status → tone + icon: the failed and interrupted states WARN, never success-green or a
+  // fizzle's danger; `brewing` (world time, issue 966) and `started` (Journal, issue 2574) INFORM.
+  const WARNING = ['warning', 'fa-triangle-exclamation'];
+  const BANNER_LOOKS = {
+    success: ['success', 'fa-circle-check'],
+    'tiered-tier': ['success', 'fa-circle-check'],
+    'produced-on-failure': WARNING,
+    'check-failed': WARNING,
+    interrupted: WARNING,
+    brewing: ['info', 'fa-hourglass-half'],
+    started: ['info', 'fa-book-open'],
+  };
+  // The copy these statuses take, and its discovery variant; the outcome words them, not a message.
+  const BANNER_COPY = {
+    brewing: 'FABRICATE.App.Alchemy.Banner.Brewing',
+    started: 'FABRICATE.App.Alchemy.Banner.Started',
+    interrupted: 'FABRICATE.App.Alchemy.Banner.Interrupted',
+    'produced-on-failure': 'FABRICATE.App.Alchemy.Banner.ProducedOnFailure',
+    'check-failed': 'FABRICATE.App.Alchemy.Banner.CheckFailed',
+  };
+  const DISCOVERED_COPY = {
+    brewing: 'FABRICATE.App.Alchemy.Banner.DiscoveredBrewing',
+    started: 'FABRICATE.App.Alchemy.Banner.DiscoveredStarted',
+    interrupted: 'FABRICATE.App.Alchemy.Banner.DiscoveredInterrupted',
+    'produced-on-failure': 'FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure',
+    'check-failed': 'FABRICATE.App.Alchemy.Banner.DiscoveredCheckFailed',
+  };
   const bannerStatus = $derived(lastBrew?.status ?? null);
-  const bannerTone = $derived.by(() => {
-    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'success';
-    if (bannerStatus === 'produced-on-failure' || bannerStatus === 'check-failed') return 'warning';
-    if (bannerStatus === 'brewing') return 'info';
-    return 'danger';
-  });
-  const bannerIcon = $derived.by(() => {
-    if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'fa-circle-check';
-    if (bannerStatus === 'produced-on-failure' || bannerStatus === 'check-failed')
-      return 'fa-triangle-exclamation';
-    if (bannerStatus === 'brewing') return 'fa-hourglass-half';
-    return 'fa-circle-xmark';
-  });
+  const bannerLook = $derived(BANNER_LOOKS[bannerStatus] ?? ['danger', 'fa-circle-xmark']);
+  const bannerTone = $derived(bannerLook[0]);
+  const bannerIcon = $derived(bannerLook[1]);
 
   const bannerText = $derived.by(() => {
     if (!lastBrew) return '';
-    if (bannerStatus === 'brewing') {
-      // A brew-discovery can land at START too (a known recipe re-brewed), so the
-      // discovery composes with the in-progress copy exactly as it does elsewhere.
-      return lastBrew.discovered
-        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredBrewing', {
-            name: lastBrew.discovered,
-          })
-        : localize('FABRICATE.App.Alchemy.Banner.Brewing');
-    }
-    if (bannerStatus === 'produced-on-failure') {
-      return lastBrew.discovered
-        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure', {
-            name: lastBrew.discovered,
-          })
-        : localize('FABRICATE.App.Alchemy.Banner.ProducedOnFailure');
-    }
-    if (bannerStatus === 'check-failed') {
-      return lastBrew.discovered
-        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredCheckFailed', {
-            name: lastBrew.discovered,
-          })
-        : localize('FABRICATE.App.Alchemy.Banner.CheckFailed');
+    if (BANNER_COPY[bannerStatus]) {
+      const name = lastBrew.discovered;
+      return name
+        ? localize(DISCOVERED_COPY[bannerStatus], { name })
+        : localize(BANNER_COPY[bannerStatus]);
     }
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') {
       if (lastBrew.discovered) {
@@ -162,6 +157,7 @@
       }
       return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Brewed');
     }
+    if (bannerStatus === 'refused') return lastBrew.message;
     return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Fizzled');
   });
 

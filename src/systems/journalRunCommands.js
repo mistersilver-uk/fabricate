@@ -149,7 +149,7 @@ export function createManagerMutation(consumeGrant) {
   };
 }
 
-function actorUuidList(actors, fallbackUuids = []) {
+export function actorUuidList(actors, fallbackUuids = []) {
   const resolved = Array.isArray(actors)
     ? actors.map((actor) => actor?.uuid).filter(validText)
     : [];
@@ -157,7 +157,7 @@ function actorUuidList(actors, fallbackUuids = []) {
   return Array.isArray(fallbackUuids) ? fallbackUuids.filter(validText) : [];
 }
 
-function executeCommandUnavailable(started) {
+export function executeCommandUnavailable(started) {
   return {
     ...started,
     success: false,

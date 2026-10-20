@@ -235,10 +235,7 @@ function buildAlchemyOperations(fabricate) {
           success: true,
           executionOperation: 'executeAlchemyFizzle',
           payload,
-          trustedContext: {
-            ...prepared,
-            alchemySubmittedItems: canonicalSubmissions,
-          },
+          trustedContext: prepared,
         };
       }
       return {
@@ -248,10 +245,8 @@ function buildAlchemyOperations(fabricate) {
           recipeId: prepared.recipeId,
           selectionPlan: prepared.selectionPlan,
         },
-        trustedContext: {
-          ...prepared,
-          alchemySubmittedItems: canonicalSubmissions,
-        },
+        // Plain data only: the grant clones it, and a cloned Document loses its identity.
+        trustedContext: prepared,
       };
     },
     executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId, sender }) => {
