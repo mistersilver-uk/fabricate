@@ -99,7 +99,8 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="fabricate-button manager-tool-replacement-component-trigger"
+        triggerButton={{ role: 'neutral' }}
+        triggerClass="manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-cube"
         triggerImg={selected.img || ''}
         triggerLabel={selected.name}
@@ -162,7 +163,8 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="fabricate-button manager-tool-replacement-component-trigger"
+        triggerButton={{ role: 'neutral' }}
+        triggerClass="manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Tools.Editor.ReplacementSearchLabel',
@@ -225,8 +227,8 @@
      it the shared component-picker box, which is what drew the select; anchoring each rule below
      on TWO classes this component writes puts it deeper than that sheet's, so nothing depends on
      injection order. `:global()` is required because `SearchablePopover` writes the picker root,
-     the button and the portrait. `fabricate-button` STAYS: stripping it hands the control back to
-     Foundry's own `.application button` rule, whose fixed height crops a two-line label. */
+     the button and the portrait. The trigger renders through `Button` (issue 2540), whose root
+     keeps Foundry's own `.application button` rule, and its label-cropping fixed height, off it. */
   .manager-tool-replacement
     .manager-tool-replacement-tile
     > :global(.manager-tool-replacement-picker) {
