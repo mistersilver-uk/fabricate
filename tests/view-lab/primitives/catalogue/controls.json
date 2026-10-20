@@ -289,9 +289,12 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "undrawn": {
-      "Remove this row": "the icon button’s accessible name; the drawing draws its glyph"
+      "Remove this row": "the icon button’s accessible name; the drawing draws its glyph",
+      "24": "the rung the bare × is drawn at, 24px around its glyph; the caption names the unit’s 34"
     },
     "props": {
+      "size": "24",
+      "role": "ghost",
       "ariaLabel": "Remove this row",
       "icon": "fas fa-xmark"
     }
@@ -303,7 +306,6 @@
     "path": "src/ui/svelte/components/IconButton.svelte",
     "props": {
       "size": "24",
-      "role": "ghost",
       "ariaLabel": "Dismiss finished run",
       "icon": "fas fa-xmark"
     }
