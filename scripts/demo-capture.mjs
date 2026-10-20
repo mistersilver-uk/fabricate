@@ -5,28 +5,42 @@
  *
  *   node scripts/demo-capture.mjs [output-dir] [--seed <n>] [--scale <factor>]
  *
- * The output defaults to `tmp/demo-frames/` (gitignored). The lab server runs on a free port, so a
- * lab already serving 5273 in another session is left alone. Encoding is a separate local step.
+ * The output defaults to `tmp/demo-frames/` (gitignored); only its `NNNN.png` frames and
+ * `manifest.json` are ever replaced. The lab server binds port 0, so a lab already serving 5273 in
+ * another session is left alone. Encoding is a separate local step (`scripts/README.md`).
  */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer as createNetServer } from 'node:net';
-import { dirname, join, resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
+import { DEMO_SEED } from '../tests/view-lab/demo/demoContent.js';
+
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
+import { collectPageFailures, LAUNCH_ARGS } from './lib/primitiveLabBrowser.js';
+import { startLabServer } from './lib/primitiveLabSmoke.js';
+import { TOLERATED_WARNINGS } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MOUNT_PATH = '/tests/view-lab/index.html';
 /** Served by the lab's Vite root, and imported in the page so a palette cut is the production path. */
 const THEME_MODULE = '/src/ui/theme.js';
-const VITE_SPECIFIER = 'vite';
-const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 const NAVIGATION_TIMEOUT_MS = 150_000;
 /** The window every scene draws, in CSS pixels; `--scale` maps it to the frame's device pixels. */
 const WINDOW = Object.freeze({ width: 1200, height: 750 });
 const DEFAULT_SCALE = 2 / 3;
+/** The only files this tool writes, and so the only ones it ever replaces. */
+const FRAME_FILE = /^\d{4}\.png$/;
+const MANIFEST_FILE = 'manifest.json';
 
 const FORGE = 'demo-emberdeep-forge';
 const PLAYER = 'fabricate-app';
@@ -34,14 +48,13 @@ const MANAGER = 'fabricate-crafting-system-manager';
 /** Cut on one screen after the forge, each through the production `applyFabricateTheme`. */
 const PALETTE_CUTS = ['fabricate', 'mythwright', 'starglass-arcana', 'sovereign', 'hearth-herb'];
 const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
-/** The lab's own environment notices, tolerated exactly as `view-lab-screenshots.mjs` does. */
-const TOLERATED_WARNINGS = [
-  /Fabricate gave this world one shared record per component, essence and tool/,
-  /Startup cleanup skipped: the ids it would prune against are not known to be complete/,
-];
 
 function parseArgs(argv) {
-  const options = { output: join(ROOT, 'tmp', 'demo-frames'), seed: null, scale: DEFAULT_SCALE };
+  const options = {
+    output: join(ROOT, 'tmp', 'demo-frames'),
+    seed: DEMO_SEED,
+    scale: DEFAULT_SCALE,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--seed') options.seed = Number(argv[(index += 1)]);
@@ -49,34 +62,46 @@ function parseArgs(argv) {
     else if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
     else options.output = resolve(arg);
   }
-  if (options.seed !== null && !Number.isInteger(options.seed))
-    throw new Error('--seed needs an integer');
-  if (!(options.scale > 0 && options.scale <= 2))
+  if (!Number.isInteger(options.seed)) throw new Error('--seed needs an integer');
+  if (!(options.scale > 0 && options.scale <= 2)) {
     throw new Error('--scale needs a factor in (0, 2]');
+  }
   return options;
 }
 
-function freePort() {
-  return new Promise((resolvePort, reject) => {
-    const probe = createNetServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address();
-      probe.close(() => resolvePort(port));
-    });
-  });
+/**
+ * Refuse an output directory this tool could not have written: the repository root or one of its
+ * ancestors, or a non-empty directory holding neither a manifest nor a numbered frame.
+ */
+function assertSafeOutput(output) {
+  // An absolute answer means another drive, which cannot contain the repository.
+  const toRoot = relative(output, ROOT);
+  if (toRoot === '' || !(toRoot.startsWith('..') || isAbsolute(toRoot))) {
+    throw new Error(`refusing to write into ${output}: it is the repository root or contains it`);
+  }
+  if (!existsSync(output)) return;
+  const entries = readdirSync(output);
+  const ours = entries.some((name) => name === MANIFEST_FILE || FRAME_FILE.test(name));
+  if (entries.length > 0 && !ours) {
+    throw new Error(`refusing to write into ${output}: it holds files this tool did not write`);
+  }
 }
 
-async function startLabServer() {
-  const { createServer } = await import(VITE_SPECIFIER);
-  const port = await freePort();
-  const server = await createServer({
-    configFile: join(ROOT, 'tests/view-lab/vite.config.js'),
-    server: { port, strictPort: true },
-    logLevel: 'warn',
-  });
-  await server.listen();
-  return { baseUrl: `http://127.0.0.1:${port}`, close: () => server.close() };
+/** Replace the previous set's frames and manifest with the new set, touching nothing else. */
+function publishFrames(staging, output) {
+  for (const name of readdirSync(output)) {
+    if (name === MANIFEST_FILE || FRAME_FILE.test(name)) rmSync(join(output, name));
+  }
+  for (const name of readdirSync(staging)) renameSync(join(staging, name), join(output, name));
+}
+
+/** Close one resource, reporting rather than throwing, so the next one still closes. */
+async function closeQuietly(resource, what) {
+  try {
+    await resource?.close();
+  } catch (error) {
+    console.error(`could not close the ${what}: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
@@ -104,15 +129,14 @@ class Take {
     });
     context.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
     this.page = await context.newPage();
-    this.watch(this.page);
-    const seeded = seed === null ? null : { demoSeed: String(seed) };
+    this.problems = collectPageFailures(this.page);
     const search = new URLSearchParams({
       app,
       world: 'demo',
       dialog: 'open',
       w: String(WINDOW.width),
       h: String(WINDOW.height),
-      ...seeded,
+      demoSeed: String(seed),
       ...query,
     });
     await this.page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, { timeout: NAVIGATION_TIMEOUT_MS });
@@ -123,21 +147,6 @@ class Take {
     const failure = await this.page.evaluate(() => globalThis.document.body.dataset.viewLabError);
     if (failure) throw new Error(`${app}: ${failure}`);
     await this.palette(theme);
-  }
-
-  watch(page) {
-    page.on('console', (message) => {
-      const text = message.text();
-      const fabricateWarning = message.type() === 'warning' && text.includes('Fabricate |');
-      const tolerated = TOLERATED_WARNINGS.some((pattern) => pattern.test(text));
-      if ((message.type() === 'error' || fabricateWarning) && !tolerated) this.problems.push(text);
-    });
-    page.on('pageerror', (error) => {
-      this.problems.push(String(error?.message ?? error));
-    });
-    page.on('response', (response) => {
-      if (response.status() >= 400) this.problems.push(`${response.status()} ${response.url()}`);
-    });
   }
 
   /** Apply a palette through the production `applyFabricateTheme`, to every root now mounted. */
@@ -179,8 +188,11 @@ class Take {
 
   /** Write one frame, held for `ms`. A palette is re-applied first, for roots that mounted since. */
   async hold(ms, beat) {
-    if (this.problems.length > 0) {
-      throw new Error(`console errors before "${beat}":\n  ${this.problems.join('\n  ')}`);
+    const problems = this.problems.filter((problem) =>
+      TOLERATED_WARNINGS.every((pattern) => !pattern.test(problem))
+    );
+    if (problems.length > 0) {
+      throw new Error(`console errors before "${beat}":\n  ${problems.join('\n  ')}`);
     }
     await this.page.evaluate(
       async ({ module, id }) => (await import(module)).applyFabricateTheme(id),
@@ -188,6 +200,10 @@ class Take {
     );
     const file = `${String(this.frames.length + 1).padStart(4, '0')}.png`;
     const frame = this.page.locator('[data-view-lab-frame]');
+    // A cold image cache would otherwise photograph a blank tile.
+    await frame.evaluate((root) =>
+      Promise.all([...root.querySelectorAll('img')].map((img) => img.decode().catch(() => {})))
+    );
     await frame.screenshot({
       path: join(this.output, file),
       animations: 'disabled',
@@ -224,6 +240,7 @@ class Take {
       await this.page.evaluate((value) => {
         globalThis.document.querySelector('[data-demo-glide]').scrollTop = value;
       }, top);
+      // `hold` decodes every image in the frame first, so a scrolled-in tile is never blank.
       await this.hold(stepMs, beat);
     }
     await this.page.evaluate(() =>
@@ -328,41 +345,46 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const cache = resolveChromeCache(ROOT);
   if (!cache) throw new Error(missingChromeMessage(ROOT));
-  rmSync(options.output, { recursive: true, force: true });
+  assertSafeOutput(options.output);
   mkdirSync(options.output, { recursive: true });
+  // The new set is built beside the old one, which survives until the new set is complete.
+  const staging = mkdtempSync(join(options.output, '.demo-capture-'));
 
   const frames = [];
-  const take = new Take({ output: options.output, frames, scale: options.scale });
-  const server = await startLabServer();
-  const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+  const take = new Take({ output: staging, frames, scale: options.scale });
+  let server = null;
+  let browser = null;
   try {
+    server = await startLabServer(ROOT);
+    browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
     const open = (scene) => take.open(browser, server.baseUrl, { seed: options.seed, ...scene });
     for (const scene of [forgeScene, paletteScene, editorScene, stillScene, salvageScene]) {
       await scene(take, open);
     }
+    const totalMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+    const manifest = {
+      foundryVersion: cache.version,
+      window: WINDOW,
+      scale: options.scale,
+      frameSize: {
+        width: Math.round(WINDOW.width * options.scale),
+        height: Math.round(WINDOW.height * options.scale),
+      },
+      seed: options.seed,
+      loop: true,
+      totalMs,
+      frames,
+    };
+    writeFileSync(join(staging, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+    publishFrames(staging, options.output);
+    console.log(
+      `wrote ${frames.length} frames (${(totalMs / 1000).toFixed(1)}s) to ${options.output}`
+    );
   } finally {
-    await browser.close();
-    await server.close();
+    await closeQuietly(browser, 'browser');
+    await closeQuietly(server, 'lab server');
+    rmSync(staging, { recursive: true, force: true });
   }
-
-  const totalMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
-  const manifest = {
-    foundryVersion: cache.version,
-    window: WINDOW,
-    scale: options.scale,
-    frameSize: {
-      width: Math.round(WINDOW.width * options.scale),
-      height: Math.round(WINDOW.height * options.scale),
-    },
-    seed: options.seed,
-    loop: true,
-    totalMs,
-    frames,
-  };
-  writeFileSync(join(options.output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(
-    `wrote ${frames.length} frames (${(totalMs / 1000).toFixed(1)}s) to ${options.output}`
-  );
 }
 
 try {
@@ -371,3 +393,5 @@ try {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 }
+// Explicitly, so a handle a failed launch or listen left open cannot keep the process alive.
+process.exit(process.exitCode ?? 0);

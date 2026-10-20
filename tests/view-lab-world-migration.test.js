@@ -173,7 +173,7 @@ test('the lab’s check-modifier system still defers the selection with an unbou
  * two entries the `1.30.0` migration made necessary are pinned here, and the messages are DERIVED
  * rather than copied.
  */
-const DRIVER_PATH = resolve(import.meta.dirname, '../scripts/view-lab-screenshots.mjs');
+const DRIVER_PATH = resolve(import.meta.dirname, '../scripts/lib/viewLabCases.js');
 
 const LANG = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
 
@@ -205,7 +205,7 @@ function toleratedWarningPatterns() {
   const start = source.indexOf('const TOLERATED_WARNINGS = [');
   assert.ok(
     start !== -1,
-    '`scripts/view-lab-screenshots.mjs` no longer declares TOLERATED_WARNINGS'
+    '`scripts/lib/viewLabCases.js` no longer declares TOLERATED_WARNINGS'
   );
   const end = source.indexOf('\n];', start);
   assert.ok(end > start, 'the TOLERATED_WARNINGS declaration is no longer a closed array literal');
