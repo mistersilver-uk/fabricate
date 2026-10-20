@@ -1,35 +1,24 @@
 /**
- * The hero-demo world (issue 2571) is internally consistent, and every image it names is a Foundry
- * core icon the harvested cache serves. The icon half skips without a harvest, as the lab's own does.
+ * The hero-demo world (issue 2571) is internally consistent and loads through the real managers.
+ * Its icons are pinned beside the lab's, in `view-lab-fixture-assets.test.js`.
  */
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-import { resolveChromeCache } from '../scripts/lib/foundryChromeCache.js';
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import { RecipeManager } from '../src/systems/RecipeManager.js';
 
-import { buildDemoContent, DEMO_ACTORS } from './view-lab/demo/demoContent.js';
-import { buildCastActors } from './view-lab/world/labActors.js';
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const MOUNT = '/@foundry-chrome/';
-const cache = resolveChromeCache(ROOT);
-const skip = cache ? false : 'no harvested Foundry chrome; run: npm run viewlab:chrome:harvest';
+import {
+  buildDemoContent,
+  DEMO_ACTORS,
+  DEMO_SEED,
+  DEMO_SYSTEM_IDS,
+} from './view-lab/demo/demoContent.js';
+import { buildDemoSettings } from './view-lab/demo/demoWorld.js';
+import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
+import { buildCastActors, buildDocumentIndex } from './view-lab/world/labActors.js';
 
 const content = buildDemoContent();
-
-/** Every string under `node` that names a mounted asset; actors and items cycle through `parent`. */
-function assetPaths(node, found = new Set(), seen = new Set()) {
-  if (typeof node === 'string') {
-    if (node.startsWith(MOUNT)) found.add(node);
-  } else if (node && typeof node === 'object' && !seen.has(node)) {
-    seen.add(node);
-    for (const value of Object.values(node)) assetPaths(value, found, seen);
-  }
-  return found;
-}
 
 /** Every `componentId` an ingredient option, result or failure result names. */
 function componentRefs(recipe) {
@@ -93,12 +82,37 @@ test('the actors hold only things the world defines, and salvage resolves too', 
   }
 });
 
-test('every demo image is a core icon present in the harvested cache', { skip }, () => {
-  const paths = assetPaths([content, buildCastActors(content, DEMO_ACTORS)]);
-  assert.ok(paths.size >= 23, `expected the demo world to name its icons, found ${paths.size}`);
-  const missing = [...paths].filter((path) => {
-    assert.ok(path.startsWith(`${MOUNT}icons/`), `${path} is not a Foundry core icon`);
-    return !existsSync(join(cache.dir, path.slice(MOUNT.length)));
+test('the demo world loads through the real system and recipe managers', async () => {
+  // `bootLabRuntime` imports `src/main.js`, which needs the lab's Vite build, so the managers it
+  // initializes are booted here directly over the same shim and the same persisted settings.
+  const world = buildDemoContent();
+  const actors = buildCastActors(world, DEMO_ACTORS);
+  const shim = installFoundryShim({
+    seed: DEMO_SEED,
+    actorList: actors,
+    scenes: [],
+    settings: buildDemoSettings(world, actors),
+    i18n: { localize: (key) => key, format: (key) => key },
+    worldTime: 0,
+    documents: buildDocumentIndex(world, actors),
   });
-  assert.deepEqual(missing, [], 'a demo icon 404s in the browser');
+  try {
+    const systems = new CraftingSystemManager();
+    await systems.initialize();
+    const recipes = new RecipeManager({ getCraftingSystemManager: () => systems });
+    await recipes.initialize();
+
+    assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.FORGE)?.resolutionMode, 'routedByCheck');
+    const longsword = recipes.getRecipe('ed-r-longsword');
+    const routed = (longsword?.resultGroups ?? []).map((group) => [...group.checkOutcomeIds]);
+    assert.deepEqual(routed, [['ed-masterwork'], ['ed-standard'], ['ed-flawed']]);
+    assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.STILL)?.resolutionMode, 'alchemy');
+    const brews = recipes.getRecipes({ craftingSystemId: DEMO_SYSTEM_IDS.STILL });
+    assert.deepEqual(
+      brews.map((recipe) => recipe.id).toSorted((a, b) => a.localeCompare(b)),
+      ['hm-r-fire', 'hm-r-mending', 'hm-r-stoneskin']
+    );
+  } finally {
+    shim.restore();
+  }
 });

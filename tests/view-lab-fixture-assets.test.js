@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveChromeCache } from '../scripts/lib/foundryChromeCache.js';
 
-import { buildLabActors } from './view-lab/world/labActors.js';
+import { buildDemoContent, DEMO_ACTORS } from './view-lab/demo/demoContent.js';
+import { buildCastActors, buildLabActors } from './view-lab/world/labActors.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,17 +28,21 @@ if (!cache && process.env.VIEWLAB_REQUIRE_CHROME === '1') {
   });
 }
 
+/** A core icon path written without the mount, which 404s in the lab rather than resolving. */
+const UNMOUNTED_ICON = /^\/?icons\//;
+
 /**
- * Every mounted asset path reachable from a fixture tree, wherever it sits in it.
+ * Every mounted asset path reachable from a fixture tree, wherever it sits in it. An icon path
+ * missing the mount is collected as itself, so the resolution check reports it.
  *
  * @param {unknown} node Fixture value to walk.
  * @param {Set<string>} found Accumulator.
  * @param {Set<object>} seen Cycle guard.
- * @returns {Set<string>} Mounted paths.
+ * @returns {Set<string>} Mounted and unmounted icon paths.
  */
 function assetPaths(node, found = new Set(), seen = new Set()) {
   if (typeof node === 'string') {
-    if (node.startsWith(MOUNT)) found.add(node);
+    if (node.startsWith(MOUNT) || UNMOUNTED_ICON.test(node)) found.add(node);
     return found;
   }
   if (!node || typeof node !== 'object' || seen.has(node)) return found;
@@ -49,8 +54,10 @@ function assetPaths(node, found = new Set(), seen = new Set()) {
 /** The paths that do NOT resolve to a file in the cache, with the resolved location. */
 function unresolved(paths) {
   return [...paths]
-    .filter((path) => !existsSync(join(cache.dir, path.slice(MOUNT.length))))
-    .map((path) => `${path} → ${join(cache.dir, path.slice(MOUNT.length))}`);
+    .filter((path) => !path.startsWith(MOUNT) || !existsSync(join(cache.dir, path.slice(MOUNT.length))))
+    .map((path) =>
+      path.startsWith(MOUNT) ? `${path} → ${join(cache.dir, path.slice(MOUNT.length))}` : `${path} → not mounted`
+    );
 }
 
 test('every lab asset path resolves in the harvested chrome', { skip }, async (subtests) => {
@@ -70,10 +77,23 @@ test('every lab asset path resolves in the harvested chrome', { skip }, async (s
     assert.deepEqual(unresolved(paths), [], 'an actor portrait 404s in the browser too');
   });
 
+  await subtests.test('the demo world names only core icons the cache holds (issue 2571)', () => {
+    const demo = buildDemoContent();
+    const paths = assetPaths([demo, buildCastActors(demo, DEMO_ACTORS)]);
+    assert.ok(paths.size >= 23, `expected the demo world to name its icons, found ${paths.size}`);
+    const notCore = [...paths].filter((path) => !path.startsWith(`${MOUNT}icons/`));
+    assert.deepEqual(notCore, [], 'every demo image is a Foundry core icon');
+    assert.deepEqual(unresolved(paths), [], 'a demo icon 404s in the browser');
+  });
+
   await subtests.test('a path the cache does not hold IS reported', () => {
     // The positive control for the check itself: `commodities/tree` is the directory the original
     // defect invented, and it must still be absent for the assertions above to mean anything.
     assert.deepEqual(unresolved([`${MOUNT}icons/commodities/tree/tree-oak-green.webp`]).length, 1);
     assert.equal(unresolved([`${MOUNT}icons/commodities/gems/gem-amber-insect-orange.webp`]).length, 0);
+    // And an icon written without the mount is collected and reported, never skipped.
+    const bare = 'icons/commodities/gems/gem-amber-insect-orange.webp';
+    assert.deepEqual([...assetPaths({ img: bare, alt: `/${bare}` })], [bare, `/${bare}`]);
+    assert.equal(unresolved([bare, `/${bare}`]).length, 2);
   });
 });

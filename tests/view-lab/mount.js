@@ -234,8 +234,15 @@ function readParams() {
     // The hero-demo world in place of the lab's (issue 2571); the lab's world flags do not apply.
     demoWorld: params.get('world') === 'demo',
     // The demo world's roll seed, for re-tuning its scripted journey.
-    demoSeed: Number(params.get('demoSeed')) || undefined,
+    demoSeed: readDemoSeed(params),
   };
+}
+
+/** The demo world's `demoSeed`, an integer when given (0 included), else the world's own seed. */
+function readDemoSeed(params) {
+  const raw = params.get('demoSeed')?.trim() ?? '';
+  const seed = raw === '' ? null : Number(raw);
+  return Number.isInteger(seed) ? seed : undefined;
 }
 
 /** Build the hero-demo world, loaded only when a page asks for it. */

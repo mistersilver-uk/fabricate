@@ -53,7 +53,7 @@ export function component(id, name, icon, { categories = [], ...extra } = {}) {
  * @param {object[]} components Component definitions built by {@link component}.
  * @returns {string[]} The de-duplicated category vocabulary.
  */
-function componentCategoryVocabulary(components) {
+export function componentCategoryVocabulary(components) {
   return [...new Set(components.map((entry) => entry.category).filter(Boolean))];
 }
 

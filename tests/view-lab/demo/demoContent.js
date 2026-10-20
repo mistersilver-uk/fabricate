@@ -2,7 +2,16 @@
  * The hero-demo world (issue 2571): one mountain hold with a forge routed by its check and a still
  * that brews by essence. Every image is a Foundry core icon; nothing here feeds a View Lab case.
  */
-import { component, ICON_BASE, recipe, simpleSet } from '../world/labContent.js';
+import {
+  component,
+  componentCategoryVocabulary,
+  ICON_BASE,
+  recipe,
+  simpleSet,
+} from '../world/labContent.js';
+
+/** The roll stream the scripted journey was tuned against; a new seed re-tunes every beat. */
+export const DEMO_SEED = 4;
 
 export const DEMO_SYSTEM_IDS = Object.freeze({
   FORGE: 'demo-emberdeep-forge',
@@ -381,7 +390,6 @@ const STILL_RECIPES = [
   ),
 ];
 
-const categoriesOf = (components) => [...new Set(components.map((entry) => entry.category))];
 const tagsOf = (components) => [...new Set(components.flatMap((entry) => entry.tags))];
 
 /** The two systems, in the persisted shape `CraftingSystemManager.initialize()` normalizes. */
@@ -403,7 +411,7 @@ function buildSystems() {
       categories: ['Smelting', 'Bladesmithing'],
       itemTags: tagsOf(FORGE_COMPONENTS),
       components: FORGE_COMPONENTS,
-      componentCategories: categoriesOf(FORGE_COMPONENTS),
+      componentCategories: componentCategoryVocabulary(FORGE_COMPONENTS),
       recipeItemDefinitions: [],
       tools: FORGE_TOOLS,
       gatheringRealmSettings: { enabled: false },
@@ -429,7 +437,7 @@ function buildSystems() {
       categories: ['Draughts'],
       itemTags: tagsOf(STILL_COMPONENTS),
       components: STILL_COMPONENTS,
-      componentCategories: categoriesOf(STILL_COMPONENTS),
+      componentCategories: componentCategoryVocabulary(STILL_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
       gatheringRealmSettings: { enabled: false },

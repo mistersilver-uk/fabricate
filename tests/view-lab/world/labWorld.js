@@ -1091,6 +1091,10 @@ export async function buildLabWorld({
 /**
  * Install the Foundry shim over an assembled world, then boot the real Fabricate runtime and its
  * ready steps against it. Shared by the lab world and the demo world (issue 2571).
+ *
+ * @param {object} world The assembled world; gains `shim` and `fabricate`.
+ * @param {string|null} [journalCaseState] Withholds the run ledger or seeds a retained claim.
+ * @returns {Promise<object>} The initialized `game.fabricate` facade.
  */
 export async function bootLabRuntime(world, journalCaseState = null) {
   const shim = installFoundryShim(world);

@@ -5,12 +5,17 @@ import { buildCastActors, buildDocumentIndex } from '../world/labActors.js';
 import { seedFabricateFlag } from '../world/labFlags.js';
 import { bootLabRuntime, LAB_WORLD_TIME } from '../world/labWorld.js';
 
-import { buildDemoContent, DEMO_ACTORS, DEMO_SYSTEM_IDS } from './demoContent.js';
+import { buildDemoContent, DEMO_ACTORS, DEMO_SEED, DEMO_SYSTEM_IDS } from './demoContent.js';
 
-/** The roll stream the scripted journey was tuned against; a new seed re-tunes every beat. */
-export const DEMO_SEED = 4;
-
-function demoSettings(content, actors, managedSystemId) {
+/**
+ * The demo world's persisted settings, keyed as `game.settings` holds them.
+ *
+ * @param {object} content Output of `buildDemoContent()`.
+ * @param {object[]} actors The demo cast; the first is the crafter.
+ * @param {string|null} [managedSystemId] The system the manager opens on.
+ * @returns {Map<string, unknown>} The seeded settings.
+ */
+export function buildDemoSettings(content, actors, managedSystemId = null) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey('fabricate', key), value);
   put('craftingSystems', content.systems);
@@ -46,7 +51,7 @@ export async function buildDemoWorld({ managedSystemId = null, seed = DEMO_SEED 
   const world = {
     seed,
     content,
-    settings: demoSettings(content, actors, managedSystemId),
+    settings: buildDemoSettings(content, actors, managedSystemId),
     documents: buildDocumentIndex(content, actors),
     actorList: actors,
     macros: [],
