@@ -53,6 +53,23 @@ const TRIGGER_CLASS = /\btriggerClass=("[^"]*"|\{[^}]*\})/;
 /** A tooltip Foundry would show beside the one the primitive writes from `ariaLabel` or `tooltip`. */
 const HAND_WRITTEN_TOOLTIP = /(?:^|\s)(?:title|data-tooltip(?:-html|-text)?)=/;
 
+// Each would still WORK from a call site — the rest spread lands last and `class` appends —
+// which is why each needs a gate: the site renders identically and the contract is a convention
+// again. A hand-written tooltip also stacks a native `title` or mutes the focus tooltip.
+const RESTATEMENTS = Object.freeze([
+  Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
+  Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
+  Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
+  Object.freeze({
+    name: 'a role class',
+    present: (tag) => ROLE_CLASS.test(CLASS_VALUE.exec(tag)?.[1] ?? ''),
+  }),
+  Object.freeze({
+    name: 'a hand-written tooltip',
+    present: (tag) => HAND_WRITTEN_TOOLTIP.test(tag),
+  }),
+]);
+
 const contract = definePrimitiveSourceContract({
   label: 'icon-button',
   tag: 'IconButton',
@@ -71,22 +88,7 @@ const contract = definePrimitiveSourceContract({
       'policing a token that reaches nothing',
   },
 
-  // Each would still WORK from a call site — the rest spread lands last and `class` appends —
-  // which is why each needs a gate: the site renders identically and the contract is a convention
-  // again. A hand-written tooltip also stacks a native `title` or mutes the focus tooltip.
-  restatements: Object.freeze([
-    Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
-    Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
-    Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
-    Object.freeze({
-      name: 'a role class',
-      present: (tag) => ROLE_CLASS.test(CLASS_VALUE.exec(tag)?.[1] ?? ''),
-    }),
-    Object.freeze({
-      name: 'a hand-written tooltip',
-      present: (tag) => HAND_WRITTEN_TOOLTIP.test(tag),
-    }),
-  ]),
+  restatements: RESTATEMENTS,
 
   classOnlyRemedy:
     'a manager icon button is an `<IconButton>`, never a hand-written ' +
@@ -176,6 +178,35 @@ test('no ActionMenu trigger takes a role class on `triggerClass`', () => {
     .filter(([, tag]) => ROLE_CLASS.test(TRIGGER_CLASS.exec(tag)?.[1] ?? ''))
     .map(([file]) => file);
   assert.deepEqual(offenders, [], 'the trigger is an `IconButton`, whose role is its `role`');
+});
+
+/** The View Lab fixtures that wire a primitive as a shipped caller does, copying its call sites. */
+const LAB_FIXTURES = 'tests/view-lab/primitives/fixtures';
+
+test('the View Lab fixtures copy the swept call sites, not the old ones', () => {
+  const fixtures = collectSources(path.join(repoRoot, LAB_FIXTURES), { extensions: ['.svelte'] });
+  const tags = (name) =>
+    Object.entries(fixtures).flatMap(([file, source]) =>
+      openingTagsNamed(source, name).map((tag) => [file, tag])
+    );
+  const iconButtons = tags('IconButton');
+  const triggers = tags('ActionMenu');
+  // NON-VACUITY: `LogListHistory` wires HistoryList's dismiss, `ListRowDefaultBrowse` a row menu.
+  assert.ok(iconButtons.length > 0, `no fixture under ${LAB_FIXTURES} renders an IconButton`);
+  assert.ok(triggers.length > 0, `no fixture under ${LAB_FIXTURES} renders an ActionMenu`);
+  const offenders = [
+    ...iconButtons.flatMap(([file, tag]) =>
+      RESTATEMENTS.filter(({ present }) => present(tag)).map(({ name }) => `${file}: ${name}`)
+    ),
+    ...triggers
+      .filter(([, tag]) => ROLE_CLASS.test(TRIGGER_CLASS.exec(tag)?.[1] ?? ''))
+      .map(([file]) => `${file}: a role class on \`triggerClass\``),
+  ];
+  assert.deepEqual(
+    offenders,
+    [],
+    'a fixture draws what its caller ships, so it passes `role`, `icon` and the name tooltip too'
+  );
 });
 
 test('the role vocabulary is a named mapping in the primitive, with no neutral class', () => {

@@ -3,13 +3,7 @@
   import IconButton from '../../../../src/ui/svelte/components/IconButton.svelte';
   import { format } from '../fixtureActs.js';
 
-  let {
-    component: Specimen,
-    props = {},
-    children,
-    dismissKey,
-    class: dismissClass = '',
-  } = $props();
+  let { component: Specimen, props = {}, dismissKey, size, role, icon } = $props();
 
   const dismissLabel = (entry) => format(dismissKey, { name: entry.text });
 
@@ -17,13 +11,7 @@
 </script>
 
 {#snippet action(entry)}
-  <IconButton
-    size={24}
-    class={dismissClass}
-    ariaLabel={dismissLabel(entry)}
-    title={dismissLabel(entry)}
-    onclick={ignore}>{@render children?.()}</IconButton
-  >
+  <IconButton {size} {role} ariaLabel={dismissLabel(entry)} onclick={ignore} {icon} />
 {/snippet}
 
 <Specimen {...props} onOpen={ignore} {action} />
