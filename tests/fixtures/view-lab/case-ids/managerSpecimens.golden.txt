@@ -6,3 +6,4 @@ manager-published-buttons-specimen
 manager-published-toggles-specimen
 manager-published-steppers-specimen
 manager-published-steppers-button-focus
+manager-published-search-specimen
