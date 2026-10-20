@@ -900,7 +900,9 @@ Each group states the accepted values of every key that entry publishes.
     The field draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the control with no name.
   - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
     The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
-    It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so, so in a DialogV2 Escape both clears the field and closes the dialog.
+  - It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so.
+  - In a DialogV2, Escape clears the query and closes the dialog; a companion that must keep the dialog open stops it in its own `keydown`.
+  - A DialogV2 companion that wants Enter to confirm handles Enter in its own listener above `target`, because the field cancels the form's implicit submission.
   - Rest `data-*` attributes land on the `<label>` root, never on the input, so the entry reserves no rest name.
   - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, which the companion gives `display: flex`.
   - The keyboard mark is the design system's text-field variant for a field whose wrapper draws the box: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own, so the companion leaves no room for one.

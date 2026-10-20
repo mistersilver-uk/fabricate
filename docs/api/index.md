@@ -2626,9 +2626,13 @@ To refuse or transform a query, pass the query you keep back through `update` be
 `placeholder` is optional final display text shown while the field is empty, and is not the field's name.
 `ariaLabel` is required and is the input's name, final display text naming what is searched, as "Search recipes".
 The field draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
-Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
 The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
-It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so, so in a DialogV2 Escape both clears the field and closes the dialog.
+
+- Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
+- In a DialogV2 that wants Enter to confirm, handle Enter in your own listener above `target`, because the field cancels the form's implicit submission.
+- It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+- In a DialogV2, Escape clears the query and closes the dialog; stop it in your own `keydown` if you must keep the dialog open.
+
 Rest `data-*` props land on the `<label>` root, never on the input, so no rest name is reserved.
 `SearchField` needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, so give `target` `display: flex`.
 Your own window or dialog carries no Fabricate root, so the field is refused there with `SearchField needs a Fabricate window ancestor`.
