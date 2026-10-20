@@ -172,7 +172,8 @@ The notice covers essences and Tools together and lists up to seven groups.
 - **Created** are essences that were added to the catalogue.
 - **Adopted** are essences that already existed in the catalogue and are now linked to the system that held a copy.
 - **Could not be linked** are essences whose id was retired by the 1.34.0 merge, and Tools a world Tool already claims, which keep working in their own system only.
-- **Ambiguous** are Tools whose source Item matches more than one world Tool, so Fabricate would not guess. An essence is never ambiguous.
+- **Ambiguous** are Tools whose source Item matches more than one world Tool, so Fabricate would not guess.
+An essence is never ambiguous.
 - **Memberships with no matching row** are links to essences their system no longer holds, which are reported and kept.
 - **Memberships of a deleted system** are links that name a crafting system that no longer exists, which are reported and kept.
 - **Look like the same essence** are essences in different systems that appear to be one essence but were kept separate.
