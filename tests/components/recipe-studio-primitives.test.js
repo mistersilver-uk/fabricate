@@ -35,7 +35,9 @@ const harnesses = new Map(
 const SVELTE_NAMED_IMPORT = /^\s*import\s*\{[\w\s,]*\}\s*from\s*(?:'svelte'|"svelte");?\s*$/;
 
 function localImports(source) {
-  return (source.match(/^\s*import\s.*$/gm) || []).filter((line) => !SVELTE_NAMED_IMPORT.test(line));
+  return (source.match(/^\s*import\s.*$/gm) || []).filter(
+    (line) => !SVELTE_NAMED_IMPORT.test(line)
+  );
 }
 
 function harnessFor(name) {
@@ -52,7 +54,7 @@ afterEach(() => {
   for (const harness of harnesses.values()) harness.remount();
 });
 
-describe('Recipe Studio primitives are import-free leaves', () => {
+describe('Recipe Studio primitives are leaves importing nothing but Svelte', () => {
   it('never imports foundryBridge, a model, or a util', () => {
     for (const name of PRIMITIVES) {
       const source = readFileSync(
@@ -69,7 +71,10 @@ describe('Recipe Studio primitives are import-free leaves', () => {
 
   it('admits only named imports from the svelte package (synthetic controls)', () => {
     assert.deepEqual(localImports("<script>\n  import { tick } from 'svelte';\n</script>"), []);
-    assert.deepEqual(localImports('<script>\n  import { onMount, tick } from "svelte";\n</script>'), []);
+    assert.deepEqual(
+      localImports('<script>\n  import { onMount, tick } from "svelte";\n</script>'),
+      []
+    );
     for (const line of [
       "  import { localize } from '../../foundryBridge.js';",
       "  import { clamp } from '../utils/clamp.js';",
@@ -78,7 +83,11 @@ describe('Recipe Studio primitives are import-free leaves', () => {
       "  import * as svelte from 'svelte';",
       "  import svelte from 'svelte';",
     ]) {
-      assert.deepEqual(localImports(`<script>\n${line}\n</script>`), [line], `must fail closed: ${line}`);
+      assert.deepEqual(
+        localImports(`<script>\n${line}\n</script>`),
+        [line],
+        `must fail closed: ${line}`
+      );
     }
   });
 
