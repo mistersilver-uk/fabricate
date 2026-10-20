@@ -27,7 +27,7 @@ import { chooseSelectOption } from './selectControl.mjs';
  */
 export async function answerRollPrompt(ctx, label, { timeout = 60_000 } = {}) {
   const { page, screenshot } = ctx;
-  const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
+  const dialog = page.locator('[data-manager-modal][data-roll-prompt]').first();
   await dialog.waitFor({ state: 'visible', timeout });
   await screenshot(page, label);
   // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode

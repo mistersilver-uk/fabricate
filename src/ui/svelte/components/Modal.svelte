@@ -141,7 +141,7 @@
 {#if open}
   <div class="manager-modal-overlay" data-manager-modal-overlay>
     <div
-      class="manager-modal"
+      class="fabricate-modal"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -186,7 +186,7 @@
   }
 
   /* The library's canonical Modal, measured off the prototype (maintainer ruling 2026-09-28). */
-  .manager-modal {
+  .fabricate-modal {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -236,7 +236,7 @@
   }
 
   /* Paint only, at (0,3,0): above the family's resting paint and below its hover. */
-  .manager-modal :global([data-manager-modal-close]) {
+  .fabricate-modal :global([data-manager-modal-close]) {
     display: grid;
     place-items: center;
     gap: normal;

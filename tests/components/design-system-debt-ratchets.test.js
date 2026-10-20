@@ -976,7 +976,7 @@ const oneLine = (selector) => selector.replaceAll(/\s+/gu, ' ').trim();
  * fails until it is listed here, and the review of that listing decides the classification.
  */
 const FLOATING_SURFACES = Object.freeze([
-  ['src/ui/svelte/components/Modal.svelte', '.manager-modal', 'a dialog over the window'],
+  ['src/ui/svelte/components/Modal.svelte', '.fabricate-modal', 'a dialog over the window'],
   [
     MODULE_SHEET,
     '.fabricate-typeahead-list.fabricate-typeahead-list',

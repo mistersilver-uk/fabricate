@@ -7,7 +7,7 @@
 import { CRAFTING_SIMPLE } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
-const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+const SINGLE_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 const CRAFT_HORSESHOE = Object.freeze([
   { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
   { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
@@ -281,7 +281,7 @@ export function playerAdditionalDicePromptCases() {
       },
       steps: [{ selector: '[data-lab-companion-roll]' }],
       expectSelector:
-        '.fabricate-standalone-overlay .manager-modal[data-roll-prompt="single"]' +
+        '.fabricate-standalone-overlay [data-manager-modal][data-roll-prompt="single"]' +
         LINE('Momentum 2 available', 'Spends 0 Momentum') +
         ' input[data-roll-prompt-additional-dice]:not(:disabled)',
       kinds: ['player', 'crafting'],

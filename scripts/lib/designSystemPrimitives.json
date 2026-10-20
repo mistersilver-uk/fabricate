@@ -235,10 +235,10 @@
     {
       "path": "src/ui/svelte/components/Modal.svelte",
       "library": "<Modal>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:1282` and `:1315` name it and its manager callers — the import folder-mapping step and the import report — and `:1315` records that ruling it out as single-caller was wrong. Scoped `shared`, and MOVED to `src/ui/svelte/components/` at issue 2046 to match: issue 2021 made it the roll prompt's chrome in the player crafting application (`apps/crafting/RollPrompt.svelte`), at the maintainer's direction that Fabricate dialogs use this modal rather than Foundry's."
+      "why": "The `<Modal>` entry of `library.html` names it: the one modal chrome of both apps, for a flow that must finish before anything else continues, drawn by four callers — the player roll prompt (`apps/crafting/RollPrompt.svelte`), the import report, the import folder mapping and the add-from-catalogue picker. Scoped `shared`, and MOVED to `src/ui/svelte/components/` at issue 2046 to match: issue 2021 made it the roll prompt's chrome, at the maintainer's direction that Fabricate dialogs use this modal rather than Foundry's. ROOTED AT `fabricate-modal` as of issue 2543, which retired its app-named root; its `manager-modal-*` descendants and `data-manager-modal*` hooks are unchanged."
     },
     {
       "path": "src/ui/svelte/apps/manager/ModifierLibraryRow.svelte",

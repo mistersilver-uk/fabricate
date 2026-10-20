@@ -1,6 +1,7 @@
 /**
- * The nine `manager-*` root classes issue 1507 retired, each with the root that replaced it and
- * the primitive whose template writes that root; and the prose lines that may still name one.
+ * The ten `manager-*` root classes issues 1507 and 2543 retired, each with the root that
+ * replaced it and the primitive whose template writes that root; and the prose lines that may
+ * still name one.
  * Read by `tests/retired-manager-classes.test.js`. A line is allowlisted by a substring unique to
  * it and by the number of retired tokens it names, so an edit that drops the history from the
  * line, or adds a token to it, drops it from this list too.
@@ -41,6 +42,7 @@ export const RETIRED_CLASSES = Object.freeze({
     root: 'fabricate-action-menu',
     primitive: 'src/ui/svelte/components/ActionMenu.svelte',
   },
+  'manager-modal': { root: 'fabricate-modal', primitive: 'src/ui/svelte/components/Modal.svelte' },
 });
 
 const REPLACED = 'records what a primitive replaced, and says the class is retired';
@@ -102,6 +104,12 @@ export const HISTORICAL_LINES = Object.freeze([
     includes: 'As of issue 1507 nine primitives write no second family class',
     tokens: 9,
     why: 'the requirement sentence that records the retirement names the nine classes it retired',
+  },
+  {
+    file: 'openspec/specs/design-system/spec.md',
+    includes: 'As of issue 2543 `manager-modal` is retired',
+    tokens: 1,
+    why: 'records what Modal replaced, and says the class is retired',
   },
   {
     file: 'openspec/specs/ui-visual-style/spec.md',
