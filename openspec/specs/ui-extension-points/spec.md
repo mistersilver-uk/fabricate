@@ -826,20 +826,24 @@ Each group states the accepted values of every key that entry publishes.
     To return focus to a stepper the companion focuses its input, `target.querySelector('input')`.
   - `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
     `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
+    A `min`, `max` or `step` outside this is outside the contract, and what is drawn for it is private.
   - `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so a companion that refused the earlier call is told again.
     Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so `onChange` can run then; a mount the companion has destroyed reports nothing.
     The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so a companion that holds whole numbers rounds it and passes its own value back.
+    A companion passes an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
     An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
     `onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
   - The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when the companion's `update` passes it.
     A companion that refuses a number passes `value` unchanged.
     The input shows what was typed until it loses focus, and Fabricate then replaces it with `value`, so the companion says why in a live region of its own.
+    Fabricate announces nothing when it restores a refused value; the companion explains a refusal in its own live region.
   - At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
     Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, the companion moves focus to the input, `target.querySelector('input')`, in the same handler.
   - The stepper has no unavailable state at version 1 beyond its bounds.
     A quantity the user cannot change right now is not drawn as a stepper: the companion destroys it, moving focus first if one of its parts holds it, and shows the number as text of its own.
     A refused edit is answered in text of the companion's, in a live region.
   - The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
+    The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
     In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
   - It takes no rest keys, so a `data-*` key is refused (M8).
   - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
