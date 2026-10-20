@@ -6,13 +6,14 @@
  * being dispatched; then the published `Notice`'s dismissal through the shipped manifest, and the
  * focus its `onDismiss` holds. The refusals, the liveness check and the failure report are
  * `published-component-callbacks.test.js`'s, on the fake runtime.
- * Limit: happy-dom activates no button from a key, so a keyboard press here is `focus()` then
- * `click()`, and the Enter and Space presses are the View Lab's.
+ * Limit: happy-dom activates no button from a key, so a keyboard press here is `focus()`, the key
+ * events, then the `click()` a browser fires at activation: on Enter's keydown, on Space's keyup.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
@@ -312,19 +313,40 @@ describe("Notice's dismissal through the seam", () => {
     return button;
   }
 
-  it('calls onDismiss once, with no argument, inside the press while the control holds focus', async () => {
-    const seen = [];
-    const held = mountNotice((...args) => {
-      seen.push({ args, focused: document.activeElement === held.dismiss() });
+  /** Focuses the dismiss control and presses `key`, clicking where a browser activates it. */
+  function pressKey(held, key) {
+    const button = held.dismiss();
+    const { KeyboardEvent } = button.ownerDocument.defaultView;
+    const fire = (type) => button.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true }));
+    button.focus();
+    fire('keydown');
+    if (key === 'Enter') button.click();
+    held.beforeActivation = held.calls.length;
+    fire('keyup');
+    if (key === ' ') button.click();
+    return button;
+  }
+
+  for (const [claim, key] of [
+    ['Enter', 'Enter'],
+    ['Space', ' '],
+  ]) {
+    it(`calls onDismiss once on ${claim}, with no argument, while the control holds focus`, async () => {
+      const calls = [];
+      const held = mountNotice((...args) => {
+        calls.push({ args, focused: document.activeElement === held.dismiss() });
+      });
+      held.calls = calls;
+      await settle();
+      const button = pressKey(held, key);
+      assert.equal(held.beforeActivation, key === 'Enter' ? 1 : 0, 'called at activation only');
+      assert.deepEqual(calls, [{ args: [], focused: true }], 'inside the press, before the flush');
+      assert.ok(held.target.contains(button), 'still drawn when the press returns');
+      flushSync();
+      assert.ok(!held.target.querySelector('.fab-notice'), 'the notice left the DOM');
+      held.handle.destroy();
     });
-    await settle();
-    const button = press(held);
-    assert.deepEqual(seen, [{ args: [], focused: true }], 'before the flush removed it');
-    assert.ok(held.target.contains(button), 'still drawn when the press returns');
-    await settle();
-    assert.ok(!held.target.querySelector('.fab-notice'), 'the notice left the DOM');
-    held.handle.destroy();
-  });
+  }
 
   it('calls onDismiss once for a second press before the flush', async () => {
     const { calls, record } = recorder();

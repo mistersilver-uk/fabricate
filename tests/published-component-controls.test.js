@@ -907,7 +907,10 @@ describe('the reach clause', () => {
 
   it('passes a guarded control named by its guard key itself', () => {
     const markup = [script('label'), '{#if label}', button(), '{/if}', styled(PAIR)].join('');
-    assert.deepEqual(syntheticFaults(markup, { pin: 'label', props: { label: { kind: 'data' } } }), []);
+    assert.deepEqual(
+      syntheticFaults(markup, { pin: 'label', props: { label: { kind: 'data' } } }),
+      []
+    );
   });
 
   for (const [claim, spec] of [
@@ -1292,7 +1295,8 @@ describe('the parts clause', () => {
   });
 
   it('names a selector that holds the action or the dismiss hook, and no other attribute', () => {
-    const css = '.a [data-notice-action] > i, .b[data-notice-dismiss], .c[data-notice-tone] { gap: 0 }';
+    const css =
+      '.a [data-notice-action] > i, .b[data-notice-dismiss], .c[data-notice-tone] { gap: 0 }';
     assert.deepEqual(partSelectors(sheet(css), NOTICE_ACTION), [
       'sheet.css: .a [data-notice-action] > i',
       'sheet.css: .b[data-notice-dismiss]',

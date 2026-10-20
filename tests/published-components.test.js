@@ -630,7 +630,10 @@ describe('a requiredWhen key', () => {
 
   it('refuses the first failing key in manifest order, whatever order the companion passes', () => {
     const { ui } = seamWith({ table: [DISMISSING] });
-    assert.throws(() => mountOf(ui, { dismissable: true }), refusal('Dismissing requires a non-empty "title"'));
+    assert.throws(
+      () => mountOf(ui, { dismissable: true }),
+      refusal('Dismissing requires a non-empty "title"')
+    );
     assert.throws(
       () => mountOf(ui, { onDismiss() {}, dismissable: true, title: 'Saved' }),
       refusal(WHEN('dismissLabel'))
@@ -644,15 +647,25 @@ describe('a requiredWhen key', () => {
   it('refuses an update atomically: the earlier props and the earlier callback stay', () => {
     const { ui, mounts } = seamWith({ table: [DISMISSING] });
     const calls = [];
-    const handle = mountOf(ui, dismissingProps({ onDismiss: () => calls.push('first') }));
-    const next = { onDismiss: () => calls.push('next') };
-    assert.throws(() => handle.update(without('dismissLabel', next)), refusal(WHEN('dismissLabel')));
+    const noting = (call) => () => {
+      calls.push(call);
+    };
+    const handle = mountOf(ui, dismissingProps({ onDismiss: noting('first') }));
+    const next = { onDismiss: noting('next') };
+    assert.throws(
+      () => handle.update(without('dismissLabel', next)),
+      refusal(WHEN('dismissLabel'))
+    );
     assert.throws(() => handle.update(without('onDismiss')), refusal(WHEN('onDismiss')));
     const [{ instance }] = mounts;
     assert.deepEqual(instance.updates, [], 'nothing was rendered');
     instance.callbacks.onDismiss.deliver([]);
     assert.deepEqual(calls, ['first'], 'the earlier function still answers');
-    assert.equal(handle.update({ title: 'Saved', dismissable: false }), true, 'cleared, so neither');
+    assert.equal(
+      handle.update({ title: 'Saved', dismissable: false }),
+      true,
+      'cleared, so neither'
+    );
   });
 
   it('describes requiredWhen last, only on the keys that state it, and never as required', () => {
@@ -700,16 +713,8 @@ describe('a requiredWhen key', () => {
       guarded({ kind: 'data', required: false, requiredWhen: 'dismissable' }),
       'dismissable',
     ],
-    [
-      'a slot key',
-      guarded({ kind: 'slot', requiredWhen: 'dismissable' }),
-      'dismissable',
-    ],
-    [
-      'an aria key',
-      guarded({ kind: 'aria', requiredWhen: 'dismissable' }),
-      'dismissable',
-    ],
+    ['a slot key', guarded({ kind: 'slot', requiredWhen: 'dismissable' }), 'dismissable'],
+    ['an aria key', guarded({ kind: 'aria', requiredWhen: 'dismissable' }), 'dismissable'],
   ]) {
     it(`refuses at registration a requiredWhen on ${claim}, naming the entry, key and guard`, () => {
       const seam = createPublishedComponents({ table: [entry], isReady: () => true });
