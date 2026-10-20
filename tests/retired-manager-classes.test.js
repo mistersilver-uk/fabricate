@@ -133,8 +133,8 @@ test('the absence scan reds on a retired class in src, tests and scripts alone',
 
 // The removal itself is not enforced here: no version this test can read moves with a release.
 // `package.json` stays at its development placeholder, release builds stamp only the built
-// `dist/module.json`, and the unit-test checkout fetches no tags. A follow-up issue tracks removing
-// the token in `HEADER_ACTION_COMPAT_REMOVE_IN`; this test keeps the compat lines honest until then.
+// `dist/module.json`, and the unit-test checkout fetches no tags. Issue 2569 tracks removing the
+// token in `HEADER_ACTION_COMPAT_REMOVE_IN`; this test keeps the compat lines honest until then.
 test('the header-action compat lines state why they survive and the release removing them', () => {
   assert.ok(COMPAT_LINES.length > 0, 'the compat seam still writes the token somewhere');
   for (const entry of COMPAT_LINES) {

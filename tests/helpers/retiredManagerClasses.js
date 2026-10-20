@@ -211,6 +211,7 @@ export const HEADER_ACTION_COMPAT_WHY =
 /**
  * The release that removes the compat token: issue 2540 ships in the 1.14 line (`main` cuts
  * `v1.14.0-beta.*`, the last stable tag is `v1.13.0`), so 1.15.0 is one minor after it.
+ * Issue 2569 tracks the removal; no test enforces the release.
  */
 export const HEADER_ACTION_COMPAT_REMOVE_IN = '1.15.0';
 
