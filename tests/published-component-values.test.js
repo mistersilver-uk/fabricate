@@ -200,7 +200,11 @@ describe('the delivery a value key answers', () => {
 
   it('runs no flush, and throws none, when the adapter registered none', () => {
     const fake = fakeRuntime();
-    const seam = createPublishedComponents({ table: [VALUED], isReady: () => true, ...fake.runtime });
+    const seam = createPublishedComponents({
+      table: [VALUED],
+      isReady: () => true,
+      ...fake.runtime,
+    });
     seam.publicApi.mount('Valued', { target: new FakeTarget(), props: {} });
     const [{ props: hostProps }] = fake.mounts;
     assert.doesNotThrow(() => hostProps.flush());
