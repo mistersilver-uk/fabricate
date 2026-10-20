@@ -360,20 +360,19 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     harness.remount();
   });
 
-  it('keeps the Edit pencil the FIRST icon button in the row', async () => {
-    // The View Lab case `manager-essence-edit-first-state` navigates by
-    // `.manager-essence-row[data-essence-id="…"] .fabricate-icon-button`. The row also carries
-    // a toggle and a selection box; the toggle wears `.fabricate-toggle` and
-    // `SelectionCheckbox` renders no `<button>` at all, so neither can intercept.
+  it('carries exactly one edit control, the one the capture navigates by', async () => {
+    // The View Lab case `manager-essence-edit-first-state` and the smoke navigate by
+    // `.manager-essence-row[data-essence-id="…"] [data-essence-edit]`, a hook both the labelled
+    // `Button` and the grid card's pencil carry (issue 2541).
     const root = await harness.mount(props([CONFIGURED_DISABLED]));
     const row = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
     assert.equal(
-      row.querySelector('.fabricate-icon-button').dataset.essenceEdit,
+      row.querySelector('[data-essence-edit]').dataset.essenceEdit,
       'aether',
-      'a new icon button placed before the pencil would silently repoint the capture'
+      'the hook names the essence the capture opens'
     );
     assert.equal(
-      row.querySelectorAll('.fabricate-icon-button').length,
+      row.querySelectorAll('[data-essence-edit]').length,
       1,
       'and the row has exactly one, so "first" is unambiguous'
     );
@@ -394,26 +393,21 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       edit.querySelector('i.fa-arrow-up-right-from-square'),
       'and carries the prototype trailing glyph that marks a control leaving this screen'
     );
-    // THE ACCESSIBLE NAME, ASSERTED BY VALUE (issue 1422). The control is an `<IconButton>`,
-    // which takes the name as the `ariaLabel` PROP and emits it as `aria-label` itself. That
-    // spelling is the whole reason this clause exists: a name handed to the wrong prop is
-    // dropped rather than rejected, the button renders IDENTICALLY, every `data-*` selector
-    // above still resolves, and the frame is unchanged — so nothing else in this file, and no
-    // screenshot, can tell a named control from an unnamed one.
+    // THE ACCESSIBLE NAME, ASSERTED BY VALUE (issue 1422): a name dropped on the way renders
+    // IDENTICALLY, every `data-*` selector above still resolves, and the frame is unchanged — so
+    // nothing else in this file, and no screenshot, can tell a named control from an unnamed one.
     assert.equal(
       edit.getAttribute('aria-label'),
       'Edit rules for Aether',
       'the labelled variant names the essence AND the layer it opens'
     );
-    // NON-VACUITY, and the reason the label could not simply replace the class.
-    // smoke reaches this control as `.fabricate-icon-button[aria-label^="Edit" i]` behind a
-    // `count() > 0` guard, so a lost class or a renamed control would stop producing the
-    // `manager-essence-edit-first-state` frame WITHOUT failing anything.
+    // A LABELLED CONTROL IS A `Button` (maintainer ruling, 2026-10-20, issue 2541): its words are
+    // its label, so it is no icon-only control and shows no tooltip repeating them.
     assert.ok(
-      edit.classList.contains('fabricate-icon-button'),
-      'it is still the primitive three surfaces address it by'
+      edit.classList.contains('fabricate-button') &&
+        !edit.classList.contains('fabricate-icon-button'),
+      'the labelled edit is drawn by `Button`, not `IconButton`'
     );
-    // Its visible words are its name, so it shows no tooltip (issue 2541's parked ruling).
     assert.ok(
       !edit.hasAttribute('title') && !edit.hasAttribute('data-tooltip-text'),
       'the labelled control repeats its visible text in no tooltip'

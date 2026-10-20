@@ -221,11 +221,12 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.fabricate-icon-button` in the row must remain the Edit pencil.
+    // The row's edit control, a `Button` since it is labelled (issue 2541), carries the hook the
+    // capture and the smoke navigate by.
     assert.equal(
-      earthRow.querySelector('.fabricate-icon-button').getAttribute('data-essence-edit'),
+      earthRow.querySelector('[data-essence-edit]').getAttribute('data-essence-edit'),
       'earth',
-      'the first icon button in a row is still the Edit pencil'
+      'the row carries its edit control under its own hook'
     );
 
     // The row toggle routes through the ONE manager write, not through updateEssence.

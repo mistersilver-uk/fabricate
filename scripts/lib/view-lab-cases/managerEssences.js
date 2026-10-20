@@ -236,7 +236,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -261,7 +261,7 @@ export const CASES = Object.freeze([
     query: { saveFails: '1' },
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-recipe-field="essence-enabled"]' },
       { selector: '[data-essence-edit-save]' },
     ],
@@ -281,7 +281,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
@@ -307,7 +307,7 @@ export const CASES = Object.freeze([
     query: { noEssenceScope: '1' },
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-essence-tab="oncraft"]' },
     ],
     expectView: 'essence-edit',
@@ -340,7 +340,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-essence-tab="validation"]' },
     ],
     expectView: 'essence-edit',
