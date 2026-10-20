@@ -438,11 +438,19 @@
     "cap": "popover — shipped",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
+    "fixture": "TintPickerPopoverOpen",
     "slot": {
-      "width": 236,
-      "height": 190
+      "width": 272,
+      "height": 340
     },
-    "note": "The popover is absolutely positioned, so it needs a containing block to stand in; a caller would anchor it to its trigger.",
+    "note": "Opened as the New-biome swatch opens it (issue 2459): the fixture's trigger snippet stands where the swatch would, the panel is open from the start and portaled to the Lab's root below it, and No colour is offered with a handler, as the drawing draws it.",
+    "undrawn": {
+      "New biome colour": "the swatch trigger's accessible name; the drawing draws the panel alone"
+    },
+    "data": {
+      "triggerIcon": "fas fa-palette",
+      "triggerLabel": "New biome colour"
+    },
     "props": {
       "colorToken": "sage",
       "allowCustom": true

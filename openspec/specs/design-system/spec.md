@@ -1000,6 +1000,8 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+In the popover the swatch is the content of a square tile of the picker's grid form: the selected tile states its own ground, `--fab-surface-soft`, by the descendant rule the square-tile rule reserves for a caller, so the inset ring is the mark; the cursor and hover are the square tile's own.
+The inline strip's cells keep the states above.
 A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
 A caller that marks selection inside the tile's own content (a swatch's inset ring) states its own ground as a descendant rule from its `popoverClass` (see the picker requirement), so the tile's ground does not compete with that mark.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
@@ -1060,7 +1062,8 @@ A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`,
 A tier track is an ordered list with an explicit `role="list"`, named by its required `ariaLabel`; its current tier carries `aria-current="step"` and its `currentLabel`, every other tier its visually hidden `reachedLabel` or `aheadLabel`; chevrons, dots and the current tier's glyph are decorative.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
-`TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+`TintPicker`'s inline cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+Its popover is the picker's grid form: the swatches are square tiles, `option`s of a `listbox` named by the same label, each carrying `aria-selected`, true on the selected tile alone; free hex, where offered, is the panel's caller footer above the key hints, and No colour, where offered, is the picker's `footerAction` (issue 2459).
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -1096,11 +1099,17 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **THEN** its accessible name is a required prop
 - **AND** its hit area is at least 24 by 24 pixels
 
-#### Scenario: A screen reader reaches a palette cell
+#### Scenario: A screen reader reaches an inline palette cell
 
-- **WHEN** a screen reader reaches a palette cell
+- **WHEN** a screen reader reaches an inline palette cell
 - **THEN** it announces the colour's name and pressed state
 - **AND** only the selected cell announces pressed
+
+#### Scenario: A screen reader reaches a popover palette tile
+
+- **WHEN** a screen reader reaches a tile in the tint popover
+- **THEN** it announces the colour's name and selected state within a listbox named by the palette label
+- **AND** only the selected tile announces selected
 
 ### Requirement: Shared primitives share one API convention
 
@@ -1687,6 +1696,13 @@ It positions the panel against the anchor, counts the anchor inside for outside-
 - **THEN** no trigger renders and a pointer press on the anchor does not dismiss the panel
 - **AND** the primitive writes no `aria-haspopup` or `aria-expanded`, because no trigger exists
 - **AND** closing the panel returns focus to the anchor
+
+#### Scenario: A GM picks a tint from the popover
+
+- **WHEN** a GM moves the cursor to a tile in an open tint popover and presses Enter
+- **THEN** that colour is committed, the panel closes and focus returns to the trigger that opened it
+- **AND** focus returns to the anchor instead when the panel was opened from one
+- **AND** a Space typed into the query moves no tile and commits nothing
 
 #### Scenario: A column count outside the supported range
 

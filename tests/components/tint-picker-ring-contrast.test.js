@@ -97,6 +97,8 @@ const CURSOR = '.fabricate-color-picker-popover .manager-color-preset:focus-visi
 const HOVER = '.fabricate-color-picker-popover .manager-color-preset:hover';
 const PICKER_CURSOR =
   ".fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true']";
+const TILE_HOVER =
+  ".fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option:hover:not([data-active-option='true'])";
 
 /** The `outline` and `outline-offset` the sheet declares on `selector`. */
 const outlineOf = (selector) =>
@@ -121,7 +123,10 @@ function drawnOutlines() {
 }
 
 test("the library draws the shipped popover's cursor and hover as the sheet declares them", () => {
-  assert.deepEqual(drawnOutlines(), [outlineOf(CURSOR), outlineOf(HOVER)]);
+  // The shipped popover is the picker's grid form (issue 2459): its tiles take the picker's cursor
+  // and the square tile's hover, which the inline strip's hover rule restates.
+  assert.deepEqual(drawnOutlines(), [outlineOf(PICKER_CURSOR), outlineOf(TILE_HOVER)]);
+  assert.deepEqual(outlineOf(HOVER), outlineOf(TILE_HOVER), 'the strip hover');
 });
 
 /** The cursor's ink on `stack` in each palette: the palettes under 3:1, and every ratio in words. */
