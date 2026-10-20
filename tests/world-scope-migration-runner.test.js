@@ -188,7 +188,7 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
       `${scopeKey} is a DESTINATION and must precede its source`
     );
   }
-  assert.equal(store.get('migrationVersion'), '1.35.0');
+  assert.equal(store.get('migrationVersion'), '1.36.0');
   // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it carries
   // one record per entity whose oldest contributing system authored a liftable section.
   const componentDefaults = store.get('componentScope').defaults;
@@ -244,7 +244,7 @@ for (const leg of LEGS) {
     const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
     const rerunSummary = await rerun.runner.run();
     assert.equal(rerunSummary.aborted, false);
-    assert.equal(rerun.store.get('migrationVersion'), '1.35.0');
+    assert.equal(rerun.store.get('migrationVersion'), '1.36.0');
     assert.deepEqual(
       finalState(rerun.store),
       untornFinal,
@@ -297,7 +297,7 @@ test('the ready-pass interaction: a same-boot pass must NOT destroy the map of a
   // AT THE NEXT BOOT the map is STILL PRESENT and the re-run repairs `gatheringConfig`.
   const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
   await rerun.runner.run();
-  assert.equal(rerun.store.get('migrationVersion'), '1.35.0');
+  assert.equal(rerun.store.get('migrationVersion'), '1.36.0');
 
   // AND THE MAP IS EVENTUALLY CLEARED. Without this assertion the arm passes against a pass
   // that withholds the clear but advances its own version, which orphans the map permanently.
@@ -353,13 +353,15 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   initial.migrationVersion = '1.30.0';
   const { runner, writes } = makeRunner(initial);
   const summary = await runner.run();
-  // Five entries are pending and none is this one: `1.31.0`, `1.32.0`, `1.33.0`, `1.34.0` and
-  // `1.35.0` all sit above `1.30.0` on the ladder.
-  assert.equal(summary.ran, 5, 'only the five passes above it are pending');
+  // Six entries are pending and none is this one: `1.31.0`, `1.32.0`, `1.33.0`, `1.34.0`,
+  // `1.35.0` and `1.36.0` all sit above `1.30.0` on the ladder.
+  assert.equal(summary.ran, 6, 'only the six passes above it are pending');
+  // This world claims 1.30.0 with unseeded scopes, so `1.36.0` registers its essence and tool rows
+  // (issue 2554); nothing 1.30.0 owns is written.
   assert.deepEqual(
     writes,
-    ['migrationVersion'],
-    'no CORPUS leg is persisted — the version bump the two entries earn is the only write'
+    ['essenceScope', 'toolScope', 'migrationVersion'],
+    'no CORPUS leg is persisted — only the 1.36.0 registration and the version bump are written'
   );
 });
 
@@ -610,7 +612,7 @@ test('tear recovery: the worldEssenceMergeMap leg (setting seam)', async () => {
 
   const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
   await rerun.runner.run();
-  assert.equal(rerun.store.get('migrationVersion'), '1.35.0');
+  assert.equal(rerun.store.get('migrationVersion'), '1.36.0');
   assert.deepEqual(
     finalState(rerun.store),
     untornFinal,

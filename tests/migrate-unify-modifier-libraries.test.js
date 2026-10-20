@@ -241,10 +241,10 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
   // and check bonus as its own override, issue 1371's 1.32.0 elects each component's world
   // essence map, issue 1608's 1.33.0 records the mark that keeps every existing subject
   // modifier pick rolling, issue 1654's 1.34.0 merges equivalent world essences, and issue
-  // 2100's 1.35.0 stamps the old always-break alchemy default; the runner counts every entry
-  // it applies.
-  assert.equal(summary.ran, 13);
-  assert.equal(store.get('migrationVersion'), '1.35.0');
+  // 2100's 1.35.0 stamps the old always-break alchemy default, and issue 2554's 1.36.0 reconciles
+  // orphaned essence and tool identities; the runner counts every entry it applies.
+  assert.equal(summary.ran, 14);
+  assert.equal(store.get('migrationVersion'), '1.36.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

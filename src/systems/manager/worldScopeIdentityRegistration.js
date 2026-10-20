@@ -140,7 +140,7 @@ function seededMembership(seed, id, systemId) {
 
 /** The decision for one Tool row against the roster; `adopt` and `create` carry no shape yet. */
 function decideTool(context, row, entity) {
-  const keys = sourceKeys(row, context.referencesOf);
+  const keys = sourceKeys(row, context.rowReferences);
   if (entity) {
     const shares =
       keys.size === 0
@@ -211,6 +211,7 @@ function planContext({ entityType, payload, retiredIds, parseUuid }) {
     defaults,
     retiredIds: new Set(retiredIds),
     seeds: null,
+    rowReferences: referencesOf,
   };
 }
 
@@ -219,7 +220,8 @@ function planContext({ entityType, payload, retiredIds, parseUuid }) {
  * `{ decision, systemId, id, name, reason?, matchedIds?, entity?, membership? }`. A row decided
  * earlier counts as registered for every later one. `seeds` is `{ systemId, essences?, tools? }`,
  * each an `entityId -> membership` map replacing the membership shape of that system's
- * `create`/`adopt` decisions; `parseUuid` is `foundry.utils.parseUuid`.
+ * `create`/`adopt` decisions; `parseUuid` is `foundry.utils.parseUuid`. `rowReferencesOf(row,
+ * system)` replaces a Tool row's own references, where the row reads its system's components.
  */
 export function planWorldScopeIdentityRegistration({
   entityType,
@@ -228,6 +230,7 @@ export function planWorldScopeIdentityRegistration({
   retiredIds = null,
   parseUuid = null,
   seeds = null,
+  rowReferencesOf = null,
 }) {
   const decisions = [];
   const context = planContext({ entityType, payload, retiredIds, parseUuid });
@@ -235,6 +238,9 @@ export function planWorldScopeIdentityRegistration({
     const systemId = trimString(system?.id);
     if (!systemId) continue;
     context.seeds = seeds?.systemId === systemId ? seeds[entityType] : null;
+    context.rowReferences = rowReferencesOf
+      ? (row) => rowReferencesOf(row, system)
+      : context.referencesOf;
     for (const [id, row] of registrationRows(system, entityType)) {
       const decided = decideRow(context, systemId, id, row);
       decisions.push({ ...decided, systemId, id, name: trimString(row.name) || id });

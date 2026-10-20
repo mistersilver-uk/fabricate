@@ -109,6 +109,25 @@ export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
   WRITEBACK_FAILED: 'writebackFailed',
 });
 
+/** Each transient object report and its summary key: 1.30.0 (issue 1363; dangling references are
+ * reported, never pruned), 1.34.0 (issue 1654) and 1.36.0 (issue 2554). */
+const OBJECT_REPORTS = Object.freeze([
+  ['_worldScopeEntityReport', 'worldScopeEntityReport'],
+  ['_worldEssenceMergeReport', 'worldEssenceMergeReport'],
+  ['_scopedIdentityReconcileReport', 'scopedIdentityReconcileReport'],
+]);
+
+/** Capture and strip each object report, `null` when absent or not an object. */
+function captureObjectReports(data) {
+  const reports = {};
+  for (const [dataKey, summaryKey] of OBJECT_REPORTS) {
+    const value = data[dataKey];
+    reports[summaryKey] = value && typeof value === 'object' ? value : null;
+    delete data[dataKey];
+  }
+  return reports;
+}
+
 /** For every pass that persisted nothing: early return, abort and both deferrals. */
 function emptyPassSummary(overrides = {}) {
   return {
@@ -124,8 +143,7 @@ function emptyPassSummary(overrides = {}) {
     retiredCraftingModCounts: [],
     unifiedModifierCollisions: [],
     characterLibraryCollisions: [],
-    worldScopeEntityReport: null,
-    worldEssenceMergeReport: null,
+    ...Object.fromEntries(OBJECT_REPORTS.map(([, summaryKey]) => [summaryKey, null])),
     ...overrides,
   };
 }
@@ -324,18 +342,7 @@ export class MigrationRunner {
     }
     delete data._characterLibraryCollisions;
 
-    // 1.30.0 (issue 1363): dangling references are reported, never pruned (requirement 18).
-    let worldScopeEntityReport = null;
-    if (data._worldScopeEntityReport && typeof data._worldScopeEntityReport === 'object') {
-      worldScopeEntityReport = data._worldScopeEntityReport;
-    }
-    delete data._worldScopeEntityReport;
-
-    let worldEssenceMergeReport = null;
-    if (data._worldEssenceMergeReport && typeof data._worldEssenceMergeReport === 'object') {
-      worldEssenceMergeReport = data._worldEssenceMergeReport;
-    }
-    delete data._worldEssenceMergeReport;
+    const objectReports = captureObjectReports(data);
 
     const changedKeys = new Set();
     for (const leg of WRITEBACK_LEGS) {
@@ -370,8 +377,7 @@ export class MigrationRunner {
       retiredCraftingModCounts,
       unifiedModifierCollisions,
       characterLibraryCollisions,
-      worldScopeEntityReport,
-      worldEssenceMergeReport,
+      ...objectReports,
     };
   }
 
