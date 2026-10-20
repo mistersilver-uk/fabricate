@@ -579,3 +579,25 @@ test('an essence-only alternative group the matcher ignores never refuses as an 
   assert.equal(started.success, true, started.message);
   assert.equal(herb.deleted && ember.deleted, true, 'the whole bench is spent');
 });
+
+test('a later alternative group is not pinned to a tag the earlier group needs', async () => {
+  const world = brewWorld(
+    brewRecipe([
+      { id: 'a', options: [component('herb')] },
+      { id: 'b', options: [tag(['green']), component('salt')] },
+    ])
+  );
+  const herb = item('herb', 'Herb');
+  const salt = item('salt', 'Salt');
+  const source = new BrewActor('source', [herb, salt]);
+  const crafter = new BrewActor('crafter');
+
+  const { prepared, started } = await startBrew(world, {
+    crafter,
+    source,
+    componentIds: ['herb', 'salt'],
+  });
+
+  assert.deepEqual(prepared.selectionPlan.ingredientOptionOverrides, { b: { optionIndex: 1 } });
+  assert.equal(started.success, true, started.message);
+});
