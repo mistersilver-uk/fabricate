@@ -29,6 +29,8 @@
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
@@ -62,6 +64,7 @@ import {
   unheldClauses,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
+import { repoRoot } from './helpers/sourceScan.js';
 import { styleRules } from './helpers/svelteStructureContract.js';
 
 const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
@@ -85,6 +88,16 @@ const FOCUSABLE_REACH = Object.freeze({
   },
   // Drawn only when `as`, which the entry does not publish, is `'checkbox'`.
   'src/ui/svelte/components/StatusToggle.svelte: input': null,
+  // In snippets both branches of `{#if isVertical}` render, which reach reads as unguarded.
+  'src/ui/svelte/components/Stepper.svelte: button[data-stepper-decrement]': 'always',
+  'src/ui/svelte/components/Stepper.svelte: button[data-stepper-increment]': 'always',
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="number"]': {
+    defaults: ['formatValue', 'parseValue'],
+    heldBy:
+      'tests/components/published-stepper-mounted.test.js: the default draws the number field',
+  },
+  // The formatted mode's, drawn only when `formatValue` and `parseValue`, which the entry does not publish, are set.
+  'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
 });
 
@@ -519,7 +532,41 @@ const INLINE_STYLE = 'states an inline style under a root that supplies the ring
  * file: each as its selector is written, beside its declarations. A file's design-system entry
  * states the variant in `statedBy`.
  */
-const SCOPED_RINGS = Object.freeze({});
+const SCOPED_RINGS = Object.freeze({
+  'src/ui/svelte/components/Stepper.svelte': {
+    statedBy:
+      'The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.',
+    rules: [
+      {
+        selector:
+          '.fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible',
+        declarations: [['outline-offset', '0']],
+      },
+      {
+        selector: '.fab-stepper-input[data-stepper-endpoint]:not(:focus-visible)',
+        declarations: [['color', 'var(--fab-text-muted)']],
+      },
+      {
+        selector: '.fab-stepper-input:focus-visible',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '1px'],
+        ],
+      },
+      {
+        selector: '.fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input:focus-visible',
+        declarations: [['outline-offset', '0']],
+      },
+      {
+        selector: '.fab-stepper-adjunct:focus-visible',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '1px'],
+        ],
+      },
+    ],
+  },
+});
 
 /** What a scoped ring pin may declare: the module ring's outline, an offset, and a colour. */
 const RING_PROPERTIES = new Set(['outline', 'outline-offset', 'color']);
@@ -688,6 +735,20 @@ describe('each published entry that draws a control', () => {
     const own = importClosure(NOTICE_ACTION.path, SHIPPED);
     assert.ok(own.has(NOTICE_ACTION.path), 'the notice was read');
     assert.deepEqual(partSelectors(everyStylesheet(), NOTICE_ACTION, own), []);
+  });
+
+  it('pins scoped rings only on a file a shipped entry draws, whose design-system entry states its own ring', () => {
+    const drawn = new Set(
+      PUBLISHED_COMPONENT_MANIFEST.flatMap((entry) => [...importClosure(entry.path, SHIPPED)])
+    );
+    const spec = resolve(repoRoot, 'openspec/specs/design-system/spec.md');
+    const stated = readFileSync(spec, 'utf8').split('\n');
+    const pinned = Object.entries(SCOPED_RINGS);
+    assert.ok(pinned.length > 0, 'the stepper is pinned');
+    for (const [file, { statedBy }] of pinned) {
+      assert.ok(drawn.has(file), `${file} is drawn by a shipped entry`);
+      assert.ok(stated.includes(statedBy), `${file}: the design-system spec states ${statedBy}`);
+    }
   });
 
   it('reads a module ring from the sheet that names button and draws an outline at an offset', () => {

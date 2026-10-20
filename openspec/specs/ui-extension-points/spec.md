@@ -390,19 +390,22 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `EmptyState` and `Notice` (issue 2451), in that order.
 - The published set continues with `Button` (issue 2452).
 - The published set continues with `StatusToggle` (issue 2452).
+- The published set continues with `Stepper` (issue 2452).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
-- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias and a prop that takes an attribute name are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
+- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
 - An element-ref bindable (`Chip`'s and `Button`'s `element`) is never published.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, `icon`, `busy`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
+- `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
+- `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button` and `StatusToggle` too (issue 2452); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button`, `StatusToggle` and `Stepper` too (issue 2452); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'` and `'aria'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
@@ -480,7 +483,7 @@ A Foundry 14 detached window's target is judged the same way.
 ### Interactive components
 
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
-- A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -490,7 +493,7 @@ In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter a
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
-- A control draws its own mark for keyboard focus where the entry's `root` is `'any'`, and takes the Fabricate window's ring otherwise.
+- A control draws its own mark for keyboard focus where the entry's `root` is `'any'`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
@@ -810,7 +813,40 @@ Each group states the accepted values of every key that entry publishes.
   - A switch mounted inside a `.tabs` element carries no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     The switch therefore opens no tooltip and keeps its own cursor, so the pointer is shown its name only as the companion's label beside it, and what the setting does goes in text beside it, tied to it with `aria-describedby`.
-- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards.
+- **`Stepper`.**
+  - It is the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+    The input is the control, so the number is always typeable.
+  - `value` is required and is the finite number the stepper holds.
+    A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
+  - `ariaLabel` is required and is the input's name, final display text naming the quantity, as "Days to credit".
+    `decrementLabel` and `incrementLabel` are required and name the two buttons from the same words: "Decrease days to credit", "Increase days to credit".
+    The buttons' faces are a minus and a plus glyph alone, and no tooltip shows either name.
+    The companion draws the quantity's name as visible text beside the stepper, and `ariaLabel` contains those words.
+    A name of white space alone leaves the control with no name, so the companion never passes one.
+    To return focus to a stepper the companion focuses its input, `target.querySelector('input')`.
+  - `min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
+    `step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
+  - `onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so a companion that refused the earlier call is told again.
+    Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so `onChange` can run then; a mount the companion has destroyed reports nothing.
+    The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so a companion that holds whole numbers rounds it and passes its own value back.
+    An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
+    `onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
+  - The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when the companion's `update` passes it.
+    A companion that refuses a number passes `value` unchanged.
+    The input shows what was typed until it loses focus, and Fabricate then replaces it with `value`, so the companion says why in a live region of its own.
+  - At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
+    Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, the companion moves focus to the input, `target.querySelector('input')`, in the same handler.
+  - The stepper has no unavailable state at version 1 beyond its bounds.
+    A quantity the user cannot change right now is not drawn as a stepper: the companion destroys it, moving focus first if one of its parts holds it, and shows the number as text of its own.
+    A refused edit is answered in text of the companion's, in a live region.
+  - The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
+    In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
+  - It takes no rest keys, so a `data-*` key is refused (M8).
+  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
+  - The input and the two buttons are the only focusable elements inside `target`.
+    An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
+  - The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
+- **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
 
 ### Mounting and its refusals
 
@@ -970,6 +1006,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onclick` once, with no argument, and the button still carries `aria-pressed="false"`
 - **AND** after an `update` that passes `on: true` the same button carries `aria-pressed="true"` and keeps focus
 - **AND** a mount that omits `ariaLabel` throws M9, and one that passes `aria-pressed` throws M13
+
+#### Scenario: A published stepper
+
+- **WHEN** a companion mounts `Stepper` with `value: 2`, `max: 3`, the three names and `onChange` inside a Fabricate window, and the user presses the increment button
+- **THEN** Fabricate calls `onChange` once, with `3`, and the input still shows `2` until the companion's `update` passes `value: 3`
+- **AND** after that `update` the increment button is disabled, and a typed value the companion refuses is replaced by `value` when the input loses focus
+- **AND** a mount that omits `decrementLabel` throws M9, and one that passes `disabled` throws M8
 
 #### Scenario: A malformed request
 

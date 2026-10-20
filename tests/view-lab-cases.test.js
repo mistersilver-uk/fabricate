@@ -5765,10 +5765,10 @@ test('every published component seam module, and the host, selects the five spec
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, and the controls fixture's switch. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, and the values fixture's stepper. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper']);
 
-test('the leaves specimen mounts every published component but TierTrack and StatusToggle and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle and Stepper and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
