@@ -23,9 +23,9 @@
  */
 
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
-import { journalCommandRefusal, notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
-import { isResolvedFailureOutcome, journalRefusalMessage } from '../util/journalRunReasons.js';
+import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 
+import { classifyBrewReply, isQuietDismissal } from './alchemyBrewBanner.js';
 import { createListingLoad } from './browseListing.svelte.js';
 
 /** The brewing actor's name, which an additional-dice notice names (issue 2008). */
@@ -81,7 +81,11 @@ export function createAlchemyStore({ services } = {}) {
     const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
     const query = search.trim().toLowerCase();
     const filtered = query
-      ? recipes.filter((recipe) => String(recipe?.name ?? '').toLowerCase().includes(query))
+      ? recipes.filter((recipe) =>
+          String(recipe?.name ?? '')
+            .toLowerCase()
+            .includes(query)
+        )
       : recipes;
     return [...filtered].sort((left, right) =>
       String(left?.name ?? '').localeCompare(String(right?.name ?? ''))
@@ -90,7 +94,9 @@ export function createAlchemyStore({ services } = {}) {
 
   const knownCount = $derived(Array.isArray(listing?.recipes) ? listing.recipes.length : 0);
   const undiscoveredCount = $derived(Number(listing?.undiscoveredCount ?? 0));
-  const fizzleKeys = $derived(new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : []));
+  const fizzleKeys = $derived(
+    new Set(Array.isArray(listing?.fizzleKeys) ? listing.fizzleKeys : [])
+  );
 
   // True when the actor owns any component in this discipline, regardless of the
   // component-name search. The column uses this to tell the onboarding "acquire
@@ -122,7 +128,11 @@ export function createAlchemyStore({ services } = {}) {
     });
     const query = componentSearch.trim().toLowerCase();
     return query
-      ? rows.filter((row) => String(row.name ?? '').toLowerCase().includes(query))
+      ? rows.filter((row) =>
+          String(row.name ?? '')
+            .toLowerCase()
+            .includes(query)
+        )
       : rows;
   });
 
@@ -264,7 +274,8 @@ export function createAlchemyStore({ services } = {}) {
     if (candidates.length === 1) return candidates[0];
     const maximal = candidates.filter((candidate) =>
       candidates.every(
-        (other) => other === candidate || !concreteStrictlyContains(other.concrete, candidate.concrete)
+        (other) =>
+          other === candidate || !concreteStrictlyContains(other.concrete, candidate.concrete)
       )
     );
     return maximal.length === 1 ? maximal[0] : null;
@@ -414,13 +425,14 @@ export function createAlchemyStore({ services } = {}) {
 
   /** Place one unit of a component on the bench (capped at owned availability). */
   function add(componentId) {
-    if (!componentId || availableOf(componentId) <= 0) return;
+    if (brewInFlight || !componentId || availableOf(componentId) <= 0) return;
     workbench = { ...workbench, [componentId]: (workbench[componentId] || 0) + 1 };
     lastBrew = null;
   }
 
   /** Remove one unit of a component from the bench. */
   function removeOne(componentId) {
+    if (brewInFlight) return;
     const next = { ...workbench };
     next[componentId] = (next[componentId] || 0) - 1;
     if (next[componentId] <= 0) delete next[componentId];
@@ -430,7 +442,7 @@ export function createAlchemyStore({ services } = {}) {
 
   /** Remove EVERY placed unit of a component from the bench (delete the key). */
   function removeAll(componentId) {
-    if (!componentId || !(componentId in workbench)) return;
+    if (brewInFlight || !componentId || !(componentId in workbench)) return;
     const next = { ...workbench };
     delete next[componentId];
     workbench = next;
@@ -439,7 +451,7 @@ export function createAlchemyStore({ services } = {}) {
 
   /** Clear the whole bench and selection. */
   function clear() {
-    resetBench();
+    if (!brewInFlight) resetBench();
   }
 
   /**
@@ -448,6 +460,7 @@ export function createAlchemyStore({ services } = {}) {
    * rich-signature recipe is selected for display only (no auto-fill).
    */
   function selectRecipe(recipeId) {
+    if (brewInFlight) return;
     selectedRecipeId = recipeId ?? null;
     lastBrew = null;
     const recipe = (Array.isArray(listing?.recipes) ? listing.recipes : []).find(
@@ -474,15 +487,16 @@ export function createAlchemyStore({ services } = {}) {
   }
 
   /**
-   * Brew the current bench through the engine (authoritative). Guards
-   * re-entrancy; a dismissed interactive roll is returned quietly. On a resolved
-   * attempt it records the outcome banner, clears the bench, and reloads so newly
-   * learned recipes + fizzle keys refresh.
+   * Brew the current bench through the engine (authoritative). Guards re-entrancy; a roll dismissed
+   * before anything was spent is returned quietly. Otherwise it records the banner, clears the
+   * bench, and reloads so newly learned recipes and fizzle keys refresh.
    */
   async function brew() {
     if (brewInFlight || !brewEnabled) return null;
     brewInFlight = true;
-    const priorKnown = new Set((Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id));
+    const priorKnown = new Set(
+      (Array.isArray(listing?.recipes) ? listing.recipes : []).map((r) => r.id)
+    );
     // The pre-brew target/selection still flags a Tiered success once the bench clears.
     const priorTarget = target;
     const priorSelected = selectedRecipe;
@@ -495,71 +509,24 @@ export function createAlchemyStore({ services } = {}) {
         interactive: true,
       });
       notifyAdditionalDice(result, services, actorNameOf(services, currentActorId()));
-      if (result && result.cancelled === true) return result;
+      if (isQuietDismissal(result)) return result;
       workbench = {};
       selectedRecipeId = null;
       await load(true);
       const nowKnown = Array.isArray(listing?.recipes) ? listing.recipes : [];
       const discovered = nowKnown.find((recipe) => !priorKnown.has(recipe.id)) ?? null;
-      const discoveredName = discovered?.name ?? null;
-      // Brew status enum (replaces the old `ok` boolean; the banner styles each):
-      //  success           — a passed brew produced its success result set;
-      //  tiered-tier       — a passed Tiered brew produced its outcome-tier result set;
-      //  produced-on-failure — a matched Simple brew FAILED its check and produced the
-      //                        reserved failure result set (must NOT read as success-green);
-      //  brewing           — a time-gated brew was STARTED: the signature matched, the
-      //                      inputs are consumed and the run is live in the Journal
-      //                      awaiting world time. Not a failure (issue 966);
-      //  check-failed      — the stage RAN and its check failed. An outcome, never a
-      //                      fizzle and never an error; the card itemises what it cost;
-      //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration);
-      //  refused           — the versioned-run authority REFUSED the brew before any
-      //                      reaction was attempted (`{success:false, reason}`, no
-      //                      `message`). Nothing was consumed, so it must not read as
-      //                      a fizzle, and its reason must be both banner and toast.
-      if (result && result.success === true) {
-        const tiered =
-          discovered?.checkMode === 'tiered' ||
-          priorTarget?.checkMode === 'tiered' ||
-          priorSelected?.checkMode === 'tiered';
-        lastBrew = {
-          status: tiered ? 'tiered-tier' : 'success',
-          discovered: discoveredName,
-          message: result.message ?? '',
-        };
-      } else if (result && result.disposition === 'produced-on-failure') {
-        lastBrew = {
-          status: 'produced-on-failure',
-          discovered: discoveredName,
-          message: result.message ?? '',
-        };
-      } else if (isResolvedFailureOutcome(result)) {
-        // The check RAN and failed. That is an outcome, not "no reaction" — the bench
-        // reacted, and what the attempt cost is the system's failure policy to decide and
-        // the chat card's to itemise, so the banner says neither.
-        lastBrew = { status: 'check-failed', discovered: discoveredName, message: '' };
-      } else if (result?.disposition === 'timed-start') {
-        // The engine's message is an untranslated developer string ("Step … is still
-        // in progress (Ns remaining)"), so the banner carries the localized copy and
-        // nothing is toasted — the player did not fail at anything.
-        lastBrew = { status: 'brewing', discovered: discoveredName, message: '' };
-      } else if (result && result.disposition === 'no-match') {
-        lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
-      } else if (typeof result?.reason === 'string' && result.reason.trim() !== '') {
-        const generic = services?.craftErrorMessage?.();
-        const refusal = journalCommandRefusal(result, services?.localize, generic);
-        lastBrew = { status: 'refused', discovered: null, message: refusal };
-        // Refused dice already raised their one warning above.
-        if (refusal && !result.additionalDiceRefusal) services?.notify?.(refusal);
-      } else {
-        const message = journalRefusalMessage(result, services?.localize, '');
-        lastBrew = { status: 'no-match-fizzle', discovered: null, message };
-        if (message) services?.notify?.(message);
-      }
+      const banner = classifyBrewReply(result, {
+        discovered: discovered?.name ?? null,
+        tiered: [discovered, priorTarget, priorSelected].some((r) => r?.checkMode === 'tiered'),
+        localize: services?.localize,
+        generic: services?.craftErrorMessage?.(),
+      });
+      lastBrew = banner.lastBrew;
+      if (banner.notice) services?.notify?.(banner.notice);
       return result ?? null;
     } catch (err) {
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
-      lastBrew = { status: 'no-match-fizzle', discovered: null, message: err?.message ?? String(err) };
+      lastBrew = { status: 'refused', discovered: null, message: err?.message ?? String(err) };
       return { success: false, results: null, message: err?.message ?? String(err) };
     } finally {
       brewInFlight = false;

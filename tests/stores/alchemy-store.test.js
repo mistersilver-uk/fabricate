@@ -87,7 +87,7 @@ function makeServices(overrides = {}) {
       overrides.submitAlchemyAttempt ??
       (async (opts) => {
         calls.submit.push(opts);
-        return { success: true, results: [], message: '' };
+        return { success: true, runId: 'run-1', disposition: 'succeeded', message: null, createdResultUuids: [] };
       }),
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'failed',
@@ -153,6 +153,7 @@ describe('alchemyStore', () => {
     ]) {
       compiler.copyPlain(module);
     }
+    compiler.copyPlain('src/ui/svelte/stores/alchemyBrewBanner.js');
     compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
     ({ createAlchemyStore } = await compiler.load('src/ui/svelte/stores/alchemyStore.svelte.js'));
   });
@@ -744,6 +745,96 @@ describe('alchemyStore', () => {
     flushSync();
     assert.equal(result.cancelled, true);
     assert.equal(store.benchEmpty, false, 'a cancelled roll leaves the bench intact');
+  });
+
+  // Issue 2574: the start spent the bench, so the reply reads as the live run it left.
+  const STARTED = {
+    success: true, runId: 'run-1', status: 'inProgress', runRevision: 2, reason: null, message: null,
+    disposition: 'started', cancelled: false, requiresExecution: true, canExecuteImmediately: true,
+    createdResultUuids: [],
+  };
+  const liveRunReplies = {
+    'a roll dismissed after the start': { ...STARTED, success: false, cancelled: true, reason: 'roll-cancelled' },
+    'an execute refused after the start': { ...STARTED, success: false, reason: 'stale-run', disposition: null },
+    'a start the call did not resolve': { ...STARTED, canExecuteImmediately: false },
+    'a start waiting on world time': { ...STARTED, status: 'waitingTime', requiresExecution: false },
+  };
+  for (const [label, reply] of Object.entries(liveRunReplies)) {
+    it(`${label} clears the bench and banners the live run as brewing`, async () => {
+      const harness = makeServices({ submitAlchemyAttempt: async () => reply });
+      const store = createAlchemyStore({ services: harness.services });
+      await store.load();
+      flushSync();
+      store.selectRecipe('vigor');
+      flushSync();
+      await store.brew();
+      flushSync();
+      assert.equal(store.benchEmpty, true, 'the spent bench is cleared');
+      assert.equal(store.lastBrew.status, 'brewing', 'never a success or a refusal');
+      assert.equal(harness.calls.list.length, 2, 'the listing reloads');
+      const toasts = reply.reason && !reply.cancelled ? 1 : 0;
+      assert.equal(harness.calls.notify.length, toasts);
+    });
+  }
+
+  it('reads a reply with neither reason nor disposition as refused, not a fizzle', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({
+        success: false, results: null, message: 'FABRICATE.App.Alchemy.NoIngredients', disposition: 'error',
+      }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+    const worded = langLeaf('FABRICATE.App.Alchemy.NoIngredients');
+    assert.ok(worded, 'the key is shipped');
+    assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', worded]);
+    assert.deepEqual(harness.calls.notify, [worded]);
+  });
+
+  it('a failed version-1 brew that created results reads produced-on-failure', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({
+        ...STARTED, success: false, status: 'failed', disposition: 'failed',
+        createdResultUuids: ['Actor.pc.Item.sludge'],
+      }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+    assert.equal(store.lastBrew.status, 'produced-on-failure');
+  });
+
+  it('leaves the bench inert while a brew is in flight', async () => {
+    let settle;
+    const harness = makeServices({
+      submitAlchemyAttempt: () => new Promise((resolve) => (settle = resolve)),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    const brewing = store.brew();
+    flushSync();
+    assert.equal(store.brewInFlight, true);
+    store.add('emberroot');
+    store.removeOne('ashsalt');
+    store.removeAll('ashsalt');
+    store.clear();
+    store.selectRecipe('vigor');
+    flushSync();
+    assert.deepEqual(store.benchChips.map((chip) => [chip.componentId, chip.qty]), [['ashsalt', 1]]);
+    settle({ ...STARTED, disposition: 'succeeded' });
+    await brewing;
   });
 
   // The only progress signal an essence-authored recipe gets: with no `concrete` multiset
