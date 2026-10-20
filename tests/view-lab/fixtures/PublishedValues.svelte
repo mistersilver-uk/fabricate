@@ -9,8 +9,9 @@
   every odd number, counting each refusal and saying why in a live region of its own; `limit` at 9
   between 0 and 10; and `card` at 4 on a `--fab-bg-2` strip. Each accepts any other edit by passing
   it back. Each section records the held number as `data-lab-value`, and what its input shows once
-  it has lost focus as `data-lab-shown`. Each target is `display: flex`, its label centred against
-  it, as the spec asks.
+  it has lost focus as `data-lab-shown`, empty until it first has, so a case cannot read the held
+  number there before its step records it. Each target is `display: flex`, its label centred
+  against it, as the spec asks.
 
   The ground is one column on `--fab-bg-1`, and sets the azure tag ink, so an ink the stepper fails
   to state shows in the frame. A case addresses the ground by `data-lab-values` and each section by
@@ -33,7 +34,7 @@
   const targets = $state([]);
   /** What each section records: the held number, its refusals, what it shows after blur, and why. */
   const lab = $state(
-    STEPPERS.map(([, { value }]) => ({ value, refused: 0, shown: String(value), reason: '' }))
+    STEPPERS.map(([, { value }]) => ({ value, refused: 0, shown: '', reason: '' }))
   );
 
   function mountSteppers(mount) {

@@ -6099,6 +6099,17 @@ test('the steppers specimen cases act on what the values fixture mounts through 
     'the frame is taken only once the refused number snapped back to the held one'
   );
   assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'Property' &&
+        node.key?.name === 'shown' &&
+        node.value?.type === 'Literal' &&
+        node.value.value === ''
+    ),
+    'data-lab-shown starts empty, so it reads "2" only after the blur step records it'
+  );
+  assert.ok(
     stepped.expectSelector.endsWith(
       ':has(button[data-stepper-increment]:disabled) input:focus-visible'
     ),
