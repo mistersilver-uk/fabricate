@@ -374,12 +374,16 @@ async function mountPlayerApp(content, params) {
     // same injectable edge the registry's own hooks travel on.
     playerExtensions,
   };
-  const instance = mount(FabricateAppRoot, { target: content, props });
+  // The demo world's journey moves between tabs, which every lab case holds still.
+  const mounted = params.demoWorld
+    ? (await import('./demo/demoTabs.svelte.js')).switchableTabs(props)
+    : props;
+  const instance = mount(FabricateAppRoot, { target: content, props: mounted });
   if (params.companionRoll) {
     const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
     installLabCompanionRoll(content.ownerDocument, params.companionRoll);
   }
-  return { instance, services, props };
+  return { instance, services, props: mounted };
 }
 
 function installJournalCaseServiceSeam(services, state) {
