@@ -2645,14 +2645,16 @@ A `value` prop is never required.
 Each `value` prop brings an optional callback prop named `on`, the prop's name with its first letter upper-cased, then `Change`: `query` brings `onQueryChange`.
 `describe` lists the value prop as `{ kind: 'value', required: false }` and directly after it that callback as `{ kind: 'callback', required: false }`.
 Fabricate calls it with `(next, previous)` only when the component changes the value itself, once per change, and never when the two are the same by `Object.is`; `mount` and `update` never call it.
-Inside that call, an `update` with the same value changes nothing, and one with another value is drawn before the call returns and wins, with no second call, so you can reject, revert or transform what the user typed; one made later shows on the next flush.
+Inside the call, `handle.value(key)` already answers `next`.
+A throw from it is reported as any callback's is, under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+Inside that call, an `update` with the same value changes nothing, and one with another value is drawn before the call returns and wins, with no second call, so you can reject, revert or transform what the user typed; one made later shows on the next flush, so the user briefly sees their own text first.
 A replaced value moves a text input's caret to the end and ends any IME composition in progress.
 `handle.value(key)` reads a value prop's current value, and answers `undefined` for any other prop and after `destroy` or a fault; `null` is a legal value.
 Detect both before you rely on them, because a Fabricate that predates a value prop refuses it:
 
 ```javascript
 const bound = fabUi.describe(name)?.props[key]?.kind === 'value';
-const readable = typeof handle.value === 'function';
+const readable = typeof handle.value === 'function'; // `handle` is what `fabUi.mount(...)` returned.
 ```
 
 An ARIA attribute is published only as an `aria` prop a component's section names.
