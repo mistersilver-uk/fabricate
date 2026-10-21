@@ -394,8 +394,10 @@ async function editorScene(take, open) {
   await take.hold(2600, 'editor: offer an alternative to the steel');
   await take.press('Escape');
   await take.click('#recipe-tab-results');
+  await take.hold(2400, 'editor: the results tab');
   await take.glide('[data-recipe-result-group="ed-mw-flourish"]', 'editor: the flourish', {
-    steps: 4,
+    steps: 6,
+    stepMs: 110,
   });
   await take.click('[data-recipe-group-chooser="rolled"]');
   await take.hold(2200, 'editor: rolled for the player');
