@@ -24,8 +24,8 @@
   - No `aria-label` on the section: the inner `VocabularyPanel` section is the landmark, and a
     second one would name the same region twice.
   - `hint` is always empty: the head's SUBLINE is the line under the title, and a hint as well would draw two.
-  - The toolbar's `:global` repair stays chained onto `.fabricate-filter-bar`: the class sits on a
-    component tag, and a bare (0,1,0) would win ties it has no business in.
+  - The filter bar is the shared bordered box, inset by the panel's own padding: this panel writes no
+    rule on `.fabricate-filter-bar`.
   - Pinned by `tests/components/world-vocabulary-control-row-cascade.test.js` and
     `tests/manager-browser-view-state-contract.test.js`.
 -->
@@ -129,8 +129,7 @@
     background: var(--fab-bg-1);
   }
 
-  /* The four control-row repairs, all `:global` and the toolbar's chained onto `.fabricate-filter-bar`:
-     the class sits on a component tag, and a bare (0,1,0) would win ties it has no business in. */
+  /* The control-row repairs below are all `:global`: they reach elements a child component renders. */
 
   /* THE ADD FORM RUNS FLUSH, because the PANEL is the card now; its own fill sits two rungs above
      the panel's, so inside one it is a card in a card brighter than the rows below it. */
@@ -150,14 +149,6 @@
   :global(.manager-vocabulary-shell-panel .fabricate-select-trigger),
   :global(.manager-vocabulary-shell-panel .manager-vocabulary-form input) {
     background: var(--fab-bg-0);
-  }
-
-  /* THE BAND IS FLATTENED: `.fabricate-filter-bar`'s fill and bottom hairline read inside a panel card
-     as a lit raised strip the reference does not draw. REMOVED rather than replaced. */
-  :global(.manager-vocabulary-shell-panel .fabricate-filter-bar.manager-scoped-list-toolbar) {
-    padding: 0;
-    border-bottom: 0;
-    background: transparent;
   }
 
   /* The head the primitive does not draw: icon tile, title and subline, left of the sort toolbar. */

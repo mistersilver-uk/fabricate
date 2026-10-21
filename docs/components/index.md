@@ -41,7 +41,8 @@ The essence filter offers **All essences**, **Carries any essence**, and **No es
 The category filter offers **All categories** and **No world category**, then one option per category in the world's category vocabulary in its order, then any other category a component already carries.
 It is left off the toolbar entirely on a world with no categories yet.
 **Sort by** offers **Name**, **System count**, and **Source type**.
-The list column runs edge to edge across the middle of the screen, so the toolbar, the rows, and the pager at the foot share the same left and right edges with nothing wasted around them.
+The list column runs edge to edge across the middle of the screen, so the rows and the pager at the foot share the same left and right edges with nothing wasted around them.
+The filter controls sit together in a bordered box at the top of the column, set in a little from the sides.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
 The list itself opens with a drop zone for dragging in items, spanning the full width of the row, so it scrolls with the rows rather than sitting fixed above the toolbar.

@@ -285,10 +285,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
-  // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections.
+  // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections: the
+  // pane host, the gathering panel, and the three hosts that pad their own content (issue 2546).
   'src/ui/svelte/components/FilterBar.svelte': Object.freeze([
     'world-component-catalogue',
     'manager-environments-browse-normal',
+    'manager-essences-normal',
+    'world-tool-catalogue',
+    'interactables-browser-tools',
+    'world-vocabulary',
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
   // Tools library card, the compact form in the task editor and the entry systems card, and the

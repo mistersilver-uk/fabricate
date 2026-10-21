@@ -924,12 +924,19 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       const box = await measureFlushColumn(markupOf(), view);
       assert.equal(box.rendered, true, 'the column, its toolbar, its rows or a row did not render');
       assert.deepEqual(box.padding, [0, 0, 0, 0], 'the list column carries no inset');
-      for (const band of ['toolbar', 'rows']) {
-        assert.ok(
-          box[band].every((edge) => Math.abs(edge) <= EPSILON_PX),
-          `the ${band} stops ${box[band].join('/')}px short of the column's left/right edges`
-        );
-      }
+      assert.ok(
+        box.rows.every((edge) => Math.abs(edge) <= EPSILON_PX),
+        `the rows stop ${box.rows.join('/')}px short of the column's left/right edges`
+      );
+      assert.ok(
+        box.toolbar.every((edge) => Math.abs(edge - GUTTER_PX) <= EPSILON_PX),
+        `the filter bar stops ${box.toolbar.join('/')}px short of the column's left/right edges, ` +
+          `not the ${GUTTER_PX}px inset`
+      );
+      assert.ok(
+        Math.abs(box.toolbar[0] - box.rowInset) <= EPSILON_PX,
+        `the filter bar's left edge (${box.toolbar[0]}px) is not the rows' gutter (${box.rowInset}px)`
+      );
       assert.ok(
         Math.abs(box.rowInset - GUTTER_PX) <= EPSILON_PX,
         `a row starts ${box.rowInset}px inside the column, not on the ${GUTTER_PX}px gutter`

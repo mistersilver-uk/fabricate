@@ -372,7 +372,7 @@ test('manager components browser defines drop target and compact responsive list
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
   // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508).
   const toolbarBlock = Array.from(
-    css.matchAll(/\.fabricate-filter-bar\.fabricate-filter-bar\s*\{[\s\S]*?\}/g)
+    css.matchAll(/^\.fabricate-filter-bar\.fabricate-filter-bar\s*\{[\s\S]*?\}/gm)
   )
     .map((match) => match[0])
     .join('\n');
@@ -454,12 +454,25 @@ test('manager components browser defines drop target and compact responsive list
     'the components list fills its drop-active state with the success tint'
   );
   assert.ok(
-    toolbarBlock.includes('display: grid;'),
-    'manager toolbar should own a grid layout for primary controls and auxiliary rows'
+    toolbarBlock.includes('display: flex;') && toolbarBlock.includes('flex-wrap: wrap;'),
+    'the filter bar is one wrapping flex row, which the stacked filter rows sit inside'
   );
   assert.ok(
-    toolbarBlock.includes('grid-template-columns: minmax(0, 1fr);'),
-    'manager toolbar grid should keep rows bounded to the main content width'
+    !toolbarBlock.includes('display: grid;') && !toolbarBlock.includes('grid-template-columns'),
+    'the filter bar declares no grid base: no screen renders that form'
+  );
+  for (const declaration of [
+    'padding: var(--fab-space-3);',
+    'border: 1px solid var(--fab-border);',
+    'border-radius: 9px;',
+    'background: var(--fab-bg-1);',
+    'gap: var(--fab-space-2);',
+  ]) {
+    assert.ok(toolbarBlock.includes(declaration), `the filter bar box declares ${declaration}`);
+  }
+  assert.ok(
+    !css.includes(':not(:has(.manager-toolbar-primary))'),
+    'the always-taken `.manager-toolbar-primary` branch is deleted'
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
   // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its sort

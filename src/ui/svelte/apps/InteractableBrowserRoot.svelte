@@ -408,14 +408,6 @@
     overflow-y: auto;
   }
 
-  /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.fabricate-filter-bar`
-     draws its own padding, a soft fill and a bottom rule — a divider that reads as a mistake when
-     it stops 12px (`--fab-space-3`) short of both edges. The pull is exactly this column's own inline padding,
-     so the bar meets the window and the rows beneath it keep their inset. */
-  .fabricate-interactable-browser :global(.fab-ib-controls) {
-    margin-inline: calc(-1 * var(--fab-space-3));
-  }
-
   /* THE PICKER STATES ITS OWN WIDTH, for the reason `Select.svelte` records: the shared select
      declares no `width` and no `min-width`, because "the trigger's box is the one thing this API
      does not address". A `<button>` hugs its content, so a system whose name is short would open

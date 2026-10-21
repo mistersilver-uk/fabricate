@@ -2485,7 +2485,7 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
-The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a set of controls mixed into it.
+The selection bar is a BAND OF ITS OWN directly beneath the filter row, inside the filter bar's box, never a set of controls mixed into it.
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
@@ -2556,6 +2556,25 @@ A compact pager (`density="compact"`) is not a player browse column's footer and
 - **WHEN** a compact pager closes a pane section that is not a player browse column
 - **THEN** its rule meets the section's edges
 - **AND** the next section's top rule sits directly beneath it
+
+### Requirement: The filter bar is a bordered box that every host insets
+
+The filter bar is a bordered box — 1px `--fab-border`, radius 9, `--fab-bg-1`, `--fab-space-3` padding, `--fab-space-2` gap — that every host insets: the stylesheet by `--fab-space-3` where the host does not pad its content, and the host's own padding where it does; no route, caller or panel flattens it to a full-width band (issue 2546, M2, superseding issue 1373's Tools and Essence flattening, the interactables browser's full-width bar and the Vocabulary panel's flattening).
+`<FilterBar>` is `shipped`, not `divergent`.
+The stylesheet insets the box in the manager's main pane, a gathering panel and the scoped list column; the top inset applies only where the bar opens its host or follows the recipe notice slot.
+A host that already pads its content, such as the Tools content column (its own `--fab-space-5`, 20px), the interactables column and the Vocabulary card, adds no inset of its own.
+Its API is the slot API (`children`, `ariaLabel`, `class` and the rest spread); the library sketch's data props are declined (issue 2546, M3).
+The search field inside the bar is the 38px field and a select takes the `toolbar` rung at 34px unless the caller lifts it to the `form` rung (the Component Rules filters do).
+
+#### Scenario: A browse bar sits in the manager's main pane
+
+- **WHEN** a filter bar renders directly in the manager's main pane, a gathering panel or the scoped list column
+- **THEN** it is a box bordered on all four sides at radius 9 on `--fab-bg-1`, inset `--fab-space-3` from the host's left and right edges, and from its top edge where the bar opens the host or follows the recipe notice slot (a drop zone, a column lead or a gap above the bar already spaces it, so its top margin is not doubled)
+
+#### Scenario: A host that pads its content holds the bar
+
+- **WHEN** a filter bar renders inside the Tools content column, the interactables column or the Vocabulary card
+- **THEN** it is the same box, inset by the host's own padding (20px in the Tools content column), and no rule on the host restyles it
 
 ### Requirement: The application shell renders through the shell primitives
 

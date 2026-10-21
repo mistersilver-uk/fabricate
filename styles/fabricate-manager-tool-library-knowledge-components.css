@@ -839,13 +839,6 @@
   background: var(--fab-bg-0);
 }
 
-/* THE BROWSER TOOLBAR STRIP IS FLUSH, NOT A RAISED BAND. Last of the surface inversions on these screens, and the same one just corrected on the secondary buttons — ours raised a region the prototype leaves level. */
-.fabricate-manager[data-manager-view='world-essences'] .fabricate-filter-bar,
-.fabricate-manager[data-manager-view='essences'] .fabricate-filter-bar {
-  border-bottom: 0;
-  background: transparent;
-}
-
 /* ── THE TOOL SCREENS JOIN THE SAME SURFACE LADDER ── The blocks above are route-scoped by design, and their route lists name the ESSENCE screens (issue 1373). */
 .fabricate-manager[data-manager-view='world-tools'] .manager-main,
 .fabricate-manager[data-manager-view='world-tool-entry'] .manager-main,
@@ -930,12 +923,6 @@
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence rules list does, so its surfaces are brought onto the ladder here rather than in a scoped block (issue 1373). */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
   --fab-manager-inspector-bg: var(--fab-bg-1);
-}
-
-/* THE WORLD TOOLS CATALOGUE'S TOOLBAR STRIP IS FLUSH TOO (issue 1373). */
-.fabricate-manager[data-manager-view='world-tools'] .fabricate-filter-bar {
-  border-bottom: 0;
-  background: transparent;
 }
 
 /* ── THE TOOL RULES EDITOR'S VALIDATION SURFACE ── Scoped to this route, not applied to `EditorValidationSurface` at large: the recipe, check and essence editors each have reference frames of their own, and this is the one that was read against its own (issues 1373, 1509). */
@@ -1842,11 +1829,6 @@
 }
 
 /* === ISSUE 1371 · PARTS C AND D — THE SYSTEM COMPONENT RULES LIST AND ITS EDITOR === */
-
-/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge (issue 1371). */
-.fabricate-manager .manager-component-toolbar {
-  padding: var(--fab-space-3) var(--fab-space-5);
-}
 
 /* ── C3. THE TOOLBAR'S SECOND ROW ── `proto:1058` puts the selection register, the two VIEW controls and the count on ONE row. */
 .fabricate-manager .manager-component-filter-row.is-secondary {

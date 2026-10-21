@@ -1286,11 +1286,20 @@ const LAYOUT_CASE_REGISTRATIONS = [
 const LAYOUT_CASE_IDS = [...new Set(LAYOUT_CASE_REGISTRATIONS)];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
-test('the gutter-claim catalogue cases still declare their search field alignment', () => {
+test('the gutter-claim catalogue cases align the filter bar box with their rows', () => {
   for (const id of ['world-tool-catalogue', 'world-essence-catalogue']) {
     const { expectLayout } = getCaseById(id);
     assert.ok(expectLayout.containerSelector, `${id} declares a containerSelector`);
-    assert.match(expectLayout.alignedLeft, /search/i, `${id} names the search field`);
+    assert.match(
+      expectLayout.alignedLeft,
+      /\.manager-scoped-list-toolbar(?!\s+\.)/,
+      `${id} names the box`
+    );
+    assert.doesNotMatch(
+      expectLayout.alignedLeft,
+      /search/i,
+      `${id} no longer claims the search field`
+    );
   }
 });
 
@@ -1313,7 +1322,10 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.equal(viewCase.expectLayout.expectedTracks, 2);
       assert.equal(viewCase.expectLayout.fillSelector, `.manager-scoped-list-column > ${foot}`);
       for (const edge of [viewCase.expectLayout.alignedLeft, viewCase.expectLayout.alignedRight]) {
-        assert.ok(edge.includes('.manager-scoped-list-column > .manager-scoped-list-toolbar'));
+        assert.ok(
+          !edge.includes('.manager-scoped-list-toolbar'),
+          'the filter bar is inset from the column edges, so it stands in no edge list'
+        );
         assert.ok(edge.includes(`.manager-scoped-list-column > ${foot}`));
       }
       continue;

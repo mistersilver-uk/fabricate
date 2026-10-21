@@ -696,7 +696,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     );
   });
 
-  it('runs the list column edge to edge in its pane, with the toolbar, the rows and the pager at the column`s own edges (M21)', () => {
+  it('runs the list column edge to edge in its pane, with the rows and the pager at the column`s own edges and the filter bar inset 12px (M21, issue 2546)', () => {
     const { frame, column, toolbar, rows, pager, firstRow, pagerSummary } = listFrame;
     assert.ok(Boolean(pager), 'the two-row window puts a foot pager in the markup');
     assert.ok(column.width > 400, 'NON-VACUITY: the column is a real width');
@@ -707,7 +707,6 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.equal(Math.round(column.top), Math.round(frame.top), 'and at its top');
     assert.equal(Math.round(column.bottom), Math.round(frame.bottom), 'and reaches its bottom');
     for (const [name, child] of [
-      ['toolbar', toolbar],
       ['rows scroller', rows],
       ['pager', pager],
     ]) {
@@ -722,10 +721,26 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         `and the ${name} ends at the column\`s right edge, which is the inspector\`s divider`
       );
     }
+    // The filter bar is the shared box, inset 12px: its left edge is the rows' gutter.
+    assert.equal(
+      Math.round(toolbar.left),
+      Math.round(column.left) + 12,
+      'the filter bar starts one 12px inset inside the column'
+    );
+    assert.equal(
+      Math.round(toolbar.right),
+      Math.round(column.right) - 12,
+      'and ends one 12px inset before the column`s right edge'
+    );
     assert.equal(
       Math.round(toolbar.top),
-      Math.round(column.top),
-      'the toolbar sits at the pane`s top, as the rules list`s toolbar does'
+      Math.round(column.top) + 12,
+      'with the same 12px above it'
+    );
+    assert.equal(
+      Math.round(toolbar.left),
+      Math.round(firstRow.left),
+      'so its left edge is the rows` gutter'
     );
     assert.equal(
       Math.round(pager.bottom),

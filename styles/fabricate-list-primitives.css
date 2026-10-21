@@ -11,22 +11,31 @@
   border: 0;
 }
 
-/* ONE RULE, MERGED. The first four declarations were written in a LIST shared with `.manager-section-header`, which is how the toolbar and the page header a view drew under it kept the same padding and rule line (issue 1515). */
+/* The filter bar: one wrapping flex row, bordered, on --fab-bg-1 at radius 9 (issue 2546). */
 .fabricate-filter-bar.fabricate-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-3);
-  border-bottom: 1px solid var(--fab-border);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: start;
-  background: var(--fab-overlay-light-03);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
 }
 
-.fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)) {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+/* Hosts that do not pad their content inset the bar by --fab-space-3 from the sides; hosts that pad add nothing. */
+.fabricate
+  :is(.manager-main, .manager-gathering-panel, .manager-scoped-list-column)
+  > .fabricate-filter-bar.fabricate-filter-bar {
+  margin: 0 var(--fab-space-3);
+}
+
+/* The top inset applies only where the bar opens its host or follows the recipe notice slot; a drop zone, a column lead or a gap above already spaces it. */
+.fabricate
+  :is(.manager-main, .manager-gathering-panel, .manager-scoped-list-column)
+  > .fabricate-filter-bar.fabricate-filter-bar:is(:first-child, .manager-recipe-notice + *) {
+  margin-block-start: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-environments-toolbar {
