@@ -388,7 +388,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
   ]),
-  // The shared empty panel.
+  // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
+  // a `compact fill` journal body and the hero in a narrow host.
   'src/ui/svelte/components/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
@@ -398,6 +399,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
+    'player-inventory-bulk-none-salvageable',
+    'manager-component-complications-empty',
+    'fabricate-journal-history-batch-empty-1240',
+    'player-alchemy-workbench',
   ]),
   // The link field (issue 2466): the world Tool screens, then at least one frame of each of its nine other hosts.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([

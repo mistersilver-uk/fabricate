@@ -355,18 +355,35 @@ export const CASES = Object.freeze([
         { selector: '.fabricate-card > div > div', styles: SLOT_BOX },
         {
           selector: HERO_PANEL,
-          styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+          styles:
+            'border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); background-color: rgba(0, 0, 0, 0)',
         },
         { selector: `${HERO_PANEL} > div`, styles: 'display: flex; row-gap: 8px' },
-        { selector: `${HERO_PANEL} > div > i`, styles: 'width: 46px; height: 46px' },
+        {
+          selector: `${HERO_PANEL} > div > i`,
+          styles:
+            'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
+        },
         { selector: `${HERO_PANEL} > div > div`, styles: SLOT_BOX },
         { selector: `${HERO_PANEL} > div > div > div`, styles: SLOT_BOX },
         {
           selector: '.manager-empty h3',
-          styles: 'color: var(--fab-text-secondary); font-size: 13px',
+          styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
         },
-        { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 12px' },
-        { selector: `${FILTERED_PANEL} p`, styles: 'color: var(--fab-text-muted)' },
+        {
+          selector: `${HERO_PANEL} > div > p`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+        },
+        {
+          selector: FILTERED_PANEL,
+          styles:
+            'padding: 16px; border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); border-radius: 11px',
+        },
+        { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 8px' },
+        {
+          selector: `${FILTERED_PANEL} p`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+        },
         {
           selector: `${HERO_PANEL} .fabricate-button`,
           styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',

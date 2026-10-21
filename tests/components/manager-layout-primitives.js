@@ -406,9 +406,9 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 
   // Matched to the reference prototype.
   assert.ok(
-    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
+    emptyPanelBlock.includes('border: 1px dashed var(--fab-border-strong);') &&
       emptyPanelBlock.includes('border-radius: 11px;'),
-    'the no-state panel should be a rounded 1.5px dashed panel'
+    'the no-state panel should be a rounded 1px dashed panel on the strong border'
   );
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
   // for an AREA-SCOPED custom property, declared inside `.fabricate-manager` only, so
@@ -435,10 +435,10 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   );
   assert.ok(!emptyPanelBlock.includes('background:'), 'the prototype panel carries no fill');
   assert.ok(
-    emptyIconBlock.includes('font-size: 18px;') &&
-      emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
-      emptyIconBlock.includes('background: var(--fab-surface-soft);'),
-    'the glyph should be a small subtle icon on a soft rounded tile'
+    emptyIconBlock.includes('font-size: 15px;') &&
+      emptyIconBlock.includes('color: var(--fab-text-secondary);') &&
+      emptyIconBlock.includes('background: var(--fab-bg-3);'),
+    'the glyph should be the specimen 15px secondary icon on a bg-3 rounded tile'
   );
   // A per-icon OR per-screen size exception would reintroduce the inconsistency the
   // primitive exists to remove, so every empty state shares one tile and type scale. The
@@ -470,13 +470,13 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   }
   assert.ok(
     emptyHeadingBlock.includes('font-weight: 600;') &&
-      emptyHeadingBlock.includes('font-size: 13px;') &&
+      emptyHeadingBlock.includes('font-size: 15px;') &&
       emptyHeadingBlock.includes('font-family: var(--fab-font-serif);'),
-    'the title should be the prototype 13px/600 serif'
+    'the title should be the specimen 15px/600 serif'
   );
   assert.ok(
-    emptyBodyBlock.includes('font-size: 11px;') && emptyBodyBlock.includes('max-width: 280px;'),
-    'the body should be 11px and capped so it wraps into a readable column'
+    emptyBodyBlock.includes('font-size: 10.5px;') && emptyBodyBlock.includes('max-width: 34ch;'),
+    'the body should be 10.5px and capped at 34ch so it wraps into a readable column'
   );
   // The sidebar/inline scale is the SAME vocabulary, not a second look.
   assert.ok(

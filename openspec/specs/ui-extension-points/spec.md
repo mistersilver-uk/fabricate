@@ -688,14 +688,14 @@ Each group states the accepted values of every key that entry publishes.
   - `hint` is optional final display text, the sentence beneath the title.
     The companion passes a title, a hint or both; with neither the panel is an empty box.
   - `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
-  - `filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, and the companion passes `hint` alone with it.
+  - `filtered` is `true` or `false`: `true` draws the plain panel, in the muted ink, with no tile or title, for filters that match nothing, which is not an absence of content, and the companion passes `hint` alone with it.
     The hint is plain text, so a search term in it takes no emphasis.
   - `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
     It is the way out of the dead end, a control or a link; what is drawn there is the companion's own, and a control drawn there is named by the companion.
     Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so the companion states the ink of any text it draws there.
   - It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is the companion's.
   - It draws no fill, so it sits on `target`'s ground.
-    The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+    The title inks `--fab-text`, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2`, `--fab-surface-soft` over `--fab-bg-2` and `--fab-bg-3` in every palette.
     The hint inks `--fab-text-muted` on every variant, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2` in every palette.
   - The title states its own serif face, and the hint inherits `target`'s.
   - The panel never moves its content slot while it is requested.

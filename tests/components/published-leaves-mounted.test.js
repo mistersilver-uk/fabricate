@@ -678,7 +678,7 @@ describe('EmptyState under a bare ancestor', () => {
   });
 
   it('lays its column out and inks its title from its own stylesheet', async () => {
-    const theme = ':root[data-fabricate-theme] { --fab-text-secondary: rgb(1, 2, 3); }';
+    const theme = ':root[data-fabricate-theme] { --fab-text: rgb(1, 2, 3); }';
     await underSheet(theme, async () => {
       const { target, handle } = mountLeaf('EmptyState', { title: 'No factions yet' });
       await settle();

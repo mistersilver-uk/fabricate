@@ -1059,8 +1059,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
   // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
-  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451); then each
-  // panel's nested button in its visual role's ink and fill (issue 2452).
+  // the filtered panel's edge, padding, gap and ink, and the notice's fill and inks (issue 2451);
+  // then each panel's nested button in its visual role's ink and fill (issue 2452).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -1098,21 +1098,35 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fabricate-card > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty:not(.is-filtered)',
-      styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+      styles:
+        'border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); background-color: rgba(0, 0, 0, 0)',
     },
     { selector: '.manager-empty:not(.is-filtered) > div', styles: 'display: flex; row-gap: 8px' },
     {
       selector: '.manager-empty:not(.is-filtered) > div > i',
-      styles: 'width: 46px; height: 46px',
+      styles:
+        'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
     },
     { selector: '.manager-empty:not(.is-filtered) > div > div', styles: 'display: contents' },
     { selector: '.manager-empty:not(.is-filtered) > div > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty h3',
-      styles: 'color: var(--fab-text-secondary); font-size: 13px',
+      styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
     },
-    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
-    { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    {
+      selector: '.manager-empty:not(.is-filtered) > div > p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
+    {
+      selector: '.manager-empty.is-filtered',
+      styles:
+        'padding: 16px; border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); border-radius: 11px',
+    },
+    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 8px' },
+    {
+      selector: '.manager-empty.is-filtered p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
     {
       selector: '.manager-empty:not(.is-filtered) .fabricate-button',
       styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
