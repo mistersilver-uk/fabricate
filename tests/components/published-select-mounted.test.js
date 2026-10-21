@@ -2,21 +2,23 @@
  * The published `Select` on Fabricate's real Svelte runtime (issue 2454), through a fresh seam
  * registered with the adapter's own table, under the Fabricate window roots it needs: the trigger
  * drawn alone and named, a choice by pointer and by key reaching `onChange` with the value as
- * passed, Escape and an outside press closing without one, the list hosted by the `overlayHost`
- * option, by the nearest `.fabricate-app` and by the standalone layer, `destroy` while open, the
- * keys the trigger keeps, and every refusal the entry adds. The trigger is held here because the
+ * passed, Escape and an outside press closing without one, an `update` and a render fault while
+ * open, the list hosted by the `overlayHost` option, by the nearest `.fabricate-manager` or
+ * `.fabricate-app` and by the standalone layer, `destroy` while open, the keys the trigger keeps,
+ * values unique as strings, and every refusal the entry adds. The trigger is held here because the
  * static gates pin it to the defaults of the picker's other trigger forms, its names and its
  * choice because they cross into the picker, which the gates do not follow.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
+  FAULT_REPORT,
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
   PUBLISHED_RAW_MODULES,
@@ -104,11 +106,11 @@ afterEach(() => {
  */
 function mountSelect(
   props = {},
-  { target = fabricateTarget(shells, 'fabricate fabricate-app'), overlayHost } = {}
+  { target = fabricateTarget(shells, 'fabricate fabricate-app'), overlayHost, onFault } = {}
 ) {
   const change = recorder();
   const base = { ...NAMED, onChange: change.record, ...props };
-  const handle = ui().mount('Select', { target, props: base, overlayHost });
+  const handle = ui().mount('Select', { target, props: base, overlayHost, onFault });
   handles.push(handle);
   flushSync();
   return {
@@ -122,6 +124,8 @@ function mountSelect(
 
 const listbox = () => document.querySelector('[role="listbox"]');
 const rows = () => [...document.querySelectorAll('[role="option"]')];
+const rowText = (row) => row.textContent.replaceAll(/\s+/g, ' ').trim();
+const selected = () => rows().map((row) => row.getAttribute('aria-selected'));
 
 /** Opens the list from its trigger, as a press does, and answers the panel. */
 async function open(trigger) {
@@ -228,14 +232,10 @@ describe('the published Select names', () => {
     assert.equal(panel.getAttribute('aria-label'), NAMED.ariaLabel);
     assert.equal(listbox().getAttribute('aria-label'), NAMED.ariaLabel);
     assert.deepEqual(
-      rows().map((row) => row.textContent.replaceAll(/\s+/g, ' ').trim()),
+      rows().map((row) => rowText(row)),
       OPTIONS.map(({ label }) => label)
     );
-    assert.deepEqual(
-      rows().map((row) => row.getAttribute('aria-selected')),
-      ['true', 'false', 'false'],
-      'the row for value is selected'
-    );
+    assert.deepEqual(selected(), ['true', 'false', 'false'], 'the row for value is selected');
   });
 
   it('draws no copy of its own and calls no game.i18n while it mounts and opens', async () => {
@@ -256,7 +256,7 @@ describe('the published Select names', () => {
   });
 
   it('clips the panel’s polite live region under a Fabricate window', async () => {
-    const sheet = readFileSync(resolve(REPOSITORY, 'styles/fabricate-list-primitives.css'), 'utf8');
+    const sheet = readStylesheet();
     const rule = /\.fabricate \.visually-hidden \{[^}]*\}/.exec(sheet)?.[0];
     assert.ok(rule, 'the module utility was read');
     await underSheet(rule, async () => {
@@ -345,6 +345,58 @@ describe('a choice in the published Select', () => {
   });
 });
 
+describe('the published Select while its list is open', () => {
+  it('moves the selection on an update, and redraws new options in place with the list open', async () => {
+    const { update, trigger } = mountSelect({ value: 10 });
+    const panel = await open(trigger());
+    assert.equal(update({ value: 'all' }), true);
+    flushSync();
+    await settle();
+    assert.deepEqual(selected(), ['false', 'false', 'true'], 'the selection follows value');
+    const more = [{ value: 5, label: 'Five per page' }, ...OPTIONS];
+    assert.equal(update({ value: 5, options: more }), true);
+    flushSync();
+    await settle();
+    assert.ok(document.querySelector('[role="dialog"]') === panel, 'the panel is the same node');
+    assert.ok(Boolean(listbox()), 'the list stays open');
+    assert.deepEqual(
+      rows().map((row) => rowText(row)),
+      more.map(({ label }) => label)
+    );
+    assert.deepEqual(selected(), ['true', 'false', 'false', 'false']);
+  });
+
+  for (const under of ['fabricate', 'fabricate fabricate-app']) {
+    it(`faults once on a render fault under a frame classed ${under}, and leaves no list`, async () => {
+      const faults = [];
+      const target = fabricateTarget(shells, under);
+      const { update, trigger } = mountSelect(
+        {},
+        {
+          target,
+          onFault: (error) => {
+            faults.push(error);
+          },
+        }
+      );
+      const panel = await open(trigger());
+      update({ options: [null] });
+      flushSync();
+      await settle();
+      assert.equal(faults.length, 1, 'onFault is told once');
+      assert.deepEqual(
+        reports.map(([report, name]) => [report, name]),
+        [[FAULT_REPORT, 'Select']],
+        'reported once'
+      );
+      assert.ok(!panel.isConnected, 'no panel');
+      assert.ok(!document.querySelector(LAYER), 'no layer');
+      assert.ok(!listbox(), 'no listbox');
+      assert.equal(target.childNodes.length, 0, 'the target is empty');
+    });
+  }
+});
+
 describe('the published Select hosts its list', () => {
   /** The `display: contents` element the seam portaled the panel into. */
   function containerOf(panel) {
@@ -365,6 +417,18 @@ describe('the published Select hosts its list', () => {
     assert.deepEqual(calls, [[25]]);
     handle.destroy();
     assert.equal(overlayHost.children.length, 0, 'destroy leaves no container');
+  });
+
+  it('in the nearest .fabricate-manager above target, inside an app root', async () => {
+    const target = fabricateTarget(shells, 'fabricate fabricate-app');
+    const manager = document.createElement('div');
+    manager.className = 'fabricate-manager';
+    target.parentElement.append(manager);
+    manager.append(target);
+    const { trigger } = mountSelect({}, { target });
+    const panel = await open(trigger());
+    assert.ok(containerOf(panel).parentElement === manager, 'the Manager root hosts');
+    assert.ok(!document.querySelector(LAYER), 'no standalone layer is made');
   });
 
   it('in the nearest .fabricate-app above target when no overlayHost is passed', async () => {
@@ -413,8 +477,46 @@ describe('the keys the published Select keeps', () => {
     trigger().focus();
     for (const key of ['ArrowDown', 'a', 'Tab']) press(trigger(), key);
     await settle();
-    assert.deepEqual(heard, [], 'no key reached the companion above target');
     assert.ok(Boolean(listbox()), 'Tab leaves the list open');
+    press(trigger(), 'Escape');
+    await settle();
+    assert.ok(!listbox(), 'Escape closes the list');
+    press(trigger(), 'Escape');
+    await settle();
+    assert.deepEqual(heard, [], 'no key reached the companion above target, Escape included');
+  });
+});
+
+describe('the published Select’s values', () => {
+  it('draws a row of its own for each value unique as a string, and faults on 1 beside "1"', async () => {
+    const { trigger } = mountSelect();
+    await open(trigger());
+    assert.equal(new Set(rows().map((row) => row.id)).size, OPTIONS.length, 'one id per value');
+    handles.pop().destroy();
+    const faults = [];
+    const target = fabricateTarget(shells, 'fabricate fabricate-app');
+    const options = [
+      { value: 1, label: 'One' },
+      { value: '1', label: 'One, as text' },
+    ];
+    const { trigger: shared } = mountSelect(
+      { options },
+      {
+        target,
+        onFault: (error) => {
+          faults.push(error);
+        },
+      }
+    );
+    await open(shared());
+    await settle();
+    assert.equal(faults.length, 1, 'the list cannot draw two rows that share one string');
+    assert.deepEqual(
+      reports.map(([report, name]) => [report, name]),
+      [[FAULT_REPORT, 'Select']]
+    );
+    assert.ok(!listbox(), 'no list is left');
+    assert.equal(target.childNodes.length, 0, 'the target is empty');
   });
 });
 
