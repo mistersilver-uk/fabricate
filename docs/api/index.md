@@ -2050,6 +2050,7 @@ The published components, in publication order:
 | `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
+| `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2650,6 +2651,60 @@ const props = () => ({
 const stepper = fabUi.mount('Stepper', { target, props: props() });
 ```
 
+### SearchField
+
+`SearchField` draws the design system's search field: a native `<input type="search">` inside a `<label>` root that also draws a decorative glyph, for a query that narrows a list already on screen and commits nothing.
+The input is the only focusable element inside `target`, so to return focus to the field, focus `target.querySelector('input')`.
+`value` is the query, a string, and is `''` when absent.
+A `value` that is not a string is outside the contract, and what is drawn for it is private.
+It is a `value` prop: the field changes it itself as the user types, and an `update` that omits it keeps the current query, so you need not pass the query back on every `update`.
+`onValueChange` is called with two strings, `(next, previous)`, each time an edit of the user's changes the query: a keystroke, a paste or a cut, and a clear the browser makes from the field's cancel button or on Escape, which reports `''`.
+Whether the browser draws a cancel button or clears on Escape is the browser's: Chromium, and so Foundry's desktop app, does both.
+It is not called by `mount`, `update`, Enter or the field losing focus.
+To refuse or transform a query, pass the query you keep back through `update` before the call returns, and the field shows it before the user's `input` event has finished dispatching; the replaced query moves the caret to the end and ends any IME composition in progress.
+`placeholder` is optional final display text shown while the field is empty, and is not the field's name.
+`ariaLabel` is required and is the input's name, final display text naming what is searched, as "Search recipes".
+The field draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
+The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
+
+- Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
+- In a DialogV2 that wants Enter to confirm, handle Enter in your own listener above `target`, because the field cancels the form's implicit submission.
+- It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+- In a DialogV2, Escape clears the query and closes the dialog; stop it in your own `keydown` if you must keep the dialog open.
+
+Rest `data-*` props land on the `<label>` root, never on the input, so no rest name is reserved.
+`SearchField` needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, so give `target` `display: flex`.
+Your own window or dialog carries no Fabricate root, so the field is refused there with `SearchField needs a Fabricate window ancestor`.
+The keyboard mark is the design system's text-field variant for a field whose wrapper draws the box: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own, so leave no room for one.
+An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its sizes beyond its height and corner, its glyph and colours beyond what this section states, and what it draws for a `value` that is not a string are private.
+`label`, `ariaLabelledBy`, `density`, `icon`, `onChange` and `inputProps` are not published at version 1, so a `class` or any of those is refused as a rest prop.
+
+A worked search field follows: a filter over your own list of recipes, which you hold trimmed.
+
+```javascript
+// After `load(['SearchField'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the value prop describes no search field: draw your own there.
+if (fabUi?.describe?.('SearchField')?.props.value?.kind !== 'value') return;
+
+// Your text above `target`, in the same Fabricate window: <span>Search recipes</span>.
+target.style.display = 'flex';
+const props = () => ({
+  ariaLabel: 'Search recipes', // The words your text draws.
+  placeholder: 'Name or tag',
+  onValueChange: (next) => {
+    const kept = next.trimStart(); // Your own rule for the query.
+    if (kept !== next) search.update({ ...props(), value: kept }); // Before any `await`.
+    acmeRecipes.filter(kept); // Your own list narrows; the field commits nothing.
+  },
+});
+const search = fabUi.mount('SearchField', { target, props: props() });
+// Later, to clear the query from your own reset control:
+search.update({ ...props(), value: '' }); // Draws `''` without calling `onValueChange`.
+const query = search.value('value'); // The query the field holds now.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2685,6 +2740,7 @@ A `value` prop is never required.
 Each `value` prop brings an optional callback prop named `on`, the prop's name with its first letter upper-cased, then `Change`: `query` brings `onQueryChange`.
 `describe` lists the value prop as `{ kind: 'value', required: false }` and directly after it that callback as `{ kind: 'callback', required: false }`.
 Fabricate calls it with `(next, previous)` only when the component changes the value itself, once per change, and never when the two are the same by `Object.is`; `mount` and `update` never call it.
+A component that clears a value to `undefined` changes it to its initial value, so `next` is never `undefined`.
 Inside the call, `handle.value(key)` already answers `next`.
 A throw from it is reported as any callback's is, under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 Inside that call, an `update` with the same value changes nothing, and one with another value is drawn before the call returns and wins, with no second call, so you can reject, revert or transform what the user typed; one made later shows on the next flush, so the user briefly sees their own text first.

@@ -1365,6 +1365,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
 A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a typeahead combobox, which `Typeahead` implements save the requirement row's name cell.
+A search field never submits the form it is in: Enter in its input, outside IME composition, cancels the form's implicit submission.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 A BROWSE CARD is a `ListRow` at `layout="card"`, the same row model on one track, and the grid around the cards owns their track.

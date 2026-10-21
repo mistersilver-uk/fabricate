@@ -255,4 +255,16 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: false,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'SearchField',
+    path: 'src/ui/svelte/components/SearchField.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'value', initial: '' }),
+      placeholder: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);

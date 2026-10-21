@@ -242,6 +242,26 @@ const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 
 /** Sized to the fixture's 320px ground and the height of its five rows. */
 const VALUES_WINDOW = Object.freeze({ width: 480, height: 520 });
 
+/** The search fixture's ground, one of its sections by key, and a part of that section's field. */
+const SEARCH_GROUND = '[data-lab-search-ground]';
+const SEARCH_SECTION = (key) => `[data-lab-search="${key}"]`;
+const LAB_SEARCH = (key, part) => `${SEARCH_GROUND} ${SEARCH_SECTION(key)} ${part}`;
+
+/** Each field `tests/view-lab/fixtures/PublishedSearch.svelte` mounts, by its section's key. */
+const SEARCH_KEYS = Object.freeze(['empty', 'filled', 'transform']);
+
+/** Each field inside the ground, and the ground inside the window. */
+const SEARCH_CONTAINMENT = Object.freeze([
+  ...SEARCH_KEYS.map((key) => ({
+    container: SEARCH_GROUND,
+    target: LAB_SEARCH(key, '.fabricate-search'),
+  })),
+  { container: '.window-content', target: SEARCH_GROUND },
+]);
+
+/** Sized to the fixture's 320px ground and the height of its three fields. */
+const SEARCH_WINDOW = Object.freeze({ width: 480, height: 360 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -632,6 +652,40 @@ export const CASES = Object.freeze([
     position: VALUES_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Stepper.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-search-specimen',
+    label:
+      'Specimen, mounted through the published seam — three search fields, each beneath the text that names it, after two steps that type into what the fixture mounts: Iron typed into Search components, which reported it; and “  SALT” typed into Search tags, whose callback passed salt back, trimmed and in lower case, from inside the call. Reading top to bottom: Search recipes empty, showing its placeholder; Search components holding Iron; and Search tags holding salt and keyboard focus, its field’s border taking the accent while its input draws no ring of its own. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each query.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-search' },
+    steps: [
+      { selector: LAB_SEARCH('filled', 'input'), fill: 'Iron' },
+      { selector: LAB_SEARCH('transform', 'input'), fill: '  SALT' },
+    ],
+    // Both reported values, neither of which exists before its step, the transformed one passed
+    // back from inside the call, and focus on the field that transformed.
+    expectSelector: `${SEARCH_GROUND}:has(> ${SEARCH_SECTION('filled')}[data-lab-value="Iron"]) > ${SEARCH_SECTION('transform')}[data-lab-value="salt"] .fabricate-search:focus-within`,
+    expectCenterHit: LAB_SEARCH('transform', 'input'),
+    expectContained: SEARCH_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The default shell's declared corner, and the focused input's want of a ring of its own.
+        { selector: LAB_SEARCH('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
+        { selector: `${LAB_SEARCH('transform', 'input')}:focus`, styles: 'outline-style: none' },
+        // The focused field's shell takes the accent, the keyboard mark a field whose wrapper draws the box.
+        {
+          selector: `${LAB_SEARCH('transform', '.fabricate-search')}:focus-within`,
+          styles: 'border-color: var(--fab-accent)',
+        },
+      ],
+    },
+    position: SEARCH_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SearchField.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

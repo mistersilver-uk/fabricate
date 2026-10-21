@@ -267,6 +267,38 @@ describe('a value key written by an effect', () => {
     assert.equal(flushes.count, 0, 'never inside an effect');
     assert.equal(handle.value('mirror'), 'm');
   });
+
+  it('records a write of undefined as the key’s initial', async () => {
+    const change = changes();
+    const { handle } = mountProbe({ mirror: 'held', onMirrorChange: change.record });
+    await settle();
+    assert.equal(handle.update({ mirrorAt: null, onMirrorChange: change.record }), true);
+    await settle();
+    assert.deepEqual(change.calls, [['', 'held']]);
+    assert.equal(handle.value('mirror'), '');
+  });
+});
+
+describe('a value key written undefined by an event handler', () => {
+  it('records the initial, draws it after the flush and calls back once', async () => {
+    const change = changes();
+    const { handle, target, flushes } = mountProbe({
+      mirror: 'held',
+      onMirrorChange: change.record,
+    });
+    await settle();
+    const mirrored = () => target.querySelector('[data-probe-query]').dataset.probeMirror;
+    assert.equal(mirrored(), 'held');
+    target
+      .querySelector('[data-probe-query]')
+      .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    assert.equal(mirrored(), '', 'drawn as the initial once the flush has run');
+    assert.deepEqual(change.calls, [['', 'held']]);
+    assert.equal(flushes.count, 1, 'flushed once, before the delivery');
+    assert.equal(handle.value('mirror'), '');
+    await settle();
+    assert.deepEqual(change.calls, [['', 'held']], 'and only once');
+  });
 });
 
 describe('the value refusals and the dead handle', () => {

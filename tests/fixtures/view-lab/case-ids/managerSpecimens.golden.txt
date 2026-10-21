@@ -8,3 +8,4 @@ manager-published-notice-dismiss-focus
 manager-published-notice-dismissed
 manager-published-steppers-specimen
 manager-published-steppers-button-focus
+manager-published-search-specimen

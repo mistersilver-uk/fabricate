@@ -162,8 +162,10 @@ describe('the delivery a value key answers', () => {
   it('forwards (next, previous) to the newest change function, reporting a throw under its name', () => {
     const first = recorder();
     const { handle, hostProps, reports } = mounted({ onQueryChange: first.record });
-    const { arity, deliver } = hostProps.callbacks('query');
+    const { arity, deliver, initial } = hostProps.callbacks('query');
     assert.equal(arity, 2);
+    assert.equal(initial, '', 'the initial the host records for a write of undefined');
+    assert.equal(Object.hasOwn(hostProps.callbacks('count'), 'initial'), true);
     deliver(['b', 'a']);
     assert.deepEqual(first.calls, [['b', 'a']]);
     const error = new Error('companion threw');
