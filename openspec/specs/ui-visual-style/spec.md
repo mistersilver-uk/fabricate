@@ -301,7 +301,7 @@ The essence inspector and the three world catalogue inspectors render every verb
 
 #### No-state messages
 
-Every manager "nothing here" message renders through one shared no-state primitive, in one of three treatments.
+Every manager "nothing here" message renders through one shared no-state primitive: its central panel, its `compact` and `filtered` treatments, and the `inline`, `note`, `field` and `fill` forms, each drawn as a unit of the library's `<Empty>` entry.
 
 - The central panel is a dashed, unfilled, rounded panel holding an optional rounded icon tile, an optional serif title, an optional capped body sentence, and optional trailing content.
 - The `compact` treatment is the same vocabulary at a smaller scale for a sidebar, a dropdown popover, or an inline panel; it changes size, never the vocabulary.

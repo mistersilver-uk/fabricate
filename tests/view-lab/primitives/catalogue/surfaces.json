@@ -109,6 +109,67 @@
     "content": ["Clear filters"]
   },
   {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "compact — a 32 tile and tighter padding, for a sidebar or a slot",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "compact": true,
+      "icon": "fa-regular fa-circle-dot",
+      "title": "No travel actor",
+      "hint": "Pick the actor that represents this party on the map."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "inline — one line, the tile released into a bare glyph",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "inline": true,
+      "icon": "fas fa-feather",
+      "hint": "Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "note — the popover line, with no panel",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "note": true,
+      "title": "No actor matches your search."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "field — inline at the width of a control, 34px high (issue 1649)",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "inline": true,
+      "field": true,
+      "hint": "Any Weather"
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "fill — the whole box of a bounded host (issue 1648)",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "slot": {
+      "width": 260,
+      "height": 120
+    },
+    "note": "A boxed slot, because `fill` takes its height from a bounded host: the drawing's 120px host, at the unit's 260px width.",
+    "props": {
+      "compact": true,
+      "fill": true,
+      "icon": "fas fa-clock-rotate-left",
+      "hint": "No completed runs yet."
+    }
+  },
+  {
     "spec": "<Card> <Well> <RowDisclosure>",
     "cap": "card — radius 11, padding 16, bg-2",
     "draws": ":scope > div",
