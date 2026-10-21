@@ -44,6 +44,22 @@ const FORGE_COMPONENTS = [
     tags: ['leather'],
     description: 'Hide wrapping worked with tallow, cut to a hilt’s length.',
   }),
+  component('ed-wyrmhide-wrap', 'Wyrmhide Wrap', 'commodities/leather/leather-studded-tan.webp', {
+    categories: ['Fittings'],
+    tags: ['leather'],
+    description: 'Scaled hide from a cave drake, rough enough that a sweating hand still holds.',
+  }),
+  component(
+    'ed-sword-belt',
+    'Tooled Sword Belt',
+    'equipment/waist/belt-armored-buckle-steel.webp',
+    {
+      categories: ['Fittings'],
+      tags: ['leather'],
+      description:
+        'A smith’s gift with a fine blade: steel-buckled and stamped with the forge mark.',
+    }
+  ),
   component('ed-leather-scraps', 'Leather Scraps', 'commodities/leather/leather-scrap-brown.webp', {
     categories: ['Fittings'],
     tags: ['leather'],
@@ -247,8 +263,8 @@ const STILL_CHECK = Object.freeze({
   simple: { rollFormula: '1d20 + @abilities.int.mod', thresholds: { success: 10 } },
 });
 
-/** One named ingredient group. */
-const group = (id, name, option) => ({ id, name, options: [option] });
+/** One named ingredient group; more than one option is an "any one of" the player picks from. */
+const group = (id, name, ...options) => ({ id, name, options });
 const essence = (essenceId, amount) => ({ match: { type: 'essence', essenceId, amount } });
 const phial = { componentId: 'hm-empty-phial', quantity: 1 };
 
@@ -321,7 +337,12 @@ const FORGE_RECIPES = [
           name: 'Blade stock',
           ingredientGroups: [
             group('ed-set-blade-g1', 'Steel', { componentId: 'ed-steel-ingot', quantity: 2 }),
-            group('ed-set-blade-g2', 'Grip', { componentId: 'ed-oiled-grip', quantity: 1 }),
+            group(
+              'ed-set-blade-g2',
+              'Grip',
+              { componentId: 'ed-oiled-grip', quantity: 1 },
+              { componentId: 'ed-wyrmhide-wrap', quantity: 1 }
+            ),
           ],
         },
       ],
@@ -330,7 +351,17 @@ const FORGE_RECIPES = [
           id: 'ed-grp-masterwork',
           name: 'Masterwork blade',
           checkOutcomeIds: ['ed-masterwork'],
-          results: [{ componentId: 'ed-masterwork-longsword', quantity: 1 }],
+          results: [
+            { componentId: 'ed-masterwork-longsword', quantity: 1 },
+            // The player picks the smith's flourish once the roll lands.
+            {
+              id: 'ed-mw-flourish',
+              alternatives: [
+                { id: 'belt', componentId: 'ed-sword-belt', quantity: 1 },
+                { id: 'offcut', componentId: 'ed-steel-ingot', quantity: 1 },
+              ],
+            },
+          ],
         },
         {
           id: 'ed-grp-sound',
@@ -445,7 +476,7 @@ function buildSystems() {
   ];
 }
 
-/** The smith who crafts and brews, and the still-keeper whose pack holds the one missing grip. */
+/** The smith who crafts and brews, and the still-keeper whose pack holds the grips she lacks. */
 export const DEMO_ACTORS = Object.freeze({
   definitions: [
     {
@@ -478,6 +509,7 @@ export const DEMO_ACTORS = Object.freeze({
     },
     'demo-actor-maren': {
       'ed-oiled-grip': 2,
+      'ed-wyrmhide-wrap': 1,
     },
   },
 });
