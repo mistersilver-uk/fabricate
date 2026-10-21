@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -560,6 +561,211 @@ describe('an aria key', () => {
       'the value, then no key at all'
     );
   });
+});
+
+// A required title, then a guard and the two keys required while it is truthy, as `Notice` publishes them.
+const DISMISSING = Object.freeze({
+  name: 'Dismissing',
+  path: 'src/ui/svelte/components/Dismissing.svelte',
+  version: 1,
+  props: {
+    title: { kind: 'data', required: true },
+    dismissable: { kind: 'data' },
+    dismissLabel: { kind: 'data', requiredWhen: 'dismissable' },
+    onDismiss: { kind: 'callback', requiredWhen: 'dismissable' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Dismissing' }),
+});
+const WHEN = (key) => `Dismissing requires a non-empty "${key}" when "dismissable" is truthy`;
+
+describe('a requiredWhen key', () => {
+  const dismissingProps = (overrides = {}) => ({
+    title: 'Saved',
+    dismissable: true,
+    dismissLabel: 'Dismiss the saved notice',
+    onDismiss() {},
+    ...overrides,
+  });
+  const mountOf = (ui, props) => ui.mount('Dismissing', { target: new FakeTarget(), props });
+  const without = (key, overrides = {}) => {
+    const props = dismissingProps(overrides);
+    delete props[key];
+    return props;
+  };
+
+  it('M9: refuses the key absent, undefined or empty while its guard is truthy, naming the guard', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    for (const dismissable of [true, 1, 'yes', {}, []]) {
+      for (const props of [
+        without('dismissLabel', { dismissable }),
+        dismissingProps({ dismissable, dismissLabel: undefined }),
+        dismissingProps({ dismissable, dismissLabel: '' }),
+      ]) {
+        assert.throws(() => mountOf(ui, props), refusal(WHEN('dismissLabel')));
+      }
+      for (const props of [
+        without('onDismiss', { dismissable }),
+        dismissingProps({ dismissable, onDismiss: undefined }),
+      ]) {
+        assert.throws(() => mountOf(ui, props), refusal(WHEN('onDismiss')));
+      }
+    }
+    assert.throws(
+      () => mountOf(ui, dismissingProps({ onDismiss: '' })),
+      refusal('"onDismiss" must be a function'),
+      'an empty callback is M17, as on a required one'
+    );
+    assert.equal(mounts.length, 0);
+  });
+
+  it('admits both keys absent while the guard is falsy or absent', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    for (const dismissable of [false, 0, '', null, undefined]) {
+      mountOf(ui, { title: 'Saved', dismissable });
+    }
+    mountOf(ui, { title: 'Saved' });
+    assert.equal(mounts.length, 6);
+  });
+
+  it('refuses the first failing key in manifest order, whatever order the companion passes', () => {
+    const { ui } = seamWith({ table: [DISMISSING] });
+    assert.throws(
+      () => mountOf(ui, { dismissable: true }),
+      refusal('Dismissing requires a non-empty "title"')
+    );
+    assert.throws(
+      () => mountOf(ui, { onDismiss() {}, dismissable: true, title: 'Saved' }),
+      refusal(WHEN('dismissLabel'))
+    );
+    assert.throws(
+      () => mountOf(ui, { dismissLabel: 'Dismiss', dismissable: true, title: 'Saved' }),
+      refusal(WHEN('onDismiss'))
+    );
+  });
+
+  it("names Notice's first failing requiredWhen key in manifest order when both fail together", () => {
+    const shipped = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === 'Notice');
+    const notice = { ...shipped, component: Object.freeze({ role: 'Notice' }) };
+    const guarded = Object.keys(notice.props).filter(
+      (key) => notice.props[key].requiredWhen === 'dismissable'
+    );
+    assert.deepEqual(guarded, ['dismissLabel', 'onDismiss'], 'the label precedes the callback');
+    const named = (entry, key) =>
+      `${entry.name} requires a non-empty "${key}" when "dismissable" is truthy`;
+    const failingBoth = [
+      { title: 'Saved', dismissable: true },
+      { onDismiss: undefined, title: 'Saved', dismissable: true },
+      { onDismiss: undefined, dismissLabel: '', dismissable: true, title: 'Saved' },
+    ];
+    const { ui } = seamWith({ table: [notice] });
+    for (const props of failingBoth) {
+      assert.throws(
+        () => ui.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(notice, guarded[0]))
+      );
+    }
+    // The same keys listed the other way round name the callback, so the order is the manifest's
+    // and not a pass over one kind before another.
+    const { dismissLabel, onDismiss, ...rest } = notice.props;
+    const reversed = { ...notice, props: { ...rest, onDismiss, dismissLabel } };
+    const flipped = seamWith({ table: [reversed] }).ui;
+    for (const props of failingBoth) {
+      assert.throws(
+        () => flipped.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(reversed, 'onDismiss'))
+      );
+    }
+  });
+
+  it('refuses an update atomically: the earlier props and the earlier callback stay', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    const calls = [];
+    const noting = (call) => () => {
+      calls.push(call);
+    };
+    const handle = mountOf(ui, dismissingProps({ onDismiss: noting('first') }));
+    const next = { onDismiss: noting('next') };
+    assert.throws(
+      () => handle.update(without('dismissLabel', next)),
+      refusal(WHEN('dismissLabel'))
+    );
+    assert.throws(() => handle.update(without('onDismiss')), refusal(WHEN('onDismiss')));
+    const [{ instance }] = mounts;
+    assert.deepEqual(instance.updates, [], 'nothing was rendered');
+    instance.callbacks.onDismiss.deliver([]);
+    assert.deepEqual(calls, ['first'], 'the earlier function still answers');
+    assert.equal(
+      handle.update({ title: 'Saved', dismissable: false }),
+      true,
+      'cleared, so neither'
+    );
+  });
+
+  it('describes requiredWhen last, only on the keys that state it, and never as required', () => {
+    const { ui } = seamWith({ table: [DISMISSING] });
+    const { props } = ui.describe('Dismissing');
+    assert.deepEqual(props.dismissLabel, {
+      kind: 'data',
+      required: false,
+      requiredWhen: 'dismissable',
+    });
+    assert.deepEqual(Object.keys(props.onDismiss), ['kind', 'required', 'requiredWhen']);
+    assert.equal(props.onDismiss.requiredWhen, 'dismissable');
+    for (const key of ['title', 'dismissable']) {
+      assert.deepEqual(Object.keys(props[key]), ['kind', 'required'], key);
+    }
+    assert.ok(Object.isFrozen(props.dismissLabel));
+  });
+
+  const guarded = (spec, extra = {}) => ({
+    ...DISMISSING,
+    props: { ...DISMISSING.props, ...extra, dismissLabel: spec },
+  });
+  for (const [claim, entry, other] of [
+    ['a key the entry does not publish', guarded({ kind: 'data', requiredWhen: 'nope' }), 'nope'],
+    ['an inherited name', guarded({ kind: 'data', requiredWhen: 'toString' }), 'toString'],
+    ['itself', guarded({ kind: 'data', requiredWhen: 'dismissLabel' }), 'dismissLabel'],
+    ['a value that is no string', guarded({ kind: 'data', requiredWhen: 1 }), '1'],
+    ['a callback guard', guarded({ kind: 'data', requiredWhen: 'onDismiss' }), 'onDismiss'],
+    [
+      'a text guard',
+      guarded({ kind: 'data', requiredWhen: 'note' }, { note: { kind: 'text' } }),
+      'note',
+    ],
+    ['a required guard', guarded({ kind: 'data', requiredWhen: 'title' }), 'title'],
+    [
+      'a guard that is itself requiredWhen',
+      guarded(
+        { kind: 'data', requiredWhen: 'shown' },
+        { shown: { kind: 'data', requiredWhen: 'dismissable' } }
+      ),
+      'shown',
+    ],
+    [
+      'a key beside required',
+      guarded({ kind: 'data', required: false, requiredWhen: 'dismissable' }),
+      'dismissable',
+    ],
+    ['a slot key', guarded({ kind: 'slot', requiredWhen: 'dismissable' }), 'dismissable'],
+    ['an aria key', guarded({ kind: 'aria', requiredWhen: 'dismissable' }), 'dismissable'],
+  ]) {
+    it(`refuses at registration a requiredWhen on ${claim}, naming the entry, key and guard`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Dismissing "dismissLabel" has an unknown requiredWhen "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
 });
 
 describe('a live mount', () => {

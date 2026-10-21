@@ -829,13 +829,15 @@ test('(a) a Stepper change publishes its two frames, then the two specimens that
   }
 });
 
-test('(a) a Notice change publishes the three specimens that mount it, after the frame that draws it', () => {
+test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ];
   assert.deepEqual(
     [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
