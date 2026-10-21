@@ -40,19 +40,106 @@ function reportMissingHost(component) {
   );
 }
 
+/** The class walk from `node`, falling back to its own document's `<body>`. */
 export function resolveOverlayHost(node, { component = 'An overlay component' } = {}) {
-  if (typeof document === 'undefined') return null;
-  if (!node) return null;
+  const doc = node?.ownerDocument;
+  if (!doc) return null;
 
   const root = node.closest?.(OVERLAY_HOST_SELECTOR);
   if (root) return root;
 
   reportMissingHost(component);
-  return document.body;
+  return doc.body;
+}
+
+// A published mount's overlay chain by its target, and each seam container by the chain that
+// made it, so an overlay opened inside another's panel joins that panel's chain (issue 2454).
+const chains = new WeakMap();
+const containerChains = new WeakMap();
+const owners = new WeakMap();
+
+export function registerOverlayChain(target, chain) {
+  chains.set(target, chain);
+}
+
+export function unregisterOverlayChain(target, chain) {
+  if (chains.get(target) === chain) chains.delete(target);
+}
+
+function chainAbove(node) {
+  for (let at = node; at; at = at.parentNode) {
+    const chain = chains.get(at) ?? containerChains.get(at);
+    if (chain) return chain;
+  }
+  return null;
+}
+
+/**
+ * The host `overlay` portals into while open: under a registered published mount, the container
+ * its chain holds for `overlay`, the same one until `releaseOverlayHost`; otherwise the class walk
+ * from `anchor`. The nearest registered target above `anchor` wins.
+ */
+export function acquireOverlayHost(overlay, anchor, options) {
+  const chain = chainAbove(anchor);
+  const held = owners.get(overlay);
+  if (held && held !== chain) releaseOverlayHost(overlay);
+  if (!chain) return resolveOverlayHost(anchor, options);
+  owners.set(overlay, chain);
+  return chain.acquire(overlay);
+}
+
+export function releaseOverlayHost(overlay) {
+  const chain = owners.get(overlay);
+  owners.delete(overlay);
+  chain?.release(overlay);
+}
+
+/** A `display: contents` container in `host` for `chain`, so `host` stays the containing block. */
+export function createOverlayContainer(host, chain) {
+  const container = host.ownerDocument.createElement('div');
+  container.style.display = 'contents';
+  host.append(container);
+  containerChains.set(container, chain);
+  return container;
+}
+
+/** A themed standalone layer on `doc.body`, carrying each of `attributes`. */
+export function createStandaloneOverlayLayer(doc, attributes = {}) {
+  const layer = doc.createElement('div');
+  layer.className = `fabricate ${STANDALONE_OVERLAY_HOST_CLASS}`;
+  for (const [name, value] of Object.entries(attributes)) layer.setAttribute(name, value);
+  doc.body.append(layer);
+  return layer;
+}
+
+// One shared layer per document, created on the first acquire and removed on the last release.
+const sharedLayers = new WeakMap();
+
+export function acquireStandaloneOverlayLayer(doc, attributes) {
+  let shared = sharedLayers.get(doc);
+  if (!shared?.layer.isConnected) {
+    shared = { layer: createStandaloneOverlayLayer(doc, attributes), count: 0 };
+    sharedLayers.set(doc, shared);
+  }
+  shared.count += 1;
+  let released = false;
+  return {
+    host: shared.layer,
+    release() {
+      if (released) return;
+      released = true;
+      shared.count -= 1;
+      if (shared.count > 0) return;
+      shared.layer.remove();
+      if (sharedLayers.get(doc) === shared) sharedLayers.delete(doc);
+    },
+  };
 }
 
 // Deliberately NO viewport fallback: a viewport-origin rect under a panel that did not move is
-// exactly the defect above. Zero degrades to the callers' own `|| window.innerWidth` sizing guard.
+// exactly the defect above. Zero degrades to the callers' own `|| innerWidth` sizing guard. A seam
+// container draws no box, so its host is measured.
 export function overlayHostRect(host) {
-  return host?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
+  const box = containerChains.has(host) ? host.parentElement : host;
+  return box?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
 }

@@ -214,17 +214,12 @@ async function openBiomePopover(trigger) {
 // well as the popover describe (issue 1716); a `before` inside one describe never reaches another.
 before(async () => {
   await harness.setup();
-  // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
-  // tests/helpers/svelte-dom.js), and `globalThis` itself has no
-  // `addEventListener`. The popover-positioning effect (unrelated to the
-  // dismissal mechanism under test here) registers `window` resize/scroll
-  // listeners whenever the popover opens; stub them so that pre-existing,
-  // out-of-scope effect does not crash this suite.
-  window.addEventListener ??= () => {};
-  window.removeEventListener ??= () => {};
-  // `defineProperty` and not `window.innerWidth = 1280`.
-  Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
-  Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+  // The popover binds its listeners to, and reads the viewport of, its own `document.defaultView`,
+  // happy-dom's real Window, apart from the flattened `globalThis` (issue 2454).
+  // `defineProperty` and not `view.innerWidth = 1280`.
+  const view = document.defaultView;
+  Object.defineProperty(view, 'innerWidth', { value: 1280, configurable: true });
+  Object.defineProperty(view, 'innerHeight', { value: 800, configurable: true });
 });
 after(harness.teardown);
 afterEach(harness.remount);
