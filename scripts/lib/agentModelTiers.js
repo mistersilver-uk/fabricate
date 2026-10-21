@@ -50,6 +50,8 @@ export const HIGH_RISK_PATHS = [
   'scripts/release.js',
   'scripts/validate-agent-bindings.mjs',
   'scripts/validate-release-tag.mjs',
+  'scripts/ui-pr-screenshot-evidence.mjs',
+  'scripts/view-lab-screenshots.mjs',
   '.github/workflows/**',
   'release.config.js',
   'release.s3.config.json',
@@ -427,7 +429,8 @@ function segmentsMatch(segments, pattern) {
 
 function baseModelTier({ paths, size, source, limits }) {
   if (paths.some((p) => matchesHighRiskPath(p))) return { tier: 'large', rule: 1 };
-  if (source === 'persisted-shape') return { tier: 'large', rule: 2 };
+  if (source === 'persisted-shape' || source === 'public-api')
+    return { tier: 'large', rule: 2 };
   const sized = Boolean(limits) && size !== null;
   if (sized && size > limits.mediumMax) return { tier: 'large', rule: 3 };
   // A new internal module or export requires review, not automatically a frontier model.

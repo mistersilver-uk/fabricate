@@ -341,6 +341,7 @@ test('8. HIGH_RISK_PATHS matching is root-anchored, never a basename match', () 
   assert.equal(matchesHighRiskPath('scripts/validate-agent-bindings.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/lib/agentModelTiers.js'), true);
   assert.equal(matchesHighRiskPath('scripts/release.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/ui-pr-screenshot-evidence.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/forward-port-provenance.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/foundry-smoke/scenarios/d0-recipes.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/lib/designSystemPrimitives.json'), false);
@@ -484,6 +485,13 @@ test('9. each worked example resolves to its stated model tier via its stated ru
     ruleTwoSource: 'persisted-shape',
   });
   assert.deepEqual([persisted.rule, persisted.tier], [2, 'large']);
+  const publicApi = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/ui/publicFacade.js'],
+    sizeMetric: 1,
+    ruleTwoSource: 'public-api',
+  });
+  assert.deepEqual([publicApi.rule, publicApi.tier], [2, 'large']);
   const exportReview = selectModelTier({
     stage: 'post-implementation',
     paths: ['src/ui/recipePicker.js', 'tests/components/recipe-picker.test.js'],

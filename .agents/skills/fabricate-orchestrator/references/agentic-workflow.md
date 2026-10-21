@@ -5,7 +5,7 @@
 ## Planning & Workflow
 
 - Plans touching shared scripts (smoke test, build, lint, anything in `scripts/` invoked from `package.json`) must spell out the behavior in both CI and local dev explicitly — don't bury one as a parenthetical.
-- Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).
+- Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | public-api | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).
 - When the work originates from an existing issue, append the delta block and preserve the reporter's original text; when it originates from a prompt with no issue, create one from the `OpenSpec Change Delta` issue template.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
@@ -166,6 +166,8 @@ scripts/release-s3.js
 scripts/release.js
 scripts/validate-agent-bindings.mjs
 scripts/validate-release-tag.mjs
+scripts/ui-pr-screenshot-evidence.mjs
+scripts/view-lab-screenshots.mjs
 .github/workflows/**
 release.config.js
 release.s3.config.json
@@ -183,6 +185,7 @@ Routine script support such as design-system registries and View Lab case lists 
 It carries a `medium` floor instead (see the floors below), because the routing table schedules `fabricate_domain_expert` at plan-review and the docs loop but **never** at post-implementation review: a spec change that does not trip the docs row has its actual canonical-spec diff reviewed by `fabricate_reviewer` alone, and the cheapest model must not author or review canonical requirement text unaccompanied.
 
 Rules 1–3 retain the explicit large-model gates for consequential changes and oversized work.
+Mark a proposed external API as `public-api` rather than `new-export`; the latter is reserved for internal exports with a bounded caller contract.
 Rule 4 selects `medium` for a bounded new module or export; these are not automatically public or persisted contracts.
 Rule 5 selects `small` only for a one-path, single-surface `none` change within the small limit.
 Rule 6 defaults **up** to `medium` for unclassified work; the number of changed paths alone never forces `large`.
@@ -192,7 +195,7 @@ A module, its tests, and required localization or canonical-spec edits can form 
 Each `### Tasks` entry in the issue delta carries a literal field:
 
 ```text
-Lane surface: new-module | new-export | persisted-shape | none
+Lane surface: new-module | new-export | public-api | persisted-shape | none
 ```
 
 Rule 2 then reads as a lookup, not a reading of prose.

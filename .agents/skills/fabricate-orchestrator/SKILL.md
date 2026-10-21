@@ -74,7 +74,7 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
    - dependency boundaries, split points, and test seams when JavaScript structure is part of the task
    - coherent implementation packets: one bounded behaviour, its interface/invariants, owned implementation/test/spec/localization paths, dependencies, and acceptance checks
    - affected files
-   - a literal `Lane surface: new-module | new-export | persisted-shape | none` field on every `### Tasks` entry, so model-tier rule 2 reads a lookup rather than prose
+   - a literal `Lane surface: new-module | new-export | public-api | persisted-shape | none` field on every `### Tasks` entry, so model-tier rule 2 reads a lookup rather than prose; use `public-api` for externally supported interfaces, not `new-export`
    - the canonical `openspec/specs/<domain>/spec.md` requirement changes, written under `### Spec Deltas` with `##### Added/Modified/Removed Requirements` so reviewers can compare them against the real `openspec/specs/` diff (include this section only when canonical requirements change)
    - verification plan
    - acceptance criteria
