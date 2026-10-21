@@ -8,6 +8,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',

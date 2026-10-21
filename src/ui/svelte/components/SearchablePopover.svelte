@@ -43,6 +43,9 @@
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
     `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
+  - Its own copy — the loading, error and no-match lines and the key hints — is localized by the
+    app root's `APP_LOCALIZER` context (`util/appLocalizer.js`), else drawn as the English
+    fallback, so its closure imports no `foundryBridge` (issue 2454).
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
     its own chrome refusing focus above all — are stated there rather than restated here.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
@@ -67,14 +70,14 @@
     identity.
 -->
 <script>
-  import { tick, untrack } from 'svelte';
+  import { getContext, tick, untrack } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
   import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { localize } from '../util/foundryBridge.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
@@ -99,8 +102,9 @@
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
+  const appLocalize = getContext(APP_LOCALIZER);
   function localizedText(key, fallback) {
-    const translated = localize(key);
+    const translated = appLocalize?.(key);
     return translated && translated !== key ? translated : fallback;
   }
 
@@ -231,6 +235,13 @@
   }
 
   const staysOpenOnChoose = $derived(multiple || stayOpen);
+
+  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
+  const keyHintText = $derived(
+    gridColumns > 1
+      ? localizedText('FABRICATE.Common.Picker.KeyHints.Grid', '←↑↓→ move · ↵ pick · esc close')
+      : localizedText('FABRICATE.Common.Picker.KeyHints.List', '↑↓ move · ↵ pick · esc close')
+  );
 
   const filteredCount = $derived(
     filteredCountLabel(filteredCountTemplate, filteredOptions.length, totalCount)
@@ -528,6 +539,7 @@
       {header}
       {footer}
       {keyHints}
+      {keyHintText}
       {footerAction}
       {chooseOption}
       {optionIsSelected}

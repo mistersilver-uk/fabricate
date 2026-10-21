@@ -22,7 +22,6 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { localize } from '../util/foundryBridge.js';
   import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
@@ -71,6 +70,7 @@
     header = undefined,
     footer = undefined,
     keyHints = false,
+    keyHintText = '',
     footerAction = null,
     chooseOption,
     optionIsSelected,
@@ -94,14 +94,6 @@
 
   const focusSearch = () => search?.focus();
   const squareTileList = $derived(isGrid && squareTiles);
-
-  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
-  const KEY_HINTS = {
-    grid: ['FABRICATE.Common.Picker.KeyHints.Grid', '←↑↓→ move · ↵ pick · esc close'],
-    list: ['FABRICATE.Common.Picker.KeyHints.List', '↑↓ move · ↵ pick · esc close'],
-  };
-  const [hintKey, hintFallback] = $derived(KEY_HINTS[gridColumns > 1 ? 'grid' : 'list']);
-  const keyHintText = $derived(localize(hintKey) === hintKey ? hintFallback : localize(hintKey));
 </script>
 
 <div
