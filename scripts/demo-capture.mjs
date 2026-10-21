@@ -60,7 +60,11 @@ const CAPTIONS = Object.freeze({
     text: 'Powerful, flexible, simple to author.',
     position: 'top',
   },
-  forge: { kicker: 'Crafting checks', text: 'Checks decide the outcome.', position: 'top' },
+  forge: {
+    kicker: 'Crafting checks · optional',
+    text: 'Add a check, and the roll decides the outcome.',
+    position: 'top',
+  },
   choice: {
     kicker: 'Player choice',
     text: 'Players choose their materials and rewards.',
@@ -80,7 +84,7 @@ const CAPTIONS = Object.freeze({
   knowledge: { kicker: 'Recipe knowledge', text: 'Track who knows what.', position: 'top' },
   alchemy: {
     kicker: 'Alchemy',
-    text: 'Experiment with essences to discover recipes.',
+    text: 'Experiment to discover recipes.',
     position: 'top',
   },
   salvage: { kicker: 'Salvage', text: 'Break it back down.', position: 'top' },

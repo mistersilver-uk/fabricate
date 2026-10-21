@@ -13,7 +13,7 @@
 
 A system-agnostic, flexible crafting and gathering module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
 
-![Fabricate in action: crafting a Masterwork Longsword, seven palettes, the recipe editor, alchemy and salvage](/docs/img/fabricate-demo-v3.gif)
+![Fabricate in action: crafting a Masterwork Longsword, seven palettes, the recipe editor, alchemy and salvage](/docs/img/fabricate-demo-v4.gif)
 
 ## Features
 
