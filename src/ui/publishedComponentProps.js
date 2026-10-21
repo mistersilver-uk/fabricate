@@ -1,9 +1,12 @@
 /**
  * The published component seam's prop kinds (issue 2451): each shipped kind's copier, the
- * `callback` and `aria` kinds' among them (issue 2452), and the validated copy of the props one
- * mount or update renders. Plain JS with no import, so the seam and its tests read it without Svelte.
+ * `callback` and `aria` kinds' among them (issue 2452) and the `value` kind's (issue 2453), and the
+ * validated copy of the props one mount or update renders. Plain JS with no Svelte import, so the
+ * seam and its tests read it without Svelte.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
+import { changeKeys, isValuePrimitive } from './publishedComponentValues.js';
+
 export const PREFIX = 'Fabricate | published components: ';
 const DATA_ATTRIBUTE = /^data-[a-z0-9-]+$/;
 const ATTRIBUTE_TYPES = new Set(['string', 'number', 'boolean']);
@@ -92,6 +95,15 @@ function copyAria(value, key) {
   return value;
 }
 
+/** One `value` value: a string, number, boolean or `null` as passed, `undefined` as absent, a function M10, else M20. */
+function copyValue(value, key) {
+  if (typeof value === 'function') throw refuseFunction(key);
+  if (value !== undefined && !isValuePrimitive(value)) {
+    throw refuse(`"${key}" must be a string, number, boolean or null`);
+  }
+  return value;
+}
+
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */
 export const SHIPPED_KINDS = Object.freeze({
   data: (value, key) => copyData(value, key, new Set()),
@@ -99,6 +111,7 @@ export const SHIPPED_KINDS = Object.freeze({
   slot: copySlot,
   callback: copyCallback,
   aria: copyAria,
+  value: copyValue,
 });
 
 /** M13: a rest key is a data attribute holding a scalar, and no name the entry reserves. */
@@ -111,18 +124,24 @@ function assertRestKey(entry, key, value) {
   }
 }
 
+/** A key's kind: its entry's, `callback` for a value key's synthesised change key, else `null`. */
+function kindOf(entry, key) {
+  if (Object.hasOwn(entry.props, key)) return entry.props[key].kind;
+  return Object.hasOwn(changeKeys(entry), key) ? 'callback' : null;
+}
+
 /**
- * The validated copy one mount or update renders: M7, M8, M10-M15 and M17, then M9. Each key is
- * configurable, so the seam can drop an absent callback key from it.
+ * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. Each key
+ * is configurable, so the seam can drop an absent callback key from it.
  */
 export function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
   const copy = {};
   for (const [key, raw] of Object.entries(props)) {
-    const published = Object.hasOwn(entry.props, key);
-    if (!published && !entry.rest) throw refuse(`"${key}" is not a prop of ${entry.name}`);
-    const value = SHIPPED_KINDS[published ? entry.props[key].kind : 'data'](raw, key);
-    if (!published) assertRestKey(entry, key, value);
+    const kind = kindOf(entry, key);
+    if (!kind && !entry.rest) throw refuse(`"${key}" is not a prop of ${entry.name}`);
+    const value = SHIPPED_KINDS[kind ?? 'data'](raw, key);
+    if (!kind) assertRestKey(entry, key, value);
     const own = { value, enumerable: true, writable: true, configurable: true };
     Object.defineProperty(copy, key, own);
   }
