@@ -26,13 +26,16 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * selects surface coverage.
  */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
-  // The tint palette's pressed cell (issue 2257) and keyboard cursor (issue 2416): the New-biome
-  // popover at rest and under the cursor, and the world essence entry's inline palette.
+  // The tint palette's selected tile (issue 2257), its cursor (issue 2416) and its grid form (issue
+  // 2459): the New-biome popover at rest and under the cursor, the biome edit palette, and the
+  // inline strip in the world essence entry and the catalogue's bulk panel.
   'src/ui/svelte/components/TintPicker.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
     'world-essence-entry-dirty',
     'manager-gathering-biome-colour-popover-cursor',
     'manager-gathering-biome-colour-popover-cursor-selected',
+    'manager-gathering-biome-colour-edit-popover',
+    'world-essence-catalogue-bulk',
   ]),
   'src/ui/svelte/components/TintPickerButton.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
@@ -288,7 +291,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environments-browse-normal',
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
-  // Tools library card, and the compact form in the task editor and the entry systems card.
+  // Tools library card, the compact form in the task editor and the entry systems card, and the
+  // specimen that mounts it through the published seam (issue 2453).
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
@@ -300,6 +304,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-access-recipe-selected',
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
+    'manager-published-search-specimen',
   ]),
   // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
   // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card.
@@ -383,7 +388,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
   ]),
-  // The shared empty panel.
+  // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
+  // a `compact fill` journal body and the hero in a narrow host.
   'src/ui/svelte/components/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
@@ -393,6 +399,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
+    'player-inventory-bulk-none-salvageable',
+    'manager-component-complications-empty',
+    'fabricate-journal-history-batch-empty-1240',
+    'player-alchemy-workbench',
   ]),
   // The link field (issue 2466): the world Tool screens, then at least one frame of each of its nine other hosts.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
@@ -578,12 +588,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
   ]),
-  // The surface that reports something that just happened (issue 1505), on two callers.
+  // The surface that reports something that just happened (issue 1505), on two callers. Then the
+  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452).
   'src/ui/svelte/components/Notice.svelte': Object.freeze([
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.

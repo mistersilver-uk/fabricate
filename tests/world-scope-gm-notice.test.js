@@ -210,7 +210,7 @@ test('the shipped Created toast keeps its View Lab anchor, and the detail keeps 
   const { message, detail } = buildWorldScopeEntityNotice(fullReport(), localizeLang);
   assert.ok(
     message.startsWith('Fabricate gave this world one shared record per component, essence and tool: 3 component(s)'),
-    '`TOLERATED_WARNINGS` in scripts/view-lab-screenshots.mjs anchors on this opening clause'
+    '`TOLERATED_WARNINGS` in scripts/lib/viewLabCases.js anchors on this opening clause'
   );
   assert.match(message, /Details are in the console \(F12\)\.$/);
   assert.match(detail, /Every crafting system keeps exactly the behaviour it had\./);

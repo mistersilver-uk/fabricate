@@ -49,7 +49,12 @@ import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
-import { labQueryFor, partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
+import {
+  labQueryFor,
+  partitionConsoleErrors,
+  publishableCases,
+  TOLERATED_WARNINGS,
+} from './lib/viewLabCases.js';
 import { assertComputedCensus } from './lib/viewLabComputedCensus.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
@@ -74,18 +79,6 @@ const BROWSER_CONTEXT = {
   locale: 'en-US',
   timezoneId: 'UTC',
 };
-
-/**
- * Fabricate warnings that describe the lab's environment rather than a defect in what it renders.
- */
-const TOLERATED_WARNINGS = [
-  // The `1.30.0` world-scope migration's own completion notice
-  // (`src/systems/worldScopeEntityNotice.js`), reporting what it created and merged.
-  /Fabricate gave this world one shared record per component, essence and tool/,
-  // The Valid Id Basis fail-safe declining to prune. This is the safety behaviour working: the two
-  // component-keyed passes are withheld and, as the message says itself, nothing is removed.
-  /Startup cleanup skipped: the ids it would prune against are not known to be complete/,
-];
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 const READY_TIMEOUT_MS = 20_000;
@@ -137,7 +130,7 @@ async function startLabServer() {
 
 /** The click modifiers Playwright accepts. */
 const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
-const PRESS_KEYS = ['Enter', 'Space', 'Tab', 'ArrowUp', 'ArrowDown'];
+const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
 
 /** The verbs a `modifiers` step may not carry. */
 const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];

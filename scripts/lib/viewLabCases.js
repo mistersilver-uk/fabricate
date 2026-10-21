@@ -166,6 +166,18 @@ export function hasUiChanges(files = []) {
 }
 
 /**
+ * Fabricate warnings that describe the lab's environment rather than a defect in what it renders.
+ */
+export const TOLERATED_WARNINGS = [
+  // The `1.30.0` world-scope migration's own completion notice
+  // (`src/systems/worldScopeEntityNotice.js`), reporting what it created and merged.
+  /Fabricate gave this world one shared record per component, essence and tool/,
+  // The Valid Id Basis fail-safe declining to prune. This is the safety behaviour working: the two
+  // component-keyed passes are withheld and, as the message says itself, nothing is removed.
+  /Startup cleanup skipped: the ids it would prune against are not known to be complete/,
+];
+
+/**
  * Split a render's console errors into the ones a case declared it would produce and the ones it
  * did not.
  */

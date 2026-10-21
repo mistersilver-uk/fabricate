@@ -7,19 +7,28 @@
   `textContent` tracks the string; the string is never markup. A `slot` key's snippet holds the
   seam's element in a wrapper of its own, and detaches it on teardown (issue 2451). A `callback`
   key reaches it as one forwarder for the life of the mount, which passes the seam a copy of the
-  first `arity` arguments under `untrack` (issue 2452).
+  first `arity` arguments under `untrack` (issue 2452). `values` holds each `value` key's value,
+  which every drawn props object carries as one stable accessor pair for the life of the mount; a
+  write from the component calls the seam's `flush` before and, when the delivery changed the
+  value, after its `on<Key>Change` delivery, outside an effect only; a write of `undefined` records
+  the key's `initial`. `setProps(next, values)` sets only the value keys `values` holds, and
+  `getValue(key)` reads one (issue 2453).
   The outer boundary takes what the inner one throws while it tears a faulted component down,
   which Svelte hands to the next boundary up.
 -->
 <script>
   import { createRawSnippet, untrack } from 'svelte';
 
-  let { component: Published, initial, onfault, kinds, slots, callbacks } = $props();
+  import { keepCurrent } from '../../publishedComponentValues.js';
+
+  let { component: Published, initial, values, onfault, kinds, slots, callbacks, flush } = $props();
 
   let current = $state.raw(untrack(() => $state.snapshot(initial)));
+  let held = $state.raw(untrack(() => ({ ...values })));
 
   const slotOf = untrack(() => slots);
   const callbackOf = untrack(() => callbacks);
+  const flushNow = untrack(() => flush);
   const DRAWN_AS = { text: textSnippet, slot: slotSnippet, callback: callbackForwarder };
 
   // Built from the entry's kinds, not the first props, so a key first passed by `update` draws.
@@ -65,22 +74,56 @@
     };
   }
 
+  // The flush before delivery draws the write, so a value put back inside the callback differs
+  // from what the DOM last drew; an effect's write is drawn by the flush already running it.
+  function write(key, { deliver, initial }, written) {
+    const next = written === undefined ? initial : written;
+    const previous = untrack(() => held[key]);
+    if (Object.is(next, previous)) return;
+    const resync = !$effect.tracking();
+    held = { ...untrack(() => held), [key]: next };
+    if (resync) flushNow();
+    untrack(() => deliver([next, previous]));
+    const settled = untrack(() => held[key]);
+    if (resync && !Object.is(settled, next)) flushNow();
+  }
+
+  // Svelte reads a bound prop's setter once, at the component's init, so each pair closes over
+  // `held`, never over the props object it is defined on.
+  const accessors = untrack(() =>
+    Object.fromEntries(
+      Object.keys(values).map((key) => {
+        const delivery = callbackOf(key);
+        const set = (next) => write(key, delivery, next);
+        return [key, { enumerable: true, configurable: true, get: () => held[key], set }];
+      })
+    )
+  );
+
   // A `text` key holding nothing or `''`, and a `slot` or `callback` key not holding `true`, is
   // omitted, so the component's own fallback applies.
-  const drawn = $derived.by(() => {
-    if (contentValues.length === 0) return current;
-    const props = { ...current };
+  function withContent(props) {
     for (const [key, value] of contentValues) {
       if (props[key]) props[key] = value;
       else delete props[key];
     }
     return props;
+  }
+
+  const drawn = $derived.by(() => {
+    const props = contentValues.length === 0 ? { ...current } : withContent({ ...current });
+    return Object.defineProperties(props, accessors);
   });
 
-  export function setProps(next) {
+  export function setProps(next, nextValues = {}) {
     untrack(() => {
       current = $state.snapshot(next);
+      held = keepCurrent(held, nextValues);
     });
+  }
+
+  export function getValue(key) {
+    return untrack(() => held[key]);
   }
 </script>
 

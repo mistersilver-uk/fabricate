@@ -17,6 +17,7 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
   'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentCallbacks.js',
+  'src/ui/publishedComponentValues.js',
   'src/ui/publishedComponentManifest.js',
   'src/ui/svelte/util/dropRateTier.js',
 ]);
@@ -42,6 +43,8 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/Field.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

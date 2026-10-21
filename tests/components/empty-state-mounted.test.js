@@ -140,13 +140,13 @@ describe('1286 EmptyState — variant contract', () => {
     harness.remount();
   });
 
-  it('the INLINE variant flips the stack to a row AND drops the 46px icon tile', () => {
+  it('the INLINE variant flips the stack to a row AND drops the 38px icon tile', () => {
     // Both halves are load-bearing. `is-compact` already shrinks the tile to 32px.
     const stack = ruleBody('.manager-empty.is-inline > div');
     assert.match(stack, /flex-direction:\s*row/, 'the inner stack becomes a row');
 
     const glyph = ruleBody('.manager-empty.is-inline > div > i');
-    assert.match(glyph, /width:\s*auto/, 'the 46px tile width is released');
+    assert.match(glyph, /width:\s*auto/, 'the 38px tile width is released');
     assert.match(glyph, /height:\s*auto/, 'and its height with it');
     assert.match(glyph, /background:\s*none/, 'the tile FILL is gone, not merely resized');
   });
@@ -264,6 +264,7 @@ describe('2178 EmptyState — small-text ink clears 4.5:1 on its host grounds', 
   });
 
   for (const selector of [
+    '.manager-empty h3',
     '.manager-empty p',
     '.manager-empty.is-note h3',
     '.manager-empty.is-note p',

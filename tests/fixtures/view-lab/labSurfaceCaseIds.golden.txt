@@ -42,8 +42,11 @@ manager-published-leaves-specimen
 manager-published-controls-specimen
 manager-published-buttons-specimen
 manager-published-toggles-specimen
+manager-published-notice-dismiss-focus
+manager-published-notice-dismissed
 manager-published-steppers-specimen
 manager-published-steppers-button-focus
+manager-published-search-specimen
 player-gathering-environments
 fabricate-app-shell
 player-inventory

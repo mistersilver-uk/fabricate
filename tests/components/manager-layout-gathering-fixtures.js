@@ -8,10 +8,6 @@ import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const colorPickerPath = resolve(
-  __dirname,
-  '../../src/ui/svelte/components/TintPickerButton.svelte'
-);
 const partyExpandedBodyPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
@@ -22,7 +18,6 @@ const partiesTabPath = resolve(
 );
 export const partiesTabSource = readFileSync(partiesTabPath, 'utf8');
 export const partiesTabScoped = scopedComponentCss(partiesTabPath);
-export const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
 export const partyExpandedBodyScoped = scopedComponentCss(partyExpandedBodyPath);
 
 // Issue 883 retired the last two hand-rolled copies of the chance slider.

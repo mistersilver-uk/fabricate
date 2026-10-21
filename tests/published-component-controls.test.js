@@ -1,12 +1,14 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over each entry's import
- * closure: every `callback` key is called from an admitted event handler; every focusable element is pinned
+ * closure: every `callback` key is called from an admitted event handler, and every `value` key is
+ * written only from one (issue 2453); every focusable element is pinned
  * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
  * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
  * companion; an entry that publishes `aria-labelledby` names each reached control by a required
  * key; a closure that takes a window's ring states no focus rule of its own but the pinned scoped
  * rings, and its reached control no inline style; and no rule outside the published `Notice`
- * styles its action button.
+ * styles its buttons. A control pinned to its guard key is named by that key, a required key or
+ * a key `requiredWhen` that guard.
  * The test-only probe runs beside the shipped entries. A key's kind and `args` are
  * `published-component-manifest.test.js`'s.
  * Limit: reach follows a guard through a plain `const` and `$derived` to the props it reads; a
@@ -17,6 +19,9 @@
  * Limit: a `svelte:element` is judged by its pinned tags, which that gate holds to its file and to
  * what each closure file passes it; the `type` of a dynamic button is
  * `components/published-button-mounted.test.js`'s.
+ * Limit: a value write is an assignment, an update, a `for…of` or `for…in` head or a `bind:`
+ * directive naming the key's own local, so a write through an alias or a shadowing name is not
+ * seen.
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
@@ -80,7 +85,9 @@ const FOCUSABLE_REACH = Object.freeze({
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
-  'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': null,
+  'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
+  // In the `control` snippet, which both branches of `{#if label}` render.
+  'src/ui/svelte/components/SearchField.svelte: input': 'always',
   'src/ui/svelte/components/StatusToggle.svelte: button': {
     defaults: ['as'],
     heldBy:
@@ -99,11 +106,15 @@ const FOCUSABLE_REACH = Object.freeze({
   // The formatted mode's, drawn only when `formatValue` and `parseValue`, which the entry does not publish, are set.
   'src/ui/svelte/components/Stepper.svelte: input[data-stepper-input][type="text"]': null,
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
 });
 
-/** The one control drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
+/** The controls drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
 const OPTIONAL_NAME_PINS = Object.freeze([
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]',
+  'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]',
 ]);
 
 const OUTSIDE_AN_EVENT = 'is a callback key referenced outside an event handler';
@@ -267,6 +278,49 @@ function eventFaults(entry, ast) {
   });
 }
 
+const WRITTEN_OUTSIDE_AN_EVENT = 'is a value key written outside an event handler';
+
+/** The only value key written outside an event handler: the probe's, which exists to prove why. */
+const WRITTEN_OUTSIDE = Object.freeze({
+  // An effect writes `mirror` once per distinct `mirrorAt`.
+  PublishedProbe: [`mirror ${WRITTEN_OUTSIDE_AN_EVENT}`],
+});
+
+const WRITING_HEADS = new Set(['AssignmentExpression', 'ForOfStatement', 'ForInStatement']);
+
+/**
+ * Whether a reference to a local writes it: assigned, updated, bound by a `bind:` directive, or
+ * named in a `for…of` or `for…in` head, a declaring one included, which fails closed.
+ */
+function isWrite(node, ancestors) {
+  const parent = ancestors.at(-1);
+  if (parent?.type === 'UpdateExpression' || parent?.type === 'BindDirective') return true;
+  const at = ancestors.findLastIndex((ancestor) => WRITING_HEADS.has(ancestor.type));
+  return at !== -1 && (ancestors[at + 1] ?? node) === ancestors[at].left;
+}
+
+/** Where each write of `local` sits: `'event'` as `referenceSites` reads one, else `'other'`. */
+function writeSites(ast, local) {
+  const sites = [];
+  const live = eventOnlyFunctions(ast);
+  for (const root of [ast.module, ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier' || node.name !== local || !isWrite(node, ancestors)) return;
+      const event = isEventReference(ancestors) || ancestors.some((ancestor) => live.has(ancestor));
+      sites.push(event ? 'event' : 'other');
+    });
+  }
+  return sites;
+}
+
+/** What each `value` key of an entry breaks: written outside an event handler. */
+function valueWriteFaults(entry, ast) {
+  const values = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'value');
+  return values.flatMap(({ key, local }) =>
+    writeSites(ast, local).includes('other') ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`] : []
+  );
+}
+
 /**
  * Every focusable element an entry's closure draws, each with the entry and its parsed file. An
  * element in the entry's own file also carries the entry's published keys by local name.
@@ -427,6 +481,7 @@ const LITERAL = 'is named by a literal';
 const UNPUBLISHED_NAME = "is not named by a published data key or a text key's render tag";
 const OPTIONAL_NAME = 'is named by a text key that is not required';
 const OPTIONAL_DATA_NAME = 'is named by a data key that is not required';
+const UNGUARDED_NAME = 'is named by a data key that is not its guard, required or requiredWhen it';
 
 /**
  * The published keys an expression's value reaches, by `nameSources`, or the fault it is: a
@@ -442,9 +497,10 @@ function dataNameOf(expression, { ast, published, entry }) {
 
 /**
  * What one part of a name breaks: text, an expression, or a render tag. A control drawn whatever
- * the companion passes (`strict`) is named only by required keys.
+ * the companion passes (`strict`) is named only by required keys, and one pinned to its `guard`
+ * key only by that key, required keys and keys `requiredWhen` that guard (issue 2452).
  */
-function namePartFault(part, control, strict) {
+function namePartFault(part, control, strict, guard = null) {
   const { published, entry } = control;
   const specOf = (local) => entry.props[published.get(local)];
   if (part.type === 'Text') return LITERAL;
@@ -457,8 +513,10 @@ function namePartFault(part, control, strict) {
   if (part.type !== 'ExpressionTag') return UNPUBLISHED_NAME;
   const { fault, keys } = dataNameOf(part.expression, control);
   if (fault) return fault;
-  const required = keys.every((key) => entry.props[key].required === true);
-  return strict && !required ? OPTIONAL_DATA_NAME : null;
+  const isRequired = (key) => entry.props[key].required === true;
+  if (strict) return keys.every(isRequired) ? null : OPTIONAL_DATA_NAME;
+  const held = (key) => key === guard || isRequired(key) || entry.props[key].requiredWhen === guard;
+  return guard === null || keys.every(held) ? null : UNGUARDED_NAME;
 }
 
 /**
@@ -495,7 +553,8 @@ function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS) {
   const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
   const strict = isAlwaysDrawn(control, pins) && !optional.includes(id);
-  const faults = parts.map((part) => namePartFault(part, control, strict)).filter(Boolean);
+  const guard = typeof pins[id] === 'string' && pins[id] !== 'always' ? pins[id] : null;
+  const faults = parts.map((part) => namePartFault(part, control, strict, guard)).filter(Boolean);
   return [...new Set(faults)].map((fault) => `${id} ${fault}`);
 }
 
@@ -680,11 +739,11 @@ function controlFaults(
   ];
 }
 
-/** The notice's action button, by the class and the hook it writes, and the file that may style it. */
+/** The notice's buttons, by the class and the hooks they write, and the file that may style them. */
 const NOTICE_ACTION = Object.freeze({
   path: 'src/ui/svelte/components/Notice.svelte',
   classes: ['fab-notice-button'],
-  attributes: ['data-notice-action'],
+  attributes: ['data-notice-action', 'data-notice-dismiss'],
 });
 
 /** Every selector of `sheets` outside `own` that names one of a part's classes or holds one of its attributes, as written. */
@@ -705,6 +764,13 @@ describe('each published entry that draws a control', () => {
       assert.deepEqual(
         eventFaults(entry, SHIPPED.component(entry.path)),
         CALLED_OUTSIDE_AN_EVENT[entry.name] ?? []
+      );
+    });
+
+    it(`${entry.name} writes each value key from an event handler, and nowhere else`, () => {
+      assert.deepEqual(
+        valueWriteFaults(entry, SHIPPED.component(entry.path)),
+        WRITTEN_OUTSIDE[entry.name] ?? []
       );
     });
 
@@ -731,7 +797,7 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual([...new Set(drawn)].sort(byName), Object.keys(FOCUSABLE_REACH).sort(byName));
   });
 
-  it('styles the notice action in no rule outside the notice, by its class or by its hook', () => {
+  it('styles the notice buttons in no rule outside the notice, by their class or by their hooks', () => {
     const own = importClosure(NOTICE_ACTION.path, SHIPPED);
     assert.ok(own.has(NOTICE_ACTION.path), 'the notice was read');
     assert.deepEqual(partSelectors(everyStylesheet(), NOTICE_ACTION, own), []);
@@ -814,7 +880,7 @@ describe('the reach clause', () => {
     assert.deepEqual(syntheticFaults(guarded, { pin: 'label' }), []);
   });
 
-  const props = { rows: { kind: 'data' }, label: { kind: 'data' } };
+  const props = { rows: { kind: 'data' }, label: { kind: 'data', requiredWhen: 'rows' } };
   for (const [claim, open, close] of [
     ['under {#each} of a published key', '{#each rows as row (row)}', '{/each}'],
     ['in the {:else} of a published key', '{#if rows}<p></p>{:else}', '{/if}'],
@@ -877,6 +943,44 @@ describe('the reach clause', () => {
     const bare = [script('label, hidden'), '{#if hidden}', button('Close'), '{/if}'].join('');
     assert.deepEqual(syntheticFaults(bare, { pin: null }), []);
   });
+
+  /** A glyph button drawn under `shown`, named through `aria-label` by `label`, published as `spec`. */
+  const glyphFaults = (spec, extra = {}) =>
+    syntheticFaults(
+      [
+        script('shown, label, other'),
+        '{#if shown}',
+        button('<i aria-hidden="true"></i>', ' aria-label={label || undefined}'),
+        '{/if}',
+        styled(PAIR),
+      ].join(''),
+      { pin: 'shown', props: { shown: { kind: 'data' }, label: spec, ...extra } }
+    );
+  for (const [claim, spec] of [
+    ['a required key', { kind: 'data', required: true }],
+    ['a key requiredWhen its guard', { kind: 'data', requiredWhen: 'shown' }],
+  ]) {
+    it(`passes a guarded control named by ${claim}`, () => {
+      assert.deepEqual(glyphFaults(spec), []);
+    });
+  }
+
+  it('passes a guarded control named by its guard key itself', () => {
+    const markup = [script('label'), '{#if label}', button(), '{/if}', styled(PAIR)].join('');
+    assert.deepEqual(
+      syntheticFaults(markup, { pin: 'label', props: { label: { kind: 'data' } } }),
+      []
+    );
+  });
+
+  for (const [claim, spec] of [
+    ['an optional key', { kind: 'data' }],
+    ['a key requiredWhen another key', { kind: 'data', requiredWhen: 'other' }],
+  ]) {
+    it(`names a guarded control named by ${claim} as a fault`, () => {
+      assert.deepEqual(glyphFaults(spec, { other: { kind: 'data' } }), [UNGUARDED_NAME]);
+    });
+  }
 
   const derived = (guard) =>
     `<script>let { label, hidden } = $props(); const shown = $derived(${guard});</script>`;
@@ -1250,10 +1354,12 @@ describe('the parts clause', () => {
     ]);
   });
 
-  it('names a selector that holds the action hook, and no other attribute', () => {
-    const css = '.a [data-notice-action] > i, .b[data-notice-dismiss] { gap: 0 }';
+  it('names a selector that holds the action or the dismiss hook, and no other attribute', () => {
+    const css =
+      '.a [data-notice-action] > i, .b[data-notice-dismiss], .c[data-notice-tone] { gap: 0 }';
     assert.deepEqual(partSelectors(sheet(css), NOTICE_ACTION), [
       'sheet.css: .a [data-notice-action] > i',
+      'sheet.css: .b[data-notice-dismiss]',
     ]);
   });
 
@@ -1283,6 +1389,20 @@ describe('the name clause', () => {
     assert.deepEqual(named('{label?.short}'), []);
     assert.deepEqual(named('<i></i>', ' aria-label={label.long}'), []);
     assert.deepEqual(named('{@render caption?.()}'), []);
+  });
+
+  it('reads undefined as nothing, though a pattern default reads it, as SearchField’s conditional aria-label does', () => {
+    const markup =
+      '<script>let { label, other, ...rest } = $props(); const { x = undefined } = $derived(rest);</script>' +
+      button('<i></i>', ' aria-label={other ? undefined : label || undefined}') +
+      styled(PAIR);
+    assert.deepEqual(syntheticFaults(markup, { props, pin: 'always' }), []);
+  });
+
+  it('names a name that reads only undefined as a fault, for it reaches no published key', () => {
+    assert.deepEqual(named('<i></i>', ' aria-label={other ? undefined : undefined}'), [
+      UNPUBLISHED_NAME,
+    ]);
   });
 
   it('reads the render tag inside a svelte:element as it reads one inside a button', () => {
@@ -1381,7 +1501,7 @@ describe('the name clause', () => {
     ]);
   });
 
-  it('exempts only the control OPTIONAL_NAME_PINS names, the probe button, which mounts unlabelled', () => {
+  it('exempts only the controls OPTIONAL_NAME_PINS names, the probe controls, which mount unlabelled', () => {
     const always = { [PRESS]: 'always' };
     const entry = { name: 'E', path: E, root: 'any', props: { label: { kind: 'data' } } };
     const [control] = controlsOf(entry, syntheticReader({ [E]: script('label') + button() }));
@@ -1608,4 +1728,60 @@ describe('the called-from-an-event clause', () => {
   it('judges no key that is not a published callback', () => {
     assert.deepEqual(eventFaults({ props: { inEffect: { kind: 'data' } } }, SYNTHETIC), []);
   });
+});
+
+describe('the written-from-an-event clause', () => {
+  const value = { kind: 'value', initial: '' };
+  const faultsOf = (declared, markup) => {
+    const source = [
+      "<script>let { query = $bindable(''), unpublished = $bindable('') } = $props();",
+      declared,
+      '</script>',
+      markup,
+    ].join('');
+    return valueWriteFaults({ props: { query: value } }, templateOf('Value.svelte', source).ast);
+  };
+  const WRITTEN = [`query ${WRITTEN_OUTSIDE_AN_EVENT}`];
+
+  for (const [claim, declared, markup] of [
+    ['a read alone', '', '<output>{query}</output>'],
+    ['an input handler', '', '<input oninput={(event) => (query = event.currentTarget.value)} />'],
+    [
+      'a function only an event reaches',
+      ' function clear() { query = ""; }',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    ['a write of a key the entry does not publish', ' $effect(() => { unpublished = "x"; });', ''],
+  ]) {
+    it(`passes ${claim}`, () => {
+      assert.deepEqual(faultsOf(declared, markup), []);
+    });
+  }
+
+  for (const [claim, declared, markup] of [
+    ['a write in $effect', ' $effect(() => { query = "x"; });', ''],
+    ['an update expression in $effect', ' $effect(() => { query++; });', ''],
+    ['a destructuring write in $effect', ' $effect(() => { [query] = ["x"]; });', ''],
+    ['a write at init', ' query = "x";', ''],
+    ['a for…of head at init', ' for (query of ["x"]) {}', ''],
+    ['a for…in head in $effect', ' $effect(() => { for (query in { x: 1 }) {} });', ''],
+    ['a destructuring for…of head', ' for ([query] of [["x"]]) {}', ''],
+    ['a declaring for…of head', ' for (const query of ["x"]) {}', ''],
+    ['bind:value', '', '<input bind:value={query} />'],
+    [
+      'a function also called from an $effect',
+      ' function clear() { query = ""; } $effect(() => { clear(); });',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    [
+      'an exported function',
+      ' export function clear() { query = ""; }',
+      '<button type="button" onclick={clear}>x</button>',
+    ],
+    ['a focus handler', '', '<input onfocus={() => (query = "")} />'],
+  ]) {
+    it(`fails closed on ${claim}`, () => {
+      assert.deepEqual(faultsOf(declared, markup), WRITTEN);
+    });
+  }
 });

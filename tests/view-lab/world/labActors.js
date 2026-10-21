@@ -303,11 +303,23 @@ const ACTOR_DEFINITIONS = [
  * @returns {object[]} Duck-typed actors.
  */
 export function buildLabActors(content) {
+  return buildCastActors(content, { definitions: ACTOR_DEFINITIONS, inventories: INVENTORIES });
+}
+
+/**
+ * Build another world's actors from its own definitions and inventories, as the demo world does
+ * (issue 2571). The lab's other tables are keyed by lab actor ids and match none of them.
+ *
+ * @param {object} content The world content the stacks are instances of.
+ * @param {{definitions: object[], inventories: object}} cast The actors and their stacks.
+ * @returns {object[]} Duck-typed actors.
+ */
+export function buildCastActors(content, { definitions, inventories }) {
   const componentsById = new Map(content.components.map((component) => [component.id, component]));
   for (const tool of content.tools) componentsById.set(tool.id, tool);
 
-  return ACTOR_DEFINITIONS.map((definition) => {
-    const stacks = INVENTORIES[definition.id] ?? {};
+  return definitions.map((definition) => {
+    const stacks = inventories[definition.id] ?? {};
     const broken = new Set(BROKEN_STACKS[definition.id] ?? []);
     const items = Object.entries(stacks).map(([componentId, quantity], index) => {
       const item = ownedItem(componentId, componentsById.get(componentId), quantity, index);

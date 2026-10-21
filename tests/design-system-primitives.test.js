@@ -228,7 +228,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // Issue 2424: the published tier track, on its specimen mounted through the seam.
   'src/ui/svelte/components/TierTrack.svelte',
-  // Issue 2257: the tint palette and its trigger, on the frames that draw a pressed cell.
+  // Issues 2257 and 2459: the tint palette and its trigger, on the frames that draw a selected swatch.
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
@@ -442,12 +442,12 @@ test('(a) the older overrides still name the frame that renders their state', ()
     [
       'src/ui/svelte/components/TintPicker.svelte',
       'manager-gathering-biome-colour-popover-cursor',
-      'the one frame that draws the keyboard cursor on a swatch that is not pressed',
+      'the one frame that draws the keyboard cursor on a tile that is not selected',
     ],
     [
       'src/ui/svelte/components/TintPicker.svelte',
       'manager-gathering-biome-colour-popover-cursor-selected',
-      'the one frame that draws the cursor and the selected ring on one swatch',
+      'the one frame that draws the cursor and the selected ring on one tile',
     ],
     [
       'src/ui/svelte/components/IconPicker.svelte',
@@ -829,13 +829,15 @@ test('(a) a Stepper change publishes its two frames, then the two specimens that
   }
 });
 
-test('(a) a Notice change publishes the three specimens that mount it, after the frame that draws it', () => {
+test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ];
   assert.deepEqual(
     [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],

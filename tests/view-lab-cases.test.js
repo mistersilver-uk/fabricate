@@ -271,7 +271,7 @@ function navDeclarationScope(sources, template) {
  * compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
-const PRESS_KEYS = ['Enter', 'Space', 'Tab', 'ArrowUp', 'ArrowDown'];
+const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -388,8 +388,8 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
- * mount page, its companion stand-in, and the two specimen fixtures whose cases act on what they
- * mount.
+ * mount page, its companion stand-in, and the three specimen fixtures whose cases act on what
+ * they mount.
  */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
@@ -397,6 +397,7 @@ const labHarnessSource = [
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
+  'tests/view-lab/fixtures/PublishedSearch.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -830,7 +831,11 @@ const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button
 const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
 /** A part of one published stepper of the values fixture, by its section's key. */
 const labStepper = (key, part) => `[data-lab-values] [data-lab-stepper="${key}"] ${part}`;
+const DISMISSAL = (tone) =>
+  `[data-lab-controls] > [data-lab-dismissals] > [data-lab-dismissal="${tone}"]`;
 const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
+/** A part of one published search field of the search fixture, by its section's key. */
+const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1054,8 +1059,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
   // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
-  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451); then each
-  // panel's nested button in its visual role's ink and fill (issue 2452).
+  // the filtered panel's edge, padding, gap and ink, and the notice's fill and inks (issue 2451);
+  // then each panel's nested button in its visual role's ink and fill (issue 2452).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -1093,21 +1098,35 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fabricate-card > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty:not(.is-filtered)',
-      styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+      styles:
+        'border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); background-color: rgba(0, 0, 0, 0)',
     },
     { selector: '.manager-empty:not(.is-filtered) > div', styles: 'display: flex; row-gap: 8px' },
     {
       selector: '.manager-empty:not(.is-filtered) > div > i',
-      styles: 'width: 46px; height: 46px',
+      styles:
+        'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
     },
     { selector: '.manager-empty:not(.is-filtered) > div > div', styles: 'display: contents' },
     { selector: '.manager-empty:not(.is-filtered) > div > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty h3',
-      styles: 'color: var(--fab-text-secondary); font-size: 13px',
+      styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
     },
-    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
-    { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    {
+      selector: '.manager-empty:not(.is-filtered) > div > p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
+    {
+      selector: '.manager-empty.is-filtered',
+      styles:
+        'padding: 16px; border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); border-radius: 11px',
+    },
+    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 8px' },
+    {
+      selector: '.manager-empty.is-filtered p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
     {
       selector: '.manager-empty:not(.is-filtered) .fabricate-button',
       styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
@@ -1125,7 +1144,7 @@ const NON_VERB_CONTROLS = Object.freeze({
   // tone's danger title in their own inks, under the fixture's azure.
   'manager-published-controls-specimen': [
     ...['info', 'danger', 'warning', 'success'].map((tone) => ({
-      selector: `.fab-notice.is-${tone} [data-notice-action]`,
+      selector: `[data-lab-controls] > section .fab-notice.is-${tone} [data-notice-action]`,
       styles: 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)',
     })),
     {
@@ -1139,7 +1158,8 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'color: var(--fab-success-text)',
     },
     {
-      selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+      selector:
+        '[data-lab-controls] > section .fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
       styles: 'color: var(--fab-danger-text)',
     },
     // The published buttons at rest (issue 2452): each visual role in the sheet's own values, a
@@ -1193,6 +1213,29 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
+  // The same fixture's dismissable notices (issue 2452): the accent one's dismiss control under
+  // keyboard focus in the accent ring, and each tone's dismiss tile at its square size.
+  'manager-published-notice-dismiss-focus': [
+    {
+      selector: `${DISMISSAL('accent')} [data-notice-dismiss]:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
+    ...['danger', 'accent'].map((tone) => ({
+      selector: `${DISMISSAL(tone)} [data-notice-dismiss]`,
+      styles: 'width: 28px; height: 28px',
+    })),
+  ],
+  // The same fixture after the danger notice's dismissal: its next control ringed, where its
+  // callback moved focus, and the accent notice's dismiss tile still drawn.
+  'manager-published-notice-dismissed': [
+    {
+      selector: `${DISMISSAL('danger')} > [data-lab-next] button:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
+    { selector: `${DISMISSAL('accent')} .fab-notice [data-notice-dismiss]`, styles: 'width: 28px' },
+  ],
   // The published steppers (issue 2452): the group's declared corner, the value's type size, and
   // the focused field's ring by its shape alone, at its own edge.
   'manager-published-steppers-specimen': [
@@ -1205,6 +1248,16 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labStepper('card', 'button[data-stepper-increment]')}:focus-visible`,
       styles: STEPPER_RING,
+    },
+  ],
+  // The published search fields (issue 2453): the default shell's declared corner, and the focused
+  // input drawing no ring of its own, the shell's border taking the accent instead.
+  'manager-published-search-specimen': [
+    { selector: labSearch('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
+    { selector: `${labSearch('transform', 'input')}:focus`, styles: 'outline-style: none' },
+    {
+      selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
+      styles: 'border-color: var(--fab-accent)',
     },
   ],
 });
@@ -5762,7 +5815,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the seven specimens it mounts', () => {
+test('every published component seam module, and the host, selects the ten specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5778,18 +5831,21 @@ test('every published component seam module, and the host, selects the seven spe
       'manager-published-controls-specimen',
       'manager-published-buttons-specimen',
       'manager-published-toggles-specimen',
+      'manager-published-notice-dismiss-focus',
+      'manager-published-notice-dismissed',
       'manager-published-steppers-specimen',
       'manager-published-steppers-button-focus',
+      'manager-published-search-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, and the values fixture's stepper. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, and the search fixture's field. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper', 'SearchField']);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle and Stepper and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper and SearchField and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -5955,8 +6011,8 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
   );
   assert.equal(
     expectContained.length,
-    27,
-    'five notices, thirteen buttons and eight switches in the ground, and the ground in the window'
+    31,
+    'five notices, thirteen buttons, eight switches, and two dismissals each with its next control in the ground, and the ground in the window'
   );
 });
 
@@ -6005,7 +6061,7 @@ test('the buttons specimen presses two published buttons of the controls fixture
   assert.deepEqual(
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
-    'the same twenty-seven containments as the fixture’s other case'
+    'the same thirty-one containments as the fixture’s other case'
   );
 });
 
@@ -6056,7 +6112,47 @@ test('the toggles specimen presses two published switches of the controls fixtur
   assert.deepEqual(
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
-    'the same twenty-seven containments as the fixture’s other cases'
+    'the same thirty-one containments as the fixture’s other cases'
+  );
+});
+
+test('the dismissal specimens Tab onto a dismiss control, then press one whose callback moves focus on', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedControls.svelte');
+  assert.ok(
+    holds(instance, (node) => node.type === 'Property' && node.key?.name === 'onDismiss'),
+    'the fixture passes onDismiss through the seam’s mount'
+  );
+  for (const hook of ['data-lab-dismissals', 'data-lab-dismissal', 'data-lab-next']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the cases' selectors name`
+    );
+  }
+  const controls = getCaseById('manager-published-controls-specimen');
+  const focus = getCaseById('manager-published-notice-dismiss-focus');
+  const dismissed = getCaseById('manager-published-notice-dismissed');
+  for (const viewCase of [focus, dismissed]) {
+    assert.deepEqual(viewCase.query, controls.query);
+    assert.deepEqual(viewCase.expectContained, controls.expectContained);
+  }
+  assert.deepEqual(
+    focus.steps,
+    [{ selector: `${DISMISSAL('accent')} [data-notice-action]`, press: 'Tab' }],
+    'one move of keyboard focus from the action'
+  );
+  assert.ok(
+    focus.expectSelector.endsWith('[data-notice-action] ~ [data-notice-dismiss]:focus-visible'),
+    'the frame is taken with keyboard focus on the dismiss control after the action'
+  );
+  assert.deepEqual(
+    dismissed.steps,
+    [{ selector: `${DISMISSAL('danger')} [data-notice-dismiss]`, press: 'Enter' }],
+    'one keyboard press of the dismiss control'
+  );
+  assert.equal(
+    dismissed.expectSelector,
+    `${DISMISSAL('danger')}:not(:has(.fab-notice)) > [data-lab-next] button:focus`,
+    'the frame is taken only once the notice is gone and focus is on the next control, not body'
   );
 });
 
@@ -6123,6 +6219,50 @@ test('the steppers specimen cases act on what the values fixture mounts through 
       '[data-lab-stepper="card"] button[data-stepper-increment]:focus-visible'
     ),
     'the frame is taken with keyboard focus on the plus on the darker strip'
+  );
+});
+
+test('the search specimen case acts on what the search fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedSearch.svelte');
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'SearchField'
+    ),
+    'the fixture mounts SearchField through the seam’s mount'
+  );
+  for (const hook of ['data-lab-search-ground', 'data-lab-search', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit } = getCaseById(
+    'manager-published-search-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [/\[data-lab-search="([a-z]+)"\]/.exec(step.selector)?.[1], step.fill]),
+    [
+      ['filled', 'Iron'],
+      ['transform', '  SALT'],
+    ],
+    'a query kept as typed, then one the companion transforms inside its callback'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-search="transform"][data-lab-value="salt"]'),
+    'the frame is taken only once the transformed value was passed back'
+  );
+  assert.ok(
+    expectSelector.endsWith('.fabricate-search:focus-within') &&
+      expectCenterHit.endsWith('[data-lab-search="transform"] input'),
+    'the frame is taken with focus in the field that transformed'
   );
 });
 

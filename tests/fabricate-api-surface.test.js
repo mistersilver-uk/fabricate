@@ -163,11 +163,12 @@ function recordingFacade() {
 
 /**
  * The docs row a described published component must carry: name, version, root, props and rest.
- * A prop cell notes its kind unless it is `data`, then `required`.
+ * A prop cell notes its kind unless it is `data`, then `required`, then `required when` its guard.
  */
 function documentedComponentRow(name, { version, props, rest, root }) {
   const cells = Object.entries(props).map(([key, spec]) => {
-    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : ''];
+    const when = spec.requiredWhen ? `required when \`${spec.requiredWhen}\`` : '';
+    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : '', when];
     const noted = notes.filter(Boolean).join(', ');
     return noted ? `\`${key}\` (${noted})` : `\`${key}\``;
   });
@@ -191,11 +192,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
+ * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452 and 2453
  * headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -278,6 +279,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Button',
       'StatusToggle',
       'Stepper',
+      'SearchField',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -404,6 +406,9 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           icon: optional,
           action: optional,
           onAction: { kind: 'callback', required: false },
+          dismissable: optional,
+          dismissLabel: { kind: 'data', required: false, requiredWhen: 'dismissable' },
+          onDismiss: { kind: 'callback', required: false, requiredWhen: 'dismissable' },
         },
         rest: true,
         root: 'any',
@@ -447,6 +452,17 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onChange: { kind: 'callback', required: true },
         },
         rest: false,
+        root: 'fabricate',
+      },
+      SearchField: {
+        version: 1,
+        props: {
+          value: { kind: 'value', required: false },
+          onValueChange: { kind: 'callback', required: false },
+          placeholder: optional,
+          ariaLabel: required,
+        },
+        rest: true,
         root: 'fabricate',
       },
     });

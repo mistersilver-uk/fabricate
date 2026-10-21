@@ -924,7 +924,7 @@ A card never contains a card.
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
 Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
-Ordinary empty panels retain their existing geometry (the hero `EmptyState` pads `--fab-space-4`, 16, on every side; issue 2257 D9).
+Ordinary empty panels draw the `<Empty>` specimen for their form.
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
 #### Scenario: A gathering availability selection is empty
@@ -940,6 +940,19 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 - **THEN** its empty placeholder matches that select in full width and 34px height
 - **AND** adding a member replaces the placeholder with a removable chip, and removing the last member restores it
 - **AND** the separate guidance shown when no realms exist retains its existing presentation without a dropdown
+
+### Requirement: The no-state panel draws its library specimen
+
+`EmptyState`'s hero (central) panel MUST draw the `<Empty>` specimen: a 1px dashed `--fab-border-strong` edge at radius 11 padded `--fab-space-4`, a 38px radius-9 `--fab-bg-3` tile carrying a 15px `--fab-text-secondary` glyph, a serif 15px/600 `--fab-text` title, and a 10.5px hint capped at 34ch (maintainer ruling, 2026-10-20).
+Its `filtered` panel MUST draw the specimen's hint-and-way-out panel, with no tile or title, on the same edge, radius, padding and stack gap, in `--fab-text-muted`, and its hint is plain text carrying no emphasis.
+`compact`, `inline`, `note`, `field` and `fill` MUST each match a drawn unit of the `<Empty>` entry.
+A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY place it (width, grid column, minimum height); a caller that mirrors a form for a sibling state follows that form's geometry and inks and varies only the state's hue.
+
+#### Scenario: The hero panel is measured against its specimen
+
+- **WHEN** `manager-published-leaves-specimen` renders the hero and filtered panels
+- **THEN** the hero's edge is 1px `--fab-border-strong`, its tile 38px on `--fab-bg-3`, and its title 15px in `--fab-text`
+- **AND** the filtered panel pads 16px on the same 1px `--fab-border-strong` edge with an 8px stack gap and a 10.5px muted hint
 
 ### Requirement: Every interactive primitive declares its full state set
 
@@ -1000,6 +1013,8 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+In the popover the swatch is the content of a square tile of the picker's grid form: the selected tile states its own ground, `--fab-surface-soft`, by the descendant rule the square-tile rule reserves for a caller, so the inset ring is the mark; the cursor and hover are the square tile's own.
+The inline strip's cells keep the states above.
 A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
 A caller that marks selection inside the tile's own content (a swatch's inset ring) states its own ground as a descendant rule from its `popoverClass` (see the picker requirement), so the tile's ground does not compete with that mark.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
@@ -1060,7 +1075,8 @@ A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`,
 A tier track is an ordered list with an explicit `role="list"`, named by its required `ariaLabel`; its current tier carries `aria-current="step"` and its `currentLabel`, every other tier its visually hidden `reachedLabel` or `aheadLabel`; chevrons, dots and the current tier's glyph are decorative.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
-`TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+`TintPicker`'s inline cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+Its popover is the picker's grid form: the swatches are square tiles, `option`s of a `listbox` named by the same label, each carrying `aria-selected`, true on the selected tile alone; free hex, where offered, is the panel's caller footer above the key hints, and No colour, where offered, is the picker's `footerAction` (issue 2459).
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -1096,11 +1112,17 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **THEN** its accessible name is a required prop
 - **AND** its hit area is at least 24 by 24 pixels
 
-#### Scenario: A screen reader reaches a palette cell
+#### Scenario: A screen reader reaches an inline palette cell
 
-- **WHEN** a screen reader reaches a palette cell
+- **WHEN** a screen reader reaches an inline palette cell
 - **THEN** it announces the colour's name and pressed state
 - **AND** only the selected cell announces pressed
+
+#### Scenario: A screen reader reaches a popover palette tile
+
+- **WHEN** a screen reader reaches a tile in the tint popover
+- **THEN** it announces the colour's name and selected state within a listbox named by the palette label
+- **AND** only the selected tile announces selected
 
 ### Requirement: Shared primitives share one API convention
 
@@ -1343,6 +1365,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
 A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a typeahead combobox, which `Typeahead` implements save the requirement row's name cell.
+A search field never submits the form it is in: Enter in its input, outside IME composition, cancels the form's implicit submission.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 A BROWSE CARD is a `ListRow` at `layout="card"`, the same row model on one track, and the grid around the cards owns their track.
@@ -1687,6 +1710,13 @@ It positions the panel against the anchor, counts the anchor inside for outside-
 - **THEN** no trigger renders and a pointer press on the anchor does not dismiss the panel
 - **AND** the primitive writes no `aria-haspopup` or `aria-expanded`, because no trigger exists
 - **AND** closing the panel returns focus to the anchor
+
+#### Scenario: A GM picks a tint from the popover
+
+- **WHEN** a GM moves the cursor to a tile in an open tint popover and presses Enter
+- **THEN** that colour is committed, the panel closes and focus returns to the trigger that opened it
+- **AND** focus returns to the anchor instead when the panel was opened from one
+- **AND** a Space typed into the query moves no tile and commits nothing
 
 #### Scenario: A column count outside the supported range
 

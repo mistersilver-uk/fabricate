@@ -2838,28 +2838,12 @@
   outline-offset: -2px;
 }
 
-.fabricate-color-picker-popover.manager-color-picker-popover {
-  position: absolute;
-  box-sizing: border-box;
-  z-index: 120;
-  display: grid;
-  gap: var(--fab-space-2);
-  width: 220px;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 6px;
-  background: var(--fab-bg-3);
-  box-shadow: var(--fab-shadow-lg);
-}
-
 .fabricate-color-picker-popover .manager-color-preset-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: var(--fab-space-chip);
 }
 
 .fabricate-color-picker-popover .manager-color-preset {
-  aspect-ratio: 1;
   border: 1px solid var(--fab-border);
 }
 
@@ -2870,6 +2854,15 @@
 
 .fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch {
   box-shadow: inset 0 0 0 2px var(--fab-text);
+}
+
+/* In the popover the swatch is a square tile's content (issue 2459): the selected tile keeps the soft ground, outranking the primitive's active ground, so the inset ring is the mark. */
+.fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-option[aria-selected='true'] .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
+}
+
+.fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true'] {
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-color-picker-popover .manager-color-custom {

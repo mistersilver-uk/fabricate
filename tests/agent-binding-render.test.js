@@ -45,6 +45,31 @@ test('1. every binding on disk is byte-identical to its render, so `--write` is 
   );
 });
 
+test('2a. medium implementer and reviewer scopes are generated for both providers', () => {
+  const { files } = renderedBindings();
+  assert.match(
+    files.get('.claude/agents/fabricate-implementer-medium.md'),
+    /bounded work packet spanning related implementation, tests, localization, and specs/
+  );
+  assert.match(
+    files.get('.codex/agents/fabricate-implementer-medium.toml'),
+    /bounded, cohesive work packet spanning implementation, tests, localization and specs/
+  );
+  assert.match(
+    files.get('.claude/agents/fabricate-reviewer-medium.md'),
+    /complete integrated diff and cross-file contracts/
+  );
+  assert.match(
+    files.get('.codex/agents/fabricate-reviewer-medium.toml'),
+    /independent whole-diff review of a cohesive multi-file concern/
+  );
+  // Other role descriptions continue using their shared defaults.
+  assert.match(
+    files.get('.codex/agents/fabricate-domain-expert-medium.toml'),
+    /single-file change spanning multiple functions, objects, or structures/
+  );
+});
+
 test('2. a hand edit to either provider fails the gate, and the failure names the line', () => {
   // A NEGATIVE CONTROL PROVES NOTHING UNTIL THE MUTATION IS PROVEN TO HAVE APPLIED.
   const cases = [

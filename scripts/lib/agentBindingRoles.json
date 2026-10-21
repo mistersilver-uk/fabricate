@@ -33,8 +33,11 @@
     "aboutCodex": "Implement a scoped Fabricate change with tests and validation.",
     "blurbs": {
       "small": "small, self-contained change confined to a single function, object, or segment of one file",
-      "medium": "medium, single-file change spanning multiple functions, objects, or structures in that file",
+      "medium": "medium, bounded work packet spanning related implementation, tests, localization, and specs across multiple files",
       "large": "large, ambiguous, or high-risk change spanning multiple files or requiring clarification of an underspecified plan"
+    },
+    "codexTierBlurbs": {
+      "medium": "bounded, cohesive work packet spanning implementation, tests, localization and specs across several related files"
     },
     "claudeExtra": [
       "Load `.agents/skills/javascript-structural-design/SKILL.md` on demand when the change reshapes module boundaries, collaborator wiring, or test seams."
@@ -60,8 +63,11 @@
     "aboutCodex": "Review Fabricate diffs for correctness, regression risk, tests, and Foundry V13 compatibility.",
     "blurbs": {
       "small": "small review of a narrow, self-contained diff in a single file with obvious intent",
-      "medium": "medium review of a single-concern diff spanning a module and its co-located test",
+      "medium": "medium review of a bounded, cohesive multi-file change, including its complete integrated diff and cross-file contracts",
       "large": "large review of a wide, ambiguous, or high-risk diff spanning multiple files or touching migration, persistence, or harness paths"
+    },
+    "codexTierBlurbs": {
+      "medium": "independent whole-diff review of a cohesive multi-file concern, including cross-file interfaces"
     },
     "claudeSandbox": [
       "Sandbox: read-only.",

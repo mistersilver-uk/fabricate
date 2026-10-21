@@ -1012,40 +1012,7 @@ export async function buildLabWorld({
     seedLabInteractables(world);
   }
 
-  const shim = installFoundryShim(world);
-  world.shim = shim;
-  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
-  if (journalCaseState !== 'authority-unavailable') {
-    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
-    const journal = globalThis.game.journal;
-    const get = journal.get;
-    journal.contents.push(ledger);
-    journal.get = (id) => (id === ledger.id ? ledger : get(id));
-  }
-
-  // Dynamic, and only now: `src/main.js` registers hooks at module scope.
-  const runtime = await import('../../../src/main.js');
-  const fabricate = runtime.default;
-  await fabricate.initialize();
-  globalThis.game.fabricate = fabricate;
-  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
-
-  // The rest of `Hooks.once('ready')`, called directly. `initialize()` is not the whole startup.
-  await runtime.processFabricateWorldTime();
-  await runtime.runRecipeItemFlagAutoStamp();
-  await runtime.runComponentFlagAutoStamp();
-  await runtime.runToolFlagAutoStamp();
-  await runtime.runOwnedItemComponentIdentityRestamp();
-  world.fabricate = fabricate;
-
-  if (!fabricate.craftingSystemManager?.initialized) {
-    throw new Error(
-      'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
-    );
-  }
-  if (!fabricate.recipeManager?.initialized) {
-    throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
-  }
+  const fabricate = await bootLabRuntime(world, journalCaseState);
 
   // Journal runs. Written after the crafting data exists, because each run resolves to a real
   // recipe - a run pointing at a recipe that is not there renders as a redacted stub and proves
@@ -1119,6 +1086,52 @@ export async function buildLabWorld({
   }
 
   return world;
+}
+
+/**
+ * Install the Foundry shim over an assembled world, then boot the real Fabricate runtime and its
+ * ready steps against it. Shared by the lab world and the demo world (issue 2571).
+ *
+ * @param {object} world The assembled world; gains `shim` and `fabricate`.
+ * @param {string|null} [journalCaseState] Withholds the run ledger or seeds a retained claim.
+ * @returns {Promise<object>} The initialized `game.fabricate` facade.
+ */
+export async function bootLabRuntime(world, journalCaseState = null) {
+  const shim = installFoundryShim(world);
+  world.shim = shim;
+  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
+  if (journalCaseState !== 'authority-unavailable') {
+    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
+    const journal = globalThis.game.journal;
+    const get = journal.get;
+    journal.contents.push(ledger);
+    journal.get = (id) => (id === ledger.id ? ledger : get(id));
+  }
+
+  // Dynamic, and only now: `src/main.js` registers hooks at module scope.
+  const runtime = await import('../../../src/main.js');
+  const fabricate = runtime.default;
+  await fabricate.initialize();
+  globalThis.game.fabricate = fabricate;
+  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
+
+  // The rest of `Hooks.once('ready')`, called directly. `initialize()` is not the whole startup.
+  await runtime.processFabricateWorldTime();
+  await runtime.runRecipeItemFlagAutoStamp();
+  await runtime.runComponentFlagAutoStamp();
+  await runtime.runToolFlagAutoStamp();
+  await runtime.runOwnedItemComponentIdentityRestamp();
+  world.fabricate = fabricate;
+
+  if (!fabricate.craftingSystemManager?.initialized) {
+    throw new Error(
+      'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
+    );
+  }
+  if (!fabricate.recipeManager?.initialized) {
+    throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
+  }
+  return fabricate;
 }
 
 function invalidateJournalFixtureCaches(fabricate) {

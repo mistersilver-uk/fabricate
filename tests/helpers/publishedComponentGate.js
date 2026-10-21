@@ -160,6 +160,10 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
   // `tag` and `href`, which could draw an `<a>`, are not published.
   'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
+  // `SearchField` draws it only under its unpublished `label`, and passes `as="label"`.
+  // With no `as` it falls back to `div`; `field-source-contract` holds that hole by requiring a literal
+  // `as` on every `<Field>`, and neither tag is focusable.
+  'src/ui/svelte/components/Field.svelte: svelte:element': { tags: ['label'], keys: [] },
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
     tags: ['h3', 'p', 'span'],
     keys: ['as'],
@@ -295,15 +299,16 @@ export function nameSources(ast, expression) {
   const bound = templateBindings(ast);
   const found = { locals: new Set(), literal: false, unfollowed: false };
   const seen = new Set();
+  // `undefined` is read before the declarations, which also hold each name a pattern's default reads.
   const readName = (name) => {
-    if (seen.has(name)) return;
+    if (seen.has(name) || name === 'undefined') return;
     seen.add(name);
     const init = declared.get(name);
     if (bound.has(name) || init === null || init?.type === 'FunctionDeclaration') {
       found.unfollowed = true;
     } else if (props.has(name)) found.locals.add(name);
     else if (init) visit(init);
-    else if (name !== 'undefined') found.unfollowed = true;
+    else found.unfollowed = true;
   };
   const readRoot = (node) => {
     const root = chainRoot(node);
@@ -454,14 +459,22 @@ function componentTags(file, ast) {
 
 /**
  * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
- * naming those props by the child's path: it states one of them on the child's tag, or a spread.
+ * naming those props and the pinned tags by the child's path: it states one of them on the child's
+ * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`entryFile`)
+ * may spread its rest local, which holds `data-*` keys alone (M13).
  */
-function passedFaults(file, ast, defaulted) {
+function passedFaults(file, ast, defaulted, entryFile) {
+  const rest = entryFile ? restLocal(ast) : null;
   return componentTags(file, ast).flatMap(([child, node]) => {
-    const keys = defaulted.get(child) ?? [];
+    const { keys = [], tags = [] } = defaulted.get(child) ?? {};
     if (keys.length === 0) return [];
+    const literalTag = (value) => tags.includes(staticText({ value }));
+    const passes = ({ type, name, value, expression }) =>
+      type === 'SpreadAttribute'
+        ? !rest || expression?.name !== rest
+        : keys.includes(name) && !(type === 'Attribute' && literalTag(value));
     return node.attributes
-      .filter(({ type, name }) => type === 'SpreadAttribute' || keys.includes(name))
+      .filter((attribute) => passes(attribute))
       .map(
         ({ name = 'a spread' }) =>
           `${file} passes ${name} to ${child}, whose pinned tags rest on its default`
@@ -474,7 +487,7 @@ function passedFaults(file, ast, defaulted) {
  * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
  * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
  * reads, a keyed pin that is not `open` states `heldBy`, no file under `src/` is `open`, and no
- * file passes a child a prop its tag reads and its pin does not follow.
+ * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal.
  */
 export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
   const faults = [];
@@ -493,10 +506,13 @@ export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
       const read = tagKeys(ast, node, published);
       faults.push(...pinFaults(id, dynamic[id], read, spelled));
       const unfollowed = read.props.filter((key) => !dynamic[id].keys.includes(key));
-      defaulted.set(file, [...(defaulted.get(file) ?? []), ...unfollowed]);
+      const { keys = [], tags = [] } = defaulted.get(file) ?? {};
+      defaulted.set(file, { keys: [...keys, ...unfollowed], tags: [...tags, ...dynamic[id].tags] });
     }
   }
-  const passed = files.flatMap(({ file, ast }) => passedFaults(file, ast, defaulted));
+  const passed = files.flatMap(({ file, ast, published }) =>
+    passedFaults(file, ast, defaulted, published.size > 0)
+  );
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
   return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
 }
@@ -646,13 +662,13 @@ const ELEMENT_HANDLERS = Object.freeze({
 });
 
 /**
- * Every element one component spreads its `$props()` rest local on, a `svelte:element` included,
- * as `{ node, guards, before, written, spreads, handed }`: the names its `{#if}` and `{#each}`
- * ancestors read; each `data-*` attribute written ahead of the spread, static or not; every
- * attribute the element states, wherever it sits; every other spread as `{ local, before, keys }`,
- * `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it carries. An attribute's name is
- * read in lower case, as HTML reads it. A rest that reaches an element any other way (an alias, a
- * `$derived` copy, a child component) answers none.
+ * Every element one component spreads its `$props()` rest local on, a `svelte:element` and a
+ * child component included, as `{ node, guards, before, written, spreads, handed }`: the names its
+ * `{#if}` and `{#each}` ancestors read; each `data-*` attribute written ahead of the spread, static
+ * or not; every attribute the element states, wherever it sits; every other spread as
+ * `{ local, before, keys }`, `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it carries.
+ * An attribute's name is read in lower case, as HTML reads it. A rest that reaches an element any
+ * other way (an alias, a `$derived` copy) answers none.
  */
 export function restElements(ast) {
   const rest = restLocal(ast);
@@ -660,7 +676,7 @@ export function restElements(ast) {
   const isRest = ({ type, expression }) => type === 'SpreadAttribute' && expression?.name === rest;
   const elements = [];
   walkWithAncestors(ast.fragment, (node, ancestors) => {
-    if (node.type === 'RegularElement' || node.type === 'SvelteElement') {
+    if (['RegularElement', 'SvelteElement', 'Component'].includes(node.type)) {
       elements.push({ node, guards: guardNames(ancestors) });
     }
   });

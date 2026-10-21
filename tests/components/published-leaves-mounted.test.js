@@ -5,9 +5,10 @@
  * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
- * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle` and
- * `Stepper` mount here as leaves; what each draws and refuses is `published-button-mounted.test.js`'s,
- * `published-toggle-mounted.test.js`'s and `published-stepper-mounted.test.js`'s.
+ * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
+ * `Stepper` and `SearchField` mount here as leaves; what each draws and refuses is
+ * `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
+ * `published-stepper-mounted.test.js`'s and `published-search-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -236,6 +237,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('input').value,
     drawn: ['2', '3'],
   },
+  {
+    name: 'SearchField',
+    under: 'fabricate',
+    root: '.fabricate-search',
+    props: { ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+    next: { value: 'iron', ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+    read: (root) => root.querySelector('input').value,
+    drawn: ['', 'iron'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -306,8 +316,6 @@ describe('a key a leaf does not publish', () => {
     ['EmptyState', 'field', 'is not a data attribute'],
     ['EmptyState', 'fill', 'is not a data attribute'],
     ['EmptyState', 'note', 'is not a data attribute'],
-    ['Notice', 'dismissable', 'is not a data attribute'],
-    ['Notice', 'dismissLabel', 'is not a data attribute'],
     ['Notice', 'blocking', 'is not a data attribute'],
     ['Notice', 'evidence', 'is not a data attribute'],
     ['Button', 'size', 'is not a data attribute'],
@@ -317,6 +325,13 @@ describe('a key a leaf does not publish', () => {
     ['StatusToggle', 'as', 'is not a data attribute'],
     ['StatusToggle', 'label', 'is not a data attribute'],
     ['Stepper', 'disabled', 'is not a prop of Stepper'],
+    ['SearchField', 'label', 'is not a data attribute'],
+    ['SearchField', 'ariaLabelledBy', 'is not a data attribute'],
+    ['SearchField', 'density', 'is not a data attribute'],
+    ['SearchField', 'icon', 'is not a data attribute'],
+    ['SearchField', 'onChange', 'is not a data attribute'],
+    ['SearchField', 'inputProps', 'is not a data attribute'],
+    ['SearchField', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -663,7 +678,7 @@ describe('EmptyState under a bare ancestor', () => {
   });
 
   it('lays its column out and inks its title from its own stylesheet', async () => {
-    const theme = ':root[data-fabricate-theme] { --fab-text-secondary: rgb(1, 2, 3); }';
+    const theme = ':root[data-fabricate-theme] { --fab-text: rgb(1, 2, 3); }';
     await underSheet(theme, async () => {
       const { target, handle } = mountLeaf('EmptyState', { title: 'No factions yet' });
       await settle();
@@ -937,7 +952,7 @@ describe('Notice with an action under a bare ancestor', () => {
     handle.destroy();
   });
 
-  it('draws no dismissal whatever its published props, and still refuses dismissable (M13)', async () => {
+  it('draws no dismissal unless dismissable, and refuses dismissable with no dismissLabel (M9)', async () => {
     const { target, handle } = mountNotice({
       tone: 'success',
       detail: 'Remove a project to continue.',
@@ -948,9 +963,9 @@ describe('Notice with an action under a bare ancestor', () => {
     });
     await settle();
     assert.ok(!target.querySelector('[data-notice-dismiss]'), 'no dismiss control');
-    assert.throws(() => handle.update({ title: TITLE, dismissable: true }), {
+    assert.throws(() => handle.update({ title: TITLE, dismissable: true, onDismiss() {} }), {
       name: 'TypeError',
-      message: `${REFUSAL}"dismissable" is not a data attribute`,
+      message: `${REFUSAL}Notice requires a non-empty "dismissLabel" when "dismissable" is truthy`,
     });
     handle.destroy();
   });
