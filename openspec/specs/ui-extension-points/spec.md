@@ -963,8 +963,8 @@ Each group states the accepted values of every key that entry publishes.
 - **`Select`.**
   - It is the design system's select: a `<button>` trigger with `role="combobox"` that opens a list of options in an overlay, for one choice from a short, known set that commits as it is made.
     The trigger is the only focusable element inside `target`, so to return focus to the select the companion focuses `target.querySelector('button')`.
-  - `options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique within the list, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
-    A member other than `value` and `label` is private, and an empty list opens a panel that lists nothing and says nothing.
+  - `options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique as a string, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
+    A member other than `value` and `label` is private, and an empty `options`, which `mount` and `update` both accept, opens a list that draws nothing and says nothing, so the companion should not offer an empty select.
   - `value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`.
     A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
   - `onChange` is a required callback, called with one argument, the chosen option's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses an option by pointer or by Enter, the option already chosen included.
@@ -978,8 +978,8 @@ Each group states the accepted values of every key that entry publishes.
     While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
     While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
     Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
-  - The trigger stops the propagation of every key pressed while it holds focus, so a companion's listener above `target` receives no key from it, and while the trigger holds focus Escape closes no window, a DialogV2 included.
-    Tab moves focus as the browser does and leaves the list open until the next press outside it.
+  - The trigger stops the propagation of every key pressed while it holds focus, so a companion's listener above `target` receives no key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
+    Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the trigger still closes the list, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
   - The list is the entry's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the list's hidden live region is clipped only under a `.fabricate` ancestor.
     The list opens against the trigger, and its placement inside the host is private.
@@ -987,7 +987,7 @@ Each group states the accepted values of every key that entry publishes.
   - It needs a Fabricate window ancestor, and its trigger's height, corner, type size, weight and fill are drawn the same in the Manager and the player window; its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own.
   - The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so the companion leaves no room for one.
   - An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus the companion moves focus first.
-  - In a Foundry 14 window the companion destroys the select and mounts it again in `_onDetach` and `_onAttach`, as Overlays states, and that `destroy` closes the list.
+  - A select is drawn only in a Fabricate window, which gives the companion no signal when Foundry 14 moves it between windows, and needs none: a list opened after the move is placed and heard in the window that then holds the trigger, as Overlays states.
 - **Private:** `Select`'s sizes beyond each rung's height and corner, its tick, chevron and colours beyond what its group states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, the list's placement and width, and how Fabricate redraws a select in its own toolbars, rows, cards and dialogs.
 
 ### Mounting and its refusals

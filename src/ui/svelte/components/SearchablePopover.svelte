@@ -43,8 +43,7 @@
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
     `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
-  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
-    its own chrome refusing focus above all — are stated there rather than restated here.
+  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, which states the invariants inside it.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
     position is STAMPED with a generation derived from the list, where an `$effect` reset would land
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
@@ -55,8 +54,7 @@
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
     while open. ESCAPE IS HANDLED IN ONE PLACE in every mode: `dismissOnOutsideClick` on the picker
     root registers a DOCUMENT-level capture-phase keydown, so it does not depend on the key reaching
-    the portaled panel, which the inline field — a sibling of the trigger in another subtree — never
-    would.
+    the portaled panel, which a key in the inline field, outside the panel, never does.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -65,6 +63,8 @@
     handing this component the caller's trigger ELEMENT, because `bind:this` cannot cross a snippet
     boundary; it and its function are created ONCE at component scope, attachments being guarded by
     identity.
+  - THE PICKER'S OWN COPY is localized by the `APP_LOCALIZER` context `mountWithLocalizer` sets at a
+    Fabricate root; a tree mounted without it draws `PICKER_COPY`'s English fallbacks.
 -->
 <script>
   import { getContext, tick, untrack } from 'svelte';
