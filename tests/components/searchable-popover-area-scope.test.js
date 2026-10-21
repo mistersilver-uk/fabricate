@@ -323,10 +323,10 @@ const PRIMITIVES = Object.freeze([
     anchors: Object.freeze(['fabricate-filter-bar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
-    // Measured at this commit: 1 written, 3 family selectors (the box, the host inset and the
-    // components route's button size), 1 owned.
+    // Measured at this commit: 1 written, 4 family selectors (the box, the host inset, its top-inset case
+    // and the components route's button size), 1 owned.
     writtenFloor: 1,
-    familyFloor: 3,
+    familyFloor: 4,
     ownedFloor: 1,
     mirrored: Object.freeze([]),
   }),

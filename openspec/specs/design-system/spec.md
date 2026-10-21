@@ -2485,7 +2485,7 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
-The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a set of controls mixed into it.
+The selection bar is a BAND OF ITS OWN directly beneath the filter row, inside the filter bar's box, never a set of controls mixed into it.
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
@@ -2564,7 +2564,7 @@ The filter bar is a bordered box — 1px `--fab-border`, radius 9, `--fab-bg-1`,
 The stylesheet insets the box in the manager's main pane, a gathering panel and the scoped list column; the top inset applies only where the bar opens its host or follows the recipe notice slot.
 A host that already pads its content, such as the Tools content column (its own `--fab-space-5`, 20px), the interactables column and the Vocabulary card, adds no inset of its own.
 Its API is the slot API (`children`, `ariaLabel`, `class` and the rest spread); the library sketch's data props are declined (issue 2546, M3).
-The search field inside the bar is the 38px field and a select takes the `toolbar` rung at 34px unless its bar lifts it (the Component Rules filters take the 38px `form` rung).
+The search field inside the bar is the 38px field and a select takes the `toolbar` rung at 34px unless the caller lifts it to the `form` rung (the Component Rules filters do).
 
 #### Scenario: A browse bar sits in the manager's main pane
 
