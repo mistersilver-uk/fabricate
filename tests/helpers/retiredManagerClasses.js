@@ -151,8 +151,7 @@ export const HISTORICAL_LINES = Object.freeze([
     file: 'scripts/README.md',
     includes: '`.manager-environment-row .manager-icon-button .nth(3)`',
     tokens: 1,
-    why:
-      'a smoke selector from the historical hit list of dropped selectors',
+    why: 'a smoke selector from the historical hit list of dropped selectors',
   },
   {
     file: 'scripts/lib/designSystemPrimitives.json',
