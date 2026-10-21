@@ -211,7 +211,7 @@ CI MUST run full required gates on `opened`, `synchronize`, and `reopened` regar
 - **AND** it waits for every required GitHub Actions and external check on that exact remote head
 - **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
 - **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
-- **AND** it reuses a complete full attempt for that exact head regardless of the PR's draft state when the attempt started, or waits for the normal source-event run when no complete attempt exists
+- **AND** it reuses an authoritative check attempt for that exact head regardless of the PR's draft state when the attempt started, or waits for the normal source-event run when no authoritative check attempt exists
 - **AND** it requires every full gate from one authoritative attempt rather than combining successful jobs across duplicates
 - **AND** metadata-only `edited` attempts cannot cancel or satisfy the authoritative code-gate attempt
 - **AND** cancelled or skipped duplicate attempts neither supply missing gates nor invalidate a separately complete authoritative attempt
