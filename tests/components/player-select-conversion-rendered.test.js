@@ -196,8 +196,7 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
 });
 
 /**
- * The two floored sites, and what each one is floored against. The book's page size left this
- * list when it became `Pagination`'s own control, floored by that primitive's hook rule.
+ * The two floored sites, and what each one is floored against.
  */
 const FLOORED_SITES = Object.freeze([
   {
@@ -353,7 +352,7 @@ describe('a converted trigger stops resizing with its value where a floor says s
 });
 
 /**
- * The four converted subjects this fixture can mount, and the row each one's panel is sized for.
+ * The three converted subjects this fixture can mount, and the row each one's panel is sized for.
  */
 const PANEL_SITES = Object.freeze([
   {
@@ -377,7 +376,6 @@ const PANEL_SITES = Object.freeze([
     widest: 'Alchemists Supplies v1.6 — Salvageable, Tool',
     banded: true,
   },
-  { subject: 'book', name: 'the book page size', value: '', widest: '12', banded: false },
 ]);
 
 /**

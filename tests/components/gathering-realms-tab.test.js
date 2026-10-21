@@ -8,6 +8,7 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createSvelteCompiler,
   installComponentTestGlobals,
@@ -80,7 +81,9 @@ describe('GatheringRealmsTab mounted behavior', () => {
     writeRawModule('src/ui/svelte/util/disclosurePhrase.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    for (const paginationModule of PAGINATION_COMPILED_MODULES) {
+      writeCompiledSvelte(paginationModule);
+    }
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);
@@ -175,6 +178,14 @@ describe('GatheringRealmsTab mounted behavior', () => {
     const scroller = panel.querySelector(':scope > .manager-table-scroll');
     assert.ok(pager.parentElement === panel, 'the pager is a direct child of the panel');
     assert.ok(Boolean(scroller) && scroller.nextElementSibling === pager, 'the pager follows the scroller');
+    remount();
+  });
+
+  it('offers no page-size control, because the realms list has one page size', async () => {
+    await mountTab({ realms: makeRealms(7) });
+    const pager = target.querySelector('.fabricate-pagination');
+    assert.ok(!pager.querySelector('[data-pagination-size]'), 'no radiogroup');
+    assert.ok(!pager.querySelector('.manager-pagination-size'), 'and no caption beside it');
     remount();
   });
 

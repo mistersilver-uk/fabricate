@@ -5,10 +5,12 @@ import { resolve } from 'node:path';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 // Issue 1504: a converted control is a shared `<Select>`.
+import { choosePageSize } from '../helpers/page-size-control.js';
 import { chooseSelectOption, openSelectPanel } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   STATUS_TONE_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -62,7 +64,7 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
+  ...PAGINATION_COMPILED_MODULES,
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
   // (`...FRAME_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -1323,7 +1325,7 @@ describe('a PAGE change disarms too, which the other four cases do not reach', (
     assert.equal(armed(root), false, 'a page change left the control armed');
 
     await arm();
-    chooseSelectOption(root, '[data-pagination-size]', '50');
+    choosePageSize(root, '', '50');
     await catalogueHarness.setProps({});
     assert.equal(armed(root), false, 'a page-size change left the control armed');
   });

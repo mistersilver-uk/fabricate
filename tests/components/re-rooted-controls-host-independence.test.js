@@ -647,9 +647,6 @@ const COMPARED = Object.freeze([
   'font-size',
 ]);
 
-/** `box-sizing` is compared on the two BUTTON families and not on the pager. */
-const COMPARED_PAGINATION = Object.freeze(COMPARED.filter((property) => property !== 'box-sizing'));
-
 /** What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`. */
 const FIELD_COMPARED = Object.freeze([
   'appearance',
@@ -1306,7 +1303,7 @@ const PILL_SELECT_REMOVE_COMPARED = Object.freeze([
 const PILL_SELECT_ANY_COMPARED = Object.freeze(['min-height', 'display', 'align-items']);
 
 const COMPARED_BY_CONTROL = Object.freeze({
-  pagination: COMPARED_PAGINATION,
+  pagination: COMPARED,
   field: FIELD_COMPARED,
   search: SEARCH_COMPARED,
   toolbar: TOOLBAR_COMPARED,
@@ -1539,60 +1536,14 @@ test('each re-rooted control computes the same geometry and type in all three ho
   }
 });
 
-test('the pager’s box-sizing keyword differs by host, and nothing in the sheet lets that render', async () => {
-  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away.
+test('the pager root states its own border-box in every host', async () => {
   const measured = await measure(sheet);
-  const declaresNone =
-    'the pager root declares no `box-sizing` of its own and takes it from host chrome; in this ' +
-    'core-less harness that means `content-box` outside the manager, and a change here means ' +
-    'the family has started declaring one';
-  assert.equal(measured.pagination.bare['box-sizing'], 'content-box', declaresNone);
-  assert.equal(measured.pagination.app['box-sizing'], 'content-box', declaresNone);
-  assert.equal(
-    measured.pagination.manager['box-sizing'],
-    'border-box',
-    'the manager area`s universal rule must still be what supplies the pager root its border-box'
-  );
-
-  const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  try {
-    await tab.setContent(document_(sheet));
-    const sized = await tab.evaluate(() => {
-      const node = globalThis.document.querySelector('[data-probe="bare-pagination"]');
-      const out = [];
-      const walk = (rules) => {
-        for (const rule of rules) {
-          if (rule.cssRules) walk(rule.cssRules);
-          if (!rule.selectorText) continue;
-          // A sheet this size holds selectors this engine can parse but `matches` rejects.
-          const matches = (() => {
-            try {
-              return node.matches(rule.selectorText);
-            } catch {
-              return false;
-            }
-          })();
-          if (!matches) continue;
-          if (/(?:^|;\s*)(?:width|height)\s*:/.test(rule.style.cssText)) {
-            out.push(`${rule.selectorText} :: ${rule.style.cssText}`);
-          }
-        }
-      };
-      walk(globalThis.document.querySelector('#module-sheet').sheet.cssRules);
-      return out;
-    });
-    assert.deepEqual(
-      sized,
-      [],
-      'a rule now gives the pager root an explicit width or height outside the manager, which is ' +
-        'the condition that turns its host-supplied `box-sizing` into a different rendered box. ' +
-        'That is invisible in Foundry, where core`s `@layer reset` universal rule gives every ' +
-        'host `border-box`, and visible in any host without it — including this harness. Give ' +
-        '`.fabricate-pagination.fabricate-pagination` its own `box-sizing: border-box` and add the ' +
-        'property back to `COMPARED_PAGINATION`.'
+  for (const host of ['bare', 'app', 'manager']) {
+    assert.equal(
+      measured.pagination[host]['box-sizing'],
+      'border-box',
+      `the pager root takes border-box from its own rule, not from the ${host} host's chrome`
     );
-  } finally {
-    await tab.close();
   }
 });
 

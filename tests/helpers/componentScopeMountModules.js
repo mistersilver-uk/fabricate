@@ -1,6 +1,7 @@
 /** The dependency manifest the mounted WORLD COMPONENT suites compile against (issue 1371). */
 
 import {
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from './svelte-component-harness.js';
@@ -85,7 +86,7 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
+  ...PAGINATION_COMPILED_MODULES,
   // `Select`, `Field` and `SearchablePopover` are already in this list via the
   // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
   'src/ui/svelte/components/SelectionCheckbox.svelte',

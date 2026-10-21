@@ -9,6 +9,7 @@ import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
@@ -17,8 +18,6 @@ import { chipToneOf } from '../helpers/chipTone.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 import {
   chooseSelectOption,
-  openSelectPanel,
-  selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
@@ -32,6 +31,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { choosePageSize, pageSizeValue, pageSizeValues } from '../helpers/page-size-control.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
@@ -72,7 +72,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
@@ -3068,7 +3068,7 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.deepEqual(picks, [SYS_B], 'the drop-down drives the store selection');
   });
 
-  it('pages a book’s recipes through one shared pager whose page-size list is unticked', async () => {
+  it('pages a book’s recipes through one shared pager whose page-size control is segmented', async () => {
     const { services } = makeServices(makeBookItem());
     const target = await harness.mount({ services });
     await settle();
@@ -3080,35 +3080,31 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
       !target.querySelector('.inventory-detail-recipe-pagesize, [data-inventory-pager="recipes"]'),
       'no hand-rolled page-size row beside a second pager'
     );
-    const hook = '[data-inventory-recipe-pager] [data-pagination-size]';
-    const trigger = target.querySelector(hook);
+    const scope = '[data-inventory-recipe-pager]';
+    const group = target.querySelector(`${scope} [data-pagination-size]`);
     const caption = pager.querySelector(':scope .manager-pagination-size span[id]');
-    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'named by its caption');
-
-    const panel = openSelectPanel(target, hook);
-    assert.ok(
-      !panel.classList.contains('fabricate-select-popover-ticked'),
-      'the page-size list drops the tick column'
-    );
+    assert.equal(group.getAttribute('aria-labelledby'), caption.id, 'named by its caption');
+    assert.equal(group.getAttribute('role'), 'radiogroup');
     assert.deepEqual(
-      selectOptionLabels(target, hook),
+      pageSizeValues(target, scope),
       ['6', '9', '12'],
-      'the three published page sizes, rendered as their own digits'
+      'the three published page sizes, as three segments'
     );
+    assert.equal(pageSizeValue(target, scope), '6', 'the first is checked');
     assert.equal(
       target.querySelectorAll('[data-inventory-learn-recipe]').length,
       6,
       'the first page holds six of the seven recipes'
     );
 
-    chooseSelectOption(target, hook, 12);
+    choosePageSize(target, scope, 12);
     await settle();
     assert.equal(
       target.querySelectorAll('[data-inventory-learn-recipe]').length,
       7,
       'choosing 12 fits the whole book on one page'
     );
-    assert.equal(selectTriggerText(target, hook), '12', 'and the trigger states the chosen value');
+    assert.equal(pageSizeValue(target, scope), '12', 'and the segment states the chosen value');
     assert.ok(
       Boolean(target.querySelector(':scope [data-inventory-recipe-pager] [data-pagination-prev]')),
       'the pager stays drawn on one page, so a smaller size can be chosen again'

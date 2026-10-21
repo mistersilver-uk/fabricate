@@ -8,10 +8,12 @@ import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js'
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   OUTCOME_LADDER_RAW_MODULES,
@@ -72,7 +74,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/SearchField.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     component('Button'),
     component('RunActionBar'),
@@ -410,6 +412,25 @@ describe('JournalView mounted behavior', () => {
     assert.match(outcomes[2].getAttribute('aria-label'), /progress/i);
   });
 
+  it('gives each list its own page-size radio group, checked at the list\'s current size', async () => {
+    const run = makeGatheringRun();
+    const { store } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 9,
+      historyPageItems: [makeSucceededRun()], historyCount: 9,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const radios = (list) => [
+      ...target.querySelectorAll(`[data-journal-list="${list}"] [data-pagination-size] input[type="radio"]`),
+    ];
+    const active = radios('active');
+    const finished = radios('finished');
+    assert.ok(active.length > 1 && finished.length > 1, 'each list offers its sizes');
+    assert.notEqual(active[0].name, finished[0].name, 'two pagers never share a radio group');
+    assert.equal(active.filter((radio) => radio.checked).length, 1, 'one size is checked');
+    assert.equal(finished.filter((radio) => radio.checked).length, 1, 'one size is checked');
+  });
+
   it('operates search, kind, status, and both independent sort controls', async () => {
     const run = makeGatheringRun();
     const finished = makeSucceededRun();
@@ -429,8 +450,8 @@ describe('JournalView mounted behavior', () => {
     chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
     target.querySelector('[data-journal-list="active"] [data-pagination-next]').click();
     target.querySelector('[data-journal-list="finished"] [data-pagination-next]').click();
-    chooseSelectOption(target, '[data-journal-list="active"] [data-pagination-size]', 6);
-    chooseSelectOption(target, '[data-journal-list="finished"] [data-pagination-size]', 6);
+    choosePageSize(target, '[data-journal-list="active"]', 6);
+    choosePageSize(target, '[data-journal-list="finished"]', 6);
 
     assert.deepEqual(calls.search, ['herb']);
     assert.deepEqual(calls.kind, ['gathering']);

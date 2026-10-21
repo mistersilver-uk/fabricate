@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   RESULT_ROW_COMPILED_MODULES,
@@ -27,6 +28,7 @@ import {
   GATHERING_TASK_EDITOR_COMPILED_MODULES,
   GATHERING_TASK_EDITOR_RAW_MODULES,
 } from '../helpers/gatheringTaskEditorModules.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
@@ -106,7 +108,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -1426,7 +1428,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
 
   it('ranks a drop by its place in the whole list, on a later page and through a search', async () => {
     const view = await twelveRanked();
-    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    choosePageSize(view.root, '.manager-task-drops-card', 10);
     await view.sync();
     assert.equal(ranks(view.root).length, 10, 'ten rows a page');
     await view.press('.manager-task-drops-card [data-pagination-next]');
@@ -1481,7 +1483,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
     const view = await twelveRanked();
     await view.press('.manager-task-drops-card [data-pagination-next]');
     assert.deepEqual(ranks(view.root), ['#6', '#7', '#8', '#9', '#10']);
-    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    choosePageSize(view.root, '.manager-task-drops-card', 10);
     await view.sync();
     assert.deepEqual(ranks(view.root).slice(0, 2), ['#1', '#2']);
     assert.equal(ranks(view.root).length, 10);

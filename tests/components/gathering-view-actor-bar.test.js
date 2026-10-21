@@ -15,6 +15,7 @@ import {
   GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -158,7 +159,11 @@ describe('GatheringView ↔ actor bar wiring', () => {
     }
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    for (const paginationModule of PAGINATION_COMPILED_MODULES) {
+
+      writeCompiledSvelte(paginationModule);
+
+    }
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
     // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.

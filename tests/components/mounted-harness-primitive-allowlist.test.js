@@ -417,7 +417,7 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
   );
 });
 
-const [SELECT, PAGINATION] = ['Select', 'Pagination'].map((name) =>
+const [SELECT, SELECT_HOST] = ['Select', 'BulkEditSelect'].map((name) =>
   SHARED_PRIMITIVES.find((path) => path.endsWith(`/${name}.svelte`))
 );
 const SYNTHETIC_SUITE = 'tests/components/synthetic-roster.test.js';
@@ -428,11 +428,11 @@ test('a roster passed by name or shorthand is read as a spread, and a call on it
   const gapsOf = (...lines) => gapsIn(SYNTHETIC_SUITE, syntheticSuite(...lines));
   const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it`;
 
-  const byName = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE });');
+  const byName = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE });');
   assert.ok(byName.gaps.includes(selectGap), 'a roster passed by name is read');
-  const shorthand = gapsOf(`const @KEY = ['${PAGINATION}'];`, 'h({ @KEY });');
+  const shorthand = gapsOf(`const @KEY = ['${SELECT_HOST}'];`, 'h({ @KEY });');
   assert.ok(shorthand.gaps.includes(selectGap), 'a roster passed by shorthand is read');
-  const call = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
+  const call = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
   assert.deepEqual(call.named, [], 'a call on a roster stays unread, as the harness test needs');
 });
 

@@ -3,7 +3,6 @@ import { mount } from 'svelte';
 
 import en from '../../../lang/en.json';
 
-import InventoryBookDetail from '../../../src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte';
 import InventoryFilters from '../../../src/ui/svelte/apps/inventory/InventoryFilters.svelte';
 import InventorySystemSelector from '../../../src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte';
 import JournalListShell from '../../../src/ui/svelte/apps/journal/JournalListShell.svelte';
@@ -22,29 +21,6 @@ const mountPoint = document.createElement('div');
 mountPoint.className = 'fixture-mount fixture-column';
 frame.append(mountPoint);
 document.body.append(frame);
-
-/** A book teaching more than one page of recipes, so the page-size control clears its guard. */
-function bookItem() {
-  return {
-    key: 'sys:book',
-    componentId: 'book',
-    systemId: 'sys',
-    name: 'Tome of Distillation',
-    img: null,
-    learnable: true,
-    isRecipeItem: true,
-    totalQuantity: 1,
-    recipes: Array.from({ length: 9 }, (unused, index) => ({
-      id: `br${index}`,
-      name: `Book Recipe ${index}`,
-      img: null,
-      description: '',
-      learned: false,
-    })),
-    requirements: [],
-    sources: [],
-  };
-}
 
 /** The two participations the multi-system selector is drawn for. */
 const PARTICIPATIONS = [
@@ -102,11 +78,6 @@ const SUBJECTS = {
         isEmpty: true,
         emptyText: 'No active runs.',
       },
-    }),
-  book: () =>
-    mount(InventoryBookDetail, {
-      target: mountPoint,
-      props: { item: bookItem() },
     }),
   system: () =>
     mount(InventorySystemSelector, {

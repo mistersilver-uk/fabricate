@@ -8,7 +8,7 @@ import { createRawSnippet } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, PAGINATION_COMPILED_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -63,8 +63,8 @@ const outcomeHarness = createHarness(
   ['Medallion', 'Chip', 'Kicker'].map(component),
   OUTCOME_LADDER_RAW_MODULES
 );
-const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], [
-  ...SEARCHABLE_POPOVER_RAW_MODULES,
+const pagerHarness = createHarness('Pagination', PAGINATION_COMPILED_MODULES, [
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
 ]);
 const harnesses = [

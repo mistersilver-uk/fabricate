@@ -46,7 +46,7 @@ async function journalBoxes(width, height, query = '') {
           pager: box(pager),
           pagerRule: getComputedStyle(pager).borderTopWidth,
           summary: box(pager.querySelector('[data-pagination-summary]')),
-          lastControl: box([...pager.querySelectorAll('button')].at(-1)),
+          lastControl: box([...pager.querySelectorAll('button, [data-pagination-size]')].at(-1)),
           body: box(body),
           rows: [...body.querySelectorAll('[role="listitem"]')].map(box),
         };
