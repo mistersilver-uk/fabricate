@@ -73,13 +73,14 @@
   const CHOOSERS = [
     {
       value: 'playerChooses',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.PlayerChooses',
-      fallback: 'Player chooses',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.PlayerChooses',
+        'Player chooses'
+      ),
     },
     {
       value: 'rolled',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.Rolled',
-      fallback: 'Rolled',
+      label: localizeOr('FABRICATE.Admin.Manager.Recipe.ChoiceGroup.Rolled', 'Rolled'),
     },
   ];
 
