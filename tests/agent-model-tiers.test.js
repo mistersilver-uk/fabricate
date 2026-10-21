@@ -346,6 +346,12 @@ test('8. HIGH_RISK_PATHS matching is root-anchored, never a basename match', () 
   assert.equal(matchesHighRiskPath('scripts/ui-pr-screenshot-evidence.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/forward-port-provenance.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/foundry-smoke/scenarios/d0-recipes.mjs'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/releaseZipChunks.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/publishGuard.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/releaseTags.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/forwardPortProvenance.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/screenshotEvidenceMatching.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/foundrySmokeSignal.js'), true);
   assert.equal(matchesHighRiskPath('scripts/lib/designSystemPrimitives.json'), false);
   assert.equal(matchesHighRiskPath('scripts/lib/view-lab-cases/managerRecipeEditor.js'), false);
   assert.equal(matchesHighRiskPath('.claude/agents/fabricate-implementer-small.md'), true);

@@ -166,6 +166,13 @@ scripts/lib/agentBindingRender.js
 scripts/lib/agentBindingRoles.js
 scripts/lib/agentBindingRoles.json
 scripts/lib/agentModelTiers.js
+scripts/lib/forwardPortProvenance.js
+scripts/lib/foundrySmokeSignal.js
+scripts/lib/publishGuard.js
+scripts/lib/releaseTags.js
+scripts/lib/releaseZipChunks.js
+scripts/lib/screenshotEvidenceMatching.js
+scripts/lib/zip.js
 scripts/release-s3.js
 scripts/release.js
 scripts/validate-agent-bindings.mjs
@@ -203,7 +210,7 @@ Lane surface: new-module | new-export | public-api | persisted-shape | none
 ```
 
 Rule 2 then reads as a lookup, not a reading of prose.
-At post-implementation stages the field is ignored and rule 2 is derived from the artifact instead, per the keyed-input table above.
+At post-implementation stages the field is read only for `public-api` and `persisted-shape` on the planned tasks the reviewer's keyed paths intersect; otherwise rule 2 is derived from the artifact, per the keyed-input table above.
 
 **Worked examples.**
 

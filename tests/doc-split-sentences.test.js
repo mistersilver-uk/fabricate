@@ -86,6 +86,108 @@ const RENAMED_ROWS = [
 const RENAMED_ROWS_COUNT = 3;
 
 /**
+ * Table rows and fenced lines a deliberate policy change replaced (issue #2583). Like
+ * SUPERSEDED_POLICY, each pins its frozen source and the replacement lines, so a row lost by
+ * accident cannot hide here.
+ */
+const SUPERSEDED_ROWS = [
+  {
+    issue: '#2583',
+    before:
+      '2 | The lane\'s rule 2 source is anything other than `none` | `large`',
+    after:
+      '2 | The lane\'s rule 2 source is `persisted-shape` or `public-api` | `large`',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      '3 | The keyed path set holds 3 or more paths | `large`',
+    after:
+      '3 | The size metric exceeds `MEDIUM_MAX` | `large`',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      '4 | The size metric exceeds `MEDIUM_MAX` | `large`',
+    after:
+      '4 | The lane\'s rule 2 source is `new-module` or `new-export` | `medium`',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      '5 | The keyed path set holds exactly 1 path and the size metric is at or below `SMALL_MAX` | `small`',
+    after:
+      '5 | Exactly one keyed path, a size at or below `SMALL_MAX`, and rule 2 source `none` | `small`',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      '6 | Otherwise, including whenever any input above is unavailable | `medium`',
+    after:
+      '6 | Otherwise, including when inputs are unavailable | `medium`',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'plan-review | 3 delta tasks | 8 delta tasks',
+    after:
+      'plan-review | 3 delta tasks | 12 delta tasks',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'implementation | 1 owned delta task | 4 owned delta tasks',
+    after:
+      'implementation | 1 owned delta task | 8 owned delta tasks',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'post-implementation, docs | 50 added + deleted lines | 400 added + deleted lines',
+    after:
+      'post-implementation, docs | 50 added + deleted lines | 1400 added + deleted lines',
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'post-implementation review, docs loop | `git diff --name-only` against the assigned base, on the driver-generated immutable artifact, intersected with the spawning path-signal row\'s globs | added + deleted lines from `git diff --numstat` | the artifact: an added `export` line',
+    after:
+      'post-implementation review, docs loop | `git diff --name-only` against the assigned base, on the driver-generated immutable artifact, intersected with the spawning path-signal row\'s globs | added + deleted lines from `git diff --numstat` | `public-api` / `persisted-shape` from affected planned tasks, else the artifact\'s added `export` line (`new-export`), else `none`',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Lane surface: new-module | new-export | persisted-shape | none',
+    after:
+      'Lane surface: new-module | new-export | public-api | persisted-shape | none',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'scripts/**',
+    after: [
+      'scripts/forward-port-complete-merge.sh',
+      'scripts/release.js',
+      'scripts/lib/agentModelTiers.js',
+    ],
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+];
+
+/** Pinned exactly: every entry excuses one historical table row or fenced line. */
+const SUPERSEDED_ROWS_COUNT = 11;
+
+/**
  * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
  * nothing has moved yet.
  */
@@ -158,9 +260,9 @@ const DECOUNTED_COUNT = 4;
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
  * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
- * #2118, #2119). `after` lists every sentence a split replacement became.
+ * #2118, #2119, #2583). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287', '#2414']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287', '#2414', '#2583']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -694,10 +796,118 @@ const SUPERSEDED_POLICY = [
     ],
     survivesIn: 'CONTRIBUTING.md',
   },
+  {
+    issue: '#2583',
+    before:
+      '**Rule 2\'s input is authored at plan time, not judged at spawn time.**',
+    after:
+      '**Rule 2\'s implementation input is authored at plan time, not judged at spawn time.**',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'A revision carrying an unresolved finding forward is floored one model tier above the previous revision\'s executed model tier.',
+    after: [
+      'An unresolved finding floors one model tier above the previous executed model tier **only** when the driver records `redesignRequired: true` after identifying a misunderstood invariant or architectural reassessment.',
+      'An ordinary, bounded fix for a reviewer finding retains the previously executed model tier, without suppressing `ESCALATE_TIER`.',
+    ],
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Rule 2\'s review-stage source is the added-`export` line **only**, deliberately excluding added files.',
+    after: [
+      'For post-implementation and docs reviewers, first intersect the reviewer\'s keyed path set with planned task paths in the issue delta.',
+      'If a matching task has a `public-api` or `persisted-shape` surface, use that source and preserve the `large` floor; otherwise use `new-export` when an added `export` line is present, or `none`.',
+    ],
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'An added file is what makes the tests row fire in the first place, so keying on it would resolve `fabricate_quality_engineer` to `large` on every change that adds a test — the same always-`large` failure that row intersection fixes.',
+    after:
+      'Do not infer risk from added files alone: that would turn the quality-engineer tests row into an automatic large-model assignment whenever a test is added.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'At post-implementation stages the field is ignored and rule 2 is derived from the artifact instead, per the keyed-input table above.',
+    after:
+      'At post-implementation stages the field is read only for `public-api` and `persisted-shape` on the planned tasks the reviewer\'s keyed paths intersect; otherwise rule 2 is derived from the artifact, per the keyed-input table above.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).',
+    after:
+      'Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | public-api | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Excluding added files also removes any dependence on ambient `diff.renames` configuration, which decides whether a rename reports as `R` or as `A` plus `D`.',
+    after:
+      'Ignoring added-file status also avoids dependence on ambient `diff.renames` configuration.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Rule 2: `large`.',
+    after:
+      'Rule 4: `medium` (rather than `small`).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Rule 6 is the default, and it defaults **up** to `medium`, never down to `small`.',
+    after:
+      'Rule 6 defaults **up** to `medium` for unclassified work; the number of changed paths alone never forces `large`.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'Rules 1 to 4 all yield `large`, so their overlap is harmless under first-match-wins; rules 5 and 6 are disjoint and rule 6 is total, so the ladder always returns exactly one model tier.',
+    after:
+      'Rules 1–3 retain the explicit large-model gates for consequential changes and oversized work.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'The 2-path case resolving to `medium` is a deliberate, stated relaxation of "single-file": a module plus its co-located test is one concern, not two, and treating it as `large` would make `large` the common case and erase the saving model tiers exist to produce.',
+    after:
+      'A module, its tests, and required localization or canonical-spec edits can form one coherent medium work packet when the contract is defined, even when they span several files.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      'The agent-harness paths are on the list because a mistake there mis-routes every future change.',
+    after:
+      'Agent-harness and publishing paths remain on the list because mistakes there can mis-route subsequent changes or corrupt a release.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2583',
+    before:
+      '`small` requires a positive, narrow match on rule 5; nothing falls into `small` by omission.',
+    after:
+      'Rule 5 selects `small` only for a one-path, single-surface `none` change within the small limit.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 62;
+const SUPERSEDED_POLICY_COUNT = 75;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -1042,7 +1252,7 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
     );
     // A verified rename or superseded policy excuses its sentence here too; each is checked below.
     const excused = new Set(
-      [...RENAMED, ...SUPERSEDED_POLICY, ...RENAMED_ROWS].map(({ before: was }) => was)
+      [...RENAMED, ...SUPERSEDED_POLICY, ...RENAMED_ROWS, ...SUPERSEDED_ROWS].map(({ before: was }) => was)
     );
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
       ({ sentence }) => !excused.has(sentence)
@@ -1084,6 +1294,29 @@ test('every renamed table row has exactly one verified model identifier replacem
       before,
       `only the named model identifier may change: ${before}`
     );
+  }
+});
+
+test('every superseded table row names its frozen source and current replacement', () => {
+  assert.equal(
+    SUPERSEDED_ROWS.length,
+    SUPERSEDED_ROWS_COUNT,
+    'the superseded-row allowlist changed size; each entry excuses exactly one historical line'
+  );
+
+  const frozen = multiset(
+    structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, PRE_1936.fixture), 'utf8'))
+  );
+  const current = survivingLines(structuralLinesOf);
+  for (const { issue, before, after, survivesIn } of SUPERSEDED_ROWS) {
+    assert.ok(APPROVING_ISSUES.has(issue), `superseded row entry names ${issue}, not an approving issue`);
+    assert.equal(frozen.get(before), 1, `superseded row was not in the fixture: ${before}`);
+    assert.equal(current.get(before) ?? 0, 0, `superseded row still survives: ${before}`);
+    assert.ok(DESTINATIONS.includes(survivesIn), `${survivesIn} is not in DESTINATIONS`);
+    const lines = structuralLinesOf(readFileSync(path.join(REPOSITORY_ROOT, survivesIn), 'utf8'));
+    for (const line of [after].flat()) {
+      assert.ok(lines.includes(line), `replacement is absent from ${survivesIn}:\n  ${line}`);
+    }
   }
 });
 

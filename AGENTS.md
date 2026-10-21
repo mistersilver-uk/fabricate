@@ -68,7 +68,7 @@ The always-row reviewer still scores and reads the **entire integrated change**;
 
 | # | Condition | Model tier |
 |---|-----------|------------|
-| 1 | Any keyed path matches `HIGH_RISK_PATHS` | `large` |
+| 1 | Any path in the keyed path set matches `HIGH_RISK_PATHS` | `large` |
 | 2 | The lane's rule 2 source is `persisted-shape` or `public-api` | `large` |
 | 3 | The size metric exceeds `MEDIUM_MAX` | `large` |
 | 4 | The lane's rule 2 source is `new-module` or `new-export` | `medium` |
