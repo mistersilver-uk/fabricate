@@ -606,7 +606,7 @@ npm run lab:parity   # compare every unreplaced element with library.html opened
 
 ## Hero demo GIF (`scripts/demo-capture.mjs`)
 
-The README hero (`docs/img/fabricate-demo-v2.gif`) is captured from the View Lab's demo world (`world=demo`) and encoded locally.
+The README hero (`docs/img/fabricate-demo-v3.gif`) is captured from the View Lab's demo world (`world=demo`) and encoded locally.
 Capture needs the harvested chrome (`npm run viewlab:chrome:harvest`) and no Docker:
 
 ```sh
@@ -617,15 +617,16 @@ The driver writes `0001.png` onwards and a `manifest.json` carrying each frame's
 It refuses the repository root, an ancestor of it, and any directory holding files it did not write.
 A run stages its frames in a `.demo-capture-*` directory inside the output directory and removes it on exit.
 Every scene draws a 1200x750 window, and `--scale` sets the device pixel ratio (default 4/3), so a default frame is 1600x1000.
-The journey runs nine scenes in order: GM authoring in the recipe editor (an "any one of" grip and a Masterwork flourish the player picks, each check tier routed to a result set), the forge craft with the player's grip pick and a routed check, the flourish claimed in the journal, the crafting inventory, the theme cut, essences in the regular crafting view (one pool of earth and fire funded from ore, charcoal and slag), an alchemy experiment by a smith who knows no recipe and learns one, the GM Knowledge view, and salvage.
+The journey runs ten scenes in order: GM authoring in the recipe editor (an "any one of" grip and a Masterwork flourish the player picks, each check tier routed to a result set), the forge craft with the player's grip pick and a routed check, the flourish claimed in the journal, the crafting inventory, the theme cut, essences in the regular crafting view (one pool of earth and fire funded from ore, charcoal and slag), the still's reagents gathered at the tarn (a d100 task whose roll and find the Journal records), an alchemy experiment by a smith who knows no recipe and learns one, the GM Knowledge view, and salvage.
 Every beat holds long enough to read; a new beat needs a hold of about two seconds or more.
 Every scene draws in the default `fabricate` theme; only the theme cut changes palette, through all seven, naming each in the caption.
 If the forge roll no longer reaches Masterwork, or a brew no longer passes its check, after a product change, it fails and names `--seed` for re-tuning `DEMO_SEED`.
 Each beat carries a caption from the driver's `CAPTIONS` table, drawn into the page in Fabricate's own Spectral and JetBrains Mono faces and the active palette's tokens.
 The run fails if either face falls back.
+Pass `--only <scene,...>` (`editor, forge, choice, pack, palettes, essences, gathering, alchemy, knowledge, salvage`) to re-tune scenes that open their own page: `choice`, `pack` and `palettes` carry on the page `forge` leaves.
 Pass `--no-captions` for a caption-free set; `manifest.json` records which one it holds under `captions`.
 
-The GIF's filename carries a version suffix (`fabricate-demo-v2.gif`).
+The GIF's filename carries a version suffix (`fabricate-demo-v3.gif`).
 A change that merges a new cut bumps the suffix once, from the cut it replaces on `main`, and updates the README reference with it, so GitHub's image proxy never serves the previous cut from its cache.
 Recaptures while the change is still open keep the suffix.
 
@@ -640,7 +641,7 @@ from pathlib import Path
 from PIL import Image
 
 src = Path("tmp/demo-frames")
-out = Path("docs/img/fabricate-demo-v2.gif")
+out = Path("docs/img/fabricate-demo-v3.gif")
 manifest = json.loads((src / "manifest.json").read_text())
 rgb = [Image.open(src / f["file"]).convert("RGB") for f in manifest["frames"]]
 palettes = {}

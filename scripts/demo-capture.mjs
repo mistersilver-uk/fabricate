@@ -4,6 +4,7 @@
  * and write numbered PNG frames plus a `manifest.json` of per-frame durations for encoding.
  *
  *   node scripts/demo-capture.mjs [output-dir] [--seed <n>] [--scale <factor>] [--no-captions]
+ *                                 [--only <scene,...>]
  *
  * The output defaults to `tmp/demo-frames/` (gitignored); only its `NNNN.png` frames and
  * `manifest.json` are ever replaced. The lab server binds port 0, so a lab already serving 5273 in
@@ -82,6 +83,11 @@ const CAPTIONS = Object.freeze({
     position: 'top',
   },
   knowledge: { kicker: 'Recipe knowledge', text: 'Track who knows what.', position: 'top' },
+  gathering: {
+    kicker: 'Gathering',
+    text: 'Gather what your crafting needs.',
+    position: 'top',
+  },
   alchemy: {
     kicker: 'Alchemy',
     text: 'Experiment to discover recipes.',
@@ -104,6 +110,7 @@ function parseArgs(argv) {
     seed: DEMO_SEED,
     scale: DEFAULT_SCALE,
     captions: true,
+    only: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -116,6 +123,10 @@ function parseArgs(argv) {
         options.scale = Number(argv[(index += 1)]);
         break;
       }
+      case '--only': {
+        options.only = argv[(index += 1)]?.split(',') ?? [];
+        break;
+      }
       case '--no-captions': {
         options.captions = false;
         break;
@@ -125,6 +136,10 @@ function parseArgs(argv) {
         options.output = resolve(arg);
       }
     }
+  }
+  const unknown = (options.only ?? []).filter((id) => SCENES.every(([sceneId]) => sceneId !== id));
+  if (unknown.length > 0) {
+    throw new Error(`--only names no scene: ${unknown.join(', ')} (${sceneIds()})`);
   }
   if (!Number.isInteger(options.seed)) throw new Error('--seed needs an integer');
   if (!(options.scale > 0 && options.scale <= 2)) {
@@ -545,6 +560,30 @@ async function knowledgeScene(take, open) {
   await take.hold(4000, 'knowledge: what Maren has learned');
 }
 
+/** (g1): the still's reagents, gathered at the tarn on a d100 drop table. */
+async function gatheringScene(take, open) {
+  await open({ app: PLAYER, query: { tab: 'gathering' } });
+  take.captionFor('gathering');
+  await take.hold(3200, 'gathering: the tarn and its two tasks');
+  await take.click('[data-task-id="demo-task-fern"]');
+  await take.hold(3200, 'gathering: what Cut Bitterfern might find');
+  await take.click('[data-gathering-attempt]');
+  await take.hold(2000, 'gathering: the roll');
+  await take.click(`${PROMPT} button[type="submit"]`);
+  await take.click('[data-player-nav-tab="journal"]');
+  await take.expect(
+    '.fabricate-app >> text=Succeeded',
+    'the gather did not succeed; re-tune the journey with --seed (see DEMO_SEED)'
+  );
+  await take.hold(4200, 'gathering: where the roll landed, and what was found');
+  await take.click('[data-player-nav-tab="inventory"]');
+  await take.fill('[data-inventory-search]', 'Bitterfern');
+  await take.click(
+    `.inventory-card[data-inventory-card="${STILL}:hm-bitterfern"] .inventory-card-button`
+  );
+  await take.hold(3000, 'gathering: the find is in the pack');
+}
+
 /** (h): a smith who knows no recipe puts an untried mix on the bench, and learns one from it. */
 async function alchemyScene(take, open) {
   await open({ app: PLAYER, query: { tab: 'alchemy' } });
@@ -584,6 +623,24 @@ async function salvageScene(take, open) {
   await take.hold(4000, 'salvage: steel and leather back in the pack');
 }
 
+/**
+ * The journey in order. A scene that carries on the page its predecessor left (`choice`, `pack`,
+ * `palettes`) cannot run alone, so `--only` is for the scenes that open their own page.
+ */
+const SCENES = [
+  ['editor', editorScene],
+  ['forge', forgeScene],
+  ['choice', choiceScene],
+  ['pack', packScene],
+  ['palettes', paletteScene],
+  ['essences', essenceScene],
+  ['gathering', gatheringScene],
+  ['alchemy', alchemyScene],
+  ['knowledge', knowledgeScene],
+  ['salvage', salvageScene],
+];
+const sceneIds = () => SCENES.map(([id]) => id).join(', ');
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   assertSafeOutput(options.output, ROOT);
@@ -607,17 +664,8 @@ async function main() {
     server = await startLabServer(ROOT);
     browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
     const open = (scene) => take.open(browser, server.baseUrl, { seed: options.seed, ...scene });
-    for (const scene of [
-      editorScene,
-      forgeScene,
-      choiceScene,
-      packScene,
-      paletteScene,
-      essenceScene,
-      alchemyScene,
-      knowledgeScene,
-      salvageScene,
-    ]) {
+    for (const [id, scene] of SCENES) {
+      if (options.only && !options.only.includes(id)) continue;
       await scene(take, open);
     }
     const totalMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
