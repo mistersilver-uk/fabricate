@@ -128,7 +128,7 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 - **WHEN** the workflow driver will coordinate mutable work
 - **THEN** it verifies that the clean coordinator checkout is on a non-protected integration branch
-- **AND** it uses a separate clean coordinator worktree when the current checkout contains unrelated user-owned state, or records before/after branch, SHA, tracked, untracked, and relevant ignored state and proves that state was preserved
+- **AND** it uses a separate clean coordinator checkout when the current checkout contains unrelated user-owned state, or records before/after branch, SHA, tracked, untracked, and relevant ignored state and proves that state was preserved
 - **AND** every spawned mutable agent verifies its assigned worktree, lane branch, base SHA, and clean status before editing
 
 #### Scenario: finishing mutable work
@@ -183,7 +183,7 @@ Before asking a maintainer to test, the workflow driver MUST identify and prove 
 ### Requirement: Ready-for-review delivery gate
 
 Before maintainer handoff, the workflow driver MUST deliver a ready PR whose unchanged remote head contains current `origin/main`, has passed authoritative post-rebase validation and required implementation review, and has one successful full required GitHub and external check attempt for that exact head.
-A successful full required check attempt for the exact remote head MUST remain authoritative across draft-to-ready transitions.
+A successful authoritative check attempt for the exact remote head MUST remain authoritative across draft-to-ready transitions.
 CI MUST run full required gates on `opened`, `synchronize`, and `reopened` regardless of draft status, while metadata-only `edited` runs MUST use independent concurrency and MUST NOT supply missing code gates.
 
 #### Scenario: preparing the final remote head
@@ -400,6 +400,14 @@ Each model tier's provider model pins MUST be declared in exactly one place, and
 - **AND** an unavailable or otherwise unmatched input resolves to the middle model tier, so no spawn reaches the cheapest model tier by omission
 - **AND** it records the resolved model tier and the facts it was resolved from in the lane's assignment brief
 
+#### Scenario: sizing a cohesive work packet
+
+- **WHEN** a lane owns a bounded work packet — such as a component with its tests, localization and matching canonical spec — that touches no high-risk path
+- **THEN** the number of keyed paths alone never resolves the most capable model tier, and only the stage's size limit or the lane surface can raise it there
+- **AND** a lane surface of `persisted-shape` or `public-api` resolves the most capable model tier, while `new-module` or `new-export` resolves at least the middle model tier
+- **AND** at post-implementation review a planned `persisted-shape` or `public-api` surface on a task the reviewer's keyed paths intersect is carried forward rather than re-derived from the diff
+- **AND** the always-row reviewer still scores and reads the entire integrated change, however the implementation was split into packets
+
 #### Scenario: escalating from a model tier
 
 - **WHEN** an agent of a model-tiered family determines that its assignment exceeds its assigned model tier
@@ -412,7 +420,7 @@ Each model tier's provider model pins MUST be declared in exactly one place, and
 
 - **WHEN** the driver re-resolves a model tier for a later revision of the same family and stage
 - **THEN** the result is never below the highest model tier at which that lane actually executed in a previous revision, rather than the model tier it was originally resolved to
-- **AND** a revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier
+- **AND** a revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier only when the driver records that the finding needs a redesign, while an ordinary bounded fix keeps the previously executed model tier
 - **AND** a lane whose keyed path set includes `openspec/specs/**` is floored at the middle model tier
 - **AND** every floor only ever raises the base model tier and clamps at the most capable one
 
