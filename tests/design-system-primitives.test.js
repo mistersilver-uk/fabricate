@@ -838,7 +838,7 @@ test('(a) a Select change publishes its four frames, then the two specimens that
   const frames = [
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
-    'player-inventory-page-size',
+    'manager-component-edit-category-list',
     'interactables-manager-region-open',
     'manager-published-select-specimen',
     'manager-published-select-layer',
