@@ -422,7 +422,9 @@ sealed('a rejected crafting show does not escape openGrant as an unhandled rejec
   const shown = [];
   const warnings = [];
   const originalWarn = console.warn;
-  console.warn = (...args) => warnings.push(args);
+  console.warn = (...args) => {
+    warnings.push(args);
+  };
   try {
     const { deps } = collaborators({
       getAppClass: () => ({
