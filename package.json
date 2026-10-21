@@ -101,7 +101,7 @@
     "stylelint-no-unsupported-browser-features": "^8.1.1",
     "svelte": "^5.0.0",
     "svelte-eslint-parser": "^1.8.0",
-    "vite": "^8.0.16"
+    "vite": "^8.3.5"
   },
   "private": true,
   "keywords": [
