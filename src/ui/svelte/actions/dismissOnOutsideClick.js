@@ -1,6 +1,7 @@
 /**
  * Svelte action that calls a callback when a mousedown occurs outside the
- * bound node, or when Escape is pressed while the action is enabled.
+ * bound node, or when Escape is pressed while the action is enabled. Both are
+ * heard on the node's own document, and a node is told by `nodeType` (issue 2454).
  *
  * @param {HTMLElement} node
  * @param {{
@@ -18,12 +19,11 @@
  * }}
  */
 export function dismissOnOutsideClick(node, options = {}) {
-  const canListen = typeof document !== 'undefined' && document?.addEventListener;
-
   let enabled = options.enabled !== false;
   let onDismiss = options.onDismiss;
   let additionalNodes = options.additionalNodes;
-  let attached = false;
+  // The document the pair is bound to, so it is removed from that one.
+  let bound = null;
 
   function getAdditionalNodes() {
     const resolved = typeof additionalNodes === 'function' ? additionalNodes() : additionalNodes;
@@ -38,9 +38,10 @@ export function dismissOnOutsideClick(node, options = {}) {
   }
 
   function handleMouseDown(event) {
-    if (!(event.target instanceof Node)) return;
-    if (node.contains(event.target)) return;
-    if (getAdditionalNodes().some((extraNode) => extraNode instanceof Node && extraNode.contains(event.target))) return;
+    const { target } = event;
+    if (typeof target?.nodeType !== 'number') return;
+    if (node.contains(target)) return;
+    if (getAdditionalNodes().some((extraNode) => typeof extraNode?.nodeType === 'number' && extraNode.contains(target))) return;
     dismiss(event);
   }
 
@@ -51,17 +52,18 @@ export function dismissOnOutsideClick(node, options = {}) {
   }
 
   function attach() {
-    if (!canListen || attached) return;
-    document.addEventListener('mousedown', handleMouseDown, true);
-    document.addEventListener('keydown', handleKeyDown, true);
-    attached = true;
+    const doc = node?.ownerDocument;
+    if (bound || typeof doc?.addEventListener !== 'function') return;
+    doc.addEventListener('mousedown', handleMouseDown, true);
+    doc.addEventListener('keydown', handleKeyDown, true);
+    bound = doc;
   }
 
   function detach() {
-    if (!canListen || !attached) return;
-    document.removeEventListener('mousedown', handleMouseDown, true);
-    document.removeEventListener('keydown', handleKeyDown, true);
-    attached = false;
+    if (!bound) return;
+    bound.removeEventListener('mousedown', handleMouseDown, true);
+    bound.removeEventListener('keydown', handleKeyDown, true);
+    bound = null;
   }
 
   if (enabled) {

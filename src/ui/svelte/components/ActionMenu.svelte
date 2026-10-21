@@ -140,10 +140,10 @@
     event.stopPropagation();
   }
 
+  // The panel's own document holds focus, which in a Foundry 14 detached window is not Fabricate's.
   function activeItemIndex() {
     const focusable = focusableItems();
-    const active = typeof document === 'undefined' ? null : document.activeElement;
-    return focusable.indexOf(active);
+    return focusable.indexOf(panelRoot?.ownerDocument?.activeElement ?? null);
   }
 
   function onPanelKeydown(event) {

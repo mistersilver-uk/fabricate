@@ -28,6 +28,23 @@ export const PROBE_ENTRY = Object.freeze({
   root: 'any',
 });
 
+/** The test-only overlay probe's entry, which opens an overlay through the seam (issue 2454). */
+export const PROBE_OVERLAY_ENTRY = Object.freeze({
+  name: 'PublishedOverlayProbe',
+  path: 'tests/fixtures/published-components/PublishedOverlayProbe.svelte',
+  version: 1,
+  props: Object.freeze({
+    open: Object.freeze({ kind: 'data' }),
+    label: Object.freeze({ kind: 'data' }),
+    explode: Object.freeze({ kind: 'data' }),
+    cap: Object.freeze({ kind: 'data' }),
+    onChoose: Object.freeze({ kind: 'callback', args: 1 }),
+  }),
+  rest: false,
+  root: 'any',
+  overlays: true,
+});
+
 /** The probe with no key the host draws content for, so its host takes the no-content path. */
 export const PROBE_VALUE_ENTRY = Object.freeze({
   ...PROBE_ENTRY,

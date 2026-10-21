@@ -511,11 +511,14 @@ Spec reference: openspec/specs/ui-extension-points/spec.md
 ## Published UI Component
 
 A presentation primitive, not a record: Fabricate persists nothing for it.
-A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot }` handle.
+A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot, value }` handle.
 "Seam" names that mount function only; the target is the companion's element, and the component is Fabricate's primitive.
-The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, plus `restOn` where an entry's rest keys land on a control it draws, which `describe` omits and whose reserved names are fixed for the entry's `version`, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
-Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`; issue #2452 publishes callbacks, the first control and ARIA attributes on a control.
-A prop is plain data, a string of text, a content slot, a callback or an ARIA attribute Fabricate writes on a control; snippets, bindables and overlays wait for issue #2427.
+The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, plus `overlays: true` where an entry opens an overlay, plus `restOn` where an entry's rest keys land on a control it draws, which `describe` omits and whose reserved names are fixed for the entry's `version`, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
+Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`; issue #2452 publishes callbacks, the first control and ARIA attributes on a control; issue #2453 publishes bound values; issue #2454 publishes the overlay host.
+A prop is plain data, a string of text, a content slot, a callback, an ARIA attribute Fabricate writes on a control or a bound value; a snippet that takes arguments is never published, and the standalone style root waits for issue #2427.
+`describe` returns `{ version, props, rest, root, overlays }`, where `overlays` says whether the entry opens an overlay, and an entry states `overlays: true` in the manifest only where it does.
+The overlay host plumbing of issue #2454 is in place and every entry published so far has `overlays: false`, so none opens an overlay yet.
+An overlay host and the standalone layer are defined in the glossary, and the host is chosen each time an overlay opens.
 A content slot is a place inside a published component where the companion draws its own content, into an element Fabricate owns and returns from `handle.slot`.
 An entry's **required ancestor root** says which Fabricate ancestor its target needs.
 The published `Rail` is a section primitive, not the Manager rail.
@@ -526,7 +529,7 @@ The published `Stepper` is the design system's number field with its two step bu
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
-Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentCallbacks.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
+Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentCallbacks.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponentOverlays.js`; `src/ui/svelte/util/overlayHost.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 

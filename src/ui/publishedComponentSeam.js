@@ -3,13 +3,15 @@
  * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`,
  * draws its own content in a content slot, is told of a contained fault through `onFault` (issue
  * 2451), is told of a press through a callback prop, sets an ARIA attribute on a control through
- * an `aria` prop (issue 2452), and reads and sets a bound value through a `value` prop (issue 2453).
+ * an `aria` prop (issue 2452), reads and sets a bound value through a `value` prop (issue 2453), and
+ * hosts an entry's overlays through `overlayHost` (issue 2454).
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
- * `mount`, `unmount` and `flush`.
+ * `mount`, `unmount`, `flush` and the empty `overlay` component.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
+import { openOverlayChain, unmountReporting } from './publishedComponentOverlays.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
 import {
   changeKeyOf,
@@ -54,6 +56,7 @@ function describeEntry(entry) {
     props: Object.freeze(props),
     rest: entry.rest === true,
     root: entry.root,
+    overlays: entry.overlays === true,
   });
 }
 
@@ -143,7 +146,15 @@ function newRecord(entry, target, onFault) {
     onFault,
     slots: new Map(),
     callbacks: new Map(),
+    overlays: null,
   };
+}
+
+/** M18: an `overlayHost` other than `undefined` is an element of the target's document. */
+function assertOverlayHost(overlayHost, target, isElement) {
+  if (overlayHost === undefined) return;
+  if (isElement(overlayHost) && overlayHost.ownerDocument === target.ownerDocument) return;
+  throw refuse("overlayHost must be an element in the target's document");
 }
 
 /** Gives each `slot` key holding `true` its element, once; the element is kept while live. */
@@ -231,6 +242,20 @@ function handleFor(entry, record, end) {
   });
 }
 
+// An entry's overlay chain is registered before the runtime mounts it; defensive, because Svelte
+// 5.56 runs an action at the next flush, after `mount` returns.
+function openOverlays(entry, record, { overlayHost, runtime, report }) {
+  if (entry.overlays !== true) return;
+  const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
+  const { target } = record;
+  record.overlays = openOverlayChain({
+    target,
+    option: overlayHost,
+    runtime,
+    report: reportFailure,
+  });
+}
+
 /**
  * The claim and lifecycle of every mount on one seam: `runtime()` reads the registered runtime and
  * `report` receives each fault.
@@ -250,12 +275,7 @@ function createMountLifecycle({ runtime, report }) {
   // returned, so a Promise settled inside the call reports before the fault notice queued after it.
   function unmountQuietly(record) {
     const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
-    try {
-      const result = runtime().unmount(record.instance);
-      if (typeof result?.then === 'function') result.then(undefined, reportFailure);
-    } catch (error) {
-      reportFailure(error);
-    }
+    unmountReporting((instance) => runtime().unmount(instance), record.instance, reportFailure);
   }
 
   // A faulted mount leaves its target empty at once, however the runtime's unmount ended.
@@ -264,10 +284,12 @@ function createMountLifecycle({ runtime, report }) {
     record.target.replaceChildren?.();
   }
 
-  // A retired mount's nested mounts end first, and its slot elements leave after its own unmount.
+  // A retired mount's nested mounts end first; its slot elements and any overlay container still
+  // open leave after its own unmount.
   function close(record, unmount) {
     for (const nested of nestedIn(record, live)) end(nested);
     unmount(record);
+    record.overlays?.close();
     detachSlots(record);
     record.callbacks.clear();
   }
@@ -290,10 +312,11 @@ function createMountLifecycle({ runtime, report }) {
     queueFaultNotice(record, error, report, deferred);
   }
 
-  function start(entry, target, initial, onFault) {
+  function start(entry, target, initial, { onFault, overlayHost }) {
     const record = newRecord(entry, target, onFault);
     claims.set(target, record);
     live.add(record);
+    openOverlays(entry, record, { overlayHost, runtime, report });
     requestSlots(entry, record, initial);
     takeCallbacks(entry, record.callbacks, initial);
     const values = seedValues(entry, takeValues(entry, initial));
@@ -332,8 +355,8 @@ function createMountLifecycle({ runtime, report }) {
 
 /**
  * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`
- * among it, at once, binding each entry's own `component`; otherwise the adapter calls `register`,
- * once.
+ * and `overlay` among it, at once, binding each entry's own `component`; otherwise the adapter
+ * calls `register`, once.
  * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
@@ -342,6 +365,7 @@ export function createPublishedComponents({
   mount,
   unmount,
   flush,
+  overlay,
   report = reportToConsole,
   isElement = isElementNode,
   hasAncestor = hasAncestorBySelector,
@@ -357,15 +381,19 @@ export function createPublishedComponents({
     if (!isReady()) throw refuse('mount before ready');
     const entry = entries.get(name);
     if (!entry) throw refuse(`"${String(name)}" is not published`);
-    const { target, props = {}, onFault } = options ?? {};
+    const { target, props = {}, onFault, overlayHost } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
     const root = ROOTS[entry.root];
     if (root && !underRoot(target, root.selector, hasAncestor, lifecycle.owner)) {
       throw refuse(`${entry.name} needs ${root.needs}`);
     }
+    assertOverlayHost(overlayHost, target, isElement);
     lifecycle.claimTarget(target);
     const notify = typeof onFault === 'function' ? onFault : null;
-    return lifecycle.start(entry, target, copyProps(entry, props), notify);
+    return lifecycle.start(entry, target, copyProps(entry, props), {
+      onFault: notify,
+      overlayHost,
+    });
   }
 
   // `async`, so the M3 refusal is a rejection and never a synchronous throw. Every entry is eager
@@ -386,6 +414,7 @@ export function createPublishedComponents({
       mount: adapterMount,
       unmount: adapterUnmount,
       flush: adapter.flush,
+      overlay: adapter.overlay,
     });
   }
 
@@ -399,7 +428,7 @@ export function createPublishedComponents({
 
   if (mount) {
     const components = Object.fromEntries(table.map((entry) => [entry.path, entry.component]));
-    register({ components, host, mount, unmount, flush });
+    register({ components, host, mount, unmount, flush, overlay });
   }
 
   return Object.freeze({

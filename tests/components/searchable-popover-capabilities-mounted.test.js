@@ -126,20 +126,6 @@ function stubGeometry() {
   return stubRect(trigger(), TRIGGER_RECT);
 }
 
-/**
- * Make `window.addEventListener` a function, so `anchoredPopover` installs its listener pair.
- *
- * @returns {() => void} Restores `globalThis`.
- */
-function installWindowEventGuardStub() {
-  globalThis.addEventListener = () => {};
-  globalThis.removeEventListener = () => {};
-  return () => {
-    delete globalThis.addEventListener;
-    delete globalThis.removeEventListener;
-  };
-}
-
 function pressKey(key) {
   const event = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
   document.activeElement.dispatchEvent(event);
@@ -169,16 +155,10 @@ const activeDescendant = (holder) => holder.getAttribute('aria-activedescendant'
 const holderOf = (open) => open.querySelector('.manager-travel-popover-search input');
 
 describe('1503 SearchablePopover — the capabilities its specimen names', () => {
-  let restoreWindowEvents = () => {};
-
-  before(async () => {
-    await harness.setup();
-    restoreWindowEvents = installWindowEventGuardStub();
-  });
-  after(() => {
-    restoreWindowEvents();
-    harness.teardown();
-  });
+  // `anchoredPopover` binds its listener pair to the panel's own `document.defaultView`, happy-dom's
+  // real Window, so the scroll clauses below need no stub on the flattened `globalThis` (issue 2454).
+  before(() => harness.setup());
+  after(() => harness.teardown());
 
   describe('the `trigger` snippet', () => {
     it('renders the caller’s button instead of its own, and keeps the primitive’s contract', async () => {

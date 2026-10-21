@@ -224,7 +224,7 @@
     input.focus();
     input.setSelectionRange(head.length, head.length);
     announceAfterFocusMove(
-      () => document.activeElement === input,
+      () => input.ownerDocument.activeElement === input,
       () => speak(mine)
     );
   }

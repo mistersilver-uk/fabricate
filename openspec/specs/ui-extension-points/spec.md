@@ -369,17 +369,18 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; the overlay host and the standalone style root are the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
 - **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.**
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
-- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required: boolean, requiredWhen?: string } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
+- `describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required: boolean, requiredWhen?: string } }`, `rest` says whether the component takes data attributes, `root` is its required ancestor root, and `overlays` says whether it opens an overlay; it returns `null` for a name that is not published.
 `requiredWhen` is present only where the manifest states it, and `required` is then `false`.
-- `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
+- `mount(name, { target, props = {}, onFault, overlayHost })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
 A companion detects `value` with `typeof handle.value === 'function'`.
 Fabricate draws a published component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
+The one exception is an open overlay's panel, which is drawn in its host while it is open, as Overlays states.
 - `load(names)` takes an array of published names, reads a value that is not an array as one name, and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 It resolves `undefined` once every named entry's code is loaded, which today is the next microtask, and rejects with the M3 `TypeError` for a name that is not published.
 It does not wait for `fabricate.ready`, so M2 still applies to `mount`.
@@ -390,12 +391,13 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn?, overlays? }`, and Fabricate's runtime adapter binds each `path` to its component.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
+`overlays` is `true` where the component opens an overlay, and is otherwise absent; `describe` answers it on every entry as a boolean.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
 - The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
 - The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
@@ -513,6 +515,31 @@ A Foundry 14 detached window's target is judged the same way.
 - A target inside a slot element that is not attached is judged from the mount that owns that element.
 - A companion's own window, a chat message and another module's sheet carry no Fabricate root, so they host `'any'` entries only.
 - Moving an entry to `'any'` later is a widening, so it is additive.
+
+### Overlays
+
+- An entry whose `describe(name).overlays` is `true` opens an overlay: a panel portaled out of `target` while it is open, such as a list, a menu or a dialog.
+`mount` ignores an option it does not know, so `overlays === true` is a companion's signal that `overlayHost` is honoured.
+- **`overlayHost` is optional, and names the element an overlay's panel is drawn in.**
+It is an element of `target.ownerDocument` (M18), positioned by the companion, because it is the panel's containing block and coordinate origin; it need not be connected at `mount`.
+On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ignored.
+- Each time an overlay opens, Fabricate picks its host from `target.ownerDocument` at that moment, and never from Fabricate's own `document`:
+  1. `overlayHost`, while it is connected and in `target`'s document;
+  2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
+  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
+- The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
+The `<div>` carries `display: contents` and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
+The standalone layer, its class and its `data-fabricate-theme` copy are private too.
+- The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
+- An overlay's outside-press, Escape and scroll listeners bind to the document that holds it and its resize listener to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
+An overlay whose document has no window stays closed.
+- An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
+An overlay drawn by Fabricate outside every published mount keeps its own host as before.
+- `destroy` and a fault close every overlay the mount holds open: each panel and its `<div>` are removed, Fabricate's runtime releases the `<div>`'s listeners, and a layer no overlay still uses is removed, so nothing of the overlay is left in any document.
+- Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
+Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
+- An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
+The gate also holds that the closure of an `overlays: true` entry imports no `resolveOverlayHost` except through `actions/anchoredPopover.js`, which acquires its host through the chain: `Modal` still portals through `resolveOverlayHost` and ignores the chain, so it is not publishable with `overlays: true` until it acquires and releases its host as `anchoredPopover.js` does.
 
 ### Interactive components
 
@@ -952,6 +979,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
 | M17 | A `callback` key holding a value that is not a function | `"<key>" must be a function` |
+| M18 | `overlayHost` is not `undefined`, and is not an element of `target.ownerDocument`, by `nodeType` and never `instanceof`; checked on every entry, directly after M16 | `overlayHost must be an element in the target's document` |
 | M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -966,7 +994,7 @@ Otherwise `mount` destroys the stale entry first, then checks that the target is
 - `update` returns `true` once accepted, with the DOM reflecting it after the next flush, or at once under the value resync, and `false` after `destroy` or a fault.
 - `update` writes the host's props under Fabricate's `untrack`, so a call from inside a `$derived` on Fabricate's own runtime is not an unsafe mutation.
 - **`destroy()` is idempotent**: it unmounts what Fabricate rendered, whether or not `target` is still connected, and releases the target.
-- `destroy` first destroys every live published mount inside its slot elements, then detaches each slot element with its remaining children untouched.
+- `destroy` first destroys every live published mount inside its slot elements, then detaches each slot element with its remaining children untouched, and closes every overlay the mount holds open.
 Fabricate never empties a slot element and never calls into a companion's runtime; content a companion drew there with its own runtime is the companion's to tear down, before `destroy`.
 - `destroy` never throws: if the runtime's unmount throws, Fabricate reports it as `console.error('Fabricate | Published component render failed:', name, error)` and still releases the target.
 A teardown that throws during the unmount is reported the same way, a microtask later.
@@ -992,7 +1020,7 @@ This is defensive: Svelte 5.56 delivers no fault before its `mount` returns.
 - By then the claim is released and `target` is empty, so a companion may mount into it from `onFault`.
 It does not mount the same input again unconditionally: a fault that repeats calls `onFault` again in a later microtask of the same task, so the page cannot paint in between.
 - A throw from `onFault` is reported as a render failure under the entry's name and goes no further; a Promise it returns is ignored.
-- A fault ends nested published mounts and detaches slot elements as `destroy` does.
+- A fault ends nested published mounts, detaches slot elements and closes open overlays as `destroy` does.
 A nested mount is destroyed, not faulted, so its own `onFault` is not called.
 The companion keeps its own reference to content it drew in a content slot and tears it down from `onFault`, because `handle.slot` answers `null` from then on.
 A nested mount's handle answers `false` from `update` from then on, and the companion drops it with the outer handle.
@@ -1006,6 +1034,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
 It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus, and makes no network request except to load an image path the companion passes.
+An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
 - **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
 - Tokens resolve from `:root[data-fabricate-theme]`, which Fabricate's theme sets on `documentElement`.
@@ -1112,6 +1141,24 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onValueChange('iron', '')` once, and `handle.value('value')` answers `'iron'`
 - **AND** a clear the browser makes calls `onValueChange('', 'iron')`, and Enter in the field inside a `<form>` submits nothing
 - **AND** a mount that omits `ariaLabel` throws M9, and one into a target with no `.fabricate` ancestor throws M16
+
+#### Scenario: An overlay host
+
+- **WHEN** a companion mounts an entry whose `overlays` is `true` with an `overlayHost` element of its own, and the user opens the overlay
+- **THEN** the panel is drawn inside `overlayHost`, in a `display: contents` element, and a press inside it reaches the component's own handler
+- **AND** with no `overlayHost` and no Fabricate root above `target`, the panel is drawn in the standalone layer on `target.ownerDocument.body`, which is removed when the overlay closes
+- **AND** `destroy` while it is open leaves no panel, element, layer or listener of the overlay's
+
+#### Scenario: An overlay host that cannot be used
+
+- **WHEN** a companion mounts an entry whose `overlays` is `true` with an `overlayHost` that is not connected when the overlay opens, inside a Fabricate window
+- **THEN** the panel is drawn in the nearest `.fabricate-manager` or `.fabricate-app` above `target`, and `mount` did not throw
+- **AND** once `overlayHost` is connected, the next overlay that opens is drawn in it
+
+#### Scenario: An overlay host from another document
+
+- **WHEN** a companion mounts any published entry with an `overlayHost` that is not an element, or is an element of another document
+- **THEN** `mount` throws `overlayHost must be an element in the target's document`, and nothing is rendered
 
 #### Scenario: A malformed request
 

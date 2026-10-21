@@ -257,7 +257,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
   });
 
-  it('publishes exactly the pinned components, each described as pinned with its root, and documents them', () => {
+  it('publishes exactly the pinned components, each described as pinned with its root and no overlay, and documents them', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
@@ -301,6 +301,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Avatar: {
         version: 1,
@@ -314,6 +315,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: false,
         root: 'any',
+        overlays: false,
       },
       Medallion: {
         version: 1,
@@ -330,12 +332,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: false,
         root: 'any',
+        overlays: false,
       },
       FillBar: {
         version: 1,
         props: { value: optional, tone: optional, color: optional, density: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Meter: {
         version: 1,
@@ -348,54 +352,63 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       BandedBar: {
         version: 1,
         props: { rows: required, direction: optional, density: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       StatBox: {
         version: 1,
         props: { value: required, label: required, icon: optional, tone: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       InfoStrip: {
         version: 1,
         props: { label: required, facts: required, badge: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Kicker: {
         version: 1,
         props: { as: optional, tone: optional, children: requiredText },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Chip: {
         version: 1,
         props: { tone: optional, density: optional, children: requiredText },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Rail: {
         version: 1,
         props: { label: optional, children: slot },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       InspectorCard: {
         version: 1,
         props: { children: slot },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
       EmptyState: {
         version: 1,
         props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Notice: {
         version: 1,
@@ -412,6 +425,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Button: {
         version: 1,
@@ -426,6 +440,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
       StatusToggle: {
         version: 1,
@@ -438,6 +453,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
       Stepper: {
         version: 1,
@@ -453,6 +469,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: false,
         root: 'fabricate',
+        overlays: false,
       },
       SearchField: {
         version: 1,
@@ -464,6 +481,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
     });
     assert.deepEqual(

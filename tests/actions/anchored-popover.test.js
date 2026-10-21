@@ -60,45 +60,13 @@ function options(overrides = {}) {
   };
 }
 
-/**
- * happy-dom's globals are FLATTENED onto `globalThis`, and `addEventListener` is not among them —
- * so the shipped `typeof window.addEventListener !== 'function'` guard, which three of the six
- * converted components already carried, makes the action skip its listeners entirely here.
- *
- * @returns {() => void} Restores `globalThis`.
- */
-function installWindowEvents() {
-  const registry = new Map();
-  globalThis.addEventListener = (type, handler) => {
-    if (!registry.has(type)) registry.set(type, new Set());
-    registry.get(type).add(handler);
-  };
-  globalThis.removeEventListener = (type, handler) => registry.get(type)?.delete(handler);
-  globalThis.dispatchEvent = (event) => {
-    // A REAL `window.dispatchEvent` SETS `event.target` TO THE WINDOW, and the window is not a
-    // `Node`.
-    Object.defineProperty(event, 'target', { configurable: true, value: globalThis });
-    for (const handler of [...(registry.get(event.type) ?? [])]) handler(event);
-    return true;
-  };
-  return () => {
-    delete globalThis.addEventListener;
-    delete globalThis.removeEventListener;
-    delete globalThis.dispatchEvent;
-  };
-}
+// The action binds `resize` to the panel's own `document.defaultView`, happy-dom's real Window,
+// which setupDOM() keeps apart from the flattened `globalThis`, so a resize is dispatched there
+// (issue 2454).
 
 describe('anchoredPopover', () => {
-  let restoreWindowEvents = () => {};
-
-  before(() => {
-    setupDOM();
-    restoreWindowEvents = installWindowEvents();
-  });
-  after(() => {
-    restoreWindowEvents();
-    teardownDOM();
-  });
+  before(() => setupDOM());
+  after(() => teardownDOM());
   afterEach(() => {
     document.body.innerHTML = '';
     resetOverlayHostDiagnostics();
@@ -357,7 +325,7 @@ describe('anchoredPopover', () => {
 
     assert.match(panel.getAttribute('style'), /width: 240px;/);
     width = 300;
-    window.dispatchEvent(new Event('resize'));
+    document.defaultView.dispatchEvent(new Event('resize'));
     assert.match(panel.getAttribute('style'), /width: 300px;/);
     handle.destroy();
   });
@@ -473,7 +441,7 @@ describe('anchoredPopover', () => {
 
     assert.equal(measures, 1);
     document.dispatchEvent(new Event('scroll'));
-    window.dispatchEvent(new Event('resize'));
+    document.defaultView.dispatchEvent(new Event('resize'));
     assert.equal(measures, 3);
     handle.destroy();
     document.dispatchEvent(new Event('scroll'));
@@ -538,7 +506,7 @@ describe('anchoredPopover', () => {
     );
 
     assert.equal(measures, 1);
-    window.dispatchEvent(new Event('resize'));
+    document.defaultView.dispatchEvent(new Event('resize'));
     assert.equal(
       measures,
       2,

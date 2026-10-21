@@ -19,6 +19,9 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentCallbacks.js',
   'src/ui/publishedComponentValues.js',
   'src/ui/publishedComponentManifest.js',
+  'src/ui/publishedComponentOverlays.js',
+  'src/ui/svelte/util/overlayHost.js',
+  'src/ui/theme.js',
   'src/ui/svelte/util/dropRateTier.js',
 ]);
 

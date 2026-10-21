@@ -2,9 +2,10 @@
 // receives the portaled node, so a caller resolves its host by walking UP from itself; a
 // document-wide `querySelector('.fabricate-manager')` finds the manager wherever it is, so a dialog
 // opened in the player window would portal into a DIFFERENT WINDOW (issue 1466). A selector string
-// is therefore not a target at all (issue 1500): an element, a resolver, or nothing.
+// is therefore not a target at all (issue 1500): an element, a resolver, or nothing. An element is
+// recognised by `nodeType`, so one from a Foundry 14 detached window's realm qualifies (issue 2454).
 export function portal(node, target) {
-  if (typeof document === 'undefined') {
+  if (!node?.ownerDocument) {
     return {
       update() {},
       destroy() {}
@@ -13,10 +14,7 @@ export function portal(node, target) {
 
   function resolveTarget(value) {
     const resolved = typeof value === 'function' ? value(node) : value;
-
-    if (!resolved) return null;
-
-    return resolved instanceof HTMLElement ? resolved : null;
+    return resolved?.nodeType === 1 ? resolved : null;
   }
 
   let currentTarget = null;

@@ -1,7 +1,8 @@
 /**
  * The published component seam's Svelte runtime (issue 2426): Fabricate's own `mount`, `unmount`,
- * boundary host and the `flush` a value key's resync runs (issue 2453), with each manifest `path`
- * bound to its component. `main.js` imports it for
+ * boundary host, the `flush` a value key's resync runs (issue 2453) and the empty component an
+ * overlay container mounts (issue 2454), with each manifest `path` bound to its component.
+ * `main.js` imports it for
  * the registration side effect, so the plain seam never imports Svelte.
  */
 import { flushSync, mount, unmount, untrack } from 'svelte';
@@ -49,8 +50,13 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/SearchField.svelte': SearchField,
 });
 
+// A Svelte 5 component is a function, and this one draws nothing: an overlay container is mounted
+// with it only so Svelte's delegated listeners sit on the container, in whatever document it is.
+const EmptyOverlay = () => {};
+
 export const publishedComponentRuntime = Object.freeze({
   host: PublishedComponentHost,
+  overlay: EmptyOverlay,
   mount: (host, options) => untrack(() => mount(host, options)),
   // Svelte's own Promise, never an `async` wrapper or `{ outro: true }`: the seam reports its
   // rejection, and either would move that report after `onFault` or let the throw escape.

@@ -4,6 +4,7 @@
 // `trigger` is the visual field box. `maxHeightCap` bounds the panel, and `rows` (`pitch`, `gap`,
 // `chrome`) floors that bound to whole rows. `onOutsidePress` reports a press on neither the field
 // nor the panel, which the caller owns because an open list is its state and not this action's.
+// The press is heard on the panel's own document, and a node is told by `nodeType` (issue 2454).
 import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
 
 import { anchoredPopover, hostRelativePopoverLayout } from './anchoredPopover.js';
@@ -26,23 +27,30 @@ function neededHeight(node, cap) {
 }
 
 function layoutFor(node, read) {
-  return (triggerRect, panelRect, hostRect, bounds) => {
+  return (triggerRect, panelRect, hostRect, bounds, _options, view) => {
     const { maxHeightCap, rows } = read();
     const cap = positive(maxHeightCap);
     const chrome = positive(rows?.chrome);
     // One figure as both ends of the band: the layout reads a zero as "use my default".
     const width = Math.max(positive(triggerRect.width), MIN_WIDTH);
-    const layout = hostRelative(triggerRect, panelRect, hostRect, bounds, {
-      horizontalAlign: 'left',
-      gap: GAP,
-      minWidth: width,
-      maxWidth: width,
-      preferredMaxHeight: cap || undefined,
-      minUsableHeight: neededHeight(node, cap) || undefined,
-      rowPitch: rows?.pitch,
-      rowGap: rows?.gap,
-      chromeHeight: chrome,
-    });
+    const layout = hostRelative(
+      triggerRect,
+      panelRect,
+      hostRect,
+      bounds,
+      {
+        horizontalAlign: 'left',
+        gap: GAP,
+        minWidth: width,
+        maxWidth: width,
+        preferredMaxHeight: cap || undefined,
+        minUsableHeight: neededHeight(node, cap) || undefined,
+        rowPitch: rows?.pitch,
+        rowGap: rows?.gap,
+        chromeHeight: chrome,
+      },
+      view
+    );
     if (!layout || !Number.isFinite(layout.listMaxHeight)) return layout;
     return { ...layout, maxHeight: layout.listMaxHeight + chrome };
   };
@@ -67,14 +75,14 @@ export function typeaheadPanel(node, params = {}) {
 
   function onPress(event) {
     const target = event.target;
-    if (!(target instanceof Node)) return;
+    if (typeof target?.nodeType !== 'number') return;
     if (node.contains(target) || anchor()?.contains?.(target)) return;
     options.onOutsidePress?.(event);
   }
 
   const popover = anchoredPopover(node, popoverParams());
-  const canListen = typeof document !== 'undefined';
-  if (canListen) document.addEventListener('mousedown', onPress, { capture: true });
+  const doc = node?.ownerDocument;
+  doc?.addEventListener('mousedown', onPress, { capture: true });
 
   return {
     update(next) {
@@ -83,7 +91,7 @@ export function typeaheadPanel(node, params = {}) {
     },
 
     destroy() {
-      if (canListen) document.removeEventListener('mousedown', onPress, { capture: true });
+      doc?.removeEventListener('mousedown', onPress, { capture: true });
       popover.destroy();
     },
   };

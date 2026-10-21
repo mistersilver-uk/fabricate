@@ -327,7 +327,7 @@
   }
 
   $effect(() => {
-    if (open && untrack(() => anchored)) return watchAnchor(anchorNode, () => close());
+    if (open && untrack(() => anchored)) return untrack(() => watchAnchor(anchorNode, close));
   });
 
   $effect(() => {
