@@ -60,7 +60,10 @@ export function importClosure(path, reader, seen = new Set()) {
   return seen;
 }
 
-/** Each `$props()` key with its local name and whether it is `$bindable`. */
+/**
+ * Each `$props()` key with its local name, whether it is `$bindable`, and its default as
+ * `fallback`: the node it is assigned, `$bindable`'s argument, or `undefined`.
+ */
 export function propLocals(ast) {
   for (const node of walkNodes(ast.instance)) {
     if (node.type !== 'VariableDeclarator' || node.init?.callee?.name !== '$props') continue;
@@ -68,10 +71,12 @@ export function propLocals(ast) {
       .filter((property) => property.type === 'Property')
       .map((property) => {
         const value = property.value;
-        const local = value.type === 'AssignmentPattern' ? value.left.name : value.name;
-        const bindable =
-          value.type === 'AssignmentPattern' && value.right.callee?.name === '$bindable';
-        return { key: property.key.name ?? property.key.value, local, bindable };
+        const defaulted = value.type === 'AssignmentPattern';
+        const local = defaulted ? value.left.name : value.name;
+        const bindable = defaulted && value.right.callee?.name === '$bindable';
+        const stated = defaulted ? value.right : undefined;
+        const fallback = bindable ? stated.arguments[0] : stated;
+        return { key: property.key.name ?? property.key.value, local, bindable, fallback };
       });
   }
   return [];
@@ -228,7 +233,7 @@ const TEMPLATE_BINDERS = Object.freeze({
 });
 
 /** Every name a template block of one component binds, wherever in the template. */
-function templateBindings(ast) {
+export function templateBindings(ast) {
   const bound = new Set();
   for (const node of walkNodes(ast.fragment)) {
     for (const binder of TEMPLATE_BINDERS[node.type]?.(node) ?? []) {
@@ -443,8 +448,8 @@ function pinFaults(id, pin, read, spelled) {
   return faults;
 }
 
-/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
-function componentTags(file, ast) {
+/** Each local one parsed file imports from a relative specifier, by the path it resolves to. */
+export function relativeImports(file, ast) {
   const imported = new Map();
   const statements = [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
   for (const statement of statements) {
@@ -452,6 +457,12 @@ function componentTags(file, ast) {
     const path = posix.join(posix.dirname(file), statement.source.value);
     for (const specifier of statement.specifiers) imported.set(specifier.local.name, path);
   }
+  return imported;
+}
+
+/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
+export function componentTags(file, ast) {
+  const imported = relativeImports(file, ast);
   return [...walkNodes(ast.fragment)]
     .filter((node) => node.type === 'Component' && imported.has(node.name))
     .map((node) => [imported.get(node.name), node]);
@@ -584,7 +595,7 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
 }
 
 /** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */
-function restLocal(ast) {
+export function restLocal(ast) {
   const declarators = [...walkNodes(ast.instance)].filter(
     (node) => node.type === 'VariableDeclarator' && isCallTo(node.init, '$props')
   );

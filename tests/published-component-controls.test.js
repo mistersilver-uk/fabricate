@@ -1,6 +1,6 @@
 /**
- * What a published entry that draws a control must hold (issue 2452), over each entry's import
- * closure: every `callback` key is called from an admitted event handler, and every `value` key is
+ * What a published entry that draws a control must hold (issue 2452), over the files each entry's
+ * drawn closure reaches (`helpers/publishedClosureDrawn.js`): every `callback` key is called from an admitted event handler, and every `value` key is
  * written only from one (issue 2453); every focusable element is pinned
  * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
  * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
@@ -25,11 +25,13 @@
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
- * to a child component, an exported function and one also called from `onMount` fail closed.
+ * to a child component fails closed unless `FORWARDED_CALLBACKS` pins it; an exported function and
+ * one also called from `onMount` fail closed.
  * Limit: a scoped ring pin is matched by its selector as written, and judged by its declarations.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
- * whether a name is drawn in every state is the mounted suite's.
+ * whether a name is drawn in every state is the mounted suite's; a control in a closure file other
+ * than the entry's is named by its `CLOSURE_NAMES` pin, which the mounted suite holds.
  * Limit: whether a control draws text of its own follows the snippets its file defines, counts a
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
@@ -55,6 +57,7 @@ import {
   focusableElements,
   followedProps,
   importClosure,
+  isComponent,
   isControlTag,
   isStrip,
   moduleRing,
@@ -811,28 +814,36 @@ function unreachedClasses(file, ast, drawn, controls, pins) {
   );
 }
 
+/** Whether a stylesheet node holds `:global` anywhere. */
+const holdsGlobal = (node) =>
+  [...walkNodes(node)].some(
+    (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
+  );
+
 /** Whether every selector of a rule names a class of `classes` and holds no `:global`. */
 const onlyOn = (rule, classes) =>
   rule.prelude.children.every((complex) => {
-    const parts = [...walkNodes(complex)];
-    const global = parts.some(
-      (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
+    // A class inside a pseudo-class's argument (`:not()`, `:is()`, `:where()`) does not confine the match.
+    const compound = complex.children.flatMap(({ selectors }) => selectors);
+    return (
+      !holdsGlobal(complex) &&
+      compound.some((part) => part.type === 'ClassSelector' && classes.has(part.name))
     );
-    return !global && parts.some((part) => part.type === 'ClassSelector' && classes.has(part.name));
   });
 
 /**
- * What a closure whose reached control takes a window's ring breaks: no file its drawn closure
- * reaches holds a selector that carries a focus pseudo-class anywhere, in or out of an at-rule,
- * scoped or `:global`, none declares `all` or a property whose name starts `outline`, and no
- * reached control states a `style` attribute or a `style:` directive. A rule `rings` pins for its
- * file is exempt as `scopedRingFaults` judges it, and so is one whose every selector names a class
- * `unreachedClasses` answers. Vacuous for a closure that draws no reached control, and at `any`
- * but for a pin, which that root never takes.
+ * What a closure whose reached control takes a window's ring breaks: no file of its closure holds
+ * a selector that carries a focus pseudo-class anywhere, in or out of an at-rule, scoped or
+ * `:global`, none declares `all` or a property whose name starts `outline`, and no reached control
+ * states a `style` attribute or a `style:` directive. A rule `rings` pins for its file is exempt as
+ * `scopedRingFaults` judges it, so is one whose every selector names a class `unreachedClasses`
+ * answers, and so is every rule holding no `:global` in a file the drawn closure does not reach.
+ * Vacuous for a closure that draws no reached control, and at `any` but for a pin, which that
+ * root never takes.
  */
 function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
   const drawn = drawnClosure(entry, reader);
-  const components = [...drawn.files];
+  const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
   const reached = controls.filter((control) => isReached(control, pins));
   if (entry.root === 'any') {
     return components
@@ -848,9 +859,10 @@ function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
     const ast = reader.component(file);
     const { css } = ast;
     const scoped = scopedRingFaults(file, css, rings[file]?.rules);
-    const unreached = unreachedClasses(file, ast, drawn, controls, pins);
-    const exempt = (node) =>
-      scoped.exempt.has(node) || (node.type === 'Rule' && onlyOn(node, unreached));
+    const reaches = drawn.files.has(file);
+    const unreached = reaches && unreachedClasses(file, ast, drawn, controls, pins);
+    const exemptRule = (rule) => (reaches ? onlyOn(rule, unreached) : !holdsGlobal(rule));
+    const exempt = (node) => scoped.exempt.has(node) || (node.type === 'Rule' && exemptRule(node));
     const nodes = [];
     walkWithAncestors(css, (node, ancestors) => {
       if (!exempt(node) && ancestors.every((ancestor) => !exempt(ancestor))) nodes.push(node);
@@ -950,6 +962,22 @@ describe('each published entry that draws a control', () => {
     ];
     assert.ok(held.length > 0, 'the picker is pinned');
     assert.deepEqual(unheldClauses(held), []);
+  });
+
+  it('pins a closure name only on a reach pin of a published entry, and forwards only a callback key', () => {
+    for (const [id, { entry }] of Object.entries(CLOSURE_NAMES)) {
+      assert.ok(Object.hasOwn(FOCUSABLE_REACH, id), `${id} is a reach pin`);
+      assert.ok(
+        ENTRIES.some(({ name }) => name === entry),
+        `${id} names the published ${entry}`
+      );
+    }
+    for (const [name, keys] of Object.entries(FORWARDED_CALLBACKS)) {
+      const entry = ENTRIES.find((candidate) => candidate.name === name);
+      for (const key of Object.keys(keys)) {
+        assert.equal(entry?.props[key]?.kind, 'callback', `${name}.${key} is a callback key`);
+      }
+    }
   });
 
   it('exempts from the required-name rule only a control pinned always', () => {
@@ -1973,6 +2001,11 @@ describe('a control drawn in a closure child, and a callback handed to one (issu
         (css ? styled(css) : ''),
     });
   const idsOf = (reader) => controlsOf(entry, reader).map(({ id }) => id);
+  /** The faults of the child's pinned control over `reader`, but the control's own. */
+  const ruleFaults = (reader) =>
+    controlFaults(entry, { [CHILD_PRESS]: 'always' }, reader).filter(
+      (fault) => !fault.startsWith(CHILD_PRESS)
+    );
 
   it('draws the child’s control only where the parent’s tag is drawn', () => {
     assert.deepEqual(idsOf(readerOf('<C {label} />')), [CHILD_PRESS]);
@@ -2013,6 +2046,51 @@ describe('a control drawn in a closure child, and a callback handed to one (issu
     assert.deepEqual(
       focusFaults(extra, ':global(.c-extra):focus-visible { color: var(--fab-text); }'),
       [OWN]
+    );
+    assert.deepEqual(
+      ruleFaults(
+        readerOf('<C {label} extra />', extra, '.c-extra:focus-visible { color: var(--fab-text); }')
+      ),
+      [OWN],
+      'a bare extra draws what its {#if} holds'
+    );
+  });
+
+  it('exempts no rule that names an undrawn class only inside a pseudo-class’s argument', () => {
+    const OWN = `${C} ${OWN_FOCUS_RULE}`;
+    const body = '{#if extra}<span class="c-extra"></span>{/if}<span class="c-own"></span>';
+    const focusFaults = (css) => ruleFaults(readerOf('<C {label} />', body, css));
+    assert.deepEqual(focusFaults('button:not(.c-extra):focus-visible { outline: none; }'), [
+      OWN,
+      `${C} declares outline under a root that supplies the ring`,
+    ]);
+    for (const selector of ['.c-own:not(.c-extra)', ':is(.c-extra, .c-own)']) {
+      assert.deepEqual(
+        focusFaults(`${selector}:focus-visible { color: var(--fab-text); }`),
+        [OWN],
+        selector
+      );
+    }
+  });
+
+  it('judges a :global focus rule in a closure file the drawn closure does not reach, and no scoped one', () => {
+    const U = 'src/U.svelte';
+    const undrawn = (css) =>
+      ruleFaults(
+        syntheticReader({
+          [E]:
+            "<script>import C from './C.svelte'; import U from './U.svelte'; let { label, extra = false } = $props();</script>" +
+            '<C {label} />{#if extra}<U />{/if}',
+          [C]:
+            '<script>let { label } = $props();</script>' +
+            '<button type="button" data-keyboard-focus="true" data-press aria-label={label}>x</button>',
+          [U]: `<span class="u"></span>${styled(css)}`,
+        })
+      );
+    assert.deepEqual(undrawn('.u:focus-visible { outline: none; }'), []);
+    assert.deepEqual(
+      undrawn(':global(.fabricate-select-trigger):focus-visible { outline: none; }'),
+      [`${U} ${OWN_FOCUS_RULE}`, `${U} declares outline under a root that supplies the ring`]
     );
   });
 
@@ -2064,4 +2142,126 @@ describe('a control drawn in a closure child, and a callback handed to one (issu
       assert.ok(forwardedOf(script, markup).includes(fault), fault);
     });
   }
+});
+
+describe('the drawn closure, which fails closed (issue 2454)', () => {
+  const C = 'src/C.svelte';
+  const W = 'src/W.svelte';
+  const CHILD_PRESS = `${C}: button[data-press]`;
+  const entry = {
+    name: 'E',
+    path: E,
+    root: 'fabricate',
+    props: { label: { kind: 'data', required: true }, items: { kind: 'data' } },
+  };
+  const CHILD =
+    '<script>let { label, extra = false } = $props();</script>' +
+    '<button type="button" data-keyboard-focus="true" data-press aria-label={label}>x</button>';
+  /** A reader over an entry file that runs `imports` and states `props`, then draws `markup`. */
+  const readerOver = (markup, { imports = "import C from './C.svelte';", props = '', more = {} }) =>
+    syntheticReader({
+      [E]: `<script>${imports} let { label, items = [], open = false${props} } = $props();</script>${markup}`,
+      [C]: CHILD,
+      ...more,
+    });
+  const idsOver = (markup, options = {}) =>
+    controlsOf(entry, readerOver(markup, options)).map(({ id }) => id);
+  /** The child's falsy props, which `undefined` answers for a child the closure leaves undrawn. */
+  const childFalsy = (markup, options = {}) => {
+    const drawn = drawnClosure(entry, readerOver(markup, options));
+    return drawn.files.has(C) ? [...drawn.falsy.get(C)] : undefined;
+  };
+
+  it('leaves the child undrawn under a falsy prop, and its own prop falsy where its tag omits it', () => {
+    assert.deepEqual(idsOver('{#if open}<C {label} />{/if}'), []);
+    assert.deepEqual(childFalsy('<C {label} />'), ['extra']);
+  });
+
+  for (const [claim, markup, props = ''] of [
+    ['an {#each} context', '{#each items as open}{#if open}<C {label} />{/if}{/each}'],
+    ['an {#each} index', '{#each items as item, open}{#if open}<C {label} />{/if}{/each}'],
+    [
+      'a snippet parameter',
+      '{#snippet row(open)}{#if open}<C {label} />{/if}{/snippet}{#each items as item}{@render row(item)}{/each}',
+    ],
+    ['a {@const}', '{#each items as item}{@const open = item}{#if open}<C {label} />{/if}{/each}'],
+    ['an {#await} value', '{#await items then open}{#if open}<C {label} />{/if}{/await}'],
+    ['an {#await} error', '{#await items}{:catch open}{#if open}<C {label} />{/if}{/await}'],
+  ]) {
+    it(`draws the child under a falsy prop that ${claim} shadows`, () => {
+      assert.deepEqual(idsOver(markup, { props }), [CHILD_PRESS]);
+    });
+  }
+
+  it('draws the child under a falsy const that a template block shadows', () => {
+    const markup = '{#each items as shown}{#if shown}<C {label} />{/if}{/each}';
+    const imports = "import C from './C.svelte'; const shown = false;";
+    assert.deepEqual(idsOver(markup, { imports }), [CHILD_PRESS]);
+  });
+
+  for (const [claim, markup, wrapper] of [
+    [
+      'content its tag holds, as children',
+      '<W {label}>{label}</W>',
+      "<script>import C from './C.svelte'; let { label, children } = $props();</script>{#if children}<C {label} />{@render children()}{/if}",
+    ],
+    [
+      'a snippet its tag holds, by the snippet’s name',
+      '<W {label}>{#snippet header()}<b>{label}</b>{/snippet}</W>',
+      "<script>import C from './C.svelte'; let { label, header } = $props();</script>{#if header}<C {label} />{@render header()}{/if}",
+    ],
+  ]) {
+    it(`draws a wrapper’s guarded child when the parent passes ${claim}`, () => {
+      const imports = "import W from './W.svelte';";
+      assert.deepEqual(idsOver(markup, { imports, more: { [W]: wrapper } }), [CHILD_PRESS]);
+    });
+  }
+
+  it('keeps a wrapper’s children falsy when its tag holds only white space', () => {
+    const wrapper =
+      "<script>import C from './C.svelte'; let { label, children } = $props();</script>{#if children}<C {label} />{/if}";
+    const imports = "import W from './W.svelte';";
+    assert.deepEqual(idsOver('<W {label}> </W>', { imports, more: { [W]: wrapper } }), []);
+  });
+
+  for (const [claim, imports, markup, more = {}] of [
+    [
+      'a const that holds its import',
+      "import C from './C.svelte'; const Comp = C;",
+      '<Comp {label} />',
+    ],
+    ['a svelte:component', "import C from './C.svelte';", '<svelte:component this={C} {label} />'],
+    [
+      'a .js module that re-exports it',
+      "import { C } from './parts.js';",
+      '<C {label} />',
+      { 'src/parts.js': "export { default as C } from './C.svelte';" },
+    ],
+  ]) {
+    it(`draws a child drawn through ${claim}, with no falsy prop`, () => {
+      assert.deepEqual(idsOver(markup, { imports, more }), [CHILD_PRESS]);
+      assert.deepEqual(childFalsy(markup, { imports, more }), []);
+    });
+  }
+
+  for (const [claim, write] of [
+    ['an array pattern', '[open] = [true];'],
+    ['an object pattern', '({ open } = { open: true });'],
+  ]) {
+    it(`draws the child under a prop the entry writes through ${claim}`, () => {
+      const imports = `import C from './C.svelte'; function toggle() { ${write} }`;
+      const markup =
+        '<button type="button" onclick={toggle}>t</button>{#if open}<C {label} />{/if}';
+      assert.ok(idsOver(markup, { imports }).includes(CHILD_PRESS));
+    });
+  }
+
+  it('reads a member off a falsy prop as falsy only as its length or an optional read no primitive holds', () => {
+    const under = (test) =>
+      idsOver(['{#if ', test, '}<C {label} />{/if}'].join(''), { props: ", blank = ''" });
+    for (const test of ['blank.trim', 'blank?.trim', 'blank.missing', 'open?.[0]']) {
+      assert.deepEqual(under(test), [CHILD_PRESS], test);
+    }
+    for (const test of ['blank.length', 'open?.missing']) assert.deepEqual(under(test), [], test);
+  });
 });

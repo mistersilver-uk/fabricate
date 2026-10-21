@@ -1193,8 +1193,8 @@ describe('each entry matches its component declaration', () => {
       '<script>\n  let { body, value = $bindable(), ...rest } = $props();\n</script>\n{@render body?.()}'
     );
     assert.deepEqual(propLocals(ast), [
-      { key: 'body', local: 'body', bindable: false },
-      { key: 'value', local: 'value', bindable: true },
+      { key: 'body', local: 'body', bindable: false, fallback: undefined },
+      { key: 'value', local: 'value', bindable: true, fallback: undefined },
     ]);
     assert.deepEqual(
       [...renderedLocals(ast)],
