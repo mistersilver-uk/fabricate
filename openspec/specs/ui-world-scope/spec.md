@@ -860,7 +860,7 @@ The world catalogues and the system-scope rules lists share ONE list composition
 20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
     These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
     The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a fifteen-row list a GM has put on a twenty-five-row page.
-    Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, per-page selector offered.
+    Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, page-size control offered.
     **AND IT SPANS THE LIST'S FULL WIDTH** (maintainer ruling M19, issue 1371 revision 13): the world Component catalogue's footer sat inside the column's own inset, a step short of both column edges and of the bottom, and a footer that does not share the column's edges reads as a control for something else; it now shares the column's edges by requirement 25 and takes the same wash the system rules list's footer draws edge to edge, measured in a real browser against the column's own box.
     The ROWS REGION takes the column's slack whether or not a pager is under it, and the pager never does — the two are separate declarations and a gate that measured only "the pager ends at the foot of the column" is satisfied by a pager that fills it.
     **THE DEFAULT PAGE WINDOW MUST BE NARROW ENOUGH THAT THE SUPPRESSION STAYS AN EXCEPTION**, and it is TEN rows: the smallest size the pager itself offers, and about what the column holds at the window sizes these screens are used at.
@@ -902,7 +902,8 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The column itself carries no padding, so no child bleeds out of an inset; the toolbar and the pager keep their own internal padding, and every boxed child the column holds — the column lead, the unavailable warning, the bulk face, and the rows scroller with the list lead, the empty states and the rows — keeps a `--fab-space-3` inline gutter, so the filter line, a scope-wide card and every row start and end together.
     The column's first boxed child also keeps that gutter above it, and a rows scroller with no pager below it keeps it at its foot.
     It is the composition's own geometry rather than an opt-in, because a switch every mounted caller turns on is the in-place edit wearing a prop's name (requirement 24).
-    Each route's surface ladder still decides the bands' fills: the Component catalogue's pager keeps its wash, and the Essence and Tools toolbars and pagers stay transparent.
+    Each route's surface ladder still decides the toolbar bands' fills: the Essence and Tools toolbars stay transparent.
+    The pager is `--fab-bg-1` on every route (issue 2546, M4), the Component, Essence and Tools catalogues included.
 
 ## GM Travel Route
 
@@ -949,7 +950,7 @@ Shipped capabilities:
 - The Parties pane exposes a search field only when the world holds more than one party.
   It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
   A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
-- The Parties pane pages its card list and offers a per-page control of 3, 6 or 9 cards, defaulting to 3.
+- The Parties pane pages its card list and offers a page-size control of 3, 6 or 9 cards, defaulting to 3.
   The pagination controls render only once the matched set reaches the smallest offered size, because below it there is one page by construction and the bar could state nothing the GM cannot already see.
   They render as a squared-off, full-bleed sibling footer under the independently scrolling card content, so they stay reachable without overlaying a card and read as the pane's own bottom edge rather than as another item in the scrolled list.
   Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
