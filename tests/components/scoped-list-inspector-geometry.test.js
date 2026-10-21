@@ -952,14 +952,15 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
 
   it("lets no route repaint the pager: its fill is the primitive's --fab-bg-1 everywhere (M4)", () => {
     const rules = [...fabricateCss.matchAll(/([^{}]*)\{([^{}]*)\}/gu)];
+    const bare = (selector) => selector.replaceAll(/\/\*[\s\S]*?\*\//gu, '').trim();
     const repaints = rules
       .filter(
         ([, selector, body]) =>
-          selector.includes('data-manager-view') &&
-          selector.includes('.fabricate-pagination') &&
-          /background/u.test(body)
+          bare(selector).includes('.fabricate-pagination') &&
+          /background/u.test(body) &&
+          !/^\.fabricate-pagination\.fabricate-pagination(?:\.is-compact)?$/u.test(bare(selector))
       )
-      .map(([, selector]) => selector.trim());
+      .map(([, selector]) => bare(selector));
     assert.deepEqual(repaints, [], 'a route rule paints the pager over its own fill');
     const owner = rules.find(([, selector]) =>
       /^\s*\.fabricate-pagination\.fabricate-pagination\s*$/u.test(selector)

@@ -1449,9 +1449,8 @@ test("every pager site's page-size segments own their pointer targets", async ()
         const bar = group.closest('.fabricate-pagination');
         const barBox = bar.getBoundingClientRect();
         const summary = bar.querySelector('.manager-pagination-summary');
-        const arrowBoxes = [...bar.querySelectorAll('.fabricate-icon-button')].map((arrow) =>
-          arrow.getBoundingClientRect()
-        );
+        const arrowElements = [...bar.querySelectorAll('.fabricate-icon-button')];
+        const arrowBoxes = arrowElements.map((arrow) => arrow.getBoundingClientRect());
         const segments = [...group.querySelectorAll('.manager-segment')].map((segment) => {
           const box = segment.getBoundingClientRect();
           const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
@@ -1464,7 +1463,21 @@ test("every pager site's page-size segments own their pointer targets", async ()
           segments,
           trackHeight: groupBox.height,
           bar: { left: barBox.left, right: barBox.right },
-          arrows: arrowBoxes.map((box) => ({ left: box.left, right: box.right })),
+          arrows: arrowBoxes.map((box, index) => ({
+            left: box.left,
+            right: box.right,
+            height: box.height,
+            radius: getComputedStyle(arrowElements[index]).borderTopLeftRadius,
+          })),
+          fill: getComputedStyle(bar).backgroundColor,
+          bg1: (() => {
+            const probe = document.createElement('div');
+            probe.style.background = 'var(--fab-bg-1)';
+            bar.append(probe);
+            const value = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return value;
+          })(),
           midpoints: [mid(summary.getBoundingClientRect()), mid(groupBox), ...arrowBoxes.map(mid)],
           summaryWidth: summary.getBoundingClientRect().width,
         };
@@ -1480,14 +1493,31 @@ test("every pager site's page-size segments own their pointer targets", async ()
             `landed on <${segment.tag}> instead, so choosing that size would never reach the radio`
         );
       }
-      // The inline rung is a 30px track. The default rung's segments take their height from the
-      // line box, which this core-less page sets by font alone, so it is bounded rather than pinned.
+      // The inline rung is a 30px track. The default rung measures 32px in this core-less page
+      // (Arial, 16px root).
       assert.ok(
         measured.compact
           ? Math.abs(measured.trackHeight - 30) <= 1
-          : measured.trackHeight > 31 && measured.trackHeight <= 36,
+          : Math.abs(measured.trackHeight - 32) <= 1,
         `${measured.probe}: the track takes the ${measured.compact ? 'inline' : 'default'} rung ` +
           `(measured ${measured.trackHeight.toFixed(1)}px)`
+      );
+      for (const arrow of measured.arrows) {
+        const side = measured.compact ? 26 : 28;
+        assert.ok(
+          Math.abs(arrow.height - side) <= 1,
+          `${measured.probe}: the arrow is the ${side}px box (measured ${arrow.height.toFixed(1)}px)`
+        );
+        assert.equal(
+          arrow.radius,
+          '7px',
+          `${measured.probe}: the arrow corners at the 7px icon rung`
+        );
+      }
+      assert.equal(
+        measured.fill,
+        measured.compact ? 'rgba(0, 0, 0, 0)' : measured.bg1,
+        `${measured.probe}: the ${measured.compact ? 'compact bar is transparent' : 'bar fills --fab-bg-1'}`
       );
       if (!measured.compact) continue;
       const spread = Math.max(...measured.midpoints) - Math.min(...measured.midpoints);
