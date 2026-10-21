@@ -1,7 +1,7 @@
 /**
  * `SegmentedControl` takes already-localized option labels (issue 2588), so its import closure holds
- * no module outside its own file and `ViewToggle`'s holds only it and `ViewToggle`: no localization
- * helper, and no Foundry global, which the published-component seam refuses (rule 5).
+ * no module outside its own file and `ViewToggle`'s holds only `ViewToggle` and `SegmentedControl`:
+ * no localization helper, and no Foundry global, which the published-component seam refuses (rule 5).
  * The negative controls run the same assertions over synthetic sources.
  */
 import assert from 'node:assert/strict';
@@ -35,7 +35,6 @@ const closureHolds = (path, reader, held) => {
 
 describe('SegmentedControl import closure', () => {
   it('holds only SegmentedControl itself', () => {
-    assert.ok(closureHolds(SEGMENTED, SHIPPED, SEGMENTED_HELD));
     assert.deepEqual(closureOf(SEGMENTED, SHIPPED), SEGMENTED_HELD);
   });
 

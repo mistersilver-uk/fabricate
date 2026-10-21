@@ -37,6 +37,7 @@
     COUNT_REPEAT_OPTIONS,
     countTestOptions,
   } from './countPoolOptions.js';
+  import { localizedOptions } from './checksSelectOptions.js';
 
   let {
     evaluation,
@@ -69,11 +70,9 @@
       .map((die) => ({ value: String(die), label: `d${die}` }))
   );
 
-  const localized = (options) =>
-    options.map(({ value, labelKey, fallback }) => ({ value, label: text(labelKey, fallback) }));
-  const TEST_OPTIONS = $derived(localized(countTestOptions(under)));
-  const REPEAT_OPTIONS = localized(COUNT_REPEAT_OPTIONS);
-  const DESTINATION_OPTIONS = localized(COUNT_DESTINATION_OPTIONS);
+  const TEST_OPTIONS = $derived(localizedOptions(countTestOptions(under), text));
+  const REPEAT_OPTIONS = localizedOptions(COUNT_REPEAT_OPTIONS, text);
+  const DESTINATION_OPTIONS = localizedOptions(COUNT_DESTINATION_OPTIONS, text);
   // Spelled out, so each hook a test or capture names is greppable in source.
   const FACE_HOOKS = {
     explode: 'data-check-count-explode-face',

@@ -23,6 +23,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
   'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
   // The pool's additional-dice group and its macro wells (issue 2008).
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/util/dropUtils.js',

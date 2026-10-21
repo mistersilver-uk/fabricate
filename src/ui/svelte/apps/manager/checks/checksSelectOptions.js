@@ -1,5 +1,6 @@
 /**
- * The checks studio's eight converted select vocabularies and their `<Select>` rows (issue 1510).
+ * The checks studio's converted select vocabularies and their `<Select>` rows (issue 1510), and the
+ * outcome toggle's segments.
  * Every label is carried verbatim from the `<option>` it replaced and every list keeps its authored
  * order. Localized copy arrives through an injected `text`, so this stays an import-free leaf — the
  * reason the previewed-record mapper lives here rather than beside `buildPreviewRecords`, whose own
@@ -100,9 +101,7 @@ const OUTCOME_TIER = Object.freeze({
   fallback: 'Outcome tier',
 });
 
-/**
- * The outcome toggle's segments, good, neutral, bad, so the neutral default sits in the middle.
- */
+/** The outcome toggle's segments, good, neutral, bad, so the neutral default sits in the middle. */
 export const OUTCOME_CHOICES = Object.freeze({
   progressive: [
     {

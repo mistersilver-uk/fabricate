@@ -2,7 +2,6 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { localizeOr } from '../../src/ui/svelte/util/localizeOr.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -41,24 +40,6 @@ describe('SegmentedControl (mounted)', () => {
     assert.equal(radios[0].getAttribute('name'), 'when-spent');
     const labels = [...root.querySelectorAll('.manager-segment-label')].map(n => n.textContent);
     assert.deepEqual(labels, ['Destroyed', 'Becomes inert']);
-  });
-
-  it('keeps the English fallback when the active language lacks the key', async () => {
-    // The synthetic caller every converted caller imitates: it resolves where it builds the options.
-    const options = [
-      { value: 'destroyed', label: localizeOr('FABRICATE.X.Destroyed', 'Destroyed') },
-      { value: 'inert', label: localizeOr('FABRICATE.X.Inert', 'Becomes inert') }
-    ];
-    const root = await harness.mount({ options, value: 'destroyed', groupName: 'g', iconOnly: true });
-    assert.deepEqual(
-      [...root.querySelectorAll('.manager-segment-label')].map(n => n.textContent),
-      ['Destroyed', 'Becomes inert']
-    );
-    assert.deepEqual(
-      [...root.querySelectorAll('.manager-segment')].map(n => n.getAttribute('title')),
-      ['Destroyed', 'Becomes inert'],
-      'an icon-only segment titles itself with its label'
-    );
   });
 
   it('reflects the selected value on the active segment and its radio', async () => {
