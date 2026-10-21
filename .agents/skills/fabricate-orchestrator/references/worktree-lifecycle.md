@@ -50,10 +50,14 @@ Before creating any mutable lane, the driver:
 
 1. requires an approved issue delta and its final resolved roster;
 2. requires a clean coordinator worktree and committed integration `HEAD`;
-3. resolves the dependency order from the approved delta;
-4. gives every mutable path exactly one owner for the current revision; and
-5. identifies lockfiles and shared configuration as single-owner paths.
+3. groups the approved delta into cohesive, bounded work packets with explicit contracts and test seams;
+4. resolves dependencies between packets and integrates prerequisites before starting dependent work;
+5. gives every mutable path exactly one owner for the current revision; and
+6. identifies lockfiles and shared configuration as single-owner paths.
 
+A work packet may include several source, test, localization, and canonical-spec files under one owner's bounded responsibility.
+File count is not a reason to split a coherent packet or to upgrade its model tier.
+Split by independent behavioural contracts; do not split merely to obtain a cheaper tier, and do not create interdependent lanes whose shared interfaces remain unsettled.
 Mutable lanes may run in parallel only when their owned paths are disjoint and none depends on output that has not integrated.
 Start dependent work only after its prerequisite commits are integrated and assign the new integration `HEAD` as its base.
 
@@ -70,7 +74,8 @@ Every lane brief records:
 - the assigned base SHA;
 - the expected mutable branch or detached target SHA;
 - the exclusively owned paths;
-- dependencies and whether each dependency is already integrated;
+- the packet's one behavioural objective, contract/invariants, test seams and acceptance checks;
+- cross-packet interface assumptions, dependencies and whether each dependency is already integrated;
 - the expected commit range;
 - the focused checks the lane may run; and
 - the required handoff fields.
@@ -141,6 +146,8 @@ Repeat review only when the owned concern materially changes or a finding remain
 When repeat review is required, create a fresh detached lane pinned to the exact new target and never reuse a detached checkout from another commit.
 
 The driver writes the immutable base-relative diff to `.worktrees/<issue>/artifacts/` before review and supplies its path in the brief.
+For the always-row general reviewer this artifact must cover the complete integrated change, including packet boundaries, not just one implementation lane's diff.
+Specialist reviewers may be routed by concern, but their verdicts cannot replace that whole-change review.
 The reviewer treats the assigned base, target SHA, artifact, issue delta, and working tree as its complete review target rather than inspecting an ambient active branch.
 Read-only agents return findings or verdicts and never commit.
 

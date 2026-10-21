@@ -34,10 +34,13 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 1. Verify the assigned detached worktree path, target SHA, base, artifact path, and clean state using only the lifecycle identity checks.
 Return `BLOCKED` without reviewing when the assignment does not match the worktree.
 2. Review the supplied immutable diff and exact detached snapshot with a findings-first mindset, judging the change against its stated goal.
+For the always-row general reviewer, this is the **full integrated diff**, not a work-packet slice, regardless of how many medium implementers contributed.
+Check interfaces, invariants, tests, spec alignment and regressions across packet boundaries; individual packet approvals never substitute for this verdict.
 A clean, well-tested implementation of the wrong thing still fails review.
 3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
 4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 5. Check correctness, regression risk, missing edge cases, data loss, and security.
+Distinguish an internal added export or module from an actual public API or persisted-data contract; escalate substantive contract ambiguity rather than treating file count as risk.
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.

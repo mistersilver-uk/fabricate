@@ -34,7 +34,8 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 1. Verify the assigned worktree path, mutable branch, base SHA, owned paths, dependencies, and clean state before any other action.
 Stop and return `BLOCKED` when the assignment does not match the worktree.
 2. Read the issue's `openspec-delta` block before touching code, using the driver-supplied copy or read-only `gh issue view` access allowed by the brief.
-3. Confirm the task scope and keep changes limited to that task.
+3. Confirm the packet's single behavioural objective, contract and exclusive owned paths, then implement the complete bounded responsibility even when it spans several source, test, localization and spec files.
+Do not ask the driver to split one cohesive feature merely because it crosses file boundaries; never widen ownership to unrelated work.
 Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change.
 If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.
 4. Write the failing test first; the exceptions are pure refactors covered by existing tests and visual-only CSS tweaks — name the exception in the summary when you take one.
@@ -60,6 +61,7 @@ The workflow driver runs those authoritative gates from the fully integrated coo
 - When the brief carries `file:line` references from an audit or an earlier capture, the tree has usually moved since.
 Re-verify every cited ref against the current tree before editing, skip any finding that no longer holds, and record each skip with its reason in the handoff so the driver and reviewers can see what was dropped and why.
 - Follow existing patterns before inventing new ones.
+Check the packet's boundary against adjacent consumers and producers and report any cross-packet contract mismatch for integrated review rather than editing another lane's paths.
 - **Concision is part of the output.** New code carries only the comments `AGENTS.md` admits under "Observed failure mode: bloat", and a docblock states purpose and contract in at most six lines.
 - Extract before the lane returns instead of adding to a giant: a function over 100 lines, a `.js` module over 800 lines, or a `.svelte` component over 500 is oversized, and `tests/file-size-ratchet.test.js` fails a change that makes a unit oversized or grows one.
 - Add no new `Source.includes(` pin (`tests/source-pin-ratchet.test.js`) and no local copy of a shared helper (`tests/scalar-helper-duplicates.test.js`); import the one implementation instead.

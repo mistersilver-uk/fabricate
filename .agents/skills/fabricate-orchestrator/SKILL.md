@@ -72,6 +72,7 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
    - in-scope and out-of-scope notes
    - implementation/design decisions
    - dependency boundaries, split points, and test seams when JavaScript structure is part of the task
+   - coherent implementation packets: one bounded behaviour, its interface/invariants, owned implementation/test/spec/localization paths, dependencies, and acceptance checks
    - affected files
    - a literal `Lane surface: new-module | new-export | persisted-shape | none` field on every `### Tasks` entry, so model-tier rule 2 reads a lookup rather than prose
    - the canonical `openspec/specs/<domain>/spec.md` requirement changes, written under `### Spec Deltas` with `##### Added/Modified/Removed Requirements` so reviewers can compare them against the real `openspec/specs/` diff (include this section only when canonical requirements change)
@@ -88,10 +89,14 @@ The driver applies the mechanical findings to the delta block itself and re-spaw
 Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once every plan-review finding is applied or dispositioned.
-9. Before mutable implementation fan-out, require an approved delta, the final roster, a clean committed coordinator baseline, disjoint path ownership, and integrated dependencies, then create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
+9. Before mutable implementation fan-out, partition the approved tasks into **cohesive work packets**, not file-count-sized fragments.
+Keep implementation, tests, localization and required spec changes for a bounded behaviour in one medium-capable packet unless an independently testable contract or dependency calls for a split.
+Do not split merely to game model-tier selection; explicitly record cross-packet interface assumptions and the integration order.
+Require an approved delta, the final roster, a clean committed coordinator baseline, disjoint path ownership, and integrated dependencies, then create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
 For every spawn of a model-tiered family, resolve exactly one model tier first, keyed on the `(family token, stage, revision)` triple, by applying the ladder in `AGENTS.md` to the facts already held at that point, then record the resolved model tier and those facts in the lane brief.
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
+Reviewers inspect the full integrated diff for the always-row `fabricate_reviewer`, including changes and contracts across packets; specialist reviewers inspect their routed concerns.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
 Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per the **Iteration cycles** in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`.
 Hard cap: 3 implementation revisions.
@@ -124,6 +129,8 @@ A second escalation in the same revision, or one from a lane already at the most
 - Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.
 - Follow its manual-test candidate proof and feedback-batching procedure whenever a maintainer is asked to test or explicitly asks to batch findings.
 - Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
+A packet may own several related files; do not create separate lanes just because a feature needs tests, specs, or translation alongside code.
+Do not accept independent packet verdicts as a substitute for the general review of the fully integrated change.
 - Preserve a valid approval across issue or PR metadata edits and patch-equivalent rebases; repeat a reviewer only for a materially changed owned concern or unresolved finding, using a fresh exact-target detached lane and immutable artifact when repetition is required.
 - Follow the final-delivery procedure in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; keep ready PRs ready and use exact-head check evidence independently of readiness transitions.
 - Prefer one issue per PR.
