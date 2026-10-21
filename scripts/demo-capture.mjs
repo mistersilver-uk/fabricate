@@ -62,7 +62,7 @@ const CAPTIONS = Object.freeze({
   },
   forge: {
     kicker: 'Crafting checks · optional',
-    text: 'Add a check, and the roll decides the outcome.',
+    text: 'Route by check, and the roll picks the result.',
     position: 'top',
   },
   choice: {
