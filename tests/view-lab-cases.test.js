@@ -3351,6 +3351,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     [
       'fabricate-app-shell',
       'interactables-manager-region-open',
+      'manager-component-edit-category-list',
       'manager-components-normal',
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
@@ -3365,13 +3366,12 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
       'player-crafting-sources-picker',
-      'player-inventory-page-size',
       'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );
 });
 
-// The forty-four frames a change to the shared positioning seam must publish: every case whose
+// The forty-three frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
 // canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
 // suggestion list open over the scroller that used to clip it, and issue 1782's three a `Typeahead`'s. Issue 1510's thirteen are the converted manager
@@ -3428,7 +3428,6 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-actor-picker',
   'player-crafting-category-filter-list',
   'player-crafting-sources-picker',
-  'player-inventory-page-size',
   'player-inventory-sort-list',
   'player-journal-sort-list',
   'world-tool-entry-on-break-repair-suggestions',
