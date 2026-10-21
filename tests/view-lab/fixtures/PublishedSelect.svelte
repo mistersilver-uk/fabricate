@@ -27,9 +27,9 @@
         size: 'inline',
         value: 10,
         options: [
-          { value: 10, label: 'Ten rows' },
-          { value: 25, label: 'Twenty-five rows' },
-          { value: 'all', label: 'Every row' },
+          { value: 10, label: '10' },
+          { value: 25, label: '25' },
+          { value: 'all', label: 'All' },
         ],
       },
     ],
@@ -111,6 +111,11 @@
     padding: var(--fab-space-3);
     color: var(--fab-tag-azure);
     background: var(--fab-bg-1);
+  }
+
+  /* Room for the hosted list, three 30px rows in a 98px panel opened 6px below the trigger, so it ends above the next section. */
+  .published-select-ground > section:first-child {
+    min-height: 160px;
   }
 
   .select-heading {

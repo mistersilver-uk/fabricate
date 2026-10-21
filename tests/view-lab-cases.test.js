@@ -6338,6 +6338,14 @@ test('the select specimen cases act on what the select fixture mounts through th
       opened.expectSelector.includes('> div > .fabricate-select-popover'),
     'the frame is taken only once the list is open in the overlay host'
   );
+  assert.deepEqual(
+    opened.expectCenterHit,
+    [
+      '[data-lab-select-ground] > div > .fabricate-select-popover [data-popover-option="25"]',
+      '[data-lab-select-ground] [data-lab-select="layer"] .fabricate-select-trigger',
+    ],
+    'the open hosted list is hit at a row, and leaves the second select’s trigger uncovered'
+  );
   const layered = getCaseById('manager-published-select-layer');
   assert.deepEqual(
     layered.steps.map(({ selector }) => selector.split(' ').at(-1)),

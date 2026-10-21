@@ -286,7 +286,7 @@ const SELECT_CONTAINMENT = Object.freeze([
   { container: '.window-content', target: SELECT_GROUND },
 ]);
 
-/** Sized to the fixture's 320px ground and the room its open lists take. */
+/** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
 const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
 
 export const CASES = Object.freeze([
@@ -718,15 +718,16 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-select-specimen',
     label:
-      'Specimen, mounted through the published seam — two selects, each beneath the text that names it, after one step: a press on Rows per page, which opened its list inside the ground the companion passed as its overlay host. The list reads Ten rows, ticked and filled as the chosen row, then Twenty-five rows and Every row, drawn over the ground below the trigger and clipped by nothing; Sort recipes by stays closed, showing its placeholder. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+      'Specimen, mounted through the published seam — two selects, each beneath the text that names it, after one step: a press on Rows per page, which opened its list inside the ground the companion passed as its overlay host. The list reads 10, ticked and filled as the chosen row, then 25 and All, drawn over the ground below the trigger, clipped by nothing and ending above Sort recipes by, which stays closed, uncovered and showing its placeholder. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-select' },
     steps: [{ selector: LAB_SELECT('hosted', SELECT_TRIGGER) }],
-    // The list the press opened, in the overlay host, with the chosen row marked.
+    // The list the press opened, in the overlay host, with the chosen row marked, and the second
+    // select's trigger left uncovered beneath it.
     expectSelector: `${SELECT_GROUND}:has(${SELECT_SECTION('hosted')} ${SELECT_TRIGGER}[aria-expanded="true"]) > div > .fabricate-select-popover [data-popover-option="10"][aria-selected="true"]`,
-    expectCenterHit: SELECT_OPTION(HOSTED_LIST, '25'),
+    expectCenterHit: [SELECT_OPTION(HOSTED_LIST, '25'), LAB_SELECT('layer', SELECT_TRIGGER)],
     expectContained: [...SELECT_CONTAINMENT, { container: SELECT_GROUND, target: HOSTED_LIST }],
     expectLayout: {
       controls: [
@@ -743,7 +744,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-select-layer',
     label:
-      'Specimen, mounted through the published seam — the same two selects after three steps: Every row chosen from the list of Rows per page, whose callback passed all back so the trigger reads Every row; then a press on Sort recipes by, which passed no overlay host and whose window carries no app root, so its list opened on the standalone layer over the window. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same two selects after three steps: All chosen from the list of Rows per page, whose callback passed all back so the trigger reads All; then a press on Sort recipes by, which passed no overlay host and whose window carries no app root, so its list opened on the standalone layer over the window. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each choice.
     reaches: 'beyond',
     smokeLabels: [],
