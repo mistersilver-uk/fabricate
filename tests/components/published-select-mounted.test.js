@@ -521,7 +521,7 @@ describe('the published Select’s values', () => {
 });
 
 describe('the published Select refuses', () => {
-  it('a missing or empty options or ariaLabel, and a missing onChange (M9)', () => {
+  it('a missing options, a missing or empty ariaLabel, and a missing onChange (M9)', () => {
     assertRefused(
       { ariaLabel: 'Rows', onChange: () => {} },
       'Select requires a non-empty "options"'

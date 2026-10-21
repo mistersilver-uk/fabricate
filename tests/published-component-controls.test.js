@@ -1,14 +1,14 @@
 /**
  * What a published entry that draws a control must hold (issue 2452), over the files each entry's
- * drawn closure reaches (`helpers/publishedClosureDrawn.js`): every `callback` key is called from an admitted event handler, and every `value` key is
- * written only from one (issue 2453); every focusable element is pinned
- * to the published key that draws it, to `'always'`, to the defaults of props the entry does not
- * publish, or to `null`; a reached one draws its own mark for keyboard focus and is named by the
- * companion; an entry that publishes `aria-labelledby` names each reached control by a required
- * key; a closure that takes a window's ring states no focus rule of its own but the pinned scoped
- * rings, and its reached control no inline style; and no rule outside the published `Notice`
- * styles its buttons. A control pinned to its guard key is named by that key, a required key or
- * a key `requiredWhen` that guard.
+ * drawn closure reaches (`helpers/publishedClosureDrawn.js`): every `callback` key is called from
+ * an admitted event handler, and every `value` key is written only from one (issue 2453); every
+ * focusable element is pinned to the published key that draws it, to `'always'`, to the defaults
+ * of props the entry does not publish, or to `null`; a reached one draws its own mark for keyboard
+ * focus and is named by the companion; an entry that publishes `aria-labelledby` names each
+ * reached control by a required key; a closure that takes a window's ring states no focus rule of
+ * its own but the pinned scoped rings, and its reached control no inline style; and no rule
+ * outside the published `Notice` styles its buttons. A control pinned to its guard key is named by
+ * that key, a required key or a key `requiredWhen` that guard.
  * The test-only probe runs beside the shipped entries. A key's kind and `args` are
  * `published-component-manifest.test.js`'s.
  * Limit: reach follows a guard through a plain `const` and `$derived` to the props it reads; a
@@ -2258,10 +2258,158 @@ describe('the drawn closure, which fails closed (issue 2454)', () => {
 
   it('reads a member off a falsy prop as falsy only as its length or an optional read no primitive holds', () => {
     const under = (test) =>
-      idsOver(['{#if ', test, '}<C {label} />{/if}'].join(''), { props: ", blank = ''" });
-    for (const test of ['blank.trim', 'blank?.trim', 'blank.missing', 'open?.[0]']) {
+      idsOver(['{#if ', test, '}<C {label} />{/if}'].join(''), {
+        props: ", blank = '', length = ''",
+      });
+    const computed = ['open?.[blank]', 'open[length]'];
+    for (const test of ['blank.trim', 'blank?.trim', 'blank.missing', 'open?.[0]', ...computed]) {
       assert.deepEqual(under(test), [CHILD_PRESS], test);
     }
     for (const test of ['blank.length', 'open?.missing']) assert.deepEqual(under(test), [], test);
+  });
+
+  /** An entry file that runs `script` over `props`, then draws `markup`, with the child beside it. */
+  const idsOverScript = (script, markup, props = 'label, open = false') =>
+    controlsOf(
+      entry,
+      syntheticReader({
+        [E]: `<script>import C from './C.svelte'; let { ${props} } = $props(); ${script}</script>${markup}`,
+        [C]: CHILD,
+      })
+    ).map(({ id }) => id);
+  const GUARDED = '{#if open}<C {label} />{/if}';
+  const PRESS = '<button type="button" onclick={toggle}>t</button>';
+
+  for (const [claim, script] of [
+    ['an update', 'function toggle() { open++; }'],
+    ['a for…of head', 'function toggle() { for (open of [1]); }'],
+    ['a for…in head', 'function toggle() { for (open in { a: 1 }); }'],
+  ]) {
+    it(`draws the child under a prop the entry writes through ${claim}`, () => {
+      assert.ok(idsOverScript(script, PRESS + GUARDED).includes(CHILD_PRESS));
+    });
+  }
+
+  it('draws the child under a prop the template writes, by a bind: directive or an inline handler', () => {
+    const bound = '<input bind:value={open} />';
+    assert.ok(idsOverScript('', bound + GUARDED).includes(CHILD_PRESS));
+    const inline = '<button type="button" onclick={() => (open = true)}>t</button>';
+    assert.ok(idsOverScript('', inline + GUARDED).includes(CHILD_PRESS));
+  });
+
+  it('draws the child under a prop a module script writes, by name', () => {
+    const source = `<script module>export function reset() { open = true; }</script>`;
+    const reader = syntheticReader({
+      [E]: `${source}<script>import C from './C.svelte'; let { label, open = false } = $props();</script>${GUARDED}`,
+      [C]: CHILD,
+    });
+    assert.deepEqual(
+      controlsOf(entry, reader).map(({ id }) => id),
+      [CHILD_PRESS]
+    );
+  });
+
+  it('leaves the child undrawn under a prop whose member the entry writes', () => {
+    assert.ok(
+      !idsOverScript('function toggle() { open.x = 1; }', PRESS + GUARDED).includes(CHILD_PRESS)
+    );
+  });
+
+  it('draws a child in the {:else} branch of an {#if} on a falsy prop', () => {
+    assert.deepEqual(idsOver('{#if open}x{:else}<C {label} />{/if}'), [CHILD_PRESS]);
+  });
+
+  it('draws the child under an entry prop whose unpublished default is truthy', () => {
+    assert.deepEqual(idsOverScript('', GUARDED, 'label, open = true'), [CHILD_PRESS]);
+  });
+
+  it('reads a test as falsy only by the cases the module docblock lists', () => {
+    const under = (test, props = '') =>
+      idsOver(['{#if ', test, '}<C {label} />{/if}'].join(''), { props });
+    for (const test of [
+      'label || open',
+      'String(open)',
+      '1',
+      'true',
+      "'x'",
+      'open ? label : open',
+    ]) {
+      assert.deepEqual(under(test), [CHILD_PRESS], test);
+    }
+    for (const test of ['undefined', 'open || undefined', 'Boolean(open)', 'open && label']) {
+      assert.deepEqual(under(test), [], test);
+    }
+  });
+
+  it('ends a cycle of consts at the name it began with, as a test no prop makes falsy', () => {
+    const script = 'const first = second; const second = first;';
+    assert.deepEqual(idsOverScript(script, '{#if first}<C {label} />{/if}'), [CHILD_PRESS]);
+  });
+
+  /** Tags `W` over `wTag`, with `wBody` its markup and `wProps` its props, and answers the ids. */
+  const idsOverWrapper = (wTag, { wBody = '{#if show}<C />{/if}', wProps = 'show', script = '' }) =>
+    controlsOf(
+      entry,
+      syntheticReader({
+        [E]: `<script>import C from './C.svelte'; import W from './W.svelte'; let { label, open = false, ...rest } = $props(); ${script}</script>${wTag}`,
+        [W]: `<script>import C from './C.svelte'; let { ${wProps} } = $props();</script>${wBody}`,
+        [C]: CHILD,
+      })
+    ).map(({ id }) => id);
+
+  it('keeps a wrapper’s guarded child undrawn where its tag passes only falsy values', () => {
+    assert.deepEqual(idsOverWrapper('<W show={open} />', {}), []);
+    assert.deepEqual(idsOverWrapper('<W />', {}), []);
+    assert.deepEqual(idsOverWrapper('<W show="" />', {}), []);
+    assert.deepEqual(idsOverWrapper('<W {...rest} />', {}), []);
+  });
+
+  for (const [claim, tag, script = ''] of [
+    ['text that is not empty', '<W show="0" />'],
+    ['text beside an expression', '<W show="{open}{label}" />'],
+    ['a spread of a local that is not its rest', '<W {...other} />', 'const other = { show: 1 };'],
+    [
+      'a bound local, which anything may write',
+      '<W bind:show={held} />',
+      'let held = $state(false);',
+    ],
+  ]) {
+    it(`draws a wrapper’s guarded child when its tag passes ${claim}`, () => {
+      assert.deepEqual(idsOverWrapper(tag, { script }), [CHILD_PRESS]);
+    });
+  }
+
+  it('draws a wrapper’s guarded child where its tag omits a prop whose default is truthy', () => {
+    assert.deepEqual(idsOverWrapper('<W />', { wProps: 'show = true' }), [CHILD_PRESS]);
+  });
+
+  it('leaves a wrapper’s guarded child undrawn where only another prop carries content', () => {
+    const wrapper = { wBody: '{#if header}<C />{/if}', wProps: 'header' };
+    assert.deepEqual(idsOverWrapper('<W>{label}</W>', wrapper), []);
+  });
+
+  it('draws what a nested wrapper’s rest holds, a spread of a non-entry rest being no keep', () => {
+    const entryTag = '<W show={true} />';
+    const sources = {
+      [E]: `<script>import W from './W.svelte'; let { label, ...rest } = $props();</script>${entryTag}`,
+      [W]: "<script>import V from './V.svelte'; let { show, ...rest } = $props();</script><V {...rest} />",
+      'src/V.svelte':
+        "<script>import C from './C.svelte'; let { x } = $props();</script>{#if x}<C />{/if}",
+      [C]: CHILD,
+    };
+    const ids = controlsOf(entry, syntheticReader(sources)).map(({ id }) => id);
+    assert.deepEqual(ids, [CHILD_PRESS]);
+  });
+
+  it('draws a component the entry loads by import(), with no falsy prop', () => {
+    const imports = "const load = () => import('./C.svelte');";
+    assert.deepEqual(idsOver('', { imports }), [CHILD_PRESS]);
+    assert.deepEqual(childFalsy('', { imports }), []);
+  });
+
+  it('draws a component drawn through a namespace import’s dotted tag, with no falsy prop', () => {
+    const imports = "import * as Ns from './C.svelte';";
+    assert.deepEqual(idsOver('<Ns.default {label} />', { imports }), [CHILD_PRESS]);
+    assert.deepEqual(childFalsy('<Ns.default {label} />', { imports }), []);
   });
 });

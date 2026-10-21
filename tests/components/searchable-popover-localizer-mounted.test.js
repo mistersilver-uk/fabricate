@@ -26,7 +26,10 @@ const TRANSLATED = Object.freeze({
   'FABRICATE.Common.Picker.KeyHints.Grid': '←↑↓→ choisir',
 });
 
-const LOCALIZER = 'src/ui/svelte/util/appLocalizer.js';
+const UTIL = 'src/ui/svelte/util';
+const LOCALIZER = `${UTIL}/appLocalizer.js`;
+// Loaded for its copy table alone; the picker's leaf modules are the harness roster's to name.
+const PICKER_MODEL = `${UTIL}/pickerOptionModel.js`;
 const BRIDGE = 'src/ui/svelte/util/foundryBridge.js';
 const MIXIN = 'src/ui/svelte/SvelteApplicationMixin.svelte.js';
 const ROLL_PROMPT_HOST = 'src/ui/svelte/apps/crafting/rollPromptHost.js';
@@ -118,7 +121,7 @@ before(async () => {
   await harness.setup();
   // The copy the compiled tree imports, so its context key is the one the picker reads.
   ({ APP_LOCALIZER, mountWithLocalizer } = await harness.loadRawModule(LOCALIZER));
-  ({ PICKER_COPY } = await harness.loadRawModule('src/ui/svelte/util/pickerOptionModel.js'));
+  ({ PICKER_COPY } = await harness.loadRawModule(PICKER_MODEL));
   ({ localize: bridgeLocalize } = await harness.loadRawModule(BRIDGE));
 });
 after(() => harness.teardown());

@@ -34,7 +34,10 @@ import {
 const FALSY_LITERALS = new Set([false, null, 0, '']);
 const DRAWN_TYPES = new Set(['RegularElement', 'SvelteElement', 'Component']);
 
-/** The members a falsy primitive reads as other than `undefined`, its prototype's and `Object`'s. */
+/**
+ * The members a falsy primitive reads as other than `undefined`, its prototype's and `Object`'s,
+ * read from the running Node, so a member newer than it reads as absent.
+ */
 const PRIMITIVE_MEMBERS = new Set(
   [String, Number, Boolean, Object].flatMap(({ prototype }) =>
     Object.getOwnPropertyNames(prototype)
@@ -183,11 +186,20 @@ function keepsFalsy(node, key, defaultFalsy, { falsy, inits, ownRest }) {
   );
 }
 
-/** Every name a component reads but as a tag's name, its import specifiers aside. */
+/** The head of each dotted tag, `Ns` of `<Ns.default />`, which reads the import it names. */
+function dottedTagHeads(fragment) {
+  const heads = [...walkNodes(fragment)]
+    .filter((node) => node.type === 'Component')
+    .map(({ name }) => [name, name.split('.', 1)[0]]);
+  return heads.filter(([name, head]) => head !== name).map(([, head]) => head);
+}
+
+/** Every name a component reads but as a plain tag's name, its import specifiers aside. */
 function namesReadUntagged(ast) {
   const scripts = [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
   const read = scripts.filter((statement) => statement.type !== 'ImportDeclaration');
-  return new Set([...read, ast.fragment].flatMap((node) => [...referencedNames(node)]));
+  const names = [...read, ast.fragment].flatMap((node) => [...referencedNames(node)]);
+  return new Set([...names, ...dottedTagHeads(ast.fragment)]);
 }
 
 /**
