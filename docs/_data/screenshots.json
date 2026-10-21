@@ -8,382 +8,382 @@
     {
       "case": "fabricate-app-shell",
       "alt": "The Fabricate player window on the Crafting tab, with the recipe browser on the left, the selected recipe and its requirements in the middle, and the shopping list on the right.",
-      "sha256": "f78080d3b24c42c1fab44b0ad85aa3b3d0ef1d3508637c7d234c9cca0083ff5a"
+      "sha256": "4dd94668eb20ed5f12ed04c5c1b7a0189187a80f4b1e8f4498ef1fffb1d2a6bd"
     },
     {
       "case": "manager-default-selection",
       "alt": "The Crafting Systems window showing the system library, with one system selected and its component, recipe and essence counts, enabled features and global conditions listed beside it.",
-      "sha256": "50f1c3af33c2492a4517d7c5039f752bd6eec5f309d37902a3c461f676a1f2ab"
+      "sha256": "9cfacfc51e19d4d91e255da4c635fc97b184c1f8eb79fca55fd9754e2c6f9d02"
     },
     {
       "case": "manager-system-edit-normal",
       "alt": "The System Overview settings page for a crafting system, showing its name and description alongside the optional feature toggles for gathering, salvage, essences and multi-step recipes.",
-      "sha256": "21e5295406e6cd4451f21e65e7699a20fbfc103384c910b5f66330cd791ae210"
+      "sha256": "4e40e7996d5914b7bc1059b5d1f038c3f60cab03eb1402ec764d42f99de40ff2"
     },
     {
       "case": "manager-recipes-normal",
       "alt": "The recipe browser for a crafting system, with recipes grouped by category and each row showing its requirement counts, its crafting check and whether it is enabled, beside a summary of the selected recipe.",
-      "sha256": "8bc79156d92403f68013e0474de4a849e59350706892d6b80fd857b9bc5d6881"
+      "sha256": "b98d0e8f08bcf544f3ac189f9ccf8b419e45be23a8db304d142e12cd7c28a5ad"
     },
     {
       "case": "manager-crafting-settings",
       "alt": "The Crafting settings page for a system, where the recipe resolution mode is chosen and recipe visibility is set.",
-      "sha256": "9d4b4c8fdfd14f298b61776c1050815a1e9a554517f1b64b506e4fa93d15084a"
+      "sha256": "c10d72788d030f3db6ef2e311dd76b90ceaafb4b43fd964242a96f65ad2ef8f2"
     },
     {
       "case": "manager-checks-crafting-modifiers",
       "alt": "The Modifiers tab of a crafting check, listing the named check modifiers available to it, how they combine into the roll, and the cap on how many a player may pick.",
-      "sha256": "e38105f2e3e7987c8f310ceeab108e653d0474af01ae79550b05eeb6db5ce0a2"
+      "sha256": "e0f5008665dc37ce55fda298df875e5b5e8e6b1369bb27ff0072018f5cf16e4f"
     },
     {
       "case": "manager-checks-crafting-recipe-tiers",
       "alt": "The crafting page of the Checks screen with two named recipe difficulty tiers defined.",
-      "sha256": "c3999faf7cc95afedcfa1f0f4adba6687b091aa9247fc5ef2d2d3c8bfbd20c84"
+      "sha256": "3ca29156f901c998e5ff4dc69477aa23adb9eaded144b58841521eab1183152f"
     },
     {
       "case": "manager-checks-crafting-odds-enumerable",
       "alt": "The crafting page of the Checks screen showing the odds of each outcome for a chosen character.",
-      "sha256": "906857ef775880fc618c1b06a0b58d49a47540dedc800d7677f60c848f681350"
+      "sha256": "22eb6ef54f799f4da681218d8d79958023a77901248dd30f27982a6606e46683"
     },
     {
       "case": "manager-checks-validation",
       "alt": "The Validation page of the Checks screen, reporting each activity check as passing, warning or blocking, with one warning raised against the salvage check.",
-      "sha256": "b866f816651aad306d6c3bf38d0d2089f4df121adb85bab874e31aeb6d7e28a1"
+      "sha256": "3983b4055079d9c7d411762b062a45dca2b7303623b301babc4916378bea5b6a"
     },
     {
       "case": "player-crafting-roll-prompt",
       "alt": "The crafting roll prompt, showing the formula, the check modifiers available to pick, a situational bonus field, the roll mode, and the advantage, normal and disadvantage buttons.",
-      "sha256": "394ff4fd60f5fae96a723f1b6103069e33e3aa118842f985e9fd02eea2db381c"
+      "sha256": "2e012a52a050279979db1f85d9488073d8005ee3f0dd050b9e925f35c541a830"
     },
     {
       "case": "player-crafting-roll-result",
       "alt": "A finished craft in the Crafting tab, showing the check that was rolled, what the craft used, what it produced, and a Craft complete confirmation.",
-      "sha256": "a3cb4bee0d864d934cbbaf5b095f7ce959085338dab8bdbd81ed66f73fd59a3b"
+      "sha256": "f53c3197b7018c21f5040765869356019c10809a9fd9958061e167d02e6065a8"
     },
     {
       "case": "manager-component-edit-salvage",
       "alt": "The salvage section of the component editor, showing the result sets a component breaks down into, the check outcome each set is awarded for, and the DC override set for this component.",
-      "sha256": "299f24d0e226f51ccbb2c3fe49634c84ca6cc73f8dcca302d96fe26e7c5de179"
+      "sha256": "c973b1666d77ca224d0b0219ec9aa96edbd15b8c77fc4c733db96a7a4856967c"
     },
     {
       "case": "player-salvage",
       "alt": "The salvage view for a selected item in the Inventory tab, listing the ordered results a roll can reach, the difficulty of each, and what can go wrong along the way.",
-      "sha256": "49c36a2dbbebeae8d8eb292116fdc3706eda20c146e94540933966817e3356a3"
+      "sha256": "6a836e08ed2954e365b70b4ee965f0010e2c9f3828667ba6e7948c9b871b1f32"
     },
     {
       "case": "player-salvage-tools",
       "alt": "The salvage view for an item whose salvage needs tools, showing which tools are required and whether the character has them.",
-      "sha256": "973656a45b9dfc5f5b8550ebb88fdbba407f39eda95fe5c70ca1a54ff667f6c3"
+      "sha256": "7744d73c8692e7f21689e0fc0cd736400e4293cf1a6f7694832a706d0d8ef223"
     },
     {
       "case": "player-inventory-bulk-mixed",
       "alt": "The Inventory tab with four items selected at once and the bulk salvage panel beside them, showing what could go wrong, which of the selection will be broken down, and the best case the batch could return.",
-      "sha256": "fff482651fd5aa3c36c76efa5a951127aeac44748d183871fcd811e5c30987c0"
+      "sha256": "60be4f590c6eb5cd43c6061eb2e5720355cbb61b17ae683b828e86eb9bb0363b"
     },
     {
       "case": "manager-tool-parity-01-library-1280x720",
       "alt": "The tool library for a crafting system, listing each tool with how it breaks and what happens when it does, below the system-wide breakage mode, with the selected tool summarised on the right.",
-      "sha256": "ed346f6f8c09ac28e1c14d2be809cf1ca8509c8eeaa23d1df883e982b4c2e347"
+      "sha256": "125320ab28a412c00a393e9640fc8bc27e1548b9e1d14c3c4ead53e42a59458d"
     },
     {
       "case": "manager-tool-parity-03-breakage-1280x720",
       "alt": "The breakage tab of the tool editor, where the chance of breaking and what happens on a break are set.",
-      "sha256": "2591f89b33546cb24f25f82bef92b5e3bd797c4a40fbd41fa79bc8dd21870c8d"
+      "sha256": "ed240a3339e74cf016813dfa9906cb318e8ce245bb28f9a6dfba9ec2afdb6752"
     },
     {
       "case": "manager-tool-parity-04-requirements-1280x720",
       "alt": "The Requirements tab of the tool editor, where the character prerequisites that gate who may wield a tool are chosen, and what happens to a character who does not meet them.",
-      "sha256": "61f751c6ce3b7f1f08e34dd80c6ca3adb9b0ddcafc2a7302a0e08fcfa48c161a"
+      "sha256": "241ce1e87304ac46f11d06cd3aca5e293c5c1ee6a788719d47d6d7430f9c7086"
     },
     {
       "case": "manager-recipe-edit-normal",
       "alt": "The Overview tab of the recipe editor, showing a recipe’s name, flavour text, category and check tier, whether it is enabled or locked, and whether it crafts in one step or several.",
-      "sha256": "0c38959c4d45122ddcf03adf3af880cf6b7f3e3ab666c9456bcc96ceb3584aff"
+      "sha256": "7e6bb68c3371f274d3f442ecd827fb3986c87158229a83c4662f637ac79c5cd9"
     },
     {
       "case": "manager-recipe-edit-ingredients",
       "alt": "The Ingredients tab of the recipe editor, listing the components a recipe requires and how many of each, with the controls that add a component, a tag requirement or an essence requirement.",
-      "sha256": "925f0bc40de16c10046f872a008533ec50527738e25bfa2ae7e1c63791636b11"
+      "sha256": "7d4e18f3c0486da46bd0a1cf5eef79101321a8f531e41cea6e7a8b22a8236195"
     },
     {
       "case": "manager-recipe-edit-results",
       "alt": "The Results tab of the recipe editor for a simple recipe, showing what it produces on success and what it produces on a failed check.",
-      "sha256": "7af617a3e617293cef14b6ac5b9c992f09067e5dfc4445b7b4c7f33ec22f3562"
+      "sha256": "7cd0d56f40b95732170f1a7fd45f453e67a64c82c653ab1a294367031e4e5ce5"
     },
     {
       "case": "manager-recipe-edit-validation",
       "alt": "The Validation tab of the recipe editor, reporting five passing structural checks, no warnings and nothing blocking the recipe from being enabled.",
-      "sha256": "ac9aec4b1272951cbca8476104ea4ee24f1079b561f588b9ed5b4190b9af9a23"
+      "sha256": "c9c010fe33047cdd54ac3db624901fc63ee180bcd93f6b35326935d5d8671aa6"
     },
     {
       "case": "manager-recipe-edit-access-rail",
       "alt": "The Recipe access page, where individual recipes are granted to specific characters or players. Every recipe in this system currently shows No access.",
-      "sha256": "9e70bdad107c53b7167311fc97ee16821523491784e0f285145d2d1854e2286b"
+      "sha256": "7f1561e05e5e013b5424376767782160e3ed0ac12ce81fa9c750894b947d3e4c"
     },
     {
       "case": "player-crafting-simple",
       "alt": "The Crafting tab with a simple recipe ready to craft and its requirements already satisfied.",
-      "sha256": "14c96b11e53200c4de63eff0ee7f7020da27e404469712bb951290f8d9c4e8c3"
+      "sha256": "8c1e3956083d098525e4fa2c5cc0dc8c2d70786ca916d950c7eb8f9f08d15253"
     },
     {
       "case": "coverage-mode-routed-ingredients-results",
       "alt": "The results tab of the recipe editor for a recipe routed by ingredients, showing one result set for each route.",
-      "sha256": "85edc90f99b089dcc82993625b9f0f61b56377cfef5839a16a070c7fdd95bfd8"
+      "sha256": "343ed1decf18bbb7d1f4ce099d02a33af1ef8be8ac6cc6fa47f57f18d2b04ec1"
     },
     {
       "case": "coverage-mode-routed-check-checks",
       "alt": "The Outcomes tab of a routed crafting check, showing its Ruined, Standard and Masterwork tiers, the roll thresholds between them, and which of them count as a success.",
-      "sha256": "9171bc67de13a9cc6431604b06ba35ad871d97672be683dc9a9c72d91b67f039"
+      "sha256": "8fd68363492a6029e96c9710ba5ec7fde85ceb34894d8b61ac50258918c5f64a"
     },
     {
       "case": "player-crafting-ingredient-routed",
       "alt": "A recipe routed by ingredients selected in the Crafting tab, showing how the chosen ingredients decide the result.",
-      "sha256": "4be05575eb37e3fd9cdaced4d23d3052d5ade6e567e65ad9bff58643e5735c48"
+      "sha256": "95b8bb7bff41d7608246cc28f62ba507624f4fdd27d02352a4ddb94da7eece33"
     },
     {
       "case": "player-crafting-routed-by-check",
       "alt": "A recipe routed by check selected in the Crafting tab, showing the outcome tiers the roll can land in.",
-      "sha256": "bfb23b5dca93f5e414fbc2b6d41e1ec5edd62d1df243c3e8a99758ec1fde32fd"
+      "sha256": "7f34594788e672681f3f690fd3fe055576abc8ac66140ab12fd0b181778977cf"
     },
     {
       "case": "manager-recipe-edit-results-progressive",
       "alt": "The Results tab of the recipe editor for a progressive recipe, showing the ordered results, the difficulty attached to each, and the mishaps that some of them carry.",
-      "sha256": "9b7b29a03031753f35e18b3168e7e8216dbbf720625dd3fae02fbb8795ec433b"
+      "sha256": "5568d54008db491e55645baab6b1529b7496bcacece5bbe494da8232d20474fa"
     },
     {
       "case": "player-crafting-progressive",
       "alt": "A progressive recipe selected in the Crafting tab, showing each ordered result, the roll it is reached at, and what can go wrong along the way.",
-      "sha256": "738d5bd244ba5f1faf35cd336d10ac6816e506be4c307b5bc61858af3721f798"
+      "sha256": "8bb9154be6b99d6184d5ae47ef17abeb95add2a0e59cb97beb75df40e463822f"
     },
     {
       "case": "manager-recipe-edit-multistep",
       "alt": "The Overview tab of the recipe editor for a multi-step recipe, showing its three ordered steps and how long each one takes.",
-      "sha256": "9091ff2171690e92ff2ebd97b7092420f412ef96eca62e8e89372ddde4cd1597"
+      "sha256": "9c599aee9ac5b3198eab66f87124e70ff1ffc5288e190457238f193092dd6ea9"
     },
     {
       "case": "player-crafting-multistep",
       "alt": "A multi-step recipe selected in the Crafting tab, showing its total duration and the first of its three steps, with the materials and tool that step needs.",
-      "sha256": "3b0d8b71ae3961927bc2e302dc082967962a113cbb79ead5ef6953a13ba96abd"
+      "sha256": "a22f6ef3ed6b736293c8827fe96f2607149c6b9582fa23f7e9640370762f19c5"
     },
     {
       "case": "manager-alchemy-settings",
       "alt": "The Crafting settings page for a system with Alchemy chosen as its recipe resolution mode.",
-      "sha256": "975c218c8a16e0d218db9bce5b1582678084d7707f3b91d67cbcfaf3b0cff7ad"
+      "sha256": "8e84ab2b5582e7ca35a452918d1c29932b0e15598917eba80f0ae49ed5dbaef8"
     },
     {
       "case": "manager-recipe-edit-results-alchemy",
       "alt": "The Results tab of the recipe editor for an alchemy recipe, showing what a successful brew produces and what a failed check produces instead.",
-      "sha256": "057c9980ec24e3a80f9976f0061ccace4e2012be5b49c90ab6e58347869f0982"
+      "sha256": "cda5b93ac65d61d4dc4270e802d17da9fbcd7adf049102ea1a567db49c735095"
     },
     {
       "case": "player-alchemy-chooser",
       "alt": "The Alchemy tab asking the player to choose a discipline, with each available discipline showing how many of its formulas the character knows.",
-      "sha256": "57b4def62aec46766a8f83f9687b8d0ddd74f2fd022e99405c57a8743af89771"
+      "sha256": "3321f2ea1726ea9fba82c5754d2d824fda0b82a124ac1a32784216016fc535d6"
     },
     {
       "case": "player-alchemy-workbench",
       "alt": "The Alchemy Workbench with an empty bench, the character’s known recipes on the left with none revealed yet, and the components available to place on it on the right.",
-      "sha256": "cd56199a017a1b669d5366cf8455046aca583c5cd14612a9c5e7687db0b30cc2"
+      "sha256": "17f8a59213976eac4b64e0e23a525539d89bb74d2325c71e84502dd4b63c5149"
     },
     {
       "case": "manager-environments-browse-normal",
       "alt": "The gathering environments browser, listing each environment with its selection mode, how many tasks it carries and whether it is on, and the selected environment summarised on the right.",
-      "sha256": "e9183d31a898c5cc64619903e8aedfbcb3227746c878d4fb00113aa2c0a47b4e"
+      "sha256": "b20a3c49ae1bbd843e2424abcb2014d02de1778f50e8f4944c9b0939834a1402"
     },
     {
       "case": "manager-gathering-task-editor-normal",
       "alt": "The gathering task editor, showing a task’s identity and when it may be attempted, with the selected drop rule’s chance, count and modifiers on the right.",
-      "sha256": "2c3cf9f33770a7e96931ee33ae1052f1d0480529ac27a73dd002c3f8d0676105"
+      "sha256": "77347c6f2fb8a39da2db62f16ae0ede21ba9bbd905675104d6b5fa59a10d4a2a"
     },
     {
       "case": "manager-gathering-event-editor-normal",
       "alt": "The gathering event editor, showing an event’s identity, what it matches on, and the biome, time, weather and character modifiers that adjust its chance.",
-      "sha256": "2afc6ce3f3735b57ddf2b266ae7ea40f9aa0e334163677dd55318c7b64c8e770"
+      "sha256": "5eb3555ac2e6bb30abe70b0c3cfa2b3aeea83226ca8c1f9258118c507f10fc0b"
     },
     {
       "case": "manager-checks-gathering",
       "alt": "The Gathering page of the Checks screen, showing that in d100 mode the gathering check is a fixed roll against each drop’s own chance, with nothing to configure.",
-      "sha256": "c4044d7b5ea02495675501e3f40929139f22f69e84c12bb711595e9a787e23f5"
+      "sha256": "f4ee6642317e56171fd7e97cc5b1a2d98d7835cf97783e52eace4e43f20138de"
     },
     {
       "case": "fabricate-journal",
       "alt": "The Journal tab, listing a character’s active runs and the history of finished ones, with a multi-step run open beside them showing what its next step needs.",
-      "sha256": "b597f02e7c47f448485f4f217ddaa3a09c5fe85b03b393a5742efb5ccec1a511"
+      "sha256": "569d845579b5cb59901c6b6d2f802a2bdb76307a4e07015b3d1fc72af73eacd8"
     },
     {
       "case": "fabricate-journal-craft-detail",
       "alt": "A finished crafting run opened in the Journal tab, showing all three of its steps succeeded, what the last step required, and when the run started.",
-      "sha256": "31e7eb7c5abb715e464a06fdb359143f981c9009ff2628889e2b448fb25befbb"
+      "sha256": "942101338749e58e817dcbc735fd01603cf6eb756d19b5badb56fa91cde49c41"
     },
     {
       "case": "manager-books-scrolls-normal",
       "alt": "The Books & Scrolls page, listing each recipe item with how many recipes it teaches and the learning cap set on it.",
-      "sha256": "7a07768912ecb475222611ea91991dd1eabe488a66b80840d12821b92e5be889"
+      "sha256": "7349ebac2e76fccc03e96aed6f10beb06236e33d9b4cf3859c6e1fb54b1410bb"
     },
     {
       "case": "manager-knowledge-owned-copies",
       "alt": "The Knowledge page, listing the characters who hold copies of a system’s recipe items and, for the selected character, each copy with how many of its uses are spent.",
-      "sha256": "9edb7d9f1379501d71fce6e439866112a81508826876bb521a552d9ed9bfc97d"
+      "sha256": "00742baa589bdb114ad586484099bb5f48f446a96c7ebdd5b2fbfbb6140adadb"
     },
     {
       "case": "player-gathering-task-ready",
       "alt": "The player Gathering tab with Frostmark Ridge selected. Its task rows each carry a success chance, and the panel on the right shows the chosen task with an Attempt button, a requirements card reading no special requirements, and what the task might yield.",
-      "sha256": "4f8e467e7ab89e9e5fccc8570bf0bd249f9e00264e498e855e2604a4e3e40535"
+      "sha256": "843ef6b05e0babe766929c4099a808a02f34a36908678eed6c81c93b13bb008d"
     },
     {
       "case": "player-gathering-events",
       "alt": "The player Gathering tab with the Old Karrun Mine detail column on its Events tab. The environment's danger level and event chance sit above a searchable list of three events, and the panel on the right shows the selected event with its own chance.",
-      "sha256": "c6cf905670fbebfc9a1c88f9c1a686771ce8dca7689cdcf2249cceb4df018e8e"
+      "sha256": "a0900b4344f49a2fcedf72b20340440e94eab6284c5db5f05d66d89fa6083d75"
     },
     {
       "case": "player-gathering-tool-blocked",
       "alt": "The player Gathering tab showing a task the selected character cannot attempt. Its row carries a missing tools pill and a padlock, the Attempt button is greyed out, and the requirements card on the right lists a required Glass Alembic marked missing.",
-      "sha256": "2e7fb0f0d3a89ce2009fd2a0c002fb20e621e4310edef17038e9d1a34c9c19d8"
+      "sha256": "0a148b857ed48caada4704b3da7915bc88f6d5bfc79be5ed00c1cb74eba93be0"
     },
     {
       "case": "player-gathering-timed-active",
       "alt": "The player Gathering tab showing a timed task the selected character has already started. Its row carries an already in progress pill and a padlock, the Attempt button is greyed out, and the requirements card on the right says this actor already has an active gathering run for this task.",
-      "sha256": "c39d53be4d8d597684b6c4ab992b4186803f9ff7e04ffa82a782ba47ec5692ab"
+      "sha256": "5ee214e326121b31ee33c79dfb7e5346dd34287d445b1203f33a3f8ee0fb601a"
     },
     {
       "case": "player-gathering-blind",
       "alt": "The player Gathering tab with the blind environment Shadow Thicket selected. A single Attempt gathering action stands in place of task rows, a discovered tasks heading reads zero of two with nothing found yet, and the panel on the right reads no available tasks.",
-      "sha256": "5b84f3c441ad0592bcfedd0d01c780b1ac763c554f37a35d0b3b6dd121238f4a"
+      "sha256": "c8cfab0c10d04f9186fba90f7c3c3630a6a79928bc46badc69b801d85556c867"
     },
     {
       "case": "player-gathering-realm-locked",
       "alt": "The player Gathering tab with a realm-locked environment called The Deepvault in the environment list, greyed out under a not in current realm pill with a padlock over its image. The environment open in the detail column beside the list is blocked for a different reason, a linked scene the character has not visited.",
-      "sha256": "6319202a7fc9777665e13a16093c9197c2eed45c208297ee86f9a4d31a892914"
+      "sha256": "82122540b6460f12df62599056a0585e778dcfd2774031d2ad511accec5cd8b6"
     },
     {
       "case": "manager-environment-edit-placeholder",
       "alt": "The environment editor's Overview tab for Sunlit Grove, showing its image, name, description and active toggle, its danger level and biome tags, and its player-facing behaviour and composition mode choices, with the linked scene, validation and runtime counts summarised on the right.",
-      "sha256": "246cb3572e664339822373b8db0d3584996fdb984e605093f9f84ca8122dc99b"
+      "sha256": "97b4c0de56a14c8c604691199b5296c4449600238c26ee57a18e940ac4c2f0e6"
     },
     {
       "case": "manager-components-normal",
       "alt": "The Components page for a crafting system, with a drop zone for adding items above the component library grouped by category, and the selected component with its tags, essence contributions and actions in the panel on the right.",
-      "sha256": "f05b7dbddd85885f8202d6e60c414f8a70f77fdf3f276a2722d7bc306725763f"
+      "sha256": "e60dd23ada2992d27fd0f3d5da1405c968e680b6bbc84f09e280912e9eda18f9"
     },
     {
       "case": "manager-environment-edit-automatic-force-add",
       "alt": "The environment editor's Tasks tab in automatic composition mode, showing the tasks included by match, an empty excluded section, and the non-matching section with a row menu open on its Force add action.",
-      "sha256": "54441f16c45cb0185644b793baf86aba4040784dccc669ecc1235daa0efca504"
+      "sha256": "2cfc996cb90bd35ec8ae4bd96cf63a4f62470a6f8c888c155a77156d65c38cf5"
     },
     {
       "case": "manager-world-travel-realms-normal",
       "alt": "The Realms page under World and Travel. The Verdant Reach is expanded into a column of environments available to add beside an included environments column reading that no environments are in this realm yet, while the panel on the right carries the realm name, the two environments it records for the realm, and a note that no parties are currently in it.",
-      "sha256": "17d9e9f78c1d1addfbc3ea242c06e5ea8af0bbe85714178f531abc47f9dc9f91"
+      "sha256": "2b565c02bbe79618fbcb3689eaa02c4e4d9d0f40206dc27d622214accba1de5a"
     },
     {
       "case": "manager-world-parties-normal",
       "alt": "The World Parties page, with each party drawn as a full-width card carrying its name, an enabled pill, its member rows, and a travel actor panel with a current realm override picker beneath it.",
-      "sha256": "35168abab547422812c0bd95142ad8772dd99e0ceee7e2ce8965e0b790fc8a68"
+      "sha256": "fb22280f481e574236b38b7730d1ccb56632efb8fa961624965dcf3e141ad7ca"
     },
     {
       "case": "manager-world-travel-map-normal",
       "alt": "The Map Region Links page under World and Travel, with one scene region called Deep Gate Approach and a picker beside it linking that region to the realm The Underdeep, and a panel on the right naming the linked realm and reporting no parties in either.",
-      "sha256": "8723115b564b6e201b13a38ce791fe568a43831ff346488f77759de655903e3c"
+      "sha256": "e13090914ee2b03b6ee2a1ad7ba3330ce244038321f4899ede4cbe49b48623b0"
     },
     {
       "case": "manager-essences-normal",
       "alt": "The Essences page for a crafting system. Each row carries the icon, name, description, effects and macro pills, component and recipe counts and an enable switch, and the panel on the right shows the selected essence and what it does on craft.",
-      "sha256": "96b957ef3fbaf31de9acd288abb3fc83083c4da9d46ad43e8a38dfac330e2526"
+      "sha256": "cf6f9c1c46d7aa080822cd7ea464d560de9ba6ef464fd1037336c94af01038e5"
     },
     {
       "case": "manager-essence-edit-first-state",
       "alt": "The essence rules editor for one crafting system. A card names the shared world definition and offers Edit shared definition, an Enabled in Karrun Forgecraft switch sits below it turned off, and the Active effect source card carries its own override switch and the linked item. A live preview on the right shows how the essence reads on an inventory tile and on a component.",
-      "sha256": "fe152b4011b8c018cdd8e61a0645b2ee8f6048cd64785405f34cb824e3405af9"
+      "sha256": "9a10f31dfad2b5183532696bd28492ef10fb04a66deec5a87b07384e15cc1634"
     },
     {
       "case": "player-crafting-essence-pool",
       "alt": "The player Crafting tab with a recipe whose two essence requirements draw on one shared pool. The Earth and Fire totals are filled, and a list of components below them carries a stepper for adding each one to the pool.",
-      "sha256": "c78272192b6208ba9be2c9203cf2694425a54fe1a0bf6729c9c895716af5e607"
+      "sha256": "85d77116a6854498ce85c99acc4ab117812d3bd356fc01a7af6f8dd092ff93f5"
     },
     {
       "case": "player-crafting-essence-alternative",
       "alt": "The player Crafting tab with a recipe requirement offering two alternatives, a component called Coal and an amount of Fire essence. Coal is chosen, and a card below confirms what the craft will consume.",
-      "sha256": "10185c972d026b8485e91fe8a67a4de9826ecb43b08b261215421a3107c5c891"
+      "sha256": "cbc30f5a1cb49d55e3f5045b9f414f030692e785f6603527251ee116c2cafa42"
     },
     {
       "case": "player-crafting-essence-shopping",
       "alt": "The player Crafting tab with a recipe the character cannot yet make. The shopping list on the right carries the queued recipe and the two shortfalls to acquire, an iron ingot and an amount of Fire essence.",
-      "sha256": "386e59168f2a2f1426919a272b2246deba3c2b44817239a5466fe9593b18ff73"
+      "sha256": "966f9613cd8a3f32e7997bad3096d0de57b909dc8a3bf179c2eacd75e8a310fe"
     },
     {
       "case": "currency-actor-property",
       "alt": "The World Currency page with the spend strategy set to reading coins from a field on the actor sheet, above a list of five coins from copper to platinum with reorder, edit and delete controls on each.",
-      "sha256": "028d11d88b14ce29f10b6d7bb43474131ff461e74382ed9557e9f9c1d2e1fa62"
+      "sha256": "c5d1dafcd442a75a677e7e80177ee6d7b37eb41dfcadd2d4d62313f361c60c6a"
     },
     {
       "case": "currency-actor-inventory",
       "alt": "The World Currency page with the spend strategy set to reading coins from the actor's inventory, showing a warning that this game system has no preconfigured provider, above the same list of five coins.",
-      "sha256": "7cdc93c81a8b45b07d8b750ad10ee101cb128a019df5182c2e33e95d23acc842"
+      "sha256": "5ff9af40e947754f346ed690f70ceee3a2d0546d1684fb2190121136db89473e"
     },
     {
       "case": "currency-macro",
       "alt": "The World Currency page with the spend strategy set to macros, showing four empty drop zones for the can afford, increment, decrement and balance macros with an explanation under each, above the list of coins.",
-      "sha256": "3dd810dc56b3d1fab4051e78c4075a006560d050f595136646887ac698296735"
+      "sha256": "1474b0288140bdb5b964e022a82e87af92d9150923ff012ebc2ca0ae6e911255"
     },
     {
       "case": "manager-component-complications-expanded",
       "alt": "A component's complication expanded in the component editor, showing the conditions it can watch with three ticked and a dice expression filled in, and the effects below with a dice roll turned on and an empty macro drop zone.",
-      "sha256": "f4ae1c67f686c8e5f76ee592e0e55e758725af4d684850960da9f05a0376749f"
+      "sha256": "1a9105ba68bc28ebe8311a71e2be98691e60b756eb98575f317a0389b7436fee"
     },
     {
       "case": "manager-recipe-edit-books-scrolls",
       "alt": "The recipe editor's Books and Scrolls tab, reading that no book or scroll teaches this recipe yet, with a note that a recipe is added to a book from the book's own editor and a button that opens the Books and Scrolls page.",
-      "sha256": "85058db2ae8e47b7b740b29a7813415d293c8011e34ed2b51d29be32da6ba59b"
+      "sha256": "62d432d5b307ce2e8df1337d0437f010ef9cdeab2064d97a01895c8cadcd6ffb"
     },
     {
       "case": "manager-knowledge-learned-lost-copy",
       "alt": "The Knowledge page's Learned recipes tab for one character, listing five recipes with how each was learned, a note reading either no owned copy or no source copy to refund, and an erase memory button on every row.",
-      "sha256": "a5a57a8255a025927b631392a4d21e8bc5ffa03fe55e72a2d57281dcb00c37c9"
+      "sha256": "cb8400ed4bd383d18af52eb7cf2a73a0d2300d3bf127bb5f3453d3535d077350"
     },
     {
       "case": "world-prerequisites",
       "alt": "The Character prerequisites page under World and Rules and Resources, listing five reusable conditions, each showing its name and the character property, comparison and value it tests.",
-      "sha256": "000240791754d10f3f15a3e3ad1bd976d696e1b9349f628b20153896fe883fa3"
+      "sha256": "7ee79900600ef78be5c495ba6a735aa68447f53d31e511adb6c8858fcdad5614"
     },
     {
       "case": "world-modifiers",
       "alt": "The Modifiers page under World and Rules and Resources, listing ten reusable expressions, each showing its name, an optional range and the character property or dice it resolves to.",
-      "sha256": "7019482fc97608494c1abb7262ccccae5d715128b6b3dc58d7176872a3203001"
+      "sha256": "3c38e22a58d67d1328b2cfc22114c53c4d08fc68dc6f98ed3892ea84a187f1e6"
     },
     {
       "case": "manager-tool-stress-repair",
       "alt": "A tool's Breakage tab with its on-break action set to mark the tool as broken, and a repair materials section below listing the ingredient groups a crafter can satisfy, with the tool's effective rules summarised on the right.",
-      "sha256": "36f3be2ee2967e56f30386ac3f17cf707d8e88fa219ff83ecf122d0ac7ec5c74"
+      "sha256": "5a2554e1dd7ff41291393dcdf6434cfbfd4cb2a809ae021ee2abadac5f3b6037"
     },
     {
       "case": "manager-tool-stress-replacement",
       "alt": "A tool's Breakage tab with breakage driven by a dice expression that breaks the tool below a threshold, an on-break action set to replace it with a component, and a picker naming the component produced when it breaks.",
-      "sha256": "8d155766ae5abf5772b5f8912ee08510354515e45c2f2711743ae4fa25c3117b"
+      "sha256": "c308f4a067bc3113512b7a7e5ace2123eab4560084f3db3abf099aca1ae949ab"
     },
     {
       "case": "manager-tool-stress-immune",
       "alt": "A tool's Breakage tab in a system whose breakage is check-driven, with the tool marked immune, and the on-break actions greyed out under a note that immune tools never run one.",
-      "sha256": "c447d5759c90095228b38e3ee34cf37ab7eee31d02797ef7201c8af8353a3402"
+      "sha256": "7dab701b6caee149f0265415a31400767d07450a5910c68ee9b927f80a8daf64"
     },
     {
       "case": "manager-checks-crafting-trigger-break-tools",
       "alt": "The crafting check's Triggers tab, with one trigger expanded to show the condition it watches and how the result moves, and a card beneath it for breaking the required tools whenever that trigger fires.",
-      "sha256": "a547e5fde8016bc03f1b6d72a1a2af29222862177d33c2d5297d061672e851c0"
+      "sha256": "29a243d9ad2bca43a6c685ef0fd0bf5e7ed9203fe6921aa74d901727c7073739"
     },
     {
       "case": "manager-systems-empty",
       "alt": "The Crafting Systems window on a world with no crafting systems, showing the empty system library with a Create system button and a first run panel listing the three steps to set one up.",
-      "sha256": "44a420fa0b39fa33e993776104af7c92a402d08fbd8b70744db16f52ecd4e286"
+      "sha256": "f420b06d839c53677255a8e68de7001d3295ed501efd61c321722e36fd66a037"
     },
     {
       "case": "manager-gathering-settings-normal",
       "alt": "The gathering Settings tab for a crafting system, showing the gathering resolution mode card, the limitation mode card with neither limitation turned on, and the system gathering rules in the inspector beside them.",
-      "sha256": "a98f04e29265b2af6d201518d2fa070f9ed82061fb293f1386aeff304cd78fd0"
+      "sha256": "e0245cc8dac89bdab5954c9c461e6b631e0f070f16012340ceb958591fb7b864"
     },
     {
       "case": "manager-environment-edit-events",
       "alt": "The Events tab of the environment editor, showing two library events included by match, nothing excluded, no non-matching events, and the selected event with its matching evidence and base chance modifier beside it.",
-      "sha256": "6491e9093fba245df18e2611f2c7fe9906cd62f03c51e6f548c5c5cdc6c2a83a"
+      "sha256": "8ed0361b0ba765c27db8fb6c2d9beff34b60d7a6525834b8d2645c4a6ae3606e"
     }
   ]
 }
