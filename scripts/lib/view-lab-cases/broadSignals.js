@@ -291,7 +291,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environments-browse-normal',
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
-  // Tools library card, and the compact form in the task editor and the entry systems card.
+  // Tools library card, the compact form in the task editor and the entry systems card, and the
+  // specimen that mounts it through the published seam (issue 2453).
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
@@ -303,6 +304,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-access-recipe-selected',
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
+    'manager-published-search-specimen',
   ]),
   // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
   // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card.

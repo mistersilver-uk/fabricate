@@ -33,7 +33,8 @@ export function takeCallbacks(entry, callbacks, props) {
 /**
  * What the host's `callbacks(key)` answers: a frozen `{ arity, deliver }`, where `arity` is how
  * many leading arguments the entry forwards and `deliver(args)` calls the key's newest function;
- * for a value key, its `on<Key>Change` with `(next, previous)`. `deliver` calls nothing once
+ * for a value key, its `on<Key>Change` with `(next, previous)`, beside the key's `initial`, which
+ * the host records for a component's write of `undefined`. `deliver` calls nothing once
  * `record` is no longer live, and a throw, or the rejection of a thenable the function returns,
  * goes to `report` and no further, once per call.
  */
@@ -42,6 +43,7 @@ export function callbackFor(entry, record, report) {
     const valued = entry.props[key].kind === 'value';
     const held = valued ? changeKeyOf(key) : key;
     return Object.freeze({
+      ...(valued && { initial: entry.props[key].initial }),
       arity: valued ? 2 : (entry.props[key].args ?? 0),
       deliver(args) {
         const call = record.live ? record.callbacks.get(held) : undefined;

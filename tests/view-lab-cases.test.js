@@ -388,8 +388,8 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
- * mount page, its companion stand-in, and the two specimen fixtures whose cases act on what they
- * mount.
+ * mount page, its companion stand-in, and the three specimen fixtures whose cases act on what
+ * they mount.
  */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
@@ -397,6 +397,7 @@ const labHarnessSource = [
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
+  'tests/view-lab/fixtures/PublishedSearch.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -833,6 +834,8 @@ const labStepper = (key, part) => `[data-lab-values] [data-lab-stepper="${key}"]
 const DISMISSAL = (tone) =>
   `[data-lab-controls] > [data-lab-dismissals] > [data-lab-dismissal="${tone}"]`;
 const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
+/** A part of one published search field of the search fixture, by its section's key. */
+const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1245,6 +1248,16 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labStepper('card', 'button[data-stepper-increment]')}:focus-visible`,
       styles: STEPPER_RING,
+    },
+  ],
+  // The published search fields (issue 2453): the default shell's declared corner, and the focused
+  // input drawing no ring of its own, the shell's border taking the accent instead.
+  'manager-published-search-specimen': [
+    { selector: labSearch('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
+    { selector: `${labSearch('transform', 'input')}:focus`, styles: 'outline-style: none' },
+    {
+      selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
+      styles: 'border-color: var(--fab-accent)',
     },
   ],
 });
@@ -5802,7 +5815,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the nine specimens it mounts', () => {
+test('every published component seam module, and the host, selects the ten specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5822,16 +5835,17 @@ test('every published component seam module, and the host, selects the nine spec
       'manager-published-notice-dismissed',
       'manager-published-steppers-specimen',
       'manager-published-steppers-button-focus',
+      'manager-published-search-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, and the values fixture's stepper. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, and the search fixture's field. */
+const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper', 'SearchField']);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle and Stepper and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper and SearchField and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6205,6 +6219,50 @@ test('the steppers specimen cases act on what the values fixture mounts through 
       '[data-lab-stepper="card"] button[data-stepper-increment]:focus-visible'
     ),
     'the frame is taken with keyboard focus on the plus on the darker strip'
+  );
+});
+
+test('the search specimen case acts on what the search fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedSearch.svelte');
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'SearchField'
+    ),
+    'the fixture mounts SearchField through the seam’s mount'
+  );
+  for (const hook of ['data-lab-search-ground', 'data-lab-search', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit } = getCaseById(
+    'manager-published-search-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [/\[data-lab-search="([a-z]+)"\]/.exec(step.selector)?.[1], step.fill]),
+    [
+      ['filled', 'Iron'],
+      ['transform', '  SALT'],
+    ],
+    'a query kept as typed, then one the companion transforms inside its callback'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-search="transform"][data-lab-value="salt"]'),
+    'the frame is taken only once the transformed value was passed back'
+  );
+  assert.ok(
+    expectSelector.endsWith('.fabricate-search:focus-within') &&
+      expectCenterHit.endsWith('[data-lab-search="transform"] input'),
+    'the frame is taken with focus in the field that transformed'
   );
 });
 

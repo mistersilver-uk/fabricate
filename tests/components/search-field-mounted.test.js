@@ -156,6 +156,28 @@ describe('SearchField', () => {
     assert.ok(input.hasAttribute('data-hook'), 'the other input props still reach the input');
   });
 
+  it('runs a caller’s `onkeydown` AFTER its own Enter guard, so the caller sees it cancelled', async () => {
+    const seen = [];
+    const root = await harness.mount({
+      ariaLabel: 'Search',
+      inputProps: {
+        onkeydown: (event) => {
+          seen.push([event.key, event.defaultPrevented]);
+        },
+      },
+    });
+    const form = document.createElement('form');
+    root.replaceWith(form);
+    form.appendChild(root);
+    const event = new globalThis.KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    root.querySelector('input').dispatchEvent(event);
+    assert.deepEqual(seen, [['Enter', true]]);
+  });
+
   it('keeps its own `type` and `value` over the input props', async () => {
     const root = await harness.mount({
       ariaLabel: 'Search',

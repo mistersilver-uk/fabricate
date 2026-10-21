@@ -86,6 +86,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
+  // In the `control` snippet, which both branches of `{#if label}` render.
+  'src/ui/svelte/components/SearchField.svelte: input': 'always',
   'src/ui/svelte/components/StatusToggle.svelte: button': {
     defaults: ['as'],
     heldBy:
@@ -1387,6 +1389,20 @@ describe('the name clause', () => {
     assert.deepEqual(named('{label?.short}'), []);
     assert.deepEqual(named('<i></i>', ' aria-label={label.long}'), []);
     assert.deepEqual(named('{@render caption?.()}'), []);
+  });
+
+  it('reads undefined as nothing, though a pattern default reads it, as SearchField’s conditional aria-label does', () => {
+    const markup =
+      '<script>let { label, other, ...rest } = $props(); const { x = undefined } = $derived(rest);</script>' +
+      button('<i></i>', ' aria-label={other ? undefined : label || undefined}') +
+      styled(PAIR);
+    assert.deepEqual(syntheticFaults(markup, { props, pin: 'always' }), []);
+  });
+
+  it('names a name that reads only undefined as a fault, for it reaches no published key', () => {
+    assert.deepEqual(named('<i></i>', ' aria-label={other ? undefined : undefined}'), [
+      UNPUBLISHED_NAME,
+    ]);
   });
 
   it('reads the render tag inside a svelte:element as it reads one inside a button', () => {

@@ -404,21 +404,23 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `Button` (issue 2452).
 - The published set continues with `StatusToggle` (issue 2452).
 - The published set continues with `Stepper` (issue 2452).
+- The published set continues with `SearchField` (issue 2453).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
-- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
+- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s and `Button`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, `icon`, `busy`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
+- `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button`, `StatusToggle` and `Stepper` too (issue 2452); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), and `SearchField` too (issue 2453); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
 It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
@@ -489,6 +491,7 @@ It takes a function as a `callback` key does (M17), and the component declares n
 `describe` lists the value key as `{ kind: 'value', required: false }`, without `initial`, and directly after it `on<Key>Change` as `{ kind: 'callback', required: false }`.
 - Fabricate calls `on<Key>Change(next, previous)` only for a change the component makes, once per change, and never when `Object.is(next, previous)`.
 `mount` and `update` never call `on<Key>Change`.
+A component's write of `undefined` records the key's `initial`, so `next` is never `undefined`.
 - Inside that call, an `update` that passes the same value is a no-op, and one that passes another value is drawn before the call returns and wins, with no second call.
 A rejection, revert or transform made synchronously inside the call is exact; one made later shows on the next flush.
 A replaced value moves a text input's caret to the end and ends any IME composition in progress.
@@ -896,6 +899,33 @@ Each group states the accepted values of every key that entry publishes.
   - The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
 - **Private:** what the button draws for a `role` value outside its set; its height, corner, padding, type size and weight; each visual role's colours and edge beyond what this group states, among them the success family that `primary` is drawn in; and how Fabricate redraws a button inside its own toolbars, rows and inspectors; and `StatusToggle`'s track and knob sizes, its button's width, its 78px cap, its colours beyond what its group states, what it draws for an `on` value other than `true` or `false`, and how Fabricate redraws a switch inside its own rows and cards; and `Stepper`'s sizes, glyphs, colours, what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max`, and how Fabricate redraws a stepper in its own rows and cards; the stepper's box is its own in every container, while core's line-height and transition still reach it.
 
+### The issue 2453 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`SearchField`.**
+  - It is the design system's search field: a native `<input type="search">` inside a `<label>` root that also draws a decorative glyph, for a query that narrows a list already on screen and commits nothing.
+    The input is the only focusable element inside `target`, so to return focus to the field the companion focuses `target.querySelector('input')`.
+  - `value` is the query, a string, and is `''` when absent.
+    A `value` that is not a string is outside the contract, and what is drawn for it is private.
+  - `onValueChange` is called with two strings, `(next, previous)`, each time an edit of the user's changes the query: a keystroke, a paste or a cut, and a clear the browser makes from the field's cancel button or on Escape, which reports `''`.
+    Whether the browser draws a cancel button or clears on Escape is the browser's: Chromium, and so Foundry's desktop app, does both.
+    It is not called by `mount`, `update`, Enter or the field losing focus.
+    A companion that refuses or transforms a query passes the query it keeps back through `update` before the call returns, and the field shows it before the user's `input` event has finished dispatching; the replaced query moves the caret to the end and ends any IME composition in progress.
+  - `placeholder` is optional final display text shown while the field is empty, and is not the field's name.
+  - `ariaLabel` is required and is the input's name, final display text naming what is searched, as "Search recipes".
+    The field draws no caption, so the companion draws the same words as visible text beside it, and a name of white space alone leaves the control with no name.
+  - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
+    The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
+  - It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so.
+  - In a DialogV2, Escape clears the query and closes the dialog; a companion that must keep the dialog open stops it in its own `keydown`.
+  - A DialogV2 companion that wants Enter to confirm handles Enter in its own listener above `target`, because the field cancels the form's implicit submission.
+  - Rest `data-*` attributes land on the `<label>` root, never on the input, so the entry reserves no rest name.
+  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, which the companion gives `display: flex`.
+  - The keyboard mark is the design system's text-field variant for a field whose wrapper draws the box: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own, so the companion leaves no room for one.
+  - An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced; `destroy` removes it, so where it holds focus the companion moves focus first.
+- **Private:** `SearchField`'s sizes beyond its height and corner, its glyph and colours beyond what its group states, what it draws for a `value` that is not a string, and how Fabricate redraws a search field in its own toolbars, rosters and cards.
+
 ### Mounting and its refusals
 
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
@@ -1075,6 +1105,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `on<Key>Change(next, previous)` once, and `handle.value(key)` answers `next`
 - **AND** an `update` that sets the key draws it without calling back, and an echo made inside the call with the same value does not loop
 - **AND** a transform made by an `update` inside the call is drawn before the call returns and wins, and a revert to `previous` holds
+
+#### Scenario: A published search field
+
+- **WHEN** a companion mounts `SearchField` with `ariaLabel` and `onValueChange` inside a Fabricate window, and the user types `iron`
+- **THEN** Fabricate calls `onValueChange('iron', '')` once, and `handle.value('value')` answers `'iron'`
+- **AND** a clear the browser makes calls `onValueChange('', 'iron')`, and Enter in the field inside a `<form>` submits nothing
+- **AND** a mount that omits `ariaLabel` throws M9, and one into a target with no `.fabricate` ancestor throws M16
 
 #### Scenario: A malformed request
 

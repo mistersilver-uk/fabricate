@@ -747,6 +747,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-controls': () => import('./fixtures/PublishedControls.svelte'),
   // Issue 2452: steppers whose edits report each number through a callback, by the same seam.
   'published-values': () => import('./fixtures/PublishedValues.svelte'),
+  // Issue 2453: search fields whose bound value reports each query, by the same seam.
+  'published-search': () => import('./fixtures/PublishedSearch.svelte'),
 });
 // view-lab-region:end
 
