@@ -5,6 +5,9 @@
  */
 export const APP_LOCALIZER = Symbol('fabricate.appLocalizer');
 
-/** Svelte's `mount` for a Fabricate root: every tree it mounts carries `localize` as the context. */
+/** Svelte's `mount` for a Fabricate root: each tree carries `localize` beside the caller's context. */
 export const mountWithLocalizer = (mount, localize) => (component, options) =>
-  mount(component, { ...options, context: new Map([[APP_LOCALIZER, localize]]) });
+  mount(component, {
+    ...options,
+    context: new Map([...(options?.context ?? []), [APP_LOCALIZER, localize]]),
+  });
