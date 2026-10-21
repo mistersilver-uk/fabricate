@@ -699,6 +699,7 @@ export function componentBulkDeleteNote(plan, phrase) {
  * The rules list's cohort filter, as `SegmentedControl` options. TWO SEGMENTS (`proto:1558`): the
  * dropped `Overriding` was a PREDICATE over the member cohort, which is why it carried no count.
  * The count is the segment's `badge`, so a label with `({n})` cannot render the number twice.
+ * `text(key, fallback)` localizes each `label` here, because `SegmentedControl` takes it already localized.
  */
 export function componentMembershipFilters({ members, world }, text) {
   return [
@@ -1123,7 +1124,10 @@ function componentRowCategoryClause(row, worldCategory, text) {
   return text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category');
 }
 
-/** The systems card's three segments, counted over the SAME arrays the rows are filtered from. */
+/**
+ * The systems card's three segments, counted over the SAME arrays the rows are filtered from.
+ * `text(key, fallback)` localizes each `label`, because `SegmentedControl` takes it already localized.
+ */
 export function componentEntrySystemFilters({ total, members }, text) {
   const all = Number(total) || 0;
   const withRules = Number(members) || 0;
