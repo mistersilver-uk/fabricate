@@ -964,8 +964,9 @@ Each group states the accepted values of every key that entry publishes.
   - It is the design system's select: a `<button>` trigger with `role="combobox"` that opens a list of options in an overlay, for one choice from a short, known set that commits as it is made.
     The trigger is the only focusable element inside `target`, so to return focus to the select the companion focuses `target.querySelector('button')`.
   - `options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique as a string, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
+    Two options whose values are the same string, as `1` and `'1'`, cannot be drawn: `mount` and `update` accept them, and the mount faults when the list opens, so the companion passes no such pair.
     A member other than `value` and `label` is private, and an empty `options`, which `mount` and `update` both accept, opens a list that draws nothing and says nothing, so the companion should not offer an empty select.
-  - `value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`.
+  - `value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`, and which row the list marks for a `value` that matches none is private.
     A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
   - `onChange` is a required callback, called with one argument, the chosen option's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses an option by pointer or by Enter, the option already chosen included.
     It is not called by `mount`, `update`, opening or closing the list, Escape or an outside press.
@@ -1185,6 +1186,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onChange` once, with the number `25`, the list closes, and focus is on the trigger
 - **AND** the trigger shows the chosen label only once the companion's `update` passes `value: 25`
 - **AND** Escape or a press outside the open list closes it without calling `onChange`
+- **AND** a mount whose `options` hold `1` and `'1'` faults when its list opens, calling `onFault` once with the target empty
 - **AND** a mount that omits `options` throws M9, and one that passes a `data-*` key throws M8
 
 #### Scenario: An overlay host
