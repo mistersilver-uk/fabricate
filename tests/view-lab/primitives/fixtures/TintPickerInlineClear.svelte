@@ -10,7 +10,6 @@
 <Specimen
   {...props}
   allowNone
-  manageDismiss={false}
   customColor=""
   presetGridLabel={localize(presetsKey)}
   noneLabel={localize(noneKey)}

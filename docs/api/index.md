@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -1997,7 +1997,7 @@ if (fabUi?.schemaVersion !== 1) return; // Absent, or a shape this companion doe
 if (!fabUi.components.includes(name)) return; // Not published by this Fabricate version.
 
 const handle = fabUi.mount(name, { target: element, props }); // `props` as `describe(name)` lists.
-handle.update(nextProps); // Replaces every prop; it never merges.
+handle.update(nextProps); // Replaces every prop but an omitted value prop; it never merges.
 handle.destroy(); // Required on every path that ends the mount.
 ```
 
@@ -2655,7 +2655,7 @@ const stepper = fabUi.mount('Stepper', { target, props: props() });
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
 `describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
-A prop's `kind` is `data`, `text`, `slot`, `callback` or `aria`.
+A prop's `kind` is `data`, `text`, `slot`, `callback`, `aria` or `value`.
 `requiredWhen` is present only where a prop is required while another is truthy, and names that other prop; `required` is then `false`.
 A `data` prop takes plain data, and the component receives a copy.
 A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
@@ -2665,10 +2665,10 @@ It takes `true` to request the content slot and `false`, `undefined` or absence 
 A `callback` prop takes a function, and `undefined` or absence omits it, so the component's own default applies.
 A required `callback` prop refuses absence and `undefined` with `<name> requires a non-empty "<key>"`, and one whose `requiredWhen` names a prop that is truthy refuses them with `<name> requires a non-empty "<key>" when "<other>" is truthy`; either refuses any value that is not a function, `''` included, with `"<key>" must be a function`.
 The component holds one stable stand-in for your function for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
-Fabricate calls your function with the arguments the component's section states, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
+Fabricate calls your function with the arguments the component's section states, or, for a value prop's `on<Key>Change`, `(next, previous)`, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
 The call is synchronous, inside the user's event, after the component has finished its own state change; a published callback is never called while Fabricate renders or runs an effect.
 It runs under Fabricate's `untrack`, which covers Fabricate's runtime only, so if you are called back inside an effect of your own, untrack your own reads.
-Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush.
+Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush, except that a value it changes is drawn before the call returns.
 After `destroy`, a fault, or an `update` that omits the prop, Fabricate does not call the function again; a required prop cannot be omitted, so an `update` that omits it throws and the earlier function still answers.
 Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates it refuses the prop.
 An `aria` prop is an ARIA attribute Fabricate writes, under the prop's own name, on the control the component's section names; the component declares no prop of that name.
@@ -2679,6 +2679,24 @@ Fabricate writes the attribute only when the value differs from the one it last 
 Fabricate checks no value against the attribute's own set: the component's section states the accepted values, and any other is private.
 Detect an `aria` prop with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates it refuses the prop.
 A camel-case prop is one the component interprets, and a hyphenated `aria-*` prop is an attribute Fabricate writes under that name; a control's name is carried by the prop its section names, and by the text that an `aria-labelledby` prop its section names points at.
+A `value` prop is a value the component binds and may change itself, such as the text of a search field.
+It takes a string, a number, a boolean or `null`, and anything else throws `"<key>" must be a string, number, boolean or null`; `undefined` or absence means you pass none, so the mount starts at the component's own initial value, which its section states.
+A `value` prop is never required.
+Each `value` prop brings an optional callback prop named `on`, the prop's name with its first letter upper-cased, then `Change`: `query` brings `onQueryChange`.
+`describe` lists the value prop as `{ kind: 'value', required: false }` and directly after it that callback as `{ kind: 'callback', required: false }`.
+Fabricate calls it with `(next, previous)` only when the component changes the value itself, once per change, and never when the two are the same by `Object.is`; `mount` and `update` never call it.
+Inside the call, `handle.value(key)` already answers `next`.
+A throw from it is reported as any callback's is, under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+Inside that call, an `update` with the same value changes nothing, and one with another value is drawn before the call returns and wins, with no second call, so you can reject, revert or transform what the user typed; one made later shows on the next flush, so the user briefly sees their own text first.
+A replaced value moves a text input's caret to the end and ends any IME composition in progress.
+`handle.value(key)` reads a value prop's current value, and answers `undefined` for any other prop and after `destroy` or a fault; `null` is a legal value.
+Detect both before you rely on them, because a Fabricate that predates a value prop refuses it:
+
+```javascript
+const bound = fabUi.describe(name)?.props[key]?.kind === 'value';
+const readable = typeof handle.value === 'function'; // `handle` is what `fabUi.mount(...)` returned.
+```
+
 An ARIA attribute is published only as an `aria` prop a component's section names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless a component's section names the prop (`StatusToggle`'s section names `aria-labelledby`); publishing one later is additive.
@@ -2693,7 +2711,7 @@ A breaking change to one component bumps that component's `version`, keeps the o
 
 `mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
-It returns a frozen `{ update(props), destroy(), slot(key) }`.
+It returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
 Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
@@ -2706,9 +2724,10 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
   Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet reads off its buttons, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
+  A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
 - `onFault` is optional, and is described with faults below.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
-- `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
+- `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts; an omitted or `undefined` value prop keeps its current value instead.
   It is atomic: when it throws, the previous props stay rendered.
   It returns `true` once accepted and `false` after `destroy` or a fault.
 - `destroy()` is idempotent, never throws, and releases the target.
@@ -2720,6 +2739,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   The element is a `<div>`, or a `<span>` where the component draws the content slot inside phrasing content; each component's section says which.
   It is created by `target.ownerDocument` and carries `display: contents` and no other attribute, so its children lay out as the component's own would.
   The element Fabricate holds it in is private.
+- `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
 A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.

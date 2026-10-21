@@ -1,19 +1,30 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
- * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot }`, draws its
- * own content in a content slot, is told of a contained fault through `onFault` (issue 2451), is
- * told of a press through a callback prop, and sets an ARIA attribute on a control through an
- * `aria` prop (issue 2452).
+ * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`,
+ * draws its own content in a content slot, is told of a contained fault through `onFault` (issue
+ * 2451), is told of a press through a callback prop, sets an ARIA attribute on a control through
+ * an `aria` prop (issue 2452), and reads and sets a bound value through a `value` prop (issue 2453).
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
- * `mount` and `unmount`.
+ * `mount`, `unmount` and `flush`.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
+import {
+  changeKeyOf,
+  seedValues,
+  takeValues,
+  valueEntryFault,
+} from './publishedComponentValues.js';
 
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
-const INERT_HANDLE = Object.freeze({ update: () => false, destroy: () => {}, slot: () => null });
+const INERT_HANDLE = Object.freeze({
+  update: () => false,
+  destroy: () => {},
+  slot: () => null,
+  value: () => {},
+});
 
 /** Each required ancestor root: the selector `target` needs above it, and what M16 says it needs. */
 const ROOTS = Object.freeze({
@@ -27,12 +38,16 @@ const hasAncestorBySelector = (target, selector) => Boolean(target.closest?.(sel
 const isFabricateReady = () => globalThis.game?.fabricate?.ready === true;
 const reportToConsole = (...args) => console.error(...args);
 
+const OPTIONAL_CALLBACK = Object.freeze({ kind: 'callback', required: false });
+
+// A value key is never required, and its synthesised `on<Key>Change` follows it directly.
 function describeEntry(entry) {
   const props = {};
   for (const [key, spec] of Object.entries(entry.props)) {
     const described = { kind: spec.kind, required: spec.required === true };
     if (spec.requiredWhen !== undefined) described.requiredWhen = spec.requiredWhen;
     props[key] = Object.freeze(described);
+    if (spec.kind === 'value') props[changeKeyOf(key)] = OPTIONAL_CALLBACK;
   }
   return Object.freeze({
     version: entry.version,
@@ -42,7 +57,7 @@ function describeEntry(entry) {
   });
 }
 
-// The kinds that may state `requiredWhen`: a `slot` or `aria` key is never required.
+// The kinds that may state `requiredWhen`: a `slot`, `aria` or `value` key is never required.
 const CONDITIONAL_KINDS = new Set(['data', 'text', 'callback']);
 
 /**
@@ -77,11 +92,13 @@ function assertKnownEntry(entry) {
   if (!Object.hasOwn(ROOTS, entry.root)) {
     throw new Error(`${PREFIX}${entry.name} has an unknown root "${entry.root}"`);
   }
+  const fault = valueEntryFault(entry);
+  if (fault) throw new Error(PREFIX + fault);
 }
 
 // The kinds the host builds something for: a snippet (`text`), a slot element (`slot`) or a
 // delivering function (`callback`). A `data` or `aria` key needs none, because its copied value
-// is already what the component takes.
+// is already what the component takes; a `value` key reaches the host as its own host prop.
 const HOST_DRAWN_KINDS = new Set(['text', 'slot', 'callback']);
 
 /**
@@ -178,16 +195,21 @@ function underRoot(target, selector, hasAncestor, owner) {
 }
 
 /**
- * What the host receives beside its component; `slots` answers a requested key's element, and
- * `callbacks` a callback key's `{ arity, deliver }`.
+ * What the host receives beside its component; `values` holds each value key's value, `slots`
+ * answers a requested key's element, `callbacks` a callback or value key's `{ arity, deliver }`,
+ * and `flush` runs the runtime's flush, if it registered one, while the mount is live.
  */
-function hostPropsFor(entry, record, initial, onfault, report) {
+function hostPropsFor({ entry, record, initial, values, onfault, report, flush }) {
   return {
     initial,
+    values,
     onfault,
     kinds: contentKinds(entry),
     slots: (key) => record.slots.get(key) ?? null,
     callbacks: callbackFor(entry, record, report),
+    flush: () => {
+      if (record.live) flush?.();
+    },
   };
 }
 
@@ -197,12 +219,15 @@ function handleFor(entry, record, end) {
       if (!record.live) return false;
       const next = copyProps(entry, props);
       takeCallbacks(entry, record.callbacks, next);
+      const values = takeValues(entry, next);
       requestSlots(entry, record, next);
-      record.instance.setProps(next);
+      record.instance.setProps(next, values);
       return true;
     },
     destroy: () => end(record),
     slot: (key) => (record.live ? (record.slots.get(key) ?? null) : null),
+    value: (key) =>
+      record.live && entry.props[key]?.kind === 'value' ? record.instance.getValue(key) : undefined,
   });
 }
 
@@ -271,10 +296,12 @@ function createMountLifecycle({ runtime, report }) {
     live.add(record);
     requestSlots(entry, record, initial);
     takeCallbacks(entry, record.callbacks, initial);
-    const { components, host, mount } = runtime();
+    const values = seedValues(entry, takeValues(entry, initial));
+    const { components, host, mount, flush } = runtime();
     const onfault = (error) => fault(record, error);
     const component = components[entry.path];
-    const props = { component, ...hostPropsFor(entry, record, initial, onfault, report) };
+    const hosted = { entry, record, initial, values, onfault, report, flush };
+    const props = { component, ...hostPropsFor(hosted) };
     try {
       record.instance = mount(host, { target, props });
     } catch (error) {
@@ -304,8 +331,9 @@ function createMountLifecycle({ runtime, report }) {
 }
 
 /**
- * One seam over `table` (the manifest by default). Passing `mount` registers the runtime at once,
- * binding each entry's own `component`; otherwise the adapter calls `register`, once.
+ * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`
+ * among it, at once, binding each entry's own `component`; otherwise the adapter calls `register`,
+ * once.
  * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
@@ -313,6 +341,7 @@ export function createPublishedComponents({
   host,
   mount,
   unmount,
+  flush,
   report = reportToConsole,
   isElement = isElementNode,
   hasAncestor = hasAncestorBySelector,
@@ -356,6 +385,7 @@ export function createPublishedComponents({
       host: adapterHost,
       mount: adapterMount,
       unmount: adapterUnmount,
+      flush: adapter.flush,
     });
   }
 
@@ -369,7 +399,7 @@ export function createPublishedComponents({
 
   if (mount) {
     const components = Object.fromEntries(table.map((entry) => [entry.path, entry.component]));
-    register({ components, host, mount, unmount });
+    register({ components, host, mount, unmount, flush });
   }
 
   return Object.freeze({

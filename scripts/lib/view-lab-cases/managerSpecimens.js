@@ -8,13 +8,14 @@ import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 /**
- * The seam, its prop kinds, its callbacks, its manifest, its adapter and its host: each redraws
- * what it mounts.
+ * The seam, its prop kinds, its callbacks, its values, its manifest, its adapter and its host:
+ * each redraws what it mounts.
  */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
   /^src\/ui\/publishedComponentProps\.js$/,
   /^src\/ui\/publishedComponentCallbacks\.js$/,
+  /^src\/ui\/publishedComponentValues\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,

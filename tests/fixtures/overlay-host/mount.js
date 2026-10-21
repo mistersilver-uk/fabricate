@@ -10,6 +10,7 @@ import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopov
 import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
 import AnchoredPopoverHost from './AnchoredPopoverHost.svelte';
+import TintAnchoredHost from './TintAnchoredHost.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';
@@ -82,7 +83,13 @@ const target = buildHost();
 // trigger at the origin, a host-relative and a viewport-relative arrangement can coincide.
 target.append(element('div', 'fixture-spacer', { height: '90px' }));
 
-const mountPoint = element('div', 'fixture-mount');
+// `?wrap=biome-add` mounts into the New-biome form's grid, so a trigger is measured in the 38px
+// column it ships in (issue 2459).
+const inBiomeForm = params.get('wrap') === 'biome-add';
+const mountPoint = element(
+  inBiomeForm ? 'form' : 'div',
+  inBiomeForm ? 'manager-condition-add manager-biome-add' : 'fixture-mount'
+);
 
 // THE CLIPPING COLUMN (issue 1477) ──────────────────────────────────────────────────────── For the
 // action menu only, the trigger is put inside a SHORT `overflow: auto` box, near its bottom edge,
@@ -122,7 +129,7 @@ function actorBarStore() {
   };
 }
 
-/** The eight overlay subjects this fixture can mount, by `?component=` (issue 1470). */
+/** The overlay subjects this fixture can mount, by `?component=` (issue 1470). */
 const COMPONENTS = {
   icon: [IconPicker, { value: 'fas fa-fire', ariaLabel: 'Choose an icon' }],
   source: [
@@ -184,6 +191,8 @@ const COMPONENTS = {
   // `.fabricate-app`, and nothing in the product depended on that.
   // The picker opened from a caller's anchor rather than its own trigger (issue 2459).
   'anchored-popover': [AnchoredPopoverHost, { form: params.get('form') ?? 'element' }],
+  // The tint palette opened from a caller's anchor, as the biome edit palette opens it (issue 2459).
+  'tint-anchored': [TintAnchoredHost, {}],
   actorbar: [
     ActorSelectTopBar,
     {

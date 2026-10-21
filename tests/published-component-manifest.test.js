@@ -61,6 +61,7 @@ import { describe, it } from 'node:test';
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
+import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
@@ -206,7 +207,9 @@ function renderedLocals(ast) {
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria', 'value']);
+const VALUE_KEY = /^[a-z][A-Za-z0-9]*$/;
+const VALUE_TYPES = new Set(['string', 'number', 'boolean']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
@@ -264,7 +267,7 @@ function argsFaults(key, spec) {
 
 /**
  * What a key's `requiredWhen` breaks: the name of another `data` key of the entry that is neither
- * `required` nor `requiredWhen` itself, on a key that is no `slot` or `aria` key and states no
+ * `required` nor `requiredWhen` itself, on a key that is no `slot`, `aria` or `value` key and states no
  * `required` (issue 2452).
  */
 function requiredWhenFaults(key, spec, entry) {
@@ -278,11 +281,31 @@ function requiredWhenFaults(key, spec, entry) {
   else if (guard.required === true || guard.requiredWhen !== undefined) {
     faults.push(`${named}, which is itself required or requiredWhen`);
   }
-  if (spec.kind === 'slot' || spec.kind === 'aria') {
+  if (['slot', 'aria', 'value'].includes(spec.kind)) {
     faults.push(`${key} states requiredWhen, which no ${spec.kind} key takes`);
   }
   if (spec.required !== undefined) faults.push(`${key} states both required and requiredWhen`);
   return faults;
+}
+
+/**
+ * What a `value` key's spec breaks: a name that is not camel case from a lower-case letter, an
+ * `initial` that is not a string, number, boolean or `null`, a stated `required`, and a
+ * synthesised `on<Key>Change` the entry lists or the component declares.
+ */
+function valueFaults(key, spec, entry, declared) {
+  if (spec.kind !== 'value') return [];
+  const change = `on${key[0].toUpperCase()}${key.slice(1)}Change`;
+  const primitive = spec.initial === null || VALUE_TYPES.has(typeof spec.initial);
+  return [
+    ...(VALUE_KEY.test(key) ? [] : [`${key} is a value key whose name is not camel case`]),
+    ...(primitive ? [] : [`${key} has an initial that is not a string, number, boolean or null`]),
+    ...(spec.required === undefined ? [] : [`${key} is a value key that states required`]),
+    ...(Object.hasOwn(entry.props, change)
+      ? [`${key} synthesises ${change}, which the entry lists`]
+      : []),
+    ...(declared.has(change) ? [`${key} synthesises ${change}, which the component declares`] : []),
+  ];
 }
 
 /** What a key's `element` breaks: stated on a `slot` key only. */
@@ -293,7 +316,8 @@ const elementFaults = (key, spec) =>
 
 /**
  * Each rule an entry's published keys break against the component's parsed declaration, as
- * `<key> <rule>`. An unpublished prop is not judged: it may be `$bindable` or rendered either way.
+ * `<key> <rule>`. A `value` key is `$bindable`, and no other published key is. An unpublished prop
+ * is not judged: it may be `$bindable` or rendered either way.
  * An `aria` key is judged by `ariaFaults`, since the component declares no prop for it.
  * Where a `callback` key is called from is `published-component-controls.test.js`'s.
  */
@@ -323,13 +347,17 @@ function declarationFaults(entry, ast) {
     if (spec.required !== undefined && typeof spec.required !== 'boolean') {
       faults.push(`${key} is required by something other than a boolean`);
     }
-    if (prop.bindable) faults.push(`${key} is $bindable`);
+    if (prop.bindable && spec.kind !== 'value') faults.push(`${key} is $bindable`);
+    if (!prop.bindable && spec.kind === 'value') {
+      faults.push(`${key} is a value key that is not $bindable`);
+    }
+    faults.push(...valueFaults(key, spec, entry, declared));
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
     if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
     faults.push(...elementFaults(key, spec));
-    if (spec.kind === 'data' && calls.length > 0) {
-      faults.push(`${key} is a data key rendered as a snippet`);
+    if ((spec.kind === 'data' || spec.kind === 'value') && calls.length > 0) {
+      faults.push(`${key} is a ${spec.kind} key rendered as a snippet`);
     }
     if (spec.kind === 'callback' && calls.length > 0) {
       faults.push(`${key} is a callback key a render tag calls`);
@@ -808,6 +836,12 @@ describe('the manifest', () => {
     );
   });
 
+  it('holds a primitive initial and no colliding change key on every value key, the probe’s among them', () => {
+    for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
+      assert.equal(valueEntryFault(entry), null, entry.name);
+    }
+  });
+
   it('is a frozen list of frozen entries with unique names', () => {
     assert.ok(Object.isFrozen(PUBLISHED_COMPONENT_MANIFEST));
     const names = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name);
@@ -848,7 +882,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges eleven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button', () => {
+  it('judges thirteen focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -869,6 +903,8 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Stepper.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
+      'tests/fixtures/published-components/PublishedProbe.svelte: input',
+      'tests/fixtures/published-components/PublishedProbe.svelte: input',
     ]);
   });
 
@@ -1011,6 +1047,28 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(faultsOf({ label: data }), []);
   });
 
+  it('passes a $bindable value key whose initial is each primitive, null among them', () => {
+    for (const initial of ['', 0, false, null]) {
+      assert.deepEqual(faultsOf({ value: { kind: 'value', initial } }), []);
+    }
+  });
+
+  it('names a value key whose change callback the component declares, or whose name is not camel case', () => {
+    const { ast } = templateOf(
+      'Valued.svelte',
+      [
+        '<script>',
+        "  let { value = $bindable(''), onValueChange, Big = $bindable('') } = $props();",
+        '</script>',
+      ].join('\n')
+    );
+    const value = { kind: 'value', initial: '' };
+    assert.deepEqual(declarationFaults({ props: { value, Big: value } }, ast), [
+      'value synthesises onValueChange, which the component declares',
+      'Big is a value key whose name is not camel case',
+    ]);
+  });
+
   for (const [claim, props, faults] of [
     ['a published $bindable key', { value: data }, ['value is $bindable']],
     [
@@ -1031,7 +1089,39 @@ describe('each entry matches its component declaration', () => {
       ['body is an optional text key rendered without ?. or an {#if} guard'],
     ],
     ['a data key with a render tag', { note: data }, ['note is a data key rendered as a snippet']],
-    ['a value kind', { note: { kind: 'value' } }, ['note has the unshipped kind value']],
+    [
+      'a value key that is not $bindable, with a render tag',
+      { note: { kind: 'value', initial: '' } },
+      ['note is a value key that is not $bindable', 'note is a value key rendered as a snippet'],
+    ],
+    [
+      'a value key with no initial',
+      { value: { kind: 'value' } },
+      ['value has an initial that is not a string, number, boolean or null'],
+    ],
+    [
+      'a value key whose initial is an object',
+      { value: { kind: 'value', initial: {} } },
+      ['value has an initial that is not a string, number, boolean or null'],
+    ],
+    [
+      'a value key that states required',
+      { value: { kind: 'value', initial: '', required: false } },
+      ['value is a value key that states required'],
+    ],
+    [
+      'a value key that states requiredWhen',
+      { open: { kind: 'data' }, value: { kind: 'value', initial: '', requiredWhen: 'open' } },
+      ['open is not a declared prop', 'value states requiredWhen, which no value key takes'],
+    ],
+    [
+      'a value key whose change callback the entry lists',
+      { value: { kind: 'value', initial: null }, onValueChange: { kind: 'callback' } },
+      [
+        'value synthesises onValueChange, which the entry lists',
+        'onValueChange is not a declared prop',
+      ],
+    ],
     [
       'a callback key a render tag calls',
       { note: { kind: 'callback' } },

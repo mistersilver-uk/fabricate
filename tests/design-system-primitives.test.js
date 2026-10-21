@@ -228,7 +228,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // Issue 2424: the published tier track, on its specimen mounted through the seam.
   'src/ui/svelte/components/TierTrack.svelte',
-  // Issue 2257: the tint palette and its trigger, on the frames that draw a pressed cell.
+  // Issues 2257 and 2459: the tint palette and its trigger, on the frames that draw a selected swatch.
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
@@ -442,12 +442,12 @@ test('(a) the older overrides still name the frame that renders their state', ()
     [
       'src/ui/svelte/components/TintPicker.svelte',
       'manager-gathering-biome-colour-popover-cursor',
-      'the one frame that draws the keyboard cursor on a swatch that is not pressed',
+      'the one frame that draws the keyboard cursor on a tile that is not selected',
     ],
     [
       'src/ui/svelte/components/TintPicker.svelte',
       'manager-gathering-biome-colour-popover-cursor-selected',
-      'the one frame that draws the cursor and the selected ring on one swatch',
+      'the one frame that draws the cursor and the selected ring on one tile',
     ],
     [
       'src/ui/svelte/components/IconPicker.svelte',

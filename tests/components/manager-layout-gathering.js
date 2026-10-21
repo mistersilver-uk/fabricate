@@ -20,7 +20,6 @@ import {
 } from './manager-layout-shared.js';
 import {
   CHANCE_SLIDER_FIXTURE,
-  colorPickerSource,
   partiesTabScoped,
   partiesTabSource,
   partyExpandedBodyScoped,
@@ -197,13 +196,8 @@ test('manager gathering settings condition panels use a two-column responsive gr
     '.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i'
   );
   // Issue 1470 re-rooted the colour family off `.fabricate-manager` and onto the namespace
-  // classes `TintPickerButton` and `TintPicker` write, so the two shared components
-  // paint in whatever application they are mounted in. Same declarations, same specificity, same
-  // place in the file — only the root moved, and these lookups follow it.
-  const colorPickerPopoverBlock = blockFor(
-    '.fabricate-color-picker-popover.manager-color-picker-popover'
-  );
-  const colorPresetGridBlock = blockFor('.fabricate-color-picker-popover .manager-color-preset-grid');
+  // classes `TintPickerButton` and `TintPicker` write; the popover box is the picker panel's own
+  // since issue 2459, so only the hex field's chrome is read here.
   const colorCustomInputBlock = blockFor('.fabricate-color-picker-popover .manager-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager .manager-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
@@ -302,39 +296,6 @@ test('manager gathering settings condition panels use a two-column responsive gr
   assert.ok(
     css.includes('--fab-biome-icon-foreground: #202124;'),
     'biome icon foreground token should stay fixed charcoal in theme declarations'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('box-sizing: border-box;'),
-    'biome color picker popover should contain its padding and border in its width'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('z-index: 120;'),
-    'biome color picker popover should layer with Manager portaled pickers'
-  );
-  assert.equal(
-    colorPickerPopoverBlock.includes('top: calc(100% + 6px);'),
-    false,
-    'biome color picker popover position should come from computed inline placement'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('width: 220px;'),
-    'biome color picker popover should be wide enough for presets and custom hex input'
-  );
-  assert.ok(
-    colorPickerSource.includes('computeIconPickerPopoverLayout'),
-    'biome color picker should use shared popover positioning'
-  );
-  assert.ok(
-    colorPickerSource.includes('minWidth: 220') && colorPickerSource.includes('maxWidth: 220'),
-    'biome color picker layout should keep a fixed compact width'
-  );
-  assert.ok(
-    colorPickerSource.includes("horizontalAlign: 'left'"),
-    'biome color picker layout should left-align with the trigger'
-  );
-  assert.ok(
-    colorPresetGridBlock.includes('grid-template-columns: repeat(4, 1fr);'),
-    'biome color picker presets should render as a compact grid'
   );
   assert.ok(
     colorCustomInputBlock.includes('width: 100%;'),
