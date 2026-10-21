@@ -316,13 +316,17 @@ export const CASES = Object.freeze([
         {
           selector: `${HERO_PANEL} > div > i`,
           styles:
-            'width: 38px; height: 38px; border-radius: 9px; background-color: var(--fab-bg-3)',
+            'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
         },
         { selector: `${HERO_PANEL} > div > div`, styles: SLOT_BOX },
         { selector: `${HERO_PANEL} > div > div > div`, styles: SLOT_BOX },
         {
           selector: '.manager-empty h3',
-          styles: 'color: var(--fab-text); font-size: 15px',
+          styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
+        },
+        {
+          selector: `${HERO_PANEL} > div > p`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px',
         },
         {
           selector: FILTERED_PANEL,

@@ -1099,13 +1099,18 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.manager-empty:not(.is-filtered) > div', styles: 'display: flex; row-gap: 8px' },
     {
       selector: '.manager-empty:not(.is-filtered) > div > i',
-      styles: 'width: 38px; height: 38px; border-radius: 9px; background-color: var(--fab-bg-3)',
+      styles:
+        'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
     },
     { selector: '.manager-empty:not(.is-filtered) > div > div', styles: 'display: contents' },
     { selector: '.manager-empty:not(.is-filtered) > div > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty h3',
-      styles: 'color: var(--fab-text); font-size: 15px',
+      styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
+    },
+    {
+      selector: '.manager-empty:not(.is-filtered) > div > p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
     },
     {
       selector: '.manager-empty.is-filtered',
