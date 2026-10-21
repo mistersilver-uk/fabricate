@@ -255,6 +255,7 @@
       pageSize={componentPageSize}
       pageIndex={componentPageIndex}
       pageSizeOptions={[6, 9, 12]}
+      density="compact"
       onPageChange={(next) => (componentPageIndex = next)}
       onPageSizeChange={(next) => {
         componentPageSize = next;

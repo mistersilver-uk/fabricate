@@ -207,7 +207,6 @@
 
 .fabricate-manager .manager-tools-browser-pagination .fabricate-pagination {
   width: 100%;
-  box-sizing: border-box;
 }
 
 /* `proto:4870`: `gap: 11px; border-radius: 9px`. The row gap takes the scale's 12px, which is the step nearest the design's 11 — it was 8, one step short, which is where a third of finding 13's 30-40% looseness reversed into tightness. */
@@ -803,11 +802,9 @@
   background: var(--fab-bg-0);
 }
 
-/* THE ROWS AND THE PAGER LOSE THEIR FILLS. The border is what makes a row a row here, which is the prototype's own construction; a fill on top of a pane one rung darker is what made five near-identical greys on one screen. */
+/* THE ROWS LOSE THEIR FILLS. The border is what makes a row a row here, which is the prototype's own construction; a fill on top of a pane one rung darker is what made five near-identical greys on one screen. */
 .fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination,
-.fabricate-manager[data-manager-view='essences'] .manager-essence-row,
-.fabricate-manager[data-manager-view='essences'] .fabricate-pagination {
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row {
   background: transparent;
 }
 
@@ -908,11 +905,9 @@
   background: var(--fab-surface-active);
 }
 
-/* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the reference’s own construction on both list screens. */
+/* THE ROWS LOSE THEIR FILLS, so the 1px border is what makes a row a row — the reference’s own construction on both list screens. */
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-tools'] .fabricate-pagination,
-.fabricate-manager[data-manager-view='tools'] .manager-tools-row,
-.fabricate-manager[data-manager-view='tools'] .fabricate-pagination {
+.fabricate-manager[data-manager-view='tools'] .manager-tools-row {
   background: transparent;
 }
 
@@ -979,11 +974,6 @@
 }
 
 /* ── THE WORLD COMPONENT CATALOGUE'S ROW STATES ── A NEW BLOCK, APPENDED (issue 1371). */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-components'] .fabricate-pagination {
-  background: transparent;
-}
-
 .fabricate-manager[data-manager-view='world-components']
   .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
   background: var(--fab-surface-raised);
@@ -2706,13 +2696,6 @@
 /* `proto:1062`: the two micro-labels on the second row at 8.5px. The shared label rule draws 8.8px, and the 0.08em tracking it already carries resolves against the element's OWN size, so the `letterSpacing` line closes with the size and needs no declaration of its own. */
 .fabricate-manager[data-manager-view="components"] .manager-component-filter-label {
   font-size: 8.5px;
-}
-
-/* === issue 1371 r16-cat — the world Component catalogue's foot pager, second pass (maintainer ruling M21, superseding r13-cat's M19 rule that stood here). === */
-
-/* ── THE PAGER IS A FULL-WIDTH BAND BY CONSTRUCTION NOW (M21) ── M19 ("the pagination footer on the component browser is not full width") was closed in r13 by bleeding the pager through the list column's `--fab-space-4` inset with three negative margins. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .fabricate-pagination {
-  background: var(--fab-overlay-light-03);
 }
 
 /* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG, ON EVERY BULK PANEL (M24) ── `proto:5340` (the world panel) and `proto:5638` (the system panel) draw the dock's destructive action `height:34px; border-radius:8px; font:700 11px` on a `--danger-soft` fill inside a `--danger-border` hairline, as ONE 11px line. */

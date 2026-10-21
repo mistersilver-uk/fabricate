@@ -764,16 +764,6 @@
   outline-offset: 2px;
 }
 
-/* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502). */
-.fabricate-pagination.fabricate-pagination .fabricate-icon-button {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-
-  /* THE PAGER'S CORNER, AND ONLY THE PAGER'S. The family's shared base block corners every icon button at 6px; the specimen's published icon rung is `.k-btn.icon` at radius 7, which is also the corner the `inline` select rung this bar now holds takes (issue 1504). */
-  border-radius: 7px;
-}
-
 .fabricate-icon-button.fabricate-icon-button i,
 .fabricate-button.fabricate-button i {
   position: static;
@@ -1841,17 +1831,11 @@
   flex-wrap: wrap;
   gap: var(--fab-space-2);
   min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
 }
 
 /* The pager is the footer's only content and renders nothing at or below the smallest page. */
@@ -2000,9 +1984,6 @@
 .fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
 }
 
 .fabricate-manager .manager-drop-rank-cell {

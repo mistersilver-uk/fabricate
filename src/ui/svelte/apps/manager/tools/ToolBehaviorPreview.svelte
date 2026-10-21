@@ -406,6 +406,7 @@
         <Pagination
           multiPageOnly
           showPageSize={false}
+          density="compact"
           totalCount={requiredFor.length}
           pageIndex={requiredForIndex}
           pageSize={requiredForPageSize}
@@ -436,35 +437,12 @@
     margin-right: var(--fab-space-chip);
   }
 
-  /* `Pagination` renders its own `<section>`, so the sizing is stated from this side of the
-     boundary — the same repair `SystemRulesRoster` makes for the inspector roster's pager. The
-     shipped bar is built for the foot of a full-width list, and in a 300px rail it wraps the nav
-     onto a second line: a pager that says there is more and hides the control that reaches it.
-     The region class carries the scoping hash, so the DESCENDANT is what must be `:global`,
-     written that way so the reach is this rail rather than every pager in the manager. */
+  /* The compact pager is the LAST element of the last region of a scrolling rail, measured at a
+     0.64px overflow of its own container: MARGIN, NOT PADDING, because padding grows the element's
+     own box and a margin is outside it. The region class carries the scoping hash, so the
+     descendant is `:global`, which keeps the reach to this rail. */
   .manager-tool-required-for > :global(.fabricate-pagination) {
     flex: 0 0 auto;
-    flex-wrap: nowrap;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-1) 0 0;
-
-    /* MARGIN, NOT PADDING, and the difference is load-bearing: this is the LAST element of the
-       last region of a scrolling rail, measured at a 0.64px overflow of its own container.
-       Padding grows the element's own box and moves nothing; a margin is outside it. */
     margin-bottom: var(--fab-space-1);
-    font-size: 0.62rem;
-  }
-
-  .manager-tool-required-for :global(.manager-pagination-page) {
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .manager-tool-required-for :global(.manager-pagination-nav .fabricate-icon-button) {
-    flex: 0 0 24px;
-    width: 24px;
-    height: 24px;
-    min-height: 24px;
-    border-radius: 6px;
   }
 </style>

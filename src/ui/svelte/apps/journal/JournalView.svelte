@@ -247,8 +247,9 @@
   }
   .journal-browse-lists {
     display: grid;
-    /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. */
-    grid-template-rows: minmax(0, 1fr) 280px;
+    /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. The
+       pager is 47px: a rule, the 30px page-size track, and the section inset above and below. */
+    grid-template-rows: minmax(0, 1fr) 284px;
     min-height: 0;
     flex: 1 1 auto;
     gap: 0;

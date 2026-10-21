@@ -277,11 +277,12 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--fab-space-3);
-  padding: var(--fab-space-2) var(--fab-space-3);
+  box-sizing: border-box;
+  padding: var(--fab-space-3);
   border-top: 1px solid var(--fab-border);
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-bg-1);
   color: var(--fab-text-muted);
-  font-size: 0.78rem;
+  font-size: 10.5px;
 }
 
 /* THE PAGER'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus` below: core's `a.button:focus, button:focus` paints an orange outline and a 4px glow that the module reset removes inside every Fabricate window, and this family now renders in hosts that have no Fabricate root at all. */
@@ -310,10 +311,11 @@
   min-width: 96px;
   text-align: center;
   color: var(--fab-text);
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
-/* `Per page` IS TWO WORDS AND ONE LABEL. In a wrapping pager row it broke across two lines beside a 28px select, which set the bar's own height off its siblings' and read as a stray word (issue 1373). */
+/* `Per page` IS TWO WORDS AND ONE LABEL: on one line, so it never sets the bar's height off its siblings'. */
 .fabricate-pagination .manager-pagination-size {
   display: inline-flex;
   align-items: center;
@@ -321,9 +323,12 @@
   white-space: nowrap;
 }
 
-/* THE PER-PAGE CONTROL'S ONLY REMAINING SHEET DECLARATION. The `<select>` this replaces was painted here at 28px / radius 6 / `--fab-bg-1` with a 64px floor; the control is a shared `<Select size="inline">` now, so its height, corner, fill and type come from the `.fabricate-select*` family and nothing about them is the pager's to say (issue 1504). */
-.fabricate-pagination .manager-pagination-size [data-pagination-size] {
-  min-width: 64px;
+/* The pager's arrow box: pagination's rule rather than IconButton's, at the specimen's 7px icon-rung corner. */
+.fabricate-pagination.fabricate-pagination .fabricate-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
 }
 
 /* Compact rails opt in; the default browse pager keeps its full three-part layout. */
@@ -360,14 +365,6 @@
   border-radius: 7px;
   flex: 0 0 26px;
   font-size: 10px;
-}
-
-.fabricate-pagination.is-compact .manager-pagination-size [data-pagination-size] {
-  min-width: 48px;
-  min-height: 26px;
-  height: 26px;
-  padding: 0 var(--fab-space-2);
-  font-size: 10.5px;
 }
 
 .fabricate-pagination .manager-pagination-hidden {
