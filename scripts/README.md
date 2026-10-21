@@ -617,13 +617,17 @@ The driver writes `0001.png` onwards and a `manifest.json` carrying each frame's
 It refuses the repository root, an ancestor of it, and any directory holding files it did not write.
 A run stages its frames in a `.demo-capture-*` directory inside the output directory and removes it on exit.
 Every scene draws a 1200x750 window, and `--scale` sets the device pixel ratio (default 4/3), so a default frame is 1600x1000.
-If the forge roll no longer reaches Masterwork, or the still's brew no longer passes its check, after a product change, it fails and names `--seed` for re-tuning `DEMO_SEED`.
+The journey runs nine scenes in order: GM authoring in the recipe editor (an "any one of" grip and a Masterwork flourish the player picks), the forge craft with the player's grip pick and a routed check, the flourish claimed in the journal, the crafting inventory, the theme cut, an essence-matched brew, the GM Knowledge view, an alchemy experiment that discovers a recipe, and salvage.
+Every scene draws in the default `fabricate` theme; only the theme cut changes palette, through all seven, naming each in the caption.
+If the forge roll no longer reaches Masterwork, or a brew no longer passes its check, after a product change, it fails and names `--seed` for re-tuning `DEMO_SEED`.
 Each beat carries a caption from the driver's `CAPTIONS` table, drawn into the page in Fabricate's own Spectral and JetBrains Mono faces and the active palette's tokens.
 The run fails if either face falls back.
 Pass `--no-captions` for a caption-free set; `manifest.json` records which one it holds under `captions`.
 
 Encoding uses Pillow (`pip install pillow`), a local tool and not a repository dependency.
-At the default frame size the captioned GIF comes to about 7 MB:
+It quantizes every frame of one theme against one shared palette, so a pixel that did not change keeps its index and each later frame stores only the rectangle that did.
+A palette per frame would store every frame whole, more than doubling the file.
+The GIF must stay at or under 10 MB; the snippet fails rather than write a larger one:
 
 ```python
 import json
@@ -631,23 +635,31 @@ from pathlib import Path
 from PIL import Image
 
 src = Path("tmp/demo-frames")
+out = Path("docs/img/fabricate-demo.gif")
 manifest = json.loads((src / "manifest.json").read_text())
+rgb = [Image.open(src / f["file"]).convert("RGB") for f in manifest["frames"]]
+palettes = {}
+for theme in {f["theme"] for f in manifest["frames"]}:
+    members = [im for im, f in zip(rgb, manifest["frames"]) if f["theme"] == theme]
+    width, height = members[0].size
+    sheet = Image.new("RGB", (width, height * len(members)))
+    for index, im in enumerate(members):
+        sheet.paste(im, (0, index * height))
+    palettes[theme] = sheet.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
 frames = [
-    Image.open(src / f["file"]).convert("RGB").quantize(
-        colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
-    )
-    for f in manifest["frames"]
+    im.quantize(palette=palettes[f["theme"]], dither=Image.Dither.NONE)
+    for im, f in zip(rgb, manifest["frames"])
 ]
-durations = [f["durationMs"] for f in manifest["frames"]]
 frames[0].save(
-    "docs/img/fabricate-demo.gif",
+    out,
     save_all=True,
     append_images=frames[1:],
-    duration=durations,
+    duration=[f["durationMs"] for f in manifest["frames"]],
     loop=0,
     optimize=True,
     disposal=1,
 )
+assert out.stat().st_size <= 10 * 1024**2, f"{out} is over 10 MB; trim holds or pass --scale 1"
 ```
 
 ## Foundry integration (smoke) tests

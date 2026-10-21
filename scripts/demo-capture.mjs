@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
+import { DEFAULT_FABRICATE_THEME, FABRICATE_THEME_CHOICES } from '../src/ui/theme.js';
 import { DEMO_SEED } from '../tests/view-lab/demo/demoContent.js';
 
 import {
@@ -40,10 +41,13 @@ const WINDOW = Object.freeze({ width: 1200, height: 750 });
 const DEFAULT_SCALE = 4 / 3;
 
 const FORGE = 'demo-emberdeep-forge';
+const STILL = 'demo-hollowmere-still';
 const PLAYER = 'fabricate-app';
 const MANAGER = 'fabricate-crafting-system-manager';
-/** Cut on one screen after the forge, each through the production `applyFabricateTheme`. */
-const PALETTE_CUTS = ['fabricate', 'mythwright', 'starglass-arcana', 'sovereign', 'hearth-herb'];
+/** Every scene draws in the default palette; only the palette scene cuts through the rest. */
+const THEME = DEFAULT_FABRICATE_THEME;
+/** Each through the production `applyFabricateTheme`, ending back on the default. */
+const PALETTE_CUTS = Object.entries(FABRICATE_THEME_CHOICES).filter(([id]) => id !== THEME);
 const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 
 /**
@@ -51,11 +55,30 @@ const PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
  * stays crisp. `top` lifts it clear of a beat whose subject sits at the bottom of the window.
  */
 const CAPTIONS = Object.freeze({
-  forge: { kicker: 'Routed by check', text: 'Craft by recipe. Quality by roll.', position: 'top' },
-  pack: { kicker: 'Masterwork', text: 'Straight from the anvil to the pack.', position: 'top' },
-  palettes: { kicker: 'Seven palettes', text: 'Every theme, one click.', position: 'top' },
-  editor: { kicker: 'Recipe editor', text: 'Every outcome tier, authored.', position: 'top' },
-  still: { kicker: 'Essence alchemy', text: 'Brew by essence, not by list.', position: 'top' },
+  editor: {
+    kicker: 'GM authoring',
+    text: 'Powerful, flexible, simple to author.',
+    position: 'top',
+  },
+  forge: { kicker: 'Crafting checks', text: 'Checks decide the outcome.', position: 'top' },
+  choice: {
+    kicker: 'Player choice',
+    text: 'Players choose their materials and rewards.',
+    position: 'top',
+  },
+  pack: {
+    kicker: 'Crafting inventory',
+    text: 'Your whole crafting inventory, in one app.',
+    position: 'top',
+  },
+  palettes: { kicker: 'Seven themes', text: 'Dress Fabricate for your world.', position: 'top' },
+  essences: {
+    kicker: 'Essences',
+    text: 'Any reagent with the right essence will do.',
+    position: 'top',
+  },
+  knowledge: { kicker: 'Recipe knowledge', text: 'Track who knows what.', position: 'top' },
+  discovery: { kicker: 'Alchemy', text: 'Experiment to discover new recipes.', position: 'top' },
   salvage: { kicker: 'Salvage', text: 'Break it back down.', position: 'top' },
 });
 /** A caption's fade-in after its beat starts: each step's opacity and how long it holds. */
@@ -175,6 +198,7 @@ class Take {
     this.theme = null;
     this.problems = [];
     this.caption = null;
+    this.kicker = null;
     this.captionShown = false;
   }
 
@@ -182,10 +206,16 @@ class Take {
   captionFor(key) {
     if (!CAPTIONS[key]) throw new Error(`no caption for "${key}"`);
     this.caption = key;
+    this.kicker = null;
     this.captionShown = false;
   }
 
-  async open(browser, baseUrl, { app, theme, seed, query = {} }) {
+  /** Swap the showing caption's kicker without fading it again, as each palette names itself. */
+  kickerFor(kicker) {
+    this.kicker = kicker;
+  }
+
+  async open(browser, baseUrl, { app, seed, query = {} }) {
     await this.page?.context().close();
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
@@ -215,7 +245,7 @@ class Take {
     });
     const failure = await this.page.evaluate(() => globalThis.document.body.dataset.viewLabError);
     if (failure) throw new Error(`${app}: ${failure}`);
-    await this.palette(theme);
+    await this.palette(THEME);
   }
 
   /** Apply a palette through the production `applyFabricateTheme`, to every root now mounted. */
@@ -281,7 +311,10 @@ class Take {
       async ({ module, id }) => (await import(module)).applyFabricateTheme(id),
       { module: THEME_MODULE, id: this.theme }
     );
-    const caption = this.captions && this.caption ? CAPTIONS[this.caption] : null;
+    const caption =
+      this.captions && this.caption
+        ? { ...CAPTIONS[this.caption], ...(this.kicker && { kicker: this.kicker }) }
+        : null;
     await drawCaption(this.page, caption, captionOpacity);
     const file = `${String(this.frames.length + 1).padStart(4, '0')}.png`;
     const frame = this.page.locator('[data-view-lab-frame]');
@@ -340,114 +373,180 @@ class Take {
   }
 }
 
-/** (a): the forge in Ironblood Forge, a routed craft to its tier and the blade in the pack. */
+/** (a): the GM recipe editor: an "any one of" grip, a reward the player picks, tiers routed. */
+async function editorScene(take, open) {
+  await open({ app: MANAGER, query: { system: FORGE } });
+  take.captionFor('editor');
+  await take.click('.manager-nav-button:has-text("Crafting")');
+  await take.hold(1000, 'editor: the forge recipes');
+  await take.click('[data-recipe-edit="ed-r-longsword"]');
+  await take.click('#recipe-tab-ingredients');
+  await take.hold(1600, 'editor: any one of two grips');
+  await take.click('[data-recipe-group-id="ed-set-blade-g1"] .manager-recipe-or-trigger');
+  await take.hold(1300, 'editor: offer an alternative to the steel');
+  await take.press('Escape');
+  await take.click('#recipe-tab-results');
+  await take.glide('[data-recipe-result-group="ed-mw-flourish"]', 'editor: the flourish', {
+    steps: 4,
+  });
+  await take.click('[data-recipe-group-chooser="rolled"]');
+  await take.hold(900, 'editor: rolled for the player');
+  await take.click('[data-recipe-group-chooser="playerChooses"]');
+  await take.expect(
+    '[data-recipe-group-chooser="playerChooses"] input:checked',
+    'the flourish did not switch back to the player choosing'
+  );
+  await take.hold(1500, 'editor: or the player chooses');
+  await take.click('#recipe-tab-overview');
+  await take.glide('[data-recipe-section="routing"]', 'editor: routing', { steps: 4 });
+  await take.hold(1800, 'editor: each tier picks its result set');
+}
+
+/** (b): the forge, the grip the player picks, and a crafting check that lands on Masterwork. */
 async function forgeScene(take, open) {
-  await open({ app: PLAYER, theme: 'ironblood-forge', query: { tab: 'crafting' } });
+  await open({ app: PLAYER, query: { tab: 'crafting' } });
   take.captionFor('forge');
   await take.click('[data-crafting-system-filter]');
   await take.click(`[data-popover-option="${FORGE}"]`);
   await take.click('.crafting-recipe-row[data-recipe-id="ed-r-longsword"]');
-  await take.hold(2200, 'forge: Forge Longsword, the grip is in another pack');
-  await take.click('.actor-bar-trigger');
-  await take.hold(900, 'forge: choose the crafting actor');
-  await take.click('.actor-bar-trigger');
+  await take.hold(1800, 'forge: Forge Longsword, the grips are in another pack');
   await take.click('[data-crafting-sources-add]');
-  await take.hold(700, 'forge: add a component source');
+  await take.hold(600, 'forge: add a component source');
   await take.click('.fabricate-set-picker-option[title="Maren of the Still"]');
-  await take.hold(1000, 'forge: two sources, ready to craft');
   await take.press('Escape');
+  await take.hold(900, 'forge: two sources');
+  take.captionFor('choice');
+  await take.hold(1300, 'forge: oiled grip or wyrmhide wrap');
+  await take.click('.crafting-alt-option[data-option-index="1"] button');
+  await take.expect(
+    '.crafting-alt-option[data-option-index="1"] button[aria-pressed="true"]',
+    'the wyrmhide wrap was not picked'
+  );
+  await take.hold(1300, 'forge: the player picks the wyrmhide wrap');
   await take.expect(
     '[data-crafting-craft][data-crafting-craft-disabled="false"]',
-    'Forge Longsword is not craftable after adding the source'
+    'Forge Longsword is not craftable after picking the grip'
   );
-  await take.glide('[data-recipe-section="outcome-tiers"]', 'forge: the outcome tiers');
-  await take.hold(1700, 'forge: three blades, one roll');
+  await take.glide('[data-recipe-section="outcome-tiers"]', 'forge: the outcome tiers', {
+    steps: 4,
+  });
+  take.captionFor('forge');
+  await take.hold(1500, 'forge: three blades, one check');
   await take.click('[data-crafting-craft][data-crafting-craft-disabled="false"]');
-  await take.hold(1300, 'forge: the crafting check');
+  await take.hold(1200, 'forge: the crafting check');
   await take.click(`${PROMPT} button[type="submit"]`);
   await take.expect(
     '[data-outcome-tier="ed-masterwork"][data-outcome-rolled="true"]',
     'the roll did not reach Masterwork; re-tune the journey with --seed (see DEMO_SEED)'
   );
-  await take.glide('[data-outcome-tier="ed-masterwork"]', 'forge: the roll lands on Masterwork', {
+  await take.glide('[data-outcome-tier="ed-masterwork"]', 'forge: the check lands on Masterwork', {
     steps: 4,
   });
-  await take.hold(1500, 'forge: your roll, Masterwork');
+  await take.hold(1500, 'forge: Masterwork');
+}
+
+/** (c): the player picks the Masterwork tier's flourish in the journal. */
+async function choiceScene(take) {
+  await take.click('[data-player-nav-tab="journal"]');
+  take.captionFor('choice');
+  await take.hold(1200, 'choice: the run waits on a pick');
+  await take.click('[data-award-choice-id="ed-mw-flourish"] button[aria-pressed]');
+  await take.hold(1000, 'choice: the sword belt');
+  await take.click('[data-award-confirm="ed-mw-flourish"]');
+  await take.expect('[data-award-outcome="claimed"]', 'the flourish was not claimed');
+  await take.hold(1500, 'choice: claimed');
+}
+
+/** (d): the pack: the new blade and belt, then the whole inventory. */
+async function packScene(take) {
   await take.click('[data-player-nav-tab="inventory"]');
   take.captionFor('pack');
   await take.fill('[data-inventory-search]', 'sword');
   await take.click(
     `.inventory-card[data-inventory-card="${FORGE}:ed-masterwork-longsword"] .inventory-card-button`
   );
-  await take.hold(2600, 'forge: the Masterwork Longsword in the pack');
-}
-
-/** (b): the palette cut, on the pack with the new blade selected. */
-async function paletteScene(take) {
-  // The whole pack, so each palette is judged across the grid and the selected blade together.
+  await take.hold(2200, 'pack: the Masterwork Longsword and its belt');
   await take.fill('[data-inventory-search]', '');
+  await take.hold(1600, 'pack: everything the party carries');
+}
+
+/** (e): the palette cut, on the whole pack: the default first, then each palette by name. */
+async function paletteScene(take) {
   take.captionFor('palettes');
-  for (const theme of PALETTE_CUTS) {
+  await take.hold(1000, `palette: ${THEME}`);
+  for (const [theme, name] of PALETTE_CUTS) {
     await take.palette(theme);
-    await take.hold(1000, `palette: ${theme}`);
+    take.kickerFor(`Theme · ${name}`);
+    await take.hold(900, `palette: ${theme}`);
   }
+  await take.palette(THEME);
 }
 
-/** (c): the GM recipe editor, routing the check's tiers to result sets. */
-async function editorScene(take, open) {
-  await open({ app: MANAGER, theme: 'foundry-native', query: { system: FORGE } });
-  take.captionFor('editor');
-  await take.click('.manager-nav-button:has-text("Crafting")');
-  await take.hold(1100, 'editor: the forge recipes');
-  await take.click('[data-recipe-edit="ed-r-longsword"]');
-  await take.hold(1100, 'editor: Forge Longsword');
-  await take.glide('[data-recipe-section="routing"]', 'editor: routing');
-  await take.hold(2200, 'editor: each tier picks its result set');
-  await take.click('#recipe-tab-results');
-  await take.hold(1600, 'editor: results by outcome');
-}
-
-/** (d): the still in Hearth & Herb, reagents combined by essence and brewed on a real check. */
-async function stillScene(take, open) {
-  await open({ app: PLAYER, theme: 'hearth-herb', query: { tab: 'alchemy' } });
-  take.captionFor('still');
-  await take.hold(1200, 'still: the workbench');
+/** (f): the still, reagents matched by the essences they carry and brewed on a check. */
+async function essenceScene(take, open) {
+  await open({ app: PLAYER, query: { tab: 'alchemy' } });
+  take.captionFor('essences');
+  await take.hold(1000, 'essences: the workbench');
   await take.click('[data-alchemy-recipe="hm-r-mending"]');
   await take.click('[data-alchemy-inventory-row="hm-bitterfern"]');
-  await take.hold(1400, 'still: bitterfern, still needs water');
+  await take.hold(1200, 'essences: bitterfern carries life, still needs water');
   await take.click('[data-alchemy-inventory-row="hm-moonbell"]');
-  await take.hold(700, 'still: moonbell');
   await take.click('[data-alchemy-inventory-row="hm-empty-phial"]');
   await take.expect('[data-alchemy-brew]:not([disabled])', 'the bench did not recognise the brew');
-  await take.hold(1800, 'still: Draught of Mending, ready to brew');
+  await take.hold(1600, 'essences: life and water, Draught of Mending');
   await take.click('[data-alchemy-brew]');
-  await take.hold(1200, 'still: the brewing check');
   await take.click(`${PROMPT} button[type="submit"]`);
   await take.expect(
     '[data-alchemy-banner-status="success"]',
     'the brew did not succeed; re-tune the journey with --seed (see DEMO_SEED)'
   );
-  await take.expect(
-    '[data-alchemy-inventory-row="hm-draught-mending"]',
-    'the brewed draught is not in the pack'
-  );
-  await take.hold(2600, 'still: brewed, and the draught is in the pack');
+  await take.hold(1600, 'essences: brewed');
 }
 
-/** (e): salvage a Longsword back to its stock. */
+/** (g): the GM's view of who knows which of the still's recipes. */
+async function knowledgeScene(take, open) {
+  await open({ app: MANAGER, query: { system: STILL } });
+  take.captionFor('knowledge');
+  await take.click('.manager-nav-button:has-text("Crafting")');
+  await take.click('#manager-crafting-nav-knowledge');
+  await take.click('[data-knowledge-actor="demo-actor-hilde"]');
+  await take.click('[data-knowledge-tab="learnedRecipes"]');
+  await take.expect('[data-knowledge-learned="hm-r-mending"]', 'Hilde does not know Mending');
+  await take.hold(2600, 'knowledge: what Hilde has learned');
+}
+
+/** (h): an untried mix on the bench, brewed as an experiment, reveals a recipe. */
+async function discoveryScene(take, open) {
+  await open({ app: PLAYER, query: { tab: 'alchemy' } });
+  take.captionFor('discovery');
+  await take.click('[data-alchemy-inventory-row="hm-stonecrop"]');
+  await take.click('[data-alchemy-inventory-row="hm-stonecrop"]');
+  await take.click('[data-alchemy-inventory-row="hm-bitterfern"]');
+  await take.click('[data-alchemy-inventory-row="hm-empty-phial"]');
+  await take.expect('[data-alchemy-status="untried"]', 'the bench does not hold an untried mix');
+  await take.hold(1800, 'discovery: an unknown outcome');
+  await take.click('[data-alchemy-brew]');
+  await take.click(`${PROMPT} button[type="submit"]`);
+  await take.expect(
+    '[data-alchemy-banner-status="success"]',
+    'the experiment did not succeed; re-tune the journey with --seed (see DEMO_SEED)'
+  );
+  await take.hold(2400, 'discovery: Elixir of Stoneskin, discovered');
+}
+
+/** (i): salvage a Longsword back to its stock. */
 async function salvageScene(take, open) {
-  await open({ app: PLAYER, theme: 'starglass-arcana', query: { tab: 'inventory' } });
+  await open({ app: PLAYER, query: { tab: 'inventory' } });
   take.captionFor('salvage');
-  await take.hold(1100, 'salvage: the inventory');
   await take.fill('[data-inventory-search]', 'Longsword');
   await take.click(
     `.inventory-card[data-inventory-card="${FORGE}:ed-longsword"] .inventory-card-button`
   );
   await take.click('[data-inventory-detail-tab="salvage"]');
-  await take.hold(1500, 'salvage: what a Longsword breaks down into');
+  await take.hold(1400, 'salvage: what a Longsword breaks down into');
   await take.click('[data-inventory-salvage-action]');
   await take.expect('[data-inventory-salvage-summary="success"]', 'the salvage did not complete');
-  await take.hold(2600, 'salvage: steel and leather back in the pack');
+  await take.hold(2200, 'salvage: steel and leather back in the pack');
 }
 
 async function main() {
@@ -473,7 +572,17 @@ async function main() {
     server = await startLabServer(ROOT);
     browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
     const open = (scene) => take.open(browser, server.baseUrl, { seed: options.seed, ...scene });
-    for (const scene of [forgeScene, paletteScene, editorScene, stillScene, salvageScene]) {
+    for (const scene of [
+      editorScene,
+      forgeScene,
+      choiceScene,
+      packScene,
+      paletteScene,
+      essenceScene,
+      knowledgeScene,
+      discoveryScene,
+      salvageScene,
+    ]) {
       await scene(take, open);
     }
     const totalMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
