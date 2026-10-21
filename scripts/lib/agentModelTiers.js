@@ -41,7 +41,15 @@ export const HIGH_RISK_PATHS = [
   'src/systems/remapWorldScopeIdentityFlags.js',
   'src/systems/restampOwnedItemComponentIdentity.js',
   'src/systems/worldScopeReferenceRewrite.js',
-  'scripts/**',
+  'scripts/forward-port-complete-merge.sh',
+  'scripts/forward-port-content-gate.sh',
+  'scripts/forward-port-provenance.mjs',
+  'scripts/foundry-smoke/**',
+  'scripts/lib/agentModelTiers.js',
+  'scripts/release-s3.js',
+  'scripts/release.js',
+  'scripts/validate-agent-bindings.mjs',
+  'scripts/validate-release-tag.mjs',
   '.github/workflows/**',
   'release.config.js',
   'release.s3.config.json',
@@ -54,7 +62,7 @@ export const HIGH_RISK_PATHS = [
 ];
 
 /** Post-implementation review and the docs loop score the same diff, so they share limits. */
-const DIFF_THRESHOLDS = { smallMax: 50, mediumMax: 400 };
+const DIFF_THRESHOLDS = { smallMax: 50, mediumMax: 1400 };
 
 /**
  * `SMALL_MAX` / `MEDIUM_MAX` per stage. The size metric is delta-task count before
@@ -62,8 +70,8 @@ const DIFF_THRESHOLDS = { smallMax: 50, mediumMax: 400 };
  * are never compared against each other.
  */
 export const STAGE_THRESHOLDS = {
-  'plan-review': { smallMax: 3, mediumMax: 8 },
-  implementation: { smallMax: 1, mediumMax: 4 },
+  'plan-review': { smallMax: 3, mediumMax: 12 },
+  implementation: { smallMax: 1, mediumMax: 8 },
   'post-implementation': DIFF_THRESHOLDS,
   docs: DIFF_THRESHOLDS,
 };
@@ -419,11 +427,13 @@ function segmentsMatch(segments, pattern) {
 
 function baseModelTier({ paths, size, source, limits }) {
   if (paths.some((p) => matchesHighRiskPath(p))) return { tier: 'large', rule: 1 };
-  if (source !== null && source !== 'none') return { tier: 'large', rule: 2 };
-  if (paths.length >= 3) return { tier: 'large', rule: 3 };
+  if (source === 'persisted-shape') return { tier: 'large', rule: 2 };
   const sized = Boolean(limits) && size !== null;
-  if (sized && size > limits.mediumMax) return { tier: 'large', rule: 4 };
-  if (sized && paths.length === 1 && size <= limits.smallMax) return { tier: 'small', rule: 5 };
+  if (sized && size > limits.mediumMax) return { tier: 'large', rule: 3 };
+  // A new internal module or export requires review, not automatically a frontier model.
+  if (source === 'new-module' || source === 'new-export') return { tier: 'medium', rule: 4 };
+  if (sized && source === 'none' && paths.length === 1 && size <= limits.smallMax)
+    return { tier: 'small', rule: 5 };
   return { tier: 'medium', rule: 6 };
 }
 
@@ -433,7 +443,8 @@ function modelTierFloor(spawn, paths) {
   const previous = spawn?.previousExecutedTier ?? null;
   if (!previous) return floor;
   floor = higherTier(floor, previous);
-  if (spawn?.unresolvedFinding === true) floor = higherTier(floor, nextTier(previous));
+  if (spawn?.unresolvedFinding === true && spawn?.redesignRequired === true)
+    floor = higherTier(floor, nextTier(previous));
   return floor;
 }
 

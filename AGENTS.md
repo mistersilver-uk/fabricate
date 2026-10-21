@@ -62,20 +62,24 @@ The model pins, the keyed inputs, row intersection, the `HIGH_RISK_PATHS` list, 
 
 **Base model tier — first match wins.**
 
-| # | Condition                                                                              | Model tier |
-|---|----------------------------------------------------------------------------------------|------------|
-| 1 | Any path in the keyed path set matches `HIGH_RISK_PATHS`                                 | `large`    |
-| 2 | The lane's rule 2 source is anything other than `none`                                   | `large`    |
-| 3 | The keyed path set holds 3 or more paths                                                 | `large`    |
-| 4 | The size metric exceeds `MEDIUM_MAX`                                                     | `large`    |
-| 5 | The keyed path set holds exactly 1 path and the size metric is at or below `SMALL_MAX`   | `small`    |
-| 6 | Otherwise, including whenever any input above is unavailable                             | `medium`   |
+The tier applies to a **cohesive work packet**, not to each file.
+A component, its tests, localization, and matching canonical spec count as one concern when the planned contract and ownership are bounded.
+The always-row reviewer still scores and reads the **entire integrated change**; splitting implementation packets never splits the final correctness verdict.
 
-| Stage                     | `SMALL_MAX`              | `MEDIUM_MAX`              |
-|---------------------------|--------------------------|---------------------------|
-| plan-review               | 3 delta tasks            | 8 delta tasks             |
-| implementation            | 1 owned delta task       | 4 owned delta tasks       |
-| post-implementation, docs | 50 added + deleted lines | 400 added + deleted lines |
+| # | Condition | Model tier |
+|---|-----------|------------|
+| 1 | Any keyed path matches `HIGH_RISK_PATHS` | `large` |
+| 2 | The lane's rule 2 source is `persisted-shape` | `large` |
+| 3 | The size metric exceeds `MEDIUM_MAX` | `large` |
+| 4 | The lane's rule 2 source is `new-module` or `new-export` | `medium` |
+| 5 | Exactly one keyed path, a size at or below `SMALL_MAX`, and rule 2 source `none` | `small` |
+| 6 | Otherwise, including when inputs are unavailable | `medium` |
+
+| Stage | `SMALL_MAX` | `MEDIUM_MAX` |
+|-------|-------------|--------------|
+| plan-review | 3 delta tasks | 12 delta tasks |
+| implementation | 1 owned delta task | 8 owned delta tasks |
+| post-implementation, docs | 50 added + deleted lines | 1400 added + deleted lines |
 
 ## Build & Test
 

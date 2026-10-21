@@ -77,6 +77,7 @@ Worked examples:
 
 Every routing token above names a role **family**, not a binding.
 The other four roles are untiered and are pinned to a single model tier each.
+The model-tiered families may perform cohesive multi-file work; model capacity is judged by bounded responsibility and risk rather than by file count.
 A model tier changes the model pin and nothing else: all three bindings of a family point at the same canonical `.agents/skills/<family>/SKILL.md`, and no per-model-tier skill directory exists.
 
 "Model tier" is written in full on first use in a section.
@@ -125,6 +126,7 @@ The driver uses only facts it mechanically holds at that spawn point.
 The implementer is the agent that *creates* the diff, and plan-review runs before any implementation exists, so neither has one.
 
 Rule 2's review-stage source is the added-`export` line **only**, deliberately excluding added files.
+An added export now selects at least `medium` (rule 4), rather than forcing `large`; truly public or persisted contracts must be surfaced as explicit high-risk design decisions and checked by the integrated reviewer.
 An added file is what makes the tests row fire in the first place, so keying on it would resolve `fabricate_quality_engineer` to `large` on every change that adds a test — the same always-`large` failure that row intersection fixes.
 Excluding added files also removes any dependence on ambient `diff.renames` configuration, which decides whether a rename reports as `R` or as `A` plus `D`.
 
@@ -155,7 +157,15 @@ src/migration/**
 src/systems/remapWorldScopeIdentityFlags.js
 src/systems/restampOwnedItemComponentIdentity.js
 src/systems/worldScopeReferenceRewrite.js
-scripts/**
+scripts/forward-port-complete-merge.sh
+scripts/forward-port-content-gate.sh
+scripts/forward-port-provenance.mjs
+scripts/foundry-smoke/**
+scripts/lib/agentModelTiers.js
+scripts/release-s3.js
+scripts/release.js
+scripts/validate-agent-bindings.mjs
+scripts/validate-release-tag.mjs
 .github/workflows/**
 release.config.js
 release.s3.config.json
@@ -167,14 +177,16 @@ CLAUDE.md
 .codex/agents/**
 ```
 
-The agent-harness paths are on the list because a mistake there mis-routes every future change.
+Agent-harness and publishing paths remain on the list because mistakes there can mis-route subsequent changes or corrupt a release.
+Routine script support such as design-system registries and View Lab case lists is no longer treated like release or agent-routing machinery merely because it lives under `scripts/`.
 `openspec/specs/**` is deliberately **not** on the list — forcing it to `large` would make the `fabricate_domain_expert` lane permanently `large` and erase the saving for the role that touches specs most.
 It carries a `medium` floor instead (see the floors below), because the routing table schedules `fabricate_domain_expert` at plan-review and the docs loop but **never** at post-implementation review: a spec change that does not trip the docs row has its actual canonical-spec diff reviewed by `fabricate_reviewer` alone, and the cheapest model must not author or review canonical requirement text unaccompanied.
 
-Rules 1 to 4 all yield `large`, so their overlap is harmless under first-match-wins; rules 5 and 6 are disjoint and rule 6 is total, so the ladder always returns exactly one model tier.
-Rule 6 is the default, and it defaults **up** to `medium`, never down to `small`.
-`small` requires a positive, narrow match on rule 5; nothing falls into `small` by omission.
-The 2-path case resolving to `medium` is a deliberate, stated relaxation of "single-file": a module plus its co-located test is one concern, not two, and treating it as `large` would make `large` the common case and erase the saving model tiers exist to produce.
+Rules 1–3 retain the explicit large-model gates for consequential changes and oversized work.
+Rule 4 selects `medium` for a bounded new module or export; these are not automatically public or persisted contracts.
+Rule 5 selects `small` only for a one-path, single-surface `none` change within the small limit.
+Rule 6 defaults **up** to `medium` for unclassified work; the number of changed paths alone never forces `large`.
+A module, its tests, and required localization or canonical-spec edits can form one coherent medium work packet when the contract is defined, even when they span several files.
 
 **Rule 2's input is authored at plan time, not judged at spawn time.**
 Each `### Tasks` entry in the issue delta carries a literal field:
@@ -201,7 +213,12 @@ One owned path, no high-risk match, `Lane surface: none`, 1 owned task.
 Rule 5: `small`.
 - **A Svelte component fix that adds an exported helper.**
 One owned path, but `Lane surface: new-export`.
-Rule 2: `large`.
+Rule 4: `medium` (rather than `small`).
+- **A coherent component, tests and localization change with 5 files and 5 owned tasks.**
+No high-risk path, `Lane surface: none`, and the size is under the implementation limit.
+Rule 6: `medium`, regardless of the five paths.
+- **A persisted data-shape change.**
+`Lane surface: persisted-shape` forces rule 2: `large`, even with one file.
 - **Post-implementation review of a 2-file, 180-line diff under `src/systems/`.**
 No high-risk match, no added file and no added `export`, 2 files, and 180 lines is above `SMALL_MAX` and below `MEDIUM_MAX`, while rule 5 needs exactly 1 path.
 Rule 6: `medium`.
@@ -212,12 +229,14 @@ Applied after the base model tier; they only ever raise it, and every floor clam
 - A lane's model tier never decreases across revisions of the same `(family, stage)`; a disposition-only confirmation round is exempt, per the override below.
 The floor is the **highest model tier at which the lane actually executed** in a previous revision — not the model tier it was originally resolved to.
 Without this, a lane that resolved `small`, escalated, and completed at `medium` would re-resolve to `small` from the same unchanged facts next revision and pay the identical wasted spawn again, since the ladder itself has no memory.
-- A revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier.
+- An unresolved finding floors one model tier above the previous executed model tier **only** when the driver records `redesignRequired: true` after identifying a misunderstood invariant or architectural reassessment.
+An ordinary, bounded fix for a reviewer finding retains the previously executed model tier, without suppressing `ESCALATE_TIER`.
 - A lane whose keyed path set includes `openspec/specs/**` floors at `medium`.
 
 **Confirmation-round override.**
 A review role spawned into a read-only lane — `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`, `fabricate_domain_expert`, `foundry_integrator` — at revision 2 or later, with a brief marked *disposition-only* (the assignment-brief field in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`), resolves `medium`, overriding rules 1 to 4 and both revision floors above.
 Its scope is fixed by construction: it dispositions its OWN prior findings against a driver-supplied immutable artifact and reports only defects the revision itself introduced, so the reading is narrow whatever the first round's path set was.
+All first-round general reviews still cover the *entire integrated change*, including boundaries between medium implementation packets.
 A mutable lane never takes the override, `ESCALATE_TIER` stays available to the confirmation spawn, and a confirmation round that returns a NEW `HIGH` finding re-enters the loop as a fresh revision at the ladder's own resolution.
 The first round of every loop stays at the ladder's resolution, because that is the round that has to find the defects.
 The override is applied by the driver on top of the mechanical ladder; `selectModelTier` in `scripts/lib/agentModelTiers.js` models the ladder and its floors only.
