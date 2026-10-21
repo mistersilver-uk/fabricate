@@ -2557,6 +2557,24 @@ A compact pager (`density="compact"`) is not a player browse column's footer and
 - **THEN** its rule meets the section's edges
 - **AND** the next section's top rule sits directly beneath it
 
+### Requirement: The filter bar is a bordered box that every host insets
+
+The filter bar is a bordered box — 1px `--fab-border`, radius 9, `--fab-bg-1`, `--fab-space-3` padding, `--fab-space-2` gap — that every host insets by `--fab-space-3`; no route, caller or panel flattens it to a full-width band (issue 2546, M2, superseding issue 1373's Tools and Essence flattening, the interactables browser's full-width bar and the Vocabulary panel's flattening).
+`<FilterBar>` is `shipped`, not `divergent`.
+The stylesheet insets the box in the manager's main pane, a gathering panel and the scoped list column; a host that already pads its content, such as the Tools card, the interactables column and the Vocabulary card, adds no inset of its own.
+Its API is the slot API (`children`, `ariaLabel`, `class` and the rest spread); the library sketch's data props are declined (issue 2546, M3).
+The search field inside the bar is the 38px field and a select is the `toolbar` rung at 34px.
+
+#### Scenario: A browse bar sits in the manager's main pane
+
+- **WHEN** a filter bar renders directly in the manager's main pane, a gathering panel or the scoped list column
+- **THEN** it is a box bordered on all four sides at radius 9 on `--fab-bg-1`, inset `--fab-space-3` from each edge of the host
+
+#### Scenario: A host that pads its content holds the bar
+
+- **WHEN** a filter bar renders inside the Tools card, the interactables column or the Vocabulary card
+- **THEN** it is the same box, inset by the host's own padding, and no rule on the host restyles it
+
 ### Requirement: The application shell renders through the shell primitives
 
 Every manager page header MUST render through `PageHeader` (`src/ui/svelte/components/PageHeader.svelte`): the Tool editor's, the Tool library's and the header every other manager route draws.

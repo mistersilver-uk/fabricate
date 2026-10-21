@@ -317,16 +317,16 @@ const PRIMITIVES = Object.freeze([
     name: 'FilterBar',
     components: Object.freeze(['src/ui/svelte/components/FilterBar.svelte']),
     roots: Object.freeze(['fabricate-filter-bar']),
-    // One exact class name. `manager-toolbar-pills` (`fabricate.css:4194`) and
-    // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
-    // `\.fabricate-filter-bar(?![\w-])`, so neither enters this family.
+    // One exact class name. `manager-toolbar-pills` is a CALLER class: `pickerSelectors` anchors on
+    // `\.fabricate-filter-bar(?![\w-])`, so it does not enter this family.
     family: 'fabricate-filter-bar',
     anchors: Object.freeze(['fabricate-filter-bar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
-    // Measured at this commit: 1 written, 7 family selectors, 1 owned.
+    // Measured at this commit: 1 written, 3 family selectors (the box, the host inset and the
+    // components route's button size), 1 owned.
     writtenFloor: 1,
-    familyFloor: 7,
+    familyFloor: 3,
     ownedFloor: 1,
     mirrored: Object.freeze([]),
   }),
@@ -1695,9 +1695,9 @@ test('the application-root-attribute clause names a caller’s own container', (
     )
   );
   assert.ok(
-    callerContainerSelectors.length >= 22,
+    callerContainerSelectors.length >= 19,
     `only ${callerContainerSelectors.length} selectors were recognised by the ` +
-      'application-root-attribute clause across every entry, against a floor of 22. A lower number means the clause ' +
+      'application-root-attribute clause across every entry, against a floor of 19. A lower number means the clause ' +
       'has stopped recognising a caller’s own container and those rules would wrongly enter the ' +
       'owned set below.'
   );

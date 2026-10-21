@@ -54,7 +54,7 @@ function rows() {
   return target.querySelectorAll('.manager-travel-realms-row');
 }
 
-// The browse body every Manager browse pane uses: a full-bleed filter bar, then the inset scroller.
+// The browse body every Manager browse pane uses: the filter bar box inset by its panel, then the inset scroller.
 function assertBrowseBody(contentSelector, site) {
   const panel = target.querySelector('[data-travel-panel="realms"]');
   const scroller = panel.querySelector(':scope > .manager-table-scroll');

@@ -25,7 +25,8 @@
 }
 
 /* EVERY HOST THAT DOES NOT PAD ITS CONTENT INSETS THE BOX BY `--fab-space-3`: the manager's main pane, a gathering panel and the scoped list column. A host that pads its content (the Tools card, the interactables column, the Vocabulary card) adds nothing. */
-:is(.manager-main, .manager-gathering-panel, .manager-scoped-list-column)
+.fabricate
+  :is(.manager-main, .manager-gathering-panel, .manager-scoped-list-column)
   > .fabricate-filter-bar.fabricate-filter-bar {
   margin: var(--fab-space-3) var(--fab-space-3) 0;
 }

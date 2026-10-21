@@ -22,7 +22,8 @@ const INSET_PX = 12;
 const EPSILON_PX = 0.5;
 
 /** One 34px control, which is what every bar in the manager holds on its single line. */
-const CONTROL = '<button type="button" style="height: 34px; width: 120px; margin: 0">Filter</button>';
+const CONTROL =
+  '<button type="button" style="height: 34px; width: 120px; margin: 0">Filter</button>';
 const BAR = `<section class="fabricate-filter-bar BAR_CLASS" aria-label="Filters">${CONTROL}</section>`;
 
 /** The hosts, each with the markup that wraps a bar and the margin the SHEET gives it (0 where the host pads). */
@@ -122,7 +123,11 @@ describe('the filter bar box, host by host', () => {
   for (const host of HOSTS) {
     it(`is a bordered radius-9 bg-1 flex box in ${host.name}`, async () => {
       const box = await measure(host);
-      assert.deepEqual(box.borders, Array(4).fill('1px solid'), 'a border on all four sides');
+      assert.deepEqual(
+        box.borders,
+        Array.from({ length: 4 }, () => '1px solid'),
+        'a border on all four sides'
+      );
       assert.equal(box.radius, '9px');
       assert.equal(box.display, 'flex');
       assert.notEqual(box.bg1, 'rgba(0, 0, 0, 0)', 'NON-VACUITY: --fab-bg-1 resolved');

@@ -623,8 +623,8 @@ export const CASES = Object.freeze([
         target: '[data-component-tag-id] .fabricate-icon-button',
       },
     ],
-    // Taller than the world scoped-entity cases: the extra height holds the full-width tag band (issue 1392) and the three bordered filter bars (issue 2546).
-    position: { width: 1280, height: 1040 },
+    // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).
+    position: { width: 1280, height: 1000 },
     // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
     expectLayout: {
       controls: [
@@ -672,9 +672,9 @@ export const CASES = Object.freeze([
       expectedTracks: 2,
       fillSelector: '.manager-scoped-list-column > .manager-scoped-list-rows',
       alignedLeft:
-        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-rows',
       alignedRight:
-        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-rows',
       controls: [
         {
           selector: '.manager-scoped-list-column > .manager-scoped-list-rows:last-child',
@@ -716,10 +716,10 @@ export const CASES = Object.freeze([
       },
     ],
     // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
-    // the search and every row on one 12px gutter (issue 2373).
+    // the filter bar's box and every row on one 12px gutter (issues 2373, 2546).
     expectLayout: {
       containerSelector: '.manager-scoped-list-column',
-      alignedLeft: '.manager-scoped-list-toolbar .fabricate-search, [data-scoped-list-row]',
+      alignedLeft: '.manager-scoped-list-toolbar, [data-scoped-list-row]',
       controls: [
         {
           selector: '[data-scoped-essence-open-entry]',

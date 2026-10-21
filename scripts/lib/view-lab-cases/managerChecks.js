@@ -1234,7 +1234,7 @@ export const CASES = Object.freeze([
     steps: [{ selector: '#manager-nav-tags' }],
     expectView: 'tags',
     // Like-for-like with `world-vocabulary`: one shell, two frames, the same frame.
-    position: { width: 1280, height: 1040 },
+    position: { width: 1280, height: 1000 },
     // Each panel's trailing delete control, measured inside ITS OWN panel (issue 1915).
     expectContained: [
       {
