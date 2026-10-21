@@ -7,7 +7,8 @@
  * companion; an entry that publishes `aria-labelledby` names each reached control by a required
  * key; a closure that takes a window's ring states no focus rule of its own but the pinned scoped
  * rings, and its reached control no inline style; and no rule outside the published `Notice`
- * styles its action button.
+ * styles its buttons. A control pinned to its guard key is named by that key, a required key or
+ * a key `requiredWhen` that guard.
  * The test-only probe runs beside the shipped entries. A key's kind and `args` are
  * `published-component-manifest.test.js`'s.
  * Limit: reach follows a guard through a plain `const` and `$derived` to the props it reads; a
@@ -84,7 +85,7 @@ const FOCUSABLE_REACH = Object.freeze({
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
-  'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': null,
+  'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // In the `control` snippet, which both branches of `{#if label}` render.
   'src/ui/svelte/components/SearchField.svelte: input': 'always',
   'src/ui/svelte/components/StatusToggle.svelte: button': {
@@ -480,6 +481,7 @@ const LITERAL = 'is named by a literal';
 const UNPUBLISHED_NAME = "is not named by a published data key or a text key's render tag";
 const OPTIONAL_NAME = 'is named by a text key that is not required';
 const OPTIONAL_DATA_NAME = 'is named by a data key that is not required';
+const UNGUARDED_NAME = 'is named by a data key that is not its guard, required or requiredWhen it';
 
 /**
  * The published keys an expression's value reaches, by `nameSources`, or the fault it is: a
@@ -495,9 +497,10 @@ function dataNameOf(expression, { ast, published, entry }) {
 
 /**
  * What one part of a name breaks: text, an expression, or a render tag. A control drawn whatever
- * the companion passes (`strict`) is named only by required keys.
+ * the companion passes (`strict`) is named only by required keys, and one pinned to its `guard`
+ * key only by that key, required keys and keys `requiredWhen` that guard (issue 2452).
  */
-function namePartFault(part, control, strict) {
+function namePartFault(part, control, strict, guard = null) {
   const { published, entry } = control;
   const specOf = (local) => entry.props[published.get(local)];
   if (part.type === 'Text') return LITERAL;
@@ -510,8 +513,10 @@ function namePartFault(part, control, strict) {
   if (part.type !== 'ExpressionTag') return UNPUBLISHED_NAME;
   const { fault, keys } = dataNameOf(part.expression, control);
   if (fault) return fault;
-  const required = keys.every((key) => entry.props[key].required === true);
-  return strict && !required ? OPTIONAL_DATA_NAME : null;
+  const isRequired = (key) => entry.props[key].required === true;
+  if (strict) return keys.every(isRequired) ? null : OPTIONAL_DATA_NAME;
+  const held = (key) => key === guard || isRequired(key) || entry.props[key].requiredWhen === guard;
+  return guard === null || keys.every(held) ? null : UNGUARDED_NAME;
 }
 
 /**
@@ -548,7 +553,8 @@ function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS) {
   const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
   const strict = isAlwaysDrawn(control, pins) && !optional.includes(id);
-  const faults = parts.map((part) => namePartFault(part, control, strict)).filter(Boolean);
+  const guard = typeof pins[id] === 'string' && pins[id] !== 'always' ? pins[id] : null;
+  const faults = parts.map((part) => namePartFault(part, control, strict, guard)).filter(Boolean);
   return [...new Set(faults)].map((fault) => `${id} ${fault}`);
 }
 
@@ -733,11 +739,11 @@ function controlFaults(
   ];
 }
 
-/** The notice's action button, by the class and the hook it writes, and the file that may style it. */
+/** The notice's buttons, by the class and the hooks they write, and the file that may style them. */
 const NOTICE_ACTION = Object.freeze({
   path: 'src/ui/svelte/components/Notice.svelte',
   classes: ['fab-notice-button'],
-  attributes: ['data-notice-action'],
+  attributes: ['data-notice-action', 'data-notice-dismiss'],
 });
 
 /** Every selector of `sheets` outside `own` that names one of a part's classes or holds one of its attributes, as written. */
@@ -791,7 +797,7 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual([...new Set(drawn)].sort(byName), Object.keys(FOCUSABLE_REACH).sort(byName));
   });
 
-  it('styles the notice action in no rule outside the notice, by its class or by its hook', () => {
+  it('styles the notice buttons in no rule outside the notice, by their class or by their hooks', () => {
     const own = importClosure(NOTICE_ACTION.path, SHIPPED);
     assert.ok(own.has(NOTICE_ACTION.path), 'the notice was read');
     assert.deepEqual(partSelectors(everyStylesheet(), NOTICE_ACTION, own), []);
@@ -874,7 +880,7 @@ describe('the reach clause', () => {
     assert.deepEqual(syntheticFaults(guarded, { pin: 'label' }), []);
   });
 
-  const props = { rows: { kind: 'data' }, label: { kind: 'data' } };
+  const props = { rows: { kind: 'data' }, label: { kind: 'data', requiredWhen: 'rows' } };
   for (const [claim, open, close] of [
     ['under {#each} of a published key', '{#each rows as row (row)}', '{/each}'],
     ['in the {:else} of a published key', '{#if rows}<p></p>{:else}', '{/if}'],
@@ -937,6 +943,44 @@ describe('the reach clause', () => {
     const bare = [script('label, hidden'), '{#if hidden}', button('Close'), '{/if}'].join('');
     assert.deepEqual(syntheticFaults(bare, { pin: null }), []);
   });
+
+  /** A glyph button drawn under `shown`, named through `aria-label` by `label`, published as `spec`. */
+  const glyphFaults = (spec, extra = {}) =>
+    syntheticFaults(
+      [
+        script('shown, label, other'),
+        '{#if shown}',
+        button('<i aria-hidden="true"></i>', ' aria-label={label || undefined}'),
+        '{/if}',
+        styled(PAIR),
+      ].join(''),
+      { pin: 'shown', props: { shown: { kind: 'data' }, label: spec, ...extra } }
+    );
+  for (const [claim, spec] of [
+    ['a required key', { kind: 'data', required: true }],
+    ['a key requiredWhen its guard', { kind: 'data', requiredWhen: 'shown' }],
+  ]) {
+    it(`passes a guarded control named by ${claim}`, () => {
+      assert.deepEqual(glyphFaults(spec), []);
+    });
+  }
+
+  it('passes a guarded control named by its guard key itself', () => {
+    const markup = [script('label'), '{#if label}', button(), '{/if}', styled(PAIR)].join('');
+    assert.deepEqual(
+      syntheticFaults(markup, { pin: 'label', props: { label: { kind: 'data' } } }),
+      []
+    );
+  });
+
+  for (const [claim, spec] of [
+    ['an optional key', { kind: 'data' }],
+    ['a key requiredWhen another key', { kind: 'data', requiredWhen: 'other' }],
+  ]) {
+    it(`names a guarded control named by ${claim} as a fault`, () => {
+      assert.deepEqual(glyphFaults(spec, { other: { kind: 'data' } }), [UNGUARDED_NAME]);
+    });
+  }
 
   const derived = (guard) =>
     `<script>let { label, hidden } = $props(); const shown = $derived(${guard});</script>`;
@@ -1310,10 +1354,12 @@ describe('the parts clause', () => {
     ]);
   });
 
-  it('names a selector that holds the action hook, and no other attribute', () => {
-    const css = '.a [data-notice-action] > i, .b[data-notice-dismiss] { gap: 0 }';
+  it('names a selector that holds the action or the dismiss hook, and no other attribute', () => {
+    const css =
+      '.a [data-notice-action] > i, .b[data-notice-dismiss], .c[data-notice-tone] { gap: 0 }';
     assert.deepEqual(partSelectors(sheet(css), NOTICE_ACTION), [
       'sheet.css: .a [data-notice-action] > i',
+      'sheet.css: .b[data-notice-dismiss]',
     ]);
   });
 

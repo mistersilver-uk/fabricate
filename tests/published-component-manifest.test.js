@@ -266,6 +266,29 @@ function argsFaults(key, spec) {
 }
 
 /**
+ * What a key's `requiredWhen` breaks: the name of another `data` key of the entry that is neither
+ * `required` nor `requiredWhen` itself, on a key that is no `slot`, `aria` or `value` key and states no
+ * `required` (issue 2452).
+ */
+function requiredWhenFaults(key, spec, entry) {
+  const name = spec.requiredWhen;
+  if (name === undefined) return [];
+  const guard = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
+  const named = `${key} is requiredWhen ${String(name)}`;
+  const faults = [];
+  if (!guard || name === key) faults.push(`${named}, which is no other key of the entry`);
+  else if (guard.kind !== 'data') faults.push(`${named}, which is no data key`);
+  else if (guard.required === true || guard.requiredWhen !== undefined) {
+    faults.push(`${named}, which is itself required or requiredWhen`);
+  }
+  if (['slot', 'aria', 'value'].includes(spec.kind)) {
+    faults.push(`${key} states requiredWhen, which no ${spec.kind} key takes`);
+  }
+  if (spec.required !== undefined) faults.push(`${key} states both required and requiredWhen`);
+  return faults;
+}
+
+/**
  * What a `value` key's spec breaks: a name that is not camel case from a lower-case letter, an
  * `initial` that is not a string, number, boolean or `null`, a stated `required`, and a
  * synthesised `on<Key>Change` the entry lists or the component declares.
@@ -308,7 +331,13 @@ function declarationFaults(entry, ast) {
       : [`${key} has the unshipped kind ${spec.kind}`];
     if (spec.kind === 'aria') {
       const own = ariaFaults(key, spec, entry, Boolean(prop));
-      return [...unshipped, ...own, ...elementFaults(key, spec), ...argsFaults(key, spec)];
+      return [
+        ...unshipped,
+        ...own,
+        ...elementFaults(key, spec),
+        ...argsFaults(key, spec),
+        ...requiredWhenFaults(key, spec, entry),
+      ];
     }
     const faults = key.startsWith('aria-')
       ? [`${key} is spelled as an ARIA attribute and is not an aria key`]
@@ -333,7 +362,7 @@ function declarationFaults(entry, ast) {
     if (spec.kind === 'callback' && calls.length > 0) {
       faults.push(`${key} is a callback key a render tag calls`);
     }
-    return [...faults, ...argsFaults(key, spec)];
+    return [...faults, ...argsFaults(key, spec), ...requiredWhenFaults(key, spec, entry)];
   });
 }
 
@@ -921,7 +950,13 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0', 'Stepper.onChange: 1'],
+      [
+        'Notice.onAction: 0',
+        'Notice.onDismiss: 0',
+        'Button.onclick: 0',
+        'StatusToggle.onclick: 0',
+        'Stepper.onChange: 1',
+      ],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -1001,7 +1036,7 @@ describe('each entry matches its component declaration', () => {
     'Synthetic.svelte',
     [
       '<script>',
-      '  let { label, body, note, value = $bindable(), row, ...rest } = $props();',
+      '  let { label, body, note, value = $bindable(), row, flag, ...rest } = $props();',
       '</script>',
       '<p {...rest}>{label}{@render body()}{@render body?.()}{@render note?.()}</p>',
       '{@render row?.(label)}{@render row()}',
@@ -1013,6 +1048,14 @@ describe('each entry matches its component declaration', () => {
   it('passes a synthetic entry whose keys each match their declaration and render tags', () => {
     const body = { kind: 'text', required: true };
     assert.deepEqual(faultsOf({ label: data, body, note: { kind: 'text' } }), []);
+    const when = { kind: 'text', requiredWhen: 'label' };
+    assert.deepEqual(faultsOf({ label: data, note: when }), [], 'a key required while label is');
+    const optional = { kind: 'data', required: false };
+    assert.deepEqual(
+      faultsOf({ label: optional, note: when }),
+      [],
+      'a guard that states required: false is not itself required'
+    );
   });
 
   it('admits an unpublished prop that is $bindable, or rendered with and without an argument', () => {
@@ -1082,6 +1125,11 @@ describe('each entry matches its component declaration', () => {
       ['value is a value key that states required'],
     ],
     [
+      'a value key that states requiredWhen',
+      { open: { kind: 'data' }, value: { kind: 'value', initial: '', requiredWhen: 'open' } },
+      ['open is not a declared prop', 'value states requiredWhen, which no value key takes'],
+    ],
+    [
       'a value key whose change callback the entry lists',
       { value: { kind: 'value', initial: null }, onValueChange: { kind: 'callback' } },
       [
@@ -1125,6 +1173,45 @@ describe('each entry matches its component declaration', () => {
       'a required that is not a boolean',
       { label: { kind: 'data', required: 'yes' } },
       ['label is required by something other than a boolean'],
+    ],
+    [
+      'a requiredWhen naming no key of the entry',
+      { label: { kind: 'data', requiredWhen: 'toString' } },
+      ['label is requiredWhen toString, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen naming its own key',
+      { label: { kind: 'data', requiredWhen: 'label' } },
+      ['label is requiredWhen label, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen that is no string',
+      { label: { kind: 'data', requiredWhen: 1 } },
+      ['label is requiredWhen 1, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen naming a key that is no data key',
+      { note: { kind: 'text' }, label: { kind: 'data', requiredWhen: 'note' } },
+      ['label is requiredWhen note, which is no data key'],
+    ],
+    [
+      'a requiredWhen naming a required key',
+      { label: { kind: 'data', required: true }, note: { kind: 'text', requiredWhen: 'label' } },
+      ['note is requiredWhen label, which is itself required or requiredWhen'],
+    ],
+    [
+      'a requiredWhen naming a requiredWhen key',
+      {
+        label: data,
+        flag: { kind: 'data', requiredWhen: 'label' },
+        note: { kind: 'text', requiredWhen: 'flag' },
+      },
+      ['note is requiredWhen flag, which is itself required or requiredWhen'],
+    ],
+    [
+      'a requiredWhen beside required',
+      { label: data, note: { kind: 'text', required: false, requiredWhen: 'label' } },
+      ['note states both required and requiredWhen'],
     ],
   ]) {
     it(`names ${claim} as a fault`, () => {
@@ -1197,6 +1284,11 @@ describe('each entry matches its component declaration', () => {
       'that states required',
       { clean: { kind: 'slot', required: false } },
       ['clean is a slot key that states required'],
+    ],
+    [
+      'that states requiredWhen',
+      { unused: { kind: 'data' }, clean: { kind: 'slot', requiredWhen: 'unused' } },
+      ['clean states requiredWhen, which no slot key takes'],
     ],
     [
       'whose element is a <p>',
@@ -2149,6 +2241,12 @@ describe('each entry matches its component declaration', () => {
       [ARIA('aria-expanded', 'that states required')],
     ],
     [
+      'an aria key that states requiredWhen',
+      { label: data, 'aria-expanded': { kind: 'aria', requiredWhen: 'label' } },
+      LANDING,
+      ['aria-expanded states requiredWhen, which no aria key takes'],
+    ],
+    [
       'an aria key on an entry with no restOn',
       { 'aria-expanded': aria },
       { rest: true },
@@ -2536,7 +2634,20 @@ describe('the module sheet and every component style against the published Notic
     );
     assert.deepEqual(
       publishedShapeOf('Notice'),
-      [['tone', 'title', 'detail', 'icon', 'action', 'onAction'], 'any'],
+      [
+        [
+          'tone',
+          'title',
+          'detail',
+          'icon',
+          'action',
+          'onAction',
+          'dismissable',
+          'dismissLabel',
+          'onDismiss',
+        ],
+        'any',
+      ],
       'a published key that writes a class reopens cannotMatchPublished'
     );
   });
