@@ -138,6 +138,8 @@ They settle it in the Journal's run detail, where the [Journal]({% link player-a
 The GM can always settle a pick for a player.
 A rolled group needs no pick, because the roll decides.
 
+{% include screenshot.html case="player-crafting-results-choice-group" caption="How a reward the player chooses looks in the Crafting tab before the craft." %}
+
 A reward the player chooses needs a run on the current lifecycle.
 A run on the older lifecycle refuses to award one.
 
@@ -233,6 +235,8 @@ An ingredient set adds a requirement through one dashed **Ingredient** adder, wh
 The menu leaves out essence and currency while the system has them turned off.
 On a requirement's bare row, **or…** opens the same kinds in a menu headed **Accept instead**; once a requirement holds alternatives, its box has one dashed **Alternative** adder that opens that same menu.
 
+{% include screenshot.html case="manager-recipe-edit-choice-group-menu" caption="An any-one-of requirement with the Accept instead menu open." %}
+
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
   The row shows each tag in a chip as a `#` followed by the tag as it is stored, such as `#solvent`, and the adder's list reads the same way.
@@ -246,6 +250,8 @@ On a requirement's bare row, **or…** opens the same kinds in a menu headed **A
 - Match an essence amount, satisfied by any combination of items whose totalled essence reaches the amount.
 - Match a currency cost, paid from the crafter's coins rather than consumed items.
   The unit's abbreviation shows beside the amount, as on a currency result.
+
+{% include screenshot.html case="player-crafting-chooser-open" caption="The player's side of a requirement with alternatives." %}
 
 An essence is a first-class option like any other, so it can sit inside a group as one of several **Accept instead** alternatives.
 For example, a group might accept either 2x Iron Ingot or 3 units of Fire essence, and either one satisfies the group.

@@ -204,6 +204,8 @@ Below the list, a count tells you how many recipes in this discipline are still 
 You are never shown the names, ingredients, or results of a recipe that has not been revealed to you.
 That count is the only hint that there is more to find.
 
+{% include screenshot.html case="player-alchemy-known-recipe" caption="A known recipe loaded onto the bench, ready to brew." %}
+
 ### Building a combination
 
 Add a component to the bench by tapping it in Your components, or by dragging it onto the bench.
