@@ -606,7 +606,7 @@ npm run lab:parity   # compare every unreplaced element with library.html opened
 
 ## Hero demo GIF (`scripts/demo-capture.mjs`)
 
-The README hero (`docs/img/fabricate-demo-v4.gif`) is captured from the View Lab's demo world (`world=demo`) and encoded locally.
+The README hero (`docs/img/fabricate-demo-v2.gif`) is captured from the View Lab's demo world (`world=demo`) and encoded locally.
 Capture needs the harvested chrome (`npm run viewlab:chrome:harvest`) and no Docker:
 
 ```sh
@@ -625,8 +625,9 @@ Each beat carries a caption from the driver's `CAPTIONS` table, drawn into the p
 The run fails if either face falls back.
 Pass `--no-captions` for a caption-free set; `manifest.json` records which one it holds under `captions`.
 
-The GIF's filename carries a version suffix (`fabricate-demo-v4.gif`).
-When the journey is recaptured, bump the suffix and update the README reference with it, so GitHub's image proxy never serves the previous cut from its cache.
+The GIF's filename carries a version suffix (`fabricate-demo-v2.gif`).
+A change that merges a new cut bumps the suffix once, from the cut it replaces on `main`, and updates the README reference with it, so GitHub's image proxy never serves the previous cut from its cache.
+Recaptures while the change is still open keep the suffix.
 
 Encoding uses Pillow (`pip install pillow`), a local tool and not a repository dependency.
 It quantizes every frame of one theme against one shared palette, so a pixel that did not change keeps its index and each later frame stores only the rectangle that did.
@@ -639,7 +640,7 @@ from pathlib import Path
 from PIL import Image
 
 src = Path("tmp/demo-frames")
-out = Path("docs/img/fabricate-demo-v4.gif")
+out = Path("docs/img/fabricate-demo-v2.gif")
 manifest = json.loads((src / "manifest.json").read_text())
 rgb = [Image.open(src / f["file"]).convert("RGB") for f in manifest["frames"]]
 palettes = {}
