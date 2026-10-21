@@ -2,9 +2,10 @@
  * What the published component gates share (issue 2452): the three parses a gate reads of a file,
  * an entry's import closure, a component's declared props, the pinned tags of each
  * `svelte:element`, admission rule 9's scan of one component with each element's hook and guards,
- * and every stylesheet a published root's selectors are read from.
- * `tests/published-component-manifest.test.js` and `tests/published-component-controls.test.js`
- * import them.
+ * every stylesheet a published root's selectors are read from, and the ancestor and Foundry
+ * dependencies of a closure. `tests/published-component-manifest.test.js`,
+ * `tests/published-component-controls.test.js` and `tests/segmented-control-closure.test.js` import
+ * them.
  */
 import assert from 'node:assert/strict';
 import { posix, resolve } from 'node:path';
@@ -23,7 +24,7 @@ import {
 } from './moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from './parsedSource.js';
 import { readScannedDirectory, repoRoot } from './sourceScan.js';
-import { parseComponentScope } from './svelteStructureContract.js';
+import { parseComponentScope, readsGlobal } from './svelteStructureContract.js';
 
 export const byName = (a, b) => a.localeCompare(b);
 
@@ -1061,4 +1062,71 @@ export function unheldClauses(heldBys) {
       .map((node) => node.arguments[0]?.value);
     return !described.includes(title);
   });
+}
+
+const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
+const APP_TOKENS = ['var(--fab-manager-'];
+/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
+const MANAGER_ROOTS = new Set(['fabricate-manager']);
+const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
+// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
+const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
+export const FOUNDRY_GLOBALS = [
+  'game',
+  'foundry',
+  'Hooks',
+  'CONFIG',
+  'CONST',
+  'ui',
+  'canvas',
+  'fromUuid',
+  'fromUuidSync',
+  'getDocumentClass',
+];
+
+/** The static class names one template node writes, by attribute or directive. */
+export function classNames(node) {
+  if (node.type === 'ClassDirective') return [node.name];
+  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
+  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
+}
+
+/**
+ * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
+ * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
+ */
+export function ancestorDependencies(ast, root = 'any') {
+  if (root === 'manager') return [];
+  const windowed = root === 'fabricate';
+  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
+  const found = new Set();
+  for (const node of walkNodes(ast.css)) {
+    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
+    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
+    if (node.type !== 'Declaration') continue;
+    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
+    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
+      found.add('unguarded var(--font-primary)');
+    }
+  }
+  for (const node of walkNodes(ast.fragment)) {
+    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
+  }
+  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
+}
+
+/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
+export function foundryReads(file, reader) {
+  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
+  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
+}
+
+/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
+export function closureDependencies(path, reader = SHIPPED, root = 'any') {
+  return [...importClosure(path, reader)].flatMap((file) =>
+    [
+      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
+      ...foundryReads(file, reader),
+    ].map((rule) => `${file}: ${rule}`)
+  );
 }

@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
+  | `options` | `[{ value, label, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
@@ -17,8 +17,6 @@
   - `{...rest}` lands on the radiogroup root, written after `class`, and carries a caller's hook.
 -->
 <script>
-  import { localizeOr } from '../util/localizeOr.js';
-
   let {
     options = [],
     value = '',
@@ -63,7 +61,7 @@
          gives the a11y tree; `undefined` omits it, so a labelled consumer's markup is untouched. -->
     <label
       class={segmentClass(option)}
-      title={iconOnly ? localizeOr(option.labelKey, option.fallback) : undefined}
+      title={iconOnly ? option.label : undefined}
       {...optionDataAttr ? { [optionDataAttr]: option.value } : {}}
     >
       <input
@@ -77,7 +75,7 @@
         onchange={() => select(option.value)}
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
-      <span class="manager-segment-label">{localizeOr(option.labelKey, option.fallback)}</span>
+      <span class="manager-segment-label">{option.label}</span>
       {#if Number.isFinite(option.count)}
         <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
       {/if}

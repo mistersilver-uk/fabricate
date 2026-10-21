@@ -13,6 +13,7 @@ import { walkNodes } from './moduleAst.js';
 import {
   SHIPPED,
   byName,
+  classNames,
   declarationsOf,
   everyStylesheet,
   importClosure,
@@ -282,13 +283,6 @@ export function dataHooksOf(census) {
       .map((part) => part.name)
   );
   return [...new Set(names)].sort(byName);
-}
-
-/** The static class names one template node writes, by attribute or directive. */
-export function classNames(node) {
-  if (node.type === 'ClassDirective') return [node.name];
-  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
-  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
 }
 
 /**

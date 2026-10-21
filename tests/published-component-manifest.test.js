@@ -75,7 +75,6 @@ import {
   attributeReads,
   bareButtonSelectors,
   cannotMatchPublished,
-  classNames,
   classesOf,
   compoundsOf,
   dataHooksOf,
@@ -95,11 +94,13 @@ import {
   BRANCH_TWIN,
   DYNAMIC_ELEMENTS,
   SHIPPED,
+  ancestorDependencies,
   ariaFaults,
   attributeSelectors,
   attributesReadInClauses,
   branchTwinFaults,
   byName,
+  closureDependencies,
   controlRestFaults,
   declarationsOf,
   dynamicElementFaults,
@@ -121,27 +122,6 @@ import {
   tagKeys,
   unheldClauses,
 } from './helpers/publishedComponentGate.js';
-import { readsGlobal } from './helpers/svelteStructureContract.js';
-
-const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
-const APP_TOKENS = ['var(--fab-manager-'];
-/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
-const MANAGER_ROOTS = new Set(['fabricate-manager']);
-const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
-// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
-const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
-const FOUNDRY_GLOBALS = [
-  'game',
-  'foundry',
-  'Hooks',
-  'CONFIG',
-  'CONST',
-  'ui',
-  'canvas',
-  'fromUuid',
-  'fromUuidSync',
-  'getDocumentClass',
-];
 
 /**
  * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
@@ -631,46 +611,6 @@ const CARD_DATA_HOOK_RULES = Object.freeze([
 const NOTICE_HAS_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-manager .manager-recipe-notice:has(.fab-notice)',
 ]);
-
-/**
- * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
- * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
- */
-function ancestorDependencies(ast, root = 'any') {
-  if (root === 'manager') return [];
-  const windowed = root === 'fabricate';
-  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
-  const found = new Set();
-  for (const node of walkNodes(ast.css)) {
-    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
-    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
-    if (node.type !== 'Declaration') continue;
-    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
-    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
-      found.add('unguarded var(--font-primary)');
-    }
-  }
-  for (const node of walkNodes(ast.fragment)) {
-    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
-  }
-  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
-}
-
-/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
-function foundryReads(file, reader) {
-  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
-  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
-}
-
-/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
-function closureDependencies(path, reader = SHIPPED, root = 'any') {
-  return [...importClosure(path, reader)].flatMap((file) =>
-    [
-      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
-      ...foundryReads(file, reader),
-    ].map((rule) => `${file}: ${rule}`)
-  );
-}
 
 const SHEET_PREFIXES = ['fab-', 'fabricate-', 'manager-'];
 
