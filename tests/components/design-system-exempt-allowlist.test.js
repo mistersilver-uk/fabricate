@@ -126,9 +126,9 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 2 },
   ],
   [
-    "the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row " +
-      "stays target only until the panel is recomposed onto the search popover's grid form, " +
-      'owned by issue 2459 (library.html, the target popover specimen)',
+    "the popover was recomposed onto the search popover's grid form at issue 2459, so this row " +
+      'stays target only for the entity-tint offering rule, owned by issue 2352 (library.html, ' +
+      'the TintPicker warn)',
     { 'src/ui/svelte/components/TintPicker.svelte': 1 },
   ],
   [

@@ -57,6 +57,9 @@ const {
 const gatheringFilter = (browser, axis) =>
   `[data-gathering-${browser}-browser] .fabricate-select-trigger[aria-labelledby$="-${axis}-filter"]`;
 
+/** The tint popover's panel; the inline strip carries the first class alone (issue 2459). */
+const COLOR_PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
+
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
  * persists a picked character modifier before the panel is rendered again (issue 1707).
@@ -1992,7 +1995,7 @@ export function registerEnvironmentsCases() {
     flushSync();
     await tick();
     flushSync();
-    const colorPopover = target.querySelector('[data-manager-color-picker-popover]');
+    const colorPopover = target.querySelector(COLOR_PANEL);
     assert.ok(colorPopover);
     assert.equal(
       colorPopover.closest('.fabricate-manager'),
@@ -2016,8 +2019,8 @@ export function registerEnvironmentsCases() {
     );
     assert.match(
       colorPopover.getAttribute('style'),
-      /width:\s*220px;/,
-      'biome color popover should keep its fixed compact width'
+      /width:\s*240px;/,
+      'biome color popover should take the picker panel band floor'
     );
     target.querySelector('[data-manager-color-token="mist"]').click();
     await tick();
@@ -2029,11 +2032,17 @@ export function registerEnvironmentsCases() {
       { colorToken: 'mist', customColor: '' },
       'alchemy',
     ]);
-    assert.ok(target.querySelector('[data-manager-color-picker-popover]'));
+    assert.ok(!target.querySelector(COLOR_PANEL), 'a pick closes the panel');
+    biomeColorTrigger.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    );
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector(COLOR_PANEL), 'the edit palette reopens');
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
+    assert.ok(!target.querySelector(COLOR_PANEL), 'an outside mousedown closes it');
     biomeColorTrigger.getBoundingClientRect = () => ({
       left: 760,
       top: 330,
@@ -2047,17 +2056,17 @@ export function registerEnvironmentsCases() {
     );
     await tick();
     flushSync();
-    const constrainedColorPopover = target.querySelector('[data-manager-color-picker-popover]');
+    const constrainedColorPopover = target.querySelector(COLOR_PANEL);
     assert.ok(constrainedColorPopover);
     assert.match(
       constrainedColorPopover.getAttribute('style'),
-      /left:\s*424px;/,
+      /left:\s*404px;/,
       'biome color popover should clamp to the Manager main panel right edge'
     );
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
+    assert.ok(!target.querySelector(COLOR_PANEL), 'Escape closes the panel');
     managerShell.getBoundingClientRect = originalShellRect;
     managerMain.getBoundingClientRect = originalMainRect;
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;

@@ -172,7 +172,6 @@
       layout="inline"
       allowNone
       allowCustom={false}
-      manageDismiss={false}
       colorToken={isTokenStaged ? colourValue : ''}
       unset={!isTokenStaged}
       noneSelected={colourValue === ESSENCE_BULK_COLOUR_NONE}

@@ -26,13 +26,16 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * selects surface coverage.
  */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
-  // The tint palette's pressed cell (issue 2257) and keyboard cursor (issue 2416): the New-biome
-  // popover at rest and under the cursor, and the world essence entry's inline palette.
+  // The tint palette's selected tile (issue 2257), its cursor (issue 2416) and its grid form (issue
+  // 2459): the New-biome popover at rest and under the cursor, the biome edit palette, and the
+  // inline strip in the world essence entry and the catalogue's bulk panel.
   'src/ui/svelte/components/TintPicker.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
     'world-essence-entry-dirty',
     'manager-gathering-biome-colour-popover-cursor',
     'manager-gathering-biome-colour-popover-cursor-selected',
+    'manager-gathering-biome-colour-edit-popover',
+    'world-essence-catalogue-bulk',
   ]),
   'src/ui/svelte/components/TintPickerButton.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',

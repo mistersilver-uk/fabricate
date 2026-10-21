@@ -5,8 +5,6 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';
-  import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import { MANAGER_MAIN_SELECTOR } from '../../util/overlayBounds.js';
   import Pagination from '../../components/Pagination.svelte';
   import Button from '../../components/Button.svelte';
@@ -14,7 +12,6 @@
   import TintPickerButton from '../../components/TintPickerButton.svelte';
   import TintPicker from '../../components/TintPicker.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import {
@@ -147,14 +144,6 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
-  // The popover root, registered via registerBiomeColorPopoverNode: `anchoredPopover` portals and
-  // positions it below, and it is ALSO an `additionalNodes` entry of the dismissOnOutsideClick on
-  // the trigger, as in TintPickerButton. TintPicker's own dismissal is off here
-  // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
-  // mousedown on the trigger would count as "outside" the portaled popover, dismiss it, and the
-  // trigger's contextmenu handler would reopen it in the same gesture.
-  let biomeColorPopoverRoot = $state(null);
-  const biomeColorPopoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   const gatheringTabs = [
     {
@@ -543,7 +532,9 @@
     event?.stopPropagation?.();
     const shouldOpen = openBiomeColorPickerId !== id;
     openBiomeColorPickerId = shouldOpen ? id : '';
-    biomeColorTriggerButton = shouldOpen ? (event?.currentTarget ?? null) : null;
+    if (shouldOpen) biomeColorTriggerButton = event?.currentTarget ?? null;
+    // A toggle shut is no `close()`, so the panel that held focus hands it back to its anchor.
+    else event?.currentTarget?.focus?.();
   }
 
   function handleBiomeIconKeydown(event, id) {
@@ -553,37 +544,7 @@
 
   function closeBiomeColorPicker() {
     openBiomeColorPickerId = '';
-    biomeColorTriggerButton = null;
   }
-
-  function registerBiomeColorPopoverNode(node) {
-    biomeColorPopoverRoot = node;
-  }
-
-  // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
-  // `TintPickerButton` records against its own copy of this shape: the panel is `TintPicker`, a
-  // shared component this view does not own the markup of and whose other call sites render it
-  // inline. An action is a plain function, so this view applies it to the node the popover
-  // registers — same contract, same teardown, no new prop on that component.
-  //
-  // The options reproduce the measure/flip/clamp pass this view used to hand-write: the picker
-  // layout in host-relative coordinates, left-aligned at a fixed 220px, clipped inside the
-  // manager's main column. The effect tracks the popover ROOT alone; the trigger is re-read
-  // through the `trigger` function on every measure, and closing unmounts the popover, which
-  // unregisters the node and tears the handle down.
-  $effect(() => {
-    if (!biomeColorPopoverRoot) return;
-
-    const handle = anchoredPopover(biomeColorPopoverRoot, {
-      component: 'EnvironmentsBrowserView biome colour picker',
-      trigger: () => biomeColorTriggerButton,
-      layout: biomeColorPopoverLayout,
-      layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 220, maxWidth: 220 }),
-      bounds: MANAGER_MAIN_SELECTOR,
-    });
-
-    return () => handle.destroy();
-  });
 </script>
 
 <main
@@ -1065,6 +1026,9 @@
 
           <div
             class="manager-condition-pill-list"
+            role="group"
+            tabindex="-1"
+            data-keyboard-focus="true"
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.Vocabularies.Values',
               'Vocabulary values'
@@ -1077,14 +1041,7 @@
                 data-gathering-vocabulary-value={valueId}
               >
                 {#if vocabulary.kind === 'biomes'}
-                  <span
-                    class="manager-biome-combined-picker"
-                    use:dismissOnOutsideClick={{
-                      enabled: openBiomeColorPickerId === valueId,
-                      onDismiss: closeBiomeColorPicker,
-                      additionalNodes: () => [biomeColorPopoverRoot],
-                    }}
-                  >
+                  <span class="manager-biome-combined-picker">
                     <IconPicker
                       value={biomeIcon(option)}
                       iconOnly={true}
@@ -1104,31 +1061,6 @@
                           selectedSystemId
                         )}
                     />
-                    {#if openBiomeColorPickerId === valueId}
-                      <TintPicker
-                        colorToken={biomeColorToken(option)}
-                        customColor={biomeCustomColor(option)}
-                        presetGridLabel={text(
-                          'FABRICATE.Admin.Manager.Environment.Vocabularies.ColorPresets',
-                          'Colour presets'
-                        )}
-                        customHexLabel={text(
-                          'FABRICATE.Admin.Manager.Environment.Vocabularies.CustomHex',
-                          'Custom hex'
-                        )}
-                        allowCustom
-                        onChange={(updates) =>
-                          onUpdateGatheringVocabularyValue?.(
-                            vocabulary.kind,
-                            valueId,
-                            updates,
-                            selectedSystemId
-                          )}
-                        onDismiss={closeBiomeColorPicker}
-                        registerPopoverNode={registerBiomeColorPopoverNode}
-                        manageDismiss={false}
-                      />
-                    {/if}
                   </span>
                 {/if}
                 <input
@@ -1170,6 +1102,41 @@
                 </button>
               </span>
             {/each}
+            {#if vocabulary.kind === 'biomes'}
+              {@const openBiome = vocabularyValues(vocabulary.vocabulary).find(
+                (option) => vocabularyId(option) === openBiomeColorPickerId
+              )}
+              <TintPicker
+                anchor={() => biomeColorTriggerButton}
+                bounds={MANAGER_MAIN_SELECTOR}
+                bind:open={
+                  () =>
+                    openBiomeColorPickerId !== '' && Boolean(biomeColorTriggerButton?.isConnected),
+                  (next) => {
+                    if (!next) closeBiomeColorPicker();
+                  }
+                }
+                colorToken={biomeColorToken(openBiome)}
+                customColor={biomeCustomColor(openBiome)}
+                presetGridLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Vocabularies.ColorPresets',
+                  'Colour presets'
+                )}
+                customHexLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Vocabularies.CustomHex',
+                  'Custom hex'
+                )}
+                allowCustom
+                onChange={(updates) =>
+                  openBiome &&
+                  onUpdateGatheringVocabularyValue?.(
+                    vocabulary.kind,
+                    vocabularyId(openBiome),
+                    updates,
+                    selectedSystemId
+                  )}
+              />
+            {/if}
           </div>
         </section>
       {/each}

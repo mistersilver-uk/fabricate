@@ -89,7 +89,9 @@
       "TintPicker": {
         "Presets": "Colour presets",
         "CustomHex": "Custom hex",
-        "None": "No colour"
+        "None": "No colour",
+        "Search": "Search colours",
+        "Count": "{matched} of {total}"
       },
       "RangeBar": {
         "Label": "Outcome bands",

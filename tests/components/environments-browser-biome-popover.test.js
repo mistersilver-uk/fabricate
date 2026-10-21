@@ -8,7 +8,10 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -38,8 +41,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
-  'src/ui/svelte/util/foundryIconCatalogue.json',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/dropUtils.js',
     // The browse view-state the environments browser and its two gathering children
     // read (issue 1438).
@@ -138,8 +141,19 @@ function biomeTrigger(target) {
   );
 }
 
+// The panel compound: the inline strip also carries `fabricate-color-picker-popover`, never both.
+const COLOR_PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
+
 function colorPopover(target) {
-  return target.querySelector('[data-manager-color-picker-popover]');
+  return target.querySelector(COLOR_PANEL);
+}
+
+/** Lets `close()`'s `tick()`-deferred focus return land. */
+async function settleFocus() {
+  flushSync();
+  await tick();
+  await new Promise((resolveTurn) => setTimeout(resolveTurn, 0));
+  flushSync();
 }
 
 async function mountSettingsTab() {
@@ -243,6 +257,8 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
       !colorPopover(target),
       'a second right-click on the trigger closes the popover instead of reopening it'
     );
+    await settleFocus();
+    assert.ok(document.activeElement === trigger, 'and focus is back on the biome icon');
   });
 
   it('still dismisses the popover on a genuine outside click', async () => {
@@ -269,12 +285,43 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     flushSync();
 
     assert.ok(!colorPopover(target), 'Escape still dismisses the popover');
+    await settleFocus();
+    assert.ok(document.activeElement === trigger, 'and returns focus to the anchor');
+  });
+
+  // A deleted anchor (issue 2459): deleting the open biome unmounts its icon while the one picker
+  // stays mounted, so focus must land on the pill list rather than fall to `body`.
+  it('a deleted anchor closes the panel and focuses the pill list', async () => {
+    const seeded = (values) => ({
+      systems: { alchemy: { vocabularies: { biomes: { values } } } },
+    });
+    const forest = gatheringConfig.systems.alchemy.vocabularies.biomes.values[0];
+    const marsh = { id: 'marsh', label: 'Salt Marsh', icon: 'fas fa-water', colorToken: 'mist' };
+    const target = await harness.mount({
+      activeGatheringTab: 'settings',
+      selectedSystemId: 'alchemy',
+      selectedSystemName: 'Alchemy',
+      gatheringConfig: seeded([forest, marsh]),
+    });
+    await openBiomePopover(stageManagerShell(target));
+    assert.ok(colorPopover(target), 'popover opens on right-click');
+
+    await harness.setProps({ gatheringConfig: seeded([marsh]) });
+    await settleFocus();
+
+    assert.ok(!colorPopover(target), 'losing its anchor closes the panel');
+    const list = target
+      .querySelector('[data-gathering-vocabulary-panel="biomes"]')
+      .querySelector(':scope .manager-condition-pill-list');
+    assert.ok(document.activeElement === list, 'focus lands on the pill list');
+    assert.equal(list.getAttribute('role'), 'group');
+    assert.equal(list.getAttribute('aria-label'), 'Vocabulary values');
   });
 
   // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL.
   //   bounds  `.manager-main` at left 60 / right 1220, inset 16 → minLeft 76, maxRight 1204
-  //   width   `minWidth: maxWidth: 220` from the view's own `layoutOptions` → 220
-  //   left    horizontalAlign 'left' → the trigger's own 140, inside [76, 1204 − 220]
+  //   width   the primitive's band 240/340, and the trigger is narrower → 240
+  //   left    horizontalAlign 'left' → the trigger's own 140, inside [76, 1204 − 240]
   //   height  preferred 380, and the space below the trigger (800 − 130 − 6 − 16 = 648) exceeds it
   //   top     the trigger's bottom 130 plus the 6px gap → 136, so the placement is 'bottom'
   it('positions the portaled panel where the deleted block would have', async () => {
@@ -287,7 +334,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.equal(
       opened.getAttribute('style'),
-      'left: 140px; right: auto; width: 220px; min-width: 220px; max-width: 220px; ' +
+      'left: 140px; right: auto; width: 240px; min-width: 240px; max-width: 240px; ' +
         'max-height: 380px; top: 136px; bottom: auto;'
     );
   });
@@ -306,7 +353,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.equal(
       opened.getAttribute('style'),
-      'left: 984px; right: auto; width: 220px; min-width: 220px; max-width: 220px; ' +
+      'left: 964px; right: auto; width: 240px; min-width: 240px; max-width: 240px; ' +
         'max-height: 380px; top: 136px; bottom: auto;'
     );
   });
@@ -332,7 +379,7 @@ describe('EnvironmentsBrowserView biome pickers offer the free hex (issue 2352)'
   /** The hex field's input inside the open palette, named by its `customHexLabel` caption. */
   function customHexInput() {
     const input = globalThis.document.querySelector(
-      '[data-manager-color-picker-popover] label.manager-color-custom input[data-manager-custom-color]'
+      `${COLOR_PANEL} label.manager-color-custom input[data-manager-custom-color]`
     );
     return input && input.closest('label').textContent.trim() === 'Custom hex' ? input : null;
   }
@@ -368,7 +415,13 @@ const SWITCH_SYSTEM = 'sys-first';
 /** One gathering vocabulary the biome add-form can render against. */
 const biomeVocabulary = {
   values: [
-    { id: 'forest', label: 'Moon Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+    {
+      id: 'forest',
+      label: 'Moon Forest',
+      icon: 'fas fa-tree',
+      colorToken: 'sage',
+      customColor: '',
+    },
   ],
 };
 
