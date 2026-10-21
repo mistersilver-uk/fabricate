@@ -412,12 +412,13 @@ describe('registering a callback kind', () => {
     assert.ok(Object.isFrozen(props.onPick));
   });
 
-  it('refuses a manifest entry whose prop kind is value, which no table ships', () => {
-    const unknown = { ...ALPHA, props: { amount: { kind: 'value' } } };
+  it('refuses a manifest entry whose prop kind is bindable, which no table ships', () => {
+    const unknown = { ...ALPHA, props: { amount: { kind: 'bindable' } } };
     const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
     assert.throws(
       () => seam.register({ ...fakeRuntime().runtime, components: {} }),
-      (error) => exactly(`${PREFIX}Alpha "amount" has an unknown kind "value"`).test(error.message)
+      (error) =>
+        exactly(`${PREFIX}Alpha "amount" has an unknown kind "bindable"`).test(error.message)
     );
   });
 });

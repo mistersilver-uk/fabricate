@@ -586,12 +586,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
   ]),
-  // The surface that reports something that just happened (issue 1505), on two callers.
+  // The surface that reports something that just happened (issue 1505), on two callers. Then the
+  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452).
   'src/ui/svelte/components/Notice.svelte': Object.freeze([
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.

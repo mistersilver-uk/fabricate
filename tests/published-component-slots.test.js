@@ -184,7 +184,7 @@ describe('a slot key', () => {
 
     const refused = panelSeam({ mountError: new Error('runtime refused') });
     const inert = refused.ui.mount('Panel', { target: new FakeTarget(), props: { body: true } });
-    assert.deepEqual(Object.keys(inert), ['update', 'destroy', 'slot']);
+    assert.deepEqual(Object.keys(inert), ['update', 'destroy', 'slot', 'value']);
     assert.equal(inert.slot('body'), null);
     await drained();
   });

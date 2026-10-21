@@ -295,7 +295,7 @@ describe('1505 Notice — the API the library states', () => {
     harness.remount();
   });
 
-  it('CLICKS the dismiss control and the notice leaves the DOM', async () => {
+  it('CLICKS the dismiss control and the notice leaves the DOM, with no onDismiss to call', async () => {
     const target = await harness.mount({
       title: 'Unsaved changes',
       dismissable: true,

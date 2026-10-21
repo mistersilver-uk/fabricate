@@ -369,14 +369,16 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; bindables, the overlay host and the standalone style root are the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; the overlay host and the standalone style root are the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
 - **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.**
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
-- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria', required: boolean } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
-- `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key) }`.
+- `describe(name)` returns a frozen `{ version, props, rest, root }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required: boolean, requiredWhen?: string } }`, `rest` says whether the component takes data attributes, and `root` is its required ancestor root; it returns `null` for a name that is not published.
+`requiredWhen` is present only where the manifest states it, and `required` is then `false`.
+- `mount(name, { target, props = {}, onFault })` renders a published component into `target` and returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
+A companion detects `value` with `typeof handle.value === 'function'`.
 Fabricate draws a published component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
 - `load(names)` takes an array of published names, reads a value that is not an array as one name, and returns a Promise; it never throws synchronously and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 It resolves `undefined` once every named entry's code is loaded, which today is the next microtask, and rejects with the M3 `TypeError` for a name that is not published.
@@ -388,7 +390,9 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria', required?, element?, args? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn? }`, and Fabricate's runtime adapter binds each `path` to its component.
+`requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
+Giving an existing key `requiredWhen` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
@@ -403,8 +407,8 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`) is not published at version 1; publishing one later is additive.
-- An element-ref bindable (`Chip`'s and `Button`'s `element`) is never published.
-- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`; `Notice`'s `dismissable` and `dismissLabel`) is not published at version 1; publishing one later is additive.
+- A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s and `Button`'s `element`) never is.
+- A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
 - `Button`'s `size`, `icon`, `busy`, its anchor form (the props `tag`, `href`, `rel` and the link prop `target`) and its `type` are not published at version 1; publishing one later is additive.
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
@@ -415,7 +419,9 @@ A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `a
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), and `Button`, `StatusToggle` and `Stepper` too (issue 2452); a companion calls it for each before mounting.
-- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'` and `'aria'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
+- Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
+It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
+It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
@@ -450,10 +456,10 @@ A `<button>` the companion draws there states `type="button"`: an untyped button
 The companion puts `data-action` on nothing it draws there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
 - A snippet the component calls with arguments is never a content slot.
 - A `callback` key takes a function, and `undefined` or absence omits it, so the component's own default applies; anything else is M17.
-A `required` `callback` key refuses absence and `undefined` (M9) and any value that is not a function, `''` included (M17), and an `update` that omits it is M9.
+A `required` `callback` key, or a `requiredWhen` one while its guard is truthy, refuses absence and `undefined` (M9) and any value that is not a function, `''` included (M17), and an `update` that omits it is M9.
 A function is accepted only as the whole value of a `callback` key: anywhere else, at any depth, it is M10.
 - The component receives one forwarder per `callback` key, the same one for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
-- Fabricate calls the function with the arguments the entry's group states, in that order, and with nothing else.
+- Fabricate calls the function with the arguments the entry's group states, or, for a synthesised `on<Key>Change`, `(next, previous)`, in that order, and with nothing else.
 Each is a copy made with Fabricate's `$state.snapshot`: plain objects and arrays at every depth, a `Map`, `Set` or `Date` one level deep.
 At version 1 every stated argument is one of those or a primitive, so no event, DOM node or Fabricate object is passed.
 An argument the group does not state is not passed.
@@ -463,8 +469,8 @@ A companion that is called back inside an effect of its own untracks its own rea
 - The function's return value is ignored.
 A throw, or the rejection of a Promise it returns, is reported as `console.error('Fabricate | Published component callback failed:', name, key, error)` and goes no further: the mount stays live, it is not a fault, and `onFault` is not called.
 - The function may call `update` or `destroy` on its own handle, or `mount`, before it returns.
-An `update` made there is drawn on Fabricate's next flush, and a refusal it throws is reported as a callback failure unless the function catches it.
-- After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again; a `required` key cannot be omitted.
+An `update` made there is drawn on Fabricate's next flush, except that a value it changes is drawn before the call returns (the value resync), and a refusal it throws is reported as a callback failure unless the function catches it.
+- After `destroy`, a fault, or an `update` that omits the key, Fabricate does not call the function again; a `required` key, or a `requiredWhen` one while its guard is truthy, cannot be omitted.
 - A companion detects a callback key with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates the key refuses it.
 - An `aria` key is an ARIA attribute Fabricate writes, under the key's own name, on the control the entry's group names; the component declares no prop of that name.
 It takes a string, a number or a boolean and writes it as the attribute's value, so `false` writes `"false"`; `undefined` or absence writes no attribute; anything else is M13.
@@ -474,6 +480,22 @@ Fabricate writes the attribute only when the value differs from the one it last 
 - Fabricate checks no value against the attribute's own set: the entry's group states the accepted values, and any other is private.
 - A companion detects an `aria` key with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates the key refuses it (M13).
 - A camel-case key is a prop the component interprets, and a hyphenated `aria-*` key is an attribute Fabricate writes under that name; a control's name is carried by the key its group names, and by the text that an `aria-labelledby` key its group names points at.
+- A `value` key is a value the component binds and may change itself; its manifest spec is `{ kind: 'value', initial }`, where `initial` is a string, a number, a boolean or `null`, and states no `required`, `element` or `args`.
+A value key's name matches `/^[a-z][A-Za-z0-9]*$/`, and it is never `required`.
+- It takes a string, a number, a boolean or `null`; `undefined` or absence is not passed, so a mount starts at `initial`; anything else is M20, and a function is M10.
+An object or an array is never a value, because a change made inside one never reaches Fabricate.
+- Each value key synthesises an optional callback, `on<Key>Change`: `on`, the key with its first letter upper-cased, then `Change`, so `query` gives `onQueryChange`.
+It takes a function as a `callback` key does (M17), and the component declares no prop of that name.
+`describe` lists the value key as `{ kind: 'value', required: false }`, without `initial`, and directly after it `on<Key>Change` as `{ kind: 'callback', required: false }`.
+- Fabricate calls `on<Key>Change(next, previous)` only for a change the component makes, once per change, and never when `Object.is(next, previous)`.
+`mount` and `update` never call `on<Key>Change`.
+- Inside that call, an `update` that passes the same value is a no-op, and one that passes another value is drawn before the call returns and wins, with no second call.
+A rejection, revert or transform made synchronously inside the call is exact; one made later shows on the next flush.
+A replaced value moves a text input's caret to the end and ends any IME composition in progress.
+- `handle.value(key)` returns a snapshot of a value key's current value, and `undefined` for any other key and after `destroy` or a fault; `null` is a legal value.
+- A companion detects a value key with `describe(name).props[key]?.kind === 'value'`, because a Fabricate that predates the key refuses it (M8).
+- A published component writes a `value` key only from an event handler.
+Fabricate's gate holds this, because the runtime does not refuse the resync's `flushSync` inside an effect.
 
 ### The required ancestor root
 
@@ -542,7 +564,7 @@ Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fa
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
-A control whose face is a glyph alone is published only with a required key for its name, and its group says whether the pointer is shown that name.
+A control whose face is a glyph alone is published only with a key for its name that is `required`, or `requiredWhen` the key that draws the control, and its group says whether the pointer is shown that name.
 
 ### The issue 2448 components
 
@@ -697,17 +719,30 @@ Each group states the accepted values of every key that entry publishes.
     An `update` that changes none of its text announces nothing.
     The companion mounts it when the thing happens and destroys it when it no longer holds, never as standing text.
     Every mount is a new announcement, so when the companion's content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), it keeps the notice through `update` where its `target` survives and does not mount an unchanged one again.
-    It moves no focus, and takes none except on its action button; where the act that caused it also moves focus, the companion moves focus first and mounts the notice after, because a focus change cancels polite speech.
+    It moves no focus, and takes none except on its action button and its dismiss control; where the act that caused it also moves focus, the companion moves focus first and mounts the notice after, because a focus change cancels polite speech.
     Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
     Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
   - Fabricate removes no notice on a timer, and a companion that does gives a notice that carries an action no time limit.
   - The button's label is part of the live region: an `update` that changes it is announced, by some screen readers together with the whole notice, so the companion changes it only to report a change of state.
   - An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
     An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so where it does the companion moves focus first, as `### Interactive components` states.
-    The button is the only focusable element inside `target`, so `target.querySelector('button')` reaches it.
-    In a host that replaces its content on render (DialogV2, a Handlebars part) the button is a new element after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses the button.
-    The keyboard ring is the accent, 2px outside the button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
-  - It draws no dismissal at version 1, so the companion removes it with `destroy`.
+    The action button is the first `button` inside `target` and the dismiss control the last, so `target.querySelector('button')` reaches the action and the last of `target.querySelectorAll('button')` the dismissal.
+    In a host that replaces its content on render (DialogV2, a Handlebars part) the action button is a new element after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses the action button.
+    The keyboard ring is the accent, 2px outside each button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
+  - `dismissable` is optional, `true` or `false`, and draws a dismiss control after the action.
+    `dismissLabel` is required while `dismissable` is truthy; it names the control and says what is dismissed, and is never white space alone.
+  - `onDismiss` is required while `dismissable` is truthy, and is called with no argument, once, when the control is pressed by pointer, Enter or Space, while it still holds focus.
+    Escape dismisses nothing.
+  - The control's face is the xmark glyph alone; no tooltip shows its name.
+  - Dismissal is final for the mount.
+    In `onDismiss` the companion moves focus to the destination "Fabricate moves no focus" orders, starting at the next control, since the press leads nowhere, and then calls `destroy`.
+    Removing the focused dismiss button drops focus to `body`, where Foundry's Escape closes every open window; `onDismiss` must move focus to a control before it returns.
+    An `update` after dismissal is validated, returns `true` and draws nothing.
+    Until `destroy`, `target` still holds the mount, so a `mount` into it throws M5.
+    A notice is shown again only by a new `mount`, which is a new announcement.
+    An `update` that clears `dismissable` removes a control that may hold focus, so the companion moves focus first.
+  - The dismiss glyph clears 3:1 against its tile at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
+    Its least contrast across the seven palettes and four tones is 5.93:1 at rest and 7.08:1 under the pointer on `--fab-bg-0`, 5.44:1 and 6.53:1 on `--fab-bg-1` and `--fab-surface`, 4.53:1 and 5.87:1 on `--fab-bg-2`, and 2.55:1 and 3.39:1 on `--fab-bg-3`.
   - The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
     The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
     At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
@@ -864,7 +899,7 @@ Each group states the accepted values of every key that entry publishes.
 ### Mounting and its refusals
 
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
-Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam never calls `flushSync`.
+Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam calls `flushSync` only as the value resync: before an `on<Key>Change` delivery and once after it when the delivery changed the value, inside the user's event, never inside an effect or flush, and not once the mount has ended.
 - `mount` throws only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -878,7 +913,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M6 | `target` is not empty | `target must be empty` |
 | M7 | `props` is not plain: its prototype is not `null`, or its prototype's prototype is not `null` | `props must be a plain object` |
 | M8 | A key the entry does not publish | `"<key>" is not a prop of <name>` |
-| M9 | A `required` prop is absent, or `''` where the key is not a `callback` | `<name> requires a non-empty "<key>"` |
+| M9 | A `required` prop is absent, or `''` where the key is not a `callback`; or a `requiredWhen` prop is absent, or `''` where it is not a `callback`, while the key it names is truthy; with several, the first key in manifest order | `<name> requires a non-empty "<key>"`, or `<name> requires a non-empty "<key>" when "<other>" is truthy` |
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
@@ -887,6 +922,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
 | M17 | A `callback` key holding a value that is not a function | `"<key>" must be a function` |
+| M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
@@ -895,9 +931,9 @@ Otherwise `mount` destroys the stale entry first, then checks that the target is
 
 ### Updating and destroying
 
-- **`update(props)` is validated with M7 to M15 and M17 and is atomic**: when it throws, the previous props stay rendered.
-- `update` replaces the props and never merges them, so an omitted key reads `undefined` and the component's default applies, and nothing remounts.
-- `update` returns `true` once accepted, with the DOM reflecting it after the next flush, and `false` after `destroy` or a fault.
+- **`update(props)` is validated with M7 to M15, M17 and M20 and is atomic**: when it throws, the previous props stay rendered.
+- `update` replaces the props and never merges them, except that an omitted or `undefined` `value` key keeps its current value; any other omitted key reads `undefined` and the component's default applies, and nothing remounts.
+- `update` returns `true` once accepted, with the DOM reflecting it after the next flush, or at once under the value resync, and `false` after `destroy` or a fault.
 - `update` writes the host's props under Fabricate's `untrack`, so a call from inside a `$derived` on Fabricate's own runtime is not an unsafe mutation.
 - **`destroy()` is idempotent**: it unmounts what Fabricate rendered, whether or not `target` is still connected, and releases the target.
 - `destroy` first destroys every live published mount inside its slot elements, then detaches each slot element with its remaining children untouched.
@@ -961,7 +997,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 #### Scenario: A companion draws a published primitive
 
 - **WHEN** a companion calls `mount(name, { target, props })` with a published name and valid props after Fabricate is ready
-- **THEN** Fabricate renders it into `target` on its own runtime and returns a frozen `{ update, destroy, slot }`
+- **THEN** Fabricate renders it into `target` on its own runtime and returns a frozen `{ update, destroy, slot, value }`
 - **AND** `update` replaces the props without remounting, and `destroy` empties `target`
 
 #### Scenario: Text content
@@ -999,6 +1035,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onAction` once, with no argument
 - **AND** when `onAction` throws, Fabricate reports it, the notice stays drawn, and `update` still answers `true`
 
+#### Scenario: A notice dismissal
+
+- **WHEN** a companion mounts `Notice` with `dismissable`, `dismissLabel` and `onDismiss` and the user presses the dismiss control
+- **THEN** Fabricate calls `onDismiss` once, with no argument, while the control still holds focus, and the notice then leaves the DOM
+- **AND** a mount that passes `dismissable: true` without `dismissLabel` throws M9, naming `dismissable`
+
 #### Scenario: A published button
 
 - **WHEN** a companion mounts `Button` with `children` and `onclick` inside a Fabricate window and the user presses it
@@ -1026,6 +1068,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onChange` once, with `3`, and the input still shows `2` until the companion's `update` passes `value: 3`
 - **AND** after that `update` the increment button is disabled, and a typed value the companion refuses is replaced by `value` when the input loses focus
 - **AND** a mount that omits `decrementLabel` throws M9, and one that passes `disabled` throws M8
+
+#### Scenario: A bound value
+
+- **WHEN** a companion mounts a component with a `value` key and its `on<Key>Change`, and the user types into it
+- **THEN** Fabricate calls `on<Key>Change(next, previous)` once, and `handle.value(key)` answers `next`
+- **AND** an `update` that sets the key draws it without calling back, and an echo made inside the call with the same value does not loop
+- **AND** a transform made by an `update` inside the call is drawn before the call returns and wins, and a revert to `previous` holds
 
 #### Scenario: A malformed request
 

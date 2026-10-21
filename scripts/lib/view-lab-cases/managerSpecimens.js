@@ -8,13 +8,14 @@ import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 /**
- * The seam, its prop kinds, its callbacks, its manifest, its adapter and its host: each redraws
- * what it mounts.
+ * The seam, its prop kinds, its callbacks, its values, its manifest, its adapter and its host:
+ * each redraws what it mounts.
  */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
   /^src\/ui\/publishedComponentProps\.js$/,
   /^src\/ui\/publishedComponentCallbacks\.js$/,
+  /^src\/ui\/publishedComponentValues\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
@@ -169,7 +170,28 @@ const PRESSED_TOGGLES = [
   `:has(> ${TOGGLE_SECTION('press')} button[data-lab-presses="1"][aria-pressed="true"])`,
 ].join('');
 
-/** Each notice, each button and each switch inside the ground, and the ground inside the window. */
+/**
+ * The same fixture's band of dismissable notices, one of its sections by the notice's tone, and
+ * the published button beneath each that stands for the companion's next control.
+ */
+const DISMISSALS_GROUND = '[data-lab-dismissals]';
+const DISMISSAL_SECTION = (tone) => `[data-lab-dismissal="${tone}"]`;
+const DISMISSAL = (tone) =>
+  `${CONTROLS_GROUND} > ${DISMISSALS_GROUND} > ${DISMISSAL_SECTION(tone)}`;
+const NEXT_BUTTON = (tone) => `${DISMISSAL(tone)} > [data-lab-next] button`;
+
+/** Each dismissable notice that fixture mounts, by its section's tone. */
+const DISMISSAL_TONES = Object.freeze(['danger', 'accent']);
+
+/** The 2px accent keyboard ring with 2px of ground between ring and control. */
+const ACCENT_RING =
+  'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)';
+
+/**
+ * Each notice, each button, each switch and each dismissal's section and next control inside the
+ * ground, and the ground inside the window. A dismissal's section, not its notice, because one
+ * case's press removes the notice.
+ */
 const CONTROLS_CONTAINMENT = Object.freeze([
   ...CONTROL_KEYS.map((key) => ({
     container: CONTROLS_GROUND,
@@ -177,11 +199,15 @@ const CONTROLS_CONTAINMENT = Object.freeze([
   })),
   ...BUTTON_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_BUTTON(key) })),
   ...TOGGLE_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_TOGGLE(key) })),
+  ...DISMISSAL_TONES.flatMap((tone) => [
+    { container: CONTROLS_GROUND, target: DISMISSAL(tone) },
+    { container: CONTROLS_GROUND, target: NEXT_BUTTON(tone) },
+  ]),
   { container: '.window-content', target: CONTROLS_GROUND },
 ]);
 
-/** Sized to the fixture's 592px ground and the height of its notices, buttons and switches. */
-const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 830 });
+/** Sized to the fixture's 592px ground and the height of its notices, buttons, switches and dismissals. */
+const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 940 });
 
 /** The values fixture's ground, one of its sections by key, and a part of that section's stepper. */
 const VALUES_GROUND = '[data-lab-values]';
@@ -366,7 +392,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-controls-specimen',
     label:
-      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. Beneath those, eight published switches at rest beside their labels: Group by category off and Hidden tasks on; Sort by name and Essences in the list off, the second over its hint; a long label wrapping beside a switch that is on; Group by tag off; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. Beneath those, eight published switches at rest beside their labels: Group by category off and Hidden tasks on; Sort by name and Essences in the list off, the second over its hint; a long label wrapping beside a switch that is on; Group by tag off; and, on a darker strip, Crafter notifications on and Shared results off. Beneath those, two dismissable notices at rest, a danger and an accent one, each with its action and a dismiss control after it, and each above a Next step button. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -386,8 +412,9 @@ export const CASES = Object.freeze([
       controls: [
         // One button per tone once the first notice has lost its own: a control selector names
         // one element.
+        // Scoped to the five notices' sections, beside the dismissals' band.
         ...['info', 'danger', 'warning', 'success'].map((tone) => ({
-          selector: `.fab-notice.is-${tone} [data-notice-action]`,
+          selector: `${CONTROLS_GROUND} > section .fab-notice.is-${tone} [data-notice-action]`,
           styles: ACTION_BUTTON,
         })),
         // The third action under keyboard focus: `:focus-visible` alone says focus, not a ring.
@@ -400,7 +427,7 @@ export const CASES = Object.freeze([
           styles: 'color: var(--fab-success-text)',
         },
         {
-          selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+          selector: `${CONTROLS_GROUND} > section .fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title`,
           styles: 'color: var(--fab-danger-text)',
         },
         ...RESTING_BUTTONS,
@@ -417,7 +444,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-buttons-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn, the five notices above are unpressed and the eight switches beneath are at rest. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn, the five notices above are unpressed and the eight switches and two dismissable notices beneath are at rest. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -452,7 +479,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-toggles-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window under Foundry 14’s own core sheet, so the button stands 28px tall here at the window’s 14px type size, and taller in a form or dialog row; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off; beneath them, the two dismissable notices are at rest. The frame draws inside the manager window under Foundry 14’s own core sheet, so the button stands 28px tall here at the window’s 14px type size, and taller in a form or dialog row; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -487,6 +514,67 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES`
     // entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-notice-dismiss-focus',
+    label:
+      'Specimen, mounted through the published seam — the controls fixture after one step: Tab from the action of the accent notice beneath the switches, which put keyboard focus on its dismiss control, the xmark glyph alone. That control carries the accent keyboard ring, 2px wide with 2px of the notice’s own fill between ring and tile, at the tone whose fill shares the ring’s hue. No other ring is drawn: the danger notice beside it is at rest with its dismiss control after its action, each notice stands above its Next step button, and the notices, buttons and switches above are at rest. The accent tone is the notice’s own and not a companion’s to pass; it is drawn here because its fill shares the ring’s hue. The frame draws inside the manager window; the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of the dismissal.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: `${DISMISSAL('accent')} [data-notice-action]`, press: 'Tab' }],
+    // Keyboard focus on the dismiss control the action precedes, which exists only once Tab has
+    // moved it there.
+    expectSelector: `${DISMISSAL('accent')} [data-notice-action] ~ [data-notice-dismiss]:focus-visible`,
+    expectCenterHit: `${DISMISSAL('accent')} [data-notice-dismiss]`,
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${DISMISSAL('accent')} [data-notice-dismiss]:focus-visible`,
+          styles: ACCENT_RING,
+        },
+        // The glyph-only control's square tile, at each tone.
+        ...DISMISSAL_TONES.map((tone) => ({
+          selector: `${DISMISSAL(tone)} [data-notice-dismiss]`,
+          styles: 'width: 28px; height: 28px',
+        })),
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-notice-dismissed',
+    label:
+      'Specimen, mounted through the published seam — the controls fixture after one step: Enter on the dismiss control of the danger notice beneath the switches, whose callback moved focus to the Next step button beneath it and then destroyed the notice. The danger notice is gone and that button, risen into its place, carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, so focus never fell to the page body. The accent notice beside it is at rest above its own Next step button, and the notices, buttons and switches above are at rest. The frame draws inside the manager window; the mounted dismissal clauses are the evidence for the pointer and Space presses',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of the dismissal.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: `${DISMISSAL('danger')} [data-notice-dismiss]`, press: 'Enter' }],
+    // The danger notice gone and focus on the next control, neither of which holds before the press.
+    expectSelector: `${DISMISSAL('danger')}:not(:has(.fab-notice)) > [data-lab-next] button:focus`,
+    expectCenterHit: NEXT_BUTTON('danger'),
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // Focus arrived by a keyboard press, so the next control draws its ring.
+        { selector: `${NEXT_BUTTON('danger')}:focus-visible`, styles: ACCENT_RING },
+        {
+          selector: `${DISMISSAL('accent')} .fab-notice [data-notice-dismiss]`,
+          styles: 'width: 28px',
+        },
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
   managerCase({
