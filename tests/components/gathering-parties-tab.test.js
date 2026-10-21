@@ -10,7 +10,6 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
-// Issue 1504: the page-size control is a shared `<Select>`.
 import { choosePageSize, pageSizeValues } from '../helpers/page-size-control.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,

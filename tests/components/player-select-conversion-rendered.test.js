@@ -360,21 +360,18 @@ const PANEL_SITES = Object.freeze([
     name: 'the inventory sort',
     value: 'type',
     widest: 'Quantity',
-    banded: true,
   },
   {
     subject: 'journal',
     name: 'the journal sort',
     value: 'oldest',
     widest: 'Soonest Ready',
-    banded: true,
   },
   {
     subject: 'system',
     name: 'the participation selector',
     value: 'Alchemy',
     widest: 'Alchemists Supplies v1.6 — Salvageable, Tool',
-    banded: true,
   },
 ]);
 
@@ -481,7 +478,7 @@ describe('an open option list draws every one of its labels in full (issue 1511)
     });
   }
 
-  for (const { subject, name, value, widest } of PANEL_SITES.filter((site) => site.banded)) {
+  for (const { subject, name, value, widest } of PANEL_SITES) {
     it(`ellipsises ${name} again once its stated panel band is taken away`, async () => {
       const page = await openFixture(subject, value);
       try {

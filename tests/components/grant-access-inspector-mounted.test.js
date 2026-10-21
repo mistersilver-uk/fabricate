@@ -21,7 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-grant-access-',
   rawModules: [
-    // Issue 1513: the shared `<Pagination>` imports `<Select>`.
+    // The picker closure the tree's own popovers reach through SearchablePopover.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',

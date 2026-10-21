@@ -160,9 +160,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     for (const paginationModule of PAGINATION_COMPILED_MODULES) {
-
       writeCompiledSvelte(paginationModule);
-
     }
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.

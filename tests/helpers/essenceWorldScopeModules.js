@@ -53,9 +53,9 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
   'src/ui/svelte/components/Medallion.svelte',
   ...PAGINATION_COMPILED_MODULES,
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
-  // (`...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: `Pagination` and the
-  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
-  // this shell rather than new controls on these screens.
+  // (`...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: the frame below
+  // imports `Select`, so it and `SearchablePopover` are transitive dependencies of this shell
+  // rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',

@@ -1,7 +1,4 @@
-/**
- * DRIVING A PAGER'S SEGMENTED PAGE-SIZE CONTROL FROM A MOUNTED SUITE. `root` is the harness's mount
- * target and `scope` a selector narrowing to one pager's host, or `''` for the first on the screen.
- */
+/** Drives a pager's segmented page-size control from a mounted suite. */
 import assert from 'node:assert/strict';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';

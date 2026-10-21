@@ -17,7 +17,6 @@ import {
 } from '../helpers/componentScopeMountModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
-// Issue 1504: the page-size control is a shared `<Select>`.
 import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   assertSelectHasResolvedName,

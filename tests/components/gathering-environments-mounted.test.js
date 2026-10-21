@@ -77,7 +77,7 @@ function makeServices(result, { reject = false } = {}) {
 async function mountView(services) {
   target = document.createElement('div');
   // THE MOUNT TARGET IS THE PLAYER APPLICATION ROOT (issue 1504, decision YY). `GatheringView`
-  // renders a `Pagination`, whose page-size control is a shared `<Select>`; a picker resolves
+  // renders a picker, which resolves
   // its portal host by walking up to the nearest Fabricate application root, and the only root
   // this view has in production is `fabricate-app`. Mounted into a bare `<div>` the panel lands
   // on `<body>`, out of reach of every `target.querySelector` in this file — which is a fixture
@@ -188,9 +188,7 @@ describe('GatheringView mounted behavior', () => {
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
     for (const paginationModule of PAGINATION_COMPILED_MODULES) {
-
       writeCompiledSvelte(paginationModule);
-
     }
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.

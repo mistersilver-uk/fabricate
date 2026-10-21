@@ -125,9 +125,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
     for (const paginationModule of PAGINATION_COMPILED_MODULES) {
-
       writeCompiledSvelte(paginationModule);
-
     }
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     for (const selectModule of SELECT_COMPILED_MODULES) {

@@ -1687,8 +1687,8 @@ test('the application-root-attribute clause names a caller’s own container', (
       'plain .fabricate-manager compound from ownership'
   );
 
-  // NON-VACUITY: the clause reaches the shipped caller-container rules across every entry, not
-  // just the synthetic control above. The pager's own per-view overrides are gone (issue 2546).
+  // NON-VACUITY: the clause reaches every entry's shipped caller-container rules, not just the
+  // synthetic control above.
   const callerContainerSelectors = PRIMITIVES.flatMap((primitive) =>
     pickerSelectors(classesWrittenBy(primitive), primitive).filter((selector) =>
       compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, primitive))
