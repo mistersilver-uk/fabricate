@@ -36,7 +36,6 @@ const SCANNED_EXTENSIONS = Object.freeze([
   '.txt',
 ]);
 const SKIPPED = Object.freeze([
-  'tests/fixtures/doc-split/',
   'tests/retired-manager-classes.test.js',
   'tests/helpers/retiredManagerClasses.js',
 ]);

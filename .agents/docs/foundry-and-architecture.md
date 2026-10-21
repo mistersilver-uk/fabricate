@@ -678,16 +678,9 @@ Its `Hooks.call` and `Hooks.callAll` run no listener and its `once` is `on`, so 
 Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering event, tools) guards an unsaved draft on route exit.
 The pattern is three layers; new editor kinds MUST mirror it rather than reach for `globalThis.confirm()` or thread callbacks through `services` directly.
 
-The Svelte layer below is stated in its pre-1705 shape, kept verbatim for the doc-split gate; what ships now is the table described after it.
-
 **1.
-Svelte layer — `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`.** Each kind has a `confirm{Kind}RouteExit(nextView)` function that early-returns `true` when the view isn't this kind or the local dirty flag is false, then calls the matching store helper.
-An orchestrator `confirmRouteExit(nextView)` chains all of them; it's what every "Back to …" / nav-click handler invokes.
-Helpers today: `confirmEnvironmentRouteExit`, `confirmEssenceRouteExit`, `confirmComponentRouteExit`, `confirmGatheringTaskRouteExit`, `confirmGatheringEventRouteExit`, `confirmToolsRouteExit`.
-Each pairs with a `finish{Kind}RouteExit` that calls `store.cancel{Kind}Draft?.()` to actually clear the draft *after* the user confirms.
-
-Those five sentences describe the shape issue 1705 replaced, and they are kept because the rule they state did not change: a guard answers for its own route, and one orchestrator asks them all.
-What ships now is one ordered table of thirteen rows in `src/ui/svelte/apps/manager/routeExitGuards.js`, asked row by row through `runRouteExitGuard` and as a whole through `confirmRouteExitGuards`.
+Svelte layer — `src/ui/svelte/apps/manager/routeExitGuards.js`.** A guard answers for its own route, and one orchestrator asks them all.
+They are one ordered table of thirteen rows, asked row by row through `runRouteExitGuard` and as a whole through `confirmRouteExitGuards`.
 In cascade order those rows are `world-essence-entry`, `world-tool-entry`, `world-component-entry`, `environment-edit`, `essence-edit`, `recipe-edit`, `recipe-item-edit`, `component-edit`, `gathering-task-edit`, `gathering-event-edit`, `tool-edit`, `checks` and `system-edit`, which is the list that supersedes the six helpers named above.
 `confirmRouteExit` is still the orchestrator every handler invokes, under the same name and signature.
 `ROUTE_EXIT_GUARDS` states each row's place in the cascade, which navigation it waives (`subject`, `same-view`, `family`, or `none`), the action its finisher receives when the store helper is absent — a per-row fact that is deliberately not uniform, so do not normalise it — and whether the row carries its own finisher (`finish: 'own'`) or shares the world entries' (`finish: 'scoped-entry'`).
