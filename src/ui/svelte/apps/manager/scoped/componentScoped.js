@@ -700,18 +700,16 @@ export function componentBulkDeleteNote(plan, phrase) {
  * dropped `Overriding` was a PREDICATE over the member cohort, which is why it carried no count.
  * The count is the segment's `badge`, so a label with `({n})` cannot render the number twice.
  */
-export function componentMembershipFilters({ members, world }) {
+export function componentMembershipFilters({ members, world }, text) {
   return [
     {
       value: 'in',
-      labelKey: 'FABRICATE.Admin.Manager.Component.FilterInSystem',
-      fallback: 'In this system',
+      label: text('FABRICATE.Admin.Manager.Component.FilterInSystem', 'In this system'),
       badge: Number(members) || 0,
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Component.FilterAllWorld',
-      fallback: 'All world components',
+      label: text('FABRICATE.Admin.Manager.Component.FilterAllWorld', 'All world components'),
       badge: Number(world) || 0,
     },
   ];
@@ -1126,26 +1124,23 @@ function componentRowCategoryClause(row, worldCategory, text) {
 }
 
 /** The systems card's three segments, counted over the SAME arrays the rows are filtered from. */
-export function componentEntrySystemFilters({ total, members }) {
+export function componentEntrySystemFilters({ total, members }, text) {
   const all = Number(total) || 0;
   const withRules = Number(members) || 0;
   return [
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterAll',
-      fallback: 'All',
+      label: text('FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterAll', 'All'),
       badge: all,
     },
     {
       value: 'with',
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWith',
-      fallback: 'With rules',
+      label: text('FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWith', 'With rules'),
       badge: withRules,
     },
     {
       value: 'without',
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWithout',
-      fallback: 'Without',
+      label: text('FABRICATE.Admin.Manager.Scoped.Component.Entry.FilterWithout', 'Without'),
       badge: Math.max(0, all - withRules),
     },
   ];

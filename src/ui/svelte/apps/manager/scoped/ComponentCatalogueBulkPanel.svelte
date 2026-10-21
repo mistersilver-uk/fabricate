@@ -319,8 +319,7 @@
   const modeSegments = $derived(
     membershipModes.map((entry) => ({
       value: entry.id,
-      labelKey: '',
-      fallback: entry.label,
+      label: entry.label,
       icon: entry.icon,
     }))
   );

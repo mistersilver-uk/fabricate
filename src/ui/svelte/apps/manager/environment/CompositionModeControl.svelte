@@ -17,8 +17,7 @@
     {
       value: 'automatic',
       icon: 'fas fa-wand-magic-sparkles',
-      labelKey: 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic',
-      fallback: 'Automatic',
+      label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic'),
       descKey: 'AutomaticHint',
       descFallback:
         'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.',
@@ -26,8 +25,7 @@
     {
       value: 'manual',
       icon: 'fas fa-hand-pointer',
-      labelKey: 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual',
-      fallback: 'Manual',
+      label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual'),
       descKey: 'ManualHint',
       descFallback:
         'Only the tasks and events you add are available, whether or not they match this environment.',
