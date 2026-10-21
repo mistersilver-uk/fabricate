@@ -623,8 +623,8 @@ export const CASES = Object.freeze([
         target: '[data-component-tag-id] .fabricate-icon-button',
       },
     ],
-    // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).
-    position: { width: 1280, height: 1000 },
+    // Taller than the world scoped-entity cases: the extra height holds the full-width tag band (issue 1392) and the three bordered filter bars (issue 2546).
+    position: { width: 1280, height: 1040 },
     // The `toolbar` rung: 11.5px at the sort-direction `Button`'s weight (issue 2257 D8).
     expectLayout: {
       controls: [

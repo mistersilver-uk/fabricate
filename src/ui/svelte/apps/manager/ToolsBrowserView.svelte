@@ -368,7 +368,7 @@
       recipe in `openspec/specs/design-system/spec.md` puts a search and a filter in the bar, while
       the three segments above are a SETTING. It NESTS because `styles/fabricate.css`'s Tools-browser
       search overrides are descendants of `.manager-tools-library-card`, and the landmark has its own
-      name so band and control do not announce alike.
+      name so the filter bar and the setting do not announce alike.
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
       <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>

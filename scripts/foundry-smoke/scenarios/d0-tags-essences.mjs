@@ -12,9 +12,9 @@ export default {
   consumes: [],
   async run(ctx) {
     const { page, results, screenshot } = ctx;
-    // 1280x1000 since issue 1915: the screen draws all three vocabularies at once, at the same
-    // frame the world screen it now shares a shell with is captured at.
-    await setManagerWindowSize(page, { width: 1280, height: 1000 });
+    // 1280x1040: the screen draws all three vocabularies and their filter bars at once, at the
+    // same frame the world screen it shares a shell with is captured at.
+    await setManagerWindowSize(page, { width: 1280, height: 1040 });
     await page.locator(railSelector('manager-nav-tags')).click();
     await page
       .locator('.fabricate-manager[data-manager-view="tags"]')

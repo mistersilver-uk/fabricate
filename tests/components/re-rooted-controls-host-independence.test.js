@@ -684,9 +684,16 @@ const TOOLBAR_COMPARED = Object.freeze([
   'padding-right',
   'padding-bottom',
   'padding-left',
+  'border-top-width',
+  'border-right-width',
   'border-bottom-width',
+  'border-left-width',
+  'border-top-style',
+  'border-right-style',
   'border-bottom-style',
-  'border-bottom-color',
+  'border-left-style',
+  'border-top-color',
+  'border-radius',
   'background-color',
   'display',
   'align-items',
@@ -2256,11 +2263,15 @@ test('the filter bar and the card declare their own box rather than inheriting i
     }
   }
 
-  // THE BAR. `--fab-space-3` padding, the hairline bottom rule.
+  // THE BAR. `--fab-space-3` padding inside a bordered box: 1px solid on all four edges, radius 9,
+  // on the `--fab-bg-1` rung, one wrapping flex row at `--fab-space-2`.
   assert.equal(toolbar['padding-top'], '12px');
   assert.equal(toolbar['padding-left'], '12px');
-  assert.equal(toolbar['border-bottom-width'], '1px');
-  assert.equal(toolbar['border-bottom-style'], 'solid');
+  for (const edge of ['top', 'right', 'bottom', 'left']) {
+    assert.equal(toolbar[`border-${edge}-width`], '1px', `the bar's ${edge} edge must be a 1px border`);
+    assert.equal(toolbar[`border-${edge}-style`], 'solid', `the bar's ${edge} edge must be solid`);
+  }
+  assert.equal(toolbar['border-radius'], '9px');
   assert.equal(toolbar.display, 'flex');
   assert.equal(toolbar['flex-wrap'], 'wrap');
   assert.equal(toolbar['align-items'], 'center');
@@ -2268,19 +2279,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
   assert.notEqual(
     toolbar['background-color'],
     'rgba(0, 0, 0, 0)',
-    'the bar declares its own translucent fill; a transparent one means the rule stopped matching'
-  );
-
-  // AND THE BRANCH THAT PAINTS IT IS THE FLEX ONE. `display: grid` is what
-  // `.fabricate-filter-bar.fabricate-filter-bar` states on its own; the `:not(:has(…))` branch
-  // overrides it to `flex`, and no component under `src/` writes `manager-toolbar-primary`, so
-  // that branch is ALWAYS taken. Measuring `flex` here is what says the branch re-rooted too —
-  // leaving it behind would give a bare-host bar the grid form nothing ships.
-  assert.equal(
-    toolbar.display,
-    'flex',
-    'the always-taken `:not(:has(.manager-toolbar-primary))` branch must travel with the family, ' +
-      'or a bar outside the manager renders the grid form no screen in the product uses'
+    'the bar declares its own fill; a transparent one means the rule stopped matching'
   );
 
   // THE CARD. Padding, a hairline border on all four edges, the 11px corner.
@@ -2327,11 +2326,14 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
         .split(',')
         .some((selector) => named.test(selector.trim().split(/[\s>+~]+/u, 1)[0]));
 
-    for (const root of ['.fabricate-filter-bar', '.fabricate-card']) {
+    for (const [root, floor] of [
+      ['.fabricate-filter-bar', 1],
+      ['.fabricate-card', 3],
+    ]) {
       const named = new RegExp(`\\${root}(?![\\w-])`);
       const family = rules.filter(rootedAt(named));
       assert.ok(
-        family.length >= 3,
+        family.length >= floor,
         `only ${family.length} rules are rooted at \`${root}\`, so the absences below hold over ` +
           'nothing. The family has been renamed or the re-root has been undone.'
       );
@@ -2376,9 +2378,10 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
       );
     }
 
-    // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT.
+    // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT: the bar has
+    // no container-scoped rule left, so a new one must be argued for here.
     for (const [root, expected] of [
-      ['.fabricate-filter-bar', 1],
+      ['.fabricate-filter-bar', 0],
       ['.fabricate-search', 2],
     ]) {
       const named = new RegExp(`\\${root}(?![\\w-])`);

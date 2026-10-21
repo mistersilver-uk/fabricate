@@ -348,21 +348,31 @@ perRoute('the sort trigger takes the toolbar rung under the panel’s own fill',
   }
 });
 
-perRoute('every control row stays one line high, flattened rather than a lit band', async (route) => {
+perRoute('every control row stays one line high inside the bordered filter bar', async (route) => {
   const { tab, close } = await open(1280, route);
   try {
-    const heights = await tab.evaluate(() =>
-      [...globalThis.document.querySelectorAll('.manager-scoped-list-toolbar')].map(
-        (bar) => bar.getBoundingClientRect().height
-      )
+    const bars = await tab.evaluate(() =>
+      [...globalThis.document.querySelectorAll('.manager-scoped-list-toolbar')].map((bar) => {
+        const style = globalThis.getComputedStyle(bar);
+        return {
+          height: bar.getBoundingClientRect().height,
+          border: ['top', 'right', 'bottom', 'left'].map((edge) => style[`border-${edge}-width`]),
+          radius: style.borderTopLeftRadius,
+          marginTop: style.marginTop,
+        };
+      })
     );
-    assert.equal(heights.length, 3, 'one control row per panel');
-    for (const height of heights) {
+    assert.equal(bars.length, 3, 'one control row per panel');
+    for (const bar of bars) {
+      // One 34px control line, 12px padding either side and the 1px border either side: 60px.
       assert.ok(
-        height < 60,
-        `a control row is ${Math.round(height)}px tall. One line of 34px controls with no bar ` +
-          'padding is about 34; anything near 100 is the row wrapped onto three lines'
+        Math.abs(bar.height - 60) <= 1,
+        `a control row is ${Math.round(bar.height)}px tall. One line of 34px controls inside the ` +
+          'bar is 60; anything near 100 is the row wrapped onto three lines'
       );
+      assert.deepEqual(bar.border, ['1px', '1px', '1px', '1px'], 'the box is bordered on all four sides');
+      assert.equal(bar.radius, '9px', 'and it keeps the library radius');
+      assert.equal(bar.marginTop, '0px', 'the panel card insets it; the sheet adds no margin here');
     }
   } finally {
     await close();

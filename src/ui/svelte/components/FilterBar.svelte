@@ -1,8 +1,11 @@
 <!--
-  THE manager's filter bar — the `<section>` landmark a browse screen writes its search field and
-  filter controls into. It renders its children and nothing else, and is an import-free leaf.
+  THE manager's filter bar — a bordered box (1px `--fab-border`, radius 9, `--fab-bg-1`, `--fab-space-3`
+  padding, `--fab-space-2` gap) in a `<section>` landmark, written by one flex rule in
+  `styles/fabricate-list-primitives.css`. It renders its children and nothing else, and is an
+  import-free leaf.
 
-  Props:
+  Props (the slot API; the library sketch's data props `query`, `toggles`, `selects`, `segments`,
+  `sort`, `result` and `onClear` are declined):
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `ariaLabel` | localized string | `undefined` | The landmark's accessible name. Required in practice; see the invariants. |
@@ -18,6 +21,10 @@
   Invariants:
   - A `<section>` is a `region` landmark only while it has an accessible name, so every call site
     passes one; `tests/components/manager-filter-bar-source-contract.test.js` asserts it.
+  - The bar draws its own box and no host restyles it: no route, caller or panel flattens it to a
+    full-width band. A host insets it by `--fab-space-3`: the sheet does so for `.manager-main`,
+    `.manager-gathering-panel` and `.manager-scoped-list-column`; a host that pads its content adds
+    nothing.
   - It declares no font floor and no focus pair, because it owns no control of its own; pinned by
     `tests/components/re-rooted-controls-host-independence.test.js`.
   - The row div and the filter control beside the search field are SLOTS, not markup this bar writes:
