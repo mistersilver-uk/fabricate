@@ -461,11 +461,13 @@ function componentTags(file, ast) {
  * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
  * naming those props and the pinned tags by the child's path: it states one of them on the child's
  * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`entryFile`)
- * may spread its rest local, which holds `data-*` keys alone (M13).
+ * may spread its rest local, which holds `data-*` keys alone (M13). A tag `drawn` answers no
+ * published closure draws is not judged (issue 2454).
  */
-function passedFaults(file, ast, defaulted, entryFile) {
+function passedFaults(file, ast, defaulted, entryFile, drawn) {
   const rest = entryFile ? restLocal(ast) : null;
-  return componentTags(file, ast).flatMap(([child, node]) => {
+  const tags = componentTags(file, ast).filter(([, node]) => drawn(file, node));
+  return tags.flatMap(([child, node]) => {
     const { keys = [], tags = [] } = defaulted.get(child) ?? {};
     if (keys.length === 0) return [];
     const literalTag = (value) => tags.includes(staticText({ value }));
@@ -487,9 +489,10 @@ function passedFaults(file, ast, defaulted, entryFile) {
  * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
  * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
  * reads, a keyed pin that is not `open` states `heldBy`, no file under `src/` is `open`, and no
- * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal.
+ * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal,
+ * from a tag `drawnTag(file, node)` answers a published closure draws.
  */
-export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
+export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS, drawnTag = () => true) {
   const faults = [];
   const drawn = new Set();
   const defaulted = new Map();
@@ -511,7 +514,7 @@ export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
     }
   }
   const passed = files.flatMap(({ file, ast, published }) =>
-    passedFaults(file, ast, defaulted, published.size > 0)
+    passedFaults(file, ast, defaulted, published.size > 0, drawnTag)
   );
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
   return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];

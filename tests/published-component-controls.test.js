@@ -42,7 +42,8 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { templateOf } from './helpers/apiConvention.js';
-import { walkNodes, walkWithAncestors } from './helpers/moduleAst.js';
+import { literalStrings, walkNodes, walkWithAncestors } from './helpers/moduleAst.js';
+import { drawnClosure, drawsNode } from './helpers/publishedClosureDrawn.js';
 import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
@@ -54,7 +55,6 @@ import {
   focusableElements,
   followedProps,
   importClosure,
-  isComponent,
   isControlTag,
   isStrip,
   moduleRing,
@@ -86,6 +86,19 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
+  // The picker's own trigger, past every trigger form `Select` does not pass.
+  'src/ui/svelte/components/SearchablePopover.svelte: button': {
+    defaults: ['anchor', 'inlineSearchTrigger', 'open', 'trigger', 'triggerButton', 'triggerChip'],
+    heldBy:
+      'tests/components/published-select-mounted.test.js: the published Select draws its trigger alone',
+  },
+  // The inline query and its close control, under `inlineSearchTrigger`, which `Select` does not pass.
+  'src/ui/svelte/components/SearchablePopover.svelte: button[data-picker-inline-close]': null,
+  'src/ui/svelte/components/SearchablePopover.svelte: input': null,
+  // The panel and its rows, which its own file draws unguarded; the query field, under `showSearch`.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: div': 'always',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: button': 'always',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': null,
   // In the `control` snippet, which both branches of `{#if label}` render.
   'src/ui/svelte/components/SearchField.svelte: input': 'always',
   'src/ui/svelte/components/StatusToggle.svelte: button': {
@@ -108,6 +121,45 @@ const FOCUSABLE_REACH = Object.freeze({
   'tests/fixtures/published-components/PublishedProbe.svelte: button[data-probe-press]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-count]': 'always',
   'tests/fixtures/published-components/PublishedProbe.svelte: input[data-probe-query]': 'always',
+});
+
+/**
+ * The reached controls of a closure file other than the entry's own, by id: the published keys
+ * whose text names it, which the gate does not follow across files, and the mounted clause that
+ * reads its accessible name.
+ */
+const CLOSURE_NAMES = Object.freeze({
+  'src/ui/svelte/components/SearchablePopover.svelte: button': {
+    entry: 'Select',
+    keys: ['ariaLabel'],
+    heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+  },
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: div': {
+    entry: 'Select',
+    keys: ['ariaLabel'],
+    heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+  },
+  // Each row's `label` member, which the entry's group states is required.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: button': {
+    entry: 'Select',
+    keys: ['options'],
+    heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+  },
+});
+
+/**
+ * The callback keys an entry hands a closure child as the child's own callback, which the gate
+ * does not follow into the child: the script function that calls the key, the child's prop it is
+ * passed as, and the mounted clause that operates the child by pointer and by key.
+ */
+const FORWARDED_CALLBACKS = Object.freeze({
+  Select: {
+    onChange: {
+      by: 'choose',
+      as: 'onSelect',
+      heldBy: 'tests/components/published-select-mounted.test.js: a choice in the published Select',
+    },
+  },
 });
 
 /** The controls drawn unguarded and named by an optional key: the probe's, which mounts unlabelled. */
@@ -266,10 +318,47 @@ function referenceSites(ast, local) {
   return sites;
 }
 
-/** What each `callback` key of an entry breaks: referenced outside an event, or called by none. */
-function eventFaults(entry, ast) {
+/**
+ * What a forwarded callback key breaks: a reference that is not a call inside the function `by`,
+ * and a reference to `by` that is not the whole value of a child component's `as` attribute.
+ */
+function forwardedFaults(ast, key, local, { by, as }) {
+  const holder = scriptFunctions(ast).get(by);
+  const faults = new Set();
+  let handed = 0;
+  for (const root of [ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      if (node.type !== 'Identifier') return;
+      const parent = ancestors.at(-1);
+      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed)
+        return;
+      if (
+        node.name === local &&
+        ancestors.every((above) => above.init?.callee?.name !== '$props')
+      ) {
+        const called = parent?.type === 'CallExpression' && parent.callee === node;
+        if (!called || !ancestors.includes(holder)) faults.add(`${key} is called outside ${by}`);
+      }
+      if (node.name !== by || parent?.id === node) return;
+      const [component, attribute, tag] = ancestors.slice(-3);
+      const passed = component?.type === 'Component' && attribute?.name === as && tag === parent;
+      if (passed) handed += 1;
+      else faults.add(`${by} is referenced but as a child's ${as}`);
+    });
+  }
+  if (handed === 0) faults.add(`${by} is handed to no child as ${as}`);
+  return [...faults];
+}
+
+/**
+ * What each `callback` key of an entry breaks: referenced outside an event, or called by none; a
+ * key `forwarded` pins is judged by `forwardedFaults` instead.
+ */
+function eventFaults(entry, ast, forwarded = FORWARDED_CALLBACKS) {
   const callbacks = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'callback');
   return callbacks.flatMap(({ key, local }) => {
+    const pin = forwarded[entry.name]?.[key];
+    if (pin) return forwardedFaults(ast, key, local, pin);
     const sites = referenceSites(ast, local);
     return [
       ...(sites.includes('other') ? [`${key} ${OUTSIDE_AN_EVENT}`] : []),
@@ -322,12 +411,14 @@ function valueWriteFaults(entry, ast) {
 }
 
 /**
- * Every focusable element an entry's closure draws, each with the entry and its parsed file. An
- * element in the entry's own file also carries the entry's published keys by local name.
+ * Every focusable element an entry's closure draws, each with the entry and its parsed file, in
+ * the files its drawn closure reaches (issue 2454). An element in the entry's own file also
+ * carries the entry's published keys by local name.
  */
 function controlsOf(entry, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS) {
   const own = publishedLocals(entry, reader.component(entry.path));
-  return [...importClosure(entry.path, reader)].filter(isComponent).flatMap((file) => {
+  const { files } = drawnClosure(entry, reader);
+  return [...files].flatMap((file) => {
     const ast = reader.component(file);
     const published = file === entry.path ? own : new Map();
     return focusableElements(file, ast, dynamic).elements.map((element) => ({
@@ -548,14 +639,23 @@ function nameParts(node) {
  * on a control drawn whatever the companion passes, outside `OPTIONAL_NAME_PINS`, each of those
  * `data` keys is required.
  */
-function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS) {
+function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS, names = CLOSURE_NAMES) {
   const { id, node } = control;
+  if (Object.hasOwn(names, id)) return closureNameFaults(control, names[id]);
   const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
   const strict = isAlwaysDrawn(control, pins) && !optional.includes(id);
   const guard = typeof pins[id] === 'string' && pins[id] !== 'always' ? pins[id] : null;
   const faults = parts.map((part) => namePartFault(part, control, strict, guard)).filter(Boolean);
   return [...new Set(faults)].map((fault) => `${id} ${fault}`);
+}
+
+/** What a closure name pin breaks: another entry, or a key its entry does not publish as required data. */
+function closureNameFaults({ id, entry }, pin) {
+  if (pin.entry !== entry.name) return [`${id} is named for ${pin.entry}, not ${entry.name}`];
+  return pin.keys
+    .filter((key) => entry.props[key]?.kind !== 'data' || entry.props[key].required !== true)
+    .map((key) => `${id} is named by ${key}, which ${entry.name} does not require as data`);
 }
 
 const LABELLED_BY = 'aria-labelledby';
@@ -673,16 +773,66 @@ function scopedRingFaults(file, css, pinned = [], moduleRule = moduleRing()) {
   return { exempt, faults };
 }
 
+/** Every class one element's `class` attribute or `class:` directive spells, its expression's literals included. */
+function elementClasses(node) {
+  const tokens = [];
+  for (const attribute of node.attributes) {
+    if (attribute.type === 'ClassDirective') tokens.push(attribute.name);
+    if (attribute.type !== 'Attribute' || attribute.name !== 'class') continue;
+    for (const part of [attribute.value].flat()) {
+      const texts = part.type === 'Text' ? [part.data] : literalStrings(part);
+      tokens.push(...texts.flatMap((text) => text.split(/\s+/)));
+    }
+  }
+  return tokens.filter(Boolean);
+}
+
 /**
- * What a closure whose reached control takes a window's ring breaks: no file of it holds a selector
- * that carries a focus pseudo-class anywhere, in or out of an at-rule, scoped or `:global`, none
- * declares `all` or a property whose name starts `outline`, and no reached control states a
- * `style` attribute or a `style:` directive. A rule `rings` pins for its file is exempt as
- * `scopedRingFaults` judges it. Vacuous for a closure that draws no reached control, and at
- * `any` but for a pin, which that root never takes.
+ * The classes one drawn closure file spells on elements only where no published key reaches them:
+ * an element its drawn closure leaves undrawn, or a control the reach pins call unreached and what
+ * it holds, and never in its script (issue 2454).
+ */
+function unreachedClasses(file, ast, drawn, controls, pins) {
+  const unreached = new Set(
+    controls
+      .filter((control) => control.ast === ast && !isReached(control, pins))
+      .map(({ node }) => node)
+  );
+  const off = new Map();
+  walkWithAncestors(ast.fragment, (node, ancestors) => {
+    if (node.type !== 'RegularElement' && node.type !== 'SvelteElement') return;
+    const hidden =
+      !drawsNode(drawn, file, node) || [node, ...ancestors].some((above) => unreached.has(above));
+    for (const name of elementClasses(node)) off.set(name, (off.get(name) ?? true) && hidden);
+  });
+  const scripted = new Set(literalStrings(ast.instance).flatMap((text) => text.split(/\s+/)));
+  return new Set(
+    [...off].filter(([name, hidden]) => hidden && !scripted.has(name)).map(([name]) => name)
+  );
+}
+
+/** Whether every selector of a rule names a class of `classes` and holds no `:global`. */
+const onlyOn = (rule, classes) =>
+  rule.prelude.children.every((complex) => {
+    const parts = [...walkNodes(complex)];
+    const global = parts.some(
+      (part) => part.type === 'PseudoClassSelector' && part.name === 'global'
+    );
+    return !global && parts.some((part) => part.type === 'ClassSelector' && classes.has(part.name));
+  });
+
+/**
+ * What a closure whose reached control takes a window's ring breaks: no file its drawn closure
+ * reaches holds a selector that carries a focus pseudo-class anywhere, in or out of an at-rule,
+ * scoped or `:global`, none declares `all` or a property whose name starts `outline`, and no
+ * reached control states a `style` attribute or a `style:` directive. A rule `rings` pins for its
+ * file is exempt as `scopedRingFaults` judges it, and so is one whose every selector names a class
+ * `unreachedClasses` answers. Vacuous for a closure that draws no reached control, and at `any`
+ * but for a pin, which that root never takes.
  */
 function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
-  const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
+  const drawn = drawnClosure(entry, reader);
+  const components = [...drawn.files];
   const reached = controls.filter((control) => isReached(control, pins));
   if (entry.root === 'any') {
     return components
@@ -695,11 +845,15 @@ function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
   );
   const inline = styled.map(({ id }) => `${id} ${INLINE_STYLE}`);
   const ruled = components.flatMap((file) => {
-    const { css } = reader.component(file);
+    const ast = reader.component(file);
+    const { css } = ast;
     const scoped = scopedRingFaults(file, css, rings[file]?.rules);
+    const unreached = unreachedClasses(file, ast, drawn, controls, pins);
+    const exempt = (node) =>
+      scoped.exempt.has(node) || (node.type === 'Rule' && onlyOn(node, unreached));
     const nodes = [];
     walkWithAncestors(css, (node, ancestors) => {
-      if (ancestors.every((ancestor) => !scoped.exempt.has(ancestor))) nodes.push(node);
+      if (!exempt(node) && ancestors.every((ancestor) => !exempt(ancestor))) nodes.push(node);
     });
     const own = nodes.some(
       (node) => node.type === 'PseudoClassSelector' && FOCUS_PSEUDO_CLASSES.has(node.name)
@@ -784,6 +938,17 @@ describe('each published entry that draws a control', () => {
       pin?.defaults ? [pin.heldBy] : []
     );
     assert.ok(held.length > 0, 'the switch is pinned to the default of as');
+    assert.deepEqual(unheldClauses(held), []);
+  });
+
+  it('names a describe block of its mounted suite in each closure name and forwarded callback pin', () => {
+    const held = [
+      ...Object.values(CLOSURE_NAMES).map(({ heldBy }) => heldBy),
+      ...Object.values(FORWARDED_CALLBACKS).flatMap((keys) =>
+        Object.values(keys).map(({ heldBy }) => heldBy)
+      ),
+    ];
+    assert.ok(held.length > 0, 'the picker is pinned');
     assert.deepEqual(unheldClauses(held), []);
   });
 
@@ -1782,6 +1947,121 @@ describe('the written-from-an-event clause', () => {
   ]) {
     it(`fails closed on ${claim}`, () => {
       assert.deepEqual(faultsOf(declared, markup), WRITTEN);
+    });
+  }
+});
+
+describe('a control drawn in a closure child, and a callback handed to one (issue 2454)', () => {
+  const C = 'src/C.svelte';
+  const CHILD_PRESS = `${C}: button[data-press]`;
+  const entry = {
+    name: 'E',
+    path: E,
+    root: 'fabricate',
+    props: { label: { kind: 'data', required: true }, note: { kind: 'data' } },
+  };
+  /** A reader over a parent that draws `C` as `tag`, beside a child whose own button `C` draws. */
+  const readerOf = (tag, childBody = '', css = '') =>
+    syntheticReader({
+      [E]:
+        "<script>import C from './C.svelte'; let { label, note, extra = false } = $props();</script>" +
+        tag,
+      [C]:
+        '<script>let { label, extra = false } = $props();</script>' +
+        '<button type="button" data-keyboard-focus="true" data-press aria-label={label}>x</button>' +
+        childBody +
+        (css ? styled(css) : ''),
+    });
+  const idsOf = (reader) => controlsOf(entry, reader).map(({ id }) => id);
+
+  it('draws the child’s control only where the parent’s tag is drawn', () => {
+    assert.deepEqual(idsOf(readerOf('<C {label} />')), [CHILD_PRESS]);
+    assert.deepEqual(idsOf(readerOf('{#if extra}<C {label} />{/if}')), []);
+    assert.deepEqual(idsOf(readerOf('{#if note}<C {label} />{/if}')), [CHILD_PRESS]);
+  });
+
+  it('names a child’s control by the required keys its closure name pin states, and no other', () => {
+    const [control] = controlsOf(entry, readerOf('<C {label} />'));
+    const pins = { [CHILD_PRESS]: 'always' };
+    const named = (keys, name = 'E') =>
+      nameFaults(control, pins, [], { [CHILD_PRESS]: { entry: name, keys } });
+    assert.deepEqual(named(['label']), []);
+    assert.deepEqual(named(['note']), [
+      `${CHILD_PRESS} is named by note, which E does not require as data`,
+    ]);
+    assert.deepEqual(named(['label'], 'Other'), [`${CHILD_PRESS} is named for Other, not E`]);
+    assert.deepEqual(nameFaults(control, pins), [`${CHILD_PRESS} ${UNPUBLISHED_NAME}`]);
+  });
+
+  it('exempts a child’s focus rule on an element no published key draws, and not one on a drawn element', () => {
+    const OWN = `${C} ${OWN_FOCUS_RULE}`;
+    const focusFaults = (body, css) =>
+      controlFaults(
+        entry,
+        { [CHILD_PRESS]: 'always' },
+        readerOf('<C {label} />', body, css)
+      ).filter((fault) => fault.startsWith(`${C} `) && !fault.startsWith(CHILD_PRESS));
+    const extra = '{#if extra}<span class="c-extra"></span>{/if}';
+    assert.deepEqual(focusFaults(extra, '.c-extra:focus-visible { color: var(--fab-text); }'), []);
+    assert.deepEqual(
+      focusFaults(
+        '<span class="c-own"></span>',
+        '.c-own:focus-visible { color: var(--fab-text); }'
+      ),
+      [OWN]
+    );
+    assert.deepEqual(
+      focusFaults(extra, ':global(.c-extra):focus-visible { color: var(--fab-text); }'),
+      [OWN]
+    );
+  });
+
+  const FORWARDED = { E: { onPick: { by: 'choose', as: 'onSelect' } } };
+  const callback = { kind: 'callback', required: true };
+  const forwardedOf = (script, markup) =>
+    eventFaults(
+      { name: 'E', props: { onPick: callback } },
+      templateOf(
+        E,
+        `<script>import C from './C.svelte'; let { onPick } = $props(); ${script}</script>${markup}`
+      ).ast,
+      FORWARDED
+    );
+  const CHOOSE = 'function choose(id) { onPick(id); }';
+
+  it('passes a callback key called only in the function the pin names, handed only as the child’s callback', () => {
+    assert.deepEqual(forwardedOf(CHOOSE, '<C onSelect={choose} />'), []);
+  });
+
+  for (const [claim, script, markup, fault] of [
+    [
+      'called outside that function',
+      `${CHOOSE} $effect(() => onPick(1));`,
+      '<C onSelect={choose} />',
+      'onPick is called outside choose',
+    ],
+    [
+      'read but not called',
+      `${CHOOSE} const held = onPick;`,
+      '<C onSelect={choose} />',
+      'onPick is called outside choose',
+    ],
+    [
+      'a function also used as a listener',
+      CHOOSE,
+      '<C onSelect={choose} /><button onclick={choose}>x</button>',
+      "choose is referenced but as a child's onSelect",
+    ],
+    [
+      'a function handed as another prop',
+      CHOOSE,
+      '<C onPress={choose} />',
+      "choose is referenced but as a child's onSelect",
+    ],
+    ['a function handed to no child', CHOOSE, '', 'choose is handed to no child as onSelect'],
+  ]) {
+    it(`names a forwarded callback ${claim}`, () => {
+      assert.ok(forwardedOf(script, markup).includes(fault), fault);
     });
   }
 });

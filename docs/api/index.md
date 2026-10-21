@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2051,6 +2051,7 @@ The published components, in publication order:
 | `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
+| `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2705,6 +2706,70 @@ search.update({ ...props(), value: '' }); // Draws `''` without calling `onValue
 const query = search.value('value'); // The query the field holds now.
 ```
 
+### Select
+
+`Select` draws the design system's select: a `<button>` trigger with `role="combobox"` that opens a list of options in an overlay, for one choice from a short, known set that commits as it is made.
+The trigger is the only focusable element inside `target`, so to return focus to the select, focus `target.querySelector('button')`.
+`options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique within the list, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
+A member other than `value` and `label` is private, and an empty list opens a panel that lists nothing and says nothing.
+`value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`.
+A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
+`onChange` is a required callback, called with one argument, the chosen option's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses an option by pointer or by Enter, the option already chosen included.
+It is not called by `mount`, `update`, opening or closing the list, Escape or an outside press.
+The select changes nothing itself: the trigger shows the new choice when your `update` passes it as `value`, so to refuse a choice, pass `value` unchanged.
+`ariaLabel` is required and names the trigger and its list, final display text naming the choice, as "Rows per page".
+The select draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
+`placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
+`size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
+
+- A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
+- While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
+- While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
+- Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
+- The trigger stops the propagation of every key pressed while it holds focus, so your listener above `target` receives no key from it, and while the trigger holds focus Escape closes no window, a DialogV2 included.
+- Tab moves focus as the browser does and leaves the list open until the next press outside it.
+
+The list is the component's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the list's hidden live region is clipped only under a `.fabricate` ancestor.
+The list opens against the trigger, and its placement inside the host is private.
+`Select` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Select`.
+`Select` needs a Fabricate window ancestor, so its root is `fabricate`; its trigger's height, corner, type size, weight and fill are drawn the same in the Manager and the player window, and its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own.
+Your own window or dialog carries no Fabricate root, so the select is refused there with `Select needs a Fabricate window ancestor`.
+The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so leave no room for one.
+An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+On Foundry 14, destroy the select and mount it again in `_onDetach` and `_onAttach`, as [Overlays](#overlays) states; that `destroy` closes the list.
+Its sizes beyond each rung's height and corner, its tick, chevron and colours beyond what this section states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, and the list's placement and width are private.
+`label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, so a `class` or any of those is refused with `"<key>" is not a prop of Select`.
+
+A worked select follows: a page size for your own list of recipes, which you hold as a number.
+
+```javascript
+// After `load(['Select'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the select describes none: draw your own control there.
+if (fabUi?.describe?.('Select')?.overlays !== true) return;
+
+// Your text beside `target`, in the same Fabricate window: <span>Rows per page</span>.
+target.style.display = 'flex';
+let pageSize = acmeRecipes.pageSize;
+const props = () => ({
+  options: [
+    { value: 10, label: 'Ten rows' },
+    { value: 25, label: 'Twenty-five rows' },
+  ],
+  value: pageSize,
+  ariaLabel: 'Rows per page', // The words your text draws.
+  size: 'inline',
+  onChange: (next) => {
+    pageSize = next; // A number, as `options` passed it.
+    acmeRecipes.setPageSize(pageSize); // Your own state first.
+    select.update(props()); // Every prop again, with the new `value`.
+  },
+});
+// Omit `overlayHost` to draw the list in the Fabricate window around `target`.
+const select = fabUi.mount('Select', { target, props: props() });
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2875,7 +2940,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle` and `Stepper` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField` and `Select` were published with `load`, so call it for each before mounting.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
@@ -2902,6 +2967,7 @@ A navigation provider's `mount` callback may not, because it returns synchronous
 ### Overlays
 
 A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog.
+`Select` is the first, and its section states what its list draws.
 `mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 

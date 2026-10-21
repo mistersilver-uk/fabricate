@@ -220,13 +220,6 @@ const EXCEPTIONS = Object.freeze([
     fault: 'spreads its rest on <input>, which is not the root',
     reason: 'rest lands on the host’s interactive element, which on the checkbox host is the input',
   },
-  {
-    component: 'Select',
-    name: REST,
-    fault: 'declares a rest spread it writes on no element',
-    reason:
-      'rest reaches the `<Field>` root in the labelled form only; the bare root is the picker’s',
-  },
 ]);
 
 /**
