@@ -124,7 +124,7 @@ test('the demo world loads through the real system and recipe managers', async (
     assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.FORGE)?.resolutionMode, 'routedByCheck');
     const longsword = recipes.getRecipe('ed-r-longsword');
     const routed = (longsword?.resultGroups ?? []).map((group) => [...group.checkOutcomeIds]);
-    assert.deepEqual(routed, [['ed-masterwork'], ['ed-standard'], ['ed-flawed']]);
+    assert.deepEqual(routed, [['ed-masterwork'], ['ed-standard'], ['ed-flawed'], ['ed-ruined']]);
     assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.STILL)?.resolutionMode, 'alchemy');
     const brews = recipes.getRecipes({ craftingSystemId: DEMO_SYSTEM_IDS.STILL });
     assert.deepEqual(

@@ -22,12 +22,20 @@ const FORGE_COMPONENTS = [
   component('ed-iron-ore', 'Iron Ore', 'commodities/stone/ore-chunk-iron-black.webp', {
     categories: ['Raw Materials'],
     tags: ['ore'],
+    essences: { earth: 2 },
     description: 'Black-veined ore hauled up from the Emberdeep seams.',
   }),
   component('ed-charcoal', 'Forge Charcoal', 'commodities/stone/ore-chunk-black.webp', {
     categories: ['Raw Materials'],
     tags: ['fuel'],
+    essences: { fire: 1 },
     description: 'Hardwood burned slow under turf until it rings when dropped.',
+  }),
+  component('ed-cinder-slag', 'Cinder Slag', 'commodities/stone/stone-pile-grey.webp', {
+    categories: ['Raw Materials'],
+    tags: ['fuel'],
+    essences: { fire: 1, earth: 1 },
+    description: 'Clinker raked from the furnace floor, still holding heat and a little iron.',
   }),
   component('ed-iron-ingot', 'Iron Ingot', 'commodities/metal/ingot-worn-iron.webp', {
     categories: ['Refined'],
@@ -237,11 +245,11 @@ const ESSENCES = [
   },
 ];
 
-/** The forge's routed check: the roll's tier picks the blade, and a ruined heat yields nothing. */
+/** The forge's routed check: the roll's tier picks the blade, and a ruined heat yields scrap. */
 const FORGE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
-  failureResultPolicy: 'never',
+  failureResultPolicy: 'perRecord',
   routed: {
     type: 'relative',
     rollFormula: '1d20 + @abilities.str.mod',
@@ -304,9 +312,18 @@ const FORGE_RECIPES = [
     DEMO_SYSTEM_IDS.FORGE,
     'commodities/metal/ingot-worn-iron.webp',
     {
-      description: 'Black ore and a hot bed of charcoal, coaxed down into one honest bar.',
+      description: 'Any ore and any fuel will do, so long as the earth and the heat are enough.',
       categories: ['Smelting'],
-      ingredientSets: [simpleSet('s1', { 'ed-iron-ore': 2, 'ed-charcoal': 1 })],
+      // By essence, so ore, charcoal or furnace slag can each stand in for the other's share.
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            group('s1-g1', 'Earth essence', essence('earth', 3)),
+            group('s1-g2', 'Fire essence', essence('fire', 2)),
+          ],
+        },
+      ],
       resultGroups: [
         { id: 'rg', name: 'Ingot', results: [{ componentId: 'ed-iron-ingot', quantity: 1 }] },
       ],
@@ -375,6 +392,12 @@ const FORGE_RECIPES = [
           checkOutcomeIds: ['ed-flawed'],
           results: [{ componentId: 'ed-flawed-longsword', quantity: 1 }],
         },
+        {
+          id: 'ed-grp-ruined',
+          name: 'Scrap',
+          checkOutcomeIds: ['ed-ruined'],
+          results: [{ componentId: 'ed-leather-scraps', quantity: 1 }],
+        },
       ],
       toolIds: ['ed-tool-hammer', 'ed-tool-anvil'],
     }
@@ -437,8 +460,8 @@ function buildSystems() {
       craftingCheck: FORGE_CHECK,
       // No salvage check: a blade broken down returns its stock outright.
       salvageResolutionMode: 'simple',
-      features: { essences: false, recipeCategories: true, itemTags: true, gathering: false },
-      essenceDefinitions: [],
+      features: { essences: true, recipeCategories: true, itemTags: true, gathering: false },
+      essenceDefinitions: ESSENCES.filter(({ id }) => id === 'fire' || id === 'earth'),
       categories: ['Smelting', 'Bladesmithing'],
       itemTags: tagsOf(FORGE_COMPONENTS),
       components: FORGE_COMPONENTS,
@@ -494,6 +517,7 @@ export const DEMO_ACTORS = Object.freeze({
     'demo-actor-hilde': {
       'ed-iron-ore': 6,
       'ed-charcoal': 5,
+      'ed-cinder-slag': 3,
       'ed-iron-ingot': 2,
       'ed-steel-ingot': 4,
       'ed-longsword': 2,

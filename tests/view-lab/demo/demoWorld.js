@@ -42,8 +42,9 @@ export function buildDemoSettings(content, actors, managedSystemId = null) {
 export async function buildDemoWorld({ managedSystemId = null, seed = DEMO_SEED } = {}) {
   const content = buildDemoContent();
   const actors = buildCastActors(content, DEMO_ACTORS);
-  // Two of the still's three brews already learned, so the bench can name the one it matches.
-  seedFabricateFlag(actors[0], ['fabricate', 'learnedRecipes'], {
+  // The still-keeper knows two of the still's three brews, for the GM Knowledge view. The smith
+  // knows none, so her bench starts with no known recipe and the experiment teaches her one.
+  seedFabricateFlag(actors[1], ['fabricate', 'learnedRecipes'], {
     'hm-r-mending': { sourceItemUuid: null, learnedAt: LAB_WORLD_TIME - 86_400 },
     'hm-r-fire': { sourceItemUuid: null, learnedAt: LAB_WORLD_TIME - 3600 },
   });
