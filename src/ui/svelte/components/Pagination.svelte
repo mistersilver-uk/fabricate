@@ -9,7 +9,7 @@
   | `onPageChange(index)` / `onPageSizeChange(size)` | functions | no-ops | Both are caller contracts; this component holds no state. |
   | `persistent` | boolean | `false` | Render the bar ALWAYS, with disabled arrows rather than no nav, for a browse surface whose footer is part of its frame: a footer that appears past a threshold reads as a layout glitch. |
   | `showPageSize` | boolean | `true` | Opt-OUT. The page-size control is not rendered, caption included, when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
-  | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the page-size control with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. Each arrow key on a page-size radio commits through `onPageSizeChange`, so a `multiPageOnly` bar can unmount under focus when the chosen size covers the whole list. |
+  | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the page-size control with it, so a POINTER reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. A KEYBOARD reader is spared: each arrow key on a page-size radio commits, so the bar stays mounted while focus is inside it and hides on blur. |
   | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row: its page-size control takes SegmentedControl's `inline` rung (the default bar takes the default rung), the "Per page" caption stays visible, and the full page sentence stays in the accessibility tree. |
   | `edge` | boolean | `false` | With `compact`, the bar closes a pane section: its rule spans the section and it pads itself by `--fab-section-inset` (`--fab-space-2` by default) inline and below. |
@@ -59,8 +59,9 @@
   const minPageSize = $derived(
     pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize
   );
+  let holdOpen = $state(false);
   const showPagination = $derived(
-    persistent || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
+    persistent || holdOpen || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
   );
   const showNav = $derived(persistent || totalPages > 1);
 
@@ -94,6 +95,8 @@
     class:is-compact={compact}
     class:is-edge={compact && edge}
     data-pagination-compact={compact || undefined}
+    onfocusin={() => (holdOpen = true)}
+    onfocusout={() => (holdOpen = false)}
     aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
@@ -143,7 +146,7 @@
         <SegmentedControl
           density={compact ? 'inline' : 'default'}
           options={sizeOptions}
-          value={pageSize}
+          value={Number(pageSize)}
           groupName={`${instanceId}-size`}
           optionDataAttr="data-pagination-size-option"
           aria-labelledby={captionId}

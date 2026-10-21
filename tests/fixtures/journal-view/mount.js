@@ -35,6 +35,10 @@ const journal = {
   historyCount: finished.length,
   historyPageSize: PAGE,
   load() {},
+  setActivePageSize(size) {
+    const { dataset } = document.documentElement;
+    dataset.activePageSizes = [dataset.activePageSizes, size].filter(Boolean).join(',');
+  },
 };
 
 mount(JournalView, {

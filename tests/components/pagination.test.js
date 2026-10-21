@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -61,6 +62,14 @@ describe('Pagination page-size control', () => {
       pageSizeOptions: [10],
       persistent: true,
     });
+    assert.ok(pager(target), 'the persistent bar still renders');
+    assert.ok(!size(target), 'no radiogroup');
+    assert.ok(!target.querySelector('.manager-pagination-size'), 'no caption either');
+  });
+
+  it('renders neither the control nor its caption under showPageSize={false}', async () => {
+    const target = await harness.mount({ totalCount: 100, pageSize: 10, showPageSize: false });
+    assert.ok(pager(target), 'the bar still renders');
     assert.ok(!size(target), 'no radiogroup');
     assert.ok(!target.querySelector('.manager-pagination-size'), 'no caption either');
   });
@@ -103,6 +112,20 @@ describe('Pagination page-size control', () => {
     assert.notEqual(name(first), name(second));
     assert.equal(pageSizeValue(first), '10');
     assert.equal(pageSizeValue(second), '25');
+  });
+
+  it('keeps a multiPageOnly bar mounted while focus is inside it, and lets it hide on blur', async () => {
+    const target = await harness.mount({ totalCount: 100, pageSize: 10, multiPageOnly: true });
+    const radio = target.querySelector('[data-pagination-size] input[type="radio"]');
+    radio.focus();
+    flushSync();
+    await harness.setProps({ pageSize: 100 });
+    flushSync();
+    assert.ok(pager(target), 'a size covering the whole list does not unmount the focused bar');
+    assert.ok(target.contains(document.activeElement), 'focus stays inside the bar');
+    radio.blur();
+    flushSync();
+    assert.ok(!pager(target), 'the bar hides once focus leaves it');
   });
 
   it('renders no bar when the whole list fits the smallest size', async () => {

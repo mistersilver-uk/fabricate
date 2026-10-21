@@ -67,6 +67,27 @@ async function journalBoxes(width, height, query = '') {
   }
 }
 
+/** An ArrowRight on the checked Active page-size radio, and what the fixture journal recorded. */
+async function arrowCommit() {
+  const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await page.goto(
+      fixtureServer.url('/tests/fixtures/journal-view/index.html?width=1240&height=774')
+    );
+    const checked = '[data-journal-list="active"] [data-pagination-size] input:checked';
+    await page.waitForSelector(checked);
+    await page.focus(checked);
+    await page.keyboard.press('ArrowRight');
+    return await page.evaluate(() => ({
+      sizes: document.documentElement.dataset.activePageSizes?.split(',').map(Number),
+      focused: document.activeElement.value,
+      isRadio: document.activeElement.type === 'radio',
+    }));
+  } finally {
+    await page.close();
+  }
+}
+
 /** Each pager's rule spans its section, and its content sits at the header's inset. */
 function assertPagerIsSectionFooter(name, { box, title, pager, pagerRule, summary, lastControl }) {
   assert.equal(pagerRule, '1px', `the ${name} pager draws its own top rule`);
@@ -168,3 +189,12 @@ for (const [label, width, stacked, expectedInset] of LAYOUTS) {
     }
   });
 }
+
+describe('journal view, rendered: the page-size radios commit from the keyboard', () => {
+  it('commits the next size on ArrowRight and keeps focus on that radio', async () => {
+    const { sizes, focused, isRadio } = await arrowCommit();
+    assert.deepEqual(sizes, [6], 'one commit, to the next offered size');
+    assert.ok(isRadio, 'NON-VACUITY: focus rests on a radio');
+    assert.equal(focused, '6', 'focus follows to the 6 radio');
+  });
+});
