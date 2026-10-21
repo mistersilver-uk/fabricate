@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2709,7 +2709,7 @@ const query = search.value('value'); // The query the field holds now.
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
-`describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
+`describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes, `root` is the Fabricate ancestor its `target` needs and `overlays` says whether it opens an overlay, described under [Overlays](#overlays); it returns `null` for a name that is not published.
 A prop's `kind` is `data`, `text`, `slot`, `callback`, `aria` or `value`.
 `requiredWhen` is present only where a prop is required while another is truthy, and names that other prop; `required` is then `false`.
 A `data` prop takes plain data, and the component receives a copy.
@@ -2765,10 +2765,10 @@ A breaking change to one component bumps that component's `version`, keeps the o
 
 ### Mounting, updating and destroying
 
-`mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
+`mount(name, { target, props = {}, onFault, overlayHost })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
 It returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
-Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
+Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction; the one exception is an open overlay's panel, which is drawn in its host.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
   A component whose root is not `any` also needs that Fabricate ancestor above `target`: otherwise `mount` throws `<name> needs a Fabricate window ancestor` or `<name> needs a Fabricate manager ancestor`, before it claims the target.
@@ -2782,11 +2782,13 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
   A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
 - `onFault` is optional, and is described with faults below.
+- `overlayHost` is optional, and is described under [Overlays](#overlays).
+  When it is passed, on any component, it must be an element of `target`'s own document (checked by `nodeType`), or `mount` throws `overlayHost must be an element in the target's document`, after the root check and before it claims the target.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
 - `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts; an omitted or `undefined` value prop keeps its current value instead.
   It is atomic: when it throws, the previous props stay rendered.
   It returns `true` once accepted and `false` after `destroy` or a fault.
-- `destroy()` is idempotent, never throws, and releases the target.
+- `destroy()` is idempotent, never throws, releases the target, and closes every overlay the mount holds open.
   Call it from your own cleanup, from an ApplicationV2 `_preClose` or `_onClose` (or before `super.close`), and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting again), because DialogV2 and Handlebars `_replaceHTML` replace their content on render; `destroy` works whether or not `target` is still in the document.
   It is safe after a fault, and still expected there.
   A mount that is never destroyed leaks for the life of the page, and keeps its slot elements, their content and every nested mount with it.
@@ -2843,7 +2845,7 @@ Any fallback copy is yours to draw.
 A teardown that throws while Fabricate unmounts is reported the same way, a microtask later.
 After such a teardown the target may still hold a node of Fabricate's, so empty it before mounting there again.
 A cleanup that throws while Fabricate tears a faulted component down is reported as that mount's fault, once, with the cleanup's error.
-A fault ends nested published mounts and detaches slot elements as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
+A fault ends nested published mounts, detaches slot elements and closes open overlays as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
 Keep your own reference to content you drew in a content slot and tear it down from `onFault`, because `handle.slot` answers `null` from then on.
 
 Pass `onFault(error)` to `mount` to be told of that fault.
@@ -2896,6 +2898,29 @@ async _onRender(context, options) {
 
 An ApplicationV2 `_onRender` may await the promise, but handle its rejection where you keep it: Foundry awaits `_onRender`, so a rejection there fails the render and skips the `render` hooks.
 A navigation provider's `mount` callback may not, because it returns synchronously, so content drawn there mounts its published components when the kept promise settles.
+
+### Overlays
+
+A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog, so the panel is never clipped by your own overflow.
+`mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
+Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
+
+1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
+2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
+3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` that carries `data-fabricate-theme`, else from Fabricate's own document.
+
+Give `overlayHost` a `position` other than `static`, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
+The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
+That element, the panel and everything in it are private: select none of it.
+An overlay listens for outside presses, Escape and scrolls on the document that holds it, and for resizes on that document's window.
+`destroy` and a fault close every open overlay and remove its panel, its element and a standalone layer nothing else uses.
+Fabricate does not follow a mount from one window to another, so destroy it and mount again in `_onDetach` and `_onAttach`; that `destroy` closes any open overlay.
+
+```javascript
+// A positioned element of your own window; a Fabricate that predates overlays ignores it.
+const overlayHost = this.element.querySelector('.my-module-overlay-host');
+const handle = fabUi.mount(name, { target, props, overlayHost });
+```
 
 ### Ownership and theme
 
