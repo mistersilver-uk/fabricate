@@ -993,7 +993,7 @@
     column-gap: 0;
   }
 
-  /* No inset, so the toolbar, rows and pager reach the pane's edges (M21, issue 2373). */
+  /* No inset, so the rows and pager reach the pane's edges (M21, issue 2373); the sheet insets the filter bar (issue 2546). */
   .manager-scoped-list-column {
     display: flex;
     flex-direction: column;
@@ -1002,8 +1002,8 @@
     min-height: 0;
   }
 
-  /* Boxed children keep the gutter `FilterBar` and `Pagination` pad inside themselves: inline,
-     above the first, and below a pagerless scroller. */
+  /* Boxed children keep the --fab-space-3 inline gutter the filter bar's box and the pager's content start on:
+     inline, above the first, and below a pagerless scroller. */
   .manager-scoped-list-column-lead,
   .manager-scoped-list-unavailable,
   .manager-scoped-list-bulk,

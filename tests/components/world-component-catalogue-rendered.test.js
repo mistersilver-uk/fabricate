@@ -696,7 +696,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     );
   });
 
-  it('runs the list column edge to edge in its pane, with the toolbar, the rows and the pager at the column`s own edges (M21)', () => {
+  it('runs the list column edge to edge in its pane, with the rows and the pager at the column`s own edges and the filter bar inset 12px (M21, issue 2546)', () => {
     const { frame, column, toolbar, rows, pager, firstRow, pagerSummary } = listFrame;
     assert.ok(Boolean(pager), 'the two-row window puts a foot pager in the markup');
     assert.ok(column.width > 400, 'NON-VACUITY: the column is a real width');
@@ -721,7 +721,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         `and the ${name} ends at the column\`s right edge, which is the inspector\`s divider`
       );
     }
-    // THE FILTER BAR IS THE SHARED BOX, INSET BY 12px: its left edge is the rows' gutter.
+    // The filter bar is the shared box, inset 12px: its left edge is the rows' gutter.
     assert.equal(
       Math.round(toolbar.left),
       Math.round(column.left) + 12,

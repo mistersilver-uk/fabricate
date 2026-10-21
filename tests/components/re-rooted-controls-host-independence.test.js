@@ -2263,7 +2263,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
     }
   }
 
-  // THE BAR. `--fab-space-3` padding inside a bordered box: 1px solid on all four edges, radius 9,
+  // The bar: `--fab-space-3` padding inside a bordered box: 1px solid on all four edges, radius 9,
   // on the `--fab-bg-1` rung, one wrapping flex row at `--fab-space-2`.
   assert.equal(toolbar['padding-top'], '12px');
   assert.equal(toolbar['padding-left'], '12px');
@@ -2378,7 +2378,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
       );
     }
 
-    // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT: the bar has
+    // And the family rules the three-host comparison does not cover, excluded by count: the bar has
     // no container-scoped rule left, so a new one must be argued for here.
     for (const [root, expected] of [
       ['.fabricate-filter-bar', 0],

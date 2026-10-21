@@ -4,8 +4,7 @@
   `styles/fabricate-list-primitives.css`. It renders its children and nothing else, and is an
   import-free leaf.
 
-  Props (the slot API; the library sketch's data props `query`, `toggles`, `selects`, `segments`,
-  `sort`, `result` and `onClear` are declined):
+  Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `ariaLabel` | localized string | `undefined` | The landmark's accessible name. Required in practice; see the invariants. |
@@ -23,8 +22,8 @@
     passes one; `tests/components/manager-filter-bar-source-contract.test.js` asserts it.
   - The bar draws its own box and no host restyles it: no route, caller or panel flattens it to a
     full-width band. A host insets it by `--fab-space-3`: the sheet does so for `.manager-main`,
-    `.manager-gathering-panel` and `.manager-scoped-list-column`; a host that pads its content adds
-    nothing.
+    `.manager-gathering-panel` and `.manager-scoped-list-column`, at the top only where the bar opens
+    the host; a host that pads its content adds nothing.
   - It declares no font floor and no focus pair, because it owns no control of its own; pinned by
     `tests/components/re-rooted-controls-host-independence.test.js`.
   - The row div and the filter control beside the search field are SLOTS, not markup this bar writes:

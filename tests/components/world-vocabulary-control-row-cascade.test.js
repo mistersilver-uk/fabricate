@@ -536,7 +536,9 @@ perRoute('all three panels’ first rows fit inside the frame, or a declared scr
         `leaves for it, and no scroll step of ${route.scrollCaseId} brings it inside. The ` +
         'published frames would cut through the row the fixture exists to show.'
     );
-    // NON-VACUITY: at least one panel is below the budget, otherwise the scroll step is decoration.
+    // Non-vacuity, as a deliberate tripwire: at least one panel is below the budget, otherwise the
+    // scroll step is decoration. It fails when the fixture gets short enough that the scroll case
+    // is no longer needed, which is the moment to retire that case.
     assert.ok(
       bottoms.some((entry) => entry.bottom > budget),
       'no panel falls below the budget, so this clause no longer needs a scroll step'
