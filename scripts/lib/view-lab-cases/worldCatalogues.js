@@ -646,6 +646,29 @@ export const CASES = Object.freeze([
       WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
+  // The second frame of `world-vocabulary`: the tag band sits beneath the 2-up category grid and
+  // below the 1000px frame's fold, so this scrolls the band into the same frame (issue 2546).
+  managerCase({
+    id: 'world-vocabulary-tags',
+    label: 'Manager — World Tags & Categories, tag panel scrolled',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-vocabulary' },
+      { selector: '[data-vocabulary-panel="componentTags"]', scroll: true },
+    ],
+    expectView: 'world-vocabulary',
+    expectSelector: '[data-scoped-page="world-vocabulary"] [data-vocabulary-panel="componentTags"]',
+    position: { width: 1280, height: 1000 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
+    ],
+  }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
   managerCase({
     id: 'world-essence-catalogue-resting',
