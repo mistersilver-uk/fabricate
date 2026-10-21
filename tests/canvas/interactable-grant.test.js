@@ -76,7 +76,11 @@ function collaborators(overrides = {}) {
 sealed('the active GM validates locally and never emits', () => {
   const { deps, calls } = collaborators({ isActiveGM: () => true });
 
-  requestActivation(placedBehavior({ system: behaviorSystem() }), { actorId: 'a1', userId: 'gm-1' }, deps);
+  requestActivation(
+    placedBehavior({ system: behaviorSystem() }),
+    { actorId: 'a1', userId: 'gm-1' },
+    deps
+  );
 
   assert.equal(calls.emitted.length, 0);
   assert.equal(calls.granted.length, 1, 'the injected thunk is used, so a patched method wins');
@@ -121,7 +125,11 @@ sealed('a behaviour that is not an interactable requests nothing', () => {
   const { deps, calls } = collaborators({ isActiveGM: () => true });
 
   requestActivation({ id: 'beh-1', type: 'other', system: behaviorSystem() }, {}, deps);
-  requestActivation({ id: 'beh-1', type: 'fabricate.interactable', system: behaviorSystem() }, {}, deps);
+  requestActivation(
+    { id: 'beh-1', type: 'fabricate.interactable', system: behaviorSystem() },
+    {},
+    deps
+  );
 
   assert.equal(calls.granted.length, 0, 'no behaviour system and no ref both abort');
   assert.equal(calls.emitted.length, 0);
@@ -187,7 +195,10 @@ sealed('each validation collaborator is consulted and routes its own denial reas
     [{ canControlActor: () => false }, 'CANNOT_CONTROL_ACTOR'],
     [{ tokenInside: () => false }, 'TOKEN_NOT_INSIDE'],
     [{ sourceExists: () => false }, 'SOURCE_MISSING'],
-    [{ worldTime: () => 120, resolveBehavior: () => placedBehavior({ system: cooling() }) }, 'COOLDOWN'],
+    [
+      { worldTime: () => 120, resolveBehavior: () => placedBehavior({ system: cooling() }) },
+      'COOLDOWN',
+    ],
   ];
   for (const [overrides, reason] of cases) {
     const { deps, calls } = collaborators(overrides);
@@ -330,9 +341,17 @@ sealed('the station chip label falls back to the linked component name on the gr
 
 sealed('openGrant opens crafting, then gathering, and refuses every incomplete grant', () => {
   const { deps, calls } = collaborators();
-  const activeCanvasTool = { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: '' };
+  const activeCanvasTool = {
+    componentId: 'comp-axe',
+    systemId: 'sysA',
+    toolId: 'tool-1',
+    label: '',
+  };
 
-  openGrant({ grant: { interactableType: 'tool', actorId: 'a7', context: { activeCanvasTool } } }, deps);
+  openGrant(
+    { grant: { interactableType: 'tool', actorId: 'a7', context: { activeCanvasTool } } },
+    deps
+  );
   assert.deepEqual(calls.shown[0], {
     tab: 'crafting',
     options: { activeCanvasTool, actorId: 'a7' },
@@ -397,6 +416,44 @@ sealed('a gathering grant falls back to its context scope and tolerates a reject
   assert.equal(calls.shown[0].options.taskId, 'task-2');
   assert.equal(calls.shown[0].options.interactableRef, null);
   assert.deepEqual(rejected, ['gathering']);
+});
+
+sealed('a rejected crafting show does not escape openGrant as an unhandled rejection', async () => {
+  const shown = [];
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    warnings.push(args);
+  };
+  try {
+    const { deps } = collaborators({
+      getAppClass: () => ({
+        show: (tab, options) => {
+          shown.push({ tab, options });
+          return Promise.reject(new Error('crafting show exploded'));
+        },
+      }),
+    });
+    const activeCanvasTool = {
+      componentId: 'comp-axe',
+      systemId: 'sysA',
+      toolId: 'tool-1',
+      label: '',
+    };
+
+    assert.doesNotThrow(() =>
+      openGrant(
+        { grant: { interactableType: 'tool', actorId: 'a7', context: { activeCanvasTool } } },
+        deps
+      )
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(shown, [{ tab: 'crafting', options: { activeCanvasTool, actorId: 'a7' } }]);
+    assert.equal(warnings.length, 1, 'a rejected crafting show is logged, not silently dropped');
+    assert.match(String(warnings[0][0]), /crafting/);
+  } finally {
+    console.warn = originalWarn;
+  }
 });
 
 sealed('a denial notifies the requesting client and emits to every other', () => {

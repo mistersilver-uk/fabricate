@@ -158,7 +158,9 @@ export function openGrant(payload, deps) {
     const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
     if (!activeCanvasTool) return;
     // The station tool goes in virtual-present, so prerequisites pass without the actor owning it.
-    void AppClass.show('crafting', { activeCanvasTool, actorId });
+    Promise.resolve(AppClass.show('crafting', { activeCanvasTool, actorId })).catch((error) => {
+      console.warn('Fabricate | Could not open the crafting station', error);
+    });
     return;
   }
 
