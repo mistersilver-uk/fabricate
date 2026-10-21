@@ -312,6 +312,7 @@ A PLAYER window presentation seam, and the structural counterpart of the row abo
 A Fabricate primitive a companion renders into an element it owns, through `game.fabricate.api.ui`: the other direction from the two navigation seams, which put a companion's content into Fabricate's windows.
 The **target** is that element, and the **seam** names only the mount function, never the target or the component.
 A **content slot** is a place inside a published component where the companion draws its own content; it is unrelated to the crafting **Slot**.
+An **overlay host** is the element an open overlay's panel is drawn in, chosen each time the overlay opens: the companion's `overlayHost`, else the nearest Fabricate window root, else the **standalone layer** Fabricate keeps on a document's body.
 
 [Notes](docs/domain/records.md#published-ui-component)
 

@@ -526,7 +526,7 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
 - Each time an overlay opens, Fabricate picks its host from `target.ownerDocument` at that moment, and never from Fabricate's own `document`:
   1. `overlayHost`, while it is connected and in `target`'s document;
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
-  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from the nearest ancestor of `target` below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
+  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from `target` or its nearest ancestor below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 The `<div>` carries `display: contents` and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
@@ -1148,6 +1148,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the panel is drawn inside `overlayHost`, in a `display: contents` element, and a press inside it reaches the component's own handler
 - **AND** with no `overlayHost` and no Fabricate root above `target`, the panel is drawn in the standalone layer on `target.ownerDocument.body`, which is removed when the overlay closes
 - **AND** `destroy` while it is open leaves no panel, element, layer or listener of the overlay's
+
+#### Scenario: An overlay host that cannot be used
+
+- **WHEN** a companion mounts an entry whose `overlays` is `true` with an `overlayHost` that is not connected when the overlay opens, inside a Fabricate window
+- **THEN** the panel is drawn in the nearest `.fabricate-manager` or `.fabricate-app` above `target`, and `mount` did not throw
+- **AND** once `overlayHost` is connected, the next overlay that opens is drawn in it
 
 #### Scenario: An overlay host from another document
 
