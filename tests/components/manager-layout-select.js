@@ -18,6 +18,7 @@ import {
   managerButtonClassesFor,
   managerComponentDir,
   pagerBarFixture,
+  segmentedScoped,
 } from './manager-layout-shared.js';
 import {
   ACTIVE_OUTLINE,
@@ -55,16 +56,14 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
     css.includes('.fabricate-pagination .manager-pagination-page'),
     'pagination should expose a stable Page-of label for keyboard users'
   );
-  // ISSUE 1504 RETARGETED THIS ASSERTION WITH THE RULE IT WAS WATCHING. The per-page control is
-  // a shared `<Select size="inline">` now, so its height, corner, fill and type come from the
-  // `.fabricate-select*` family and the pager states only the one thing that is still its own:
+  // The page-size control's geometry is the segmented control's own: the sheet states none of it.
   assert.ok(
-    css.includes('.fabricate-pagination .manager-pagination-size [data-pagination-size]'),
-    'pagination should floor its own per-page control from the primitive`s own root'
+    !css.includes('.manager-pagination-size [data-pagination-size]'),
+    'no rule hangs a size or floor on the page-size control from the pager'
   );
   assert.ok(
     !css.includes('.manager-pagination-size select'),
-    'and no rule may still paint a native per-page select: there is no longer one to paint'
+    'and no rule paints a native per-page select: there is none to paint'
   );
 });
 
@@ -1371,11 +1370,36 @@ test('a hovered SELECTED option row keeps the shared Select`s own fill', async (
   }
 });
 
-test('every converted pager site retains its declared trigger fill and width floor', async () => {
+/** The compact bars that hold the tightest rails: the journal's edge bar, a book's pager, a preview's. */
+const COMPACT_PAGER_PROBES = Object.freeze([
+  { probe: 'journal-edge', area: 'fabricate-app', width: 336, sizes: [4, 6, 12, 25], edge: true },
+  { probe: 'book', area: 'fabricate-app', width: 300, sizes: [6, 9, 12] },
+  { probe: 'recipe-item', area: 'fabricate-manager', width: 300, sizes: [6, 9, 12] },
+]);
+const COMPACT_SUMMARY = 'Showing 1–25 of 412';
+/** The narrowest the compact summary may be drawn before it stops being a count a reader can read. */
+const MIN_COMPACT_SUMMARY_WIDTH = 60;
+
+test("every pager site's page-size segments own their pointer targets", async () => {
   const scoped = CONVERTED_PAGER_SITES.filter((site) => site.component).map((site) => ({
     site,
     ...scopedComponentCss(resolve(__dirname, '../..', site.component)),
   }));
+  const hashOf = (probe) => scoped.find(({ site }) => site.probe === probe)?.hashClass || '';
+  const frame = (area, inner) =>
+    area === 'fabricate-manager'
+      ? `<div class="fabricate"><main class="fabricate-manager">${inner}</main></div>`
+      : `<div class="fabricate ${area}">${inner}</div>`;
+  const siteMarkup = (site) =>
+    frame(
+      site.area,
+      `<div class="${site.wrapper} ${hashOf(site.probe)}">${pagerBarFixture({ probe: site.probe, arrows: true })}</div>`
+    );
+  const compactMarkup = ({ probe, area, width, sizes, edge }) =>
+    frame(
+      area,
+      `<div style="width: ${width}px">${pagerBarFixture({ probe, sizes, arrows: true, compact: true, edge, summary: COMPACT_SUMMARY })}</div>`
+    );
 
   const context = await openLayoutContext({
     viewport: { width: 1000, height: 900 },
@@ -1384,18 +1408,6 @@ test('every converted pager site retains its declared trigger fill and width flo
   const page = await context.newPage();
 
   try {
-    // Each site's wrapper carries its OWN component's hash, because that is what Svelte compiles:
-    const siteMarkup = (site, hash) => `
-      <div class="${site.area === 'fabricate-manager' ? 'fabricate' : `fabricate ${site.area}`}">
-        ${site.area === 'fabricate-manager' ? '<main class="fabricate-manager">' : ''}
-        <div class="${site.wrapper}${hash ? ` ${hash}` : ''}">
-          ${pagerBarFixture({ probe: site.probe, arrows: true })}
-        </div>
-        ${site.area === 'fabricate-manager' ? '</main>' : ''}
-      </div>`;
-
-    const hashOf = (probe) => scoped.find(({ site }) => site.probe === probe)?.hashClass || '';
-
     await page.setContent(`
       <!doctype html>
       <html lang="en">
@@ -1410,139 +1422,138 @@ test('every converted pager site retains its declared trigger fill and width flo
             @layer modules { ${css} }
             :root { --button-size: 28px; --input-height: 2rem; font-size: 16px; }
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            *, *::before, *::after { box-sizing: border-box; }
             .fabricate { font-size: 14px; }
             .fas::before { content: "x"; }
-            .probe { width: 10px; height: 10px; }
           </style>
-          <!-- After the sheet and UNLAYERED, which is what the injected-CSS compiler option
-               does and what the two-axis win depends on. -->
+          <style>${segmentedScoped.css}</style>
           <style>${scoped.map(({ css: block }) => block).join('\n')}</style>
         </head>
         <body>
-          ${CONVERTED_PAGER_SITES.map((site) => siteMarkup(site, hashOf(site.probe))).join('\n')}
-          <div class="probe" data-probe="surface" style="background: var(--fab-surface)"></div>
-          <div class="probe" data-probe="bg-2" style="background: var(--fab-bg-2)"></div>
+          ${CONVERTED_PAGER_SITES.map(siteMarkup).join('\n')}
+          ${COMPACT_PAGER_PROBES.map(compactMarkup).join('\n')}
         </body>
       </html>
     `);
 
-    const report = await page.evaluate(() => {
+    const probes = [
+      ...CONVERTED_PAGER_SITES.map(({ probe }) => ({ probe, compact: false })),
+      ...COMPACT_PAGER_PROBES.map(({ probe }) => ({ probe, compact: true })),
+    ];
+    const report = await page.evaluate((names) => {
       const at = (name) => document.querySelector(`[data-probe="${name}"]`);
-      const fill = (name) => getComputedStyle(at(name)).backgroundColor;
-      const read = (name) => {
-        const element = at(name);
-        const style = getComputedStyle(element);
+      const mid = (box) => box.top + box.height / 2;
+      return names.map(({ probe, compact }) => {
+        const group = at(`pager-${probe}`);
+        group.scrollIntoView({ block: 'center' });
+        const bar = group.closest('.fabricate-pagination');
+        const barBox = bar.getBoundingClientRect();
+        const summary = bar.querySelector('.manager-pagination-summary');
+        const arrowElements = [...bar.querySelectorAll('.fabricate-icon-button')];
+        const arrowBoxes = arrowElements.map((arrow) => arrow.getBoundingClientRect());
+        const segments = [...group.querySelectorAll('.manager-segment')].map((segment) => {
+          const box = segment.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return { own: hit?.closest?.('.manager-segment') === segment, tag: hit?.tagName ?? 'none' };
+        });
+        const groupBox = group.getBoundingClientRect();
         return {
-          background: style.backgroundColor,
-          minWidth: style.minWidth,
-          paddingInline: style.paddingInlineStart,
-          height: element.getBoundingClientRect().height,
-          radius: style.borderTopLeftRadius,
+          probe,
+          compact,
+          segments,
+          trackHeight: groupBox.height,
+          bar: { left: barBox.left, right: barBox.right },
+          arrows: arrowBoxes.map((box, index) => ({
+            left: box.left,
+            right: box.right,
+            height: box.height,
+            radius: getComputedStyle(arrowElements[index]).borderTopLeftRadius,
+          })),
+          fill: getComputedStyle(bar).backgroundColor,
+          bg1: (() => {
+            const probe = document.createElement('div');
+            probe.style.background = 'var(--fab-bg-1)';
+            bar.append(probe);
+            const value = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return value;
+          })(),
+          midpoints: [mid(summary.getBoundingClientRect()), mid(groupBox), ...arrowBoxes.map(mid)],
+          summaryWidth: summary.getBoundingClientRect().width,
         };
-      };
-      const probes = [
-        'inventory',
-        'recipes',
-        'environments',
-        'tasks',
-        'events',
-        'journal',
-        'manager',
-      ];
-      // THE POINTER HIT-TEST, per converted site class. DOM presence is not enough for a
-      // control that opens an overlay: a stacking context, a global Foundry rule or a
-      // transparent wrapper can swallow the click while every computed style above still
-      // reads correctly. This asks the browser what is actually AT the trigger's centre, and
-      // names what intercepted it when the answer is wrong.
-      const hitOf = (name) => {
-        const element = at(name);
-        // `elementFromPoint` is VIEWPORT-relative.
-        element.scrollIntoView({ block: 'center' });
-        const box = element.getBoundingClientRect();
-        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-        return {
-          own: hit?.closest?.('.fabricate-select-trigger') === element,
-          tag: hit?.tagName ?? 'none',
-          className: String(hit?.className ?? ''),
-        };
-      };
-      return {
-        tokens: { surface: fill('surface'), 'bg-2': fill('bg-2') },
-        pagers: Object.fromEntries(probes.map((probe) => [probe, read(`pager-${probe}`)])),
-        arrows: Object.fromEntries(probes.map((probe) => [probe, read(`arrow-${probe}`)])),
-        hits: Object.fromEntries(probes.map((probe) => [probe, hitOf(`pager-${probe}`)])),
-      };
-    });
+      });
+    }, probes);
 
-    assert.notEqual(
-      report.tokens.surface,
-      report.tokens['bg-2'],
-      'the two fills are distinguishable in this theme at all, or nothing below is a measurement'
-    );
-
-    for (const site of CONVERTED_PAGER_SITES) {
-      const measured = report.pagers[site.probe];
-      assert.equal(
-        measured.background,
-        report.tokens[site.fill],
-        `${site.probe}: the trigger takes --fab-${site.fill}` +
-          (site.fill === 'surface'
-            ? ', from its own scoped block, which beats the rung rule on layer AND specificity'
-            : ', the `inline` rung`s own fill, because this caller states none of its own')
-      );
+    for (const measured of report) {
+      assert.ok(measured.segments.length > 1, `${measured.probe}: the control draws its segments`);
+      for (const [index, segment] of measured.segments.entries()) {
+        assert.ok(
+          segment.own,
+          `${measured.probe}: the segment ${index} owns the pointer at its centre — the press ` +
+            `landed on <${segment.tag}> instead, so choosing that size would never reach the radio`
+        );
+      }
+      // The inline rung is a 30px track. The default rung measures 32px in this core-less page
+      // (Arial, 16px root).
       assert.ok(
-        Math.abs(measured.height - 30) <= 1,
-        `${site.probe}: the geometry comes from the rung, not from the retargeted block ` +
-          `(measured ${measured.height.toFixed(1)}px against 30)`
+        measured.compact
+          ? Math.abs(measured.trackHeight - 30) <= 1
+          : Math.abs(measured.trackHeight - 32) <= 1,
+        `${measured.probe}: the track takes the ${measured.compact ? 'inline' : 'default'} rung ` +
+          `(measured ${measured.trackHeight.toFixed(1)}px)`
       );
+      for (const arrow of measured.arrows) {
+        const side = measured.compact ? 26 : 28;
+        assert.ok(
+          Math.abs(arrow.height - side) <= 1,
+          `${measured.probe}: the arrow is the ${side}px box (measured ${arrow.height.toFixed(1)}px)`
+        );
+        assert.equal(
+          arrow.radius,
+          '7px',
+          `${measured.probe}: the arrow corners at the 7px icon rung`
+        );
+      }
       assert.equal(
-        measured.radius,
-        '7px',
-        `${site.probe}: and so does the corner, which is the axis the pager matches its arrows on`
+        measured.fill,
+        measured.compact ? 'rgba(0, 0, 0, 0)' : measured.bg1,
+        `${measured.probe}: the ${measured.compact ? 'compact bar is transparent' : 'bar fills --fab-bg-1'}`
       );
-      // THE TRIGGER'S OWN INLINE PADDING.
-      assert.equal(
-        measured.paddingInline,
-        site.padding,
-        `${site.probe}: the trigger's inline padding is ${site.padding}` +
-          (site.padding === '8px'
-            ? ", narrowed at this site because the summary beside it is the row's only shrink"
-            : ", the family's own --fab-space-3 rung")
-      );
-      const hit = report.hits[site.probe];
+      if (!measured.compact) continue;
+      const spread = Math.max(...measured.midpoints) - Math.min(...measured.midpoints);
+      assert.ok(spread <= 1, `${measured.probe}: summary, arrows and control share one row (${spread}px apart)`);
+      for (const arrow of measured.arrows) {
+        assert.ok(
+          arrow.left >= measured.bar.left - 1 && arrow.right <= measured.bar.right + 1,
+          `${measured.probe}: the arrows sit fully inside the bar, so neither is clipped`
+        );
+      }
       assert.ok(
-        hit.own,
-        `${site.probe}: the converted trigger owns its own pointer target — the click at its ` +
-          `centre landed on <${hit.tag} class="${hit.className}"> instead. A control that ` +
-          'opens an overlay has to receive the press that opens it, and neither the wrapper ' +
-          'this site hangs its fill off nor the picker root around it may intercept it'
+        measured.summaryWidth >= MIN_COMPACT_SUMMARY_WIDTH,
+        `${measured.probe}: the summary keeps ${measured.summaryWidth.toFixed(0)}px, which is ` +
+          `under the ${MIN_COMPACT_SUMMARY_WIDTH}px a reader needs to read the count`
       );
+    }
 
-      // THE PAIR, WHICH IS THE WHOLE POINT OF THE MOVE. This change takes the arrows' RADIUS
-      // and nothing else, so the bar reads as one control on the axis the specimen matches it
-      // on while every arrow keeps the box it shipped at.
-      const arrow = report.arrows[site.probe];
-      assert.equal(
-        arrow.radius,
-        '7px',
-        `${site.probe}: the pager's arrows corner at the specimen's icon rung, so the field ` +
-          'and the arrows are one matched pair rather than a 7 beside a 6'
-      );
-      assert.ok(
-        Math.abs(arrow.height - 28) <= 1,
-        `${site.probe}: and its BOX is untouched (measured ${arrow.height.toFixed(1)}px against ` +
-          `the 28px core's own 2em floor gives it, over a declared ${site.declaredArrow}) — ` +
-          'the radius moved and nothing else did'
-      );
-
-      assert.equal(
-        measured.minWidth,
-        site.floored ? '64px' : '0px',
-        site.floored
-          ? `${site.probe}: the pager keeps the shared 64px floor, so a ` +
-              'one-digit and a three-digit value do not sit at two widths'
-          : `${site.probe}: no floor at a player site — its pager row is a nowrap single line ` +
-              'in a narrow column, and a floor is what would wrap it'
+    // A 2px ring on the focused segment, in both application hosts, after a real Tab.
+    for (const { probe } of COMPACT_PAGER_PROBES) {
+      await page.evaluate((name) => {
+        document.querySelector(`[data-probe="arrow-${name}"]`).focus();
+      }, probe);
+      for (let step = 0; step < 4; step += 1) {
+        await page.keyboard.press('Tab');
+        const onRadio = await page.evaluate(() => document.activeElement?.matches?.('.manager-segment-input'));
+        if (onRadio) break;
+      }
+      const ring = await page.evaluate(() => {
+        const label = document.activeElement?.closest?.('.manager-segment');
+        const style = label ? getComputedStyle(label) : null;
+        return style ? { width: style.outlineWidth, style: style.outlineStyle } : null;
+      });
+      assert.deepEqual(
+        ring,
+        { width: '2px', style: 'solid' },
+        `${probe}: Tab lands on a page-size radio and rings its segment`
       );
     }
   } finally {
@@ -1681,39 +1692,34 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
   }
 });
 
-test('the pager names its per-page control with the words a GM can see', () => {
-  // ── WCAG 2.5.3, LABEL IN NAME (issue 1504) ───────────────────────────────────────────────
-  // The `<select>` this replaced read `aria-label="Rows per page"` beside a visible `Per page`.
+test('the pager names its page-size control with the words a GM can see', () => {
+  // WCAG 2.5.3, LABEL IN NAME: the radiogroup's accessible name is the visible `Per page` caption.
   const source = readFileSync(
     resolve(__dirname, '../../src/ui/svelte/components/Pagination.svelte'),
     'utf8'
   );
 
-  // THE HOST CLASS IS BUILT RATHER THAN SPELLED, and that is not fussiness.
   const HOST_CLASS = 'manager-pagination-size';
   assert.ok(
     !source.includes(`<label class="${HOST_CLASS}"`),
-    'the host is no longer a `<label>`: a label names no `<button>` by containment and DOES ' +
-      'forward its clicks to one, which would open the panel and shut it again in one press'
+    'the host is not a `<label>`: it would forward a caption click into the first radio'
   );
   assert.ok(
     source.includes(`<span class="${HOST_CLASS}">`),
-    'and the class survives the host change, because every per-site trigger rule hangs off it'
+    'the host class survives, because the sheet lays the caption and control out from it'
   );
   assert.match(
     source,
-    /<span id=\{captionId\}\s+class:manager-pagination-hidden=\{compact\}\s*>\{localizeOr\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
-    'the caption carries the per-instance id, visually hidden only in compact mode'
+    /<span id=\{captionId\}\s*>\{localizeOr\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    'the caption carries the per-instance id and is visible in every density'
   );
   assert.match(
     source,
-    /ariaLabelledBy=\{captionId\}/,
-    'and the trigger points at THAT, so the accessible name IS the visible text rather than a ' +
-      'second string free to drift from it'
+    /aria-labelledby=\{captionId\}/,
+    'the radiogroup points at THAT through the rest spread, so its name IS the visible text'
   );
   assert.ok(
     !source.includes('PerPageLabel'),
-    'the `Rows per page` key retires with the control it named; a name that no longer matches ' +
-      'what is on screen is the defect this change removes, not a string to keep beside it'
+    'the `Rows per page` key stays retired: a name that no longer matches the screen is the defect'
   );
 });

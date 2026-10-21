@@ -202,10 +202,11 @@ const PRIMITIVES = Object.freeze([
       'manager-pagination-page',
       'manager-pagination-size',
     ]),
-    // Written inline on the root `<section>` (`Pagination.svelte:215`).
-    writtenFloor: 4,
-    familyFloor: 15,
-    ownedFloor: 5,
+    // Written inline on the root `<section>`. Measured after issue 2546: 6 written, 21 family
+    // selectors, 13 owned.
+    writtenFloor: 6,
+    familyFloor: 21,
+    ownedFloor: 13,
     mirrored: Object.freeze([]),
   }),
   Object.freeze({
@@ -1660,11 +1661,11 @@ test('the application-root-attribute clause names a caller’s own container', (
   const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
 
   // FIRES: an application root qualified by a per-view attribute is a caller's own container,
-  // exactly like the four shipped `[data-manager-view=…] .fabricate-pagination` overrides.
+  // exactly like the `[data-manager-view=…]` caller rules the sheet still holds.
   assert.ok(
     namesCallersOwnContainer(".fabricate-manager[data-manager-view='world-essences']", pagination),
     'the clause no longer fires on an application root qualified by a per-view attribute, so the ' +
-      'four shipped Pagination overrides would stay gate-owned and red the ownership assertion below'
+      'shipped per-view caller rules would stay gate-owned and red the ownership assertion below'
   );
 
   // DOES NOT FIRE: an attribute that qualifies the FAMILY's own compound is not an application
@@ -1686,20 +1687,19 @@ test('the application-root-attribute clause names a caller’s own container', (
       'plain .fabricate-manager compound from ownership'
   );
 
-  // NON-VACUITY: the clause actually reaches Pagination's shipped per-view overrides in
-  // `styles/fabricate.css` — six of them today — not just the synthetic control above.
-  const written = classesWrittenBy(pagination);
-  const family = pickerSelectors(written, pagination);
-  const callerContainerSelectors = family.filter((selector) =>
-    compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, pagination))
+  // NON-VACUITY: the clause reaches every entry's shipped caller-container rules, not just the
+  // synthetic control above.
+  const callerContainerSelectors = PRIMITIVES.flatMap((primitive) =>
+    pickerSelectors(classesWrittenBy(primitive), primitive).filter((selector) =>
+      compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, primitive))
+    )
   );
   assert.ok(
-    callerContainerSelectors.length >= 4,
-    `only ${callerContainerSelectors.length} Pagination selectors were recognised by the ` +
-      'application-root-attribute clause, against a floor of 4 — the `[data-manager-view=…] ' +
-      '.fabricate-pagination` overrides, of which the sheet holds six today. A lower number means ' +
-      'the clause has stopped recognising ' +
-      'them and they would wrongly enter the owned set below.'
+    callerContainerSelectors.length >= 22,
+    `only ${callerContainerSelectors.length} selectors were recognised by the ` +
+      'application-root-attribute clause across every entry, against a floor of 22. A lower number means the clause ' +
+      'has stopped recognising a caller’s own container and those rules would wrongly enter the ' +
+      'owned set below.'
   );
 });
 

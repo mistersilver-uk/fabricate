@@ -5,12 +5,12 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
-// Issue 1504: the page-size control is a shared `<Select>`.
-import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import { choosePageSize, pageSizeValues } from '../helpers/page-size-control.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -44,7 +44,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
@@ -212,7 +212,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     flushSync();
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 3 of 5/);
 
-    chooseSelectOption(root, '[data-pagination-size]', 6);
+    choosePageSize(root, '', 6);
 
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
     assert.equal(
@@ -252,8 +252,8 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('offers exactly 3/6/9 per page and defaults to 3', async () => {
     const root = await mountTab({ parties: makeParties(9) });
-    // Counted, not merely present: the control renders unconditionally.
-    assert.deepEqual(selectOptionValues(root, '[data-pagination-size]'), ['3', '6', '9']);
+    // Counted, not merely present.
+    assert.deepEqual(pageSizeValues(root), ['3', '6', '9']);
     assert.equal(cards(root).length, 3);
   });
 
@@ -291,7 +291,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 2');
 
     // A page CHANGE would unmount the keyed cards and close both incidentally.
-    chooseSelectOption(root, '[data-pagination-size]', 6);
+    choosePageSize(root, '', 6);
 
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');

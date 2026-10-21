@@ -43,9 +43,8 @@ frame.append(mountPoint);
 document.body.append(frame);
 
 /**
- * The three caption shapes around one bare `Select`, hosted the way the manager's `Pagination`
- * page-size row hosts its control (the wrapper class is the difference under test); the `showTick`
- * refusal matches that shipped row.
+ * The three caption shapes around one bare `Select`, hosted in an inline caption-and-control row
+ * (the wrapper class is the difference under test), with the tick column refused.
  */
 function mountShape() {
   mountCaptionShape({

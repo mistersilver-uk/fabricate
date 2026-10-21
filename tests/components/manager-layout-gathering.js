@@ -17,6 +17,7 @@ import {
   css,
   pagerBarFixture,
   readWorkspaceGrid,
+  segmentedScoped,
 } from './manager-layout-shared.js';
 import {
   CHANCE_SLIDER_FIXTURE,
@@ -710,11 +711,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'component grip should avoid viewport-scaled or negative tracking'
   );
   assert.ok(
-    componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-border);'),
-    'component browser should own a pagination footer'
+    !componentBrowserFooterBlock.includes('border-top') &&
+      !componentBrowserFooterBlock.includes('background'),
+    'component browser footer is layout only: its compact pager paints its own rule'
   );
   assert.ok(
-    componentBrowserFooterPaginationBlock.includes('background: transparent;'),
+    !componentBrowserFooterPaginationBlock.includes('background'),
     'component browser footer should not nest pagination chrome'
   );
   assert.ok(
@@ -1644,7 +1646,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       <div class="manager-travel-parties-list ${hash}">${cards}</div>
     </div>
     <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
-      ${pagerBarFixture({ probe: 'parties' })}
+      ${pagerBarFixture({ probe: 'parties', sizes: [3, 6, 9] })}
     </div>
   </div>`;
 
@@ -1657,6 +1659,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
     // The component's OWN scoped CSS, after the global sheet.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
       <style>${css}</style>
+      <style>${segmentedScoped.css}</style>
       <style>${partiesTabScoped.css}</style>
       <style>
         html, body { margin: 0; width: 100%; height: 100%; }
@@ -1840,7 +1843,7 @@ const TRAVEL_REALMS_PANE = `<div class="manager-gathering-panel manager-travel-r
   <div class="manager-table-scroll">
     <div class="manager-travel-realms-list" role="list">${TRAVEL_REALM_ROWS}</div>
   </div>
-  ${pagerBarFixture({ probe: 'realms', arrows: true })}
+  ${pagerBarFixture({ probe: 'realms', sizes: [], arrows: true })}
 </div>`;
 
 const mapLinksPane = (content) =>

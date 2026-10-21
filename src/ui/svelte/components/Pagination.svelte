@@ -1,5 +1,5 @@
 <!--
-  THE browse-screen pager: a range summary, a prev/page/next nav, and a per-page `<Select>`.
+  THE browse-screen pager: a range summary, a prev/page/next nav, and a per-page `<SegmentedControl>`.
   Area-agnostic — the player app's lists render it as well as the manager's browse screens.
 
   Props:
@@ -8,19 +8,22 @@
   | `totalCount` / `pageSize` / `pageIndex` / `pageSizeOptions` | numbers / number[] | `0` / `10` / `0` / `[10, 25, 50]` | The window the caller is showing, and the sizes offered. |
   | `onPageChange(index)` / `onPageSizeChange(size)` | functions | no-ops | Both are caller contracts; this component holds no state. |
   | `persistent` | boolean | `false` | Render the bar ALWAYS, with disabled arrows rather than no nav, for a browse surface whose footer is part of its frame: a footer that appears past a threshold reads as a layout glitch. |
-  | `showPageSize` | boolean | `true` | Opt-OUT. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
-  | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the per-page selector with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. |
+  | `showPageSize` | boolean | `true` | Opt-OUT. The page-size control is not rendered, caption included, when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
+  | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the page-size control with it, so a POINTER reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. A KEYBOARD reader is spared: each arrow key on a page-size radio commits, so the bar stays mounted while focus is inside it, moving between its own controls included, and hides once focus leaves it entirely. |
   | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
-  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row; the full page sentence stays in the accessibility tree. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row: its page-size control takes SegmentedControl's `inline` rung (the default bar takes the default rung), the "Per page" caption stays visible, and the full page sentence stays in the accessibility tree. |
   | `edge` | boolean | `false` | With `compact`, the bar closes a pane section: its rule spans the section and it pads itself by `--fab-section-inset` (`--fab-space-2` by default) inline and below. |
 
   Invariants:
   - THE ROOT `<section>` CARRIES `fabricate-pagination`, written inline
     because this component composes nothing. THE `<nav>` IS NOT THE ROOT: the descendant rules
     resolve through the `<section>`, so a root there would leave the summary and per-page label
-    unpainted. The family declares its own focus pair for the BUTTONS it contains, buttons only,
-    because an `:is(button, select)` form would delete the player app's inset select ring; both rules
-    are `openspec/specs/design-system/spec.md`'s.
+    unpainted. The family declares its own focus pair for the BUTTONS it contains, buttons only;
+    the page-size segments carry their own ring. Both rules are
+    `openspec/specs/design-system/spec.md`'s.
+  - THE PAGE-SIZE RADIOGROUP carries `data-pagination-size` and is named by the visible "Per page"
+    caption through `aria-labelledby`. Its radio `name` is per instance, so two pagers on one
+    screen never uncheck each other.
   - THIS COMPONENT EMITS TWO LANDMARKS — an `aria-label`led `<section>` is a REGION and the `<nav>`
     inside it is a second — so a screen drawing two bars would publish two identically named entries
     in the one list a screen-reader user navigates BY. Both names default to `''` with the fallback
@@ -30,7 +33,7 @@
 <script>
   import { localizeOr } from '../util/localizeOr.js';
   import IconButton from './IconButton.svelte';
-  import Select from './Select.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
 
   let {
     totalCount = 0,
@@ -56,8 +59,9 @@
   const minPageSize = $derived(
     pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize
   );
+  let holdOpen = $state(false);
   const showPagination = $derived(
-    persistent || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
+    persistent || holdOpen || (multiPageOnly ? totalPages > 1 : totalCount > minPageSize)
   );
   const showNav = $derived(persistent || totalPages > 1);
 
@@ -75,7 +79,13 @@
   const captionId = `${instanceId}-per-page`;
 
   const sizeOptions = $derived(
-    pageSizeOptions.map((option) => ({ value: option, label: String(option) }))
+    [
+      ...new Set(
+        [...pageSizeOptions, pageSize].map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      ),
+    ]
+      .sort((a, b) => a - b)
+      .map((n) => ({ value: n, labelKey: '', fallback: String(n) }))
   );
 </script>
 
@@ -85,6 +95,10 @@
     class:is-compact={compact}
     class:is-edge={compact && edge}
     data-pagination-compact={compact || undefined}
+    onfocusin={() => (holdOpen = true)}
+    onfocusout={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) holdOpen = false;
+    }}
     aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
@@ -126,18 +140,19 @@
         />
       </nav>
     {/if}
-    {#if showPageSize}
+    {#if showPageSize && sizeOptions.length > 1}
       <span class="manager-pagination-size">
-        <span id={captionId} class:manager-pagination-hidden={compact}
+        <span id={captionId}
           >{localizeOr('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
         >
-        <Select
-          size="inline"
-          showTick={false}
-          value={pageSize}
+        <SegmentedControl
+          density={compact ? 'inline' : 'default'}
           options={sizeOptions}
-          ariaLabelledBy={captionId}
-          triggerProps={{ 'data-pagination-size': '' }}
+          value={Number(pageSize)}
+          groupName={`${instanceId}-size`}
+          optionDataAttr="data-pagination-size-option"
+          aria-labelledby={captionId}
+          data-pagination-size=""
           onChange={changePageSize}
         />
       </span>

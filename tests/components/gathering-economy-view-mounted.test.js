@@ -8,6 +8,7 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
@@ -123,7 +124,9 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    for (const paginationModule of PAGINATION_COMPILED_MODULES) {
+      writeCompiledSvelte(paginationModule);
+    }
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);

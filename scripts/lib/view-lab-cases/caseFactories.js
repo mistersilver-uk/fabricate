@@ -47,6 +47,11 @@ export function chooseSelectOption(trigger, value, host = '') {
   return [{ selector: trigger }, { selector: `${panel} [data-popover-option="${value}"]` }];
 }
 
+/** Choose a page size on a pager's segmented control: the segment's label is the pointer target, never the radio. */
+export function choosePageSize(value, host = '') {
+  return [{ selector: `${host ? `${host} ` : ''}[data-pagination-size-option="${value}"]` }];
+}
+
 /** The three canvas-window factories. */
 export function canvasCaseFactory(app) {
   return (entry) => ({ app, position: DEFAULT_POSITION[app], publish: true, ...entry });

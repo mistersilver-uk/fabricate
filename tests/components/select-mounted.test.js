@@ -1025,7 +1025,7 @@ describe('1504 Select — the select every screen renders', () => {
 
     it('forwards triggerProps, id, name, invalid and mono onto the control itself', async () => {
       await mountSelect({
-        triggerProps: { 'data-pagination-size': '' },
+        triggerProps: { 'data-example-hook': '' },
         id: 'page-size',
         name: 'pageSize',
         invalid: true,
@@ -1036,7 +1036,7 @@ describe('1504 Select — the select every screen renders', () => {
       const button = trigger();
 
       assert.equal(
-        button.getAttribute('data-pagination-size'),
+        button.getAttribute('data-example-hook'),
         '',
         'a call site`s own hook goes on the CONTROL, not on a wrapper around it'
       );

@@ -14,7 +14,7 @@ import {
   CARD,
   CARD_BUTTON,
   SHIFT_CLICK,
-  chooseSelectOption,
+  choosePageSize,
   playerCase,
   responsiveLayout,
 } from './caseFactories.js';
@@ -53,7 +53,7 @@ const BULK_ADDITIONAL_SOURCES = [
   /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
 ];
 const bulkAdditionalSteps = (keys) => [
-  ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+  ...choosePageSize('75', '.inventory-grid-pagination'),
   ...keys.map((key) => SHIFT_CLICK(key)),
   { selector: '[data-inventory-bulk-salvage]' },
 ];
@@ -223,24 +223,21 @@ export const CASES = Object.freeze([
   }),
   playerCase({
     id: 'player-inventory-page-size',
-    label: 'Player app — Inventory page size list',
+    label: 'Player app — Inventory page size control',
     smokeLabels: [],
     reaches: 'beyond',
-    // The `showTick={false}` half of the issue 1504 pair: only the ticked frame reads the gutter as gone.
+    // The pager's page-size control is a segmented radiogroup: choosing the 75 segment moves the active tile onto it.
     query: { tab: 'inventory' },
-    steps: [{ selector: '.inventory-grid-pagination [data-pagination-size]' }],
-    // Three claims: the panel is a child of the application frame, it is unticked, and it holds the option rows.
+    steps: choosePageSize('75', '.inventory-grid-pagination'),
     expectSelector:
-      '.fabricate-app > .fabricate-select-popover:not(.fabricate-select-popover-ticked) ' +
-      '[data-popover-option="75"]',
-    // Inside the captured window, which is `.fabricate-app`: a panel clamped outside that box proves nothing.
-    expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
-    kinds: ['player', 'inventory'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventory/,
-      ...ANCHORED_POPOVER_SOURCES,
+      '.inventory-grid-pagination [data-pagination-size-option="75"].is-active ' +
+      '.manager-segment-input:checked',
+    // Inside the pager, which is inside the captured window.
+    expectContained: [
+      { container: '.inventory-grid-pagination', target: '[data-pagination-size-option="75"]' },
     ],
+    kinds: ['player', 'inventory'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
   }),
   playerCase({
     id: 'player-inventory-sort-list',
@@ -772,7 +769,7 @@ export const CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-simple',
     label: 'Player app — Inventory bulk salvage, simple mode',
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-longsword'),
     ],
     // Guaranteed: simple with no authored roll formula awards its whole result set, and the certainty chip shows it.
@@ -786,7 +783,7 @@ export const CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-routed',
     label: 'Player app — Inventory bulk salvage, routed mode',
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-runework:rw-slag'),
     ],
     expectSelector:
@@ -798,7 +795,7 @@ export const CASES = Object.freeze([
     id: 'player-inventory-bulk-mode-progressive',
     label: 'Player app — Inventory bulk salvage, progressive mode',
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
     ],
     // Progressive is the one mode that honours a saved stage order, so it carries the footer's reorder note.
@@ -823,7 +820,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk salvage across all three resolution modes',
     // One of each, in one queue, across three systems — the case the other three exist to be read against.
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-longsword'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -906,7 +903,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk roll prompt, roll-under targets',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under' },
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
@@ -924,7 +921,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk roll prompt, a roll-under row with no single target',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-attribute' },
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
@@ -942,7 +939,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk roll prompt, success-counting rows',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count' },
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
@@ -960,7 +957,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk roll prompt, rolls whose advantage notes differ',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-mixed' },
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
@@ -982,7 +979,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk roll prompt, rolls that share an advantage note',
     query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-shared' },
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       SHIFT_CLICK('lab-runework:rw-slag'),
       { selector: '[data-inventory-bulk-salvage]' },
@@ -1078,7 +1075,7 @@ export const CASES = Object.freeze([
     label: 'Player app — Inventory bulk broken but salvageable',
     // Acceptance 3: brokenness is about usability and does not gate salvage, so a broken row stays in the queue.
     steps: [
-      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      ...choosePageSize('75', '.inventory-grid-pagination'),
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-longsword'),
     ],

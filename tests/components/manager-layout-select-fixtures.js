@@ -245,81 +245,14 @@ export function selectPanelFixture(area, rung, { ticked }) {
     </div>`;
 }
 
-// THE CONVERTED PAGER'S SEVEN SITES.
+// THE PAGER'S SEVEN SITES: the host class each wraps its bar in, and the component whose scoped
+// block carries that class's hash.
 export const CONVERTED_PAGER_SITES = Object.freeze([
-  // The inventory grid's re-theme is deleted (issue 1518), so its pager paints itself.
-  Object.freeze({
-    probe: 'inventory',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'inventory-grid-pagination',
-    component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  // No re-theme: the pager paints itself (issue 1518).
-  Object.freeze({
-    probe: 'recipes',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'crafting-browser-pagination',
-    component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  // Nor do the gathering pagers.
-  Object.freeze({
-    probe: 'environments',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'gathering-env-pagination',
-    component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  Object.freeze({
-    probe: 'tasks',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'gathering-detail-pagination',
-    component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  Object.freeze({
-    probe: 'events',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'gathering-detail-pagination',
-    component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  Object.freeze({
-    probe: 'journal',
-    padding: '12px',
-    area: 'fabricate-app',
-    wrapper: 'journal-list-section',
-    component: 'src/ui/svelte/apps/journal/JournalListShell.svelte',
-    // The recomposed Journal footer uses the Pagination rung's own fill.
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
-  // The manager pager states no fill of its own.
-  Object.freeze({
-    probe: 'manager',
-    padding: '12px',
-    area: 'fabricate-manager',
-    wrapper: 'manager-main',
-    component: '',
-    fill: 'bg-2',
-    floored: true,
-    declaredArrow: 28,
-  }),
+  Object.freeze({ probe: 'inventory', area: 'fabricate-app', wrapper: 'inventory-grid-pagination', component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte' }),
+  Object.freeze({ probe: 'recipes', area: 'fabricate-app', wrapper: 'crafting-browser-pagination', component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte' }),
+  Object.freeze({ probe: 'environments', area: 'fabricate-app', wrapper: 'gathering-env-pagination', component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte' }),
+  Object.freeze({ probe: 'tasks', area: 'fabricate-app', wrapper: 'gathering-detail-pagination', component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte' }),
+  Object.freeze({ probe: 'events', area: 'fabricate-app', wrapper: 'gathering-detail-pagination', component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte' }),
+  Object.freeze({ probe: 'journal', area: 'fabricate-app', wrapper: 'journal-list-section', component: 'src/ui/svelte/apps/journal/JournalListShell.svelte' }),
+  Object.freeze({ probe: 'manager', area: 'fabricate-manager', wrapper: 'manager-main', component: '' }),
 ]);

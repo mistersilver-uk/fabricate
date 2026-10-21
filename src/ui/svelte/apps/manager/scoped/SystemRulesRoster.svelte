@@ -189,6 +189,7 @@
       <Pagination
         persistent={true}
         showPageSize={false}
+        density="compact"
         totalCount={visibleRows.length}
         {pageIndex}
         pageSize={SYSTEM_PAGE_SIZE}
@@ -353,35 +354,10 @@
     flex-wrap: nowrap;
   }
 
-  /* `Pagination` renders its own `<section>`, so the sizing is stated from this side: the shipped
-     bar is built for a full-width list and in a 258px column it wrapped the nav below the scroll
-     edge. THE ANCESTOR MOVED WITH THE MARKUP, which is why it is restated — Svelte prunes a
-     scoped compound it can prove unused, but not one whose only failing part is `:global()`, so
-     this would have compiled clean. The pager is a BORDERED ROW (`proto:2037`), and the `border`
-     SHORTHAND is what removes the shipped `border-top`. */
+  /* The compact pager is a sibling of the field and the list in the card's column: it never
+     shrinks, and keeps its distance from the list above. */
   .manager-scoped-roster-card > :global(.fabricate-pagination) {
     flex: 0 0 auto;
-    flex-wrap: nowrap;
-    gap: var(--fab-space-2);
     margin-top: var(--fab-space-3);
-    padding: var(--fab-space-chip) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    /* AND ITS FILL (`proto:2037`): the pager is part of the card in the ASIDE, not in the pane. */
-    background: var(--fab-bg-0);
-    font-size: 0.62rem;
-  }
-
-  .manager-scoped-roster :global(.manager-pagination-page) {
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .manager-scoped-roster :global(.manager-pagination-nav .fabricate-icon-button) {
-    width: 24px;
-    height: 24px;
-    min-height: 24px;
-    border-radius: 6px;
-    flex: 0 0 24px;
   }
 </style>

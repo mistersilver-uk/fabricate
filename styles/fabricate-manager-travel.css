@@ -442,13 +442,7 @@
 
 .fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .fabricate-pagination {
   width: 100%;
-  box-sizing: border-box;
   margin: 0;
-  padding: var(--fab-space-3) var(--fab-space-5);
-  border: 0;
-  border-top: 1px solid var(--fab-border);
-  border-radius: 0;
-  background: var(--fab-bg-0);
 }
 
 /* The travel-actor picker's trigger, inline search field and popover — all rendered by `SearchablePopover`. */

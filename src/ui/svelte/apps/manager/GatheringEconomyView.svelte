@@ -507,6 +507,7 @@
             pageSize={actorPageSize}
             pageIndex={actorPageIndex}
             pageSizeOptions={[6, 12, 24]}
+            density="compact"
             onPageChange={(index) => (actorPageIndex = index)}
             onPageSizeChange={(size) => {
               actorPageSize = size;
@@ -812,24 +813,5 @@
     color: var(--fab-accent);
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
-  }
-
-  /* Keep the actor-list pagination compact and on a single line. */
-  .manager-economy-subsection :global(.fabricate-pagination) {
-    flex-wrap: nowrap;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 0;
-    background: transparent;
-  }
-
-  .manager-economy-subsection :global(.manager-pagination-page) {
-    min-width: auto;
-  }
-
-  .manager-economy-subsection :global(.manager-pagination-summary) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 </style>

@@ -692,7 +692,11 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
         'manager-published-buttons-specimen',
       ],
     ],
-    ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
+    [
+      'src/ui/svelte/components/Pagination.svelte',
+      ['player-inventory', 'player-crafting-simple'],
+      ['world-tool-catalogue-page-two', 'player-journal-stacked'],
+    ],
   ];
   for (const [file, caseIds, specimens = []] of expectations) {
     assert.deepEqual(

@@ -274,6 +274,7 @@
         pageSize={toolPageSize}
         pageIndex={toolPageIndex}
         pageSizeOptions={[6, 9, 12]}
+        density="compact"
         onPageChange={(next) => (toolPageIndex = next)}
         onPageSizeChange={(next) => {
           toolPageSize = next;

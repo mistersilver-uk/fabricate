@@ -20,6 +20,7 @@ import {
   headerSaveButton,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   booksScrollsFixtures,
   managerComponents,
@@ -621,7 +622,7 @@ export function registerRecipesCases() {
       Boolean(target.querySelector('.fabricate-pagination')),
       'past one page the shared pager renders'
     );
-    chooseSelectOption(target, '[data-pagination-size]', 10);
+    choosePageSize(target, '', 10);
     await tick();
     flushSync();
     target.querySelector('[data-pagination-next]').click();

@@ -220,6 +220,13 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
+// The pager's compiled closure: the arrow buttons and the segmented page-size control it composes.
+export const PAGINATION_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Pagination.svelte'
+]);
+
 // The requirement row's `or…` kind menu (issue 1516): `PickerRow` imports it whether or not a
 // caller passes `allowAny`, so every tree that compiles the row compiles these too.
 export const KIND_MENU_RAW_MODULES = Object.freeze(['src/ui/svelte/util/actionMenuLayout.js']);
@@ -559,12 +566,14 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // Every transitive `.svelte` module in the player Crafting tab tree (plus the shared Pagination
 // component RecipeBrowser reuses).
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/components/Pagination.svelte',
-  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s page-size
-  // control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
+  ...PAGINATION_COMPILED_MODULES,
+  // Restated as a literal: the allowlist guard follows one spread level, and this list is itself
+  // spread by its callers.
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: the crafting browser's
+  // category and system filters are `<Select>`s, so this PLAYER-app list reaches `Select`, `Field`,
   // `SearchablePopover`, the `Button` `SearchablePopover` renders its trigger through (issue
-  // 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
-  // `IconButton` below arrives by.
+  // 1371), and the `Chip`/`EmptyState` pair the popover's list renders.
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',

@@ -12,6 +12,7 @@ import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -69,7 +70,7 @@ const harness = createMountedComponentHarness({
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',

@@ -17,7 +17,7 @@ import {
 } from '../helpers/componentScopeMountModules.js';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
-// Issue 1504: the page-size control is a shared `<Select>`.
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
@@ -127,7 +127,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
 
     browser.remount();
     const paged = await browser.mount({ itemCards: manyGeneral(26) });
-    chooseSelectOption(paged, '[data-pagination-size]', 25);
+    choosePageSize(paged, '', 25);
     paged.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -251,7 +251,7 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     });
 
     // Shrink the page to 10 so Metal (12) must span two pages.
-    chooseSelectOption(root, '[data-pagination-size]', 10);
+    choosePageSize(root, '', 10);
 
     // Page 1: the whole Herb bucket, then the first slice of Metal.
     assert.equal(root.querySelectorAll('.manager-component-row').length, 10, 'page 1 holds ten');
@@ -428,7 +428,7 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
     );
 
     // POSITIVE CONTROL, same fixture, same spy: turning the page is what asks for the rest.
-    chooseSelectOption(root, '[data-pagination-size]', 25);
+    choosePageSize(root, '', 25);
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -670,7 +670,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    chooseSelectOption(root, '[data-pagination-size]', 10);
+    choosePageSize(root, '', 10);
 
     const memberRows = () => root.querySelectorAll('[data-component-member="true"]').length;
     const ghostRows = () => root.querySelectorAll('[data-component-member="false"]').length;
@@ -703,7 +703,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
       selectedSystemId: 'sys-1',
     });
     widen(root);
-    chooseSelectOption(root, '[data-pagination-size]', 10);
+    choosePageSize(root, '', 10);
     const count = () => root.querySelector('[data-component-count]').textContent.trim();
 
     assert.equal(count(), '10 shown · 8 of 13 in this system');

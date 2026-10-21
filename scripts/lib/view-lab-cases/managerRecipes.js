@@ -10,7 +10,7 @@ import {
   RECIPE_BULK_EDIT_MATCHES,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, choosePageSize, managerCase } from './caseFactories.js';
 
 // The selection the inspector draws, and the draft whose refused save the notice reports.
 const RECIPE_ITEM_MODEL_PATTERN =
@@ -270,7 +270,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
+      ...choosePageSize('10', '.manager-main'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'recipes',
@@ -964,7 +964,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
-    // The shared pager's page-size trigger, inside the preview's recipe pager.
+    // The shared pager's page-size control, inside the preview's recipe pager.
     expectSelector:
       '[data-recipe-item-preview] [data-inventory-recipe-pager] [data-pagination-size]',
     // In the photograph, not merely in the document.

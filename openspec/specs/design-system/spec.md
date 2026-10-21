@@ -55,7 +55,9 @@ HistoricalRunDetail and StageCard are the initial independent result-row callers
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
 The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
 Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
-Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
+The page-size control is a `SegmentedControl` (SegmentedControl `inline` density in a compact pager), named by the visible "Per page" caption through `aria-labelledby` (the caption stays visible in a compact pager, where only the page-position label is visually hidden), and is not rendered when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values (issue 2546, M1, superseding issue 1504's `Select` for the pager).
+The default pager's fill is `--fab-bg-1` on every route and caller and its footer stays square; a compact pager is transparent.
+Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select (the search and filter controls) and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
@@ -277,7 +279,7 @@ Choosing an existing app root, or a second ancestor picked for reach, is the sam
 
 Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
 A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
-An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
+An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view="gathering-task-edit"] .fabricate-search.is-compact` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
 The boundary matters as much as the rule.
 An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]`, written before issue 1507 retired `manager-button` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
 One further case belongs in this paragraph, and recording it does not widen the exemption.
@@ -369,14 +371,14 @@ Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `
 `CheckEvidenceRows` passes it for a counting check's `Count`, `Pool` and `Result` rows.
 Issue 2381 adds two more under `apps/crafting/detail/`: `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`, the player progressive stage row's content and its complication band, which the crafting and salvage bodies both render inside `SortableList`.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
-`Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
+The player application's `<Select size="inline">`s render with no `label`, `hint` or `error`, so `Select` computes `labelled` false and its `<Field as="label">` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
 Issue 1520 turned five of the six from claims into facts; the sixth, `ChanceSlider`, is recorded below.
 `src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
-A family reached only through another primitive is reached, so the `Pagination` chain above describes ONE caller's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
-The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the pager's, and the six that issue 1511 converted, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all seven and the `<Field as="label">` form still never renders there.
+A family reached only through another primitive is reached, so the player-application chain above describes ONE application's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
+The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the crafting browser's two filters, the inventory sort, the participation selector and the journal's sort, which renders twice, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all six and the `<Field as="label">` form still never renders there.
 What the interactables config window changes is the corpus that statement is true of, not the statement.
 The fifth phase discharged three more, and their importer paths are recorded because the claim is about where an importer lives rather than about how many there are.
 `src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `SearchField` and `FilterBar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
@@ -413,7 +415,7 @@ The picker is therefore held to the geometry as well as the markup — its panel
 The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
 A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
 `Button` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
-`Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised both directly, by the journal history and the shopping list, and transitively, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
+`Pagination` is exercised DIRECTLY — nine of its 31 importers are player-app components — and `IconButton` is exercised both directly, by the journal history and the shopping list, and transitively, because `Pagination` renders two of them as its page arrows and those nine player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
 The player window is the second application for `EmptyState`, `Avatar` and `SegmentedControl`, and it deepens the `Medallion`, `Kicker`, `FillBar`, `Callout` and `Notice` adoptions that preceded it.
@@ -489,14 +491,14 @@ Scoping that third one to buttons is load-bearing, and it now reads as history p
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
 A family that ALREADY declares its own pair re-roots that pair IN PLACE, at unchanged specificity and unchanged declarations, rather than adding a second one at the family root.
 `StatusToggle`'s pair is at (0,3,0) and its repaint carries a `box-shadow: none` the module repaint does not; both survive the re-root unchanged, and a second pair at the root would have been a new rule rather than the same rule moved.
-`Field` is the second instance of the scoping rule the pager's `select` states above.
+`Field` is the second instance of the scoping rule the pager's buttons-only pair states above.
 Its pair covers `input` and `textarea` and excludes `select`, and the exclusion outlived the reason it was written for: at (0,2,1) a `select` leg tied `.fabricate-app select:focus-visible` and won on source order, deleting the inset ring that stopped a clipped outline, and that rule went with the player app's last native select at issue 1511.
 What keeps the exclusion is narrower and still true — issue 1777 converted the manager's last native selects a `Field` hosted, so its floor and element chrome cover `input` and `textarea` alone — and a leg here would be family chrome for a control this primitive no longer hosts.
 The STRIP half is declared on the element that can TAKE focus, which is not always the element the repaint paints.
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
 A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
-`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
+`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids.
 No rule rooted at the family reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
 
 The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
@@ -1625,7 +1627,7 @@ The difference between the two is INFORMATIONAL — it tells assistive technolog
 
 `Select` IS THE SEARCH-SUPPRESSED SHAPE OF THIS SAME PICKER: it announces `aria-haspopup="listbox"`, renders no query field, and uses the primitive's OWN trigger rather than a `trigger` snippet, so the combobox contract, the attribute-omission rule below and the naming route are the primitive's throughout.
 A caller composing the primitive's own trigger INHERITS the primitive's whole class family and its paint, so a composing primitive states its own shell against that inherited cascade rather than assuming a bare element — including the panel's inherited width floor and its inherited corner, neither of which a width PROP alone can change, because a floor declared in the sheet outranks an inline width.
-A per-call-site deviation from that shell — a pager's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
+A per-call-site deviation from that shell — a caller's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
 And the panel is PORTALED to the nearest application root, so every driver that clicks an option — a capture step, a mounted test, a smoke step — addresses it from that root rather than from the trigger's own subtree, and a mounted suite declares the application root its production mount really has.
 
 The picker MUST name both surfaces it renders.
@@ -2233,7 +2235,7 @@ Every select in the product MUST therefore render the app’s own option list, u
 Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
 
 THE IMPLEMENTATION IS `src/ui/svelte/components/Select.svelte`, composed over `SearchablePopover` with the query field suppressed, and a surface that needs a one-of-N choice MUST render through it rather than restate its markup.
-The three shared CONTROLS that hosted a native select — `Pagination` from the primitive set, `BulkEditSelect`, an adjudicated non-member since issue 1371 left it one caller, and `EntityListInspectorFrame`, a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
+The shared CONTROLS that hosted a native select — `Pagination` from the primitive set (converted onto `SegmentedControl` at issue 2546), `BulkEditSelect`, an adjudicated non-member since issue 1371 left it one caller, and `EntityListInspectorFrame`, a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
 
 A converted control keeps the identity handles its drivers address it by, and there are TWO of them rather than one.
 The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.
@@ -2266,7 +2268,7 @@ The gate compares with the base commit rather than with a recorded count, so a c
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was counted with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
-It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
+It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 #### Scenario: A select offers three plain options
@@ -2487,11 +2489,13 @@ The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a 
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
-The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the per-page selector's exists only when the list holds more rows than the SMALLEST offered size.
+The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the page-size control's exists only when the list holds more rows than the SMALLEST offered size.
+Separately, the page-size control renders only when the sorted union of the offered sizes and the current size holds two or more values, an option-count gate on a different axis from the row count that decides whether the band renders at all.
 A surface that says nothing renders the band whenever EITHER control has a reachable second state, which reduces to the smallest-offered-size threshold, because below it every offered size draws the same list and the nav can only ever say `Page 1 of 1`.
 A surface MAY opt in to the STRICTER rule that the band renders only past one page, and MUST restore it the moment a second page exists.
 That opt-in is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
-Taking it also suppresses the per-page selector, so a surface that takes it accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+Taking it also suppresses the page-size control, so a surface that takes it accepts that a pointer GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+A pager stays mounted while focus is inside it and hides on blur, so a keyboard GM, whose arrow keys on the page-size control each commit a size, is not unmounted under the keyboard by choosing one that covers the whole list (issue 2546).
 A surface MAY instead opt OUT and render the band always, which is the choice for a surface whose footer is part of its frame rather than a control, and there the nav renders its disabled arrows rather than vanishing.
 The two opt-ins are mutually exclusive by meaning and rendering-always wins if both are named.
 

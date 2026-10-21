@@ -529,7 +529,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
     'manager-recipes-bulk-edit-check-tier',
-    'player-inventory-page-size',
+    'manager-component-edit-category-list',
     'interactables-manager-region-open',
     'manager-recipe-edit-crafting-modifier-cap-reached',
     'manager-system-edit-lists',
@@ -554,7 +554,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
-    'player-inventory-page-size',
+    'manager-component-edit-category-list',
     'interactables-manager-region-open',
   ]),
   // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
@@ -658,10 +658,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
   ]),
-  // The pager's two player forms: the inventory's persistent bar and the recipe browser's threshold one.
+  // The pager's two player forms (the inventory's persistent bar and the recipe browser's threshold
+  // one), its manager footer on a second page, and the journal's compact pager.
   'src/ui/svelte/components/Pagination.svelte': Object.freeze([
     'player-inventory',
     'player-crafting-simple',
+    'world-tool-catalogue-page-two',
+    'player-journal-stacked',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
   // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
@@ -673,9 +676,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-essence-shopping',
     'player-crafting-pick-for-me',
   ]),
-  // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
+  // The track (issue 1516): its 30px inline rung is drawn by the requirement row's amount toggle and the compact pager's page-size control.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
+    'player-journal-stacked',
   ]),
   // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
   'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([

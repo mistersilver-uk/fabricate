@@ -8,7 +8,7 @@ import {
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+import { choosePageSize, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -1212,7 +1212,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
-      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
+      ...choosePageSize('10', '.manager-main'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'components',

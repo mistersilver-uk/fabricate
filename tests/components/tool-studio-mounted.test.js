@@ -24,6 +24,7 @@ import {
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
@@ -138,7 +139,7 @@ const harness = createMountedComponentHarness({
     // issue 1373's parity round. This editor passes no `requiredForPageSize`, so it draws no
     // pager - but the import is STATIC, so it is in this tree's graph either way and the
     // harness's closure validator throws for a shared-harness suite that omits it.
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',

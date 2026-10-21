@@ -19,7 +19,6 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
-  chooseSelectOption,
   selectOptionLabels,
   selectOptionValues,
 } from '../helpers/select-control.js';
@@ -27,6 +26,7 @@ import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { parseUuidDouble } from '../helpers/manager/parseUuidDouble.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   labCaseSelector,
   managerComponents,
@@ -293,7 +293,7 @@ export function registerWorldScopeCases() {
     assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
 
     // Rooted on `target` rather than on `pagination`.
-    chooseSelectOption(target, '[data-pagination-size]', 6);
+    choosePageSize(target, '', 6);
     await tick();
     flushSync();
 

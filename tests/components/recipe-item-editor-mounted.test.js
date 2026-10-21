@@ -6,6 +6,7 @@ import {
   CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
@@ -71,7 +72,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Avatar.svelte',
     // The identity row `InventoryDetailHeader` composes (issue 1518).
     'src/ui/svelte/apps/PlayerDetailHeader.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
