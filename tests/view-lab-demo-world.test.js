@@ -101,6 +101,26 @@ test('the actors hold only things the world defines, and salvage resolves too', 
   }
 });
 
+test('the tarn gathers only the still’s own reagents, through tasks its environment enables', () => {
+  const still = content.systems.find((system) => system.id === DEMO_SYSTEM_IDS.STILL);
+  assert.equal(still.features.gathering, true);
+  const reagents = new Set(still.components.map((entry) => entry.id));
+  const tasks = new Map(content.gatheringConfig.tasks.map((task) => [task.id, task]));
+  assert.ok(content.environments.length > 0);
+  for (const environment of content.environments) {
+    assert.equal(environment.craftingSystemId, DEMO_SYSTEM_IDS.STILL);
+    assert.deepEqual(environment.enabledTaskIds, environment.taskOrder);
+    for (const taskId of environment.enabledTaskIds) {
+      const task = tasks.get(taskId);
+      assert.ok(task, `${environment.id} enables ${taskId}`);
+      assert.equal(task.craftingSystemId, DEMO_SYSTEM_IDS.STILL);
+      for (const row of task.dropRows) {
+        assert.ok(reagents.has(row.componentId), `${task.id} drops ${row.componentId}`);
+      }
+    }
+  }
+});
+
 test('the demo world loads through the real system and recipe managers', async () => {
   // `bootLabRuntime` imports `src/main.js`, which needs the lab's Vite build, so the managers it
   // initializes are booted here directly over the same shim and the same persisted settings.

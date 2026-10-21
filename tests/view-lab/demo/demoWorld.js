@@ -20,8 +20,11 @@ export function buildDemoSettings(content, actors, managedSystemId = null) {
   const put = (key, value) => settings.set(settingsKey('fabricate', key), value);
   put('craftingSystems', content.systems);
   put('recipes', content.recipes);
+  put('gatheringEnvironments', content.environments);
+  put('gatheringConfig', content.gatheringConfig);
   put('gatheringParties', []);
   put('lastCraftingActor', actors[0].id);
+  put('lastGatheringActor', actors[0].id);
   // The smith alone, so the journey adds the still-keeper's pack as a source on screen.
   put('lastComponentSources', [actors[0].id]);
   put('lastManagedCraftingSystem', managedSystemId ?? DEMO_SYSTEM_IDS.FORGE);

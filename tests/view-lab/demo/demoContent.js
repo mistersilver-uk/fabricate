@@ -444,6 +444,101 @@ const STILL_RECIPES = [
   ),
 ];
 
+/** The tarn's two gathering tasks: plain d100 drop tables over the still's own reagents. */
+const GATHERING_TASKS = [
+  {
+    id: 'demo-task-fern',
+    name: 'Cut Bitterfern',
+    description: 'The best fronds grow where the bank is wettest, so mind your footing.',
+    enabled: true,
+    craftingSystemId: DEMO_SYSTEM_IDS.STILL,
+    img: `${ICON_BASE}/consumables/plants/fern-leaf-bundle-green.webp`,
+    dropRows: [
+      { id: 'row-1', componentId: 'hm-bitterfern', quantity: 2, dropRate: 55, enabled: true },
+      { id: 'row-2', componentId: 'hm-moonbell', quantity: 1, dropRate: 30, enabled: true },
+      { id: 'row-3', componentId: 'hm-stonecrop', quantity: 1, dropRate: 15, enabled: true },
+    ],
+  },
+  {
+    id: 'demo-task-moonbell',
+    name: 'Pick Moonbells',
+    description: 'They open under mist and close at the first sun, so the tarn is cold and quiet.',
+    enabled: true,
+    craftingSystemId: DEMO_SYSTEM_IDS.STILL,
+    img: `${ICON_BASE}/commodities/flowers/cornflower-blue.webp`,
+    dropRows: [
+      { id: 'row-1', componentId: 'hm-moonbell', quantity: 2, dropRate: 60, enabled: true },
+      { id: 'row-2', componentId: 'hm-bitterfern', quantity: 1, dropRate: 40, enabled: true },
+    ],
+  },
+];
+
+/** The one place the still's reagents are gathered. */
+const GATHERING_ENVIRONMENTS = [
+  {
+    id: 'demo-env-tarn',
+    craftingSystemId: DEMO_SYSTEM_IDS.STILL,
+    name: 'Hollowmere Tarn',
+    description: 'A black pool under the hold, ringed with fern and cold enough to keep moonbells.',
+    enabled: true,
+    selectionMode: 'targeted',
+    compositionMode: 'automatic',
+    sceneUuid: null,
+    img: `${ICON_BASE}/environment/wilderness/tree-spruce-green.webp`,
+    biomes: ['wetland'],
+    dangerTags: ['safe'],
+    includedRealmIds: [],
+    enabledTaskIds: ['demo-task-fern', 'demo-task-moonbell'],
+    enabledEventIds: [],
+    taskOrder: ['demo-task-fern', 'demo-task-moonbell'],
+    taskDropRateAdjustments: {},
+    conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
+    nodeRuntime: {},
+  },
+];
+
+const GATHERING_VOCABULARIES = {
+  biomes: [{ id: 'wetland', label: 'Wetland', icon: 'fas fa-droplet', colorToken: '' }],
+  danger: ['safe', 'hazardous', 'unsafe', 'extreme'],
+  weather: [{ id: 'clear', label: 'Clear', icon: 'fas fa-sun', colorToken: '' }],
+  timeOfDay: [{ id: 'day', label: 'Day', icon: 'fas fa-sun', colorToken: '' }],
+};
+
+/** The gathering config the still's tasks and rules live in, as `gatheringConfig` persists it. */
+function buildGatheringConfig() {
+  return {
+    vocabularies: GATHERING_VOCABULARIES,
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    tasks: GATHERING_TASKS,
+    events: [],
+    systems: {
+      [DEMO_SYSTEM_IDS.STILL]: {
+        rules: {
+          rewardSelectionMode: 'highestRankedDrop',
+          rewardLimit: 1,
+          eventSelectionMode: 'allDrops',
+          eventLimit: 1,
+          eventPolicy: 'successWithEvent',
+          toolBreakagePolicy: 'perUse',
+          biomeModifierAggregation: 'sum',
+          blindCandidateGate: 'discovered',
+          revealPolicy: 'onSuccess',
+          revealScope: 'party',
+          eventVisibility: 'encounterChance',
+          dropModifierMode: 'character',
+        },
+        tasks: GATHERING_TASKS,
+        events: [],
+        conditions: {
+          weather: { enabled: true, current: 'clear', values: GATHERING_VOCABULARIES.weather },
+          timeOfDay: { enabled: true, current: 'day', values: GATHERING_VOCABULARIES.timeOfDay },
+        },
+        characterModifiers: [],
+      },
+    },
+  };
+}
+
 const tagsOf = (components) => [...new Set(components.flatMap((entry) => entry.tags))];
 
 /** The two systems, in the persisted shape `CraftingSystemManager.initialize()` normalizes. */
@@ -484,7 +579,7 @@ function buildSystems() {
         essences: true,
         recipeCategories: true,
         itemTags: true,
-        gathering: false,
+        gathering: true,
         alchemy: true,
       },
       essenceDefinitions: ESSENCES,
@@ -543,6 +638,8 @@ export function buildDemoContent() {
   return {
     systems: buildSystems(),
     recipes: [...FORGE_RECIPES, ...STILL_RECIPES],
+    environments: GATHERING_ENVIRONMENTS,
+    gatheringConfig: buildGatheringConfig(),
     components: [...FORGE_COMPONENTS, ...STILL_COMPONENTS],
     tools: FORGE_TOOLS,
     recipeItems: [],
