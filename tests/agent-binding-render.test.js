@@ -45,7 +45,7 @@ test('1. every binding on disk is byte-identical to its render, so `--write` is 
   );
 });
 
-test('2. medium implementer and reviewer scopes are generated for both providers', () => {
+test('2a. medium implementer and reviewer scopes are generated for both providers', () => {
   const { files } = renderedBindings();
   assert.match(
     files.get('.claude/agents/fabricate-implementer-medium.md'),
@@ -70,7 +70,7 @@ test('2. medium implementer and reviewer scopes are generated for both providers
   );
 });
 
-test('3. a hand edit to either provider fails the gate, and the failure names the line', () => {
+test('2. a hand edit to either provider fails the gate, and the failure names the line', () => {
   // A NEGATIVE CONTROL PROVES NOTHING UNTIL THE MUTATION IS PROVEN TO HAVE APPLIED.
   const cases = [
     {

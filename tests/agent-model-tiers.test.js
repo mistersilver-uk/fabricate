@@ -494,6 +494,13 @@ test('9. each worked example resolves to its stated model tier via its stated ru
     ruleTwoSource: 'public-api',
   });
   assert.deepEqual([publicApi.rule, publicApi.tier], [2, 'large']);
+  const publicApiReview = selectModelTier({
+    stage: 'post-implementation',
+    paths: ['src/integrations/thirdPartyBridge.js', 'tests/third-party-bridge.test.js'],
+    sizeMetric: 150,
+    ruleTwoSource: 'public-api',
+  });
+  assert.deepEqual([publicApiReview.rule, publicApiReview.tier], [2, 'large']);
   const exportReview = selectModelTier({
     stage: 'post-implementation',
     paths: ['src/ui/recipePicker.js', 'tests/components/recipe-picker.test.js'],
@@ -935,7 +942,7 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
   }
 });
 
-// --- 15. Rule 5 requires a single path and no new contract surface --------------------------------------
+// --- 15. Rule 5 requires a single path and no new contract surface -----
 
 test('15. a 2-path spawn at or below SMALL_MAX resolves to medium via rule 6, not small', () => {
   // A module plus its co-located test is one concern, and it is deliberately medium.

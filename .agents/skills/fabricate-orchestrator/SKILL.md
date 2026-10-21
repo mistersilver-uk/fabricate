@@ -97,6 +97,7 @@ For every spawn of a model-tiered family, resolve exactly one model tier first, 
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers inspect the full integrated diff for the always-row `fabricate_reviewer`, including changes and contracts across packets; specialist reviewers inspect their routed concerns.
+Carry the strongest `public-api` or `persisted-shape` risk from planned tasks affecting the reviewed paths into the review-stage tier inputs; do not reduce the planned risk to `new-export`.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
 Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per the **Iteration cycles** in `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md`.
 Hard cap: 3 implementation revisions.

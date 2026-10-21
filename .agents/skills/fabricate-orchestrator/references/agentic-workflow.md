@@ -120,15 +120,16 @@ The driver uses only facts it mechanically holds at that spawn point.
 |---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | plan-review                           | the delta's proposed affected-files list, **intersected with the globs of the path-signal routing-table row that spawned this reviewer** | count of `### Tasks` items                     | the strongest `Lane surface` among the `### Tasks` entries whose declared paths intersect this reviewer's keyed path set, or `none` when none intersects |
 | implementation                        | the lane's owned-path set from the assignment brief                                                                                       | count of `### Tasks` items owned by the lane   | the lane's `Lane surface` field                                                                                                                         |
-| post-implementation review, docs loop | `git diff --name-only` against the assigned base, on the driver-generated immutable artifact, intersected with the spawning path-signal row's globs | added + deleted lines from `git diff --numstat` | the artifact: an added `export` line                                                                                                                    |
+| post-implementation review, docs loop | `git diff --name-only` against the assigned base, on the driver-generated immutable artifact, intersected with the spawning path-signal row's globs | added + deleted lines from `git diff --numstat` | `public-api` / `persisted-shape` from affected planned tasks, else the artifact's added `export` line (`new-export`), else `none` |
 
 `git diff` is an input for post-implementation stages only.
 The implementer is the agent that *creates* the diff, and plan-review runs before any implementation exists, so neither has one.
 
-Rule 2's review-stage source is the added-`export` line **only**, deliberately excluding added files.
-An added export now selects at least `medium` (rule 4), rather than forcing `large`; truly public or persisted contracts must be surfaced as explicit high-risk design decisions and checked by the integrated reviewer.
-An added file is what makes the tests row fire in the first place, so keying on it would resolve `fabricate_quality_engineer` to `large` on every change that adds a test — the same always-`large` failure that row intersection fixes.
-Excluding added files also removes any dependence on ambient `diff.renames` configuration, which decides whether a rename reports as `R` or as `A` plus `D`.
+For post-implementation and docs reviewers, first intersect the reviewer's keyed path set with planned task paths in the issue delta.
+If a matching task has a `public-api` or `persisted-shape` surface, use that source and preserve the `large` floor; otherwise use `new-export` when an added `export` line is present, or `none`.
+An added internal export now selects at least `medium` (rule 4), but cannot erase previously declared external API or persisted-data risk.
+Do not infer risk from added files alone: that would turn the quality-engineer tests row into an automatic large-model assignment whenever a test is added.
+Ignoring added-file status also avoids dependence on ambient `diff.renames` configuration.
 
 **Row intersection.**
 A reviewer spawned by a **path-signal** routing-table row is scored only on the paths that row's globs matched — the driver already computed that intersection to build the roster.
@@ -194,7 +195,7 @@ Rule 5 selects `small` only for a one-path, single-surface `none` change within 
 Rule 6 defaults **up** to `medium` for unclassified work; the number of changed paths alone never forces `large`.
 A module, its tests, and required localization or canonical-spec edits can form one coherent medium work packet when the contract is defined, even when they span several files.
 
-**Rule 2's input is authored at plan time, not judged at spawn time.**
+**Rule 2's implementation input is authored at plan time, not judged at spawn time.**
 Each `### Tasks` entry in the issue delta carries a literal field:
 
 ```text
