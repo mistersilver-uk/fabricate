@@ -468,4 +468,24 @@ describe('watchAnchor (issue 2459)', () => {
     stop();
     assert.equal(seen.disconnected, 1, 'the returned function disconnects the observer');
   });
+
+  it('watches the anchor’s own document unless given a root, else this one', () => {
+    const ownerDocument = { name: 'detached' };
+    const owned = fakeObserver();
+    watchAnchor(
+      () => ({ isConnected: true, ownerDocument }),
+      () => {},
+      undefined,
+      owned.Observer
+    );
+    assert.equal(owned.seen.observed, ownerDocument, 'a detached window’s anchor is watched there');
+    const none = fakeObserver();
+    watchAnchor(
+      () => null,
+      () => {},
+      undefined,
+      none.Observer
+    );
+    assert.equal(none.seen.observed, globalThis.document, 'no anchor falls back to this document');
+  });
 });

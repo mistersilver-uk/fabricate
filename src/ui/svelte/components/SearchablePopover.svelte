@@ -327,8 +327,7 @@
   }
 
   $effect(() => {
-    if (open && untrack(() => anchored))
-      return watchAnchor(anchorNode, () => close(), anchorNode()?.ownerDocument);
+    if (open && untrack(() => anchored)) return watchAnchor(anchorNode, () => close());
   });
 
   $effect(() => {

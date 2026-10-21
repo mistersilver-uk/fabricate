@@ -92,11 +92,15 @@ export function focusReturnTarget(origin, root) {
   return target?.isConnected === false ? null : (target ?? null);
 }
 
-/** Calls `onLost` when a mutation under `root` leaves `resolve()` answering no connected anchor; returns the disconnect. */
+/**
+ * Calls `onLost` when a mutation under `root` leaves `resolve()` answering no connected anchor;
+ * returns the disconnect. `root` is the anchor's own document unless given, since a Foundry 14
+ * detached window's anchor is not in this one.
+ */
 export function watchAnchor(
   resolve,
   onLost,
-  root = globalThis.document,
+  root = resolve()?.ownerDocument ?? globalThis.document,
   Observer = globalThis.MutationObserver
 ) {
   const observer = new Observer(() => {
