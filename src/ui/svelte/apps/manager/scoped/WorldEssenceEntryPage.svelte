@@ -657,7 +657,6 @@
                       layout="inline"
                       allowNone
                       allowCustom={false}
-                      manageDismiss={false}
                       colorToken={identity.colorToken || ''}
                       unset={!identity.colorToken}
                       customColor=""

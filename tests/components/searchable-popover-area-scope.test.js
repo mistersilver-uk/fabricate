@@ -147,9 +147,10 @@ const PRIMITIVES = Object.freeze([
       'manager-color-picker-trigger',
       'manager-color-preset',
     ]),
-    // Measured today: 12 written, 16 family selectors, 15 owned, 1 caller override.
+    // Measured at issue 2459, the box rule gone and the tile ring rooted on the picker panel: 12
+    // written, 17 family selectors, 15 owned, 2 caller overrides.
     writtenFloor: 10,
-    familyFloor: 13,
+    familyFloor: 14,
     ownedFloor: 12,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-color-picker', root: 'fabricate-color-picker' }),

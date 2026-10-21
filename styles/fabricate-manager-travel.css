@@ -793,8 +793,9 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
-/* The square tile (issue 2459). `squareTiles` makes each cell a text-free glyph or image named by its tooltip, so selection is the `--fab-surface-active` ground, the cursor the inset outline below and hover an outset outline that never fills. The list insets its own scroll box by that outline's 3px reach, so a corner tile's ring draws whole while the tiles stay flush with the query field. */
+/* The square tile (issue 2459). `squareTiles` makes each cell a text-free glyph or image named by its tooltip, so selection is the `--fab-surface-active` ground, the cursor the inset outline below and hover an outset outline that never fills. The list insets its own scroll box by that outline's 3px reach, so a corner tile's ring draws whole while the tiles stay flush with the query field, and its rows keep the tiles' square height, so a panel opened short of room scrolls its list rather than stacking one row over the next. */
 .fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] {
+  grid-auto-rows: max-content;
   gap: var(--fab-space-chip);
 
   /* ratchet-exempt(design-system): the hover ring's reach (2px outline at a 1px offset), not spacing */

@@ -35,7 +35,7 @@ const BOUNDARIES = [
     expected: '.manager-main',
     callers: [
       ['src/ui/svelte/components/TintPickerButton.svelte', 'bounds = MANAGER_MAIN_SELECTOR'],
-      ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte', 'bounds: MANAGER_MAIN_SELECTOR'],
+      ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte', 'bounds={MANAGER_MAIN_SELECTOR}'],
     ],
     // DELIBERATELY NARROWER THAN THE ONE ABOVE, and the narrowness is the content.
     why: 'the manager colour picker and the biome colour popover, which render in the manager column and nowhere else',
