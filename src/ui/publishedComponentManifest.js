@@ -1,7 +1,7 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
- * frozen `{ name, path, version, props, rest, root, restOn? }`, appended and never interleaved, and a
- * breaking change to one bumps its own `version` (issue 2426). A prop is `{ kind, required?,
+ * frozen `{ name, path, version, props, rest, root, restOn?, overlays? }`, appended and never
+ * interleaved, and a breaking change to one bumps its own `version` (issue 2426). A prop is `{ kind, required?,
  * requiredWhen?, element?, args? }`, its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`:
  * `requiredWhen` names the `data` key while which it is required (issue 2452), a `text` key takes
  * a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says
@@ -11,7 +11,8 @@
  * also states `restOn: 'control'`, which makes M13 refuse `RESERVED_ON_A_CONTROL` among its rest
  * keys; the `describe` result leaves `restOn` out. An `aria` key is an ARIA attribute of its own
  * name on such an entry: the component declares no prop for it, so it lands on that control with
- * the rest keys (issue 2452).
+ * the rest keys (issue 2452). `overlays: true` marks an entry that opens an overlay, which the seam
+ * hosts by its mount's `overlayHost` chain; absent, it opens none (issue 2454).
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({

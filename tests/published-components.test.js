@@ -43,15 +43,16 @@ describe('the published-components descriptor', () => {
     assert.ok(Object.isFrozen(ui.components));
   });
 
-  it('describes an entry as a frozen version, its props by kind, rest and root, with nothing else', () => {
+  it('describes an entry as a frozen version, its props by kind, rest, root and overlays, with nothing else', () => {
     const { ui } = seamWith();
     const described = ui.describe('Zeta');
-    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root']);
+    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root', 'overlays']);
     assert.deepEqual(described, {
       version: 3,
       props: { label: { kind: 'data', required: true }, items: { kind: 'data', required: false } },
       rest: true,
       root: 'any',
+      overlays: false,
     });
     assert.ok(Object.isFrozen(described));
     assert.ok(Object.isFrozen(described.props));
@@ -61,6 +62,7 @@ describe('the published-components descriptor', () => {
       props: { value: { kind: 'data', required: false } },
       rest: false,
       root: 'any',
+      overlays: false,
     });
     assert.deepEqual(ui.describe('Titled').props, {
       title: { kind: 'text', required: true },
@@ -165,6 +167,48 @@ describe('mount refuses before it can draw', () => {
       refusal('target must be an element')
     );
     seam.publicApi.mount('Zeta', { target: allowed, props: zetaProps() });
+  });
+
+  it('M18: refuses an overlayHost that is no element or is one of another document, on an entry that opens no overlay', () => {
+    const { ui, mounts } = seamWith();
+    const target = new FakeTarget();
+    const text = { nodeType: 3, ownerDocument: target.ownerDocument };
+    for (const overlayHost of [null, 'body', {}, text, new FakeTarget()]) {
+      assert.throws(
+        () => ui.mount('Zeta', { target, props: zetaProps(), overlayHost }),
+        refusal("overlayHost must be an element in the target's document")
+      );
+    }
+    assert.equal(mounts.length, 0, 'nothing is rendered');
+    assert.equal(ui.describe('Zeta').overlays, false);
+    const own = new FakeTarget('section', target.ownerDocument);
+    const handle = ui.mount('Zeta', { target, props: zetaProps(), overlayHost: own });
+    assert.equal(
+      handle.update(zetaProps()),
+      true,
+      'one of the same document, unconnected, is accepted'
+    );
+    handle.destroy();
+    ui.mount('Zeta', { target, props: zetaProps(), overlayHost: undefined }).destroy();
+  });
+
+  it('M18: is checked directly after M16 and before M5 and M7', () => {
+    const rooted = [{ ...ZETA, root: 'fabricate' }];
+    const { ui } = seamWith({ table: rooted, hasAncestor: () => false });
+    const overlayHost = new FakeTarget();
+    assert.throws(
+      () => ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps(), overlayHost }),
+      refusal('Zeta needs a Fabricate window ancestor')
+    );
+    const { ui: open } = seamWith();
+    const target = new FakeTarget();
+    open.mount('Zeta', { target, props: zetaProps() });
+    const stray = refusal("overlayHost must be an element in the target's document");
+    assert.throws(() => open.mount('Zeta', { target, props: zetaProps(), overlayHost }), stray);
+    assert.throws(
+      () => open.mount('Zeta', { target: new FakeTarget(), props: [], overlayHost }),
+      stray
+    );
   });
 
   it('M5: refuses a target holding a live mount and leaves that mount live', () => {
@@ -333,7 +377,13 @@ describe('a rest key on an entry whose rest lands on a control', () => {
 
   it('describes the entry without restOn, which only its group states', () => {
     const { ui } = pressed();
-    assert.deepEqual(Object.keys(ui.describe('Pressed')), ['version', 'props', 'rest', 'root']);
+    assert.deepEqual(Object.keys(ui.describe('Pressed')), [
+      'version',
+      'props',
+      'rest',
+      'root',
+      'overlays',
+    ]);
     assert.deepEqual(ui.describe('Pressed'), { ...ui.describe('Rooted') });
   });
 

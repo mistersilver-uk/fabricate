@@ -2,8 +2,9 @@
  * The published component manifest (issue 2426) against each component's parsed declaration: its
  * props, rest, root and each key's kind, then its import closure of `.svelte` and `.js` files: a
  * stylesheet and template that need no ancestor above the entry's root, no read of a Foundry
- * global, no class the module sheet names under an `any` root, and focusable elements marked as
- * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
+ * global, no class the module sheet names under an `any` root, focusable elements marked as
+ * admission rule 9 asks, and `overlays` stated exactly where an overlay action is reached, as rule
+ * 10 asks (issue 2454); then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
  * that names a bare `button`, every selector that reads a shipped `aria` key off any element, and
@@ -63,7 +64,7 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
 import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
-import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
+import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
 import { parseModule, walkNodes } from './helpers/moduleAst.js';
 import { componentAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
@@ -863,15 +864,82 @@ describe('the manifest', () => {
   });
 });
 
+/** The overlay actions admission rule 10 names: a closure that reaches one opens an overlay. */
+const OVERLAY_ACTIONS = Object.freeze([
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/typeaheadPanel.js',
+]);
+
+/** Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action. */
+function overlayFaults(entry, reader = SHIPPED) {
+  const reached = [...importClosure(entry.path, reader)]
+    .filter((file) => OVERLAY_ACTIONS.includes(file))
+    .sort(byName);
+  if (reached.length === 0) {
+    return entry.overlays === true ? ['is overlays: true and reaches no overlay action'] : [];
+  }
+  if (entry.overlays === true) return [];
+  return reached.map((file) => `reaches ${file} and is not overlays: true`);
+}
+
+describe('admission rule 10: an entry that opens an overlay states overlays', () => {
+  it('names only overlay actions the plumbing ships', () => {
+    for (const file of OVERLAY_ACTIONS) assert.ok(SHIPPED.module(file).ast, file);
+  });
+
+  it('holds every shipped entry and both probes', () => {
+    for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
+      assert.deepEqual(overlayFaults(entry), [], entry.name);
+    }
+  });
+
+  it('refuses the overlay probe without overlays, by each action its closure reaches', () => {
+    const { overlays, ...unstated } = PROBE_OVERLAY_ENTRY;
+    assert.equal(overlays, true, 'the probe states it');
+    assert.deepEqual(overlayFaults(unstated), [
+      'reaches src/ui/svelte/actions/anchoredPopover.js and is not overlays: true',
+      'reaches src/ui/svelte/actions/portal.js and is not overlays: true',
+    ]);
+  });
+
+  it('refuses a closure that imports only a pure export of anchoredPopover.js', () => {
+    const reader = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';" +
+        'const layout = hostRelativePopoverLayout(() => null);</script>',
+      'src/ui/svelte/actions/anchoredPopover.js':
+        'export function hostRelativePopoverLayout(compute) { return compute; }',
+    });
+    const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte' };
+    assert.deepEqual(overlayFaults(entry, reader), [
+      'reaches src/ui/svelte/actions/anchoredPopover.js and is not overlays: true',
+    ]);
+    assert.deepEqual(overlayFaults({ ...entry, overlays: true }, reader), []);
+  });
+
+  it('refuses overlays on an entry whose closure reaches no overlay action', () => {
+    assert.deepEqual(overlayFaults({ ...PROBE_ENTRY, overlays: true }), [
+      'is overlays: true and reaches no overlay action',
+    ]);
+  });
+});
+
 describe('each entry matches its component declaration', () => {
-  for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
+  for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      const keys = Object.keys(entry).filter((key) => key !== 'restOn');
+      const optional = new Set(['restOn', 'overlays']);
+      const keys = Object.keys(entry).filter((key) => !optional.has(key));
       assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
       assert.ok(
         !Object.hasOwn(entry, 'restOn') || entry.restOn === 'control',
         "restOn is 'control' or absent"
+      );
+      assert.ok(
+        !Object.hasOwn(entry, 'overlays') || entry.overlays === true,
+        'overlays is true or absent'
       );
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
