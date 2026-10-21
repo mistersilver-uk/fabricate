@@ -340,6 +340,8 @@ test('8. HIGH_RISK_PATHS matching is root-anchored, never a basename match', () 
   assert.equal(matchesHighRiskPath('AGENTS.md'), true);
   assert.equal(matchesHighRiskPath('scripts/validate-agent-bindings.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/lib/agentModelTiers.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/agentBindingRender.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/agentBindingRoles.json'), true);
   assert.equal(matchesHighRiskPath('scripts/release.js'), true);
   assert.equal(matchesHighRiskPath('scripts/ui-pr-screenshot-evidence.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/forward-port-provenance.mjs'), true);

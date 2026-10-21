@@ -161,6 +161,9 @@ scripts/forward-port-complete-merge.sh
 scripts/forward-port-content-gate.sh
 scripts/forward-port-provenance.mjs
 scripts/foundry-smoke/**
+scripts/lib/agentBindingRender.js
+scripts/lib/agentBindingRoles.js
+scripts/lib/agentBindingRoles.json
 scripts/lib/agentModelTiers.js
 scripts/release-s3.js
 scripts/release.js
