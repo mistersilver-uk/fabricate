@@ -5,7 +5,7 @@
 ## Planning & Workflow
 
 - Plans touching shared scripts (smoke test, build, lint, anything in `scripts/` invoked from `package.json`) must spell out the behavior in both CI and local dev explicitly — don't bury one as a parenthetical.
-- Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | public-api | persisted-shape | none` field, because model-tier rule 2 reads it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).
+- Every `### Tasks` entry in the delta declares a literal `Lane surface: new-module | new-export | public-api | persisted-shape | none` field, because ladder rules 2, 4 and 5 read it as a lookup at spawn time; see [Model tier routing](#model-tier-routing).
 - When the work originates from an existing issue, append the delta block and preserve the reporter's original text; when it originates from a prompt with no issue, create one from the `OpenSpec Change Delta` issue template.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
@@ -200,7 +200,7 @@ At post-implementation stages the field is read only for `public-api` and `persi
 | `lang/en.json` string correction | implementation | 1 owned path, no high-risk match | 1 owned task | `none` | 5 → `small` |
 | Svelte component fix that adds an exported helper | implementation | 1 owned path | — | `new-export` | 4 → `medium` |
 | Cohesive component, tests and localization change | implementation | 5 paths, no high-risk match | 5 owned tasks | `none` | 6 → `medium` |
-| Persisted data-shape change | any | 1 file | — | `persisted-shape` | 2 → `large` |
+| Persisted data-shape change | implementation | 1 file | — | `persisted-shape` | 2 → `large` |
 | 2-file diff under `src/systems/` | post-implementation review | 2 paths, no high-risk match | 180 lines (above `SMALL_MAX`, below `MEDIUM_MAX`) | `none` (no added `export`) | 6 → `medium` (rule 5 needs exactly 1 path) |
 
 In the UI example, the `fabricate_reviewer` spawn scores unintersected, hits `package.json`, and is `large` (rule 1).
@@ -208,7 +208,7 @@ In the UI example, the `fabricate_reviewer` spawn scores unintersected, hits `pa
 **Model-tier floors.**
 Applied after the base model tier; they only ever raise it, and every floor clamps at `large`.
 
-- A lane's model tier never decreases across revisions of the same `(family, stage)`; a disposition-only confirmation round (a reviewer re-spawn that only rules on how its own earlier findings were handled) is exempt, per the override below.
+- A lane's model tier never decreases across revisions of the same `(family, stage)`; a disposition-only confirmation round is exempt, per the override below.
 The floor is the **highest model tier at which the lane actually executed** in a previous revision — not the model tier it was originally resolved to — so a lane that escalated from `small` to `medium` does not re-resolve to `small` from unchanged facts.
 - An unresolved finding floors one model tier above the previous executed model tier **only** when the driver records `redesignRequired: true` after identifying a misunderstood invariant or architectural reassessment.
 An ordinary, bounded fix for a reviewer finding retains the previously executed model tier, without suppressing `ESCALATE_TIER`.
@@ -217,7 +217,7 @@ An ordinary, bounded fix for a reviewer finding retains the previously executed 
 **Confirmation-round override.**
 A review role spawned into a read-only lane — `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`, `fabricate_domain_expert`, `foundry_integrator` — at revision 2 or later, with a brief marked *disposition-only* (an [assignment brief](worktree-lifecycle.md#assignment-brief) field), resolves `medium`, overriding rules 1 to 4 and both revision floors above.
 It dispositions its OWN prior findings against a driver-supplied immutable artifact and reports only defects the revision itself introduced.
-All first-round general reviews still cover the *entire integrated change*, including boundaries between medium implementation packets.
+All first-round general reviews still cover the *entire integrated change*, including boundaries between implementation packets.
 A mutable lane never takes the override, `ESCALATE_TIER` stays available to the confirmation spawn, and a confirmation round that returns a NEW `HIGH` finding re-enters the loop as a fresh revision at the ladder's own resolution.
 The first round of every loop stays at the ladder's resolution.
 The override is applied by the driver on top of the mechanical ladder; `selectModelTier` in `scripts/lib/agentModelTiers.js` models the ladder and its floors only.
@@ -234,7 +234,7 @@ This bounds the worst case at two spawns per revision.
 - **`ESCALATE_TIER` from a `large` lane is a protocol error.**
 The driver converts it to `BLOCKED` and surfaces it under the existing stop condition.
 - **Feedback rule.**
-When a `small` spawn escalates on a recurring assignment shape, move that shape up the ladder in this file.
+When a `small` spawn escalates on a recurring assignment shape, move that shape up the ladder in `AGENTS.md`.
 
 Record the resolved model tier and the facts it was resolved from in the lane's assignment brief.
 

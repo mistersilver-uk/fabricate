@@ -68,7 +68,7 @@ A dangling `{% link %}` fails the Jekyll build.
 Treat the shipped canonical specs under `openspec/specs/` — and the issue delta as reconciled by the domain expert — as the source of truth for documented behaviour.
 6. Update only documentation that matches real behavior (the shipped canonical spec, not a superseded proposal).
 7. Keep quick-start content canonical in `docs/help/quickstart.md`.
-8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
+8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings, each graded `HIGH`, `MEDIUM` or `LOW` per [Iteration cycles](../fabricate-orchestrator/references/agentic-workflow.md#iteration-cycles).
 9. Iterate with the domain expert until every finding is applied or dispositioned, per [Iteration cycles](../fabricate-orchestrator/references/agentic-workflow.md#iteration-cycles) — one full round by default, then disposition-only confirmation — capped at 3 revisions before escalating to the user through the workflow driver.
 10. In a mutable documentation lane, commit only owned documentation paths locally and return the lifecycle's commit handoff to the workflow driver.
 11. Report exactly what changed, the ordered commit SHAs and base-relative path list, recommended issue or PR text, and what could not be documented confidently.

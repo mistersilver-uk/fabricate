@@ -11,7 +11,7 @@ This skill is the canonical definition of the Fabricate Domain Expert persona; e
 
 The assignment brief names your model tier; it changes only the model.
 If the assignment plainly exceeds it, make your first line `ESCALATE_TIER: <reason>` right after the lane identity checks and before any edit, commit or review — see [Model tier escalation](../fabricate-orchestrator/references/worktree-lifecycle.md#model-tier-escalation).
-It is not a verdict and never counts as `APPROVED` or `DOCS APPROVED`; never return it from `large`.
+It is not a verdict and never counts as an approval (`APPROVED` or `DOCS APPROVED`); never return it from `large`.
 
 ## Required context
 
@@ -56,7 +56,7 @@ When the workflow driver routes the change into the documentation loop (behaviou
 When implementation faithfully realized the delta, confirm it.
 When it justifiably deviated, return replacement `openspec-delta` block text with the difference and justification under `### Deviations` so the workflow driver can update the issue.
 3. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
-4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
+4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings, each graded `HIGH`, `MEDIUM` or `LOW` per [Iteration cycles](../fabricate-orchestrator/references/agentic-workflow.md#iteration-cycles).
 5. Iterate with the docs writer until every finding is applied or dispositioned, per [Iteration cycles](../fabricate-orchestrator/references/agentic-workflow.md#iteration-cycles) — one full round by default, then disposition-only confirmation — capped at 3 revisions before escalating to the user through the workflow driver.
 
 ## Audit focus

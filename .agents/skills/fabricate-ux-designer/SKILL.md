@@ -11,7 +11,7 @@ This skill is the canonical definition of the Fabricate UX Designer persona; eve
 
 The assignment brief names your model tier; it changes only the model.
 If the assignment plainly exceeds it, make your first line `ESCALATE_TIER: <reason>` right after the lane identity checks and before any edit, commit or review — see [Model tier escalation](../fabricate-orchestrator/references/worktree-lifecycle.md#model-tier-escalation).
-It is not a verdict and never counts as `APPROVED`; never return it from `large`.
+It is not a verdict and never counts as an approval; never return it from `large`.
 
 ## Worktree contract
 
@@ -74,7 +74,7 @@ Check:
 - duplicate implementations of one meaning: a second component, a copied markup block, or a per-screen style override that re-derives a shipped primitive is a finding, and the fix is a prop or variant on the primitive rather than the copy
 - Svelte 5 rune usage and avoidable side effects
 - the bloat checklist in `.agents/skills/fabricate-reviewer/SKILL.md`, which for a component means its header against `.agents/component-header-template.md`, narrative or ALL-CAPS comments, and a `.svelte` file past 500 lines (`tests/file-size-ratchet.test.js`); a copied markup block is already covered by the one-implementation rule below
-- compact navigation, headers, cards, and fact components with long names or localized strings
+- compact navigation, headers, cards, and fact components with long names or localized strings, and localization readiness for longer strings everywhere else
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
 - layout resilience and rendered geometry in resizable Foundry windows, including CSS that overflows, compresses, or clips despite looking plausible in source
 - whether image-card screenshots prove linked imagery or only fallback artwork
@@ -106,7 +106,7 @@ Reuse the `IconPicker.svelte` pattern; if a portal is genuinely required to esca
 Verify drop position and outside-click-dismiss in real Foundry, since Svelte scoped styles and the layout cascade differ once a node is portaled.
 - Keep product-specific UI contracts in the owning `openspec/specs/ui-*/spec.md` shard named by `openspec/specs/ui-integration/spec.md`'s surface map (or, while still being planned, the issue's `openspec-delta` block); UX guidance should cite those contracts rather than rely on memory.
 When reviewing a plan, audit the UI portion of the issue delta against these contracts.
-- Be specific with file paths and selectors, and give screenshot feedback with the screenshot file, viewport/window size, and concrete pass/fail criteria.
+- Be specific with file paths, selectors and viewport sizes, and give screenshot feedback with the screenshot file, viewport/window size, and concrete pass/fail criteria.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Validate every automated affected view against the provenance procedure in `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`; generic provenance is mandatory and any view-specific parity constraints remain stricter additions.
 - When a design prototype exists, measure the screen against it with `scripts/visual-parity/` rather than judging by eye, and read `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` first.

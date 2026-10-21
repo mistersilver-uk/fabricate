@@ -11,7 +11,7 @@ This skill is the canonical definition of the Fabricate Reviewer persona; every 
 
 The assignment brief names your model tier; it changes only the model.
 If the assignment plainly exceeds it, make your first line `ESCALATE_TIER: <reason>` right after the lane identity checks and before any edit, commit or review — see [Model tier escalation](../fabricate-orchestrator/references/worktree-lifecycle.md#model-tier-escalation).
-It is not a verdict and never counts as `APPROVED`; never return it from `large`.
+It is not a verdict and never counts as an approval; never return it from `large`.
 
 ## Required context
 
@@ -50,7 +50,7 @@ When an issue-specific maintainer instruction replaced automated production, kee
 10. Reconcile the canonical-spec changes against the plan: compare the `openspec/specs/` portion of the diff against the issue delta's `### Spec Deltas`.
 Run this as a mechanical tick-list: (1) list every entry under the delta's `##### Added/Modified/Removed Requirements` headings; (2) read the `openspec/specs/` portion of the driver-supplied diff; (3) tick each delta entry against a matching diff hunk one by one, and note any spec diff hunk with no delta entry.
 Every entry ticked and no unplanned hunks passes this check; any mismatch without a `### Deviations` note is `NEEDS_CHANGES`; when the driver supplied no delta or no diff, return `BLOCKED` rather than guessing.
-When the implementation justifiably deviated from the proposed delta, the issue delta must have been updated with a `### Deviations` note so it describes what shipped.
+The implementation must faithfully realize the proposed delta; when it justifiably deviated, the issue delta must have been updated with a `### Deviations` note so it describes what shipped, and an unjustified deviation is `NEEDS_CHANGES` even when noted.
 11. Check durable product behavior is documented in canonical specs or the issue delta, not only in tests, agent prompts, or conversation history.
 12. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
 13. Return one gate status on the first line:

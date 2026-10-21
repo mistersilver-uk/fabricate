@@ -11,14 +11,14 @@ This skill is the canonical definition of the Fabricate Implementer persona; eve
 
 The assignment brief names your model tier; it changes only the model.
 If the assignment plainly exceeds it, make your first line `ESCALATE_TIER: <reason>` right after the lane identity checks and before any edit, commit or review — see [Model tier escalation](../fabricate-orchestrator/references/worktree-lifecycle.md#model-tier-escalation).
-It is not a verdict and never counts as `APPROVED`; never return it from `large`.
+It is not a verdict and never counts as an approval; never return it from `large`.
 
 ## Required context
 
 - `AGENTS.md`
 - the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
-- `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
+- `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, constructors, cohesion, API shape, or test seams
 - `openspec/specs/design-system/spec.md` BEFORE writing any UI code when the task changes `src/ui/**`, `styles/**`, or any `*.svelte` — reuse the primitive that owns the meaning, extend it with a prop when it lacks the behaviour, and add a new primitive only with two or more independent callers, adding its specimen to `openspec/specs/design-system/library.html` and, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, theming-architecture and shipped-inventory reference; where it and the `design-system` capability disagree, the capability wins
 - current git diff when continuing existing work
@@ -29,7 +29,7 @@ It is not a verdict and never counts as `APPROVED`; never return it from `large`
 1. Verify the assigned worktree path, mutable branch, base SHA, owned paths, dependencies, and clean state before any other action.
 Stop and return `BLOCKED` when the assignment does not match the worktree.
 2. Read the issue's `openspec-delta` block before touching code, using the driver-supplied copy or read-only `gh issue view` access allowed by the brief.
-3. Confirm the [work packet](../../../AGENTS.md#default-agentic-workflow)'s single behavioural objective, contract and exclusive owned paths, then implement the complete bounded responsibility even when it spans several source, test, localization and spec files.
+3. Confirm the [work packet](../../../AGENTS.md#model-tier-routing)'s single behavioural objective, contract and exclusive owned paths, then implement the complete bounded responsibility even when it spans several source, test, localization and spec files.
 Do not ask the driver to split one cohesive feature merely because it crosses file boundaries; never widen ownership to unrelated work.
 Make the canonical spec changes the delta's `### Spec Deltas` require under `openspec/specs/` as part of the change.
 If implementation forces a justified departure from the proposed delta, note it for the driver so the docs loop can reconcile the issue delta against what shipped.

@@ -31,16 +31,16 @@ Spawned role agents execute their scoped role and do not nest — no role agent 
 **Terms.** These names are used the same way in every harness document.
 
 - **Lane** — one spawned role's own worktree for one stage and revision: on its own branch when the role edits, or a review snapshot when it is read-only.
-- **Coordinator checkout** — the driver's worktree for the task (never the maintainer's primary clone); it holds the **integration branch** that accepted lane commits land on, and it is not a lane.
+- **Coordinator checkout** — the driver's worktree for the task (never the maintainer's primary clone, unless the maintainer explicitly instructs it); it holds the **integration branch** that accepted lane commits land on, and it is not a lane.
 - **Review snapshot** — a fresh detached worktree pinned to the exact commit under review.
 - **Assignment brief** — the driver's written instructions for one lane, with the fields in [Assignment brief](.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md#assignment-brief).
 - **Always row** — the "Any non-trivial task" routing row; it applies to every non-trivial change.
 - **Keyed path set** — the paths a spawn's model tier is scored on; which paths depends on the stage, per [Model tier routing](.agents/skills/fabricate-orchestrator/references/agentic-workflow.md#model-tier-routing).
-- **Lane surface** — the planned risk class each delta task declares, `new-module | new-export | public-api | persisted-shape | none`, which ladder rules 2, 4 and 5 read.
+- **Lane surface** — the risk class `new-module | new-export | public-api | persisted-shape | none` that ladder rules 2, 4 and 5 read; each `### Tasks` entry declares it, and after implementation it is derived per the keyed-input table in Model tier routing.
 - **Disposition-only round** — a re-spawn of a reviewer that only rules on how its own earlier findings were handled, never a second full reading.
 - **Exact head** — the PR branch's current remote commit; check results count only for the commit they ran on.
 - **Authoritative gates** — the required local gates, run on the fully integrated coordinator checkout.
-- **Authoritative check attempt** — the one full CI attempt for the exact head that decides delivery.
+- **Authoritative check attempt** — the one full attempt of every required GitHub and external check for the exact head, which decides delivery.
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user.
 **Each loop runs ONE full round by default.**
@@ -56,11 +56,12 @@ Resolve the roster with this procedure — it is mechanical, not a judgment call
 3. Take the union of every matching row's agents — multi-select, never single-pick; the always row always applies.
 4. Record the union in the issue delta's `### Resolved Roster` section, split by stage (plan-review, post-implementation review, docs loop).
 5. **Prune a path-signal role whose row fired on prose alone** at post-implementation review and the docs loop.
-The row does not spawn when the `git diff` limited to the paths that row matched:
+   The row does not spawn when the `git diff` limited to the paths that row matched:
    - is at or below the post-implementation `SMALL_MAX`; and
    - changes, in every hunk, only comments, JSDoc or docblocks, Markdown prose, a `file:line` cite or a count — no executable line, selector, assertion or requirement sentence.
-The driver records the pruned role and the hunks it measured in the handoff.
-The always row, the paired docs-loop row (`fabricate_docs_writer` + `fabricate_domain_expert`), every plan-review spawn, and any hunk that adds or changes a requirement sentence under `openspec/specs/**` are never pruned.
+
+   The driver records the pruned role and the hunks it measured in the handoff.
+   The always row, the paired docs-loop row (`fabricate_docs_writer` + `fabricate_domain_expert`), every plan-review spawn, and any hunk that adds or changes a requirement sentence under `openspec/specs/**` are never pruned.
 
 | Signal                                                                                                                            | Agent(s)                                                                                         | Stage                                    |
 |-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|------------------------------------------|
@@ -82,7 +83,7 @@ The model pins, the keyed inputs per stage, row intersection, the `HIGH_RISK_PAT
 
 The tier applies to a **cohesive work packet**, not to each file.
 A component, its tests, localization, and matching canonical spec count as one concern when the planned contract and ownership are bounded.
-The always-row reviewer still scores and reads the **entire integrated change**; splitting implementation packets never splits the final correctness verdict.
+The always-row `fabricate_reviewer` still scores and reads the **entire integrated change**; splitting implementation packets never splits the final correctness verdict.
 
 | # | Condition | Model tier |
 |---|-----------|------------|
@@ -120,7 +121,7 @@ Do not add or reintroduce Handlebars templates.
 - `src/ui/presenters/` holds the modules that render a chat card or build a read-side row model for a UI surface.
 Unlike `src/ui/model/`, these may have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
 Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
-- `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field), so it shares the page with every other module and system sheet.
+- `styles/fabricate.css` is loaded **globally** into the Foundry document (via `module.json`'s `styles` field; in dev also through the `src/main.js` import), so it shares the page with every other module and system sheet.
 It is the module sheet's entry and holds only `@import` rules for the sibling `styles/fabricate-*.css` partials, in cascade order, which `scripts/lib/stylesheetSource.js` reads as one file, so every rule about this file binds each partial it imports.
 Every selector in this file MUST be namespaced under a `.fabricate*` root class (e.g. `.fabricate-app`, `.fabricate`, `.fabricate-manager`) — the only exception is `:root` for custom-property definitions.
 A bare generic selector like `.badge` or `.btn-icon` will bleed into other sheets.
@@ -155,7 +156,7 @@ Review rejects each of these shapes; each already has a rule:
 - Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.
 - Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.
 - Redeclaring a shared helper locally, answered by `tests/scalar-helper-duplicates.test.js` and `tests/category-shim-bindings.test.js`.
-- An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
+- An issue delta, assignment brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
 
 The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.
@@ -190,8 +191,8 @@ Nothing re-wraps Markdown (Prettier skips it), so author it this way by hand.
 
 - All implementation, documentation, and workflow-file changes must happen on a non-`main` integration or lane branch.
 - Branch verification, lane commits, review-feedback lanes and review snapshots are in [Git Conventions](.agents/skills/fabricate-orchestrator/references/agentic-workflow.md#git-conventions).
-- Follow the final-delivery procedure in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; marking a PR ready does not count as its checks passing.
-- Commits and PR titles use Conventional Commits; for `feat`, `fix`, and `perf` the format is `<type>(#<issue>): <short description>`.
+- Follow the final-delivery procedure in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; readiness changes do not create check evidence.
+- Commits and PR titles use Conventional Commits; for `feat`, `fix`, and `perf` the format is `<type>(#<issue>): <short description>` when a GitHub issue exists.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - PR descriptions must include a GitHub closing keyword for the issue the PR resolves: put `Closes #<issue>` (or `Fixes #<issue>` / `Resolves #<issue>`) on its own line in the `Description` section so merging the PR auto-closes the issue.
 - Never commit directly to `main` or `release`.

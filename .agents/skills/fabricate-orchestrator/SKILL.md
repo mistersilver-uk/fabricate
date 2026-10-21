@@ -18,7 +18,7 @@ Make behavior changes here, not in the bindings.
 - `openspec/specs/design-system/spec.md` when planning any UI-touching change, so the plan names the primitives it reuses and states explicitly which, if any, it extends or adds
 - the **Agent Roles & Bindings** table in `AGENTS.md` and its `Family` table, to resolve routing tokens (including model-tiered families) to provider agents
 - the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder and its stage thresholds
-- `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md` for the workflow procedure: planning, proportionality, model-tier floors and the `HIGH_RISK_PATHS` list, the iteration loops, the final handoff, stop conditions, and confirming work
+- `.agents/skills/fabricate-orchestrator/references/agentic-workflow.md` for the workflow procedure: planning, proportionality, model-tier keyed inputs, row intersection, floors, the confirmation-round override and the `HIGH_RISK_PATHS` list, the iteration loops, the final handoff, stop conditions, and confirming work
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for lane assignment, `ESCALATE_TIER` handling, integration, artifacts, feedback, final delivery, and cleanup
 - `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md` for interrupted or stale per-worktree Foundry recovery and local/CI lifecycle semantics
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
@@ -50,7 +50,7 @@ Repeat a reviewer only when its owned concern materially changed or one of its f
 Rerun exact-head mechanical gates when the head changes, and rerun any gate whose evidence is stale or ambiguous or that repository policy explicitly requires.
 - Apply mechanical findings yourself: a finding that names exact replacement text, an anchor, a count or a roster entry goes straight into the next delta revision or the fix brief, with no reviewer spawn to confirm it.
 - Prune a path-signal role at the post-implementation and docs stages when its row fired on prose alone (comments, docblocks, cites, counts; no executable line, selector, assertion or requirement sentence; at or below the stage's `SMALL_MAX`), per step 5 of `AGENTS.md`'s **Auto-spawn routing**; record the pruned role in the handoff.
-- Run changes as parallel lanes only when neither touches a stylesheet region the other edits, and otherwise sequence them on one branch; the quality ratchets compute their baseline from the base commit, so sharing a ratcheted file never couples two issues.
+- Run changes as parallel lanes only when neither touches a stylesheet region the other edits, and otherwise sequence them one after the other (one rail); the quality ratchets compute their baseline from the base commit, so sharing a ratcheted file never couples two issues.
 - Monitor each delegated lane for observable progress (tool output, a status report, a diff, or a commit); after ~60 seconds without it, request status once; after another ~60 seconds, interrupt and reassign the lane or continue locally when that work is within driver authority.
 
 1. Read the repo guidance and the current task context first.
@@ -138,7 +138,7 @@ Hard cap: 3 docs revisions.
 Do not accept independent packet verdicts as a substitute for the general review of the fully integrated change.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs, expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
-Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`; derive `<old-base-tip>` from the child's own history — do not guess a SHA), push only with `git push --force-with-lease=<branch>:<expected-sha>` (never retry with `--force` or an unqualified force push), and let CI re-run, before merging it.
+Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`; derive `<old-base-tip>` from the child's own history — do not guess a SHA), push only with `git push --force-with-lease=<branch>:<expected-sha>`, where `<expected-sha>` is the child's remote head captured before the rebase (never retry with `--force` or an unqualified force push), and let CI re-run, before merging it.
 Before rebasing any branch, check whether its own PR already merged (`gh pr view --json state`): a squash-merged branch is dead, so delete it rather than rebase it, which would replay its landed commits into conflicts.
 When two parallel (not stacked) PRs off `main` touch the SAME file or cite each other's paths, GitHub's `mergeable` flag checks only for a TEXTUAL conflict, so a clean merge can still leave a semantic duplicate or a dangling path reference that fails `validate:agents`.
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.

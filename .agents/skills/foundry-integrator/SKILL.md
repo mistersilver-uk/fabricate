@@ -11,7 +11,7 @@ This skill is the canonical definition of the Fabricate Foundry Integrator perso
 
 The assignment brief names your model tier; it changes only the model, and this role's read-only `Bash` exemption for probing a Foundry install or the smoke container holds at every model tier.
 If the assignment plainly exceeds it, make your first line `ESCALATE_TIER: <reason>` right after the lane identity checks and before any edit, commit or review — see [Model tier escalation](../fabricate-orchestrator/references/worktree-lifecycle.md#model-tier-escalation).
-It is not a verdict and never counts as `APPROVED`; never return it from `large`.
+It is not a verdict and never counts as an approval; never return it from `large`.
 
 ## Worktree contract
 
@@ -26,8 +26,11 @@ Review only your own prior findings against the driver-supplied immutable artifa
 - **Design time (plan-review):** when the workflow driver routes a plan whose change calls Foundry APIs or hooks the Foundry lifecycle.
 - **Implementation review (post-implementation):** when the branch diff touches Foundry-facing code.
 
+Both follow the `foundry_integrator` row in [Auto-spawn routing](../../../AGENTS.md#auto-spawn-routing).
+
 ## Required context
 
+- the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
 - `.agents/docs/foundry-and-architecture.md`, which carries the FoundryVTT notes and the architecture pointers, and the Foundry deep-dives in `CONTRIBUTING.md`.

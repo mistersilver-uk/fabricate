@@ -66,7 +66,7 @@ One mechanically valid evidence run MUST satisfy every gate it directly covers w
 - **THEN** the driver reuses that evidence instead of repeating an equivalent check or review ceremonially
 - **AND** a reviewer repeats only when its owned concern materially changed or an unresolved finding remains
 - **AND** issue or PR metadata edits and patch-equivalent rebases do not invalidate approval
-- **AND** when repeat review is required, the driver uses a fresh detached lane pinned to the exact target and supplies an immutable artifact
+- **AND** when repeat review is required, the driver uses a fresh review snapshot pinned to the exact target and supplies an immutable artifact
 
 #### Scenario: timeboxing a delegated lane
 
@@ -135,7 +135,7 @@ The release automation's forward-port merge from `release` into `main` is not ag
 
 - **WHEN** a spawned mutable agent completes a scoped change
 - **THEN** it commits only owned paths to its local lane branch and returns the commits to the workflow driver without pushing or mutating GitHub state
-- **AND** the driver verifies and integrates the returned commits on the coordinator branch
+- **AND** the driver verifies and integrates the returned commits on the integration branch
 - **AND** the driver pushes the integrated branch and opens or updates a PR targeting `main`, or `release` or a hotfix line when the change is a hotfix to the current public release
 - **AND** the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf`
 - **AND** the PR description uses H2 sections for `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`
@@ -158,7 +158,7 @@ The release automation's forward-port merge from `release` into `main` is not ag
 - **WHEN** a review-only agent evaluates work
 - **THEN** it reviews a fresh detached worktree pinned to the exact assigned integration commit against the supplied base and immutable diff artifact
 - **AND** it must not commit, push, merge, or mutate GitHub state
-- **AND** if repeat review is later required at another commit, the driver creates another fresh detached lane instead of reusing that checkout
+- **AND** if repeat review is later required at another commit, the driver creates another fresh review snapshot instead of reusing that checkout
 
 #### Scenario: working near the release branch
 
@@ -177,7 +177,7 @@ Before asking a maintainer to test, the workflow driver MUST identify and prove 
 - **THEN** the driver integrates the candidate into the intended checkout or deliberately serves it from another exact worktree
 - **AND** it reports the absolute root, branch, `HEAD`, URL or launch command, tracked and meaningful untracked state, and relevant ignored state
 - **AND** it proves the running process, Foundry module path, or requested checkout resolves to that candidate rather than merely asserting branch or SHA
-- **AND** it records coordinator branch, SHA, and dirty state before and after preparation and preserves unrelated user-owned state
+- **AND** it records the integration branch, SHA, and dirty state before and after preparation and preserves unrelated user-owned state
 - **AND** if the requested checkout cannot safely expose the candidate, it reports the exact clean alternate root and launch command instead of claiming visibility
 
 ### Requirement: Ready-for-review delivery gate
@@ -190,11 +190,11 @@ CI MUST run full required gates on `opened`, `synchronize`, and `reopened` regar
 
 - **WHEN** implementation, review, and documentation loops have accepted the integrated change
 - **THEN** the driver finalizes PR title, body, issue linkage, screenshots, and other metadata before the final run
-- **AND** it fetches `origin/main`, captures the expected remote PR-head SHA, and requires a clean coordinator with no active mutable lane
+- **AND** it fetches `origin/main`, captures the expected remote PR-head SHA, and requires a clean coordinator checkout with no active mutable lane
 - **AND** it rebases the integration branch onto current `origin/main`
 - **AND** it reruns every required authoritative local gate plus `npx commitlint --from origin/main --to HEAD`
 - **AND** it preserves valid implementation approval when the rebase is patch-equivalent for the reviewer's owned concern and no finding remains unresolved
-- **AND** when repeat review is required, it obtains that review from a fresh detached lane pinned to the exact rebased commit with an immutable diff artifact
+- **AND** when repeat review is required, it obtains that review from a fresh review snapshot pinned to the exact rebased commit with an immutable diff artifact
 - **AND** it repeats domain and documentation reconciliation if conflict resolution or later fixes change workflow, canonical specification, or documentation content
 
 #### Scenario: publishing rewritten history
@@ -207,11 +207,11 @@ CI MUST run full required gates on `opened`, `synchronize`, and `reopened` regar
 #### Scenario: validating the ready head
 
 - **WHEN** the explicit-lease push succeeds
-- **THEN** the driver marks the PR ready when it is reviewable unless an explicit maintainer hold applies
+- **THEN** the driver marks the PR ready when it is reviewable unless the work is incomplete, the user or maintainer explicitly holds it, the user asked to inspect the change first, or a delivery precondition is unmet, naming which
 - **AND** it waits for every required GitHub Actions and external check on that exact remote head
 - **AND** both SonarCloud checks, Automatic Analysis and Quality Gate, report success
 - **AND** pending, skipped when required, cancelled, stale-head, or failing checks do not satisfy the gate
-- **AND** it reuses an authoritative check attempt for that exact head regardless of the PR's draft state when the attempt started, or waits for the normal source-event run when no authoritative check attempt exists
+- **AND** it reuses a completed authoritative check attempt for that exact head regardless of the PR's draft state when the attempt started, or waits for the normal source-event run when no completed attempt exists
 - **AND** it requires every full gate from one authoritative attempt rather than combining successful jobs across duplicates
 - **AND** metadata-only `edited` attempts cannot cancel or satisfy the authoritative code-gate attempt
 - **AND** cancelled or skipped duplicate attempts neither supply missing gates nor invalidate a separately complete authoritative attempt
@@ -242,7 +242,7 @@ A lane of a model-tiered family MUST carry its model-tiered token in both its br
 #### Scenario: preparing mutable implementation lanes
 
 - **WHEN** the workflow driver is ready to fan out approved work
-- **THEN** it requires the approved issue delta, final resolved roster, dependency order, exclusive path ownership, and a clean committed coordinator baseline
+- **THEN** it requires the approved issue delta, final resolved roster, dependency order, exclusive path ownership, and a clean committed coordinator checkout baseline
 - **AND** it creates each lane beneath `.worktrees/<issue>/` with a unique directory that carries the same role component as the branch, including for detached read-only lanes
 - **AND** it assigns mutable branches named `agent/<issue>-<stage>-<role>-r<revision>`, where the role component is the model-tiered token in hyphenated file form for a model-tiered family
 
@@ -275,7 +275,7 @@ Spawned agents MUST return local work products to the driver and MUST NOT exerci
 #### Scenario: integrating lane commits
 
 - **WHEN** the driver receives a mutable lane handoff
-- **THEN** it verifies the coordinator and lane state, exact commit range, owned changed paths, integrated dependencies, and absence of a prior integration record
+- **THEN** it verifies the coordinator checkout and lane state, exact commit range, owned changed paths, integrated dependencies, and absence of a prior integration record
 - **AND** it cherry-picks commits in declared dependency order
 - **AND** it records a source-to-integrated SHA mapping for every commit
 - **AND** if a cherry-pick conflicts it aborts the cherry-pick and routes resolution through a fresh revision lane based on current integration `HEAD` without editing another lane
@@ -296,7 +296,7 @@ Spawned agents MUST return local work products to the driver and MUST NOT exerci
 
 ### Requirement: Serialized validation and guarded cleanup
 
-The workflow driver MUST serialize resource-heavy validation and MUST treat only gates run from the fully integrated coordinator branch as authoritative acceptance evidence.
+The workflow driver MUST serialize resource-heavy validation and MUST treat only gates run from the fully integrated coordinator checkout as authoritative acceptance evidence.
 Cleanup MUST preserve any lane whose integration or meaningful state has not been mechanically resolved.
 An escalated lane proven clean at its assigned base with zero commits MAY be disposed; any other escalating lane MUST be preserved and reported as `BLOCKED`.
 
@@ -305,7 +305,7 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **WHEN** lane work is in progress
 - **THEN** agents may run focused checks allowed by their briefs
 - **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
-- **AND** the driver runs required final gates from the fully integrated coordinator branch
+- **AND** the driver runs required final gates from the fully integrated coordinator checkout
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
 - **AND** CI MAY additionally PRODUCE screenshot evidence for the pull request under the UI PR screenshot evidence requirement, which is authoring rather than gate-running, and is therefore stated here explicitly rather than read into "unchanged gates"
 

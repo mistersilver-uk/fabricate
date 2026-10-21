@@ -679,10 +679,11 @@ Every editor in the Crafting System Manager (component, essence, environment, ga
 The pattern is three layers; new editor kinds MUST mirror it rather than reach for `globalThis.confirm()` or thread callbacks through `services` directly.
 
 **1.
-Svelte layer — `src/ui/svelte/apps/manager/routeExitGuards.js`.** A guard answers for its own route, and one orchestrator asks them all.
+Svelte layer — `src/ui/svelte/apps/manager/routeExitGuards.js` and `CraftingSystemManagerRoot.svelte`.** A guard answers for its own route, and one orchestrator asks them all.
 They are one ordered table of thirteen rows, asked row by row through `runRouteExitGuard` and as a whole through `confirmRouteExitGuards`.
-In cascade order those rows are `world-essence-entry`, `world-tool-entry`, `world-component-entry`, `environment-edit`, `essence-edit`, `recipe-edit`, `recipe-item-edit`, `component-edit`, `gathering-task-edit`, `gathering-event-edit`, `tool-edit`, `checks` and `system-edit`, which is the list that supersedes the six helpers named above.
-`confirmRouteExit` is still the orchestrator every handler invokes, under the same name and signature.
+In cascade order those rows are `world-essence-entry`, `world-tool-entry`, `world-component-entry`, `environment-edit`, `essence-edit`, `recipe-edit`, `recipe-item-edit`, `component-edit`, `gathering-task-edit`, `gathering-event-edit`, `tool-edit`, `checks` and `system-edit`.
+`confirmRouteExit(nextView)` in `CraftingSystemManagerRoot.svelte` is the orchestrator every handler invokes.
+A finisher clears the draft with `store.cancel{Kind}Draft?.()` only after the user confirms.
 `ROUTE_EXIT_GUARDS` states each row's place in the cascade, which navigation it waives (`subject`, `same-view`, `family`, or `none`), the action its finisher receives when the store helper is absent — a per-row fact that is deliberately not uniform, so do not normalise it — and whether the row carries its own finisher (`finish: 'own'`) or shares the world entries' (`finish: 'scoped-entry'`).
 The manager supplies one context of arrow accessors over its runes, keyed by the same view tokens: `active`, `isDirty` and `confirm` on every row, plus `whenClean` where a clean exit still has work to do, `subject` or `family` where the row's skip shape needs one, and either `finish` on an `'own'` row or the `save`/`discard` pair `finishScopedEntryExit` calls on a `'scoped-entry'` row.
 The cascade stops at the first `false` and creates no promise while every row is inactive or skipped, because `selectSystem`, `openSystemEssenceRules` and `openToolEditor` read the answer as a boolean and `afterTruthyResult` runs its callback inline only for a non-thenable.
