@@ -43,9 +43,6 @@
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
     `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
-  - Its own copy — the loading, error and no-match lines and the key hints — is localized by the
-    app root's `APP_LOCALIZER` context (`util/appLocalizer.js`), else drawn as the English
-    fallback, so its closure imports no `foundryBridge` (issue 2454).
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
     its own chrome refusing focus above all — are stated there rather than restated here.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
@@ -92,6 +89,7 @@
     latestSourceRequest,
     listedOptions,
     optionListGeneration as listGenerationOf,
+    pickerCopy,
     pickerEmptiness,
     refiningSource,
     renderedOptionOrder,
@@ -101,12 +99,7 @@
   } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
-
-  const appLocalize = getContext(APP_LOCALIZER);
-  function localizedText(key, fallback) {
-    const translated = appLocalize?.(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  const copy = pickerCopy(getContext(APP_LOCALIZER));
 
   let {
     options = [],
@@ -211,8 +204,8 @@
       query: normalizedSearch,
       loading,
       error,
-      errorText: localizedText('FABRICATE.Common.Picker.Error', 'The list could not load'),
-      loadingText: localizedText('FABRICATE.Common.Picker.Loading', 'Loading…'),
+      errorText: copy('error'),
+      loadingText: copy('loading'),
     })
   );
 
@@ -236,25 +229,15 @@
 
   const staysOpenOnChoose = $derived(multiple || stayOpen);
 
-  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
-  const keyHintText = $derived(
-    gridColumns > 1
-      ? localizedText('FABRICATE.Common.Picker.KeyHints.Grid', '←↑↓→ move · ↵ pick · esc close')
-      : localizedText('FABRICATE.Common.Picker.KeyHints.List', '↑↓ move · ↵ pick · esc close')
-  );
-
   const filteredCount = $derived(
     filteredCountLabel(filteredCountTemplate, filteredOptions.length, totalCount)
   );
 
-  const noMatchesText = $derived(
-    noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
-  );
   const emptiness = $derived(
     pickerEmptiness({
       total: totalCount,
       matched: filteredOptions.length,
-      noMatchesText,
+      noMatchesText: noMatchesHint || copy('noMatches'),
       emptyHint,
       emptyDetail,
     })
@@ -370,9 +353,6 @@
     event.stopPropagation();
     triggerOnKeydown?.(event);
   }
-
-  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
-  const dialogNamedBy = $derived(panelLabelledBy || undefined);
 
   const triggerAttributes = $derived({
     ...triggerProps,
@@ -509,8 +489,8 @@
       {popoverLayout}
       {popoverClass}
       {compactOptionRows}
-      {dialogNameAttribute}
-      {dialogNamedBy}
+      {panelLabel}
+      {panelLabelledBy}
       {horizontalAlign}
       {minWidth}
       {maxWidth}
@@ -547,7 +527,7 @@
       {header}
       {footer}
       {keyHints}
-      {keyHintText}
+      {copy}
       {footerAction}
       {chooseOption}
       {optionIsSelected}

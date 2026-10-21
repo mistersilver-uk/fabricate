@@ -167,12 +167,6 @@ const EXCEPTIONS = Object.freeze([
     reason: 'a function returning one row’s attributes, where `<part>Props` names a fixed object',
   },
   {
-    component: 'SearchablePopoverPanel',
-    name: 'dialogNameAttribute',
-    fault: suffixed('Attribute'),
-    reason: 'an internal part with one caller, handed the name its parent already derived',
-  },
-  {
     component: 'PickerRowNameField',
     name: 'describedBy',
     fault: 'is a retired spelling',

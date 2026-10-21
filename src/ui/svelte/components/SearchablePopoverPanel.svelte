@@ -23,6 +23,7 @@
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
   import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
+  import { pickerCopy } from '../util/pickerOptionModel.js';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
@@ -30,8 +31,8 @@
   let {
     popoverClass = '',
     compactOptionRows = false,
-    dialogNameAttribute = undefined,
-    dialogNamedBy = undefined,
+    panelLabel = '',
+    panelLabelledBy = '',
     anchor = null,
     popoverLayout,
     horizontalAlign = 'left',
@@ -70,7 +71,7 @@
     header = undefined,
     footer = undefined,
     keyHints = false,
-    keyHintText = '',
+    copy = pickerCopy(),
     footerAction = null,
     chooseOption,
     optionIsSelected,
@@ -94,6 +95,11 @@
 
   const focusSearch = () => search?.focus();
   const squareTileList = $derived(isGrid && squareTiles);
+  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
+  const dialogNamedBy = $derived(panelLabelledBy || undefined);
+
+  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
+  const keyHintText = $derived(copy(gridColumns > 1 ? 'gridHints' : 'listHints'));
 </script>
 
 <div
