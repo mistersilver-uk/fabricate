@@ -1,8 +1,10 @@
 # Isolated Worktree Lifecycle
 
+Terms such as lane, coordinator checkout, review snapshot and authoritative check attempt are defined under **Terms** in [`AGENTS.md`](../../../../AGENTS.md#default-agentic-workflow).
+
 ## Purpose
 
-Use isolated Git worktrees for spawned agents so independent workstreams can run concurrently without sharing a mutable checkout.
+Spawned agents work in isolated Git worktrees so independent workstreams run concurrently without sharing a mutable checkout.
 The workflow driver owns the coordinator checkout and integrates every accepted lane.
 
 ## Driver authority
@@ -24,8 +26,8 @@ They return local commits, findings, or recommended managed-block text to the dr
 ## Repository layout
 
 Use `.worktrees/<issue>/` as the repository-local root for lanes associated with an issue.
-Keep driver-owned immutable review artifacts in `.worktrees/<issue>/artifacts/`, which is a sibling of agent worktrees rather than content inside a detached review checkout.
-Use a distinct directory for every lane, including every revision and every detached review target.
+Keep driver-owned immutable review artifacts in `.worktrees/<issue>/artifacts/`, a sibling of agent worktrees rather than content inside a review snapshot.
+Use a distinct directory for every lane, including every revision and every review snapshot.
 
 The coordinator checkout is not a lane.
 It stays on the non-protected integration branch that the driver will push and use for the PR.
@@ -34,50 +36,53 @@ It stays on the non-protected integration branch that the driver will push and u
 
 Before creating read-only planning or plan-review lanes, the driver:
 
-1. verifies the coordinator branch is not `main`, `release`, or a hotfix line;
-2. requires a clean coordinator worktree, including tracked and meaningful untracked state;
+1. verifies the integration branch is not `main`, `release`, or a hotfix line;
+2. requires a clean coordinator checkout, including tracked and meaningful untracked state;
 3. commits the complete shared baseline so every assignment has an immutable base SHA;
 4. derives a preliminary roster mechanically from the current request and proposed affected paths; and
-5. creates each planner or plan reviewer in a detached worktree pinned to that immutable baseline.
+5. creates each planner or plan reviewer in a review snapshot pinned to that immutable baseline.
 
-An approved delta is not required for this read-only phase because its purpose is to produce and review the delta.
-When the proposed paths or signals change, the driver recomputes the preliminary roster and repeats affected plan review only when the change materially alters a reviewer's owned concern or leaves a finding unresolved.
-When repeat plan review is required, the driver creates a fresh detached lane at the exact current planning target and supplies an immutable artifact.
+An approved delta is not required for this read-only phase, which exists to produce and review the delta.
+When the proposed paths or signals change, the driver recomputes the preliminary roster and repeats affected plan review only when the change materially alters a reviewer's *owned concern* (the paths and contracts that reviewer's routing row assigns it) or leaves a finding unresolved, in a fresh review snapshot at the exact current planning target with an immutable artifact.
 
 ## Before mutable implementation fan-out
 
 Before creating any mutable lane, the driver:
 
 1. requires an approved issue delta and its final resolved roster;
-2. requires a clean coordinator worktree and committed integration `HEAD`;
-3. resolves the dependency order from the approved delta;
-4. gives every mutable path exactly one owner for the current revision; and
-5. identifies lockfiles and shared configuration as single-owner paths.
+2. requires a clean coordinator checkout and committed integration `HEAD`;
+3. groups the approved delta into cohesive, bounded work packets with explicit contracts and test seams;
+4. resolves dependencies between packets and integrates prerequisites before starting dependent work;
+5. gives every mutable path exactly one owner for the current revision; and
+6. identifies lockfiles and shared configuration as single-owner paths.
 
+A work packet may span several source, test, localization, and canonical-spec files under one owner; file count is not a reason to split it or to upgrade its model tier.
+Split by independent behavioural contracts; do not split merely to obtain a cheaper model tier, and do not create interdependent lanes whose shared interfaces remain unsettled.
 Mutable lanes may run in parallel only when their owned paths are disjoint and none depends on output that has not integrated.
 Start dependent work only after its prerequisite commits are integrated and assign the new integration `HEAD` as its base.
 
 ## Assignment brief
 
-Every lane brief records:
+Every assignment brief records:
 
 - the absolute worktree path;
 - the GitHub issue number;
 - the role, workflow stage, and revision number;
 - the resolved model tier for a model-tiered family;
-- the facts that model tier was resolved from — the keyed path set, the size metric, the rule 2 source, and the ladder rule or floor that decided it;
-- whether the round is a *disposition-only* confirmation round and, if so, the prior findings it dispositions;
+- the facts that model tier was resolved from — the keyed path set, the size metric, the lane surface, and the ladder rule or floor that decided it;
+- whether the round is a disposition-only round and, if so, the prior findings it dispositions;
 - the assigned base SHA;
 - the expected mutable branch or detached target SHA;
 - the exclusively owned paths;
-- dependencies and whether each dependency is already integrated;
+- the packet's one behavioural objective, contract/invariants, test seams and acceptance checks;
+- cross-packet interface assumptions, dependencies and whether each dependency is already integrated;
 - the expected commit range;
 - the focused checks the lane may run; and
 - the required handoff fields.
 
 For mutable lanes, use `agent/<issue>-<stage>-<role>-r<revision>` as the branch name.
 For a model-tiered family, `<role>` is the model-tiered token in hyphenated file form (`fabricate-implementer-small`), not the family name; for an untiered role it is the family token itself.
-Because an escalation does not consume a revision, a family-named lane would collide with itself at the same revision, so the same component appears in the lane **directory** name as well — including for detached read-only lanes, which have no branch to disambiguate them.
+Because an escalation does not consume a revision, a family-named lane would collide with itself, so the same component appears in the lane **directory** name too — including for review snapshots, which have no branch to disambiguate them.
 The expected commit range begins at the assigned base and ends at the lane `HEAD`.
 
 ```text
@@ -106,12 +111,12 @@ An identity mismatch or unexpected existing change is `BLOCKED` and returns to t
 ## Model tier escalation
 
 Immediately after those identity checks, and before its first edit, an agent of a model-tiered family whose assignment exceeds its assigned model tier returns `ESCALATE_TIER: <reason>` on its first line rather than guessing.
-An untiered role has no model tier above it to escalate into and returns `BLOCKED` with the reason instead.
+Only the six model-tiered families may return it; an untiered role has no model tier above it and returns `BLOCKED` with the reason instead.
 `ESCALATE_TIER` is not a verdict: it never satisfies a loop's acceptance condition, never counts as an approval, and is not a stop condition.
 
-The driver honours an escalation only after mechanically confirming the lane has zero commits, its `git status --short` is empty, and its `HEAD` equals the assigned base.
+The driver honours an escalation only after mechanically proving the **clean-lane predicate**: the lane has zero commits, its `git status --short` is empty, and its `HEAD` equals the assigned base.
 Any other escalating lane is preserved and reported as `BLOCKED`.
-It then disposes that proven-clean lane under the guarded-cleanup exception below and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up.
+The driver then disposes that proven-clean lane under the guarded-cleanup exception below and creates a fresh lane at the same assigned base with the same owned paths, exactly one model tier up.
 An escalation does not consume a loop revision, and at most one escalation is permitted per `(family, stage, revision)` — the fresh lane inherits the spent budget, so a second escalation in the same revision is `BLOCKED`.
 `ESCALATE_TIER` returned by a lane already at the most capable model tier is a protocol error the driver converts to `BLOCKED`.
 
@@ -135,12 +140,13 @@ The lane stays available until the driver has integrated and verified its commit
 
 ## Read-only lanes and artifacts
 
-Create planners and reviewers in detached worktrees pinned to the exact commit they must evaluate.
-An approval survives issue or PR metadata edits and a patch-equivalent rebase when the reviewer's owned concern and findings remain unchanged.
-Repeat review only when the owned concern materially changes or a finding remains unresolved.
-When repeat review is required, create a fresh detached lane pinned to the exact new target and never reuse a detached checkout from another commit.
+Create planners and reviewers in review snapshots pinned to the exact commit they must evaluate.
+An approval survives issue or PR metadata edits and a patch-equivalent rebase (one that leaves the diff within the reviewer's owned concern unchanged).
+Repeat review only when the owned concern materially changes or a finding remains unresolved, in a fresh review snapshot pinned to the exact new target; never reuse a snapshot from another commit.
 
 The driver writes the immutable base-relative diff to `.worktrees/<issue>/artifacts/` before review and supplies its path in the brief.
+For the always-row `fabricate_reviewer` this artifact must cover the complete integrated change, including packet boundaries, not just one implementation lane's diff.
+Specialist reviewers may be routed by concern, but their verdicts cannot replace that whole-change review.
 The reviewer treats the assigned base, target SHA, artifact, issue delta, and working tree as its complete review target rather than inspecting an ambient active branch.
 Read-only agents return findings or verdicts and never commit.
 
@@ -180,11 +186,11 @@ The handoff reports:
 Branch and SHA claims alone do not prove visibility.
 For a dev server, report the process working directory and the source SHA it serves.
 For a Foundry module, report the module path or link target visible to Foundry and prove that it resolves into the candidate root.
-For an already-running process, restart it when necessary and prove the new process uses the candidate rather than assuming hot reload crossed worktrees.
+For an already-running process, restart it when necessary and prove the new process uses the candidate; never assume hot reload crossed worktrees.
 
-Record coordinator branch, `HEAD`, and `git status --short` before and after preparing the candidate.
-Serve the candidate from the clean coordinator worktree or another dedicated serving worktree.
-When the coordinator contains unrelated user-owned tracked, untracked, or ignored state, preserve it in place and use another clean worktree; do not stash, delete, overwrite, or absorb that state merely to make a candidate visible.
+Record the integration branch, `HEAD`, and `git status --short` before and after preparing the candidate.
+Serve the candidate from the clean coordinator checkout or another dedicated serving worktree.
+When the coordinator checkout contains unrelated user-owned tracked, untracked, or ignored state, preserve it in place and use another clean worktree; do not stash, delete, overwrite, or absorb that state merely to make a candidate visible.
 If a requested checkout cannot safely expose the candidate without disturbing unrelated state, say so and provide the exact alternate root and launch command instead of claiming the requested checkout is ready.
 
 The manual handoff proves only which candidate the maintainer will exercise.
@@ -214,53 +220,48 @@ After both domain and documentation outputs integrate, their read-only cross-rev
 
 Agents may run focused checks in their own lanes when the brief permits them.
 The driver serializes dependency installation, the complete unit-test suite, build, complete lint and format checks, Foundry or Docker smoke tests, and screenshot generation to avoid shared resource contention.
-Acceptance results are authoritative only when run from the fully integrated coordinator branch.
+Acceptance results are authoritative only when run from the fully integrated coordinator checkout.
 
 CI does not create agent worktrees.
 It runs the repository's unchanged gates against the pushed integrated commit.
-`npm run validate:agents` invokes the same dependency-free validator with identical behavior in local development and CI; neither environment uses a provider-specific fallback.
+`npm run validate:agents` runs the same dependency-free validator locally and in CI, with no provider-specific fallback in either.
 
 ## Final PR delivery
 
-The workflow driver completes this loop before handing a PR to the maintainer for review.
-Before maintainer handoff, complete the final delivery loop: rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across a patch-equivalent rebase or obtain fresh detached review when the owned concern materially changed or a finding remains unresolved, explicit-lease push, mark ready, require all exact-head checks including both SonarCloud checks, then re-fetch main and reverify ancestry, head identity, and ready state.
-A successful full required check attempt remains authoritative for its exact remote head whether it started while the PR was draft or ready.
+Complete steps 1–8 before handing a PR to the maintainer.
 Readiness changes do not change source and do not create check evidence.
-Delivery is complete only when the PR is ready and one full required check attempt is successful for its exact remote head.
+Delivery is complete only when the PR is ready and its authoritative check attempt for the exact head is successful.
 
 **The driver runs this loop, including the ready transition, on its own initiative.**
-Marking a PR ready is a step the driver owns outright, not a decision to refer upward, so the driver never waits to be told to undraft.
-Mark the PR ready without asking once it is reviewable; hold it at draft only for incomplete work, an explicit maintainer hold, or an unmet delivery precondition, and name the reason.
-Ask first only when the user has said to hold, when the change is one the user asked to inspect before it goes out, or when a delivery precondition below cannot be met.
-Hold at draft only when the user asked to hold or a delivery precondition is unmet, and say which.
-The maintainer's decision point is reviewing and merging the ready PR, and asking them to authorise the transition into that state only moves work back to the person the loop exists to serve.
+It marks the PR ready once it is reviewable and never waits to be told to undraft.
+Hold at draft only for incomplete work, an explicit user or maintainer hold, a change the user asked to inspect before it goes out, or an unmet delivery precondition, and name which.
+The maintainer's decision point is reviewing and merging the ready PR, not authorising the transition into it.
 Keep a ready PR ready while rebasing, updating its branch, investigating a failed check, or routing a fix.
 
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
 2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
 3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
 4. Determine mechanically whether the rebase materially changed the implementation reviewer's owned concern or left an unresolved finding.
-Reuse the valid approval for a patch-equivalent rebase; when repeat review is required, create a fresh detached implementation-review lane pinned to the exact rebased commit and supply an immutable diff artifact.
+Reuse the valid approval for a patch-equivalent rebase; otherwise create a fresh implementation review snapshot pinned to the exact rebased commit and supply an immutable diff artifact.
 Repeat domain and documentation reconciliation when conflict resolution or a later fix changes workflow, canonical spec, or documentation content.
 5. Update the remote branch only with `git push --force-with-lease=<branch>:<expected-sha>`.
 A rejected lease stops the loop for investigation; never retry with `--force` or an unqualified force push.
 6. If the PR is still draft and reviewable, mark it ready, then wait for every required GitHub Actions and external check associated with that exact remote head.
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
 Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
-Choose one authoritative full attempt for the exact remote head and require every full gate from that attempt rather than combining successful jobs across duplicate attempts.
-Reuse a complete full attempt for that head, including one started while draft; otherwise wait for the normal `opened`, `synchronize`, or `reopened` run.
+Choose one authoritative check attempt for the exact head and require every full gate from that attempt rather than combining successful jobs across duplicate attempts.
+Reuse a completed authoritative check attempt for that head, including one started while draft; otherwise wait for the normal `opened`, `synchronize`, or `reopened` run.
 Metadata-only `edited` attempts are never authoritative code-gate attempts.
 Skipped or cancelled duplicate attempts do not invalidate a separately identified authoritative attempt, but they also cannot fill a missing gate in it.
 Never toggle draft/ready to manufacture a run.
 7. If any check fails, gather evidence, reconcile the issue, and route fixes through isolated implementation and review lanes while preserving the PR's readiness state.
 Repeat rebase, local validation, explicit-lease push, and exact-head CI after a fix.
-Repeat detached review only when the fix or rebase materially changes the reviewer's owned concern or an unresolved finding remains.
+Repeat review in a fresh review snapshot only when the fix or rebase materially changes a reviewer's owned concern or a finding remains unresolved.
 8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
-If main advanced or the PR head changed, repeat the mandatory delivery steps while keeping a ready PR ready, preserving approval when the resulting rebase is patch-equivalent and repeating review only when the material-change rule requires it.
+If main advanced or the PR head changed, repeat the mandatory delivery steps while keeping a ready PR ready, applying step 4's review-reuse rule.
 If the PR is draft without an explicit hold, mark it ready after the other delivery conditions are restored.
 
-The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required exact-head check are mechanically true at the same time.
-Only hand the PR to the maintainer after all final-delivery conditions are true on the same commit.
+The maintainer handoff is valid only when current-main ancestry, exact remote-head identity, ready state, and every required exact-head check are mechanically true at the same time, on the same commit.
 
 ## Guarded cleanup
 
@@ -270,8 +271,7 @@ Dirty, unintegrated, blocked, interrupted, or ambiguous lanes are preserved and 
 
 An escalated lane is the one exception to that preservation rule.
 Because `ESCALATE_TIER` is returned before the lane's first edit, such a lane has nothing to integrate, and preserving it would leak one worktree per escalation.
-The driver may dispose it only after mechanically proving zero commits, an empty `git status --short`, and `HEAD` equal to the assigned base.
-An escalating lane that fails any part of that predicate is preserved and reported as `BLOCKED`.
+The driver may dispose of it only after proving the clean-lane predicate in **Model tier escalation**; a lane failing it is preserved and reported as `BLOCKED`.
 
 For a clean integrated lane, the driver:
 

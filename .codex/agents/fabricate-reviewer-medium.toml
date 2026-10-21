@@ -1,5 +1,5 @@
 name = "fabricate_reviewer_medium"
-description = "Review Fabricate diffs for correctness, regression risk, tests, and Foundry V13 compatibility. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at."
+description = "Review Fabricate diffs for correctness, regression risk, tests, and Foundry V13 compatibility. Bound to the medium model tier, selected by the workflow driver, for an independent whole-diff review of a cohesive multi-file concern, including cross-file interfaces. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
