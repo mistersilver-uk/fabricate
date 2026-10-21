@@ -74,7 +74,7 @@ export const HIGH_RISK_PATHS = [
 ];
 
 /** Post-implementation review and the docs loop score the same diff, so they share limits. */
-const DIFF_THRESHOLDS = { smallMax: 50, mediumMax: 1400 };
+const DIFF_THRESHOLDS = { smallMax: 50, mediumMax: 800 };
 
 /**
  * `SMALL_MAX` / `MEDIUM_MAX` per stage. The size metric is delta-task count before

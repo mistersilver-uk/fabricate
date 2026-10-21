@@ -521,6 +521,11 @@ test('9. each worked example resolves to its stated model tier via its stated ru
     ruleTwoSource: 'none',
   });
   assert.deepEqual([routineRegistry.rule, routineRegistry.tier], [6, 'medium']);
+  // The review-stage MEDIUM_MAX is 800 lines: at it stays medium, one line over is rule 3.
+  const reviewAt = (sizeMetric) =>
+    selectModelTier({ stage: 'post-implementation', paths: ['src/a.js', 'tests/a.test.js'], sizeMetric, ruleTwoSource: 'none' });
+  assert.deepEqual([reviewAt(800).rule, reviewAt(800).tier], [6, 'medium']);
+  assert.deepEqual([reviewAt(801).rule, reviewAt(801).tier], [3, 'large']);
   const unavailable = selectModelTier({ stage: 'implementation', paths: ['a.js'] });
   assert.deepEqual([unavailable.rule, unavailable.tier], [6, 'medium']);
 });

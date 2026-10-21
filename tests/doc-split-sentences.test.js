@@ -152,7 +152,7 @@ const SUPERSEDED_ROWS = [
     before:
       'post-implementation, docs | 50 added + deleted lines | 400 added + deleted lines',
     after:
-      'post-implementation, docs | 50 added + deleted lines | 1400 added + deleted lines',
+      'post-implementation, docs | 50 added + deleted lines | 800 added + deleted lines',
     survivesIn: 'AGENTS.md',
   },
   {

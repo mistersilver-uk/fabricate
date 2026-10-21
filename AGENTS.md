@@ -79,7 +79,7 @@ The always-row reviewer still scores and reads the **entire integrated change**;
 |-------|-------------|--------------|
 | plan-review | 3 delta tasks | 12 delta tasks |
 | implementation | 1 owned delta task | 8 owned delta tasks |
-| post-implementation, docs | 50 added + deleted lines | 1400 added + deleted lines |
+| post-implementation, docs | 50 added + deleted lines | 800 added + deleted lines |
 
 ## Build & Test
 
