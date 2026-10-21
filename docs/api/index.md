@@ -2711,6 +2711,8 @@ const query = search.value('value'); // The query the field holds now.
 `Select` draws the design system's select: a `<button>` trigger with `role="combobox"` that opens a list of options in an overlay, for one choice from a short, known set that commits as it is made.
 The trigger is the only focusable element inside `target`, so to return focus to the select, focus `target.querySelector('button')`.
 `options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique as a string, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
+Two values that are the same string, such as `1` and `'1'`, are outside the contract, because the list cannot draw two rows that share one.
+Opening the list then ends the mount as a fault, which empties `target` and reports to `onFault`, as [Mounting, updating and destroying](#mounting-updating-and-destroying) states.
 A member other than `value` and `label` is private, and an empty `options`, which `mount` and `update` both accept, opens a list that draws nothing and says nothing, so do not offer an empty select.
 `value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`.
 A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
@@ -2976,6 +2978,7 @@ Each time an overlay opens, Fabricate picks where to draw it, from `target`'s ow
 3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
+A component's section may narrow where `overlayHost` sits, and `Select`'s does: keep it inside the same Fabricate window as `target`.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
