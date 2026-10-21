@@ -254,6 +254,72 @@ describe('the host chain an overlay resolves when it opens', () => {
     unmount(instance);
     flushSync();
   });
+
+  it('leaves an unpublished overlay on the class walk once a published mount has been destroyed', () => {
+    const target = fabricateTarget(shells, 'fabricate-app');
+    openProbe(target, { overlayHost: companionHost() }).handle.destroy();
+    const { mount, unmount } = runtime;
+    const instance = mount(probe.default, { target, props: { open: true, label: 'Own' } });
+    flushSync();
+    const panel = document.querySelector('[data-overlay-probe-panel]');
+    assert.ok(panel.parentElement === target.parentElement, 'the dead chain hosts nothing');
+    unmount(instance);
+    flushSync();
+  });
+
+  it('ends a stale claim’s chain when the target is mounted again on the same seam', () => {
+    const target = companionTarget(shells);
+    const overlayHost = companionHost();
+    const seam = overlaySeam();
+    openProbe(target, { overlayHost, seam });
+    assert.equal(overlayHost.children.length, 1, 'one container while open');
+    target.replaceChildren();
+    const { handle } = openProbe(target, { overlayHost, seam });
+    assert.equal(overlayHost.children.length, 1, 'the stale claim’s container is gone');
+    handle.destroy();
+    assert.equal(overlayHost.children.length, 0, 'destroy leaves none');
+  });
+
+  it('keeps one container while an update re-syncs the open panel', () => {
+    const overlayHost = companionHost();
+    const { handle, props } = openProbe(companionTarget(shells), { overlayHost });
+    for (const cap of [100, 200]) {
+      handle.update({ ...props, open: true, cap });
+      flushSync();
+      assert.equal(overlayHost.children.length, 1, `one container at cap ${cap}`);
+    }
+    handle.destroy();
+    assert.equal(overlayHost.children.length, 0);
+  });
+
+  it('measures the panel from the overlayHost option’s own rect', () => {
+    const overlayHost = companionHost();
+    overlayHost.getBoundingClientRect = () => ({
+      left: 50,
+      top: 60,
+      right: 350,
+      bottom: 260,
+      width: 300,
+      height: 200,
+    });
+    const { handle, panel } = openProbe(companionTarget(shells), { overlayHost });
+    assert.match(panel.getAttribute('style'), /left: 50px;/);
+    handle.destroy();
+  });
+
+  it('takes a new container when the host it was opened in is removed while open', () => {
+    const overlayHost = companionHost();
+    const { handle, panel, props } = openProbe(companionTarget(shells), { overlayHost });
+    const first = containerOf(panel);
+    overlayHost.remove();
+    handle.update({ ...props, open: true, cap: 10 });
+    flushSync();
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer && !first.isConnected, 'the removed host’s container is replaced');
+    assert.ok(containerOf(panel).parentElement === layer, 'by one in the standalone layer');
+    assert.equal(layer.children.length, 1);
+    handle.destroy();
+  });
 });
 
 describe('a press inside the container', () => {
@@ -281,6 +347,27 @@ describe('destroy and a fault close every open overlay', () => {
       listeners.stop();
     }
     assert.deepEqual(reports, []);
+  });
+
+  it('destroy closes the chain whatever the runtime’s unmount does', () => {
+    const failing = overlaySeam({
+      unmount: () => {
+        throw new Error('unmount failed');
+      },
+    });
+    const { handle, panel } = openProbe(companionTarget(shells), { seam: failing });
+    const container = containerOf(panel);
+    handle.destroy();
+    assert.ok(!panel.isConnected && !container.isConnected, 'no panel and no container');
+    assert.ok(!document.querySelector(LAYER), 'no layer remains');
+    assert.deepEqual(
+      reports.map(([report, name, error]) => [report, name, error.message]),
+      [
+        [FAULT_REPORT, 'PublishedOverlayProbe', 'unmount failed'],
+        [FAULT_REPORT, 'PublishedOverlayProbe', 'unmount failed'],
+      ],
+      'the mount’s and the container’s failures are both reported'
+    );
   });
 
   it('a fault while open does the same, then tells onFault', async () => {
@@ -334,8 +421,16 @@ describe('in a second window', () => {
   it('hosts the overlay on that document’s own layer, and a press there reaches onChoose', () => {
     const choose = recorder();
     const target = detachedTarget();
-    const { handle, panel } = openProbe(target, { onChoose: choose.record });
-    const layer = second.document.querySelector(LAYER);
+    second.document.documentElement.setAttribute(THEME, 'stale');
+    document.documentElement.setAttribute(THEME, 'fresh');
+    let handle, panel, layer;
+    try {
+      ({ handle, panel } = openProbe(target, { onChoose: choose.record }));
+      layer = second.document.querySelector(LAYER);
+      assert.equal(layer.getAttribute(THEME), 'fresh', 'not the copy made when the window opened');
+    } finally {
+      document.documentElement.removeAttribute(THEME);
+    }
     assert.ok(layer?.parentElement === second.document.body, "the second document's body");
     assert.ok(containerOf(panel).parentElement === layer);
     assert.ok(!document.querySelector(LAYER), 'nothing is drawn in this window');
@@ -343,6 +438,24 @@ describe('in a second window', () => {
     assert.deepEqual(choose.calls, [[25]], 'delegated through the container’s own listener');
     handle.destroy();
     assert.ok(!layer.isConnected, 'its layer goes with its last overlay');
+  });
+
+  it('hosts a same-document overlayHost moved into another document in the target’s own layer', () => {
+    const target = companionTarget(shells);
+    const overlayHost = companionHost();
+    const seam = overlaySeam();
+    const props = { label: 'Per page' };
+    const handle = seam.mount('PublishedOverlayProbe', { target, props, overlayHost });
+    handles.push(handle);
+    flushSync();
+    second.document.body.append(overlayHost);
+    handle.update({ ...props, open: true });
+    flushSync();
+    const layer = document.querySelector(LAYER);
+    assert.ok(layer, 'a layer in the target’s document');
+    assert.ok(layer.querySelector('[data-overlay-probe-panel]'), 'the panel is in it');
+    assert.equal(overlayHost.children.length, 0, 'the moved host holds none');
+    handle.destroy();
   });
 
   it('reaches no handler when the container is not a mount target', () => {

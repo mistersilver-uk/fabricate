@@ -2901,20 +2901,23 @@ A navigation provider's `mount` callback may not, because it returns synchronous
 
 ### Overlays
 
-A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog, so the panel is never clipped by your own overflow.
+A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog.
 `mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
 1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
 2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
-3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` that carries `data-fabricate-theme`, else from Fabricate's own document.
+3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document.
 
-Give `overlayHost` a `position` other than `static`, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
+Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 That element, the panel and everything in it are private: select none of it.
+The standalone layer, its class and its `data-fabricate-theme` copy are private too.
+The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 An overlay listens for outside presses, Escape and scrolls on the document that holds it, and for resizes on that document's window.
 `destroy` and a fault close every open overlay and remove its panel, its element and a standalone layer nothing else uses.
-Fabricate does not follow a mount from one window to another, so destroy it and mount again in `_onDetach` and `_onAttach`; that `destroy` closes any open overlay.
+On Foundry 14 Fabricate does not follow a mount from one window to another, so destroy it and mount again in `_onDetach` and `_onAttach`; that `destroy` closes any open overlay.
+Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 
 ```javascript
 // A positioned element of your own window; a Fabricate that predates overlays ignores it.

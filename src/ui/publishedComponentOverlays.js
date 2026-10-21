@@ -16,11 +16,16 @@ import { FABRICATE_THEME_ATTRIBUTE } from './theme.js';
 
 const KEEP = () => {};
 
-// A detached window's own theme is stale after a change, so an ancestor's is read before the main one.
+// A Foundry 14 detached window's <html> holds a copy of the main one's attributes made when it
+// opened, stale after a theme change, so the walk stops below it and falls back to the main one.
 function themeAttributes(target) {
+  const main = globalThis.document?.documentElement;
+  const top = target.ownerDocument?.documentElement;
   let themed = target;
-  while (themed && !themed.hasAttribute?.(FABRICATE_THEME_ATTRIBUTE)) themed = themed.parentElement;
-  const source = themed ?? globalThis.document?.documentElement;
+  while (themed && themed !== top && !themed.hasAttribute?.(FABRICATE_THEME_ATTRIBUTE)) {
+    themed = themed.parentElement;
+  }
+  const source = themed && themed !== top ? themed : main;
   const theme = source?.getAttribute?.(FABRICATE_THEME_ATTRIBUTE);
   return theme ? { [FABRICATE_THEME_ATTRIBUTE]: theme } : {};
 }
@@ -35,6 +40,16 @@ function placeFor(target, option) {
   return acquireStandaloneOverlayLayer(target.ownerDocument, themeAttributes(target));
 }
 
+/** Unmounts `instance` through `unmount`, passing a throw or a rejection to `report`. */
+export function unmountReporting(unmount, instance, report) {
+  try {
+    const result = unmount(instance);
+    if (typeof result?.then === 'function') result.then(undefined, report);
+  } catch (error) {
+    report(error);
+  }
+}
+
 /**
  * Registers and returns the chain for `target`; `runtime()` reads the seam's runtime, whose
  * `overlay` component draws nothing, and `report(error)` receives a failed container unmount.
@@ -42,26 +57,19 @@ function placeFor(target, option) {
 export function openOverlayChain({ target, option, runtime, report }) {
   const held = new Map();
 
-  function unmountQuietly(mounted) {
-    try {
-      const result = runtime().unmount(mounted);
-      if (typeof result?.then === 'function') result.then(undefined, report);
-    } catch (error) {
-      report(error);
-    }
-  }
-
   const chain = {
     acquire(overlay) {
       const lease = held.get(overlay);
-      if (lease) return lease.container;
+      if (lease?.container.isConnected) return lease.container;
+      if (lease) chain.release(overlay);
       const place = placeFor(target, option);
-      const container = createOverlayContainer(place.host, chain);
+      let container;
       try {
+        container = createOverlayContainer(place.host, chain);
         const { mount, overlay: empty } = runtime();
         held.set(overlay, { container, place, mounted: mount(empty, { target: container }) });
       } catch (error) {
-        container.remove();
+        container?.remove();
         place.release();
         throw error;
       }
@@ -71,7 +79,7 @@ export function openOverlayChain({ target, option, runtime, report }) {
       const lease = held.get(overlay);
       if (!lease) return;
       held.delete(overlay);
-      unmountQuietly(lease.mounted);
+      unmountReporting((mounted) => runtime().unmount(mounted), lease.mounted, report);
       lease.container.remove();
       lease.place.release();
     },

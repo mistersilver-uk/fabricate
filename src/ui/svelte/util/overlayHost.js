@@ -1,9 +1,10 @@
 // Where a portaled overlay lives and what its coordinates are measured from (issues 1466, 1520).
-// INVARIANT: the coordinate origin and the portal target are the same element — both resolve
-// through `resolveOverlayHost`, because computing them apart is what let them diverge (the defect
-// this replaces). A class is eligible only if it is itself positioned, so it is the containing
-// block of the absolute panel appended to it; `tests/components/portal-host-app-root.test.js` pins
-// that, and that no component hard-codes a root of its own.
+// INVARIANT: the coordinate origin and the portal target are the same element — both come from one
+// `acquireOverlayHost` call, and `overlayHostRect` measures a seam container by its host, because
+// computing them apart is what let them diverge (the defect this replaces). A class is eligible
+// only if it is itself positioned, so it is the containing block of the absolute panel appended to
+// it; `tests/components/portal-host-app-root.test.js` pins that, and that no component hard-codes a
+// root of its own.
 
 export const OVERLAY_HOST_ROOT_CLASSES = Object.freeze(['fabricate-manager', 'fabricate-app']);
 
@@ -136,10 +137,13 @@ export function acquireStandaloneOverlayLayer(doc, attributes) {
   };
 }
 
-// Deliberately NO viewport fallback: a viewport-origin rect under a panel that did not move is
-// exactly the defect above. Zero degrades to the callers' own `|| innerWidth` sizing guard. A seam
-// container draws no box, so its host is measured.
+// Deliberately NO viewport fallback for an application root or an explicit host: a viewport-origin
+// rect under a panel that did not move is exactly the defect above, and zero degrades to the
+// callers' own `|| innerWidth` sizing guard. A seam container draws no box, so its host is
+// measured, and the standalone layer, fixed to its window's viewport, is that viewport.
 export function overlayHostRect(host) {
   const box = containerChains.has(host) ? host.parentElement : host;
+  const view = box?.matches?.(`.${STANDALONE_OVERLAY_HOST_CLASS}`) && box.ownerDocument.defaultView;
+  if (view) return { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
   return box?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
 }

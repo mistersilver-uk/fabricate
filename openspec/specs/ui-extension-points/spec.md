@@ -526,17 +526,20 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
 - Each time an overlay opens, Fabricate picks its host from `target.ownerDocument` at that moment, and never from Fabricate's own `document`:
   1. `overlayHost`, while it is connected and in `target`'s document;
   2. else the nearest `.fabricate-manager`, `.fabricate-app` or `.fabricate-standalone-overlay` above `target`;
-  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from the nearest ancestor of `target` that carries one, else from Fabricate's own document element.
+  3. else a `.fabricate.fabricate-standalone-overlay` layer Fabricate keeps on `target.ownerDocument.body`, made when the first overlay in that document opens on it and removed when the last one closes, whose `data-fabricate-theme` is copied, when it is made, from the nearest ancestor of `target` below its document element that carries one, else from Fabricate's own document element, because a Foundry 14 detached window's document element holds a copy made when that window opened.
 - The panel is drawn in a `<div>` Fabricate creates with `target.ownerDocument` inside the host and mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 The `<div>` carries `display: contents` and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
-- The panel is never clipped by the companion's overflow, because it is drawn in its host and not inside `target`.
+The standalone layer, its class and its `data-fabricate-theme` copy are private too.
+- The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
 - An overlay's outside-press, Escape and scroll listeners bind to the document that holds it and its resize listener to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
-A document with no window binds nothing, and its overlay stays closed.
+An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
 An overlay drawn by Fabricate outside every published mount keeps its own host as before.
 - `destroy` and a fault close every overlay the mount holds open: each panel and its `<div>` are removed, Fabricate's runtime releases the `<div>`'s listeners, and a layer no overlay still uses is removed, so nothing of the overlay is left in any document.
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
+Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 - An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
+The gate also holds that the closure of an `overlays: true` entry imports no `resolveOverlayHost` except through `actions/anchoredPopover.js`, which acquires its host through the chain: `Modal` still portals through `resolveOverlayHost` and ignores the chain, so it is not publishable with `overlays: true` until it acquires and releases its host as `anchoredPopover.js` does.
 
 ### Interactive components
 

@@ -1,14 +1,15 @@
 /**
  * The overlay plumbing inside a second happy-dom `Window`, the stand-in for a Foundry 14 detached
  * window (issue 2454): each action binds its listeners to the node's own document and window and
- * reads that window's viewport and style, and tells a node by `nodeType`. Each clause is red
- * against an action that reads the global `document`, `window` or `instanceof`.
+ * reads that window's viewport and style, and tells a node by `nodeType`. Each clause except the
+ * `portal in a second window` pair, which pins what happy-dom 20's shared classes already give, is
+ * red against an action that reads the global `document`, `window` or `instanceof`.
  * Limit: happy-dom 20 shares its classes between Windows, so its second Window's nodes pass this
  * realm's `instanceof`; a node of another realm is stood in by an object no class of this realm
  * recognises, which carries `nodeType` as a detached window's node does.
  */
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Window } from 'happy-dom';
 
@@ -257,6 +258,21 @@ describe('anchoredPopover in a second window', () => {
     handle.destroy();
   });
 
+  it('re-measures when the panel’s own document finishes loading its fonts', async () => {
+    const { promise: ready, resolve } = Promise.withResolvers();
+    Object.defineProperty(doc, 'fonts', { value: { ready }, configurable: true });
+    const { trigger, panel } = detachedScene();
+    const counter = { measures: 0 };
+    const handle = countedPopover(panel, trigger, counter);
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(counter.measures, 1, 'no other document’s fonts re-measure it');
+    resolve();
+    await ready;
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(counter.measures, 2, 'measured again once its own fonts are ready');
+    handle.destroy();
+  });
+
   it('binds nothing and stays closed in a document without a window', () => {
     const windowless = document.implementation.createHTMLDocument('windowless');
     assert.equal(windowless.defaultView, null);
@@ -339,10 +355,17 @@ describe('ancestorScrollerBounds in a second window', () => {
     const bounds = ancestorScrollerBounds('.manager-main');
     assert.deepEqual(bounds(box(0, 0, 1000, 800), trigger), { minLeft: 116, maxRight: 684 });
     root.style.display = 'contents';
-    assert.deepEqual(
-      bounds(box(0, 0, 1000, 800), trigger),
-      { minLeft: 16, maxRight: 984 },
-      'a display: contents scroller is skipped, read from the second window'
-    );
+    // This realm's getComputedStyle answers a box for every element, so only a read from the
+    // candidate's own window sees `contents`.
+    const stub = mock.method(globalThis, 'getComputedStyle', () => ({ display: 'block' }));
+    try {
+      assert.deepEqual(
+        bounds(box(0, 0, 1000, 800), trigger),
+        { minLeft: 16, maxRight: 984 },
+        'a display: contents scroller is skipped, read from the second window'
+      );
+    } finally {
+      stub.mock.restore();
+    }
   });
 });

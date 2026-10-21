@@ -872,7 +872,29 @@ const OVERLAY_ACTIONS = Object.freeze([
   'src/ui/svelte/actions/typeaheadPanel.js',
 ]);
 
-/** Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action. */
+/** The files that may name `resolveOverlayHost`: its own, and the action that acquires through the chain. */
+const HOST_RESOLVER_HOMES = Object.freeze([
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayHost.js',
+]);
+
+/** The files of `entry`'s closure that import `resolveOverlayHost`, which ignores the overlay chain. */
+function hostResolverImports(entry, reader) {
+  return [...importClosure(entry.path, reader)]
+    .filter((file) => !HOST_RESOLVER_HOMES.includes(file))
+    .filter((file) => {
+      const ast = isComponent(file) ? reader.component(file) : reader.module(file).ast;
+      return [...walkNodes(ast)].some(
+        (node) => node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost'
+      );
+    })
+    .sort(byName);
+}
+
+/**
+ * Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action, and
+ * an `overlays: true` closure reaches no `resolveOverlayHost` except through `anchoredPopover.js`.
+ */
 function overlayFaults(entry, reader = SHIPPED) {
   const reached = [...importClosure(entry.path, reader)]
     .filter((file) => OVERLAY_ACTIONS.includes(file))
@@ -880,8 +902,11 @@ function overlayFaults(entry, reader = SHIPPED) {
   if (reached.length === 0) {
     return entry.overlays === true ? ['is overlays: true and reaches no overlay action'] : [];
   }
-  if (entry.overlays === true) return [];
-  return reached.map((file) => `reaches ${file} and is not overlays: true`);
+  if (entry.overlays !== true)
+    return reached.map((file) => `reaches ${file} and is not overlays: true`);
+  return hostResolverImports(entry, reader).map(
+    (file) => `is overlays: true and ${file} imports resolveOverlayHost, which ignores the chain`
+  );
 }
 
 describe('admission rule 10: an entry that opens an overlay states overlays', () => {
@@ -917,6 +942,38 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
       'reaches src/ui/svelte/actions/anchoredPopover.js and is not overlays: true',
     ]);
     assert.deepEqual(overlayFaults({ ...entry, overlays: true }, reader), []);
+  });
+
+  it('refuses an overlays: true closure that imports resolveOverlayHost beside an overlay action', () => {
+    const reader = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { portal } from '../actions/portal.js';" +
+        "import { resolveOverlayHost } from '../util/overlayHost.js';" +
+        'const host = (node) => resolveOverlayHost(node);</script>',
+      'src/ui/svelte/actions/portal.js': 'export function portal() {}',
+      'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
+    });
+    const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte', overlays: true };
+    assert.deepEqual(overlayFaults(entry, reader), [
+      'is overlays: true and src/ui/svelte/components/E.svelte imports resolveOverlayHost, which ignores the chain',
+    ]);
+    const through = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { anchoredPopover } from '../actions/anchoredPopover.js';</script>",
+      'src/ui/svelte/actions/anchoredPopover.js':
+        "import { resolveOverlayHost } from '../util/overlayHost.js';" +
+        'export const anchoredPopover = (node) => resolveOverlayHost(node);',
+      'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
+    });
+    assert.deepEqual(overlayFaults(entry, through), [], 'through anchoredPopover.js is allowed');
+  });
+
+  it('names Modal as unpublishable until it acquires through the chain', () => {
+    const modal = { name: 'Modal', path: 'src/ui/svelte/components/Modal.svelte', overlays: true };
+    assert.ok(
+      hostResolverImports(modal, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
+      'Modal still portals through resolveOverlayHost'
+    );
   });
 
   it('refuses overlays on an entry whose closure reaches no overlay action', () => {

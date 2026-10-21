@@ -11,7 +11,7 @@
  */
 import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
-import { openOverlayChain } from './publishedComponentOverlays.js';
+import { openOverlayChain, unmountReporting } from './publishedComponentOverlays.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
 import {
   changeKeyOf,
@@ -242,8 +242,8 @@ function handleFor(entry, record, end) {
   });
 }
 
-// An entry's overlay chain is registered before the runtime mounts it, so an overlay open at init
-// finds it.
+// An entry's overlay chain is registered before the runtime mounts it; defensive, because Svelte
+// 5.56 runs an action at the next flush, after `mount` returns.
 function openOverlays(entry, record, { overlayHost, runtime, report }) {
   if (entry.overlays !== true) return;
   const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
@@ -275,12 +275,7 @@ function createMountLifecycle({ runtime, report }) {
   // returned, so a Promise settled inside the call reports before the fault notice queued after it.
   function unmountQuietly(record) {
     const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
-    try {
-      const result = runtime().unmount(record.instance);
-      if (typeof result?.then === 'function') result.then(undefined, reportFailure);
-    } catch (error) {
-      reportFailure(error);
-    }
+    unmountReporting((instance) => runtime().unmount(instance), record.instance, reportFailure);
   }
 
   // A faulted mount leaves its target empty at once, however the runtime's unmount ended.

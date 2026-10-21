@@ -37,6 +37,7 @@ export const PROBE_OVERLAY_ENTRY = Object.freeze({
     open: Object.freeze({ kind: 'data' }),
     label: Object.freeze({ kind: 'data' }),
     explode: Object.freeze({ kind: 'data' }),
+    cap: Object.freeze({ kind: 'data' }),
     onChoose: Object.freeze({ kind: 'callback', args: 1 }),
   }),
   rest: false,

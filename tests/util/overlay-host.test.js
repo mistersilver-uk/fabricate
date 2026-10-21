@@ -20,6 +20,9 @@ const {
   unregisterOverlayChain,
 } = await import('../../src/ui/svelte/util/overlayHost.js');
 
+const { anchoredPopover } = await import('../../src/ui/svelte/actions/anchoredPopover.js');
+const { computeActionMenuLayout } = await import('../../src/ui/svelte/util/actionMenuLayout.js');
+
 const LAYER = '.fabricate.fabricate-standalone-overlay';
 
 /** A chain that hands each overlay one container in `host` and logs each call in `log`. */
@@ -131,6 +134,54 @@ describe('overlayHostRect', () => {
     const container = createOverlayContainer(host, standInChain(host));
     assert.deepEqual(overlayHostRect(container), { left: 5, top: 6, width: 7, height: 8 });
     assert.equal(container.style.display, 'contents');
+  });
+
+  it('measures the standalone layer, which has no box of its own, as its window’s viewport', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const { innerWidth, innerHeight } = document.defaultView;
+    const viewport = { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    assert.ok(innerWidth > 0 && innerHeight > 0, 'the window has a size');
+    assert.deepEqual(overlayHostRect(layer.host), viewport);
+    const container = createOverlayContainer(layer.host, standInChain(layer.host));
+    assert.deepEqual(overlayHostRect(container), viewport, 'so is a container in it');
+    layer.release();
+  });
+
+  it('places an action menu in the standalone layer, where a zero-size host would leave it unplaced', () => {
+    const layer = acquireStandaloneOverlayLayer(document, {});
+    const trigger = { left: 100, right: 130, top: 50, bottom: 80 };
+    const placed = computeActionMenuLayout(
+      trigger,
+      { width: 120, height: 90 },
+      overlayHostRect(layer.host)
+    );
+    assert.equal(placed?.placement, 'bottom');
+    layer.release();
+  });
+});
+
+describe('anchoredPopover under a registered chain', () => {
+  it('releases the container it held when it closes, and holds a new one when it opens again', () => {
+    const host = element('section');
+    const target = element();
+    const chain = standInChain(host);
+    registerOverlayChain(target, chain);
+    const trigger = element('button', target);
+    const panel = element();
+    const params = {
+      component: 'ChainPopover',
+      trigger,
+      layout: () => ({ left: 0, top: 0, placement: 'bottom' }),
+    };
+    const handle = anchoredPopover(panel, params);
+    assert.ok(panel.parentElement?.parentElement === host, 'held a container while open');
+    handle.update({ ...params, open: false });
+    assert.deepEqual(chain.log, ['acquire', 'release'], 'released on close');
+    assert.equal(host.children.length, 0, 'the container is gone');
+    handle.update(params);
+    assert.equal(host.children.length, 1, 'a new one on reopening');
+    handle.destroy();
+    unregisterOverlayChain(target, chain);
   });
 });
 

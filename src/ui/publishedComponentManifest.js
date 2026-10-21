@@ -1,8 +1,9 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
  * frozen `{ name, path, version, props, rest, root, restOn?, overlays? }`, appended and never
- * interleaved, and a breaking change to one bumps its own `version` (issue 2426). A prop is `{ kind, required?,
- * requiredWhen?, element?, args? }`, its kind `'data' | 'text' | 'slot' | 'callback' | 'aria'`:
+ * interleaved, and a breaking change to one bumps its own `version` (issue 2426). A prop is
+ * `{ kind, required?, requiredWhen?, element?, args? }`, its kind `'data' | 'text' | 'slot' |
+ * 'callback' | 'aria'`:
  * `requiredWhen` names the `data` key while which it is required (issue 2452), a `text` key takes
  * a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says
  * `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
