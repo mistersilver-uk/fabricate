@@ -306,8 +306,6 @@ describe('a key a leaf does not publish', () => {
     ['EmptyState', 'field', 'is not a data attribute'],
     ['EmptyState', 'fill', 'is not a data attribute'],
     ['EmptyState', 'note', 'is not a data attribute'],
-    ['Notice', 'dismissable', 'is not a data attribute'],
-    ['Notice', 'dismissLabel', 'is not a data attribute'],
     ['Notice', 'blocking', 'is not a data attribute'],
     ['Notice', 'evidence', 'is not a data attribute'],
     ['Button', 'size', 'is not a data attribute'],
@@ -663,7 +661,7 @@ describe('EmptyState under a bare ancestor', () => {
   });
 
   it('lays its column out and inks its title from its own stylesheet', async () => {
-    const theme = ':root[data-fabricate-theme] { --fab-text-secondary: rgb(1, 2, 3); }';
+    const theme = ':root[data-fabricate-theme] { --fab-text: rgb(1, 2, 3); }';
     await underSheet(theme, async () => {
       const { target, handle } = mountLeaf('EmptyState', { title: 'No factions yet' });
       await settle();
@@ -937,7 +935,7 @@ describe('Notice with an action under a bare ancestor', () => {
     handle.destroy();
   });
 
-  it('draws no dismissal whatever its published props, and still refuses dismissable (M13)', async () => {
+  it('draws no dismissal unless dismissable, and refuses dismissable with no dismissLabel (M9)', async () => {
     const { target, handle } = mountNotice({
       tone: 'success',
       detail: 'Remove a project to continue.',
@@ -948,9 +946,9 @@ describe('Notice with an action under a bare ancestor', () => {
     });
     await settle();
     assert.ok(!target.querySelector('[data-notice-dismiss]'), 'no dismiss control');
-    assert.throws(() => handle.update({ title: TITLE, dismissable: true }), {
+    assert.throws(() => handle.update({ title: TITLE, dismissable: true, onDismiss() {} }), {
       name: 'TypeError',
-      message: `${REFUSAL}"dismissable" is not a data attribute`,
+      message: `${REFUSAL}Notice requires a non-empty "dismissLabel" when "dismissable" is truthy`,
     });
     handle.destroy();
   });

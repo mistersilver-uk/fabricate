@@ -386,7 +386,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
   ]),
-  // The shared empty panel.
+  // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
+  // a `compact fill` journal body and the hero in a narrow host.
   'src/ui/svelte/components/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
@@ -396,6 +397,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
+    'player-inventory-bulk-none-salvageable',
+    'manager-component-complications-empty',
+    'fabricate-journal-history-batch-empty-1240',
+    'player-alchemy-workbench',
   ]),
   // The link field (issue 2466): the world Tool screens, then at least one frame of each of its nine other hosts.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
@@ -581,12 +586,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
   ]),
-  // The surface that reports something that just happened (issue 1505), on two callers.
+  // The surface that reports something that just happened (issue 1505), on two callers. Then the
+  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452).
   'src/ui/svelte/components/Notice.svelte': Object.freeze([
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.

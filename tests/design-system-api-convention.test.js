@@ -122,8 +122,7 @@ const EXCEPTIONS = Object.freeze([
     name: 'compact',
     fault: REGISTER_ONLY,
     reason:
-      'a density-shaped flag whose values and geometry are the library’s planned-migrations ' +
-      'row "Empty variant geometry"',
+      'a variant flag beside inline, note, field and fill, each a drawn unit of the <Empty> entry, not a density value',
   },
   {
     component: 'ItemDropZone',
