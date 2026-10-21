@@ -17,6 +17,7 @@ manager-gathering-biome-colour-popover-cursor
 manager-gathering-biome-colour-popover-cursor-hearth-herb
 manager-gathering-biome-colour-popover-cursor-selected
 manager-gathering-biome-colour-popover-cursor-selected-hearth-herb
+manager-gathering-biome-colour-edit-popover
 manager-gathering-rules-select-open
 manager-gathering-condition-current-list
 manager-gathering-economy-actors

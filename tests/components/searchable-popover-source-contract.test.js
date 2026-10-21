@@ -85,6 +85,9 @@ const popover = definePrimitiveAdoptionContract({
     // Issue 1513's two, and they have DIFFERENT callers.
     'multiple',
     'stayOpen',
+    // Issue 2459's grid-form capabilities, both passed bare by `TintPicker`.
+    'squareTiles',
+    'keyHints',
   ]),
   detectorFixture: {
     source: DETECTOR_FIXTURE,
@@ -357,12 +360,26 @@ test('the anchor the picker hands its panel is what the panel positions against'
   );
 });
 
+const TINT_PICKER_PATH = 'src/ui/svelte/components/TintPicker.svelte';
+
+/**
+ * `TintPicker` forwards its caller's `anchor` and `trigger` to the one site it renders, and
+ * either may be `undefined`, so that site alone writes both — and only as the bare identities.
+ */
+const isTintForwardingSite = (site) =>
+  site.file === TINT_PICKER_PATH &&
+  site.attribute('anchor') === '{anchor}' &&
+  site.attribute('trigger') === '{trigger}';
+
 /** What an `anchor` call site passes that the anchored shape refuses (issue 2459). */
 function anchorSiteRefusals(site) {
   if (!site.attribute('anchor')) return [];
   const refused = [];
   const passed = (name) => site.attribute(name) && site.attribute(name) !== name.concat('={false}');
-  if (site.attribute('trigger') || site.snippetSource('trigger')) refused.push('trigger');
+  const forwards = isTintForwardingSite(site);
+  if ((site.attribute('trigger') && !forwards) || site.snippetSource('trigger')) {
+    refused.push('trigger');
+  }
   if (site.attribute('showSearch') === 'showSearch={false}') refused.push('showSearch={false}');
   for (const name of ['inlineSearchTrigger', 'disabled', 'triggerAriaDisabled']) {
     if (passed(name)) refused.push(name);
@@ -375,7 +392,7 @@ function anchorSiteRefusals(site) {
 }
 
 test('an anchored popover passes no trigger prop and binds `open`', () => {
-  // Non-vacuity: no shipped caller anchors yet, so the reader is proved on fixtures first.
+  // The reader is proved on fixtures first, then on the one shipped forwarding site.
   const fixture = (attributes, children = '') =>
     callSitesIn(
       'anchor-fixture.svelte',
@@ -405,11 +422,110 @@ test('an anchored popover passes no trigger prop and binds `open`', () => {
     );
   }
 
+  // The forwarding exemption is the file and the bare identities, and nothing else of the shape.
+  const forwarding = (file, trigger = '{trigger}', more = '') =>
+    anchorSiteRefusals(
+      callSitesIn(
+        file,
+        [
+          '<SearchablePopover',
+          '{anchor}',
+          trigger,
+          'bind:open panelLabel="Tints"',
+          more,
+          '/>',
+        ].join(' '),
+        'SearchablePopover'
+      )[0]
+    );
+  assert.deepEqual(forwarding(TINT_PICKER_PATH), [], "TintPicker's forwarding site");
+  assert.deepEqual(forwarding('anchor-fixture.svelte'), ['anchor-fixture.svelte: trigger']);
+  assert.deepEqual(forwarding(TINT_PICKER_PATH, 'trigger={swatch}'), [
+    `${TINT_PICKER_PATH}: trigger`,
+  ]);
+  assert.deepEqual(forwarding(TINT_PICKER_PATH, '{trigger}', 'disabled'), [
+    `${TINT_PICKER_PATH}: disabled`,
+  ]);
+  assert.deepEqual(
+    popover.callSites.filter(isTintForwardingSite).map((site) => site.file),
+    [TINT_PICKER_PATH],
+    'exactly one shipped site forwards both an anchor and a trigger: the tint popover'
+  );
+
   assert.deepEqual(
     popover.callSites.flatMap(anchorSiteRefusals),
     [],
     'an `anchor` site renders no trigger, so every trigger prop is a dead letter and the caller ' +
       'must own `open`, because nothing of the primitive’s can open the panel'
+  );
+});
+
+// `TintPicker` forwards its popover props to this primitive, so its own sites are read here too.
+const tintPickerSites = componentCallSites('TintPicker');
+const TINT_PICKER_PROPS = new Set(declaredPropNames(SOURCES[TINT_PICKER_PATH] ?? ''));
+const RETIRED_TINT_PROPS = ['manageDismiss', 'onDismiss', 'registerPopoverNode'];
+
+/** What a `<TintPicker>` site passes that the forwarded popover refuses (issue 2459). */
+function tintPickerSiteRefusals(site) {
+  const refused = [];
+  const bindsOpen = (site.node.attributes ?? []).some(
+    (attribute) => attribute.type === 'BindDirective' && attribute.name === 'open'
+  );
+  const trigger = site.attribute('trigger') ?? site.snippetSource('trigger');
+  if (site.attribute('anchor')) {
+    if (!bindsOpen) refused.push('anchor with no bind:open');
+    if (trigger) refused.push('anchor with a trigger');
+  } else if (site.attribute('layout') !== 'layout="inline"' && !trigger) {
+    refused.push('a popover with neither an anchor nor a trigger');
+  }
+  if (site.snippetSource('trigger') && !snippetTriggerName(site)) {
+    refused.push('a trigger snippet whose button has no aria-label');
+  }
+  for (const attribute of site.node.attributes ?? []) {
+    if (!attribute.name || TINT_PICKER_PROPS.has(attribute.name)) continue;
+    refused.push(`undeclared ${attribute.name}`);
+  }
+  return refused.map((what) => `${site.file}: ${what}`);
+}
+
+test('a tint picker site opens its popover by an anchor it binds or by a named trigger', () => {
+  const fixture = (attributes, children = '') =>
+    tintPickerSiteRefusals(
+      callSitesIn(
+        'tint-fixture.svelte',
+        `<TintPicker ${attributes}>${children}</TintPicker>`,
+        'TintPicker'
+      )[0]
+    );
+  const named =
+    '{#snippet trigger({ attributes })}<button aria-label="Tint" {...attributes}></button>{/snippet}';
+  assert.deepEqual(fixture('anchor={node} bind:open'), [], 'the anchored shape');
+  assert.deepEqual(fixture('', named), [], 'the trigger shape');
+  assert.deepEqual(fixture('layout="inline"'), [], 'the inline strip');
+  for (const [attributes, children, what] of [
+    ['anchor={node}', '', 'anchor with no bind:open'],
+    ['anchor={node} bind:open', named, 'anchor with a trigger'],
+    ['', '', 'a popover with neither an anchor nor a trigger'],
+    [
+      '',
+      named.replace(' aria-label="Tint"', ''),
+      'a trigger snippet whose button has no aria-label',
+    ],
+    ['layout="inline" manageDismiss={false}', '', 'undeclared manageDismiss'],
+  ]) {
+    assert.deepEqual(fixture(attributes, children), [`tint-fixture.svelte: ${what}`], what);
+  }
+  assert.ok(TINT_PICKER_PROPS.has('anchor'), 'the declared-prop reader reads TintPicker');
+
+  // Non-vacuity: the shipped sites are the anchored biome, the swatch trigger and four strips.
+  assert.equal(tintPickerSites.length, 6, `${tintPickerSites.length} <TintPicker> sites`);
+  assert.deepEqual(
+    tintPickerSites.flatMap(tintPickerSiteRefusals),
+    [],
+    'a <TintPicker> popover is opened by a caller-bound anchor or by a named trigger snippet, ' +
+      'and passes only the props TintPicker declares; it declares no rest, so an unknown prop ' +
+      `is silently dropped. ${RETIRED_TINT_PROPS.join(', ')} retired at issue 2459, when the ` +
+      'panel became the picker grid form and stopped positioning or dismissing through its caller'
   );
 });
 

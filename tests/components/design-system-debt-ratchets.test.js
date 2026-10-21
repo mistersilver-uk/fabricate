@@ -985,7 +985,6 @@ const FLOATING_SURFACES = Object.freeze([
   [MODULE_SHEET, '.fabricate-manager .manager-recipe-duration-popover', 'a popover'],
   [MODULE_SHEET, '.fabricate-manager .manager-recipe-option-suggestions', 'opens over the form'],
   [MODULE_SHEET, '.fabricate-manager .manager-availability-menu', 'a menu'],
-  [MODULE_SHEET, '.fabricate-color-picker-popover.manager-color-picker-popover', 'a popover'],
   [MODULE_SHEET, '.fabricate-action-menu-panel.manager-action-menu-panel', 'a row menu'],
   [MODULE_SHEET, '.fabricate-interaction-prompt', 'a toast over the canvas'],
   [MODULE_SHEET, '.fabricate-picker-popover.manager-travel-popover', 'a popover'],
@@ -1283,6 +1282,12 @@ const STATE_TINTS = Object.freeze([
     '.fabricate-manager .manager-selected-tag-pill button:hover, .fabricate-manager .manager-selected-tag-pill button:focus-visible',
     'var(--fab-success-soft)',
     'the remove inside a success pill hovers in the pill’s family',
+  ],
+  [
+    MODULE_SHEET,
+    ".fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true']",
+    'var(--fab-surface-soft)',
+    'a selected tint tile keeps the tile ground its ring is the mark on (spec, the swatch exception)',
   ],
   [
     MODULE_SHEET,

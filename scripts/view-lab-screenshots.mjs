@@ -130,7 +130,7 @@ async function startLabServer() {
 
 /** The click modifiers Playwright accepts. */
 const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
-const PRESS_KEYS = ['Enter', 'Space', 'Tab', 'ArrowUp', 'ArrowDown'];
+const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
 
 /** The verbs a `modifiers` step may not carry. */
 const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];
