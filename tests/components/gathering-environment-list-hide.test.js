@@ -45,8 +45,9 @@ const harness = createMountedComponentHarness({
 
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
   // picker, which resolves its portal host by walking up to the nearest Fabricate application
-  // root. `rootClass` IS that host: on the `fabricate-manager` default the panel would portal to a root no production
-  // mount of this component can reach, and every `target.querySelector` for a row would miss.
+  // root. `rootClass` IS that host: on the `fabricate-manager` default the panel would portal to
+  // a root no production mount of this component can reach, and every `target.querySelector` for
+  // a row would miss.
   rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
 });

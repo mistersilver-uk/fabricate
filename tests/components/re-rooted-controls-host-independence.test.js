@@ -2309,10 +2309,10 @@ test('the filter bar and the card declare their own box rather than inheriting i
 
 test('neither the filter bar nor the card declares a font floor or a focus pair', async () => {
   // THE NEGATIVE CONTROL FOR A POSITIVE DECISION. `openspec/specs/design-system/spec.md` forbids
-  // a primitive displacing an area's chrome for a control it does not own. These two families own no control at all, so the honest
-  // shape of "they declare neither" is an assertion that no rule rooted at either names a focus
-  // state or carries type. Without it, a later change adding a floor "for consistency with the
-  // other four" would pass every other gate in this repository.
+  // a primitive displacing an area's chrome for a control it does not own. These two families own
+  // no control at all, so the honest shape of "they declare neither" is an assertion that no rule
+  // rooted at either names a focus state or carries type. Without it, a later change adding a
+  // floor "for consistency with the other four" would pass every other gate in this repository.
   const tab = await browser.newPage();
   try {
     await tab.setContent(document_(sheet));

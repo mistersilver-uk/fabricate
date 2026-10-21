@@ -116,7 +116,7 @@ describe('Pagination page-size control', () => {
 
   it('keeps a multiPageOnly bar mounted while focus is inside it, and lets it hide on blur', async () => {
     const target = await harness.mount({ totalCount: 100, pageSize: 10, multiPageOnly: true });
-    const radio = target.querySelector('[data-pagination-size] input[type="radio"]');
+    const radio = target.querySelector(':scope [data-pagination-size] input[type="radio"]');
     radio.focus();
     flushSync();
     await harness.setProps({ pageSize: 100 });
@@ -126,6 +126,24 @@ describe('Pagination page-size control', () => {
     radio.blur();
     flushSync();
     assert.ok(!pager(target), 'the bar hides once focus leaves it');
+  });
+
+  it('keeps a held multiPageOnly bar mounted when focus moves between its own controls', async () => {
+    // Negative control: an unguarded focusout handler (holdOpen = false on every focusout) drops
+    // the hold here, because focusout also fires when focus moves to a sibling control inside the
+    // bar.
+    const target = await harness.mount({ totalCount: 100, pageSize: 10, multiPageOnly: true });
+    const [first, second] = target.querySelectorAll(
+      ':scope [data-pagination-size] input[type="radio"]'
+    );
+    first.focus();
+    flushSync();
+    await harness.setProps({ pageSize: 100 });
+    flushSync();
+    assert.ok(pager(target), 'the held bar is mounted before focus moves');
+    first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
+    flushSync();
+    assert.ok(pager(target), 'focus moving to a sibling control inside the bar keeps it mounted');
   });
 
   it('renders no bar when the whole list fits the smallest size', async () => {

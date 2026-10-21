@@ -77,11 +77,11 @@ function makeServices(result, { reject = false } = {}) {
 async function mountView(services) {
   target = document.createElement('div');
   // THE MOUNT TARGET IS THE PLAYER APPLICATION ROOT (issue 1504, decision YY). `GatheringView`
-  // renders a picker, which resolves
-  // its portal host by walking up to the nearest Fabricate application root, and the only root
-  // this view has in production is `fabricate-app`. Mounted into a bare `<div>` the panel lands
-  // on `<body>`, out of reach of every `target.querySelector` in this file — which is a fixture
-  // asserting against a portal that FAILED, not a product regression.
+  // renders a picker, which resolves its portal host by walking up to the nearest Fabricate
+  // application root, and the only root this view has in production is `fabricate-app`. Mounted
+  // into a bare `<div>` the panel lands on `<body>`, out of reach of every `target.querySelector`
+  // in this file — which is a fixture asserting against a portal that FAILED, not a product
+  // regression.
   target.className = 'fabricate-app';
   document.body.appendChild(target);
   mounted = mount(GatheringView, { target, props: { services } });
