@@ -253,6 +253,8 @@ A **Your selection** recap beneath lists every carrier the player has allocated,
 Essences the recipe does not need appear muted in those chips.
 Fractional essence amounts are rounded to 12 significant digits.
 
+{% include screenshot.html case="player-crafting-essence-overshoot" caption="A selection that overshoots what the recipe needs." %}
+
 A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
 Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.
 

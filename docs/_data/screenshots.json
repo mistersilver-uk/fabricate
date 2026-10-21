@@ -384,6 +384,96 @@
       "case": "manager-environment-edit-events",
       "alt": "The Events tab of the environment editor, showing two library events included by match, nothing excluded, no non-matching events, and the selected event with its matching evidence and base chance modifier beside it.",
       "sha256": "8ed0361b0ba765c27db8fb6c2d9beff34b60d7a6525834b8d2645c4a6ae3606e"
+    },
+    {
+      "case": "player-inventory",
+      "alt": "The player Inventory tab: a filterable grid of the character's items with quantity badges, beside the selected item's sources and the components that contribute to it.",
+      "sha256": "ef095cf506c3f2117fbc1260401fe6b5855f3aa325e2b771166458a5e4eac23c"
+    },
+    {
+      "case": "manager-recipe-edit-choice-group-menu",
+      "alt": "The recipe editor's Ingredients tab with an any-one-of requirement open, and the Accept instead menu offering Component, Tag, Essence and Currency alternatives.",
+      "sha256": "8178f6a5c509d6b1ccb3b9bc0892a0261ade7cf3dac256b92c80ff17fb5dd394"
+    },
+    {
+      "case": "player-crafting-results-choice-group",
+      "alt": "A recipe in the player Crafting tab whose produced results include a group headed You choose up to, listing the alternatives the player may take.",
+      "sha256": "c154f748d682cd4325a8fece26a8cfb34a28b6518955d33b8200be055beadc40"
+    },
+    {
+      "case": "player-crafting-chooser-open",
+      "alt": "The player Crafting tab with a requirement's alternatives open, showing each candidate item and how many the player holds, beside the list of what the craft will use.",
+      "sha256": "4e926a5d6bee93fb58661f4a03d94d0437a52aec742afa9227b857665c69cbe6"
+    },
+    {
+      "case": "player-crafting-chat-card-rewards",
+      "alt": "The Crafting tab beside a Crafting Successful chat card that shows the roll against its target, what was created, a currency reward and a recipe learned, and what was consumed.",
+      "sha256": "38b058ecd97ad57356285ff8bad12aa01057a801438e9bb3f36f2b74cef0daf8"
+    },
+    {
+      "case": "player-gathering-chat-card-event",
+      "alt": "The Gathering tab beside two chat cards: the result card listing what was gathered and the event that occurred, and the d100 roll that decided it.",
+      "sha256": "78130df75f70e9a5820d114f0542ee8a761a4b8a4839028cad56a2b6ff58a7df"
+    },
+    {
+      "case": "player-journal-award-choice",
+      "alt": "A Journal run waiting on a reward, with the alternatives offered as tiles under Choose your reward and a note that the reward is waiting for the player's choice.",
+      "sha256": "51d70a57c136ad07ff527f3758e9c68a8101b2ccd403a5d832a736012c6bec9f"
+    },
+    {
+      "case": "manager-tags-categories-normal",
+      "alt": "The Tags & Categories screen, with the recipe category and component category panels side by side above the component tags panel, each with its own search, sort control and add form.",
+      "sha256": "1e0dfc9a88e60c9396f05d6e83dcec80fc71ca79403fb1670001073147bf9388"
+    },
+    {
+      "case": "manager-tags-categories-tags-tab",
+      "alt": "The component tags panel of Tags & Categories scrolled into view, listing each tag as a hash-prefixed chip with how many components reference it and a delete button.",
+      "sha256": "812e6c84a8ee13b9872f3db9752772621985f4a273513a3f5a2167fe731e4ec3"
+    },
+    {
+      "case": "player-crafting-essence-overshoot",
+      "alt": "The essence pool in the Crafting tab with a selection that overshoots, listing each carrier with a stepper and a note saying how much more of an essence was picked than required.",
+      "sha256": "342b37d1e7efeb4ee1ecb474b01a1fa34cfe697a0973a41aa3a9586f225fb078"
+    },
+    {
+      "case": "manager-recipe-edit-access-inspector",
+      "alt": "The Access screen with a recipe selected, and its inspector listing each character and player with an on or off grant switch.",
+      "sha256": "823d1f8a29ed681879e454dfce0220c9696dd1ee8aa2ef512f31765858b6656d"
+    },
+    {
+      "case": "manager-component-edit-normal",
+      "alt": "A component's catalogue entry in Component Rules, with its category and tags cards, the Essence contribution card with a quantity for each essence, and a preview of how players see the component.",
+      "sha256": "e8925334374c2a8c058f1997a8cbb7606f17d90bcdffe9ac33f840a3e1edbb64"
+    },
+    {
+      "case": "manager-components-essence-chips",
+      "alt": "The Component Rules screen listing the system's components, with each row's essence contribution shown as chips, and the selected component's summary and an Edit system rules button beside the list.",
+      "sha256": "603aec7e2a8f5b28721b590aafc145c49b093e7811dcf7b3a879f4891bc23220"
+    },
+    {
+      "case": "interactables-browser-tools",
+      "alt": "The Interactable browser's Tools tab, listing tools with a place-region-and-marker button and a region-only button beside each.",
+      "sha256": "28d67cba42070f9675da5e3f6a0d1c60504b72fb93bcae6b005546a48ac4358d"
+    },
+    {
+      "case": "manager-world-downtime-tracking",
+      "alt": "The Tracking tab of the Downtime preview, with a Run downtime without the spreadsheet panel and a compact example party board.",
+      "sha256": "0d27f8aca6bef49cd4563bc24a6cb7e33844b35e0ea872bfc7f6363c5ab1681e"
+    },
+    {
+      "case": "manager-checks-salvage-modifiers",
+      "alt": "The Modifiers tab of the salvage check, listing the named check modifiers with each one marked as considered or not considered.",
+      "sha256": "5568bbf3c44a3a5ebe4a94ecd84d0d8ea36b54a967fd791cb79467863ae2db90"
+    },
+    {
+      "case": "manager-checks-salvage-on-failure",
+      "alt": "The On failure tab of the salvage check, where the failure result policy is set to Never, Decided per salvageable item or Always, with the consume and break-tools toggles beneath.",
+      "sha256": "0a4e3c9bf20680e35bdfd910c13011b224bc3efa8b2f7bdb49574d85bd819d81"
+    },
+    {
+      "case": "player-alchemy-known-recipe",
+      "alt": "The Alchemy workbench with a known recipe loaded: three components on the bench with their signature and essence chips, and a banner naming the recipe and saying it is ready to brew above the item it produces.",
+      "sha256": "37f4725b371044e403030f82a219e2f6b64cb5d8aea4f3aeeef291b4b1eb07fc"
     }
   ]
 }

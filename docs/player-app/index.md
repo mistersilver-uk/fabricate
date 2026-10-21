@@ -29,6 +29,18 @@ The selected item, recipe, environment, or run leads with a header naming it bes
 A **Shopping List** sits alongside the Crafting tab, so a player can queue several recipes and see one consolidated list of what they still need.
 See [Shopping List]({% link player-app/shopping-list.md %}).
 
+The **Inventory** tab lists everything the selected character carries, with filters across the top and the selected item's sources beside the grid.
+
+{% include screenshot.html case="player-inventory" caption="The Inventory tab." %}
+
+## Results in chat
+
+A finished craft or gather posts a result card to the chat log, naming the roll, what was created or found, and what was consumed.
+
+{% include screenshot.html case="player-crafting-chat-card-rewards" caption="The card a successful craft posts, beside the Crafting tab." %}
+
+{% include screenshot.html case="player-gathering-chat-card-event" caption="The cards a gather posts, with the event that occurred." %}
+
 Which recipes a player sees in the Crafting tab is decided by the system's visibility mode.
 See [Settings]({% link crafting/settings.md %}) for the modes, and [Access]({% link crafting/access.md %}) for per-recipe grants.
 

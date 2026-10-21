@@ -91,9 +91,10 @@ The reasoning, the alternatives and the review history belong in the issue and t
 
 ## Screenshots
 
-Docs screenshots are curated into `docs/img/screenshots/` with durable names.
-A view the View Lab case registry covers can be regenerated with `node scripts/view-lab-screenshots.mjs apps <case-id>` (seconds, no container), and its PNGs are publishable; other views come from the smoke harness, which writes into `test-results/`.
-Curation is manual either way.
+Docs screenshots are generated from View Lab cases and committed under `docs/img/screenshots/lab/`.
+A page names a case with `{% raw %}{% include screenshot.html case="<case-id>" caption="..." %}{% endraw %}`, and the case needs an entry with alt text in `docs/_data/screenshots.json`.
+Run `npm run docs:screenshots` to render the frames (see "Documentation screenshot source" in `scripts/README.md`), which needs the harvested chrome and the `cwebp` and `dwebp` tools.
+A case the guard test rejects reaches the right window but not the state its name implies, so pick another.
 Only reference a frame that exists.
 Never commit a frame that no page links to, because the guard test rejects it.
 Regenerate affected frames when on-screen text changes.

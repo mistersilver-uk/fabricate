@@ -26,6 +26,8 @@ Each list has its own search box, and a chip on each recipe row summarises how m
 Past six characters or six players, each list also shows page controls so you can page through the rest.
 Grants apply as soon as you make them, so there is no separate save step.
 
+{% include screenshot.html case="manager-recipe-edit-access-inspector" caption="A recipe's grants, character by character and player by player." %}
+
 **Simple and explicit.** Good for smaller recipe sets where you want direct control over who can see what.
 
 ## Locked Recipes

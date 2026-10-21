@@ -157,6 +157,8 @@ Choose **Open catalogue entry** on a selected row, or drop a new item onto the c
 The header band across the top carries **Back** and **Save entry**, with an **Unsaved changes** marker while a change is pending.
 Two tabs sit below it, **Catalogue entry** and **Validation**.
 
+{% include screenshot.html case="manager-component-edit-normal" caption="A component's catalogue entry." %}
+
 ### Identity
 
 For a component linked to a Foundry item, the name and description are shown as read-only text under a **Linked Foundry item** pill, and a note explains that they refresh from the linked item and that every system shows the same three.
@@ -273,6 +275,9 @@ On a narrow window the rail moves below the tab strip and its cards instead of s
 
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
+
+{% include screenshot.html case="manager-components-essence-chips" caption="A system's Component Rules, with each component's essences as chips." %}
+
 **Add from catalogue**, in the header, opens a picker listing every world catalogue component this system does not already hold.
 Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
 Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.
