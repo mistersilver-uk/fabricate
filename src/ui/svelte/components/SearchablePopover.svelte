@@ -464,6 +464,8 @@
       <button
         type="button"
         class="manager-travel-picker-inline-close"
+        data-picker-inline-close=""
+        data-keyboard-focus="true"
         aria-label={inlineCloseLabel || undefined}
         title={inlineCloseLabel || undefined}
         onclick={() => close()}
@@ -487,7 +489,13 @@
       class={triggerClass}>{@render triggerBody()}</Button
     >
   {:else}
-    <button bind:this={triggerElement} class={triggerClass} {...triggerAttributes}>
+    <button
+      bind:this={triggerElement}
+      class={triggerClass}
+      {...triggerAttributes}
+      type="button"
+      data-keyboard-focus="true"
+    >
       {@render triggerBody()}
     </button>
   {/if}
