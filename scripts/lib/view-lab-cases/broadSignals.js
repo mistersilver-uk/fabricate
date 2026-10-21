@@ -679,6 +679,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The track (issue 1516): its 30px inline rung is drawn by the requirement row's amount toggle and the compact pager's page-size control.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
+    'player-journal-stacked',
   ]),
   // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
   'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([

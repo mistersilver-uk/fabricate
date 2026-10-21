@@ -437,10 +437,11 @@
     margin-right: var(--fab-space-chip);
   }
 
-  /* The compact pager is the LAST element of the last region of a scrolling rail, measured at a
-     0.64px overflow of its own container: MARGIN, NOT PADDING, because padding grows the element's
-     own box and a margin is outside it. The region class carries the scoping hash, so the
-     descendant is `:global`, which keeps the reach to this rail. */
+  /* The compact pager is the last element of the last region of a scrolling rail that has no
+     slack to spare: margin, not padding, because padding grows the element's own box and a margin
+     sits outside it. Re-measure the rail's overflow if the compact bar's height changes. The
+     region class carries the scoping hash, so the descendant is `:global`, which keeps the reach
+     to this rail. */
   .manager-tool-required-for > :global(.fabricate-pagination) {
     flex: 0 0 auto;
     margin-bottom: var(--fab-space-1);

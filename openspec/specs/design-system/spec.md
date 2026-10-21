@@ -498,7 +498,7 @@ The STRIP half is declared on the element that can TAKE focus, which is not alwa
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
 A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
-`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for a control the primitive does not own.
+`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids.
 No rule rooted at the family reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
 
 The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
@@ -2489,7 +2489,8 @@ The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a 
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
-The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the page-size control's exists only when the sorted union of the offered sizes and the current size holds two or more values, a different axis from the row count that decides whether the band renders at all.
+The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the page-size control's exists only when the list holds more rows than the SMALLEST offered size.
+Separately, the page-size control renders only when the sorted union of the offered sizes and the current size holds two or more values, an option-count gate on a different axis from the row count that decides whether the band renders at all.
 A surface that says nothing renders the band whenever EITHER control has a reachable second state, which reduces to the smallest-offered-size threshold, because below it every offered size draws the same list and the nav can only ever say `Page 1 of 1`.
 A surface MAY opt in to the STRICTER rule that the band renders only past one page, and MUST restore it the moment a second page exists.
 That opt-in is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
