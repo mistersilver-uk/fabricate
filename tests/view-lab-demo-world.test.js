@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { RecipeManager } from '../src/systems/RecipeManager.js';
+import { awardedResults } from '../src/utils/choiceGroupShape.js';
 
 import {
   buildDemoContent,
@@ -25,7 +26,7 @@ function componentRefs(recipe) {
   const options = recipe.ingredientSets
     .flatMap((set) => set.ingredientGroups)
     .flatMap((group) => group.options);
-  const results = recipe.resultGroups.flatMap((group) => group.results);
+  const results = recipe.resultGroups.flatMap((group) => group.results).flatMap(awardedResults);
   return [...options, ...results].map((entry) => entry.componentId).filter(Boolean);
 }
 
@@ -64,6 +65,24 @@ test('every routed result set claims a tier the forge check defines', () => {
   );
   assert.ok(claimed.length >= 3, 'the longsword routes its three blades by tier');
   for (const id of claimed) assert.ok(tiers.has(id), `a result set claims unknown tier ${id}`);
+});
+
+test('the longsword offers the player a grip and a Masterwork flourish to choose', () => {
+  const longsword = content.recipes.find((recipe) => recipe.id === 'ed-r-longsword');
+  const grip = longsword.ingredientSets[0].ingredientGroups.find(
+    (group) => group.id === 'ed-set-blade-g2'
+  );
+  assert.deepEqual(
+    grip.options.map((option) => option.componentId),
+    ['ed-oiled-grip', 'ed-wyrmhide-wrap']
+  );
+  const masterwork = longsword.resultGroups.find((group) => group.id === 'ed-grp-masterwork');
+  const flourish = masterwork.results.find((result) => result.id === 'ed-mw-flourish');
+  assert.equal(flourish.chooser ?? 'playerChooses', 'playerChooses');
+  assert.equal(flourish.alternatives.length, 2);
+  // The crafter needs the second source's pack for either grip, so the journey adds it on screen.
+  const held = DEMO_ACTORS.inventories['demo-actor-hilde'];
+  assert.ok(grip.options.every((option) => !held[option.componentId]));
 });
 
 test('the actors hold only things the world defines, and salvage resolves too', () => {
@@ -105,7 +124,7 @@ test('the demo world loads through the real system and recipe managers', async (
     assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.FORGE)?.resolutionMode, 'routedByCheck');
     const longsword = recipes.getRecipe('ed-r-longsword');
     const routed = (longsword?.resultGroups ?? []).map((group) => [...group.checkOutcomeIds]);
-    assert.deepEqual(routed, [['ed-masterwork'], ['ed-standard'], ['ed-flawed']]);
+    assert.deepEqual(routed, [['ed-masterwork'], ['ed-standard'], ['ed-flawed'], ['ed-ruined']]);
     assert.equal(systems.getSystem(DEMO_SYSTEM_IDS.STILL)?.resolutionMode, 'alchemy');
     const brews = recipes.getRecipes({ craftingSystemId: DEMO_SYSTEM_IDS.STILL });
     assert.deepEqual(

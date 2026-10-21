@@ -22,12 +22,20 @@ const FORGE_COMPONENTS = [
   component('ed-iron-ore', 'Iron Ore', 'commodities/stone/ore-chunk-iron-black.webp', {
     categories: ['Raw Materials'],
     tags: ['ore'],
+    essences: { earth: 2 },
     description: 'Black-veined ore hauled up from the Emberdeep seams.',
   }),
   component('ed-charcoal', 'Forge Charcoal', 'commodities/stone/ore-chunk-black.webp', {
     categories: ['Raw Materials'],
     tags: ['fuel'],
+    essences: { fire: 1 },
     description: 'Hardwood burned slow under turf until it rings when dropped.',
+  }),
+  component('ed-cinder-slag', 'Cinder Slag', 'commodities/stone/stone-pile-grey.webp', {
+    categories: ['Raw Materials'],
+    tags: ['fuel'],
+    essences: { fire: 1, earth: 1 },
+    description: 'Clinker raked from the furnace floor, still holding heat and a little iron.',
   }),
   component('ed-iron-ingot', 'Iron Ingot', 'commodities/metal/ingot-worn-iron.webp', {
     categories: ['Refined'],
@@ -44,6 +52,22 @@ const FORGE_COMPONENTS = [
     tags: ['leather'],
     description: 'Hide wrapping worked with tallow, cut to a hilt’s length.',
   }),
+  component('ed-wyrmhide-wrap', 'Wyrmhide Wrap', 'commodities/leather/leather-studded-tan.webp', {
+    categories: ['Fittings'],
+    tags: ['leather'],
+    description: 'Scaled hide from a cave drake, rough enough that a sweating hand still holds.',
+  }),
+  component(
+    'ed-sword-belt',
+    'Tooled Sword Belt',
+    'equipment/waist/belt-armored-buckle-steel.webp',
+    {
+      categories: ['Fittings'],
+      tags: ['leather'],
+      description:
+        'A smith’s gift with a fine blade: steel-buckled and stamped with the forge mark.',
+    }
+  ),
   component('ed-leather-scraps', 'Leather Scraps', 'commodities/leather/leather-scrap-brown.webp', {
     categories: ['Fittings'],
     tags: ['leather'],
@@ -221,11 +245,11 @@ const ESSENCES = [
   },
 ];
 
-/** The forge's routed check: the roll's tier picks the blade, and a ruined heat yields nothing. */
+/** The forge's routed check: the roll's tier picks the blade, and a ruined heat yields scrap. */
 const FORGE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
-  failureResultPolicy: 'never',
+  failureResultPolicy: 'perRecord',
   routed: {
     type: 'relative',
     rollFormula: '1d20 + @abilities.str.mod',
@@ -247,8 +271,8 @@ const STILL_CHECK = Object.freeze({
   simple: { rollFormula: '1d20 + @abilities.int.mod', thresholds: { success: 10 } },
 });
 
-/** One named ingredient group. */
-const group = (id, name, option) => ({ id, name, options: [option] });
+/** One named ingredient group; more than one option is an "any one of" the player picks from. */
+const group = (id, name, ...options) => ({ id, name, options });
 const essence = (essenceId, amount) => ({ match: { type: 'essence', essenceId, amount } });
 const phial = { componentId: 'hm-empty-phial', quantity: 1 };
 
@@ -288,9 +312,18 @@ const FORGE_RECIPES = [
     DEMO_SYSTEM_IDS.FORGE,
     'commodities/metal/ingot-worn-iron.webp',
     {
-      description: 'Black ore and a hot bed of charcoal, coaxed down into one honest bar.',
+      description: 'Any ore and any fuel will do, so long as the earth and the heat are enough.',
       categories: ['Smelting'],
-      ingredientSets: [simpleSet('s1', { 'ed-iron-ore': 2, 'ed-charcoal': 1 })],
+      // By essence, so ore, charcoal or furnace slag can each stand in for the other's share.
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            group('s1-g1', 'Earth essence', essence('earth', 3)),
+            group('s1-g2', 'Fire essence', essence('fire', 2)),
+          ],
+        },
+      ],
       resultGroups: [
         { id: 'rg', name: 'Ingot', results: [{ componentId: 'ed-iron-ingot', quantity: 1 }] },
       ],
@@ -321,7 +354,12 @@ const FORGE_RECIPES = [
           name: 'Blade stock',
           ingredientGroups: [
             group('ed-set-blade-g1', 'Steel', { componentId: 'ed-steel-ingot', quantity: 2 }),
-            group('ed-set-blade-g2', 'Grip', { componentId: 'ed-oiled-grip', quantity: 1 }),
+            group(
+              'ed-set-blade-g2',
+              'Grip',
+              { componentId: 'ed-oiled-grip', quantity: 1 },
+              { componentId: 'ed-wyrmhide-wrap', quantity: 1 }
+            ),
           ],
         },
       ],
@@ -330,7 +368,17 @@ const FORGE_RECIPES = [
           id: 'ed-grp-masterwork',
           name: 'Masterwork blade',
           checkOutcomeIds: ['ed-masterwork'],
-          results: [{ componentId: 'ed-masterwork-longsword', quantity: 1 }],
+          results: [
+            { componentId: 'ed-masterwork-longsword', quantity: 1 },
+            // The player picks the smith's flourish once the roll lands.
+            {
+              id: 'ed-mw-flourish',
+              alternatives: [
+                { id: 'belt', componentId: 'ed-sword-belt', quantity: 1 },
+                { id: 'offcut', componentId: 'ed-steel-ingot', quantity: 1 },
+              ],
+            },
+          ],
         },
         {
           id: 'ed-grp-sound',
@@ -343,6 +391,12 @@ const FORGE_RECIPES = [
           name: 'Flawed blade',
           checkOutcomeIds: ['ed-flawed'],
           results: [{ componentId: 'ed-flawed-longsword', quantity: 1 }],
+        },
+        {
+          id: 'ed-grp-ruined',
+          name: 'Scrap',
+          checkOutcomeIds: ['ed-ruined'],
+          results: [{ componentId: 'ed-leather-scraps', quantity: 1 }],
         },
       ],
       toolIds: ['ed-tool-hammer', 'ed-tool-anvil'],
@@ -406,8 +460,8 @@ function buildSystems() {
       craftingCheck: FORGE_CHECK,
       // No salvage check: a blade broken down returns its stock outright.
       salvageResolutionMode: 'simple',
-      features: { essences: false, recipeCategories: true, itemTags: true, gathering: false },
-      essenceDefinitions: [],
+      features: { essences: true, recipeCategories: true, itemTags: true, gathering: false },
+      essenceDefinitions: ESSENCES.filter(({ id }) => id === 'fire' || id === 'earth'),
       categories: ['Smelting', 'Bladesmithing'],
       itemTags: tagsOf(FORGE_COMPONENTS),
       components: FORGE_COMPONENTS,
@@ -445,7 +499,7 @@ function buildSystems() {
   ];
 }
 
-/** The smith who crafts and brews, and the still-keeper whose pack holds the one missing grip. */
+/** The smith who crafts and brews, and the still-keeper whose pack holds the grips she lacks. */
 export const DEMO_ACTORS = Object.freeze({
   definitions: [
     {
@@ -463,6 +517,7 @@ export const DEMO_ACTORS = Object.freeze({
     'demo-actor-hilde': {
       'ed-iron-ore': 6,
       'ed-charcoal': 5,
+      'ed-cinder-slag': 3,
       'ed-iron-ingot': 2,
       'ed-steel-ingot': 4,
       'ed-longsword': 2,
@@ -478,6 +533,7 @@ export const DEMO_ACTORS = Object.freeze({
     },
     'demo-actor-maren': {
       'ed-oiled-grip': 2,
+      'ed-wyrmhide-wrap': 1,
     },
   },
 });
