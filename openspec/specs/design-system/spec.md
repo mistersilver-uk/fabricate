@@ -55,7 +55,7 @@ HistoricalRunDetail and StageCard are the initial independent result-row callers
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
 The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
 Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
-The page-size control is a `SegmentedControl` (SegmentedControl `inline` density in a compact pager), named by the visible "Per page" caption through `aria-labelledby`, and is not rendered when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values (issue 2546, M1, superseding issue 1504's `Select` for the pager).
+The page-size control is a `SegmentedControl` (SegmentedControl `inline` density in a compact pager), named by the visible "Per page" caption through `aria-labelledby` (the caption stays visible in a compact pager, where only the page-position label is visually hidden), and is not rendered when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values (issue 2546, M1, superseding issue 1504's `Select` for the pager).
 The default pager's fill is `--fab-bg-1` on every route and caller and its footer stays square; a compact pager is transparent.
 Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select (the search and filter controls) and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
@@ -2494,7 +2494,8 @@ Separately, the page-size control renders only when the sorted union of the offe
 A surface that says nothing renders the band whenever EITHER control has a reachable second state, which reduces to the smallest-offered-size threshold, because below it every offered size draws the same list and the nav can only ever say `Page 1 of 1`.
 A surface MAY opt in to the STRICTER rule that the band renders only past one page, and MUST restore it the moment a second page exists.
 That opt-in is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
-Taking it also suppresses the page-size control, so a surface that takes it accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+Taking it also suppresses the page-size control, so a surface that takes it accepts that a pointer GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+A pager stays mounted while focus is inside it and hides on blur, so a keyboard GM, whose arrow keys on the page-size control each commit a size, is not unmounted under the keyboard by choosing one that covers the whole list (issue 2546).
 A surface MAY instead opt OUT and render the band always, which is the choice for a surface whose footer is part of its frame rather than a control, and there the nav renders its disabled arrows rather than vanishing.
 The two opt-ins are mutually exclusive by meaning and rendering-always wins if both are named.
 
