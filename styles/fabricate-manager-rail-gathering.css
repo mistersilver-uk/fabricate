@@ -711,7 +711,7 @@
   background: var(--fab-warning-soft);
 }
 
-/* THE BUSY FACE (issue 2540): an action in flight keeps its tab stop, so it is `aria-disabled` and never `:disabled`, and every role hover above refuses it. A natively disabled carrier (`ArmedDangerButton`) keeps the disabled face. */
+/* THE BUSY FACE (issue 2540): an action in flight keeps its tab stop, so it is `aria-disabled` and never `:disabled`, and every role hover above refuses it. Every busy carrier draws it, `ArmedDangerButton` included; only native `disabled` draws the disabled face. */
 .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled) {
   cursor: progress;
   opacity: 0.7;
