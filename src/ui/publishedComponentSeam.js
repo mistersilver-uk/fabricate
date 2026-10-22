@@ -3,13 +3,14 @@
  * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`,
  * draws its own content in a content slot, is told of a contained fault through `onFault` (issue
  * 2451), is told of a press through a callback prop, sets an ARIA attribute on a control through
- * an `aria` prop (issue 2452), reads and sets a bound value through a `value` prop (issue 2453), and
- * hosts an entry's overlays through `overlayHost` (issue 2454).
+ * an `aria` prop (issue 2452), reads and sets a bound value through a `value` prop (issue 2453),
+ * hosts an entry's overlays through `overlayHost` (issue 2454), and loads a lazy entry (issue 2455).
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
- * `mount`, `unmount`, `flush` and the empty `overlay` component.
+ * `mount`, `unmount`, `flush`, the empty `overlay` component and each lazy entry's loader.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
+import { createEntryLoading, lazyBindingFault } from './publishedComponentLoading.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
 import { openOverlayChain, unmountReporting } from './publishedComponentOverlays.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
@@ -312,7 +313,7 @@ function createMountLifecycle({ runtime, report }) {
     queueFaultNotice(record, error, report, deferred);
   }
 
-  function start(entry, target, initial, { onFault, overlayHost }) {
+  function start(entry, target, initial, { component, onFault, overlayHost }) {
     const record = newRecord(entry, target, onFault);
     claims.set(target, record);
     live.add(record);
@@ -320,9 +321,8 @@ function createMountLifecycle({ runtime, report }) {
     requestSlots(entry, record, initial);
     takeCallbacks(entry, record.callbacks, initial);
     const values = seedValues(entry, takeValues(entry, initial));
-    const { components, host, mount, flush } = runtime();
+    const { host, mount, flush } = runtime();
     const onfault = (error) => fault(record, error);
-    const component = components[entry.path];
     const hosted = { entry, record, initial, values, onfault, report, flush };
     const props = { component, ...hostPropsFor(hosted) };
     try {
@@ -354,9 +354,9 @@ function createMountLifecycle({ runtime, report }) {
 }
 
 /**
- * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`
- * and `overlay` among it, at once, binding each entry's own `component`; otherwise the adapter
- * calls `register`, once.
+ * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`,
+ * `overlay`, `loaders` and `reportLoadFailure` among it, at once, binding each eager entry's own
+ * `component`; otherwise the adapter calls `register`, once.
  * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
@@ -366,6 +366,8 @@ export function createPublishedComponents({
   unmount,
   flush,
   overlay,
+  loaders = {},
+  reportLoadFailure,
   report = reportToConsole,
   isElement = isElementNode,
   hasAncestor = hasAncestorBySelector,
@@ -375,12 +377,14 @@ export function createPublishedComponents({
   const descriptions = new Map(table.map((entry) => [entry.name, describeEntry(entry)]));
   let runtime = null;
   const lifecycle = createMountLifecycle({ runtime: () => runtime, report });
+  const loading = createEntryLoading({ entries, runtime: () => runtime });
 
   function mountPublished(name, options) {
     if (!runtime) throw new Error(`${PREFIX}not registered`);
     if (!isReady()) throw refuse('mount before ready');
     const entry = entries.get(name);
     if (!entry) throw refuse(`"${String(name)}" is not published`);
+    if (!loading.isLoaded(entry)) throw refuse(`"${entry.name}" is not loaded`);
     const { target, props = {}, onFault, overlayHost } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
     const root = ROOTS[entry.root];
@@ -391,25 +395,25 @@ export function createPublishedComponents({
     lifecycle.claimTarget(target);
     const notify = typeof onFault === 'function' ? onFault : null;
     return lifecycle.start(entry, target, copyProps(entry, props), {
+      component: loading.componentOf(entry),
       onFault: notify,
       overlayHost,
     });
   }
 
-  // `async`, so the M3 refusal is a rejection and never a synchronous throw. Every entry is eager
-  // today, so there is no code to fetch; it needs neither a runtime nor `fabricate.ready`.
-  async function loadPublished(names) {
-    for (const name of Array.isArray(names) ? names : [names]) {
-      if (!entries.has(name)) throw refuse(`"${String(name)}" is not published`);
-    }
-  }
-
   function register(adapter) {
     if (runtime) throw new Error(`${PREFIX}already registered`);
-    for (const entry of table) assertKnownEntry(entry);
-    const { components, host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
+    const { components = {}, loaders: adapterLoaders = {} } = adapter;
+    for (const entry of table) {
+      assertKnownEntry(entry);
+      const fault = lazyBindingFault(entry, components, adapterLoaders);
+      if (fault) throw new Error(PREFIX + fault);
+    }
+    const { host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
     runtime = Object.freeze({
       components,
+      loaders: adapterLoaders,
+      reportLoadFailure: adapter.reportLoadFailure,
       host: adapterHost,
       mount: adapterMount,
       unmount: adapterUnmount,
@@ -423,12 +427,13 @@ export function createPublishedComponents({
     components: Object.freeze(table.map((entry) => entry.name)),
     describe: (name) => descriptions.get(name) ?? null,
     mount: mountPublished,
-    load: loadPublished,
+    load: loading.load,
   });
 
   if (mount) {
-    const components = Object.fromEntries(table.map((entry) => [entry.path, entry.component]));
-    register({ components, host, mount, unmount, flush, overlay });
+    const eager = table.filter((entry) => entry.lazy !== true);
+    const components = Object.fromEntries(eager.map((entry) => [entry.path, entry.component]));
+    register({ components, loaders, reportLoadFailure, host, mount, unmount, flush, overlay });
   }
 
   return Object.freeze({

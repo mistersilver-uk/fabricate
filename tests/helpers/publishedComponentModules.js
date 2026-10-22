@@ -15,6 +15,9 @@ export const CALLBACK_REPORT = 'Fabricate | Published component callback failed:
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
+  'src/ui/publishedComponentLoading.js',
+  'src/utils/deferredEntryNotice.js',
+  'src/utils/localizeWithFallback.js',
   'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentCallbacks.js',
   'src/ui/publishedComponentValues.js',

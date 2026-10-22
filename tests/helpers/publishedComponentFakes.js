@@ -209,10 +209,19 @@ export function seamWith({
   table = TABLE,
   isReady = () => true,
   hasAncestor,
+  loaders,
+  reportLoadFailure,
   ...runtimeOptions
 } = {}) {
   const fake = fakeRuntime(runtimeOptions);
-  const seam = createPublishedComponents({ table, isReady, hasAncestor, ...fake.runtime });
+  const seam = createPublishedComponents({
+    table,
+    isReady,
+    hasAncestor,
+    loaders,
+    reportLoadFailure,
+    ...fake.runtime,
+  });
   return { ...fake, seam, ui: seam.publicApi };
 }
 
@@ -236,3 +245,16 @@ export function recorder() {
 
 /** Past every queued microtask, however many each one queues in turn. */
 export const drained = () => new Promise((done) => setTimeout(done, 0));
+
+/** A loader whose Promise the test settles: `calls` counts each call of `load`. */
+export function deferredLoader() {
+  const loader = { calls: 0 };
+  const promise = new Promise((resolve, reject) => {
+    Object.assign(loader, { resolve, reject });
+  });
+  loader.load = () => {
+    loader.calls += 1;
+    return promise;
+  };
+  return loader;
+}
