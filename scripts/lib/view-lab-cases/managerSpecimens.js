@@ -289,6 +289,16 @@ const SELECT_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
 const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
 
+/** The stage bars fixture's ground, and one of its sections by key. */
+const STAGE_BARS_GROUND = '[data-lab-stage-bars-ground]';
+const STAGE_BARS_SECTION = (key) => `${STAGE_BARS_GROUND} > [data-lab-stage-bars="${key}"]`;
+
+/** Each group `tests/view-lab/fixtures/PublishedStageBars.svelte` mounts, by its section's key. */
+const STAGE_BARS_KEYS = Object.freeze(['forge', 'brew', 'copy']);
+
+/** Sized to the fixture's 360px ground and the height of its three groups. */
+const STAGE_BARS_WINDOW = Object.freeze({ width: 480, height: 320 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -768,6 +778,37 @@ export const CASES = Object.freeze([
     position: SELECT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-stage-bars-specimen',
+    label:
+      'Specimen, mounted through the published seam — three stage groups, each beneath the text that names it, reading top to bottom: Forging progress, four bars side by side captioned 1 Gather, 2 Smelt, 3 Forge and 4 Temper, the first two full in the success tone, Forge, the current stage, a little under half full in the accent, and Temper an empty track; Brewing progress, three bars with no captions, the first, the current stage, under a third full in the accent and the other two empty tracks; and Copying a scroll, one bar across the whole width captioned 1 Copy, about two thirds full in the accent. Each caption sits on one line, whole, in the muted ink. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-stage-bars' },
+    steps: [],
+    // The current stage of the numbered group, the labelled bar of the unnumbered one, and the
+    // lone bar named by its stage.
+    expectSelector: `${STAGE_BARS_GROUND}:has(${STAGE_BARS_SECTION('forge')} [data-stage-bars-stage="2"][data-stage-bars-state="accent"]):has(${STAGE_BARS_SECTION('brew')} [role="progressbar"][aria-label="Stage 3 of 3"]) > [data-lab-stage-bars="copy"] [role="progressbar"][aria-label="Copy"]`,
+    expectContained: [
+      ...STAGE_BARS_KEYS.map((key) => ({
+        container: STAGE_BARS_GROUND,
+        target: `${STAGE_BARS_SECTION(key)} [role="group"]`,
+      })),
+      { container: '.window-content', target: STAGE_BARS_GROUND },
+    ],
+    // Each group's bars side by side on one line, and every caption whole, so no name is cut
+    // off with an ellipsis.
+    expectLayout: {
+      containerSelector: STAGE_BARS_GROUND,
+      oneLineRows: `${STAGE_BARS_GROUND} .fab-stage-bars`,
+      unclipped: `${STAGE_BARS_GROUND} .fab-stage-bars-caption`,
+    },
+    position: STAGE_BARS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StageBars.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);
