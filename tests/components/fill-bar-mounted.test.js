@@ -192,4 +192,13 @@ describe('FillBar shares (mounted)', () => {
       [0, 0, 0, 0, 50, 50]
     );
   });
+
+  it('reads shares that all weigh nothing as a grow of 0 each, never NaN', async () => {
+    const root = await harness.mount({ value: 60, shares: [{ weight: 0 }, { weight: NaN }] });
+    assert.deepEqual(
+      sharesOf(root).map((share) => share.style.flexGrow),
+      ['0', '0'],
+      'a NaN grow would be dropped as an invalid declaration, leaving none'
+    );
+  });
 });

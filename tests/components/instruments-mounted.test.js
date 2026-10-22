@@ -179,6 +179,81 @@ describe('Meter segments (mounted)', () => {
       segments: [{ value: 7, tone: 'accent' }, { tone: 'neutral' }],
     });
     assertSingleFill(trailing, 'accent', 'width: 58%;');
+    meter.remount();
+
+    const leading = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 0, tone: 'danger' }, { tone: 'accent' }],
+    });
+    assertSingleFill(leading, 'accent', 'width: 58%;');
+    meter.remount();
+
+    const whole = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 12, tone: 'danger' }, { tone: 'accent' }],
+    });
+    assertSingleFill(whole, 'danger', 'width: 58%;');
+  });
+
+  it('reads an entry value that is not a finite number of zero or more as 0', async () => {
+    for (const bad of ['3', Infinity, -2, NaN]) {
+      const root = await meter.mount({
+        value: 7,
+        max: 12,
+        label: 'x',
+        segments: [
+          { value: bad, tone: 'danger' },
+          { value: 2, tone: 'accent' },
+          { tone: 'neutral' },
+        ],
+      });
+      assertRatio(root, [2, 5]);
+      assert.deepEqual(sharesOf(root).map(toneOf), ['is-accent', 'is-neutral'], String(bad));
+      meter.remount();
+    }
+  });
+
+  it('reads a null entry as one with no value, tone or colour', async () => {
+    for (const [segments, tones] of [
+      [
+        [{ value: 3, tone: 'accent' }, null],
+        ['is-accent', 'is-success'],
+      ],
+      [
+        [{ value: 3, tone: 'accent' }, null, { tone: 'neutral' }],
+        ['is-accent', 'is-neutral'],
+      ],
+    ]) {
+      const root = await meter.mount({ value: 7, max: 12, label: 'x', segments });
+      assertRatio(root, [3, 4]);
+      assert.deepEqual(sharesOf(root).map(toneOf), tones);
+      meter.remount();
+    }
+  });
+
+  it('draws a span of float residue as nothing and a small real one as a segment', async () => {
+    const residue = await meter.mount({
+      value: 0.1 + 0.2,
+      max: 1,
+      label: 'x',
+      segments: [{ value: 0.1 }, { value: 0.2 }, { tone: 'danger' }],
+    });
+    assertRatio(residue, [1, 2]);
+    assert.deepEqual(sharesOf(residue).map(toneOf), ['is-success', 'is-success']);
+    meter.remount();
+
+    const small = await meter.mount({
+      value: 1e-6,
+      max: 1,
+      label: 'x',
+      segments: [{ value: 5e-7, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertRatio(small, [1, 1]);
+    assert.deepEqual(sharesOf(small).map(toneOf), ['is-accent', 'is-neutral']);
   });
 
   it('draws one entry, or none, as the single fill it drew before segments', async () => {

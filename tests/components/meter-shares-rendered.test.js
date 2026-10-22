@@ -41,9 +41,11 @@ let tab;
 /** Draws each props object as its own 300px row, keyed by `id`, on one page. */
 async function render(rows) {
   const markup = [];
-  for (const { id, ...props } of rows) {
+  for (const { id, dir = 'ltr', ...props } of rows) {
     const root = await harness.mount({ label: id, ...props });
-    markup.push(`<div data-row="${id}" style="display:flex;width:300px">${root.innerHTML}</div>`);
+    markup.push(
+      `<div data-row="${id}" dir="${dir}" style="display:flex;width:300px">${root.innerHTML}</div>`
+    );
     harness.remount();
   }
   await tab.setContent(page(markup.join('\n')), { waitUntil: 'load' });
@@ -94,6 +96,7 @@ before(async () => {
   await harness.setup();
   await render([
     { id: 'pooled', value: 7, max: 12, segments: POOLED },
+    { id: 'pooled-rtl', dir: 'rtl', value: 7, max: 12, segments: POOLED },
     {
       id: 'half',
       value: 0.5,
@@ -124,6 +127,15 @@ describe('Meter segments, rendered (issue 2182)', () => {
         `${id}: the last segment ends at ${shares.at(-1).right}px, the fill at ${fill.right}px`
       );
     }
+  });
+
+  it('starts the first segment at the fill start under a right-to-left parent', () => {
+    const { fill, shares } = rows['pooled-rtl'];
+    assert.equal(shares.length, 2);
+    assert.ok(
+      Math.abs(shares[0].left - fill.left) <= 0.5,
+      `the first segment starts at ${shares[0].left}px, the fill at ${fill.left}px`
+    );
   });
 
   it('draws the fill 58% of the track, and the segments 3 to 4 within it', () => {
