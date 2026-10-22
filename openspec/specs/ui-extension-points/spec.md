@@ -660,12 +660,13 @@ Each group states the accepted values of every key that entry publishes.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
   - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+  - A fact takes no `props` member; it is dropped and never written (see the publishable subset).
   - `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 - **Tones.**
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
   Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
-- **Private and undocumented:** every per-item `props` spread, which Fabricate drops from the copy it renders and never writes; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Private and undocumented:** a fact's `props` member, which Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
   It is not a refusal.
@@ -1018,17 +1019,22 @@ A `reason` is a code, a colon and free text, and the code is one of `no-consumer
 A `pending` row names an open issue and is the first row to leave the list.
 - **The list only shrinks.**
 Against the merge base, a path in the list and not in the base list fails unless it did not pass the static rules at the base, whether or not it was then a candidate.
+The static rules are judged at the base with the `svelte:element` pins the head holds.
 Where the list is absent at the base there is no list comparison, which seeds it; where the base holds it and the head does not, the check fails.
 A row's reason is the exemption channel, because the list is JSON and carries no `ratchet-exempt` marker.
 - **A listed path is stale, and fails, when it is published, is not a candidate or fails a static rule.**
 A reason is non-empty after trimming and a path is listed once.
 The list commits human decisions only, so no total or baseline is committed and no assertion pins the number of rows.
 - **Limit.**
-A change that makes a listed component fail a static rule drops it from the list without a review of that drop.
+A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
 - **A per-item spread is stripped or the check fails.**
-A spread `{...x.y}` whose root `x` is an `{#each}` item, or a published `data` local, inside a published closure fails unless `STRIPPED_ITEM_MEMBERS` names `<Entry>.<key>.<member>`, with any members that hold the items between the key and the member dropped.
+Every spread attribute in a published closure fails unless it spreads the file's `$props()` rest, a script-level `const` or `$derived` local, or a member of published `data` that `STRIPPED_ITEM_MEMBERS` names.
+A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
+An `{#each}` item (destructured or not), an `{@const}` alias, a snippet parameter of the entry's own file and a child component's `$props()` key are traced to the data they hold.
+A whole item, a spread of any other expression, and an item of a collection the entry does not publish fail with a message that no row can name it.
 Today the one member is `InfoStrip.facts.props`.
 A row is stale when no published closure spreads it, in either direction.
+A spread inside a child component's snippet is not traced.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
