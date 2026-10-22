@@ -908,6 +908,16 @@ test('(a) a Callout change publishes its four frames, then the specimen that mou
   assertBroadSignalFrames(file, frames);
 });
 
+test('(a) an IconButton change publishes its two frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/IconButton.svelte';
+  const frames = [
+    'world-modifiers',
+    'manager-environment-edit-blind-weights',
+    'manager-published-icon-buttons-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [

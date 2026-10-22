@@ -15,3 +15,4 @@ manager-published-stage-bars-specimen
 manager-published-field-specimen
 manager-published-well-specimen
 manager-published-callout-specimen
+manager-published-icon-buttons-specimen

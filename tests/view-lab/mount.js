@@ -786,6 +786,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-well': () => import('./fixtures/PublishedWell.svelte'),
   // Issue 2601: six standing notes, one per tone, one holding a published button in its actions.
   'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
+  // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
+  'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
 });
 // view-lab-region:end
 

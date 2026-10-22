@@ -326,6 +326,26 @@ const CALLOUT_ACTIONS = `${CALLOUT('actions')} > .manager-callout-actions`;
 /** Sized to the fixture's 360px ground and the height of its six notes. */
 const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 560 });
 
+/** The icon button fixture's ground, one row and its published button by key, and the notes. */
+const ICON_BUTTONS = '[data-lab-icon-buttons]';
+const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
+const ICON_BUTTON = (key) => `${ICON_ROW(key)} button`;
+const ICON_NOTES = `${ICON_BUTTONS} > [data-lab-icon-notes]`;
+const ICON_BUTTON_KEYS = Object.freeze([
+  'neutral',
+  'primary',
+  'ghost',
+  'danger',
+  'ghost-danger',
+  'size-24',
+  'size-26',
+  'disabled',
+  'expand',
+]);
+
+/** Sized to the fixture's 360px ground and the height of its nine rows and the notes beneath. */
+const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -983,6 +1003,67 @@ export const CASES = Object.freeze([
     position: CALLOUT_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Callout.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-icon-buttons-specimen',
+    label:
+      'Specimen, mounted through the published seam — nine icon buttons in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each a glyph alone beside a caption the companion draws, after two steps: a click on the last, the Batch notes disclosure, whose callback passed aria-expanded true in its own update and showed the companion’s notes line Quench each ingot before the next pour beneath it, the pointer still resting on that button’s raised tile; and Tab from the danger button, which put keyboard focus on the ghost-danger Remove Ember salt, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face, on its danger fill and ink. Reading top to bottom: a neutral pen on its 34px bordered face; a primary check in the success ink and edge; a ghost ellipsis 28px tall with no edge or fill; a danger trash in the danger ink and edge; the focused ghost-danger xmark; an xmark at size 24 and one at size 26, each a square of that side; and a disabled arrow at 62% opacity. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the hover text each button writes and the tooltip’s opening and closing are the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each press.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-icon-buttons' },
+    steps: [{ selector: ICON_BUTTON('expand') }, { selector: ICON_BUTTON('danger'), press: 'Tab' }],
+    // The disclosure's expanded state and the notes it shows, which only the click produces, and
+    // the tooltip the keyboard focus opened through the facade on the ghost-danger button.
+    expectSelector: `${ICON_BUTTONS}:has(> [data-lab-icon-button="expand"] button[aria-expanded="true"]):has(> [data-lab-icon-notes]:not([hidden])) > [data-lab-icon-button="ghost-danger"] button[aria-describedby="tooltip"]:focus-visible`,
+    expectCenterHit: ICON_BUTTON('expand'),
+    expectContained: [
+      ...ICON_BUTTON_KEYS.map((key) => ({ container: ICON_BUTTONS, target: ICON_ROW(key) })),
+      { container: ICON_BUTTONS, target: ICON_NOTES },
+      { container: '.window-content', target: ICON_BUTTONS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each role's face and each rung's square at rest, the disabled face, the focused
+        // ghost-danger's ring and face, and the pressed disclosure under the pointer.
+        {
+          selector: ICON_BUTTON('neutral'),
+          styles:
+            'width: 34px; height: 34px; border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+        },
+        {
+          selector: ICON_BUTTON('primary'),
+          styles: 'color: var(--fab-success-text); border-top-color: var(--fab-success-border)',
+        },
+        {
+          selector: ICON_BUTTON('ghost'),
+          styles:
+            'height: 28px; border-top-color: rgba(0, 0, 0, 0); background-color: rgba(0, 0, 0, 0)',
+        },
+        {
+          selector: ICON_BUTTON('danger'),
+          styles: 'color: var(--fab-danger-text); border-top-color: var(--fab-danger-border)',
+        },
+        // `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${ICON_BUTTON('ghost-danger')}:focus-visible`,
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-danger-text); background-color: var(--fab-danger-soft)',
+        },
+        { selector: ICON_BUTTON('size-24'), styles: 'width: 24px; height: 24px' },
+        { selector: ICON_BUTTON('size-26'), styles: 'width: 26px; height: 26px' },
+        { selector: ICON_BUTTON('disabled'), styles: 'opacity: 0.62' },
+        // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
+        {
+          selector: ICON_BUTTON('expand'),
+          styles: 'background-color: var(--fab-surface-raised)',
+        },
+      ],
+    },
+    position: ICON_BUTTONS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `IconButton.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

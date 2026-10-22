@@ -291,10 +291,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
   ]),
-  // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches only its neutral state.
+  // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches
+  // only its neutral state, so the specimen that mounts it through the published seam (issue 2601)
+  // draws every role and rung.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
+    'manager-published-icon-buttons-specimen',
   ]),
   // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections: the
   // pane host, the gathering panel, and the three hosts that pad their own content (issue 2546).
