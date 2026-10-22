@@ -2597,12 +2597,13 @@ describe('the module sheet against the published Chip', () => {
 
 describe('the module sheet and every component style against the published InspectorCard', () => {
   // Issue 2315 retired seven caller rules that restated or wrapped the card and added its `flush`
-  // rule, so the census InspectorCard was published on, 23, is now 17.
-  it('names the card root in 17 selectors: its two family rules, two data-hook rules, and thirteen no published card can match', () => {
+  // rule, so the census InspectorCard was published on, 23, became 17; issue 2467 deleted the
+  // modifier card's two option-gap selectors, so it is 15.
+  it('names the card root in 15 selectors: its two family rules, two data-hook rules, and eleven no published card can match', () => {
     assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
     const selectors = shippedCensus(CARD, 'InspectorCard');
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
-    assert.equal(selectors.length, 17, 'the census at issue 2315');
+    assert.equal(selectors.length, 15, 'the census at issue 2467');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
       ['InspectorCard', 'Button', 'StatusToggle', 'Stepper', 'SearchField', 'Select'],

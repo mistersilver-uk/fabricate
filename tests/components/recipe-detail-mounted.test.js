@@ -400,7 +400,7 @@ describe('RecipeDetail mounted behavior', () => {
         group.querySelector(':scope > legend')?.textContent.trim(),
       ],
       [true, true, 'FABRICATE.App.Crafting.Detail.IngredientSetsTitle'],
-      'config cards, as the Journal draws routes, under a shown "Ingredient options" legend'
+      'the group writes the `is-config-cards` class string and shows its "Ingredient options" legend'
     );
 
     const cardA = section.querySelector('[data-set-id="set-a"]');

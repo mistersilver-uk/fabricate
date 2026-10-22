@@ -17,6 +17,7 @@ import { chromium } from 'playwright';
 
 import { specificityOf } from '../../scripts/lib/stylesheetSelectorCensus.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sheet = readStylesheet();
@@ -390,7 +391,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header.
     comparesBox: false,
     markup: (host) =>
-      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
+      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><span class="manager-resolution-option-head" data-probe="${host}-option-cards-head"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-wand-magic-sparkles"></i></span></span><span class="manager-resolution-option-text" data-probe="${host}-option-cards-text"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-layer-group"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Routed by ingredients</span></span><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"></span></label></div></fieldset>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE STATUS CARD EITHER (issue 1509 phase 4). This family
   // owns NO CONTROL: the switch inside it is `StatusToggle`'s, composed rather than written, and
@@ -487,8 +488,9 @@ const EXTRA_PROBES = Object.freeze([
   'option-cards-options',
   'option-cards-row',
   'option-cards-row-active',
+  'option-cards-head',
   'option-cards-icon',
-  'option-cards-body',
+  'option-cards-text',
   'option-cards-name',
   'option-cards-desc',
   'option-cards-radio',
@@ -536,8 +538,9 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'option-cards-options',
   'option-cards-row',
   'option-cards-row-active',
+  'option-cards-head',
   'option-cards-icon',
-  'option-cards-body',
+  'option-cards-text',
   'option-cards-name',
   'option-cards-desc',
   // AND THE STATUS CARD'S COPY COLUMN AND ITS TWO LINES (issue 1509 phase 4).
@@ -1009,10 +1012,12 @@ const OPTION_CARDS_OPTIONS_COMPARED = Object.freeze([
   'min-width',
 ]);
 
-/** The card ROW, resting and active, whose border and fill are what a selection reads as. */
+/** The card, resting and active, whose border and fill are what a selection reads as. */
 const OPTION_CARDS_ROW_COMPARED = Object.freeze([
   'display',
-  'align-items',
+  'align-content',
+  'position',
+  'isolation',
   'gap',
   'padding-top',
   'padding-left',
@@ -1024,36 +1029,25 @@ const OPTION_CARDS_ROW_COMPARED = Object.freeze([
   'cursor',
 ]);
 
-/** The 40x40 glyph plate, compared as the size and edge it DECLARES. */
+/** The chip's wrapper, which owns its flex sizing and nothing else; the chip is `Medallion`'s. */
 const OPTION_CARDS_ICON_COMPARED = Object.freeze([
-  'order',
   'display',
-  'align-items',
-  'justify-content',
   'width',
   'height',
   'flex-grow',
   'flex-shrink',
   'flex-basis',
-  'border-top-width',
-  'border-top-style',
-  'border-top-color',
-  'border-radius',
-  'background-color',
-  'color',
-  'font-size',
 ]);
 
-/** The copy column the tile leads, and the two lines inside it. */
-const OPTION_CARDS_BODY_COMPARED = Object.freeze([
-  'order',
-  'display',
-  'flex-direction',
-  'gap',
-  'flex-grow',
-  'min-width',
+/** The head that lines the chip, the text and the radio up, and the text column inside it. */
+const OPTION_CARDS_HEAD_COMPARED = Object.freeze(['display', 'align-items', 'gap', 'min-width']);
+const OPTION_CARDS_TEXT_COMPARED = Object.freeze(['display', 'gap', 'flex-grow', 'min-width']);
+const OPTION_CARDS_NAME_COMPARED = Object.freeze([
+  'font-size',
+  'font-weight',
+  'color',
+  'line-height',
 ]);
-const OPTION_CARDS_NAME_COMPARED = Object.freeze(['font-size', 'font-weight', 'color']);
 const OPTION_CARDS_DESC_COMPARED = Object.freeze([
   'font-size',
   'font-weight',
@@ -1352,8 +1346,9 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'option-cards-options': OPTION_CARDS_OPTIONS_COMPARED,
   'option-cards-row': OPTION_CARDS_ROW_COMPARED,
   'option-cards-row-active': OPTION_CARDS_ROW_COMPARED,
+  'option-cards-head': OPTION_CARDS_HEAD_COMPARED,
   'option-cards-icon': OPTION_CARDS_ICON_COMPARED,
-  'option-cards-body': OPTION_CARDS_BODY_COMPARED,
+  'option-cards-text': OPTION_CARDS_TEXT_COMPARED,
   'option-cards-name': OPTION_CARDS_NAME_COMPARED,
   'option-cards-desc': OPTION_CARDS_DESC_COMPARED,
   'option-cards-radio': OPTION_CARDS_RADIO_COMPARED,
@@ -2417,7 +2412,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
 /** The elements a widened floor would have reached. */
 const NEGATIVE_CONTROLS =
   '<fieldset class="fabricate-field fabricate-option-cards" data-probe="neg-root">' +
-  '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
+  '<label class="manager-resolution-option"><span class="manager-resolution-option-head"><input type="radio" data-probe="neg-radio"></span></label>' +
   '<label><input type="checkbox" data-probe="neg-checkbox"></label>' +
   '<span class="fabricate-slider manager-chance-slider"><span class="manager-drop-rate-control"><input type="range" data-probe="neg-range"></span></span>' +
   '<span class="fab-stepper"><input type="number" class="fab-stepper-input" data-probe="neg-stepper"></span>' +
@@ -2435,6 +2430,14 @@ const NEGATIVE_CONTROLS =
   // measurement rather than with an argument. The button's own (0,2,0) rule states the 12.5px
   // and its (0,3,0) current-tab rule the 600 weight, and the floor must not disturb either.
   '<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="neg-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="neg-tab"><span>Overview</span></button></div>';
+
+test('both option-card fixtures carry only classes RadioCardGroup writes (issue 2467)', () => {
+  const card = CONTROLS.find((control) => control.id === 'option-cards').markup('bare');
+  const start = NEGATIVE_CONTROLS.lastIndexOf('<label', NEGATIVE_CONTROLS.indexOf('manager-resolution-option'));
+  const negative = NEGATIVE_CONTROLS.slice(start, NEGATIVE_CONTROLS.indexOf('</label>', start));
+  assert.ok(start !== -1, 'the negative control no longer draws an option card');
+  assert.deepEqual(classesNotWritten(`${card}${negative}`), [], 'a static copy drifted from the component');
+});
 
 /**
  * Those elements measured in the manager host under a given sheet text.
@@ -2616,7 +2619,7 @@ test('the option-card family declares no font floor of its own', async () => {
         .some((compound) => compound !== '' && !compound.includes('.'))
     );
     assert.ok(
-      bareElement.length >= 7,
+      bareElement.length >= 5,
       `only ${bareElement.length} rules name a bare element under this root, so the type check ` +
         'below examines almost nothing: ' +
         bareElement.map((rule) => rule.selectorText).join(', ')

@@ -642,6 +642,7 @@
       "groupName": "pl-tool-breakage",
       "selectedValue": "breakable",
       "columns": 3,
+      "layout": "stacked",
       "options": [
         {
           "value": "breakable",
@@ -662,6 +663,38 @@
           "disabled": true,
           "badgeFallback": "Coming soon",
           "descFallback": "Quality drops with each failed check."
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<OptionCards>",
+    "cap": "row — one or two tracks",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/RadioCardGroup.svelte",
+    "undrawn": {
+      "Breakage": "the group’s legend, which the shipped group requires; the drawing draws none",
+      "breakable": "an option’s value, not its words",
+      "immune": "an option’s value, not its words"
+    },
+    "props": {
+      "legend": "Breakage",
+      "groupName": "pl-tool-breakability",
+      "selectedValue": "breakable",
+      "columns": 2,
+      "layout": "row",
+      "options": [
+        {
+          "value": "breakable",
+          "fallback": "Breakable",
+          "icon": "fas fa-hammer",
+          "descFallback": "The active check may break this Tool."
+        },
+        {
+          "value": "immune",
+          "fallback": "Immune",
+          "icon": "fas fa-lock",
+          "descFallback": "This Tool ignores check-driven breakage."
         }
       ]
     }

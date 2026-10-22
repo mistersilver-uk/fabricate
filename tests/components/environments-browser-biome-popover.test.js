@@ -95,6 +95,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',

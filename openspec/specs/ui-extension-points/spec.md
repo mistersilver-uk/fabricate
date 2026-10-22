@@ -431,7 +431,8 @@ It refuses a `value` key whose `initial` is not a string, number, boolean or `nu
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
-- Adding a component, an optional prop, a descriptor member, a handle method, a prop `kind` or a widening of an entry's root is additive.
+- Adding a component, an optional prop, a descriptor member, a handle method, a prop `kind` or a widening of an entry's root is additive, and so is adding a value to a key's accepted values where the key's group states that a value outside its accepted set draws as unset, as `Medallion`'s `tone` and `ink` do: a Fabricate that predates the value draws the unset render and refuses nothing.
+- Where a group says nothing of a value outside a key's accepted set, or calls what is drawn for it private, a companion passes only the values that group lists.
 - A companion treats an unknown name, member, kind or root as absent, and never assumes the list is closed.
 `typeof ui.load === 'function'` also says that `mount` honours `onFault`.
 
@@ -619,7 +620,11 @@ Each group states the accepted values of every key that entry publishes.
   - `alt` is as for `Avatar`.
   - `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
   - `variant` is `''` or `glyph-chip`.
-  - `tone` and `ink` are each `''`, `success` or `danger`; both outrank `tint`, and `ink` outranks `tone` on the glyph.
+  - `tone` is `''`, `success`, `danger` or `accent`, and it outranks `tint`.
+  - `ink` is `''`, `success`, `danger` or `neutral`, it outranks `tint`, and it outranks `tone` on the glyph.
+  - A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
+  - A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
+  - A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
   - The glyph is hidden from assistive technology, so a tile without art carries no name: the companion always draws the name as text beside it, and passes `alt: ''` when it sets `art`.
 - **`FillBar`.**
   - `value` is 0–100, clamped.
@@ -1238,6 +1243,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion passes a prop the component declares but the manifest does not list: `src` to `Medallion`, or `class` to `FillBar`
 - **THEN** `mount` throws M8 (`"src" is not a prop of Medallion`) for a component without a rest spread, or M13 (`"class" is not a data attribute`) for one with it
 - **AND** nothing is rendered
+
+#### Scenario: A value added to a published key
+
+- **WHEN** a companion mounts `Medallion` with `tone: 'accent'`
+- **THEN** a Fabricate whose `tone` accepts only `''`, `success` and `danger` draws the tile byte-identical to one with `tone` unset, and `mount` throws nothing
+- **AND** a Fabricate whose `tone` accepts `accent` draws the accent ground and glyph, and the entry's `version` is `1` on both
 
 #### Scenario: A bare ancestor
 

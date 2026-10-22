@@ -18,6 +18,7 @@ const harness = createMountedComponentHarness({
   rawModules: CHECKS_TREE_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Stepper.svelte',
