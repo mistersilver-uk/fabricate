@@ -72,17 +72,18 @@ function measureBusyTransition(busyAttributes) {
 }
 
 /** Load the product markup into a fresh page of `browser` and run `measure` against it. */
-async function measureIn(browser, markup, measure, ...args) {
+async function measureIn(browser, markup, measure, arg = null) {
   const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
   await page.setContent(
     `<!doctype html><html><head><meta charset="utf-8"></head><body>${markup}</body></html>`,
     { waitUntil: 'load' }
   );
-  return page.evaluate(measure, ...args);
+  return page.evaluate(measure, arg);
 }
 
 let measured = null;
 let transition = null;
+let sameNode = false;
 
 // One mount and one browser launch for both describes: the armed markup, then the attributes
 // the same control renders once its caller sets `busy`.
@@ -106,8 +107,10 @@ before(async () => {
       rowAttr: 'data-recipe-bulk-impact-row',
     });
     markup = target.innerHTML;
+    const idleButton = target.querySelector(':scope .fab-bulk-delete-card .fabricate-button');
     await card.setProps({ busy: true });
     const busyButton = target.querySelector(':scope .fab-bulk-delete-card .fabricate-button');
+    sameNode = idleButton !== null && busyButton === idleButton;
     busyAttributes = Object.fromEntries(
       [...(busyButton?.attributes ?? [])].map(({ name, value }) => [name, value])
     );
@@ -166,6 +169,7 @@ describe('the busy face keeps focus across the real busy transition in a real br
     assert.ok(transition.rendered, `${CARD_PATH} rendered no .fab-bulk-delete-card .fabricate-button`);
     assert.ok(transition.focusedBefore, 'the control did not take focus, so nothing below is measured');
     assert.ok(transition.busyMatch, 'the busy render carried no aria-busy, so this is not the busy transition');
+    assert.ok(sameNode, 'setting busy replaced the control element, so a real browser drops its focus');
   });
 
   it('fires no blur, keeps the keyboard on the control, and is not :disabled', () => {

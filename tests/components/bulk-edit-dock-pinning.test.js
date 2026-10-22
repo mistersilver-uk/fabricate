@@ -81,11 +81,9 @@ const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-dock-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
-  // THE manager's labelled push-button (issue 1118). Apply renders through the primitive
-  // now, so it is a static import of the shell and belongs in its closure. This suite is
-  // NOT covered by `mounted-harness-primitive-allowlist.test.js`, which gates the
-  // hand-rolled harnesses only — `createMountedComponentHarness` carries its own closure
-  // validator, and that is what named this omission rather than hanging on it.
+  // THE manager's labelled push-button (issue 1118). Apply renders through the primitive, so
+  // it is a static import of the shell and belongs in its closure; the harness's own closure
+  // validator names an omission, and the allowlist guard reads this file's rosters too.
   compiledModules: [
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/Notice.svelte',

@@ -134,6 +134,9 @@ describe('ArmedDangerButton draws its busy face through Button', () => {
       });
       assert.equal(button().textContent.trim(), 'Deleting…');
       assert.equal(button().getAttribute('aria-label'), 'Deleting…');
+      assert.equal(button().getAttribute('aria-busy'), 'true');
+      assert.equal(button().getAttribute('aria-disabled'), 'true');
+      assert.equal(button().disabled, false);
       const described = document.querySelector(`#${button().getAttribute('aria-describedby')}`);
       assert.ok(described === note, "aria-describedby resolves to the caller's element");
     } finally {
