@@ -423,7 +423,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
-- Fabricate drops a stripped per-item member and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset names the members that are stripped.
+- Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), and `Select` too (issue 2454); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
@@ -660,13 +660,13 @@ Each group states the accepted values of every key that entry publishes.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
   - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
-  - A fact takes no `props` member; it is dropped and never written (see the publishable subset).
+  - A fact takes no `props` member: it is a stripped member, dropped and never written (see the publishable subset).
   - `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 - **Tones.**
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
   Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
-- **Private and undocumented:** a fact's `props` member, which Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Private and undocumented:** a fact's `props` member, a stripped member that Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
   It is not a refusal.
@@ -1001,21 +1001,22 @@ Each group states the accepted values of every key that entry publishes.
 
 Each term is defined here and used in this sense throughout.
 The _design-system manifest_ is `scripts/lib/designSystemPrimitives.json`.
-The _published manifest_ is the frozen entry list that `components` mirrors.
-A _candidate_ is a design-system row with scope `shared`, or a recorded non-member that has a library specimen.
+The _published manifest_ is `src/ui/publishedComponentManifest.js`, the frozen entry list that `components` mirrors.
+A _candidate_ is a `designSystemPrimitives` row with scope `shared`, or a `notAPrimitive` row whose `library` is not `null` (it has a library specimen).
 The _publishable subset_ is the candidates that pass the static rules below.
 The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
+A _stripped member_ is a per-item member of a published `data` key that `STRIPPED_ITEM_MEMBERS` in `src/ui/publishedComponentProps.js` names.
 
 - **A candidate is publishable when it passes every static rule.**
-  - Its import closure reads no Foundry global, so it does not reach the Foundry bridge.
+  - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
   - Every element admission rule 9 judges is marked as that rule asks, and every `svelte:element` in its closure is pinned to the tags it can draw.
   - Every required prop, a `$props()` key with no default, is carried by a shipped kind; a snippet a component calls with arguments is never a slot, and a prop that is drawn as a component is not data.
   - Its closure reaches `resolveOverlayHost` only through `anchoredPopover.js`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
-  - The ancestor a component needs sets its `root` and never excludes it.
+  - The ancestor a component needs is not a static rule: it sets the entry's `root` and never excludes the component.
 - **Every publishable candidate is published or listed.**
 A component that becomes publishable is published, or listed, in the same change.
 - **A row of the exclusion list is `{ path, reason }`.**
-A `reason` is a code, a colon and free text, and the code is one of `no-consumer` (no companion consumer asks for it), `domain-coupled` (its props take a Fabricate record shape), `part-of:<path>` (an internal part of the component at that path), `event-argument` (a callback it takes needs a DOM event or node), `item-spread` (an unstripped per-item attribute spread) or `pending:#<number>` (an open issue publishes it).
+A `reason` is, after trimming, `<code>: <text>` with non-empty text, and the code is one of `no-consumer` (no companion consumer asks for it), `domain-coupled` (its props take a Fabricate record shape), `part-of:<path>` (an internal part of the component at that path, which is a design-system row), `event-argument` (a callback it takes needs a DOM event or node), `item-spread` (an unstripped per-item attribute spread) or `pending:#<number>` (an open issue publishes it).
 A `pending` row names an open issue and is the first row to leave the list.
 - **The list only shrinks.**
 Against the merge base, a path in the list and not in the base list fails unless it did not pass the static rules at the base, whether or not it was then a candidate.
@@ -1023,17 +1024,20 @@ The static rules are judged at the base with the `svelte:element` pins the head 
 Where the list is absent at the base there is no list comparison, which seeds it; where the base holds it and the head does not, the check fails.
 A row's reason is the exemption channel, because the list is JSON and carries no `ratchet-exempt` marker.
 - **A listed path is stale, and fails, when it is published, is not a candidate or fails a static rule.**
-A reason is non-empty after trimming and a path is listed once.
+A row whose reason is not `<code>: <text>` with a code from that set, or whose `part-of` path is no design-system row, fails, and a path is listed once.
 The list commits human decisions only, so no total or baseline is committed and no assertion pins the number of rows.
 - **Limit.**
 A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
-- **A per-item spread is stripped or the check fails.**
-Every spread attribute in a published closure fails unless it spreads the file's `$props()` rest, a script-level `const` or `$derived` local, or a member of published `data` that `STRIPPED_ITEM_MEMBERS` names.
+- **A per-item spread is stripped or the check fails, and the check fails closed.**
+Every spread attribute in a published closure is traced to the published `data` it comes from.
+A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local, a published key that is not `data`, and a literal.
+A spread of a member of published `data` passes only when it is a stripped member.
+Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
 A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
 An `{#each}` item (destructured or not), an `{@const}` alias, a snippet parameter of the entry's own file and a child component's `$props()` key are traced to the data they hold.
-A whole item, a spread of any other expression, and an item of a collection the entry does not publish fail with a message that no row can name it.
-Today the one member is `InfoStrip.facts.props`.
-A row is stale when no published closure spreads it, in either direction.
+A failing spread of a whole item, of an expression no rule traces or of an unpublished collection is reported with a message that no row can name it.
+The one stripped member is `InfoStrip.facts.props`.
+A row fails when no published closure spreads that member, whether its key is not `data`, its entry is not published or the component stopped spreading it.
 A spread inside a child component's snippet is not traced.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
@@ -1052,7 +1056,7 @@ A dropped `aria-label` is release-noted.
 
 #### Scenario: The list only shrinks
 
-- **WHEN** a change removes a row, or adds one for a component that failed a static rule at the base
+- **WHEN** a change removes a row and publishes its component, or adds a row for a component that failed a static rule at the base
 - **THEN** the ratchet passes and reports a removal as `shrank`
 - **AND** a row added for a component that was publishable at the base fails
 
