@@ -788,6 +788,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
   // Issue 2601: icon buttons at each role and rung, and a disclosure that reports its press.
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
+  // Issue 2601: a three-tab strip whose selection the companion's own update draws.
+  'published-tabs': () => import('./fixtures/PublishedTabs.svelte'),
 });
 // view-lab-region:end
 
