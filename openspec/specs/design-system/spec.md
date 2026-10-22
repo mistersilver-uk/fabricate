@@ -707,7 +707,9 @@ A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside t
 Four background levels carry all depth: `--fab-bg-0` is the page ground, `--fab-bg-1` is rails, rows and wells, `--fab-bg-2` is cards and panels, and `--fab-bg-3` is icon chips.
 A well on a modal body, which is itself `--fab-bg-1`, takes the next level, `--fab-bg-2`, so its fill stays distinct from the body.
 Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-raised` on hover, and `--fab-surface-active` when pressed or selected.
-A radio card is the one exception to that ladder: it rests on `--fab-bg-2`, its hover moves its border alone to `--fab-border-strong` because muted ink on the raised ground computes under 4.5:1, and its chosen card layers `--fab-surface-soft` over that ground behind `--fab-accent-border` (issue 2467).
+A radio card departs from that ladder in three ways: it rests on `--fab-bg-2`, its hover moves its border alone to `--fab-border-strong`, and its chosen card layers `--fab-surface-soft` over the `--fab-bg-2` ground behind `--fab-accent-border` (issue 2467).
+Its hover keeps the rest ground because `--fab-text-muted` on the raised ground computes under 4.5:1 in four of the seven palettes, at 4.33:1 in `foundry-native`.
+Its description inks `--fab-text-muted` and clears 4.5:1 at rest and chosen in every palette, at 4.99:1 on `--fab-bg-2` and 4.60:1 on `--fab-surface-soft` over `--fab-bg-2` in `foundry-native`, its weakest.
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
 The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip that carries no tint of its own, and the tag row's `+ Tag`, ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1; a tinted chip keeps its tint's ink.
@@ -758,7 +760,8 @@ Whether a surface floats or sits is a judgement no pattern can read from a decla
 The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those two tokens.
 A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
-The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+The checked radio's dot of a tool bonus row, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+A radio card's checked radio draws a 4px accent border ring and no shadow.
 No rule in that scope draws depth through another channel: no `drop-shadow()`, no `text-shadow` other than `none`, and no `--fab-shadow-*` declaration outside the theme blocks.
 `tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds all of them to that set absolutely, the player apps included.
 
