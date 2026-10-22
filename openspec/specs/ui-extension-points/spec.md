@@ -441,6 +441,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
+- `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
@@ -661,8 +662,14 @@ Each group states the accepted values of every key that entry publishes.
     A value that must be announced is a `Meter`.
 - **`Meter`.**
   - `value` is read against `max`, which defaults to 100; a `max` of zero or less reads full.
-  - `segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s; an empty array draws `success`.
-    A second or later entry is reserved and is not drawn.
+  - `segments` is an array of `{ value?, tone?, color? }`, drawn in order as segments of the one fill; `tone` and `color` are each as `FillBar`'s, and an empty array draws `success`.
+    Each entry but the last spans its `value`, a finite number of zero or more on the scale of `max` (any other reads 0), and stops where the fill ends; the last spans the rest of the fill, and its `value` is not read.
+    An entry that spans nothing is not drawn, so the segments drawn always make up the fill exactly.
+    A list that draws one segment or none draws one fill as before: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+    The segments abut with no gap and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
+    The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so the companion always states each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
+    Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1: before them a second or later entry was reserved and an entry's `value` was unnamed and so private, and a one-entry list draws as it did.
+    `describe` cannot tell a companion whether the running Fabricate draws segments: one that predates them draws the whole fill in the first entry's paint and refuses nothing, so the text beside the meter carries the segments on either.
   - `valueText` is the reading, announced in place of the bare number.
   - The companion passes `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
   - `label` is required and is the meter's name, drawn visually hidden.
@@ -1223,6 +1230,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion calls `mount(name, { target, props })` with a published name and valid props after Fabricate is ready
 - **THEN** Fabricate renders it into `target` on its own runtime and returns a frozen `{ update, destroy, slot, value }`
 - **AND** `update` replaces the props without remounting, and `destroy` empties `target`
+
+#### Scenario: A published meter in segments
+
+- **WHEN** a companion mounts `Meter` with `label: 'Pooled days'`, `value: 7`, `max: 12`, `valueText: '7 of 12 days: yours 3, others 4'` and `segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }]`
+- **THEN** the fill spans 58% of the track as an accent segment of 3 and a neutral segment of 4, with no gap between them
+- **AND** `aria-valuenow` is `7`, `aria-valuetext` is the companion's text, and the segments add nothing to what is announced
 
 #### Scenario: Text content
 
