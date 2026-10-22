@@ -2066,6 +2066,7 @@ Root names the Fabricate ancestor the component's `target` needs, and `any` need
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
 On `Button`, `StatusToggle` and `IconButton` the rest keys land on the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
+`IconButton`'s button carries Foundry's tooltip, so it refuses `data-locked` as well.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
 A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
@@ -3030,14 +3031,17 @@ Never pass `true` while the button holds focus, as [Ownership and theme](#owners
 `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
 `aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
 It is for a button whose press shows and hides a region you draw, as the [`Button`](#button) section states; the name is the same in both states, and you omit the prop on a button that does no such thing.
+Its glyph may follow the state: pass the other `icon` in the same `update`, as `fas fa-chevron-up` while the region is shown.
 The tooltip is `ariaLabel`, plain text that is never read as HTML.
 Fabricate writes it as `data-tooltip-text` on the button in every mount, and Foundry's own hover listener shows it after a delay while the pointer rests on the button.
 Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, read when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `ariaLabel` or passes `disabled: true`; it closes only its own tooltip, and Escape still reaches a `keydown` listener of yours above `target`.
-While that tooltip is open Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader may read the name a second time as its description.
+While either tooltip is open, the one hover shows or the one keyboard focus opens, Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader reads the name a second time as its description.
+You cannot suppress that second reading at version 1, so keep `ariaLabel` a short verb phrase.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on IconButton`.
 That includes `data-tooltip-text`, so the tooltip says only what `ariaLabel` says.
+`data-locked` is refused the same way, because Foundry pins a copy of a tooltip it opens on a button carrying it, and the closes this section states never reach that copy.
 It needs a Fabricate window ancestor, because its face and ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the button is refused there with `IconButton needs a Fabricate window ancestor`.
 Give `target` `display: flex` and align your own content to the button by centring.
@@ -3147,6 +3151,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
   Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet reads off its buttons, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
+  Where it also says that control carries Foundry's tooltip, `data-locked` throws the same.
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
   A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
 - `onFault` is optional, and is described with faults below.

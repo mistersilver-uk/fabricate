@@ -33,8 +33,8 @@
  * Limit: the DOM-read census sees only the read forms `attributeReads` names, and the aria-key
  * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
- * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice` and
- * `Callout`, and `Callout`'s `items[].icon`), or an unprefixed state class.
+ * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice`,
+ * `Callout` and `IconButton`, and `Callout`'s `items[].icon`), or an unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
@@ -61,7 +61,11 @@ import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
-import { RESERVED_ON_A_CONTROL, STRIPPED_ITEM_MEMBERS } from '../src/ui/publishedComponentProps.js';
+import {
+  RESERVED_ON_A_CONTROL,
+  RESERVED_ON_A_TOOLTIP,
+  STRIPPED_ITEM_MEMBERS,
+} from '../src/ui/publishedComponentProps.js';
 import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
 import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
@@ -679,6 +683,12 @@ const MIXED_REST = 'rest lands on a control and on an element that is none';
 const UNSTATED_REST = "rest lands on a control and restOn is not 'control'";
 const OVERSTATED_REST = 'restOn is stated and rest lands on no control';
 const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
+const UNSTATED_TOOLTIP =
+  'rest lands on a control that carries a Foundry tooltip and tooltip is not true';
+const OVERSTATED_TOOLTIP =
+  'tooltip is stated and no control rest lands on carries a Foundry tooltip';
+/** The attributes Foundry's hover listener reads a tooltip from. */
+const FOUNDRY_TOOLTIP = /^data-tooltip(?:-text|-html)?$/;
 
 /**
  * The entries whose rest lands on more than one element, by path, each drawn while every prop of
@@ -747,7 +757,8 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
  * child component its pin does not name undrawn, fails closed.
  * An entry `landings` pins is judged by its drawn landing alone, and every entry by the twin rule.
  * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
- * the entry's `aria` keys among it.
+ * the entry's `aria` keys among it, and `tooltip` is stated exactly when that control writes an
+ * attribute Foundry's hover listener reads a tooltip from.
  */
 function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
@@ -765,11 +776,14 @@ function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS)
   if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
   const lands = controls.length > 0;
   const stated = entry.restOn === 'control';
+  const tipped = controls.some(({ written }) => written.some((name) => FOUNDRY_TOOLTIP.test(name)));
   return [
     ...shape,
     ...(restReads(ast) > every.length || handed.length > 0 ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
+    ...(tipped && entry.tooltip !== true ? [UNSTATED_TOOLTIP] : []),
+    ...(!tipped && entry.tooltip !== undefined ? [OVERSTATED_TOOLTIP] : []),
     ...controls.flatMap((control) =>
       controlRestFaults(control, RESERVED_ON_A_CONTROL, ariaKeysOf(entry))
     ),
@@ -797,6 +811,7 @@ describe('the manifest', () => {
       '/^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/',
       'reserving another name narrows every restOn entry and bumps its version'
     );
+    assert.equal(String(RESERVED_ON_A_TOOLTIP), '/^data-locked$/', 'and every tooltip entry');
   });
 
   it('holds a primitive initial and no colliding change key on every value key, the probe’s among them', () => {
@@ -1053,12 +1068,16 @@ describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      const optional = new Set(['restOn', 'overlays', 'lazy']);
+      const optional = new Set(['restOn', 'tooltip', 'overlays', 'lazy']);
       const keys = Object.keys(entry).filter((key) => !optional.has(key));
       assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
       assert.ok(
         !Object.hasOwn(entry, 'restOn') || entry.restOn === 'control',
         "restOn is 'control' or absent"
+      );
+      assert.ok(
+        !Object.hasOwn(entry, 'tooltip') || (entry.tooltip === true && entry.restOn === 'control'),
+        "tooltip is true on an entry whose restOn is 'control', or absent"
       );
       assert.ok(
         !Object.hasOwn(entry, 'overlays') || entry.overlays === true,
@@ -1074,7 +1093,7 @@ describe('each entry matches its component declaration', () => {
       assert.deepEqual(declarationFaults(entry, declaration.ast), []);
     });
 
-    it(`${entry.name} states restOn exactly when its rest keys land on a control it draws`, () => {
+    it(`${entry.name} states restOn exactly when its rest keys land on a control it draws, and tooltip when that control carries Foundry’s`, () => {
       assert.deepEqual(restOnFaults(entry, componentAstOf(entry.path)), []);
     });
 
@@ -2060,6 +2079,25 @@ describe('each entry matches its component declaration', () => {
       assert.deepEqual(restFaultsOf(template, restOn), faults);
     });
   }
+
+  it('names a control-landing rest beside a Foundry tooltip as a fault unless tooltip is stated, and tooltip stated beside none', () => {
+    const faultsOf = (attributes, stated = {}) => {
+      const entry = { path: 'src/E.svelte', rest: true, restOn: 'control', ...stated };
+      return restOnFaults(entry, templateOf(entry.path, REST + pressed(attributes)).ast);
+    };
+    const TIPPED = { tooltip: true };
+    for (const name of ['data-tooltip', 'data-tooltip-text', 'data-tooltip-html']) {
+      const attributes = ' {...rest} ' + name + '="Why"';
+      assert.deepEqual(faultsOf(attributes), [UNSTATED_TOOLTIP], name);
+      assert.deepEqual(faultsOf(attributes, TIPPED), [], name);
+    }
+    assert.deepEqual(faultsOf(' {...rest}', TIPPED), [OVERSTATED_TOOLTIP]);
+    assert.deepEqual(
+      faultsOf(' {...rest} data-tooltip-direction="UP"'),
+      [],
+      'a name Foundry reads no tooltip text from'
+    );
+  });
 
   it('fails closed on rest that reaches a control through a $derived copy, and admits a data attribute written after the spread', () => {
     const copied =

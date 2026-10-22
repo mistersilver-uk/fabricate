@@ -179,11 +179,13 @@ describe('the default draws the button host alone', () => {
     handle.destroy();
   });
 
-  it('lands a rest data attribute on the button itself, beside its own mark', async () => {
-    const { handle, button } = mountToggle({ 'data-acme-id': 'group', 'data-acme-open': true });
+  it('lands a rest data attribute on the button itself, data-locked among them, beside its own mark', async () => {
+    const rest = { 'data-acme-id': 'group', 'data-acme-open': true, 'data-locked': '' };
+    const { handle, button } = mountToggle(rest);
     await settle();
     assert.equal(button().getAttribute('data-acme-id'), 'group');
     assert.ok(button().hasAttribute('data-acme-open'));
+    assert.equal(button().getAttribute('data-locked'), '', 'the button carries no tooltip to pin');
     assert.equal(button().getAttribute('data-keyboard-focus'), 'true', 'its own mark stays');
     handle.destroy();
   });

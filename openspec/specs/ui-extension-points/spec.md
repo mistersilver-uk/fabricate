@@ -411,12 +411,13 @@ It exists once Fabricate's own `init` listener has run, so a companion reads it 
 
 ### The manifest and versioning
 
-- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn?, overlays?, lazy? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
+- **The published set is a frozen data manifest**, each entry `{ name, path, version, props: { <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required?, requiredWhen?, element?, args?, initial? } }, rest, root, restOn?, tooltip?, overlays?, lazy? }`, and Fabricate's runtime adapter binds each `path` to its component, or a lazy entry's to a loader that fetches it.
 `requiredWhen` names another `data` key of the same entry; the key is required while that key is truthy.
 Giving an existing key `requiredWhen` is a narrowing.
 `restOn` is `'control'` where the component's rest keys land on a control it draws, and is otherwise absent.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
+`tooltip` is `true` on an entry whose `restOn` is `'control'` where that control carries Foundry's tooltip, and is otherwise absent; it reserves `data-locked` beside the names `restOn` reserves, and `describe` does not state it.
 `overlays` is `true` where the component opens an overlay, and is otherwise absent; `describe` answers it on every entry as a boolean.
 `lazy` is `true` where the entry's code is fetched by `load` rather than with Fabricate's entry script, and is otherwise absent; `describe` does not state it.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
@@ -1155,12 +1156,15 @@ Each group states the accepted values of every key that entry publishes.
   - `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
   - `aria-expanded` is `true` or `false`, and is an `aria` key: Fabricate writes it on the button.
     It is for a button whose press shows and hides a region the companion draws, as the `Button` group states; the name is the same in both states, and the companion omits the key on a button that does no such thing.
+    Its glyph may follow the state: the companion passes the other `icon` in the same `update`, as `fas fa-chevron-up` while the region is shown.
   - The tooltip is `ariaLabel`, plain text that is never read as HTML.
     Fabricate writes it as `data-tooltip-text` on the button in every mount, and Foundry's own hover listener shows it after a delay while the pointer rests on the button.
     Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, read when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `ariaLabel` or passes `disabled: true`; it closes only its own tooltip, and Escape still reaches a companion's `keydown` listener above `target`.
-    While that tooltip is open Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader may read the name a second time as its description.
+    While either tooltip is open, the one hover shows or the one keyboard focus opens, Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader reads the name a second time as its description.
+    A companion cannot suppress that second reading at version 1, so it keeps `ariaLabel` a short verb phrase.
   - Rest `data-*` attributes land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused (M13).
     That includes `data-tooltip-text`, so the tooltip says only what `ariaLabel` says.
+    `data-locked` is refused too (M13), because Foundry pins a copy of a tooltip it opens on a button carrying it, and the closes this group states never reach that copy.
   - It needs a Fabricate window ancestor, because its face and ring come from Fabricate's module sheet, and it is drawn the same in the Manager and the player window.
     A companion's own window or dialog carries no Fabricate root, so the button is refused there (M16).
     The companion gives `target` `display: flex` and aligns its own content to the button by centring.
@@ -1262,7 +1266,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M10 | A function anywhere but as the whole value of a `callback` key | `"<key>" must not hold a function` |
 | M11 | A value at any depth that is not a primitive, plain object or array | `"<key>" must be data` |
 | M12 | A cycle | `"<key>" holds a cycle` |
-| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction`; or an `aria` key not holding a string, number or boolean (a function is M10) | `"<key>" is not a data attribute`, `"<key>" is reserved on <name>`, or `"<key>" must be a string, number or boolean` |
+| M13 | A rest key not matching `/^data-[a-z0-9-]+$/`, or not holding a string, number or boolean; or, on an entry whose group says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, a name that starts `data-tooltip-`, or a name Fabricate's own stylesheet reads off its buttons, `data-validation-focused` or `data-essence-sort-direction`; or, on an entry whose group says its control carries Foundry's tooltip, `data-locked`; or an `aria` key not holding a string, number or boolean (a function is M10) | `"<key>" is not a data attribute`, `"<key>" is reserved on <name>`, or `"<key>" must be a string, number or boolean` |
 | M14 | A `text` key holding a value that is not a string (a function is M10) | `"<key>" must be a string` |
 | M15 | A `slot` key holding a value that is not a boolean (a function is M10) | `"<key>" is a slot and takes true or false` |
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |

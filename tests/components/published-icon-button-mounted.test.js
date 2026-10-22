@@ -340,6 +340,21 @@ describe('what the published IconButton refuses', () => {
     });
   }
 
+  for (const value of ['', 'true', true]) {
+    it(`refuses data-locked holding ${JSON.stringify(value)} as reserved (M13), on mount and on update`, async () => {
+      assertRefused({ 'data-locked': value }, '"data-locked" is reserved on IconButton');
+      const { handle, button } = mountIconButton();
+      await settle();
+      assert.throws(
+        () => handle.update({ icon: GLYPH, ariaLabel: LABEL, onclick() {}, 'data-locked': value }),
+        { name: 'TypeError', message: `${REFUSAL}"data-locked" is reserved on IconButton` }
+      );
+      await settle();
+      assert.ok(!button().hasAttribute('data-locked'), 'so no tooltip it carries is pinned');
+      handle.destroy();
+    });
+  }
+
   for (const [claim, props, tail] of [
     ['an absent icon (M9)', { icon: undefined }, 'IconButton requires a non-empty "icon"'],
     ['an empty icon (M9)', { icon: '' }, 'IconButton requires a non-empty "icon"'],
@@ -376,16 +391,18 @@ describe('what the published IconButton refuses', () => {
 describe('the aria key on the published IconButton', () => {
   const base = (overrides = {}) => ({ icon: GLYPH, ariaLabel: LABEL, onclick() {}, ...overrides });
 
-  it('writes aria-expanded on the same focused button, and removes it when an update omits the key', async () => {
+  it('writes aria-expanded on the same focused button, its glyph swapped in the same update, and removes it when an update omits the key', async () => {
     const { handle, button } = mountIconButton({ 'aria-expanded': false });
     await settle();
     const node = button();
     assert.equal(node.getAttribute('aria-expanded'), 'false');
     node.focus();
-    assert.equal(handle.update(base({ 'aria-expanded': true })), true);
+    const shown = base({ 'aria-expanded': true, icon: 'fas fa-chevron-up' });
+    assert.equal(handle.update(shown), true);
     await settle();
     assert.ok(button() === node && document.activeElement === node, 'that node, still focused');
     assert.equal(node.getAttribute('aria-expanded'), 'true');
+    assert.equal(node.firstElementChild.className, 'fas fa-chevron-up', 'the other glyph');
     assert.equal(handle.update(base()), true);
     await settle();
     assert.ok(!node.hasAttribute('aria-expanded'), 'removed, on that node');
@@ -441,6 +458,28 @@ describe('the tooltip of the published IconButton', () => {
     node.blur();
     assert.ok(!tooltip.element, 'its own tooltip closes');
     assert.ok(!node.hasAttribute('aria-describedby'), 'and the description goes with it');
+    handle.destroy();
+  });
+
+  it('leaves another element’s open tooltip open when it blurs or takes Escape', async () => {
+    const tooltip = withTooltip();
+    const { target, handle, button } = mountIconButton();
+    await settle();
+    const node = button();
+    keyboardFocus(node);
+    const other = target.ownerDocument.createElement('span');
+    target.after(other);
+    tooltip.activate(other, { text: 'Another hint' });
+    const { KeyboardEvent } = node.ownerDocument.defaultView;
+    node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    node.blur();
+    assert.ok(tooltip.element === other, 'the other tooltip stays open');
+    assert.deepEqual(transcript(tooltip, node), [
+      ['activate', 'button', { text: LABEL }],
+      ['deactivate', 'button'],
+      ['activate', 'another', { text: 'Another hint' }],
+    ]);
+    other.remove();
     handle.destroy();
   });
 

@@ -716,6 +716,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'must be a string, number or boolean',
       ...RESERVED_REST_FAMILIES,
       '`data-tooltip-`',
+      '`data-locked`',
     ];
     for (const [where, prose] of [
       ['the spec’s M13 row', row[0]],
@@ -764,14 +765,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     }
   });
 
-  it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
-    const names = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control').map(
-      (entry) => entry.name
+  it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control, and data-locked exactly where its control carries a tooltip', () => {
+    const entries = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control');
+    assert.ok(entries.length > 0, 'an entry states restOn');
+    assert.ok(
+      entries.some((entry) => entry.tooltip === true),
+      'and one states tooltip'
     );
-    assert.ok(names.length > 0, 'an entry states restOn');
     const groups = specifiedComponentGroups();
     const sections = documentedComponentSections();
-    for (const name of names) {
+    for (const { name, tooltip } of entries) {
       const section = sections.find((candidate) => candidate.startsWith(`${name}\n`));
       for (const [where, prose] of [
         [`the ${name} group`, groups.get(name) ?? ''],
@@ -782,6 +785,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           [],
           `${where} is where a companion learns the names it reserves`
         );
+        assert.equal(prose.includes('`data-locked`'), tooltip === true, `${where}: data-locked`);
       }
     }
   });

@@ -22,6 +22,12 @@ const ATTRIBUTE_TYPES = new Set(['string', 'number', 'boolean']);
 export const RESERVED_ON_A_CONTROL =
   /^data-(?:keyboard-focus|action|cursor|validation-focused|essence-sort-direction|tooltip(?:-[a-z0-9-]*)?)$/;
 
+/**
+ * The rest name an entry stating `tooltip: true` also refuses: Foundry pins a copy of a tooltip it
+ * opens on a `data-locked` element, and the control's own closes never reach that copy.
+ */
+export const RESERVED_ON_A_TOOLTIP = /^data-locked$/;
+
 export const refuse = (message) => new TypeError(PREFIX + message);
 
 /** M10: a function anywhere but as the whole value of a `callback` key, named by its top-level key. */
@@ -161,7 +167,9 @@ function assertRestKey(entry, key, value) {
   if (!(DATA_ATTRIBUTE.test(key) && ATTRIBUTE_TYPES.has(typeof value))) {
     throw refuse(`"${key}" is not a data attribute`);
   }
-  if (entry.restOn === 'control' && RESERVED_ON_A_CONTROL.test(key)) {
+  const reserved =
+    RESERVED_ON_A_CONTROL.test(key) || (entry.tooltip === true && RESERVED_ON_A_TOOLTIP.test(key));
+  if (entry.restOn === 'control' && reserved) {
     throw refuse(`"${key}" is reserved on ${entry.name}`);
   }
 }

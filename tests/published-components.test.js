@@ -390,6 +390,8 @@ const PRESS_SHAPE = Object.freeze({
 // One entry whose rest lands on the control, and one whose rest lands on a root that is none.
 const PRESSED = Object.freeze({ ...PRESS_SHAPE, name: 'Pressed', restOn: 'control' });
 const ROOTED = Object.freeze({ ...PRESS_SHAPE, name: 'Rooted' });
+// One whose control also carries Foundry's tooltip.
+const TIPPED = Object.freeze({ ...PRESSED, name: 'Tipped', tooltip: true });
 
 const UNRESERVED_NAMES = [
   'data-tooltips',
@@ -433,6 +435,20 @@ describe('a rest key on an entry whose rest lands on a control', () => {
       assert.equal(mounts[0].props.initial[key], value, 'passed through, as before');
     });
   }
+
+  it('M13: refuses data-locked where the control carries Foundry’s tooltip, and accepts it on any other control', () => {
+    const { ui, mounts } = seamWith({ table: [PRESSED, TIPPED] });
+    for (const value of ['', 'true', true]) {
+      assert.throws(
+        () => mountOf(ui, 'Tipped', pressedProps({ 'data-locked': value })),
+        refusal('"data-locked" is reserved on Tipped')
+      );
+    }
+    assert.equal(mounts.length, 0);
+    mountOf(ui, 'Pressed', pressedProps({ 'data-locked': '' }));
+    assert.equal(mounts[0].props.initial['data-locked'], '', 'passed through, as before');
+    assert.ok(!Object.hasOwn(ui.describe('Tipped'), 'tooltip'), 'and describe leaves it out');
+  });
 
   it('accepts a name that only starts like a reserved one, and passes it through', () => {
     const { ui, mounts } = pressed();

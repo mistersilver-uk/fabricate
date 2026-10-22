@@ -174,11 +174,13 @@ describe('the published Button', () => {
     blank.handle.destroy();
   });
 
-  it('lands a rest data attribute on the button itself', async () => {
-    const { handle, button } = mountButton({ 'data-acme-id': 'clear', 'data-acme-open': true });
+  it('lands a rest data attribute on the button itself, data-locked among them', async () => {
+    const rest = { 'data-acme-id': 'clear', 'data-acme-open': true, 'data-locked': '' };
+    const { handle, button } = mountButton(rest);
     await settle();
     assert.equal(button().getAttribute('data-acme-id'), 'clear');
     assert.ok(button().hasAttribute('data-acme-open'));
+    assert.equal(button().getAttribute('data-locked'), '', 'the button carries no tooltip to pin');
     assert.equal(button().getAttribute('data-keyboard-focus'), 'true', 'its own mark stays');
     handle.destroy();
   });
