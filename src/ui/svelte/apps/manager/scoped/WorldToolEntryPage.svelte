@@ -987,7 +987,7 @@
                  own figure for the identical set. -->
             <RadioCardGroup
               options={breakageModeOptions}
-              selectedValue={breakageChoice}
+              value={breakageChoice}
               groupName="world-tool-breakage-mode"
               columns={2}
               legend={sectionLabel('breakage')}
@@ -1146,7 +1146,7 @@
             </p>
             <RadioCardGroup
               options={onBreakOptions}
-              selectedValue={defaults.onBreak?.mode ?? 'destroy'}
+              value={defaults.onBreak?.mode ?? 'destroy'}
               groupName="world-tool-onbreak-mode"
               columns={3}
               layout="stacked"

@@ -50,7 +50,6 @@ const VALUE_PROP_NAMES = new Set([
   'controls',
   'pageSelectionState',
   'activeTab',
-  'selectedValue',
   'groupName',
   'valence',
 ]);

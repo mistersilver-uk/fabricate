@@ -629,7 +629,7 @@
     "props": {
       "legend": "When the tool breaks",
       "groupName": "pl-tool-breakage",
-      "selectedValue": "breakable",
+      "value": "breakable",
       "columns": 3,
       "layout": "stacked",
       "options": [
@@ -649,9 +649,13 @@
           "value": "degrading",
           "fallback": "Degrading",
           "icon": "fas fa-star",
-          "disabled": true,
-          "badgeFallback": "Coming soon",
           "descFallback": "Quality drops with each failed check."
+        }
+      ],
+      "disabledOptions": [
+        {
+          "value": "degrading",
+          "reason": "Coming soon"
         }
       ]
     }
@@ -669,7 +673,7 @@
     "props": {
       "legend": "Breakage",
       "groupName": "pl-tool-breakability",
-      "selectedValue": "breakable",
+      "value": "breakable",
       "columns": 2,
       "layout": "row",
       "options": [

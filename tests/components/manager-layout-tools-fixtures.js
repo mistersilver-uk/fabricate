@@ -21,7 +21,7 @@ export const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
 // The option-card DOM that `RadioCardGroup` emits for each geometry fixture; `OPTION_CARD_COPIES`
 // is what the drift guard in `manager-layout-tools.js` holds to the component's classes.
-const TOOL_ON_BREAK_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards is-stacked" data-radio-card-group="tool-on-break">
+const TOOL_ON_BREAK_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-stacked" data-radio-card-group="tool-on-break">
               <legend class="manager-resolution-mode-legend">On-break action</legend>
               <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
                 <label class="manager-resolution-option is-active" data-radio-card-option="destroy" data-tool-on-break-choice="destroy"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-trash"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Destroy the item</span><span class="manager-resolution-option-desc" data-tool-choice-description>The tool is consumed and removed.</span></span><input type="radio" name="tool-on-break" value="destroy" checked></span></label>
@@ -29,14 +29,14 @@ const TOOL_ON_BREAK_CARDS = `<fieldset class="fabricate-field fabricate-option-c
                 <label class="manager-resolution-option" data-radio-card-option="replaceWith" data-tool-on-break-choice="replaceWith"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-arrow-right-arrow-left"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Replace with component</span><span class="manager-resolution-option-desc" data-tool-choice-description>Replace it with a managed Component that can participate in repair routes.</span></span><input type="radio" name="tool-on-break" value="replaceWith"></span></label>
               </div>
             </fieldset>`;
-const DC_SOURCE_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+const DC_SOURCE_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group">
           <legend class="manager-resolution-mode-legend">DC source</legend>
           <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
             <label class="manager-resolution-option is-active" data-dc-mode-option="static"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Static</span></span><input type="radio" name="dc-mode" value="static" checked></span></label>
             <label class="manager-resolution-option" data-dc-mode-option="dynamic"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Dynamic</span></span><input type="radio" name="dc-mode" value="dynamic"></span></label>
           </div>
         </fieldset>`;
-const MODIFIER_POLICY_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+const MODIFIER_POLICY_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group">
         <legend class="manager-resolution-mode-legend">How they combine</legend>
         <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
           <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Add all</span></span><input type="radio" name="modifier-policy" value="addAll" checked></span></label>

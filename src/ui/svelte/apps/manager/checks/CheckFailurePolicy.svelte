@@ -107,7 +107,7 @@
     legendKey="FABRICATE.Admin.Manager.Checks.FailureResults.Heading"
     legend="Produce a result on a failed check"
     {options}
-    selectedValue={value}
+    {value}
     groupName={`checks-${activity}-failure-result-policy`}
     columns={1}
     data-failure-result-policy-group
