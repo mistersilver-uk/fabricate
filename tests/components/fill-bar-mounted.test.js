@@ -1,4 +1,4 @@
-/** `FillBar`, the product's ONE horizontal fill bar (issue 1096). */
+/** `FillBar`, the product's ONE horizontal fill bar (issue 1096), and its shares (issue 2182). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -90,5 +90,115 @@ describe('FillBar (mounted)', () => {
     // `[data-odds-bar]` selector would still match.
     const plain = await harness.mount({ value: 10 });
     assert.ok(!plain.querySelector('.fab-fill-bar').hasAttribute('data-odds-bar'));
+  });
+});
+
+const sharesOf = (root) => [...root.querySelectorAll('.fab-fill-bar-share')];
+const authored = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
+/** Every element under the root, as its tag, authored classes and other attributes. */
+const shapeOf = (root) =>
+  [...root.querySelectorAll('*')].map((node) => [
+    node.tagName,
+    authored(node),
+    node
+      .getAttributeNames()
+      .filter((name) => name !== 'class')
+      .map((name) => [name, node.getAttribute(name)]),
+  ]);
+
+describe('FillBar shares (mounted)', () => {
+  it('draws the single fill for one share or none, exactly as without shares', async () => {
+    const plain = shapeOf(await harness.mount({ value: 50, tone: 'accent' }));
+    harness.remount();
+    for (const shares of [[], [{ weight: 1, tone: 'danger', color: 'var(--fab-tag-aqua)' }]]) {
+      const root = await harness.mount({ value: 50, tone: 'accent', shares });
+      assert.equal(sharesOf(root).length, 0, `${shares.length} share draws no share element`);
+      assert.deepEqual(shapeOf(root), plain, `${shares.length} share draws the single fill`);
+      harness.remount();
+    }
+  });
+
+  it('draws two or more shares in proportion inside the value-wide fill', async () => {
+    const root = await harness.mount({
+      value: 40,
+      shares: [
+        { weight: 1, tone: 'accent' },
+        { weight: 3, tone: 'neutral' },
+      ],
+    });
+    assert.equal(widthOf(root), '40');
+    assert.deepEqual(
+      sharesOf(root).map((share) => Number(share.style.flexGrow)),
+      [25, 75],
+      'the grow factors are each weight over the total, out of 100'
+    );
+    assert.deepEqual(
+      sharesOf(root).map((share) => authored(share)),
+      [
+        ['fab-fill-bar-share', 'is-accent'],
+        ['fab-fill-bar-share', 'is-neutral'],
+      ]
+    );
+  });
+
+  it('paints an unknown or null share tone neutral and an absent one success', async () => {
+    const root = await harness.mount({
+      value: 60,
+      shares: [{ weight: 1, tone: 'chartreuse' }, { weight: 1, tone: null }, { weight: 1 }],
+    });
+    assert.deepEqual(
+      sharesOf(root).map((share) => authored(share)[1]),
+      ['is-neutral', 'is-neutral', 'is-success']
+    );
+  });
+
+  it("lands a share's caller-owned colour inline, and only that share's", async () => {
+    const root = await harness.mount({
+      value: 60,
+      shares: [
+        { weight: 1, tone: 'accent', color: 'var(--fab-tag-aqua)' },
+        { weight: 1, tone: 'accent' },
+      ],
+    });
+    const [painted, toned] = sharesOf(root);
+    assert.match(painted.getAttribute('style'), /background: var\(--fab-tag-aqua\)/u);
+    assert.doesNotMatch(toned.getAttribute('style'), /background/u);
+  });
+
+  it('gives a stacked fill no tone class and its track no tone attribute', async () => {
+    const root = await harness.mount({
+      value: 60,
+      tone: 'danger',
+      shares: [{ weight: 1 }, { weight: 1 }],
+    });
+    assert.deepEqual(authored(fillOf(root)), ['fab-fill-bar-fill', 'is-stacked']);
+    assert.ok(!root.querySelector('.fab-fill-bar').hasAttribute('data-fill-bar-tone'));
+  });
+
+  it('reads a non-finite or negative weight as 0', async () => {
+    const root = await harness.mount({
+      value: 60,
+      shares: [
+        { weight: -2 },
+        { weight: NaN },
+        { weight: Infinity },
+        { weight: '3' },
+        { weight: 2 },
+        { weight: 2 },
+      ],
+    });
+    assert.deepEqual(
+      sharesOf(root).map((share) => Number(share.style.flexGrow)),
+      [0, 0, 0, 0, 50, 50]
+    );
+  });
+
+  it('reads shares that all weigh nothing as a grow of 0 each, never NaN', async () => {
+    const root = await harness.mount({ value: 60, shares: [{ weight: 0 }, { weight: NaN }] });
+    assert.deepEqual(
+      sharesOf(root).map((share) => share.style.flexGrow),
+      ['0', '0'],
+      'a NaN grow would be dropped as an invalid declaration, leaving none'
+    );
   });
 });
