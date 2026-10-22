@@ -2746,6 +2746,33 @@ Widening the composition with a background prop for one such caller is not the a
 - **THEN** it carries `aria-busy`
 - **AND** a visible label states what is loading
 
+### Requirement: A browse list that loads separately from its view draws its loading and error through ListState
+
+A browse list whose rows load separately from the view around it MUST render its loading and error states through `ListState` (`src/ui/svelte/components/ListState.svelte`), which replaces the list's body and leaves its header in place.
+While `loading` is true, `ListState` MUST set `aria-busy` on the region it renders, MUST state what is loading in a visible line carrying `role="status"`, and MUST draw static skeleton rows at the ListRow geometry of the list's `density`, hidden from the accessibility tree; nothing in it MUST animate or take focus.
+When `error` is set, `ListState` MUST render a danger-toned, non-blocking notice in the body.
+Loading masks error, and when neither holds the list's own body renders with no element of `ListState`'s around it.
+A list that declares `loading` MUST NOT draw its empty or no-match panel while it is true, and a list that declares `error` MUST NOT draw them for a failed load (for example a refused world-setting read).
+A list declares only the states it can reach: one with no reachable failure, or whose failure a sibling pane reports, passes no `error`, and then draws no body in that state rather than an empty or no-match claim.
+A list that loads together with its view takes the view's composition instead, and a pane that is not a list keeps its own no-state panel.
+The manager's crafting system library, gathering environment browser and Knowledge roster are its first callers (issue 2548).
+
+#### Scenario: A browse list is loading
+
+- **WHEN** a list's `loading` is true
+- **THEN** its header stays, and its body is a visible status line over static skeleton rows inside an `aria-busy` region
+- **AND** no row, empty panel or no-match panel renders
+
+#### Scenario: A browse list fails to load
+
+- **WHEN** the list's load fails
+- **THEN** its body is a danger-toned notice with a live-region role, and its header stays
+
+#### Scenario: A list loads together with its view
+
+- **WHEN** a player app view and its lists load together
+- **THEN** the view's composition draws the loading and error, and none of those lists renders through `ListState`
+
 ### Requirement: A well is the one container level below a card
 
 A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/components/Well.svelte`, issue 2008), the level below `<Card>` that the library specifies, and never hand-rolled at a call site.

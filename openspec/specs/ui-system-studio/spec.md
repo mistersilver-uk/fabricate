@@ -1324,7 +1324,7 @@ The rejection still propagates to the caller.
 A hook-driven or post-action re-read of a surface that already holds a snapshot publishes neither state, so a populated surface does not blank while it refreshes, and a failed re-read keeps the last published rows.
 
 **Loading and error states.** While the projection is loading, the surface root carries `aria-busy="true"`.
-The roster pane renders a compact no-state panel stating that player characters are loading, in place of its empty and no-match panels, and the detail pane renders a no-state panel stating that character knowledge is loading, in place of its select-a-character prompt.
+The roster pane draws its list's loading form through `ListState` — a visible line stating that player characters are loading over static skeleton rows, under `aria-busy` — in place of its empty and no-match panels, and the detail pane renders a no-state panel stating that character knowledge is loading, in place of its select-a-character prompt.
 While the projection is in error, the detail pane renders a danger-toned notice with `role="status"` and a polite live region, stating that character knowledge could not be loaded, with a line telling the GM how to try again, and the roster pane renders its search field and nothing beneath it.
 In neither state does a pane say "No player characters", report that no character matches the search, or ask the GM to select a character, because each of those claims describes a finished read.
 Each pane nests the shared primitive inside its own tinted wrapper rather than adopting the player views' view-state composition, per the design system's rule for a pane inside a tinted container.
