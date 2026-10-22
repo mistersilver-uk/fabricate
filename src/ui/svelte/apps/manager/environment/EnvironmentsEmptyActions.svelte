@@ -2,7 +2,8 @@
   The empty environment list's three first steps: create an environment, or open the Tasks or
   Events tab to prepare the building blocks an environment attaches.
 
-  Props: onCreateEnvironment(), onReviewTasks(), onReviewEvents().
+  Callbacks:
+  - `onCreateEnvironment()` / `onReviewTasks()` / `onReviewEvents()` — its button was pressed.
 -->
 <script>
   import Button from '../../../components/Button.svelte';

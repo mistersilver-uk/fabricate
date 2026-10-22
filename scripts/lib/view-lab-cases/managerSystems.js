@@ -96,7 +96,6 @@ export const CASES = Object.freeze([
       '.fabricate-manager .manager-main > .fabricate-filter-bar:not(:has(.manager-chip))' +
       ' ~ .manager-table-scroll > [data-systems-loading][aria-busy="true"] > [role="status"]',
     kinds: ['manager', 'systems'],
-    // No pattern for a shared component: it is a broad signal, so no case's `sourceMatches` sees it.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
   }),
   managerCase({
