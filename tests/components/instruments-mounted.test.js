@@ -98,6 +98,130 @@ describe('Meter (mounted)', () => {
   });
 });
 
+const sharesOf = (root) => [...root.querySelectorAll('.fab-fill-bar-share')];
+const toneOf = (node) => [...node.classList].find((name) => name.startsWith('is-'));
+const fillOf = (root) => root.querySelector('.fab-fill-bar-fill');
+
+/** The drawn segments' grow factors stand in `expected`'s ratio, within 1e-6. */
+function assertRatio(root, expected) {
+  const grows = sharesOf(root).map((share) => Number(share.style.flexGrow));
+  assert.equal(grows.length, expected.length, `${expected.length} segments drawn`);
+  const sum = (list) => list.reduce((total, each) => total + each, 0);
+  for (const [index, grow] of grows.entries()) {
+    const want = expected[index] / sum(expected);
+    assert.ok(Math.abs(grow / sum(grows) - want) < 1e-6, `segment ${index} is ${want} of the fill`);
+  }
+}
+
+/** The single fill: its tone class, inline style and the track's tone attribute, and no segment. */
+function assertSingleFill(root, tone, style) {
+  assert.equal(sharesOf(root).length, 0, 'no segment element');
+  assert.ok(!root.querySelector('.is-stacked'), 'no stacked fill');
+  assert.deepEqual(
+    [...fillOf(root).classList].filter((name) => !name.startsWith('svelte-')),
+    ['fab-fill-bar-fill', `is-${tone}`]
+  );
+  assert.equal(fillOf(root).getAttribute('style'), style);
+  assert.equal(root.querySelector('.fab-fill-bar').dataset.fillBarTone, tone);
+}
+
+describe('Meter segments (mounted)', () => {
+  it('draws each entry as a segment of the one fill, and still announces the whole', async () => {
+    const root = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'Pooled days',
+      segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assert.match(fillOf(root).getAttribute('style'), /width: 58%/u);
+    assert.ok(fillOf(root).classList.contains('is-stacked'));
+    assertRatio(root, [3, 4]);
+    assert.deepEqual(sharesOf(root).map(toneOf), ['is-accent', 'is-neutral']);
+    assert.equal(root.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '7');
+  });
+
+  it('stops each span where the fill ends, so an entry past the reading is not drawn', async () => {
+    const root = await meter.mount({
+      value: 8,
+      max: 10,
+      label: 'x',
+      segments: [{ value: 6 }, { value: 6 }, { tone: 'danger' }],
+    });
+    assertRatio(root, [6, 2]);
+    assert.deepEqual(sharesOf(root).map(toneOf), ['is-success', 'is-success']);
+  });
+
+  it('gives the last entry the rest of the reading, whatever its own value', async () => {
+    const root = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 3 }, { value: 1, tone: 'neutral' }],
+    });
+    assertRatio(root, [3, 4]);
+  });
+
+  it('draws no entry that spans nothing', async () => {
+    const zero = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 0, tone: 'danger' }, { value: 2, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertRatio(zero, [2, 5]);
+    assert.deepEqual(sharesOf(zero).map(toneOf), ['is-accent', 'is-neutral']);
+    meter.remount();
+
+    const trailing = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 7, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertSingleFill(trailing, 'accent', 'width: 58%;');
+  });
+
+  it('draws one entry, or none, as the single fill it drew before segments', async () => {
+    for (const [segments, tone] of [
+      [[{ tone: 'accent' }], 'accent'],
+      [[], 'success'],
+      [[{ value: 9, tone: 'accent' }], 'accent'],
+    ]) {
+      const root = await meter.mount({ value: 7, max: 12, label: 'x', segments });
+      assertSingleFill(root, tone, 'width: 58%;');
+      meter.remount();
+    }
+  });
+
+  it("paints the first entry's tone and colour when no entry spans anything", async () => {
+    const empty = await meter.mount({
+      value: 0,
+      max: 12,
+      label: 'x',
+      segments: [{ tone: 'accent', color: 'var(--fab-tag-aqua)' }],
+    });
+    assertSingleFill(empty, 'accent', 'width: 0%; background: var(--fab-tag-aqua);');
+    meter.remount();
+
+    const owed = await meter.mount({
+      value: 0,
+      max: 0,
+      label: 'x',
+      segments: [{ tone: 'accent' }],
+    });
+    assertSingleFill(owed, 'accent', 'width: 100%;');
+    meter.remount();
+
+    const full = await meter.mount({
+      value: 7,
+      max: 0,
+      label: 'x',
+      segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertSingleFill(full, 'accent', 'width: 100%;');
+  });
+});
+
 describe('BandedBar (mounted)', () => {
   it('draws one row as a meter, captioned and valued', async () => {
     const root = await banded.mount({
