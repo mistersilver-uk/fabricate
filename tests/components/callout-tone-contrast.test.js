@@ -2,15 +2,21 @@
  * Issue 2601: the published `Callout`'s inks over each tone's translucent fill, in all seven
  * themes, on the four grounds its group names. The title, an item's lead and the glyphs clear their
  * floors at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title
- * not on `--fab-bg-3`; the muted body clears 4.5:1 there at `neutral`, at `danger` off
- * `--fab-bg-2`, and falls short in the default palette at the other four tones. Every ink and fill
- * is read off the component's own rules.
+ * not on `--fab-bg-3`; the muted body's shortfalls are pinned ratio for ratio, and a published
+ * `Button`'s ring clears 3:1 on every fill. Every ink and fill is read off the shipped rules.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { DEFAULT_FABRICATE_THEME } from '../../src/ui/theme.js';
-import { collectStyleCorpus, rulesIn, splitSelectorList } from '../helpers/styleBlockScan.js';
+import {
+  collectStyleCorpus,
+  rulesIn,
+  splitSelectorList,
+  stripCssComments,
+} from '../helpers/styleBlockScan.js';
 import {
   declaredToken,
   propertiesOf,
@@ -59,9 +65,20 @@ test('the body inks --fab-text-muted at every tone, which its text and items inh
     propertiesOf(rule).has('color') ? splitSelectorList(rule.selector) : []
   );
   assert.deepEqual(
-    inked.filter((selector) => !/(?:> i|-title|-item-lead)$/u.test(selector)),
-    ['.manager-callout'],
-    'no rule but the root inks the body, the text or an item’s text'
+    inked,
+    [
+      '.manager-callout',
+      '.manager-callout > i',
+      '.manager-callout-item > i',
+      '.manager-callout-title',
+      '.manager-callout-item-lead',
+      ...TINTED.flatMap((tone) => [
+        `.manager-callout.is-${tone} > i`,
+        `.manager-callout.is-${tone} .manager-callout-item > i`,
+        `.manager-callout.is-${tone} .manager-callout-title`,
+      ]),
+    ],
+    'no rule but these inks the note, so nothing shadows the inks measured here'
   );
 });
 
@@ -106,11 +123,48 @@ test('the body clears 4.5:1 in every theme at neutral on the four grounds, and a
   }
 });
 
-test('the body falls short on --fab-bg-1 in the default palette alone at the other four tones, and on --fab-bg-2 at every tinted tone', () => {
-  for (const tone of ['info', 'accent', 'warning', 'success']) {
-    assert.deepEqual(shortOn(BODY, tone, '--fab-bg-1'), [DEFAULT_FABRICATE_THEME], tone);
+/** The default palette's body ratio under 4.5:1 on `tone`'s fill over `ground`, if any. */
+const defaultBodyShortfall = (tone, ground) =>
+  shortfalls(themes, BODY, [TONES[tone].fill, ground])
+    .filter((line) => line.startsWith(`${DEFAULT_FABRICATE_THEME}:`))
+    .map((line) => line.match(/ (\d\.\d\d):1$/u)[1]);
+
+test('off --fab-bg-2 the body falls short in the default palette alone, at these ratios', () => {
+  const figures = {
+    info: { '--fab-bg-0': ['4.49'], '--fab-bg-1': ['4.20'], '--fab-surface': ['4.20'] },
+    accent: { '--fab-bg-0': ['4.36'], '--fab-bg-1': ['4.08'], '--fab-surface': ['4.08'] },
+    warning: { '--fab-bg-0': ['4.42'], '--fab-bg-1': ['4.14'], '--fab-surface': ['4.14'] },
+    success: { '--fab-bg-0': [], '--fab-bg-1': ['4.27'], '--fab-surface': ['4.27'] },
+  };
+  for (const [tone, byGround] of Object.entries(figures)) {
+    for (const [ground, ratios] of Object.entries(byGround)) {
+      const where = `${tone} on ${ground}`;
+      const palettes = shortOn(BODY, tone, ground);
+      assert.deepEqual(palettes, ratios.length > 0 ? [DEFAULT_FABRICATE_THEME] : [], where);
+      assert.deepEqual(defaultBodyShortfall(tone, ground), ratios, where);
+    }
   }
+});
+
+test('on --fab-bg-2 the body falls short at every tinted tone in up to six palettes, the default among them', () => {
+  const counts = { info: 5, accent: 6, warning: 6, success: 6, danger: 4 };
   for (const tone of TINTED) {
-    assert.ok(shortOn(BODY, tone, '--fab-bg-2').includes(DEFAULT_FABRICATE_THEME), tone);
+    const palettes = shortOn(BODY, tone, '--fab-bg-2');
+    assert.ok(palettes.includes(DEFAULT_FABRICATE_THEME), tone);
+    assert.equal(palettes.length, counts[tone], tone);
+  }
+});
+
+test('a published Button’s focus ring clears 3:1 on every tone’s fill on the four grounds', () => {
+  const sheet = 'styles/fabricate-manager-rail-gathering.css';
+  const css = readFileSync(resolve(import.meta.dirname, '../..', sheet), 'utf8');
+  const ring = rulesIn(stripCssComments(css))
+    .filter((rule) => splitSelectorList(rule.selector).includes('.fabricate-button:focus-visible'))
+    .map((rule) => propertiesOf(rule).get('outline'));
+  assert.deepEqual(ring, ['2px solid var(--fab-accent)'], `${sheet}: the button's one ring`);
+  for (const tone of Object.keys(TONES)) {
+    for (const ground of GROUNDS) {
+      assert.deepEqual(shortOn('--fab-accent', tone, ground, 3), [], `${tone} on ${ground}`);
+    }
   }
 });
