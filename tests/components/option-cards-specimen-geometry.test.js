@@ -92,6 +92,11 @@ const CASES = Object.freeze({
     value: 'a',
     disabledOptions: [{ value: 'b', reason: 'Coming later.' }],
   },
+  chosenDisabled: {
+    options: [option('a', 'On offer'), option('b', 'Chosen, then withdrawn')],
+    value: 'b',
+    disabledOptions: [{ value: 'b', reason: 'No longer offered.' }],
+  },
   unchosen: {
     options: [option('a', 'Route one'), option('b', 'Route two')],
     value: '',
@@ -433,8 +438,9 @@ for (const hostId of Object.keys(HOSTS)) {
     it('dims each part of a disabled option, never the card', () =>
       inHost(hostId, async (tab) => {
         const [, later] = (await readCase(tab, 'disabled')).cards;
+        const stackedLater = (await readCase(tab, 'stackedDisabled')).cards[2];
         const group = (await readCase(tab, 'groupDisabled')).cards;
-        for (const card of [later, ...group]) {
+        for (const card of [later, stackedLater, ...group]) {
           assert.deepEqual([...card.opacity, card.radio.opacity], ['0.45', '0.45', '0.45', '0.45']);
           assert.equal(card.own, '1');
         }
@@ -505,6 +511,27 @@ for (const hostId of Object.keys(HOSTS)) {
         assert.equal(landed, 1, 'Tab from the page start lands on the second radio');
       }));
 
+    it('tabs to the first enabled radio when the chosen one is disabled', () =>
+      inHost(hostId, async (tab) => {
+        await tab.evaluate(() => {
+          for (const other of document.querySelectorAll(
+            '[data-case]:not([data-case="chosenDisabled"])'
+          ))
+            other.remove();
+        });
+        const radios = () => tab.locator('input[type="radio"]');
+        assert.deepEqual(
+          await radios().evaluateAll((all) => all.map((r) => [r.checked, r.disabled])),
+          [
+            [false, false],
+            [true, true],
+          ]
+        );
+        await tab.keyboard.press('Tab');
+        const landed = await radios().evaluateAll((all) => all.indexOf(document.activeElement));
+        assert.equal(landed, 0, 'the group stays reachable, at its one enabled radio');
+      }));
+
     it('reflows to one track at 620px of host and not at 621px', () =>
       inHost(hostId, async (tab) => {
         const tracksAt = async (width) => {
@@ -570,6 +597,13 @@ describe('<OptionCards> geometry cases carry the mounted radios’ own state (is
     assert.deepEqual(
       radios.groupDisabled.map((radio) => radio.disabled),
       [true, true]
+    );
+    assert.deepEqual(
+      radios.chosenDisabled.map((radio) => [radio.checked, radio.disabled]),
+      [
+        [false, false],
+        [true, true],
+      ]
     );
     assert.deepEqual(
       radios.unchosen.map((radio) => radio.checked),
