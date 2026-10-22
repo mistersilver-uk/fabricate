@@ -249,7 +249,7 @@ export function readBaseCorpus(base, root, { cwd = REPO_ROOT, include = () => tr
   );
 }
 
-function readHeadFile(cwd, file) {
+export function readHeadFile(cwd, file) {
   try {
     return readFileSync(path.join(cwd, file), 'utf8');
   } catch (error) {
