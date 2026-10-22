@@ -116,6 +116,30 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: SegmentedControl takes already-localized option labels
+
+`SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
+An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
+`SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` and `EditorTabs` keep a lang key plus fallback, because neither is a published-seam entry and neither is held by this rule.
+
+#### Scenario: A caller's key has no translation
+
+- **WHEN** a caller builds an option from a key the active language lacks
+- **THEN** the segment renders the caller's English fallback as its `label`
+
+#### Scenario: The closure stays clear of Foundry
+
+- **WHEN** the import closure of `SegmentedControl` or `ViewToggle` is computed
+- **THEN** it holds no module outside those two components and reaches no Foundry global
+
+#### Scenario: An icon-only segment
+
+- **WHEN** `iconOnly` is set
+- **THEN** each segment's `title` is its `label`
+- **AND** the clipped label stays its accessible name
+
 ### Requirement: A list's arrangement switch renders through ViewToggle
 
 A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.

@@ -364,8 +364,7 @@
   function segmentOptions(values, labels, disabled) {
     return values.map((value) => ({
       value,
-      labelKey: labels[value][0],
-      fallback: labels[value][1],
+      label: text(...labels[value]),
       disabled,
     }));
   }

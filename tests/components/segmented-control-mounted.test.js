@@ -22,8 +22,8 @@ const harness = createMountedComponentHarness({
 });
 
 const OPTIONS = [
-  { value: 'destroyed', labelKey: 'FABRICATE.X.Destroyed', fallback: 'Destroyed', icon: 'fas fa-trash' },
-  { value: 'inert', labelKey: 'FABRICATE.X.Inert', fallback: 'Becomes inert' }
+  { value: 'destroyed', label: 'Destroyed', icon: 'fas fa-trash' },
+  { value: 'inert', label: 'Becomes inert' }
 ];
 
 before(() => harness.setup());
@@ -31,7 +31,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('SegmentedControl (mounted)', () => {
-  it('renders one radio segment per option with the fallback labels', async () => {
+  it('renders one radio segment per option with the labels', async () => {
     const root = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'when-spent' });
     const segments = root.querySelectorAll('.manager-segment');
     assert.equal(segments.length, 2);
@@ -101,9 +101,9 @@ describe('SegmentedControl (mounted)', () => {
 
   it('tints only the ACTIVE segment with its per-option variant', async () => {
     const options = [
-      { value: 'success', variant: 'success', fallback: 'Automatic success' },
-      { value: 'none', variant: 'neutral', fallback: 'No effect' },
-      { value: 'failure', variant: 'danger', fallback: 'Automatic failure' }
+      { value: 'success', variant: 'success', label: 'Automatic success' },
+      { value: 'none', variant: 'neutral', label: 'No effect' },
+      { value: 'failure', variant: 'danger', label: 'Automatic failure' }
     ];
     const root = await harness.mount({ options, value: 'failure', groupName: 'g' });
     const seg = (value) =>
@@ -126,9 +126,9 @@ describe('SegmentedControl (mounted)', () => {
   // ── The semantic variant ramp (issue 1286) ─────────────────────────────────────
   it('tints the active segment for EVERY declared variant, and paints each one', async () => {
     const options = [
-      { value: 'minor', variant: 'info', fallback: 'Minor' },
-      { value: 'major', variant: 'warning', fallback: 'Major' },
-      { value: 'severe', variant: 'danger', fallback: 'Severe' }
+      { value: 'minor', variant: 'info', label: 'Minor' },
+      { value: 'major', variant: 'warning', label: 'Major' },
+      { value: 'severe', variant: 'danger', label: 'Severe' }
     ];
     for (const { value, variant } of [
       { value: 'minor', variant: 'info' },
@@ -172,8 +172,8 @@ describe('SegmentedControl (mounted)', () => {
   it('carries `disabled` onto the RADIO, not merely onto a class', async () => {
     const calls = [];
     const options = [
-      { value: 'a', fallback: 'A' },
-      { value: 'b', fallback: 'B', disabled: true }
+      { value: 'a', label: 'A' },
+      { value: 'b', label: 'B', disabled: true }
     ];
     const root = await harness.mount({
       options,
@@ -426,8 +426,8 @@ describe('SegmentedControl (mounted)', () => {
     // The consuming lane passes all three.
     const root = await harness.mount({
       options: [
-        { value: 'all', fallback: 'All', badge: 6 },
-        { value: 'in', fallback: 'With rules', badge: 2 }
+        { value: 'all', label: 'All', badge: 6 },
+        { value: 'in', label: 'With rules', badge: 2 }
       ],
       value: 'all',
       groupName: 'g',

@@ -227,6 +227,15 @@ describe('run primitives mounted behavior', () => {
       0,
       'the completion holds only the shared kicker and the switch'
     );
+    assert.deepEqual(
+      [
+        ...target
+          .querySelector('[data-run-completion-switch]')
+          .querySelectorAll('.manager-segment-label'),
+      ].map((label) => label.textContent),
+      ['By hand', 'As time passes'],
+      'the completion switch draws each option’s already-localized label'
+    );
     const completion = target.querySelector('input[value="worldTime"]');
     completion.click();
     await flushRender();

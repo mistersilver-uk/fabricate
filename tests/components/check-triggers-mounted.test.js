@@ -178,6 +178,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
       selected.classList.contains('is-active'),
       'the toggle reflects the trigger outcome'
     );
+    assert.ok(selected.classList.contains('is-danger'), 'the failure segment takes the red tint');
     assert.equal(
       selected.querySelector('input[type="radio"]').checked,
       true,

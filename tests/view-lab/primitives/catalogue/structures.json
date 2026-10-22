@@ -257,9 +257,9 @@
     "data": {
       "searchLabel": "Search recipes",
       "scopes": [
-        { "value": "all", "fallback": "All" },
-        { "value": "mine", "fallback": "Mine" },
-        { "value": "shared", "fallback": "Shared" }
+        { "value": "all", "label": "All" },
+        { "value": "mine", "label": "Mine" },
+        { "value": "shared", "label": "Shared" }
       ],
       "scope": "all",
       "scopeLabel": "Recipe scope",

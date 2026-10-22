@@ -157,14 +157,12 @@
     {
       value: 'single',
       icon: 'fas fa-square',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.SingleStep',
-      fallback: 'Single step',
+      label: text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step'),
     },
     {
       value: 'multi',
       icon: 'fas fa-list-ol',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.MultiStep',
-      fallback: 'Multi-step',
+      label: text('FABRICATE.Admin.Manager.Recipe.MultiStep', 'Multi-step'),
     },
   ];
 

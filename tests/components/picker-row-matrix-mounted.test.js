@@ -633,6 +633,15 @@ describe('PickerRow: the remaining branches', () => {
     assert.notEqual(names[0], names[1], 'two rows sharing a name would be one radio group');
   });
 
+  it('words the tag-match segments in English when the active language has no translation', async () => {
+    const { target } = await mountRow(ingredient, unnamed('tags'));
+    const words = ['any', 'all'].map(
+      (mode) =>
+        target.querySelector(`[data-recipe-tag-match="${mode}"] .manager-segment-label`).textContent
+    );
+    assert.deepEqual(words, ['Any of', 'All of']);
+  });
+
   it('the tag picker lists every vocabulary tag and marks the held ones selected', async () => {
     const { target } = await mountRow(ingredient, { ...unnamed('tags'), tags: ['herb'] });
     const panel = await openTagAdder(target);

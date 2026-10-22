@@ -32,8 +32,8 @@
 
   const groupName = $props.id();
   const options = $derived([
-    { value: 'list', fallback: listLabel, icon: 'fas fa-list' },
-    { value: 'grid', fallback: gridLabel, icon: 'fas fa-table-cells-large' },
+    { value: 'list', label: listLabel, icon: 'fas fa-list' },
+    { value: 'grid', label: gridLabel, icon: 'fas fa-table-cells-large' },
   ]);
 </script>
 

@@ -501,15 +501,15 @@
       "options": [
         {
           "value": "flat",
-          "fallback": "Flat"
+          "label": "Flat"
         },
         {
           "value": "market",
-          "fallback": "Full market"
+          "label": "Full market"
         },
         {
           "value": "sim",
-          "fallback": "Deep sim"
+          "label": "Deep sim"
         }
       ],
       "value": "market",
@@ -531,11 +531,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -558,11 +558,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -586,11 +586,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -613,11 +613,11 @@
       "options": [
         {
           "value": "list",
-          "fallback": "List"
+          "label": "List"
         },
         {
           "value": "grid",
-          "fallback": "Card grid"
+          "label": "Card grid"
         }
       ],
       "value": "list",
@@ -1004,12 +1004,12 @@
         "options": [
           {
             "value": "manual",
-            "fallback": "By hand",
+            "label": "By hand",
             "icon": "fas fa-hand"
           },
           {
             "value": "worldTime",
-            "fallback": "As time passes",
+            "label": "As time passes",
             "icon": "fas fa-bolt"
           }
         ]

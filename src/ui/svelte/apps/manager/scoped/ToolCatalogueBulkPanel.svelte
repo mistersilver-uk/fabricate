@@ -62,18 +62,15 @@
   const statusSegments = $derived([
     {
       value: UNCHANGED,
-      labelKey: 'FABRICATE.Admin.Manager.BulkEdit.Unchanged',
-      fallback: 'Unchanged',
+      label: text('FABRICATE.Admin.Manager.BulkEdit.Unchanged', 'Unchanged'),
     },
     {
       value: 'on',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.BulkEdit.StatusOn',
-      fallback: 'On',
+      label: text('FABRICATE.Admin.Manager.Tools.BulkEdit.StatusOn', 'On'),
     },
     {
       value: 'off',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.BulkEdit.StatusOff',
-      fallback: 'Off',
+      label: text('FABRICATE.Admin.Manager.Tools.BulkEdit.StatusOff', 'Off'),
     },
   ]);
 

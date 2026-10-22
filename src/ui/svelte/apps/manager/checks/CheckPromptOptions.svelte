@@ -88,16 +88,14 @@
     text('FABRICATE.Admin.Manager.Checks.Advantage.ModeTitle', 'Advantage and disadvantage')
   );
   const MODE_OPTIONS = [
-    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.Checks.Advantage.ModeOff', fallback: 'Off' },
+    { value: 'off', label: text('FABRICATE.Admin.Manager.Checks.Advantage.ModeOff', 'Off') },
     {
       value: 'keep',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Advantage.ModeKeep',
-      fallback: 'Roll extra, keep one',
+      label: text('FABRICATE.Admin.Manager.Checks.Advantage.ModeKeep', 'Roll extra, keep one'),
     },
     {
       value: 'bonus',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Advantage.ModeBonus',
-      fallback: 'Bonus die',
+      label: text('FABRICATE.Admin.Manager.Checks.Advantage.ModeBonus', 'Bonus die'),
     },
   ];
   const modeOptions = $derived(
