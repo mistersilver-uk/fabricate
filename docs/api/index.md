@@ -2838,21 +2838,23 @@ It draws no control, no caption and no text of its own: draw both in its content
 A `div` field names no control, so give your caption an `id` and point the control's `aria-labelledby` at it.
 `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, the caption first and the control beneath it.
 The column states `--fab-text` ink at 12.5px and weight 500, which your content inherits, and a text input or textarea there inherits its face from it.
-The content slot holds your caption a level below the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
-For the kicker type, mount a published `Kicker` with `as` `span` into your caption `<span id>`, which keeps the `id` on your element, as [Kicker](#kicker) states.
+The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
+Fabricate's own fields caption in the kicker type, so to match them mount a published `Kicker` with `as` `span` into your caption `<span id>` and give that span `display: flex`, which keeps the `id` on your element and the caption as tall as Fabricate's own, as [Kicker](#kicker) states.
 A text-like `<input>`, one whose `type` is `text`, `url`, `email`, `tel` or `password` or is absent, and a `<textarea>` you draw in the slot take the field's chrome: the width of the column, a 1px `--fab-border` edge on a `--fab-bg-1` fill and `--fab-text` ink, a 38px input at radius 9, and a textarea at least 92px tall that resizes vertically.
 A `<small>` there takes the muted ink, for a hint beneath the control.
+Give the hint an `id` and add it to the control's `aria-describedby`, so the hint is read with the control.
 A published control you draw there is drawn as it is in Fabricate's own fields, and what the chrome draws on any other `<input>` is private.
 The keyboard ring of a text-like input or a textarea in the slot is the accent, 1px wide and inset 1px, so it is drawn over the control's own edge and you leave no room for it.
-It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3`.
+It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3` in every palette (two fall short), so draw the field on those four grounds.
 Rest `data-*` attributes land on the column root.
 `Field` needs a Fabricate window ancestor, so its root is `fabricate`, because its column and chrome come from Fabricate's module sheet.
 Your own window or dialog carries no Fabricate root, so the field is refused there with `Field needs a Fabricate window ancestor`.
 Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 Its gap, its type figures beyond the column's, and the chrome's figures and colours beyond what this section states are private.
-The `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1, so a `class`, `label` or `caption` is refused as a rest prop.
+The `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1.
+A `class`, `label` or `caption` is refused because a rest key must be a `data-*` attribute.
 
-A worked field follows: a caption and a text input of your own, for the name of a recipe you hold.
+A worked field follows: a caption, a text input and a hint of your own, for the name of a recipe you hold.
 
 ```javascript
 // After `load(['Field', 'Kicker'])` has resolved and `fabricate.ready` has fired.
@@ -2863,11 +2865,16 @@ const field = fabUi.mount('Field', { target, props: { as: 'div', children: true 
 const slot = field.slot('children');
 const caption = document.createElement('span');
 caption.id = 'acme-recipe-name-caption'; // Unique in the document.
+caption.style.display = 'flex';
+const hint = document.createElement('small');
+hint.id = 'acme-recipe-name-hint';
+hint.textContent = 'Shown on the recipe card.';
 const input = document.createElement('input');
 input.type = 'text';
 input.setAttribute('aria-labelledby', caption.id);
+input.setAttribute('aria-describedby', hint.id);
 input.value = acmeRecipe.name;
-slot.append(caption, input);
+slot.append(caption, input, hint);
 // The caption in the kicker type, named by the id on your own span.
 fabUi.mount('Kicker', {
   target: caption,

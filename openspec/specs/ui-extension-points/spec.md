@@ -1068,13 +1068,13 @@ Each group states the accepted values of every key that entry publishes.
     A `div` field names no control, so the companion gives its caption an `id` and points the control's `aria-labelledby` at it.
   - `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, the caption first and the control beneath it.
     The column states `--fab-text` ink at 12.5px and weight 500, which the content inherits, and a text input or textarea there inherits its face from it.
-  - The content slot holds the caption a level below the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
-    For the kicker type the companion mounts a published `Kicker` with `as` `span` into its caption `<span id>`, which keeps the `id` on the companion's element, as the `Kicker` group states.
+  - The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
+    Fabricate's own fields caption in the kicker type, so to match them the companion mounts a published `Kicker` with `as` `span` into its caption `<span id>` and gives that span `display: flex`, which keeps the `id` on the companion's element and the caption as tall as Fabricate's own, as the `Kicker` group and "Ownership, strings and theme" state.
   - A text-like `<input>`, one whose `type` is `text`, `url`, `email`, `tel` or `password` or is absent, and a `<textarea>` the companion draws in the slot take the field's chrome: the width of the column, a 1px `--fab-border` edge on a `--fab-bg-1` fill and `--fab-text` ink, a 38px input at radius 9, and a textarea at least 92px tall that resizes vertically.
-    A `<small>` there takes the muted ink, for a hint beneath the control.
+    A `<small>` there takes the muted ink, for a hint beneath the control; the companion gives the hint an `id` and adds it to the control's `aria-describedby`, so the hint is read with the control.
     A published control drawn there is drawn as it is in Fabricate's own fields, and what the chrome draws on any other `<input>` is private.
   - The keyboard ring of a text-like input or a textarea in the slot is the accent, 1px wide and inset 1px, so it is drawn over the control's own edge and the companion leaves no room for it.
-    It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3`.
+    It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3` in every palette (two fall short), so the companion draws the field on those four grounds.
   - Rest `data-*` attributes land on the column root.
   - It needs a Fabricate window ancestor, because its column and chrome come from Fabricate's module sheet.
   - Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
