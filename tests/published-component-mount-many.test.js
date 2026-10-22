@@ -5,6 +5,8 @@
  * of handles in item order, and a render fault that stays with its own item.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
@@ -23,7 +25,8 @@ import {
   zetaProps,
 } from './helpers/publishedComponentFakes.js';
 
-// One key of every shipped kind, so each item refusal `mount` makes has an item that meets it.
+// One key of every shipped kind; `STRICT` takes no rest, which M8 needs. The table of invalid items
+// below is held to cover every item refusal the spec rows state.
 const KINDS = Object.freeze({
   name: 'Kinds',
   path: 'src/ui/svelte/components/Kinds.svelte',
@@ -42,8 +45,13 @@ const KINDS = Object.freeze({
 });
 // An entry that needs a Fabricate window ancestor, judged by an injected `hasAncestor`.
 const ROOTED = Object.freeze({ ...KINDS, name: 'Rooted', root: 'fabricate' });
+const STRICT = Object.freeze({ ...KINDS, name: 'Strict', rest: false });
 const LAZY = Object.freeze({ ...KINDS, name: 'Lazy', path: 'src/Lazy.svelte', lazy: true });
-const TABLE = Object.freeze([KINDS, ROOTED, LAZY, ZETA]);
+const TABLE = Object.freeze([KINDS, ROOTED, STRICT, LAZY, ZETA]);
+const SPECIFIED = readFileSync(
+  resolve(import.meta.dirname, '../openspec/specs/ui-extension-points/spec.md'),
+  'utf8'
+);
 
 const UNDER_ROOT = 'under-root';
 const hasAncestor = (target) => target.marks === UNDER_ROOT;
@@ -184,9 +192,41 @@ describe('a batch that validates', () => {
       assert.ok(Object.isFrozen(handle));
       assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot', 'value']);
     }
+    assert.equal(handles[0].update({ label: 'A2' }), true);
+    assert.equal(mounts[0].instance.updates.at(-1).label, 'A2', "the first item's own mount");
     assert.equal(handles[1].update({ label: 'B2' }), true);
     assert.equal(mounts[1].instance.updates.at(-1).label, 'B2', "the second item's own mount");
+    assert.equal(mounts[2].instance.updates.length, 0, 'the third is untouched');
     assert.equal(seam.liveMountCount(), 3);
+  });
+
+  it('reads the length once and follows no iterator, so an array’s own iterator draws every item', () => {
+    const { ui, mounts } = batchSeam();
+    const items = [valid(), valid()];
+    items[Symbol.iterator] = function* oneOfTwo() {
+      yield items[0];
+    };
+    assert.equal([...items].length, 1, 'the iterator alone would have drawn one');
+    assert.equal(ui.mountMany('Kinds', items).length, 2);
+    assert.equal(mounts.length, 2);
+  });
+
+  it('draws the items it was given when a getter pushes another during validation', () => {
+    const { ui, mounts } = batchSeam();
+    const items = [valid()];
+    const pushed = valid();
+    items.push({
+      get target() {
+        items.push(pushed);
+        return new FakeTarget();
+      },
+      props: { label: 'Rank' },
+    });
+    const handles = ui.mountMany('Kinds', items);
+    assert.equal(items.length, 3, 'the getter did push');
+    assert.equal(handles.length, 2);
+    assert.equal(mounts.length, 2);
+    assert.ok(isEmpty(pushed.target), 'and the pushed item was not drawn');
   });
 
   it('leaves the rest live when one handle is destroyed', () => {
@@ -202,7 +242,7 @@ describe('a batch that validates', () => {
     assert.equal(seam.liveMountCount(), 2);
   });
 
-  it('reads each item as mount reads its options: onFault, overlayHost and the default props', () => {
+  it('accepts an item’s overlayHost and a non-function onFault, and defaults its props', () => {
     const { ui, mounts } = batchSeam({ table: [ZETA] });
     const document = new FakeTarget().ownerDocument;
     const target = new FakeTarget('div', document);
@@ -219,13 +259,19 @@ describe('a batch that validates', () => {
   });
 });
 
-/** Each item refusal `mount` makes, as an item that meets it and the tail it throws. */
+/**
+ * Each item refusal `mount` makes, as `[what, item, tail, { entry = 'Kinds', ahead }]`: an item that
+ * meets it, the tail it throws, the entry it is judged under and the item ahead of it in its batch.
+ */
 function invalidItems() {
   const held = batchSeam();
   const heldTarget = new FakeTarget();
   held.ui.mount('Kinds', { target: heldTarget, props: { label: 'Held' } });
   const full = new FakeTarget();
   full.childNodes.push({ role: 'companion' });
+  const fullWithBadProps = new FakeTarget();
+  fullWithBadProps.childNodes.push({ role: 'companion' });
+  const shared = new FakeTarget();
   const cycle = { label: 'Rank' };
   cycle.self = cycle;
   const props = (extra) => ({ target: new FakeTarget(), props: { label: 'Rank', ...extra } });
@@ -250,11 +296,34 @@ function invalidItems() {
       ],
       ['a target that is not empty', valid({ target: full }), 'target must be empty'],
       [
+        'a held target with a key it does not publish',
+        { target: heldTarget, props: { label: 'Rank', nope: 1 } },
+        'target already holds a published component',
+      ],
+      [
+        'a target that is not empty with a key it does not publish',
+        { target: fullWithBadProps, props: { label: 'Rank', nope: 1 } },
+        'target must be empty',
+      ],
+      [
+        'a target an earlier item names, with an overlayHost of another document',
+        valid({ target: shared, overlayHost: new FakeTarget() }),
+        "overlayHost must be an element in the target's document",
+        { ahead: () => valid({ target: shared }) },
+      ],
+      [
         'props that are not plain',
         { target: new FakeTarget(), props: new Map() },
         'props must be a plain object',
       ],
       ['a key it does not publish', props({ nope: 1 }), '"nope" is not a data attribute'],
+      [
+        'a key an entry without rest does not publish',
+        props({ nope: 1 }),
+        '"nope" is not a prop of Strict',
+        { entry: 'Strict' },
+      ],
+      ['an entry whose code is not loaded', valid(), '"Lazy" is not loaded', { entry: 'Lazy' }],
       [
         'a required key absent',
         { target: new FakeTarget(), props: {} },
@@ -296,14 +365,14 @@ function invalidItems() {
 describe('a batch with an invalid item', () => {
   it("throws mount's own refusal for that item unchanged, and renders and claims nothing", () => {
     const { held, items } = invalidItems();
-    for (const [what, item, tail] of items) {
-      const fake = { ...held, mountsBefore: held.mounts.length };
-      const before = valid();
+    for (const [what, item, tail, { entry = 'Kinds', ahead = valid } = {}] of items) {
+      const mountsBefore = held.mounts.length;
+      const before = ahead();
       const after = valid();
-      const expected = mountRefusal(held.ui, 'Kinds', item);
+      const expected = mountRefusal(held.ui, entry, item);
       assert.ok(expected, `mount refuses ${what}`);
       assert.throws(
-        () => fake.ui.mountMany('Kinds', [before, item, after]),
+        () => held.ui.mountMany(entry, [before, item, after]),
         (error) => {
           refusal(tail)(error);
           assert.equal(error.constructor, expected.constructor, what);
@@ -312,11 +381,38 @@ describe('a batch with an invalid item', () => {
         },
         what
       );
-      assert.equal(fake.mounts.length, fake.mountsBefore, `${what}: nothing rendered`);
+      assert.equal(held.mounts.length, mountsBefore, `${what}: nothing rendered`);
       assert.ok(isEmpty(before.target) && isEmpty(after.target), `${what}: every target empty`);
-      assert.equal(fake.seam.liveMountCount(), 1, `${what}: only the held mount is live`);
-      for (const handle of fake.ui.mountMany('Kinds', [before, after])) handle.destroy();
+      assert.equal(held.seam.liveMountCount(), 1, `${what}: only the held mount is live`);
+      for (const handle of held.ui.mountMany('Kinds', [before, after])) handle.destroy();
     }
+  });
+
+  it('covers every item refusal the spec rows state, but M16, which has its own test', () => {
+    const rowTails = (id) => {
+      const rows = SPECIFIED.split('\n').filter((line) => line.startsWith(`| ${id} |`));
+      assert.equal(rows.length, 1, `one ${id} row`);
+      const cell = rows[0].replace(/ \|$/u, '').split(' | ').at(-1);
+      return [...cell.matchAll(/`([^`]+)`/gu)].map(([, tail]) => tail);
+    };
+    // A placeholder such as `<key>` stands for any text.
+    const matcher = (tail) =>
+      new RegExp(
+        `^${tail
+          .split(/<[^>]+>/u)
+          .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`))
+          .join('.+')}$`,
+        'u'
+      );
+    const thrown = invalidItems().items.map((row) => row[2]);
+    const rows = Array.from({ length: 17 }, (_, index) => `M${index + 4}`).filter(
+      (id) => id !== 'M16'
+    );
+    assert.equal(rows.length, 16, 'M4 to M20, but M16');
+    const covers = (id) =>
+      rowTails(id).some((tail) => thrown.some((got) => matcher(tail).test(got)));
+    const uncovered = rows.filter((id) => covers(id) === false);
+    assert.deepEqual(uncovered, [], 'each row has an item the table throws its tail for');
   });
 
   it('M16: refuses a target outside the root, and M18 is judged after it', () => {
@@ -382,7 +478,7 @@ describe('a batch with an invalid item', () => {
     assert.equal(seam.liveMountCount(), 1);
   });
 
-  it('cannot judge a target inside another item’s slot before that item renders, so a later call does', () => {
+  it('cannot place a target in another item’s slot before that item renders, so a later call does', () => {
     const { ui } = batchSeam();
     const outer = rootedTarget();
     const inner = new FakeTarget();

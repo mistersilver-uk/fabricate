@@ -416,9 +416,9 @@ function createMounting({
     const entry = entryToMount(name);
     if (!Array.isArray(items)) throw refuse('items must be an array');
     const targets = new Set();
-    // `Array.from` visits a hole, which reads as an item with no target.
-    const validated = Array.from(items, (item) => {
-      const request = readRequest(entry, item);
+    // The length is read once and a hole reads as an item with no target; no iterator is followed.
+    const validated = Array.from({ length: items.length }, (_, index) => {
+      const request = readRequest(entry, items[index]);
       if (targets.has(request.target)) throw refuse(HELD);
       targets.add(request.target);
       lifecycle.assertUnheld(request.target);
