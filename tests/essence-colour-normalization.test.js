@@ -68,6 +68,17 @@ test('an unrecognized token is retained rather than discarded', () => {
   assert.equal(definition.colorToken, 'chartreuse');
 });
 
+test('the tints added at issue 2352 persist unchanged, with no migration', () => {
+  const definitions = normalizeEssences([
+    { id: 'moss', colorToken: 'verdant' },
+    { id: 'tide', colorToken: '--fab-tag-azure' },
+  ]);
+  assert.deepEqual(
+    definitions.map((definition) => definition.colorToken),
+    ['verdant', 'azure']
+  );
+});
+
 test('there is no customColor sibling — the palette is the whole vocabulary', () => {
   // A free hex cannot be guaranteed legible against all seven themes, so unlike the
   // gathering biome colour this model deliberately has no custom-hex companion.

@@ -59,15 +59,10 @@ const DEFAULT_VOCABULARIES = Object.freeze({
 const OBJECT_STRINGIFICATION = '[object object]';
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
 const VOCABULARY_DIMENSIONS = ['biomes'];
+// prettier-ignore
 const BIOME_COLOR_TOKENS = new Set([
-  'sage',
-  'mist',
-  'lavender',
-  'rose',
-  'peach',
-  'butter',
-  'aqua',
-  'mauve',
+  'sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve',
+  'verdant', 'azure',
 ]);
 const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_BIOME_METADATA = Object.freeze({

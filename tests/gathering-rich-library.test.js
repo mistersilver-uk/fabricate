@@ -6,6 +6,7 @@ import { GatheringEnvironmentStore } from '../src/systems/GatheringEnvironmentSt
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import { MANAGER_COLOR_TOKEN_KEYS } from '../src/ui/svelte/util/managerColorTokens.js';
 
 const actor = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items: [] };
 const viewer = { id: 'user-1', isGM: false };
@@ -471,6 +472,28 @@ test('rich gathering service preserves explicit biome record labels icons and co
       customColor: '#AABBCC',
     },
   ]);
+});
+
+test('rich gathering service keeps every offered tint on a biome and folds any other onto sage', () => {
+  // The service's biome vocabulary cannot import the manager palette, so this holds them equal.
+  // A build predating a tint folds it the same way, which is issue 2352 D5's stated downgrade.
+  const tokens = [...MANAGER_COLOR_TOKEN_KEYS, 'ember', 'bone', 'slate'];
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          vocabularies: {
+            biomes: { values: tokens.map((colorToken) => ({ id: `b-${colorToken}`, colorToken })) },
+          },
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(
+    service._config().systems['system-a'].vocabularies.biomes.values.map((b) => b.colorToken),
+    [...MANAGER_COLOR_TOKEN_KEYS, 'sage', 'sage', 'sage']
+  );
 });
 
 test('task and event libraries match environments by tags and global conditions', async () => {

@@ -70,11 +70,11 @@ function measure(ink, fills) {
   return { lowest: Math.min(...lowest), short };
 }
 
-test('a colour swatch rings in the dark ink at 3:1 on all eight swatches in every theme', (t) => {
+test('a colour swatch rings in the dark ink at 3:1 on all ten swatches in every theme', (t) => {
   const ink = ringInk(SWATCH_RING);
   assert.equal(ink, '--fab-biome-icon-foreground');
   const fills = MANAGER_COLOR_TOKEN_KEYS.map((token) => `--fab-tag-${token}`);
-  assert.equal(fills.length, 8);
+  assert.equal(fills.length, 10);
   const { lowest, short } = measure(ink, fills);
   t.diagnostic(`lowest swatch ring ratio ${lowest.toFixed(2)}:1`);
   assert.deepEqual(short, [], 'a selected swatch would be under WCAG 1.4.11');

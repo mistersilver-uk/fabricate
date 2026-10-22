@@ -19,7 +19,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-color-popover-characterization-',
-  // The shared colour-token constant (issue 1036). The popover localizes its eight preset
+  // The shared colour-token constant (issue 1036). The popover localizes its preset
   // labels through it, so it is a static import of the component under test; the harness's
   // own closure validator reports the omission by name rather than hanging on it.
   rawModules: [
@@ -44,6 +44,8 @@ const PRESETS = [
   ['butter', 'Butter'],
   ['aqua', 'Aqua'],
   ['mauve', 'Mauve'],
+  ['verdant', 'Verdant'],
+  ['azure', 'Azure'],
 ];
 
 const PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
@@ -142,14 +144,14 @@ afterEach(() => {
 
 for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
   describe(`1036 TintPicker — characterization (${layout})`, () => {
-    it('renders exactly the eight shipped presets, in order, as real buttons', async () => {
+    it('renders exactly the ten offered presets, in order, as real buttons', async () => {
       const scope = await mount({ colorToken: 'sage' });
       const cells = presetCells(scope);
 
       assert.deepEqual(
         cells.map((cell) => cell.dataset.managerColorToken),
         PRESETS.map(([token]) => token),
-        'eight cells, in the shipped palette order'
+        'ten cells, in the shipped palette order'
       );
       for (const cell of cells) {
         assert.equal(cell.tagName, 'BUTTON', 'each cell is a real button');
@@ -190,7 +192,7 @@ for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
       const named = scope.querySelector(group);
       assert.ok(Boolean(named), `the cells sit in ${group}`);
       assert.equal(named.getAttribute('aria-label'), 'Biome colours', 'named by its label');
-      assert.equal(named.querySelectorAll('[data-manager-color-token]').length, 8);
+      assert.equal(named.querySelectorAll('[data-manager-color-token]').length, 10);
     });
 
     it('names the palette through the shared keys when a caller passes no label (issue 2257)', async () => {
@@ -263,7 +265,7 @@ for (const [layout, { mark, group, mount }] of Object.entries(LAYOUTS)) {
         'the per-essence colour caller (issue 917) has the palette as its whole vocabulary'
       );
       assert.ok(!scope.querySelector('.manager-color-custom'), 'and no hex caption either');
-      assert.equal(presetCells(scope).length, 8, 'and still exactly eight cells');
+      assert.equal(presetCells(scope).length, 10, 'and still exactly ten cells');
     });
 
     it('offers no free-hex entry to a caller that does not pass `allowCustom`', async () => {
@@ -336,7 +338,7 @@ describe('2459 TintPicker — the popover is the picker grid form', () => {
     assert.equal(list.dataset.pickerAs, 'grid');
     assert.equal(list.dataset.pickerColumns, '4');
     assert.equal(list.dataset.pickerTiles, 'square');
-    assert.equal(panel.querySelector('[data-popover-filtered-count]').textContent, '8 of 8');
+    assert.equal(panel.querySelector('[data-popover-filtered-count]').textContent, '10 of 10');
     assert.equal(
       panel.querySelector('input[role="combobox"]').getAttribute('aria-label'),
       'Search colours'
