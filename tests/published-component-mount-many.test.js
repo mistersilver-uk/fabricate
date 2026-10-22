@@ -444,5 +444,7 @@ describe('a render fault in a batch', () => {
     assert.deepEqual(told, [[], [], []], 'never inside mountMany');
     await drained();
     assert.deepEqual(told, [[], [failure], []], "only that item's onFault, once");
+    assert.equal(handles[0].update({ label: 'y' }), true, 'its notice ends no other mount');
+    assert.equal(liveMountCount(), 2);
   });
 });
