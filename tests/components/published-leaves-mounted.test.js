@@ -288,6 +288,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),
     drawn: ['40', '80'],
   },
+  {
+    name: 'Field',
+    under: 'fabricate',
+    root: '.fabricate-field',
+    props: { as: 'div', 'data-companion-field': 'name' },
+    next: { as: 'div', 'data-companion-field': 'title' },
+    read: (root) => root.getAttribute('data-companion-field'),
+    drawn: ['name', 'title'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -408,6 +417,9 @@ describe('a key a leaf does not publish', () => {
     ['Select', 'triggerProps', 'is not a prop of Select'],
     ['StageBars', 'ariaLabelledBy', 'is not a data attribute'],
     ['StageBars', 'class', 'is not a data attribute'],
+    ['Field', 'class', 'is not a data attribute'],
+    ['Field', 'label', 'is not a data attribute'],
+    ['Field', 'caption', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -574,6 +586,7 @@ const SLOT_LEAVES = [
   ['Rail', '.fab-rail'],
   ['InspectorCard', '.fabricate-card'],
   ['EmptyState', '.manager-empty > div'],
+  ['Field', '.fabricate-field'],
 ];
 
 describe('a slot key through the shipped seam', () => {

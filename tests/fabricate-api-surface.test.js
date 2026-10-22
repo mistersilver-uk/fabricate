@@ -192,11 +192,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454
- * and 2455 headings, by name and in the order the spec states them.
+ * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
+ * 2455 and 2601 headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -282,6 +282,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'SearchField',
       'Select',
       'StageBars',
+      'Field',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -504,6 +505,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: { stages: required, currentIndex: optional, numbered: optional, ariaLabel: required },
         rest: true,
         root: 'any',
+        overlays: false,
+      },
+      Field: {
+        version: 1,
+        props: { as: required, children: slot },
+        rest: true,
+        root: 'fabricate',
         overlays: false,
       },
     });

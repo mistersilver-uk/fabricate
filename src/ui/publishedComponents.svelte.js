@@ -15,6 +15,7 @@ import BandedBar from './svelte/components/BandedBar.svelte';
 import Button from './svelte/components/Button.svelte';
 import Chip from './svelte/components/Chip.svelte';
 import EmptyState from './svelte/components/EmptyState.svelte';
+import Field from './svelte/components/Field.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
 import InspectorCard from './svelte/components/InspectorCard.svelte';
@@ -52,6 +53,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/SearchField.svelte': SearchField,
   'src/ui/svelte/components/Select.svelte': Select,
   'src/ui/svelte/components/StageBars.svelte': StageBars,
+  'src/ui/svelte/components/Field.svelte': Field,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

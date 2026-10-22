@@ -17,10 +17,6 @@
       "reason": "domain-coupled: its thresholds, allocation and sources are Fabricate essence records, and its readings run while Fabricate renders."
     },
     {
-      "path": "src/ui/svelte/components/Field.svelte",
-      "reason": "pending:#2601: needs a caption prop from the design-system rail, or `as` required at div with a published Kicker as the caption."
-    },
-    {
       "path": "src/ui/svelte/components/FilterBar.svelte",
       "reason": "no-consumer: a toolbar section around the manager's filter controls; a companion arranges its own published controls."
     },
