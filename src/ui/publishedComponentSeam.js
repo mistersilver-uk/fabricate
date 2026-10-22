@@ -356,7 +356,8 @@ function createMountLifecycle({ runtime, report }) {
 /**
  * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`,
  * `overlay`, `loaders` and `reportLoadFailure` among it, at once, binding each eager entry's own
- * `component`; otherwise the adapter calls `register`, once.
+ * `component`; otherwise the adapter calls `register`, once. `loaders` maps a lazy entry's `path` to
+ * a function resolving its component, and `reportLoadFailure(error)` takes a chunk-load failure.
  * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
@@ -384,6 +385,7 @@ export function createPublishedComponents({
     if (!isReady()) throw refuse('mount before ready');
     const entry = entries.get(name);
     if (!entry) throw refuse(`"${String(name)}" is not published`);
+    // M19, directly after M3: a lazy entry is refused until `load` has resolved for it.
     if (!loading.isLoaded(entry)) throw refuse(`"${entry.name}" is not loaded`);
     const { target, props = {}, onFault, overlayHost } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');

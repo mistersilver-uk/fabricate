@@ -1,7 +1,8 @@
 /**
  * Lazy published entries (issue 2455): an entry stating `lazy: true` is bound to a loader, which
  * resolves its component, instead of a component, and `load` calls that loader once per seam. A
- * failed fetch keeps its rejection for the page session; a chunk-load failure is also reported.
+ * failed fetch keeps its rejection for the page session and is not retried; a chunk-load failure
+ * is also handed to the runtime's `reportLoadFailure`.
  */
 import { isChunkLoadFailure } from '../utils/deferredEntryNotice.js';
 
@@ -25,6 +26,10 @@ export function lazyBindingFault(entry, components, loaders) {
 /**
  * One seam's `load` and the lazy components it has fetched. `runtime()` reads the registered
  * runtime: its `loaders` by path, and the `reportLoadFailure` a chunk-load failure is handed to.
+ * `load` resolves an eager name at once and a lazy name once its component is fetched. It rejects
+ * with M3 for an unpublished name before any loader runs, with the loader's own error for a failed
+ * fetch, and for a lazy name before the runtime registers. `isLoaded` is true for an eager entry,
+ * and for a lazy one once fetched.
  */
 export function createEntryLoading({ entries, runtime }) {
   const loaded = new Map();

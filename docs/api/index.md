@@ -2985,9 +2985,12 @@ It resolves `undefined` once every named component's code is loaded: at once, on
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
 `TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
-`Rail` is lazy: Fabricate fetches its code only when `load` names it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
+`Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
+A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
-When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice, shared with the Manager's so one shows at a time; otherwise it draws and announces nothing, so draw your own pending state until `load` settles and your own error state, announced through your own live region, when it rejects.
+Fabricate draws no pending state and no error state for a load, so draw your own until `load` settles and, when it rejects, your own error state, announced through your own live region.
+When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice, shared with the Manager's so one shows at a time, and at most once per page session.
+A failure before Foundry has created its notifications, which a `load` made in `setup` can meet, shows that notice when Foundry's `ready` hook fires.
 Once loaded, a lazy component mounts, draws and behaves exactly as it would if Fabricate loaded it with its entry script.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 

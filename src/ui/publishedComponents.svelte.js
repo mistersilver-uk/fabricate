@@ -2,9 +2,9 @@
  * The published component seam's Svelte runtime (issue 2426): Fabricate's own `mount`, `unmount`,
  * boundary host, the `flush` a value key's resync runs (issue 2453) and the empty component an
  * overlay container mounts (issue 2454), with each eager manifest `path` bound to its component
- * and each lazy one to a loader that imports its chunk (issue 2455).
- * `main.js` imports it for
- * the registration side effect, so the plain seam never imports Svelte.
+ * and each lazy one to a loader that imports its chunk (issue 2455), and the reporter a failed
+ * chunk load is handed to. `main.js` imports it for the registration side effect, so the plain
+ * seam never imports Svelte.
  */
 import { flushSync, mount, unmount, untrack } from 'svelte';
 
