@@ -2,6 +2,7 @@
  * Source contract: the manager's button contract is written in ONE place (issue 1118).
  * A hand-written button class string was a CSS CONVENTION for as long as this app has had a
  * manager, and a convention is exactly as reliable as everyone's memory of it.
+ * No `.svelte` under `src/` writes the literal: the primitive composes its classes in `<script>`.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,20 +17,6 @@ const SRC = join(repoRoot, 'src');
 const ROOT_CLASS = 'fabricate-button';
 const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
 const PRIMITIVE_FILE = 'src/ui/svelte/components/Button.svelte';
-
-/**
- * The one `.svelte` file under `src/` that may still write the literal, with its reason. The
- * primitive itself composes its classes in `<script>` and writes no literal at all.
- * Repo-relative POSIX paths, so a Windows checkout compares the same strings (issue 1502).
- */
-const LITERAL_EXCEPTIONS = Object.freeze({
-  'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze({
-    why:
-      'a consumer of the same CSS contract, not of the primitive: its danger role is an ' +
-      'invariant of its arm/confirm machine rather than a caller choice — so its evidence is ' +
-      'MARKUP, read in token form',
-  }),
-});
 
 /** Every file beneath `directory`, as repo-relative POSIX paths. */
 function filesUnder(directory) {
@@ -82,13 +69,11 @@ test('no .svelte under src writes the fabricate-button class literal', () => {
   );
 
   // TOKEN-AWARE, not a prefix probe (issue 1502).
-  const offenders = svelte
-    .filter((path) => !(path in LITERAL_EXCEPTIONS))
-    .filter((path) =>
-      classAttributesIn(readFileSync(join(repoRoot, path), 'utf8')).some((attribute) =>
-        attribute.split(/\s+/).filter(Boolean).includes(ROOT_CLASS)
-      )
-    );
+  const offenders = svelte.filter((path) =>
+    classAttributesIn(readFileSync(join(repoRoot, path), 'utf8')).some((attribute) =>
+      attribute.split(/\s+/).filter(Boolean).includes(ROOT_CLASS)
+    )
+  );
 
   assert.deepEqual(
     offenders,
@@ -98,19 +83,6 @@ test('no .svelte under src writes the fabricate-button class literal', () => {
       '`class` prop — see `openspec/specs/ui-visual-style/spec.md` `### Shared product UI primitives`:\n  ' +
       offenders.join('\n  ')
   );
-
-  // The exceptions are asserted to still EARN their exemption.
-  for (const [path, exception] of Object.entries(LITERAL_EXCEPTIONS)) {
-    const source = readFileSync(join(repoRoot, path), 'utf8');
-    const earns = classAttributesIn(source).some((attribute) =>
-      attribute.split(/\s+/).filter(Boolean).includes(ROOT_CLASS)
-    );
-    assert.ok(
-      earns,
-      `${path} is exempted (${exception.why}) but no longer writes the literal in its markup, ` +
-        'so drop the exception or restate its evidence'
-    );
-  }
 });
 
 test('the primitive emits the family root and the keyboard-focus attribute', () => {

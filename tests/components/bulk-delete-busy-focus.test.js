@@ -1,4 +1,4 @@
-/* THE BLUR THAT MAKES THE BUSY FACE NECESSARY (issue 1132), in a real browser. */
+/* In a real browser: disabling the focused delete control blurs it, and its busy face does not (issue 1132). */
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
@@ -15,6 +15,7 @@ const card = createMountedComponentHarness({
   // The card's ONE shared leaf (issue 1157).
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     CARD_PATH,
@@ -22,7 +23,7 @@ const card = createMountedComponentHarness({
   componentPath: CARD_PATH,
 });
 
-/** Focus the armed control, then disable it exactly as a caller flipping `busy` would. */
+/** Focus the armed control, then disable it natively, as a caller's `disabled` does. */
 function measureDisableWhileFocused() {
   const button = document.querySelector('.fab-bulk-delete-card .fabricate-button');
   if (!button) return { rendered: false };
@@ -43,45 +44,87 @@ function measureDisableWhileFocused() {
   };
 }
 
-describe('1132 disabling the focused delete control fires blur in a real browser', () => {
-  let measured = null;
-  let markup = '';
+/** Focus the armed control, then give it the busy render's attributes, as the caller's `busy` does. */
+function measureBusyTransition(busyAttributes) {
+  const button = document.querySelector('.fab-bulk-delete-card .fabricate-button');
+  if (!button) return { rendered: false };
 
-  before(async () => {
-    await card.setup();
-    try {
-      const target = await card.mount({
-        token: 'delete-recipes',
-        heading: 'Delete selected recipes',
-        rows: [{ key: 'recipes', text: '3 recipes will be deleted.' }],
-        idleLabel: 'Delete 3 recipes',
-        armedLabel: 'Confirm delete',
-        busyLabel: 'Deleting…',
-        idleAriaLabel: 'Delete 3 recipes',
-        armedAriaLabel: 'Confirm delete — 3 recipe(s) affected. This cannot be undone.',
-        armed: true,
-        cardAttr: 'data-recipe-bulk-delete-card',
-        impactAttr: 'data-recipe-bulk-impact',
-        rowAttr: 'data-recipe-bulk-impact-row',
-      });
-      markup = target.innerHTML;
-    } finally {
-      card.teardown();
-    }
-
-    const browser = await chromium.launch();
-    try {
-      const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
-      await page.setContent(
-        `<!doctype html><html><head><meta charset="utf-8"></head><body>${markup}</body></html>`,
-        { waitUntil: 'load' }
-      );
-      measured = await page.evaluate(measureDisableWhileFocused);
-    } finally {
-      await browser.close();
-    }
+  const events = [];
+  button.addEventListener('blur', () => {
+    events.push('blur');
   });
+  button.focus();
+  const focusedBefore = document.activeElement === button;
 
+  for (const name of button.getAttributeNames()) {
+    if (!Object.hasOwn(busyAttributes, name)) button.removeAttribute(name);
+  }
+  for (const [name, value] of Object.entries(busyAttributes)) button.setAttribute(name, value);
+
+  return {
+    rendered: true,
+    focusedBefore,
+    busyMatch: button.getAttribute('aria-busy') === 'true',
+    blurCount: events.length,
+    focusedAfter: document.activeElement === button,
+    disabledMatch: button.matches(':disabled'),
+  };
+}
+
+/** Load the product markup into a fresh page of `browser` and run `measure` against it. */
+async function measureIn(browser, markup, measure, ...args) {
+  const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
+  await page.setContent(
+    `<!doctype html><html><head><meta charset="utf-8"></head><body>${markup}</body></html>`,
+    { waitUntil: 'load' }
+  );
+  return page.evaluate(measure, ...args);
+}
+
+let measured = null;
+let transition = null;
+
+// One mount and one browser launch for both describes: the armed markup, then the attributes
+// the same control renders once its caller sets `busy`.
+before(async () => {
+  let markup;
+  let busyAttributes;
+  await card.setup();
+  try {
+    const target = await card.mount({
+      token: 'delete-recipes',
+      heading: 'Delete selected recipes',
+      rows: [{ key: 'recipes', text: '3 recipes will be deleted.' }],
+      idleLabel: 'Delete 3 recipes',
+      armedLabel: 'Confirm delete',
+      busyLabel: 'Deleting…',
+      idleAriaLabel: 'Delete 3 recipes',
+      armedAriaLabel: 'Confirm delete — 3 recipe(s) affected. This cannot be undone.',
+      armed: true,
+      cardAttr: 'data-recipe-bulk-delete-card',
+      impactAttr: 'data-recipe-bulk-impact',
+      rowAttr: 'data-recipe-bulk-impact-row',
+    });
+    markup = target.innerHTML;
+    await card.setProps({ busy: true });
+    const busyButton = target.querySelector(':scope .fab-bulk-delete-card .fabricate-button');
+    busyAttributes = Object.fromEntries(
+      [...(busyButton?.attributes ?? [])].map(({ name, value }) => [name, value])
+    );
+  } finally {
+    card.teardown();
+  }
+
+  const browser = await chromium.launch();
+  try {
+    measured = await measureIn(browser, markup, measureDisableWhileFocused);
+    transition = await measureIn(browser, markup, measureBusyTransition, busyAttributes);
+  } finally {
+    await browser.close();
+  }
+});
+
+describe('1132 disabling the focused delete control fires blur in a real browser', () => {
   it('renders a real, focusable control from the product markup', () => {
     // Anti-vacuity, asserted before anything it bounds.
     assert.ok(
@@ -91,14 +134,10 @@ describe('1132 disabling the focused delete control fires blur in a real browser
     assert.ok(measured.focusedBefore, 'the control did not take focus, so the disable below cannot blur it');
   });
 
-  // THE SECOND PREMISE, and the one issue 1157's guard rests on. `BulkDeleteCard` no longer
-  // restores focus unconditionally after a refused write: it restores only when focus is
-  // still on `document.body`, so a GM who tabbed into the browser's search field while the
-  // write was running keeps their place. That guard is only the RIGHT guard if `<body>` is
-  // genuinely where the disable leaves the keyboard — if Chromium parked focus somewhere else
-  // the condition would never hold, the restore would never run, and the mounted suite (which
-  // enters that state by hand with an explicit `document.body.focus()`) would agree it was
-  // fine.
+  // Issue 1157's guard: `BulkDeleteCard` restores focus after a write only when it is still on
+  // `document.body`, so a GM who tabbed elsewhere keeps their place. That is the right guard only
+  // if `<body>` is where a native disable leaves the keyboard; the mounted suite enters that
+  // state by hand, so only a browser can say.
   it('leaves the keyboard on document.body, which is what the restore guard tests for', () => {
     assert.equal(
       measured.activeAfter,
@@ -109,14 +148,29 @@ describe('1132 disabling the focused delete control fires blur in a real browser
   });
 
   it('fires blur the moment the control is disabled, which happy-dom never does', () => {
-    // THE PREMISE. Without it, `busy` would be an unnecessary prop and an `armed`-derived
-    // busy face would be correct — and the mounted suite, running on an engine that raises no
-    // such event, would agree.
+    // The premise behind `focus()`, the body-only restore and the blur-while-busy guard, each of
+    // which a happy-dom suite would pass without.
     assert.equal(
       measured.blurCount,
       1,
-      'Chromium did not blur the focused control when it was disabled — the browser fact the busy prop exists for no longer holds, so re-derive the design before deleting the prop'
+      'Chromium did not blur the focused control when it was disabled — the browser fact behind '
+        + "ArmedDangerButton's focus() export, BulkDeleteCard's restore and the blur guard no "
+        + 'longer holds, so re-derive them before deleting any'
     );
     assert.equal(measured.focusedAfter, false, 'and focus really left the control');
+  });
+});
+
+describe('the busy face keeps focus across the real busy transition in a real browser', () => {
+  it('takes focus before the transition, and the transition is to the busy render', () => {
+    assert.ok(transition.rendered, `${CARD_PATH} rendered no .fab-bulk-delete-card .fabricate-button`);
+    assert.ok(transition.focusedBefore, 'the control did not take focus, so nothing below is measured');
+    assert.ok(transition.busyMatch, 'the busy render carried no aria-busy, so this is not the busy transition');
+  });
+
+  it('fires no blur, keeps the keyboard on the control, and is not :disabled', () => {
+    assert.equal(transition.blurCount, 0, 'setting busy blurred the focused control');
+    assert.equal(transition.focusedAfter, true, 'focus left the control when busy was set');
+    assert.equal(transition.disabledMatch, false, 'the busy face matches :disabled');
   });
 });
