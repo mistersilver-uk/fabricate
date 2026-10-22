@@ -2695,7 +2695,7 @@ describe('the module sheet and every component style against the published Inspe
     assert.equal(selectors.length, 15, 'the census at issue 2467');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper', 'SearchField', 'Select'],
+      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper', 'SearchField', 'Select', 'Field'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(

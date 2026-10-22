@@ -772,6 +772,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-select': () => import('./fixtures/PublishedSelect.svelte'),
   // Issue 2455: stage groups named by their stages' labels and names, by the same seam.
   'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
+  // Issue 2601: a field whose content slot holds a companion's caption, input and hint, by the same seam.
+  'published-field': () => import('./fixtures/PublishedField.svelte'),
 });
 // view-lab-region:end
 

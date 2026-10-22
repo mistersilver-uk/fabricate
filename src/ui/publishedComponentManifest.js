@@ -300,4 +300,15 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'any',
   }),
+  Object.freeze({
+    name: 'Field',
+    path: 'src/ui/svelte/components/Field.svelte',
+    version: 1,
+    props: Object.freeze({
+      as: Object.freeze({ kind: 'data', required: true }),
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);

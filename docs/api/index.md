@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2053,6 +2053,7 @@ The published components, in publication order:
 | `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
+| `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2829,6 +2830,60 @@ const bars = fabUi.mount('StageBars', { target, props: props() });
 bars.update(props());
 ```
 
+### Field
+
+`Field` draws the design system's field: the column that stacks a caption over the control it heads, for one labelled entry of a form you draw.
+It draws no control, no caption and no text of its own: draw your caption and your control in its content slot.
+`as` is required and is `div`, the one host published at version 1; what it draws for any other value is private.
+A `div` field names no control, so give your caption an `id` and point the control's `aria-labelledby` at it.
+`children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, in the order you append them: the caption first, the control beneath it.
+The column states `--fab-text` ink at 12.5px and weight 500, which your content inherits, and a text input or textarea there inherits its face from it.
+The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
+Fabricate's own fields caption in the kicker type, so to match them mount a published `Kicker` with `as` `span` into your caption `<span id>` and give that span `display: flex`, which keeps the `id` on your element and the span exactly as tall as the kicker, as [Kicker](#kicker) states.
+A text-like `<input>`, one whose `type` is `text`, `url`, `email`, `tel` or `password` or is absent, and a `<textarea>` you draw in the slot take the field's chrome: the width of the column, a 1px `--fab-border` edge on a `--fab-bg-1` fill and `--fab-text` ink, a 38px input at radius 9, and a textarea at least 92px tall that resizes vertically.
+A `<small>` there takes the muted ink, for a hint beneath the control.
+Give the hint an `id` and add it to the control's `aria-describedby`, so the hint is read with the control.
+A published control you draw there is drawn as it is in Fabricate's own fields, and what the chrome draws on any other `<input>` is private.
+The keyboard ring of a text-like input or a textarea in the slot is the accent, 1px wide and inset 1px, so it is drawn over the control's own edge and you leave no room for it.
+It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3`, where two palettes fall short, so draw the field on those four grounds.
+Rest `data-*` attributes land on the column root.
+`Field` needs a Fabricate window ancestor, so its root is `fabricate`: its column and chrome come from Fabricate's module sheet.
+Your own window or dialog carries no Fabricate root, so the field is refused there with `Field needs a Fabricate window ancestor`.
+Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The field never moves its content slot while it is requested.
+Its gap, its type figures beyond the column's, the chrome's figures and colours beyond what this section states, and how Fabricate redraws a field and its control in its own rows, cards and rails are private.
+The `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1.
+A `class`, `label` or `caption` is refused because a rest key must be a `data-*` attribute.
+
+A worked field follows: a caption, a text input and a hint of your own, for the name of a recipe you hold.
+
+```javascript
+// After `load(['Field', 'Kicker'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('Field')) return;
+
+const field = fabUi.mount('Field', { target, props: { as: 'div', children: true } });
+const slot = field.slot('children');
+const caption = document.createElement('span');
+caption.id = 'acme-recipe-name-caption'; // Unique in the document.
+caption.style.display = 'flex';
+const hint = document.createElement('small');
+hint.id = 'acme-recipe-name-hint';
+hint.textContent = 'Shown on the recipe card.';
+const input = document.createElement('input');
+input.type = 'text';
+input.setAttribute('aria-labelledby', caption.id);
+input.setAttribute('aria-describedby', hint.id);
+input.value = acmeRecipe.name;
+slot.append(caption, input, hint);
+// The caption in the kicker type, named by the id on your own span.
+fabUi.mount('Kicker', {
+  target: caption,
+  props: { as: 'span', children: 'Recipe name' },
+});
+// `field.destroy()` also destroys the kicker mounted in its content slot.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3002,7 +3057,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars` and `Field` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.

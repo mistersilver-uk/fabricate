@@ -166,10 +166,13 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
   // `tag` and `href`, which could draw an `<a>`, are not published.
   'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
-  // `SearchField` draws it only under its unpublished `label`, and passes `as="label"`.
-  // With no `as` it falls back to `div`; `field-source-contract` holds that hole by requiring a literal
-  // `as` on every `<Field>`, and neither tag is focusable.
-  'src/ui/svelte/components/Field.svelte: svelte:element': { tags: ['label'], keys: [] },
+  // An `as` outside the three hosts draws a `div`, and no host is focusable; `SearchField` passes
+  // the literal `as="label"`, and `field-source-contract` requires a literal `as` on every `<Field>`.
+  'src/ui/svelte/components/Field.svelte: svelte:element': {
+    tags: ['div', 'fieldset', 'label'],
+    keys: ['as'],
+    heldBy: "tests/components/published-field-mounted.test.js: Field's host element",
+  },
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
     tags: ['h3', 'p', 'span'],
     keys: ['as'],

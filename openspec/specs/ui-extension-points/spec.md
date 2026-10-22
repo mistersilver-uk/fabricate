@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -430,6 +430,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `SearchField` (issue 2453).
 - The published set continues with `Select` (issue 2454).
 - The published set continues with `StageBars` (issue 2455).
+- The published set continues with `Field` (issue 2601).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -440,6 +441,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - `StatusToggle`'s `as`, `label`, `disabled`, `trailing` and `onChange`, and so its indicator and checkbox hosts, are not published at version 1; publishing one later is additive.
 - `Stepper`'s `disabled`, `allowUnset`, `placeholder`, `fill`, `orientation`, `density`, `stops` and `nullLabel` are not published at version 1; publishing one later is additive.
 - `SearchField`'s `density`, `icon` and `onChange` are not published at version 1; publishing one later is additive.
+- `Field`'s `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1; publishing one later is additive.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
@@ -447,7 +449,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), and `StageBars` too (issue 2455); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field` too (issue 2601); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -1055,6 +1057,30 @@ Each group states the accepted values of every key that entry publishes.
   - It is not a live region: an `update` redraws the bars in place and announces nothing.
 - **Private:** `StageBars`' track height and corner, its gaps, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
 
+### The issue 2601 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`Field`.**
+  - It is the design system's field: the column that stacks a caption over the control it heads, for one labelled entry of a form the companion draws.
+    It draws no control, no caption and no text of its own: the companion draws its caption and its control in its content slot.
+  - `as` is required and is `div`, the one host published at version 1; what it draws for any other value is private.
+    A `div` field names no control, so the companion gives its caption an `id` and points the control's `aria-labelledby` at it.
+  - `children` is a content slot whose element is a `<div>`; the field draws the content slot's children in a column it spaces, in the order the companion appends them: the caption first, the control beneath it.
+    The column states `--fab-text` ink at 12.5px and weight 500, which the content inherits, and a text input or textarea there inherits its face from it.
+  - The caption is a child of the content slot's element, never of the column, so Fabricate's sheet draws it in the column's type, never as a kicker.
+    Fabricate's own fields caption in the kicker type, so to match them the companion mounts a published `Kicker` with `as` `span` into its caption `<span id>` and gives that span `display: flex`, which keeps the `id` on the companion's element and the span exactly as tall as the kicker, as the `Kicker` group and "Ownership, strings and theme" state.
+  - A text-like `<input>`, one whose `type` is `text`, `url`, `email`, `tel` or `password` or is absent, and a `<textarea>` the companion draws in the slot take the field's chrome: the width of the column, a 1px `--fab-border` edge on a `--fab-bg-1` fill and `--fab-text` ink, a 38px input at radius 9, and a textarea at least 92px tall that resizes vertically.
+    A `<small>` there takes the muted ink, for a hint beneath the control; the companion gives the hint an `id` and adds it to the control's `aria-describedby`, so the hint is read with the control.
+    A published control drawn there is drawn as it is in Fabricate's own fields, and what the chrome draws on any other `<input>` is private.
+  - The keyboard ring of a text-like input or a textarea in the slot is the accent, 1px wide and inset 1px, so it is drawn over the control's own edge and the companion leaves no room for it.
+    It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3`, where two palettes fall short, so the companion draws the field on those four grounds.
+  - Rest `data-*` attributes land on the column root.
+  - The field never moves its content slot while it is requested.
+  - It needs a Fabricate window ancestor, because its column and chrome come from Fabricate's module sheet.
+  - Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails.
+
 ### The publishable subset
 
 Each term is defined here and used in this sense throughout.
@@ -1340,6 +1366,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** it draws a group named by `ariaLabel` holding one `progressbar` per stage, each named by its stage's `label`, else its `name`
 - **AND** the one bar of a one-stage list whose stage has neither takes the group's name, and an empty `stages` draws the named group with no bar
 - **AND** its import closure reads no Foundry global
+
+#### Scenario: A published field
+
+- **WHEN** a companion mounts `Field` with `as: 'div'` and `children: true` inside a Fabricate window, and draws a caption `<span id>` and a text `<input>` whose `aria-labelledby` names it in the content slot
+- **THEN** the field draws one `<div>` column holding the slot, and the input takes the field's chrome and its inset 1px ring
+- **AND** an `update` keeps focus on the input, and `destroy` leaves `target` empty
+- **AND** a mount that omits `as` throws M9, and one into a target with no `.fabricate` ancestor throws M16
 
 #### Scenario: An overlay host
 

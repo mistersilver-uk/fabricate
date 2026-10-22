@@ -873,6 +873,34 @@ test('(a) a StageBars change publishes its two run frames, then the specimen tha
   }
 });
 
+test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/Field.svelte';
+  const frames = [
+    'manager-gathering-task-editor-normal',
+    'manager-system-edit-normal',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-currency-body-empty',
+    'manager-selected-condition-select-long-option',
+    'manager-checks-crafting-trigger-break-tools',
+    'manager-gathering-task-stamina-modifier-list',
+    'world-tool-entry',
+    'interactables-config-configured',
+    'manager-component-edit-salvage',
+    'player-crafting-roll-prompt-basic',
+    'manager-import-folder-mapping',
+    'manager-published-field-specimen',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Field change does not select '${caseId}'`);
+  }
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
