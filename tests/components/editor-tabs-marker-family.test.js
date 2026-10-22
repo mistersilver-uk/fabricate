@@ -3,17 +3,14 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { APP_LOCALIZER_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-family-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: APP_LOCALIZER_RAW_MODULES,
   compiledModules: [
     // The manager's ONE chip (issue 883).
     'src/ui/svelte/components/Chip.svelte',
@@ -27,8 +24,8 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 const TABS = [
-  { id: 'roll', icon: 'fas fa-dice-d20', labelKey: 'x.Roll', label: 'The roll' },
-  { id: 'outcomes', icon: 'fas fa-list', labelKey: 'x.Outcomes', label: 'Outcomes' },
+  { id: 'roll', icon: 'fas fa-dice-d20', label: 'The roll' },
+  { id: 'outcomes', icon: 'fas fa-list', label: 'Outcomes' },
 ];
 
 /** The classes the strip authors on an element, in order, without Svelte's scoping class. */
@@ -371,6 +368,7 @@ describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
   it('draws the premium padlock from `tierGated` alone, never as a mark (issue 1779)', async () => {
     const root = await harness.mount({
       tabs: [{ ...TABS[0], tierGated: true }, TABS[1]],
+      annotated: true,
       activeTab: 'roll',
       badges: { outcomes: { vehicle: 'premium', label: 'PREMIUM' } },
     });
@@ -409,7 +407,6 @@ describe('EditorTabs names the Validation tab`s toned counts (issue 1522)', () =
     {
       id: 'validation',
       icon: 'fas fa-clipboard-check',
-      labelKey: 'x.Validation',
       label: 'Validation',
     },
   ];
@@ -431,6 +428,41 @@ describe('EditorTabs names the Validation tab`s toned counts (issue 1522)', () =
     assert.equal(
       await nameFor({ validation: { label: '3', tone: 'warning' } }),
       'Validation, 3 warnings'
+    );
+  });
+
+  it('localizes the names through the app localizer, and calls no game.i18n without one', async () => {
+    const blocking = { validation: { label: '1', tone: 'danger' } };
+    const asked = [];
+    const shipped = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = (key) => {
+      asked.push(key);
+      return key;
+    };
+    try {
+      assert.equal(
+        await nameFor(blocking),
+        'Validation, 1 blocking',
+        'the English, with no localizer'
+      );
+      assert.deepEqual(asked, [], 'and no game.i18n call');
+    } finally {
+      globalThis.game.i18n.localize = shipped;
+    }
+    harness.remount();
+    const { APP_LOCALIZER } = await harness.loadRawModule('src/ui/svelte/util/appLocalizer.js');
+    const copy = {
+      'FABRICATE.Admin.Manager.Validation.TabBlockingOne': '{count} bloquant',
+      'FABRICATE.Admin.Manager.Validation.TabNameWithIssues': '{label} : {issues}',
+    };
+    const context = new Map([[APP_LOCALIZER, (key) => copy[key] ?? key]]);
+    const root = await harness.mount(
+      { tabs: VALIDATION, activeTab: 'roll', badges: blocking },
+      { context }
+    );
+    assert.equal(
+      buttonFor(root, 'validation').getAttribute('aria-label'),
+      'Validation : 1 bloquant'
     );
   });
 

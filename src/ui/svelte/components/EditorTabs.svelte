@@ -5,12 +5,13 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, labelKey, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `labelKey` is looked up and `label` is the English fallback, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
-  | tab `ariaLabelKey` / `ariaLabel` | key / English fallback | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here (see Invariants). |
-  | tab `tooltipKey` / `tooltip` | key / English fallback | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
+  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `label` is final display text the caller resolved, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
+  | `annotated` | boolean | `false` | Reads each tab's `ariaLabel`, `tooltip` and `tierGated` below; off, a tab is drawn from its `id`, `icon` and `label` alone. |
+  | tab `ariaLabel` | final text | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here (see Invariants). |
+  | tab `tooltip` | final text | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
-  | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
-  | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
+  | `badges` | per tab id: one mark, or an array of them | `undefined`, no marks | A mark is a plain value, or `{ vehicle, label, tone, name, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
+  | `ariaLabel` | final text | `''` | The strip's own accessible name. |
   | `idStem` / `buttonIdStem` / `panelIdStem` | strings | `'editor'` / `''` / `''` | `idStem` builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`; the other two override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
   | `tooltipIdStem` / `tooltipDataAttr` | string / `data-*` name | `<idStem>-tooltip` / `''` | The description id `<stem>-<id>` and its per-tab hook. |
   | `activePanelOnly` | boolean | `false` | Emit `aria-controls` ONLY on the selected tab. Not cosmetic: a strip rendering one panel at a time otherwise points every unselected tab at an id not in the document, which assistive technology reports as a broken relationship rather than as "not currently shown". |
@@ -24,8 +25,11 @@
   Invariants:
   - THE DOM CONTRACT IS A PROP, because the converging sites do not share one: the hook attribute
     name has no common stem and is read by the smoke harness, the View Lab registry and ~25 mounted
-    assertions; the button `id` and `aria-controls` stem has its PANEL ids rendered by the caller;
-    and the `aria-label` lang key is per-site. No converted site changes a rendered id or class.
+    assertions; and the button `id` and `aria-controls` stem has its PANEL ids rendered by the
+    caller. No converted site changes a rendered id or class.
+  - The caller resolves every string it passes (`localizeTabs` in `util/localizeOr.js` does it for
+    a tab list); the strip localizes only the severity names it builds, through `APP_LOCALIZER`, so
+    a tree mounted with none draws their English and calls no `game.i18n`.
   - THE MARK FAMILY IS CLOSED, AND WHICH MARK A STRIP DRAWS IS DECIDED BY WHAT IT MEANS.
     `DOMAIN.md`'s Rail Marker Family names four marks that MUST NOT be substituted for one another:
     `count` is a RECORD COUNT, a bare mono numeral; `issue` is an ISSUE SUMMARY, the filled toned
@@ -44,13 +48,19 @@
     1 warning" on its button; the marks' DOM and the strip's pixels do not change. A tab that sets its own
     `ariaLabel`, or any mark that names itself, keeps that name.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
-    `activeTab`. The hovered tab's description shows, else the focused tab's, and Escape hides it
-    until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
+    `activeTab`. The hovered tab's description shows, else the focused tab's when none is hovered;
+    a hovered tab that carries none shows none, and Escape hides it until that tab is next hovered
+    or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
     A description stays shown while the pointer is over it, and a hover-shown one takes Escape even
-    with focus outside the strip, stopping it before the window's keybindings so the host stays open.
+    with focus outside the strip, stopping it before the window's keybindings so the host stays open;
+    the strip listens on its document only while a description shows.
 -->
 <script>
-  import { localizeOr } from '../util/localizeOr.js';
+  import { getContext } from 'svelte';
+
+  import { fill } from '../../../utils/fillPlaceholders.js';
+  import { localizeWith } from '../../../utils/localizeWithFallback.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import Chip from './Chip.svelte';
 
   const DEFAULT_CLASSES = Object.freeze({
@@ -62,14 +72,14 @@
   let {
     tabs = [],
     activeTab = '',
-    badges = {},
+    badges = undefined,
     onSelect = () => {},
-    ariaLabelKey = '',
     ariaLabel = '',
     idStem = 'editor',
     buttonIdStem = '',
     panelIdStem = '',
     activePanelOnly = false,
+    annotated = false,
     tabDataAttr = 'data-editor-tab-button',
     tooltipIdStem = '',
     tooltipDataAttr = '',
@@ -83,6 +93,8 @@
     ...rest
   } = $props();
 
+  const localize = getContext(APP_LOCALIZER);
+
   const buttonStem = $derived(buttonIdStem || `${idStem}-tab`);
   const panelStem = $derived(panelIdStem || `${idStem}-panel`);
   const tooltipStem = $derived(tooltipIdStem || `${idStem}-tooltip`);
@@ -90,13 +102,22 @@
     tabs.some((tab) => tab.id === activeTab) ? activeTab : (tabs[0]?.id ?? null)
   );
   const describedTabs = $derived(tabs.filter(isDescribed));
+  const describedIds = $derived(new Set(describedTabs.map((tab) => tab.id)));
+
+  // Each map is keyed by tab id, so a spread below reads a script-level derived, never a call.
+  const marksByTab = $derived(byTab(markList));
+  const buttonHooks = $derived(byTab((tab) => hook(tabDataAttr, tab)));
+  const tooltipHooks = $derived(byTab((tab) => hook(tooltipDataAttr, tab)));
+  const markHooks = $derived(
+    byTab((tab) => marksByTab[tab.id].map((mark) => markAttributes(tab, mark)))
+  );
 
   let hoveredTabId = $state(null);
   let focusedTabId = $state(null);
   let dismissedTabId = $state(null);
   const shownTooltipId = $derived.by(() => {
     const candidate = hoveredTabId ?? focusedTabId;
-    return candidate === dismissedTabId ? null : candidate;
+    return candidate === dismissedTabId || !describedIds.has(candidate) ? null : candidate;
   });
 
   const VEHICLES = new Set(['count', 'issue', 'dot']);
@@ -115,19 +136,29 @@
   });
   $effect(() => () => clearTimeout(hoverClear));
 
-  // Capturing at the document runs ahead of Foundry's window-level keybindings.
+  // Capturing at the document runs ahead of Foundry's window-level keybindings; it binds while a
+  // description shows, on the document the strip is in at that moment.
   $effect(() => {
+    if (shownTooltipId === null) return undefined;
     const host = tablistNode?.ownerDocument;
     host?.addEventListener('keydown', onDocumentKeydown, true);
     return () => host?.removeEventListener('keydown', onDocumentKeydown, true);
   });
 
-  function optionalText(key = '', fallback = '') {
-    return localizeOr(key, fallback) || undefined;
+  function byTab(read) {
+    return Object.fromEntries(tabs.map((tab) => [tab.id, read(tab)]));
+  }
+
+  function hook(name, tab) {
+    return name ? { [name]: tab.id } : {};
+  }
+
+  function severityText(key, fallback, data) {
+    return fill(localizeWith(localize, key, undefined, fallback), data);
   }
 
   function isDescribed(tab) {
-    return Boolean(tab.tooltipKey || tab.tooltip);
+    return annotated && Boolean(tab.tooltip);
   }
 
   function track(kind, tabId) {
@@ -217,7 +248,8 @@
 
   function isDangerTab(tab) {
     return (
-      danger && markList(tab).some((mark) => mark.vehicle === 'issue' && mark.tone === 'danger')
+      danger &&
+      marksByTab[tab.id].some((mark) => mark.vehicle === 'issue' && mark.tone === 'danger')
     );
   }
 
@@ -238,8 +270,8 @@
 
   // The Validation tab's toned counts as words, so severity is not carried by colour alone.
   function severityName(tab) {
-    if (tab.id !== 'validation' || tab.ariaLabel || tab.ariaLabelKey) return undefined;
-    const marks = markList(tab);
+    if (tab.id !== 'validation') return undefined;
+    const marks = marksByTab[tab.id];
     if (marks.length === 0 || marks.some((mark) => mark.name !== '')) return undefined;
     const parts = [];
     for (const mark of marks) {
@@ -248,26 +280,26 @@
       if (!keys || !Number.isFinite(count)) return undefined;
       const [oneKey, otherKey, oneText, otherText] = keys;
       const one = count === 1;
-      parts.push(localizeOr(one ? oneKey : otherKey, one ? oneText : otherText, { count }));
+      parts.push(severityText(one ? oneKey : otherKey, one ? oneText : otherText, { count }));
     }
-    return localizeOr('FABRICATE.Admin.Manager.Validation.TabNameWithIssues', '{label}, {issues}', {
-      label: localizeOr(tab.labelKey, tab.label),
-      issues: parts.join(', '),
-    });
+    return severityText(
+      'FABRICATE.Admin.Manager.Validation.TabNameWithIssues',
+      '{label}, {issues}',
+      {
+        label: tab.label,
+        issues: parts.join(', '),
+      }
+    );
   }
 
   function tabName(tab) {
-    return optionalText(tab.ariaLabelKey, tab.ariaLabel) ?? severityName(tab);
-  }
-
-  function buttonAttributes(tab) {
-    if (!tabDataAttr) return {};
-    return { [tabDataAttr]: tab.id };
+    if (annotated && tab.ariaLabel) return tab.ariaLabel;
+    return severityName(tab);
   }
 
   function markAttributes(tab, mark) {
-    if (mark.vehicle === 'count') return countDataAttr ? { [countDataAttr]: tab.id } : {};
-    if (mark.vehicle === 'dot') return dotDataAttr ? { [dotDataAttr]: tab.id } : {};
+    if (mark.vehicle === 'count') return hook(countDataAttr, tab);
+    if (mark.vehicle === 'dot') return hook(dotDataAttr, tab);
     const attributes = badgeDataAttr
       ? { [badgeDataAttr]: tab.id, 'data-badge-tone': mark.tone }
       : {};
@@ -283,10 +315,6 @@
     return -1;
   }
 
-  function tooltipAttributes(tab) {
-    return tooltipDataAttr ? { [tooltipDataAttr]: tab.id } : {};
-  }
-
   function activate(event, tabId) {
     const tabButton = event.currentTarget;
     onSelect(tabId);
@@ -294,6 +322,7 @@
   }
 
   function onKeydown(event, index) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'Escape') {
       if (shownTooltipId !== null) dismissedTabId = shownTooltipId;
       return;
@@ -301,9 +330,9 @@
     const nextIndex = targetIndex(event.key, index);
     if (nextIndex < 0) return;
     event.preventDefault();
-    onSelect(tabs[nextIndex].id);
     const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
     buttons?.[nextIndex]?.focus();
+    onSelect(tabs[nextIndex].id);
   }
 </script>
 
@@ -311,7 +340,7 @@
   bind:this={tablistNode}
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
-  aria-label={localizeOr(ariaLabelKey, ariaLabel)}
+  aria-label={ariaLabel || undefined}
   {...rest}
 >
   {#each tabs as tab, index (tab.id)}
@@ -323,11 +352,11 @@
       aria-selected={activeTab === tab.id}
       aria-controls={activePanelOnly && activeTab !== tab.id ? undefined : `${panelStem}-${tab.id}`}
       aria-label={tabName(tab)}
-      aria-describedby={isDescribed(tab) ? `${tooltipStem}-${tab.id}` : undefined}
+      aria-describedby={describedIds.has(tab.id) ? `${tooltipStem}-${tab.id}` : undefined}
       tabindex={tabStop === tab.id ? 0 : -1}
       data-keyboard-focus="true"
       bind:this={buttonNodes[tab.id]}
-      {...buttonAttributes(tab)}
+      {...buttonHooks[tab.id]}
       onclick={(event) => activate(event, tab.id)}
       onkeydown={(event) => onKeydown(event, index)}
       onmouseenter={() => track('hover', tab.id)}
@@ -336,30 +365,34 @@
       onblur={() => untrack('focus', tab.id)}
     >
       {#if tab.icon}<i class={tab.icon} aria-hidden="true"></i>{/if}
-      <span>{localizeOr(tab.labelKey, tab.label)}</span>{#if tab.tierGated}<i
+      <span>{tab.label}</span>{#if annotated && tab.tierGated}<i
           class="fas fa-lock manager-editor-tab-lock"
           aria-hidden="true"
         ></i>{/if}
-      {#each markList(tab) as mark, markIndex (`${tab.id}-${markIndex}`)}
-        {#if mark.vehicle === 'count'}
-          <span class="manager-editor-tab-count" {...markAttributes(tab, mark)}>{mark.label}</span>
-        {:else if mark.vehicle === 'dot'}
-          <span
-            class="manager-editor-tab-dot"
-            role="img"
-            aria-label={mark.name}
-            {...markAttributes(tab, mark)}
-          ></span>
-        {:else}
-          <Chip
-            tone={badgeTone(mark.tone)}
-            density="inspector"
-            mono
-            class={badgeClass}
-            {...markAttributes(tab, mark)}>{mark.label}</Chip
-          >
-        {/if}
-      {/each}
+      {#if badges}
+        {#each marksByTab[tab.id] as mark, markIndex (`${tab.id}-${markIndex}`)}
+          {#if mark.vehicle === 'count'}
+            <span class="manager-editor-tab-count" {...markHooks[tab.id][markIndex]}
+              >{mark.label}</span
+            >
+          {:else if mark.vehicle === 'dot'}
+            <span
+              class="manager-editor-tab-dot"
+              role="img"
+              aria-label={mark.name}
+              {...markHooks[tab.id][markIndex]}
+            ></span>
+          {:else}
+            <Chip
+              tone={badgeTone(mark.tone)}
+              density="inspector"
+              mono
+              class={badgeClass}
+              {...markHooks[tab.id][markIndex]}>{mark.label}</Chip
+            >
+          {/if}
+        {/each}
+      {/if}
     </button>
   {/each}
 </div>
@@ -372,7 +405,7 @@
     bind:this={tooltipNodes[tab.id]}
     onmouseenter={() => track('hover', tab.id)}
     onmouseleave={() => untrack('hover', tab.id)}
-    {...tooltipAttributes(tab)}>{localizeOr(tab.tooltipKey, tab.tooltip)}</span
+    {...tooltipHooks[tab.id]}>{tab.tooltip}</span
   >{/each}
 
 <style>

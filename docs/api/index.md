@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well` and `Callout`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton` and `EditorTabs`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2057,6 +2057,7 @@ The published components, in publication order:
 | `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
 | `IconButton` | 1 | `fabricate` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
+| `EditorTabs` | 1 | `fabricate` | `tabs` (required), `activeTab`, `onSelect` (callback, required), `ariaLabel` (required), `idStem` (required), `activePanelOnly` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3075,6 +3076,74 @@ const remove = fabUi.mount('IconButton', {
 // `remove.destroy()` when the row goes away, moving focus first if the button holds it.
 ```
 
+### EditorTabs
+
+`EditorTabs` draws the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels you draw.
+It draws no panel, and no mark, padlock or description on a tab.
+`tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
+Each `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
+Each `label` is required and is final display text, the tab's whole visible text and its accessible name; a label of white space alone leaves the tab with no name, so never pass one.
+Each `icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+An item's other members are private and Fabricate draws nothing from them; a function in one is refused.
+`activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
+`onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
+The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so make that `update` from inside `onSelect`, before any `await`.
+Until that `update`, focus rests on a tab drawn unselected with `tabindex="-1"` while the previous tab stays the tab stop; if you decline a selection, move focus back to the tab stop.
+`ariaLabel` is required and is the strip's name, final display text, as "Reagent sections".
+`idStem` is required and is the stem of every id the strip writes: a tab's `id` is `<idStem>-tab-<id>`, and its `aria-controls` names `<idStem>-panel-<id>`.
+Fabricate builds ids from it, so make it unique in the document with your module id, as `acme-reagents`.
+Draw each panel outside `target`, after it in document order so `Tab` moves from the tab into the panel, with `id="<idStem>-panel-<id>"`, `role="tabpanel"` and `aria-labelledby="<idStem>-tab-<id>"`, and give it `tabindex="0"` when it holds no focusable element.
+`activePanelOnly` is `true` or `false` and defaults to `false`: `true` writes `aria-controls` on the selected tab alone, for a strip whose panels you draw one at a time; with `false` every tab writes it, so every panel it names exists in the document, or a screen reader may report the relationship as broken.
+The strip is horizontal and selects as focus moves: `ArrowRight` and `ArrowLeft` move focus to the next and the previous tab, wrapping at either end, `Home` to the first and `End` to the last, and then call `onSelect` with the `id` of the tab focus reached.
+Those four keys have their default prevented and still bubble to a `keydown` listener of yours above `target`; the strip handles no other key, so `ArrowUp` and `ArrowDown` move nothing, and `Enter` and `Space` press the focused tab as a native button does.
+A key pressed with `Alt`, `Ctrl` or `Meta` held is left to the platform, so `Alt+ArrowLeft` still goes back where the browser binds it.
+A press, by pointer, `Enter` or `Space`, calls `onSelect` and focuses its tab.
+Focus moves only among the strip's tabs, on a press and on those four keys, and never out of `target`.
+To return focus to the strip, focus `target.querySelector('[role="tab"][tabindex="0"]')`, the strip's one tab stop: the selected tab, or the first tab when `activeTab` names none.
+An `update` keeps every tab whose `id` it keeps, so focus stays on it; one that drops the focused tab's item, and `destroy`, remove that tab, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The strip adds no listener of its own to the document and stops the propagation of no key, so wherever the pointer rests, Escape reaches your `keydown` listeners on its path, the document's among them.
+Rest `data-*` is for your own hooks, and lands on the tablist, never on a tab.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+It needs a Fabricate window ancestor, because its row, its tabs and their ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
+The row wraps onto a further row when `target` is narrower than its tabs, and a selected tab on an upper row then draws its underline above the row below.
+Your own window or dialog carries no Fabricate root, so the strip is refused there with `EditorTabs needs a Fabricate window ancestor`.
+The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side; leave that much inside any edge of your own that clips.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the strip on one of those four grounds.
+Its padding, rule, type and colour figures beyond what this section states, and how Fabricate draws a tab strip in its own editors, are private.
+`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab never draws a mark, a padlock, a description or a name of its own.
+
+A worked strip follows: two sections of a reagent sheet you draw inside a Fabricate window, for example in an extension target, with one panel shown at a time.
+
+```javascript
+// After `load(['EditorTabs'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates `EditorTabs` describes none: draw your own strip there.
+if (!fabUi?.describe?.('EditorTabs')) return;
+
+const sections = [
+  { id: 'inputs', label: 'Inputs', icon: 'fas fa-flask' },
+  { id: 'outputs', label: 'Outputs', icon: 'fas fa-box-open' },
+];
+let shown = 'inputs';
+const props = () => ({
+  tabs: sections,
+  activeTab: shown,
+  ariaLabel: 'Reagent sections',
+  // Your panels, after `target`: id="acme-reagents-panel-<id>", role="tabpanel",
+  // aria-labelledby="acme-reagents-tab-<id>", and tabindex="0" where one holds no control.
+  idStem: 'acme-reagents',
+  activePanelOnly: true,
+  onSelect: (id) => {
+    shown = id;
+    strip.update(props()); // Before any `await`, so the tab is drawn selected at once.
+    acmeReagents.showPanel(id);
+  },
+});
+const strip = fabUi.mount('EditorTabs', { target, props: props() });
+
+// `strip.destroy()` when the sheet goes away, moving focus first if a tab holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3400,7 +3469,7 @@ A published component draws a control only where its section says so, and each c
 - A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
-- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
   A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
   Enter presses on key down and again on each repeat while held, and Space on release.
   In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
@@ -3412,7 +3481,7 @@ A published component draws a control only where its section says so, and each c
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
-- Fabricate moves no focus.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and never out of `target`.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.

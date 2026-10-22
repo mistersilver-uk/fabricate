@@ -311,17 +311,14 @@
     { id: 'validation', icon: 'fas fa-clipboard-check', label: 'Validation' },
   ];
 
-  const tabs = $derived(
-    TABS.map((tab) => ({
-      id: tab.id,
-      icon: tab.icon,
-      labelKey:
-        tab.id === 'definition'
-          ? 'FABRICATE.Admin.Manager.Scoped.Essence.TabDefinition'
-          : 'FABRICATE.Admin.Manager.Scoped.Essence.TabValidation',
-      label: tab.label,
-    }))
-  );
+  const tabs = TABS.map((tab) => ({
+    id: tab.id,
+    icon: tab.icon,
+    label:
+      tab.id === 'definition'
+        ? text('FABRICATE.Admin.Manager.Scoped.Essence.TabDefinition', tab.label)
+        : text('FABRICATE.Admin.Manager.Scoped.Essence.TabValidation', tab.label),
+  }));
 
   const badges = $derived({ validation: validationBadge(counts) });
   const summaryStatus = $derived(worstStatus(counts));
@@ -532,8 +529,10 @@
         {activeTab}
         {badges}
         onSelect={(tab) => (activeTab = tab)}
-        ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel"
-        ariaLabel="Essence definition sections"
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel',
+          'Essence definition sections'
+        )}
         idStem="scoped-essence-entry"
         tabDataAttr="data-scoped-entry-tab"
         badgeDataAttr="data-scoped-entry-tab-badge"

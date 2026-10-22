@@ -15,6 +15,7 @@ import BandedBar from './svelte/components/BandedBar.svelte';
 import Button from './svelte/components/Button.svelte';
 import Callout from './svelte/components/Callout.svelte';
 import Chip from './svelte/components/Chip.svelte';
+import EditorTabs from './svelte/components/EditorTabs.svelte';
 import EmptyState from './svelte/components/EmptyState.svelte';
 import Field from './svelte/components/Field.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
@@ -62,6 +63,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Well.svelte': Well,
   'src/ui/svelte/components/Callout.svelte': Callout,
   'src/ui/svelte/components/IconButton.svelte': IconButton,
+  'src/ui/svelte/components/EditorTabs.svelte': EditorTabs,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

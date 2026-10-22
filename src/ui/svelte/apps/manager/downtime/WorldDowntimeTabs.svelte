@@ -1,6 +1,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   // CORE-FALLBACK ONLY: a registered provider's tabs are the rail's Downtime sub-items, so provider
   // mode renders no strip. Hence no `coreFallback` prop, Core's four fields read as lang keys (a
@@ -36,14 +37,14 @@
     </div>
   </div>
   <EditorTabs
-    tabs={stripTabs}
+    tabs={localizeTabs(stripTabs)}
     activeTab={activeTabId}
     {onSelect}
     idStem="world-downtime"
+    annotated
     tabDataAttr="data-downtime-tab"
     tooltipDataAttr="data-downtime-tooltip"
-    ariaLabelKey={TABLIST_KEY}
-    ariaLabel={TABLIST_KEY}
+    ariaLabel={localizeOr(TABLIST_KEY, TABLIST_KEY)}
     data-downtime-tablist=""
   />
 </div>

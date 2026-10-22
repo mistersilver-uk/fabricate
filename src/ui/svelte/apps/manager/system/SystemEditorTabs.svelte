@@ -12,6 +12,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   let { activeTab = 'settings', badges = {}, onSelect = () => {} } = $props();
 
@@ -32,12 +33,14 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {badges}
   {onSelect}
-  ariaLabelKey="FABRICATE.Admin.Manager.SystemEdit.Tabs.Label"
-  ariaLabel="System overview sections"
+  ariaLabel={localizeOr(
+    'FABRICATE.Admin.Manager.SystemEdit.Tabs.Label',
+    'System overview sections'
+  )}
   idStem="system"
   tabDataAttr="data-system-tab"
   containerClass="manager-environment-tabs manager-system-tabs"

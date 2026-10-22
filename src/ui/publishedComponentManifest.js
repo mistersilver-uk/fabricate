@@ -357,4 +357,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     restOn: 'control',
     tooltip: true,
   }),
+  Object.freeze({
+    name: 'EditorTabs',
+    path: 'src/ui/svelte/components/EditorTabs.svelte',
+    version: 1,
+    props: Object.freeze({
+      tabs: Object.freeze({ kind: 'data', required: true }),
+      activeTab: Object.freeze({ kind: 'data' }),
+      onSelect: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      idStem: Object.freeze({ kind: 'data', required: true }),
+      activePanelOnly: Object.freeze({ kind: 'data' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);
