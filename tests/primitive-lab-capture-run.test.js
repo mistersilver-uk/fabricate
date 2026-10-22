@@ -307,6 +307,16 @@ test('a deleted row the library no longer draws is a removed note; one it still 
   assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 0);
 });
 
+test('a removed note for a spec-only address records a null cap, whether or not the request names one', async (t) => {
+  const run = harness(t, { keys: [addressKey('<Gone>', null)] });
+  run.requests.push({ key: 'by-hand', kind: 'address', spec: '<Gone>', deletedRow: true });
+  await captureLibrary(run.requests, run.pages, run.state, run.io);
+  assert.deepEqual(
+    run.state.notes.map(({ cap }) => cap),
+    [null, null]
+  );
+});
+
 test('only a deleted row address is let go: every other unresolved request still fails', async (t) => {
   const sections = [{ section: 'controls', rows: [{ spec: '<Chip>', cap: 'ghost' }] }];
   const run = harness(t, {
