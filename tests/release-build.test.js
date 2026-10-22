@@ -15,6 +15,7 @@ import {
   assertArchiveChunkCompleteness,
   releaseZipName
 } from '../scripts/lib/releaseZipChunks.js';
+import { MANAGER_MARKER } from '../scripts/verify-manager-chunk-split.mjs';
 // Imported, never retyped, for two reasons.
 import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../src/migration/migrationNoticeDetail.js';
 import {
@@ -423,25 +424,34 @@ test('a --no-zip build reports the archive gate as skipped and still succeeds', 
 const RAIL_LITERAL = 'fab-rail-label';
 const TIER_TRACK_LITERAL = 'fab-tier-track-list';
 
-/** The one built module holding `Rail`'s code, which the assertion first proves is one. */
-function railChunk(distDir) {
-  const holding = builtModulesHolding(distDir, RAIL_LITERAL);
-  assert.equal(holding.length, 1, `one built module holds ${RAIL_LITERAL}; found ${holding}`);
+/** The one built module holding `literal`, which the assertion first proves is one. */
+function onlyModuleHolding(distDir, literal) {
+  const holding = builtModulesHolding(distDir, literal);
+  assert.equal(holding.length, 1, `one built module holds ${literal}; found ${holding}`);
   return holding[0];
 }
 
-test('the lazy Rail ships in a chunk the startup modules reach only through import(), and the eager TierTrack in a startup module', () => {
+const railChunk = (distDir) => onlyModuleHolding(distDir, RAIL_LITERAL);
+
+/** The startup module that imports `chunk` through `import()`, or `undefined`. */
+function lazyReferrerOf(distDir, chunk) {
+  const referrer = [...startupModules(distDir)].find(([name, source]) =>
+    importedBy(name, source, LAZY_IMPORT_SPECIFIER).includes(chunk)
+  );
+  return referrer?.[0];
+}
+
+test('the lazy Rail ships in a chunk of its own the startup modules reach only through import(), and the eager TierTrack in a startup module', () => {
   buildWithoutZip();
   const distDir = join(REPO_ROOT, 'dist');
   const chunk = railChunk(distDir);
-  const startup = startupModules(distDir);
-  assert.ok(!startup.has(chunk), `${chunk} is not loaded at startup`);
+  assert.ok(!startupModules(distDir).has(chunk), `${chunk} is not loaded at startup`);
   assert.equal(startupModuleHolding(distDir, RAIL_LITERAL), '', 'no startup module holds Rail');
-  assert.ok(
-    [...startup].some(([name, source]) =>
-      importedBy(name, source, LAZY_IMPORT_SPECIFIER).includes(chunk)
-    ),
-    `a startup module imports ${chunk} through import()`
+  assert.ok(lazyReferrerOf(distDir, chunk), `a startup module imports ${chunk} through import()`);
+  assert.notEqual(
+    onlyModuleHolding(distDir, MANAGER_MARKER),
+    chunk,
+    `${chunk} holds none of the manager chunk's code`
   );
   assert.notEqual(startupModuleHolding(distDir, TIER_TRACK_LITERAL), '', 'TierTrack is eager');
 });
@@ -450,6 +460,8 @@ test('the release archive gate passes an archive carrying the Rail chunk, and re
   buildWithoutZip();
   const distDir = join(REPO_ROOT, 'dist');
   const chunk = railChunk(distDir);
+  const referrer = lazyReferrerOf(distDir, chunk);
+  assert.ok(referrer, `a startup module imports ${chunk} through import()`);
   const manifest = JSON.parse(readFileSync(join(distDir, 'module.json'), 'utf8'));
   const staging = await mkdtemp(join(tmpdir(), 'fab-rail-archive-'));
   try {
@@ -459,12 +471,13 @@ test('the release archive gate passes an archive carrying the Rail chunk, and re
     assert.ok(proved.referenced.includes(chunk), `the gate reaches ${chunk}`);
 
     const short = join(staging, 'short');
-    cpSync(distDir, short, { recursive: true, filter: (path) => basename(path) !== posix.basename(chunk) });
+    const keeps = (path) => basename(path) !== posix.basename(chunk);
+    cpSync(distDir, short, { recursive: true, filter: keeps });
     const shortZip = join(staging, 'short.zip');
     zipDirectory(short, shortZip);
     assert.throws(
       () => assertArchiveChunkCompleteness({ zipPath: shortZip, manifest }),
-      (error) => error.message.includes(`${chunk} (referenced by main.js)`)
+      (error) => error.message.includes(`${chunk} (referenced by ${referrer})`)
     );
   } finally {
     await rm(staging, { recursive: true, force: true });
