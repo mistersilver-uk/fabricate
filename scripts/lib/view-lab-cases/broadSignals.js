@@ -430,11 +430,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-component-complications-macro-linked',
     'manager-component-complications-macro-missing',
   ]),
-  // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
+  // The radio-card group (issue 1373), the player's crafting routes (issue 1778), and the
+  // Crafting Settings, Checks Studio and Journal faces it converged (issue 2467).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
     'player-crafting-ingredient-routed',
+    'manager-crafting-settings',
+    'manager-checks-crafting-modifiers',
+    'fabricate-journal-lifecycle-ingredient-route',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
