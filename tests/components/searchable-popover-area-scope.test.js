@@ -508,14 +508,14 @@ const PRIMITIVES = Object.freeze([
       'manager-resolution-option-body',
       'manager-resolution-option-name',
       'manager-resolution-option-desc',
-      'manager-resolution-option-badge',
+      'manager-resolution-option-reason',
       'manager-radio-card-group',
     ]),
-    // Measured at this commit: 14 written; 36 family selectors (48, less the 15 route-scoped caller
-    // rules deleted and the 12 owned rules merged or deleted, plus 15 new); 35 owned. Each floor
-    // keeps the base entry's headroom: written 2 (12 against 10), family 5 (47 against 42),
-    // owned 4 (31 against 27), so 12, 31 and 31.
-    writtenFloor: 12,
+    // Measured at this commit: 13 written; 36 family selectors (48, less the 15 route-scoped caller
+    // rules deleted and the 12 owned rules merged or deleted, plus 15 new, then the badge rule out
+    // and the reason selector in); 35 owned. Each floor keeps the base entry's headroom: written 2
+    // (12 against 10), family 5 (47 against 42), owned 4 (31 against 27), so 11, 31 and 31.
+    writtenFloor: 11,
     familyFloor: 31,
     ownedFloor: 31,
     // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
@@ -2285,19 +2285,18 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 7,
+    blocks >= 6,
     `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
+      'opened after `</script>`. Six do today: `SearchablePopover` and the ' +
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
       '`TintPicker` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the scoped ' +
       'danger pair, naming both button vocabularies, that tints a failing validation ' +
-      'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
-      'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
+      'tab, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +
       'and the mono address line under the name, and `ModifierPillSelect`, whose block is the ' +
       'disabled-trigger tint and the visually-hidden status span its multi-select cap announces. ' +
-      'All seven blocks STAY ' +
+      'All six blocks STAY ' +
       'where they are: a scoped block is injected unlayered and this sheet is ' +
       'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
       'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, ' +
@@ -2308,7 +2307,7 @@ test('each primitive’s own scoped styles name no application root either', () 
 });
 
 /** The data hooks the option cards' face is addressed by; a caller never selects on them. */
-const OPTION_FACE_HOOKS = /^data-(?:radio-card-(?:option|meta)|tool-choice-[\w-]+)$/;
+const OPTION_FACE_HOOKS = /^data-(?:radio-card-(?:option|reason)|tool-choice-[\w-]+)$/;
 
 /** The classes and attributes each rule of a parsed component's scoped block names, `:global()` arguments included. */
 function scopedRuleNames(ast) {
@@ -2367,7 +2366,7 @@ test('no caller’s scoped block restates the option cards’ face (issue 2467)'
   );
   assert.deepEqual(
     allSelectors().filter((selector) =>
-      /\[data-(?:radio-card-(?:option|meta)|tool-choice-)/.test(selector)
+      /\[data-(?:radio-card-(?:option|reason)|tool-choice-)/.test(selector)
     ),
     [],
     'the sheet selects on the option cards’ data hooks; the face is addressed by the primitive’s classes'

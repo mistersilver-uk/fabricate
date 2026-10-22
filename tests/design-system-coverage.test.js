@@ -789,6 +789,20 @@ for (const name of PROP_PINNED_ENTRIES) {
   });
 }
 
+test('the <OptionCards> specimen names every prop its shipped component declares', () => {
+  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<OptionCards>');
+  assert.ok(row, 'no manifest row names <OptionCards>, so there is no component to read');
+  const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
+  const block = library.blocks.find((entry) => entry.names.includes('OptionCards'));
+  const named = new Set(block?.apiNames);
+  assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
+  assert.deepEqual(
+    props.filter((name) => !named.has(name)),
+    [],
+    'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
+  );
+});
+
 test('a divergent entry names the issue that decided it', () => {
   // NO DOMAIN GUARD, and that is deliberate rather than an omission.
   const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');

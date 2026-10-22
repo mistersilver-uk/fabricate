@@ -34,6 +34,8 @@ const harness = createMountedComponentHarness({
 const body = createRawSnippet((option) => ({
   render: () => `<span class="probe-body">${option().value}</span>`,
 }));
+const LONG_REASON =
+  'Coming in a later release, once the degrading model can carry its quality track across every failed crafting check run.';
 const option = (value, label, extra = {}) => ({
   value,
   label,
@@ -48,12 +50,12 @@ const CASES = Object.freeze({
       option('a', 'Breakable', { icon: 'fas fa-hammer' }),
       option('b', 'Immune', { icon: 'fas fa-lock' }),
     ],
-    selectedValue: 'a',
+    value: 'a',
     optionBody: body,
   },
   bare: {
     options: [option('a', 'Route one'), option('b', 'Route two')],
-    selectedValue: 'b',
+    value: 'b',
     optionBody: body,
   },
   stacked: {
@@ -62,14 +64,38 @@ const CASES = Object.freeze({
     options: ['a', 'b', 'c'].map((value) =>
       option(value, `Mode ${value}`, { icon: 'fas fa-star' })
     ),
-    selectedValue: 'a',
+    value: 'a',
   },
   disabled: {
     options: [
       option('a', 'On offer', { icon: 'fas fa-hammer' }),
-      option('b', 'Later', { icon: 'fas fa-star', disabled: true }),
+      option('b', 'Later', { icon: 'fas fa-star' }),
     ],
-    selectedValue: 'a',
+    value: 'a',
+    disabledOptions: [{ value: 'b', reason: 'Coming later.' }],
+  },
+  stackedDisabled: {
+    layout: 'stacked',
+    columns: 3,
+    options: ['a', 'b', 'c'].map((value) =>
+      option(value, `Mode ${value}`, { icon: 'fas fa-star' })
+    ),
+    value: 'a',
+    disabledOptions: [{ value: 'c', reason: LONG_REASON }],
+  },
+  groupDisabled: {
+    disabled: true,
+    options: [
+      option('a', 'On offer', { icon: 'fas fa-hammer' }),
+      option('b', 'Later', { icon: 'fas fa-star' }),
+    ],
+    value: 'a',
+    disabledOptions: [{ value: 'b', reason: 'Coming later.' }],
+  },
+  unchosen: {
+    options: [option('a', 'Route one'), option('b', 'Route two')],
+    value: '',
+    disabledOptions: [{ value: 'a', reason: 'Not yet.' }],
   },
 });
 
@@ -95,7 +121,6 @@ const document_ = (host, markup) => `<!doctype html><html><head><meta charset="u
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, component('Medallion'))).css}</style>
-<style>${scopedComponentCss(resolve(repoRoot, component('RadioCardGroup'))).css}</style>
 <style>:root{--font-primary:Arial,sans-serif}*,*::before{transition-duration:0s!important}
 ${host.container}{width:1000px}</style>
 </head><body class="game">${host.wrap(
@@ -106,14 +131,19 @@ ${host.container}{width:1000px}</style>
 
 let browser;
 const markup = {};
+/** Each case's radios as the mounted DOM holds them, which serialised markup cannot carry. */
+const radios = {};
 
 before(async () => {
   await harness.setup();
   try {
     for (const [key, props] of Object.entries(CASES)) {
-      markup[key] = (
-        await harness.mount({ legend: key, groupName: key, configCards: true, ...props })
-      ).innerHTML;
+      const root = await harness.mount({ legend: key, groupName: key, ...props });
+      radios[key] = [...root.querySelectorAll('input[type="radio"]')].map((radio) => ({
+        checked: radio.checked,
+        disabled: radio.disabled,
+      }));
+      markup[key] = root.innerHTML;
       harness.remount();
     }
   } finally {
@@ -132,13 +162,13 @@ async function inHost(hostId, check) {
   try {
     await tab.setContent(document_(HOSTS[hostId], markup), { waitUntil: 'load' });
     // Svelte writes `checked` and `disabled` as properties, which serialised markup drops.
-    await tab.evaluate(() => {
-      for (const card of document.querySelectorAll('.manager-resolution-option')) {
-        const radio = card.querySelector('input[type="radio"]');
-        radio.checked = card.classList.contains('is-active');
-        radio.disabled = card.classList.contains('is-disabled');
+    await tab.evaluate((records) => {
+      for (const [id, states] of Object.entries(records)) {
+        const inputs = document.querySelectorAll(`[data-case="${id}"] input[type="radio"]`);
+        if (inputs.length !== states.length) throw new Error(`${id}: radio count drifted`);
+        for (const [index, radio] of [...inputs].entries()) Object.assign(radio, states[index]);
       }
-    });
+    }, radios);
     return await check(tab);
   } finally {
     await tab.close();
@@ -186,7 +216,24 @@ const readCase = (tab, caseId) =>
             box: rect(part('[data-tool-choice-title]')),
             ...pick(style(part('[data-tool-choice-title]'))),
           },
-          desc: pick(style(part('[data-tool-choice-description]'))),
+          desc: {
+            box: rect(part('[data-tool-choice-description]')),
+            ...pick(style(part('[data-tool-choice-description]'))),
+          },
+          reason: part('[data-radio-card-reason]') && {
+            box: rect(part('[data-radio-card-reason]')),
+            ...pick(style(part('[data-radio-card-reason]'))),
+            last:
+              part('.manager-resolution-option-text').lastElementChild ===
+              part('[data-radio-card-reason]'),
+            opacity: chainOpacity(
+              part('[data-radio-card-reason]'),
+              group.querySelector('fieldset')
+            ),
+            overflow:
+              part('[data-radio-card-reason]').scrollWidth >
+              part('[data-radio-card-reason]').clientWidth,
+          },
           radio: {
             box: rect(part('input[type="radio"]')),
             opacity: style(part('input[type="radio"]')).opacity,
@@ -201,6 +248,14 @@ const readCase = (tab, caseId) =>
         };
       }),
     };
+    function chainOpacity(element, fieldset) {
+      let product = 1;
+      for (let node = element; node; node = node.parentElement) {
+        product *= Number(getComputedStyle(node).opacity);
+        if (node === fieldset) return product;
+      }
+      return NaN;
+    }
     function pick(cs) {
       return (
         cs && { size: cs.fontSize, weight: cs.fontWeight, leading: cs.lineHeight, color: cs.color }
@@ -378,8 +433,76 @@ for (const hostId of Object.keys(HOSTS)) {
     it('dims each part of a disabled option, never the card', () =>
       inHost(hostId, async (tab) => {
         const [, later] = (await readCase(tab, 'disabled')).cards;
-        assert.deepEqual([...later.opacity, later.radio.opacity], ['0.45', '0.45', '0.45', '0.45']);
-        assert.equal(later.own, '1');
+        const group = (await readCase(tab, 'groupDisabled')).cards;
+        for (const card of [later, ...group]) {
+          assert.deepEqual([...card.opacity, card.radio.opacity], ['0.45', '0.45', '0.45', '0.45']);
+          assert.equal(card.own, '1');
+        }
+      }));
+
+    it('draws a disabled option’s reason last in its text column, undimmed, in the description’s type', () =>
+      inHost(hostId, async (tab) => {
+        const muted = await tokenColour(tab, '--fab-text-muted');
+        const contentLeft = (card) => card.card.left + card.borderLeft + card.paddingLeft;
+        for (const [caseId, index, inset] of [
+          ['disabled', 1, 38],
+          ['groupDisabled', 1, 38],
+          ['stackedDisabled', 2, 0],
+          ['unchosen', 0, 0],
+        ]) {
+          const card = (await readCase(tab, caseId)).cards[index];
+          const { reason } = card;
+          assert.ok(Boolean(reason), `${caseId} draws its option's reason`);
+          assert.equal(
+            reason.box.left,
+            card.text.left,
+            `${caseId}: the reason sits in the text column`
+          );
+          assert.equal(reason.box.left - contentLeft(card), inset, `${caseId}: ${inset}px in`);
+          assert.equal(
+            reason.box.top - card.desc.box.bottom,
+            6,
+            `${caseId}: 6px under the description`
+          );
+          assert.ok(reason.last, `${caseId}: the reason is the text column's last child`);
+          assert.equal(
+            reason.opacity,
+            1,
+            `${caseId}: nothing between the reason and its fieldset dims it`
+          );
+          assert.deepEqual(
+            [reason.size, reason.weight, reason.leading, reason.color],
+            ['10.5px', '400', '15.75px', muted],
+            `${caseId}: the description's type and ink`
+          );
+        }
+      }));
+
+    it('keeps a long reason inside its stacked card', () =>
+      inHost(hostId, async (tab) => {
+        const card = (await readCase(tab, 'stackedDisabled')).cards[2];
+        const inset = card.borderLeft + card.paddingLeft;
+        assert.ok(card.reason.box.height > 15.75, 'the long reason wraps');
+        assert.ok(card.reason.box.right <= card.card.right - inset, 'within the content edge');
+        assert.ok(card.reason.box.bottom <= card.card.bottom - inset, 'and above the foot padding');
+        assert.equal(card.reason.overflow, false, 'with no line running past its box');
+      }));
+
+    it('keeps a disabled radio out of focus and out of the Tab order', () =>
+      inHost(hostId, async (tab) => {
+        const focused = await tab.evaluate(() => {
+          for (const other of document.querySelectorAll('[data-case]:not([data-case="unchosen"])'))
+            other.remove();
+          const [first] = document.querySelectorAll('input[type="radio"]');
+          first.focus();
+          return { onFirst: document.activeElement === first, disabled: first.disabled };
+        });
+        assert.deepEqual(focused, { onFirst: false, disabled: true }, 'focus() skips it');
+        await tab.keyboard.press('Tab');
+        const landed = await tab.evaluate(() =>
+          [...document.querySelectorAll('input[type="radio"]')].indexOf(document.activeElement)
+        );
+        assert.equal(landed, 1, 'Tab from the page start lands on the second radio');
       }));
 
     it('reflows to one track at 620px of host and not at 621px', () =>
@@ -433,3 +556,24 @@ for (const hostId of Object.keys(HOSTS)) {
       }));
   });
 }
+
+describe('<OptionCards> geometry cases carry the mounted radios’ own state (issue 2467)', () => {
+  it('records `disabled` from the mounted DOM, not from a class', () => {
+    assert.deepEqual(
+      radios.disabled.map((radio) => radio.disabled),
+      [false, true]
+    );
+    assert.deepEqual(
+      radios.stackedDisabled.map((radio) => radio.disabled),
+      [false, false, true]
+    );
+    assert.deepEqual(
+      radios.groupDisabled.map((radio) => radio.disabled),
+      [true, true]
+    );
+    assert.deepEqual(
+      radios.unchosen.map((radio) => radio.checked),
+      [false, false]
+    );
+  });
+});

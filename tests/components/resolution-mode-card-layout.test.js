@@ -13,13 +13,13 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readStylesheet();
 
-// The DOM RadioCardGroup.svelte emits with `configCards`, held to its classes below.
+// The DOM RadioCardGroup.svelte emits, held to its classes below.
 const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="crafting-settings">
       <div style="grid-column: 1 / -1;">
-        <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group">
           <legend class="manager-resolution-mode-legend">Recipe resolution</legend>
           <div class="manager-resolution-mode-options">
             <label class="manager-resolution-option">

@@ -134,7 +134,7 @@ const OPTION_CARDS_OWN_CLASSES = (() => {
   return match[1].trim();
 })();
 
-const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-config-cards`;
+const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES}`;
 
 /** The class list `ToggleCard` writes on its own root `<div>`, read out of its template. */
 const TOGGLE_CARD_CLASSES = (() => {
@@ -206,7 +206,7 @@ test('the fifteen class strings under measurement are the ones the primitives em
   assert.equal(
     OPTION_CARDS_CLASSES,
     'fabricate-field fabricate-option-cards is-wide ' +
-      'manager-resolution-mode-card manager-radio-card-group is-config-cards',
+      'manager-resolution-mode-card manager-radio-card-group',
     'the fieldset carries `Field`s pair, then this family`s root, then this family`s own classes'
   );
   assert.equal(
@@ -391,7 +391,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header.
     comparesBox: false,
     markup: (host) =>
-      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><span class="manager-resolution-option-head" data-probe="${host}-option-cards-head"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-wand-magic-sparkles"></i></span></span><span class="manager-resolution-option-text" data-probe="${host}-option-cards-text"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-layer-group"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Routed by ingredients</span></span><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"></span></label></div></fieldset>`,
+      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><span class="manager-resolution-option-head" data-probe="${host}-option-cards-head"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-wand-magic-sparkles"></i></span></span><span class="manager-resolution-option-text" data-probe="${host}-option-cards-text"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-layer-group"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Routed by ingredients</span></span><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"></span></label></div></fieldset>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE STATUS CARD EITHER (issue 1509 phase 4). This family
   // owns NO CONTROL: the switch inside it is `StatusToggle`'s, composed rather than written, and

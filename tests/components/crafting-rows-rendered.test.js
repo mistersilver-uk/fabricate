@@ -28,9 +28,7 @@ const ROW = 'src/ui/svelte/apps/crafting/RecipeListRow.svelte';
 const ROUTES = 'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte';
 const SCOPED = [
   ROW,
-  ...['Medallion', 'Chip', 'Kicker', 'RadioCardGroup'].map(
-    (name) => `src/ui/svelte/components/${name}.svelte`
-  ),
+  ...['Medallion', 'Chip', 'Kicker'].map((name) => `src/ui/svelte/components/${name}.svelte`),
 ];
 
 const uncraftable = (selected) => ({
