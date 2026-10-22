@@ -1,8 +1,6 @@
 /** Which design-library units a PR's changed files select for the CI library capture (issue 2413). */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +20,8 @@ import {
   parseTargetKey,
   scanLibraryRegions,
 } from '../scripts/lib/primitiveLabUnits.js';
+
+import { unifiedPatch } from './helpers/unifiedPatch.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHIP = 'src/ui/svelte/components/Chip.svelte';
@@ -96,23 +96,6 @@ function fakeSource(overrides = {}) {
         .filter(Boolean)
         .sort((left, right) => left.localeCompare(right)),
   };
-}
-
-/** The hunks `git diff` writes from `before` to `after`, as the PR files API carries them. */
-function unifiedPatch(before, after) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'lab-selection-'));
-  try {
-    writeFileSync(path.join(dir, 'a'), before);
-    writeFileSync(path.join(dir, 'b'), after);
-    const run = spawnSync('git', ['diff', '--no-index', '--no-color', '-U3', 'a', 'b'], {
-      cwd: dir,
-      encoding: 'utf8',
-    });
-    const at = run.stdout.indexOf('\n@@');
-    return at === -1 ? '' : run.stdout.slice(at + 1);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 }
 
 /** Select after one file changed from `before` to `after`, the checkout holding `after`. */

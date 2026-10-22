@@ -1,11 +1,12 @@
 /**
  * The browser half of `npm run lab:capture` (issue 2413), over fake pages whose in-page reads run
  * against happy-dom: boot failure, the deadline, the incremental manifest, the cross-check, the
- * clip, the resolution of every real library unit, and the CLI's exit code.
+ * clip, the resolution of every real library unit, a deleted row's `removed` note, and the exit
+ * code and log lines of a run.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -28,10 +29,13 @@ import {
   readCatalogueSections,
   readLabels,
   resolveRequests,
+  runOutcome,
 } from '../scripts/lib/primitiveLabCapture.js';
 import { CATALOGUE_DIRECTORY, parseCatalogueRows } from '../scripts/lib/primitiveLabCatalogue.js';
 import { selectLibraryTargets } from '../scripts/lib/primitiveLabSelection.js';
 import { LIBRARY_PATH, addressKey, scanLibraryRegions } from '../scripts/lib/primitiveLabUnits.js';
+
+import { unifiedPatch } from './helpers/unifiedPatch.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IN_PAGE = new Set([resolveRequests, readLabels, measureUnit]);
@@ -75,25 +79,25 @@ function fakePage(doc, { report = { error: null, mounted: 3 }, hangs = [] } = {}
 
 /** Requests for every unit of the fixture library, and an io that records what it was handed. */
 function harness(t, options = {}) {
+  const written = { frames: [], manifests: [] };
   const {
     lab = {},
     labHtml = libraryOf(),
     passedAfter = Infinity,
     library = libraryOf(),
+    keys = ['unit:0.0', 'unit:0.1', 'unit:0.2'],
+    sections = [],
+    referenceHtml = library,
+    writeManifest = (state) => {
+      written.manifests.push({ frames: state.frames.length, failures: state.failures.length });
+    },
   } = options;
-  const { keys = ['unit:0.0', 'unit:0.1', 'unit:0.2'], sections = [] } = options;
   const { requests } = planRequests(keys, { sections, library });
   const pages = {
-    reference: fakePage(documentOf(t, options.referenceHtml ?? library)),
+    reference: fakePage(documentOf(t, referenceHtml)),
     lab: fakePage(documentOf(t, labHtml), lab),
   };
   let checks = 0;
-  const written = { frames: [], manifests: [] };
-  const writeManifest =
-    options.writeManifest ??
-    ((state) => {
-      written.manifests.push({ frames: state.frames.length, failures: state.failures.length });
-    });
   const io = {
     baseUrl: 'https://lab.test',
     now: () => 0,
@@ -235,6 +239,16 @@ test('a removed note is not a requested unit, and no other note or failure is su
   assert.equal(exitCodeOf({ frames: [], failures: [], notes: [unlocated] }, 1), 1);
 });
 
+test('a run outcome carries the removed lines, exits 0 when every unit was removed, and 1 on a failure', () => {
+  const notes = [{ key: 'addr:x', kind: 'removed', spec: '<Gone>', cap: null, reason: 'no entry' }];
+  const gone = runOutcome(captureManifest({ notes }), 1, '/out');
+  assert.equal(gone.code, 0);
+  assert.equal(gone.lines.length, 2);
+  assert.match(gone.lines[1], /^removed with its drawing: <Gone> \(no entry\)$/);
+  const failed = captureManifest({ notes, failures: [{ id: 'unit:0.0', reason: 'deadline' }] });
+  assert.equal(runOutcome(failed, 2, '/out').code, 1);
+});
+
 test('the manifest lands whole, by a rename', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'lab-manifest-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -274,6 +288,7 @@ const REMOVED_KEYS = [
   addressKey('<Chip>', 'gone'),
   addressKey('<Gone>', 'x'),
   addressKey('<Chip>', 'removable'),
+  addressKey('<Gone>', null),
 ];
 
 test('a deleted row the library no longer draws is a removed note; one it still draws is captured', async (t) => {
@@ -286,6 +301,7 @@ test('a deleted row the library no longer draws is a removed note; one it still 
     [
       { key: REMOVED_KEYS[1], kind: 'removed', spec: '<Chip>', cap: 'gone' },
       { key: REMOVED_KEYS[2], kind: 'removed', spec: '<Gone>', cap: 'x' },
+      { key: REMOVED_KEYS[4], kind: 'removed', spec: '<Gone>', cap: null },
     ]
   );
   assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 0);
@@ -308,24 +324,8 @@ test('only a deleted row address is let go: every other unresolved request still
   assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 1);
 });
 
-/** `rows` as a catalogue file, one row per `  {` block. */
+/** `rows` as a catalogue file: pretty-printed JSON ending in a newline. */
 const catalogueText = (rows) => `${JSON.stringify(rows, null, 2)}\n`;
-
-/** The hunks `git diff` writes from `before` to `after`. */
-function unifiedPatch(before, after) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'lab-capture-patch-'));
-  try {
-    writeFileSync(path.join(dir, 'a'), before);
-    writeFileSync(path.join(dir, 'b'), after);
-    const diff = spawnSync('git', ['diff', '--no-index', '--no-color', '-U3', 'a', 'b'], {
-      cwd: dir,
-      encoding: 'utf8',
-    }).stdout;
-    return diff.slice(diff.indexOf('\n@@') + 1);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
 
 test('a row deleted with its drawing is selected, planned, captured as a note, and exits 0', async (t) => {
   const row = (cap) => ({ spec: '<Chip>', cap, draws: '.k-chip', path: 'Chip.svelte' });
@@ -394,6 +394,6 @@ test('a capture that stops after resolving fails its live keys and not a removed
   ]);
   assert.deepEqual(
     run.state.notes.map(({ key }) => key),
-    [REMOVED_KEYS[1], REMOVED_KEYS[2]]
+    [REMOVED_KEYS[1], REMOVED_KEYS[2], REMOVED_KEYS[4]]
   );
 });

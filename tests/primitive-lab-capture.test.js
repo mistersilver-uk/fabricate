@@ -259,7 +259,7 @@ test('composites render at double density while lab:check keeps its own context'
   assert.equal(panelWidth(header, 1), 500);
 });
 
-test('the run log counts the removed notes and prints one control-free line for each', () => {
+test('the run log counts the removed notes and prints one line free of control and format characters for each', () => {
   const manifest = captureManifest({
     frames: [{ id: 'a' }],
     failures: [{ id: 'k', reason: 'r' }],
@@ -268,8 +268,8 @@ test('the run log counts the removed notes and prints one control-free line for 
         key: 'k1',
         kind: 'removed',
         spec: '<Chip>',
-        cap: 'go\nne',
-        reason: '<Chip> has no\u{1B} unit',
+        cap: 'go\nne\u{202E}',
+        reason: '<Chip> has no\u{1B}\u{200B} unit',
       },
       { key: 'k2', kind: 'removed', spec: '<Gone>', cap: null, reason: 'no entry' },
       { key: 'k3', kind: 'unlocated', file: 'a.json', count: 1 },

@@ -322,12 +322,15 @@ export function parseCaptureArgs(argv) {
   return { ...options, keys: parseTargets(rest.join(',')) };
 }
 
+/** The note kind for a deleted row whose drawing the library no longer holds. */
+export const REMOVED_NOTE_KIND = 'removed';
+
 /**
  * Non-zero when any key failed, or when units were requested and none was captured; a `removed`
  * note is not a requested unit, and no other note kind is subtracted.
  */
 export function exitCodeOf({ frames, failures, notes = [] }, requested) {
-  const live = requested - notes.filter((note) => note.kind === 'removed').length;
+  const live = requested - notes.filter((note) => note.kind === REMOVED_NOTE_KIND).length;
   return failures.length > 0 || (live > 0 && frames.length === 0) ? 1 : 0;
 }
 
@@ -339,9 +342,9 @@ export function exitCodeOf({ frames, failures, notes = [] }, requested) {
  * @returns {string[]} The summary first.
  */
 export function describeRun(manifest, output) {
-  const removed = manifest.notes.filter((note) => note.kind === 'removed');
+  const removed = manifest.notes.filter((note) => note.kind === REMOVED_NOTE_KIND);
   const { bootMs, totalMs } = manifest.timings;
-  const plain = (text) => String(text ?? '').replaceAll(/\p{Cc}/gu, '');
+  const plain = (text) => String(text ?? '').replaceAll(/[\p{Cc}\p{Cf}]/gu, '');
   return [
     `captured ${manifest.frames.length} unit(s) to ${output} ` +
       `(${manifest.failures.length} failure(s), ${removed.length} removed with their drawing, ` +
@@ -351,6 +354,11 @@ export function describeRun(manifest, output) {
         `removed with its drawing: ${[spec, cap].filter(Boolean).map(plain).join(' · ')} (${plain(reason)})`
     ),
   ];
+}
+
+/** The run's log lines and exit code, from the manifest and the number of units requested. */
+export function runOutcome(manifest, requested, output) {
+  return { lines: describeRun(manifest, output), code: exitCodeOf(manifest, requested) };
 }
 
 /** A capture run's mutable record, which the manifest is written from. */
@@ -527,7 +535,13 @@ async function resolveInReference(reference, requests, state, deadline) {
   for (const [index, result] of results.entries()) {
     const { key, spec, cap, deletedRow } = requests[index];
     if (result.error && deletedRow) {
-      state.notes.push({ key, kind: 'removed', spec, cap: cap ?? null, reason: result.error });
+      state.notes.push({
+        key,
+        kind: REMOVED_NOTE_KIND,
+        spec,
+        cap: cap ?? null,
+        reason: result.error,
+      });
     } else if (result.error) state.failures.push({ id: key, reason: result.error });
     else resolved.push({ key, ...result });
   }

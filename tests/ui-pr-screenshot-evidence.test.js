@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 
+import { REMOVED_NOTE_KIND, captureManifest } from '../scripts/lib/primitiveLabCapture.js';
 import { addressKey } from '../scripts/lib/primitiveLabUnits.js';
 
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
@@ -2963,7 +2964,10 @@ describe('publishing design-library frames (issue 2413)', () => {
   });
 
   const GONE = addressKey('<Stepper>', 'signed');
-  const removedNote = key => ({ key, kind: 'removed', spec: '<Stepper>', cap: 'signed', reason: '<Stepper> has no unit captioned "signed"' });
+  const noteOf = (key, kind) => captureManifest({
+    notes: [{ key, kind, spec: '<Stepper>', cap: 'signed', reason: '<Stepper> has no unit captioned "signed"' }],
+  }).notes[0];
+  const removedNote = key => noteOf(key, REMOVED_NOTE_KIND);
   const sectionFor = async (targets, overrides = {}) => librarySection((await publishLibrary({
     library: { files: ['3-0-stepper.png'], manifest: manifestOf(overrides) },
     targets,
@@ -2977,6 +2981,11 @@ describe('publishing design-library frames (issue 2413)', () => {
     assert.ok(!noted.includes('has no unit captioned'), noted);
     const bare = await sectionFor(targets);
     assert.ok(bare.includes(`- ${GONE}: no record in the library manifest`), bare);
+  });
+
+  it('accounts for nothing from an address note of another kind', async () => {
+    const section = await sectionFor(`row:controls/4,${GONE}`, { notes: [noteOf(GONE, 'unlocated')] });
+    assert.ok(section.includes(`- ${GONE}: no record in the library manifest`), section);
   });
 
   it('changes nothing for a removed note off the selection, a removed non-address key, or an unlocated note', async () => {
