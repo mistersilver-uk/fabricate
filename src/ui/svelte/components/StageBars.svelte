@@ -5,9 +5,9 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `stages` | `{ name?, label?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. `[]` draws an empty named group. |
+  | `stages` | `{ name?, label?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. |
   | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills and carries `aria-current="step"`. A finished bar reads success and the rest neutral. |
-  | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name. |
+  | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name, in muted ink and the mono face, the position at weight 500. |
   | `ariaLabel` / `ariaLabelledBy` | string / string | `''` / `''` | Exactly one names the group; `ariaLabelledBy` where the caller renders the kicker. |
 
   Rest spread:
