@@ -3404,7 +3404,7 @@
   cursor: pointer;
 }
 
-/* Hover moves the border alone: muted ink on the raised ground computes under 4.5:1. */
+/* Hover moves the border alone: muted ink on the raised ground computes under 4.5:1 in four of the seven palettes. */
 .fabricate-option-cards .manager-resolution-option:not(.is-active, .is-disabled):hover {
   border-color: var(--fab-border-strong);
 }
