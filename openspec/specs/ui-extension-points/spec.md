@@ -450,7 +450,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), `Field` too (issue 2601), and `Well` too (issue 2601); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field` and `Well` too (issue 2601); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -1085,22 +1085,22 @@ Each group states the accepted values of every key that entry publishes.
   - It is the design system's well, the container level below a card, for a group of related content inside a card's content slot.
     It draws no control and no text of its own but its label.
   - `label` is optional final display text, drawn as the well's kicker in upper case above its content.
-    With it the well is a `group` named by it, so a screen reader may read the label twice, as the group's name and as the kicker's text, which is recorded and accepted; without it, an unnamed `<div>` with no role.
+    With it the well is a `group` named by it, so a screen reader may read the label twice, as the group's name and as the kicker's text; without it, an unnamed `<div>` with no role.
     The companion passes sentence case.
   - `children` is a content slot whose element is a `<div>`; the well draws the content slot's children in normal flow below its kicker, with no gap of its own, inside its own padding, so the companion adds no padding.
     The companion fills the slot with one element of its own that lays out and spaces its content, as the content-slot rules state.
     Children appended to the slot directly, not inside that one element, lay out in ordinary block and inline flow: inline ones share a line and block ones keep their own margins.
   - The label is drawn by a `Kicker` as `p`, so the `Kicker` group's type and grounds apply; it is not a heading.
-  - Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate modal.
-    A Fabricate modal is Fabricate's own in-window modal, the `.fabricate-modal` dialog that `Modal.svelte` draws inside a Fabricate window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
+  - Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate dialog.
+    A Fabricate dialog is the shared `Modal` Fabricate draws in its own window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
     It states no ink or type, so its content inherits the Fabricate window's ink from `target`, and a `Kicker` clears 4.5:1 on either fill.
   - A well is never nested in a well: the design system has two container levels, the card and the well.
     Fabricate does not refuse a well nested in a well; the group only says not to.
   - Rest `data-*` attributes land on the well's root.
-  - It needs a Fabricate window ancestor, and draws the same in every Fabricate window but for its fill inside a Fabricate modal.
+  - It needs a Fabricate window ancestor, and draws the same in every Fabricate window but for its fill inside a Fabricate dialog.
   - The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
   - Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
-- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding, corner and edge figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
 
 ### The publishable subset
 
@@ -1399,7 +1399,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 - **WHEN** a companion mounts `Well` with a `label` and `children: true` in a published `InspectorCard`'s content slot inside a Fabricate window, and fills the well's content slot with one element of its own
 - **THEN** the well draws one `<div>` named as a `group` by its label, its kicker above the content slot, which it draws in normal flow on `--fab-bg-1`
-- **AND** an `update` that adds or drops `label` keeps the slot and focus in place, and the card's `destroy` ends the well and leaves `target` empty
+- **AND** an `update` that adds or drops `label` keeps the slot and focus in place, and the card's `destroy` ends the well and leaves the card's `target` empty
 - **AND** a mount into a target with no `.fabricate` ancestor throws M16
 
 #### Scenario: An overlay host
