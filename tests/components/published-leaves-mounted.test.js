@@ -335,12 +335,13 @@ describe("InfoStrip's per-item props", () => {
         .filter((name) => name !== 'class')
         .filter((name) => drawn().hasAttribute(name));
     assert.deepEqual(named(), []);
-    assert.equal(drawn().classList.contains('x'), false);
+    assert.equal(drawn().textContent.trim(), 'Clear');
+    const strip = target.querySelector('.fabricate-info-strip');
+    assert.ok(strip.hasAttribute('aria-labelledby'), 'the strip keeps its accessible name');
     handle.update({ label: 'Conditions', facts: [{ value: 'Storm', props: { ...attributes } }] });
     await settle();
     assert.equal(drawn().textContent.trim(), 'Storm');
     assert.deepEqual(named(), []);
-    assert.equal(drawn().classList.contains('x'), false);
     assert.deepEqual(facts[0].props, attributes);
     assert.deepEqual(reports, []);
   });

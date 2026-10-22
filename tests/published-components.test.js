@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { withoutMember } from '../src/ui/publishedComponentProps.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -1317,7 +1318,7 @@ describe('registration', () => {
 });
 
 // `InfoStrip` spreads each fact's `props` as attributes, so the seam drops that member; `Meter`'s
-// `segments` are not stripped, so an item there keeps every member it was given.
+// `segments` and `Ticker`'s `facts` are not stripped, so an item there keeps every member it was given.
 const STRIP_TABLE = Object.freeze([
   {
     name: 'InfoStrip',
@@ -1336,6 +1337,15 @@ const STRIP_TABLE = Object.freeze([
     rest: false,
     root: 'any',
     component: Object.freeze({ role: 'Meter' }),
+  },
+  {
+    name: 'Ticker',
+    path: 'src/ui/svelte/components/Ticker.svelte',
+    version: 1,
+    props: { facts: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'Ticker' }),
   },
 ]);
 const ATTRIBUTES = Object.freeze({ 'data-action': 'close', class: 'x', 'aria-label': 'Hidden' });
@@ -1403,5 +1413,20 @@ describe('a per-item member the seam strips', () => {
     const segments = [{ tone: 'danger', props: { 'data-x': 1 } }];
     ui.mount('Meter', { target: target(), props: { segments } });
     assert.deepEqual(mounts[0].props.initial.segments, segments);
+  });
+
+  it('is private to its own entry: another entry’s key of the same name passes through', () => {
+    const { ui, mounts } = stripping();
+    const facts = [fact('Clear')];
+    ui.mount('Ticker', { target: target(), props: { facts } });
+    assert.deepEqual(mounts[0].props.initial.facts, facts);
+  });
+
+  it('drops a member at a nested path from the items below it', () => {
+    const tiers = [{ yields: [{ props: { a: 1 }, name: 'x' }, { name: 'y' }], props: { b: 2 } }];
+    assert.deepEqual(withoutMember(tiers, ['yields', 'props']), [
+      { yields: [{ name: 'x' }, { name: 'y' }], props: { b: 2 } },
+    ]);
+    assert.deepEqual(tiers[0].yields[0].props, { a: 1 }, 'the value it was given is unchanged');
   });
 });

@@ -123,7 +123,7 @@ const STRIPPED_PATHS = Map.groupBy(
 );
 
 /** `value` with the member `path` ends at dropped from each item it holds, as a new tree. */
-function withoutMember(value, path) {
+export function withoutMember(value, path) {
   if (Array.isArray(value)) return value.map((item) => withoutMember(item, path));
   if (!hasPlainPrototype(value)) return value;
   const [head, ...below] = path;
