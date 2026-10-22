@@ -13,6 +13,8 @@ import { propertiesOf, shortfalls, themePalettes } from './themePaletteContrast.
 const SHEET = 'styles/fabricate.css';
 const MODULE_RING = '.fabricate button:focus-visible';
 const RING_GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface', '--fab-bg-2']);
+/** The ratio a keyboard ring clears against its ground, the floor of both contrast clauses. */
+const RING_CONTRAST = 3;
 
 /** Defines the ring clauses for a control whose own `:focus-visible` rule is `ownRing`. */
 export function defineAccentRingContrast(ownRing) {
@@ -21,7 +23,8 @@ export function defineAccentRingContrast(ownRing) {
   const listing = (selector) =>
     rules.filter((rule) => splitSelectorList(rule.selector).includes(selector));
 
-  for (const selector of [MODULE_RING, ownRing]) {
+  const rings = [MODULE_RING, ownRing];
+  for (const selector of rings) {
     test(`${selector} draws the accent 2px wide and 2px clear`, () => {
       const drawn = listing(selector);
       assert.equal(drawn.length, 1, 'one rule draws it');
@@ -31,13 +34,17 @@ export function defineAccentRingContrast(ownRing) {
     });
   }
 
+  test(`${ownRing} is a rule of its own beside the module ring`, () => {
+    assert.equal(new Set(rings.flatMap(listing)).size, 2);
+  });
+
   for (const ground of RING_GROUNDS) {
     test(`the ring clears 3:1 on ${ground} in every theme`, () => {
-      assert.deepEqual(shortfalls(themes, '--fab-accent', [ground], 3), []);
+      assert.deepEqual(shortfalls(themes, '--fab-accent', [ground], RING_CONTRAST), []);
     });
   }
 
   test('the ring falls short of 3:1 on --fab-bg-3 in two themes, so the group names four grounds', () => {
-    assert.equal(shortfalls(themes, '--fab-accent', ['--fab-bg-3'], 3).length, 2);
+    assert.equal(shortfalls(themes, '--fab-accent', ['--fab-bg-3'], RING_CONTRAST).length, 2);
   });
 }
