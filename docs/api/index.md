@@ -2945,24 +2945,32 @@ well.slot('children').append(content);
 `Callout` draws the design system's callout: a standing statement, a rule or fact that is always true and stays put, beside a leading glyph in a rounded strip.
 It is never a live region and announces nothing, on mount or on `update`: a note the reader must hear when it appears is a [`Notice`](#notice).
 `tone` is `neutral`, `info`, `accent`, `warning`, `success` or `danger`, and defaults to `neutral`; a tone outside that set draws `neutral`, so a tone added later is additive.
-`info` is a standing note about live state, and `warning` a hazard the reader can still avoid.
+`info` is a standing note about live state, `warning` a hazard the reader can still avoid, `danger` a standing consequence and `success` a standing confirmation; `accent` is colour alone and says nothing.
 It repaints the edge, the fill, the glyph and the title, and the body keeps its muted ink at every tone.
-Colour is never the only carrier and the glyph is hidden from assistive technology, so say the state in words in your title or text.
+Colour is never the only carrier and the glyph is hidden from assistive technology, so say the state in words in your title or text; `neutral`, `info` and `accent` draw the same glyph, so only colour tells them apart.
 `title` is optional final display text, a short line drawn above the text.
+It is not a heading.
 `text` is optional final display text, the note's sentence.
 `icon` is optional Font Awesome classes for the leading glyph, hidden from assistive technology; absent, the tone's own glyph is drawn.
 `items` is optional and is an array of `{ icon, lead, text }` points drawn under the body as a list: `lead` and `text` are final display text, the lead inked `--fab-text` before the text, and `icon` is Font Awesome classes for the point's glyph, hidden from assistive technology and inked as the leading glyph.
-Every member is optional and draws nothing when absent or empty, and a value that is not an array draws no list.
+Every member is optional and draws nothing when absent or empty, a member that is not an object is skipped, and a value that is not an array draws no list.
 Pass no other member: one this line does not state is private, and a function in it throws `"items" must not hold a function`.
+The lead and the text are drawn one space apart, so punctuate the lead where the run would be ambiguous, as `Moonpetal:` before `one held, two needed`.
+An item with no `icon` starts 21px left of its glyph-led siblings, so give every item of a list an `icon`, or none.
 `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
-Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks, so the body narrows to make room: keep what you draw there short.
+Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room and a long label squeezes it: keep what you draw there short.
 Fill it with phrasing content, a `<span>` for a mount target, for example of a published [`Button`](#button) inside a Fabricate window; content there inherits the strip's muted ink and type.
-It draws a `<p>` with no role while it draws `text` alone, and a `<div>` with `role="note"` while it draws a `title`, an item or the `actions` slot, because a paragraph cannot hold them; with none of `title`, `text` and `items` the strip is a bare glyph, beside the `actions` slot where that is requested.
+A published `Button`'s focus ring clears 3:1 against every tone's fill on the four grounds named below.
+Give that button the `neutral`, `primary`, `warning` or `danger` role, never `ghost` or `dashed`, whose transparent face draws the label in the muted ink, which falls short on a tinted fill as the body does.
+It draws a `<p>` with no role unless it draws a `title`, an item or the `actions` slot, and then a `<div>` with `role="note"`, because a paragraph cannot hold them.
+With none of `title`, `text` and `items` the strip is a bare glyph that says nothing, so never mount a callout without one of them; with `actions` alone it is a note holding just your control.
 An `update` that moves it between the two replaces its root element; the mount, its handle and its claim on `target` are unchanged, and while `actions` is requested the root stays the `<div>`, so no `update` moves the slot.
 Its ink and fill are its own, so its root is `any` and it needs no Fabricate window: the body inks `--fab-text-muted` on the tone's translucent fill over `target`'s ground, and the title inks `--fab-text` at `neutral` and the tone's own text ink otherwise; it inherits `target`'s face.
 The title, an item's lead and the glyphs clear their floors, 4.5:1 for text and 3:1 for a glyph, at every tone in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title does not on `--fab-bg-3`, so draw a callout on those four grounds.
-The body, its text and each item's text, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, and at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
-At `info`, `accent`, `warning` and `success` it falls short on `--fab-bg-1`, a Fabricate window's own ground, in the default palette, and at every tone but `neutral` it falls short on `--fab-bg-2`, so inside an [`InspectorCard`](#inspectorcard); so say in `title` whatever the reader must not miss.
+On a light ground, such as Foundry's light application theme or a chat card, the translucent fills barely tint it and the inks fall to about 1:1 to 2:1, so in a window of your own paint `--fab-bg-1` on `target`.
+The body, its text, each item's text and text you draw in `actions`, which inherits the same ink, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`, and at `success` on `--fab-bg-0`.
+In the default palette alone it falls short on `--fab-bg-1`, a Fabricate window's own ground, and on `--fab-surface`, at `info` (4.20:1), `accent` (4.08:1), `warning` (4.14:1) and `success` (4.27:1), and on `--fab-bg-0` at `info` (4.49:1), `accent` (4.36:1) and `warning` (4.42:1).
+At every tone but `neutral` it falls short on `--fab-bg-2`, so inside an [`InspectorCard`](#inspectorcard), in up to six of the seven palettes, the default among them; so say in `title` whatever the reader must not miss.
 Rest `data-*` attributes land on the root.
 Name them for your module, as `data-<module-id>-…`; `data-callout-*` names are the note's own and private, and a value you pass under one overwrites what the note writes.
 Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
@@ -2975,7 +2983,7 @@ A worked note follows: the reagents a batch still lacks, with the control that a
 ```javascript
 // After `load(['Callout', 'Button'])` has resolved and `fabricate.ready` has fired.
 const fabUi = game.fabricate?.api?.ui;
-if (!fabUi?.components.includes('Callout')) return;
+if (!fabUi?.components.includes('Callout') || !fabUi.components.includes('Button')) return;
 
 const note = fabUi.mount('Callout', {
   target,
@@ -2983,8 +2991,8 @@ const note = fabUi.mount('Callout', {
     tone: 'warning',
     title: 'Two reagents run short',
     items: [
-      { icon: 'fas fa-leaf', lead: 'Moonpetal', text: 'one held, two needed' },
-      { icon: 'fas fa-fire', lead: 'Ember salt', text: 'none held' },
+      { icon: 'fas fa-leaf', lead: 'Moonpetal:', text: 'one held, two needed' },
+      { icon: 'fas fa-fire', lead: 'Ember salt:', text: 'none held' },
     ],
     actions: true,
   },
@@ -2995,7 +3003,7 @@ buttonTarget.style.display = 'flex';
 note.slot('actions').append(buttonTarget);
 fabUi.mount('Button', {
   target: buttonTarget,
-  props: { children: 'Open the shopping list', onclick: () => acmeShop.open() },
+  props: { role: 'neutral', children: 'Open the shopping list', onclick: () => acmeShop.open() },
 });
 // `note.destroy()` also destroys the button mounted in its actions slot.
 ```

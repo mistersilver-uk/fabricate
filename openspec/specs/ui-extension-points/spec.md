@@ -1105,24 +1105,32 @@ Each group states the accepted values of every key that entry publishes.
   - It is the design system's callout: a standing statement, a rule or fact that is always true and stays put, beside a leading glyph in a rounded strip.
     It is never a live region and announces nothing, on mount or on `update`: a note the reader must hear when it appears is a `Notice`.
   - `tone` is `neutral`, `info`, `accent`, `warning`, `success` or `danger`, and defaults to `neutral`; a tone outside that set draws `neutral`, so a tone added later is additive.
-    `info` is a standing note about live state, and `warning` a hazard the reader can still avoid.
+    `info` is a standing note about live state, `warning` a hazard the reader can still avoid, `danger` a standing consequence and `success` a standing confirmation; `accent` is colour alone and says nothing.
     It repaints the edge, the fill, the glyph and the title, and the body keeps its muted ink at every tone.
-    Colour is never the only carrier and the glyph is hidden from assistive technology, so the companion's title or text states the state in words.
+    Colour is never the only carrier and the glyph is hidden from assistive technology, so the companion's title or text states the state in words; `neutral`, `info` and `accent` draw the same glyph, so only colour tells them apart.
   - `title` is optional final display text, a short line drawn above the text.
+    It is not a heading.
   - `text` is optional final display text, the note's sentence.
   - `icon` is optional Font Awesome classes for the leading glyph, hidden from assistive technology; absent, the tone's own glyph is drawn.
   - `items` is optional and is an array of `{ icon, lead, text }` points drawn under the body as a list: `lead` and `text` are final display text, the lead inked `--fab-text` before the text, and `icon` is Font Awesome classes for the point's glyph, hidden from assistive technology and inked as the leading glyph.
-    Every member is optional and draws nothing when absent or empty, and a value that is not an array draws no list.
+    Every member is optional and draws nothing when absent or empty, a member that is not an object is skipped, and a value that is not an array draws no list.
     The companion passes no other member: one this line does not state is private, and a function in it is M10.
+    The lead and the text are drawn one space apart, so the companion punctuates the lead where the run would be ambiguous, as `Moonpetal:` before `one held, two needed`.
+    An item with no `icon` starts 21px left of its glyph-led siblings, so the companion gives every item of a list an `icon`, or none.
   - `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
-    Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks, so the body narrows to make room and the companion keeps what it draws there short.
+    Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room, a long label squeezes it, and the companion keeps what it draws there short.
     The companion fills it with phrasing content, a `<span>` for a mount target, for example of a published `Button` inside a Fabricate window; content there inherits the strip's muted ink and type.
-  - It draws a `<p>` with no role while it draws `text` alone, and a `<div>` with `role="note"` while it draws a `title`, an item or the `actions` slot, because a paragraph cannot hold them; with none of `title`, `text` and `items` the strip is a bare glyph, beside the `actions` slot where that is requested.
+    A published `Button`'s focus ring clears 3:1 against every tone's fill on the four grounds this group names.
+    The companion gives that button the `neutral`, `primary`, `warning` or `danger` role, never `ghost` or `dashed`, whose transparent face draws the label in the muted ink, which falls short on a tinted fill as the body does.
+  - It draws a `<p>` with no role unless it draws a `title`, an item or the `actions` slot, and then a `<div>` with `role="note"`, because a paragraph cannot hold them.
+    With none of `title`, `text` and `items` the strip is a bare glyph that says nothing, so the companion never mounts a callout without one of them; with `actions` alone it is a note holding just the companion's control.
     An `update` that moves it between the two replaces its root element; the mount, its handle and its claim on `target` are unchanged, and while `actions` is requested the root stays the `<div>`, so no `update` moves the slot.
   - Its ink and fill are its own, so it needs no Fabricate ancestor: the body inks `--fab-text-muted` on the tone's translucent fill over `target`'s ground, and the title inks `--fab-text` at `neutral` and the tone's own text ink otherwise; it inherits `target`'s face.
   - The title, an item's lead and the glyphs clear their floors, 4.5:1 for text and 3:1 for a glyph, at every tone in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title does not on `--fab-bg-3`, so the companion draws a callout on those four grounds.
-    The body, its text and each item's text, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, and at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
-    At `info`, `accent`, `warning` and `success` it falls short on `--fab-bg-1`, a Fabricate window's own ground, in the default palette, and at every tone but `neutral` it falls short on `--fab-bg-2`, so inside an `InspectorCard`; so the companion says in `title` whatever the reader must not miss.
+    On a light ground, such as Foundry's light application theme or a chat card, the translucent fills barely tint it and the inks fall to about 1:1 to 2:1, so in a window of its own the companion paints `--fab-bg-1` on `target`.
+    The body, its text, each item's text and text the companion draws in `actions`, which inherits the same ink, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`, and at `success` on `--fab-bg-0`.
+    In the default palette alone it falls short on `--fab-bg-1`, a Fabricate window's own ground, and on `--fab-surface`, at `info` (4.20:1), `accent` (4.08:1), `warning` (4.14:1) and `success` (4.27:1), and on `--fab-bg-0` at `info` (4.49:1), `accent` (4.36:1) and `warning` (4.42:1).
+    At every tone but `neutral` it falls short on `--fab-bg-2`, so inside an `InspectorCard`, in up to six of the seven palettes, the default among them; so the companion says in `title` whatever the reader must not miss.
   - Rest `data-*` attributes land on the root.
   - Fabricate draws nothing focusable in the note: an `update` that keeps `actions` keeps its slot, so focus stays on a control the companion drew there; one that omits `actions`, and `destroy`, remove that control, so where it holds focus the companion moves focus first.
 - **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attribute, and how Fabricate lays a callout out in its own entries and cards.
