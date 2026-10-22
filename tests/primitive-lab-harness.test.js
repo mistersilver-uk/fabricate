@@ -605,7 +605,10 @@ test('lab:check expects every library section and every catalogued beside specim
     beside,
     'the per-entry keys must account for every beside specimen'
   );
-  assert.ok(Object.keys(besideByEntry).length > 1, 'one key, so the keying is not keying');
+  assert.ok(
+    Object.keys(besideByEntry).length > 0 && Object.keys(besideByEntry).every((key) => key !== '?'),
+    'every beside specimen is keyed by the heading of its own entry'
+  );
   const partial = catalogueEntries(REPO_ROOT).filter((entry) => entry.row.partial).length;
   assert.ok(partial > 1, `${partial} partial rows, so the partial caption has no domain`);
   assert.equal(Object.values(partialByEntry).flat().length, partial);
