@@ -6,7 +6,7 @@
     },
     {
       "path": "src/ui/svelte/components/ChanceSlider.svelte",
-      "reason": "no-consumer: a percentage slider whose resolveColor runs while Fabricate renders; a companion sets a number through Stepper."
+      "reason": "no-consumer: resolveColor is a function prop Fabricate calls while it renders, which no shipped kind carries; a companion sets a number through Stepper."
     },
     {
       "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
@@ -42,7 +42,7 @@
     },
     {
       "path": "src/ui/svelte/components/SearchablePopover.svelte",
-      "reason": "part-of:src/ui/svelte/components/Select.svelte: the picker engine Select publishes; its trigger, option and header snippets take arguments."
+      "reason": "no-consumer: the picker engine Select draws; its trigger, option and header snippets take arguments, so they are never slots, and a companion picks one of n through the published Select."
     },
     {
       "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
@@ -62,7 +62,7 @@
     },
     {
       "path": "src/ui/svelte/components/Typeahead.svelte",
-      "reason": "no-consumer: its source and itemLabel run while Fabricate renders, so they are no callback; a companion searches with SearchField."
+      "reason": "no-consumer: source and itemLabel are function props Fabricate calls while it renders, which no shipped kind carries; a companion searches with SearchField."
     },
     {
       "path": "src/ui/svelte/components/Well.svelte",
