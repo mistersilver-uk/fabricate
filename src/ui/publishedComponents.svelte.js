@@ -13,6 +13,7 @@ import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
 import Button from './svelte/components/Button.svelte';
+import Callout from './svelte/components/Callout.svelte';
 import Chip from './svelte/components/Chip.svelte';
 import EmptyState from './svelte/components/EmptyState.svelte';
 import Field from './svelte/components/Field.svelte';
@@ -56,6 +57,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/StageBars.svelte': StageBars,
   'src/ui/svelte/components/Field.svelte': Field,
   'src/ui/svelte/components/Well.svelte': Well,
+  'src/ui/svelte/components/Callout.svelte': Callout,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

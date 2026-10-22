@@ -306,6 +306,14 @@ const LEAVES = Object.freeze([
     read: (root) => root.getAttribute('aria-label'),
     drawn: [null, 'Chosen reagents'],
   },
+  {
+    name: 'Callout',
+    root: '.manager-callout',
+    props: { text: 'Salvage returns half.' },
+    next: { text: 'Salvage returns all.', tone: 'info' },
+    read: (root) => root.textContent.trim(),
+    drawn: ['Salvage returns half.', 'Salvage returns all.'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -430,6 +438,7 @@ describe('a key a leaf does not publish', () => {
     ['Field', 'label', 'is not a data attribute'],
     ['Field', 'caption', 'is not a data attribute'],
     ['Well', 'class', 'is not a data attribute'],
+    ['Callout', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

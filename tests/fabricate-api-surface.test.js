@@ -284,6 +284,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'StageBars',
       'Field',
       'Well',
+      'Callout',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -520,6 +521,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         props: { label: optional, children: slot },
         rest: true,
         root: 'fabricate',
+        overlays: false,
+      },
+      Callout: {
+        version: 1,
+        props: {
+          tone: optional,
+          title: optional,
+          text: optional,
+          icon: optional,
+          items: optional,
+          actions: slot,
+        },
+        rest: true,
+        root: 'any',
         overlays: false,
       },
     });

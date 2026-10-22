@@ -33,8 +33,8 @@
  * Limit: the DOM-read census sees only the read forms `attributeReads` names, and the aria-key
  * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
- * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState` and `Notice`),
- * or an unprefixed state class.
+ * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice` and
+ * `Callout`, and `Callout`'s `items[].icon`), or an unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
@@ -650,6 +650,8 @@ function sheetReach({ path, root }, sheet, reader = SHIPPED) {
 
 /** The sheet-named tokens the shipped `any` closures spell, each kept off a published mount. */
 const SHEET_REACH_PINS = Object.freeze([
+  // The note's root class, which the 2-selector census of `published-callout-census.test.js` holds.
+  'src/ui/svelte/components/Callout.svelte: manager-callout',
   // On the remove control, which no published key draws.
   'src/ui/svelte/components/Chip.svelte: fab-hit-area',
   // The chip's root class, which the 16-selector census below holds.
@@ -1201,7 +1203,7 @@ describe('each entry matches its component declaration', () => {
     );
   });
 
-  it('spells no sheet-named class in an any closure but the four pinned: the Chip pair, and the EmptyState and Notice roots', () => {
+  it('spells no sheet-named class in an any closure but the five pinned: the Chip pair, and the EmptyState, Notice and Callout roots', () => {
     const sheet = sheetClassNames();
     assert.ok(sheet.has('fabricate-card') && sheet.size > 500, 'the module sheet was read');
     const reach = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) =>

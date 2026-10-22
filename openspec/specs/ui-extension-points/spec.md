@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field` and `Well`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well` and `Callout`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -432,6 +432,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `StageBars` (issue 2455).
 - The published set continues with `Field` (issue 2601).
 - The published set continues with `Well` (issue 2601).
+- The published set continues with `Callout` (issue 2601).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -450,7 +451,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field` and `Well` too (issue 2601); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well` and `Callout` too (issue 2601); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -1100,7 +1101,31 @@ Each group states the accepted values of every key that entry publishes.
   - It needs a Fabricate window ancestor, and draws the same in every Fabricate window but for its fill inside a Fabricate dialog.
   - The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
   - Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
-- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
+- **`Callout`.**
+  - It is the design system's callout: a standing statement, a rule or fact that is always true and stays put, beside a leading glyph in a rounded strip.
+    It is never a live region and announces nothing, on mount or on `update`: a note the reader must hear when it appears is a `Notice`.
+  - `tone` is `neutral`, `info`, `accent`, `warning`, `success` or `danger`, and defaults to `neutral`; a tone outside that set draws `neutral`, so a tone added later is additive.
+    `info` is a standing note about live state, and `warning` a hazard the reader can still avoid.
+    It repaints the edge, the fill, the glyph and the title, and the body keeps its muted ink at every tone.
+    Colour is never the only carrier and the glyph is hidden from assistive technology, so the companion's title or text states the state in words.
+  - `title` is optional final display text, a short line drawn above the text.
+  - `text` is optional final display text, the note's sentence.
+  - `icon` is optional Font Awesome classes for the leading glyph, hidden from assistive technology; absent, the tone's own glyph is drawn.
+  - `items` is optional and is an array of `{ icon, lead, text }` points drawn under the body as a list: `lead` and `text` are final display text, the lead inked `--fab-text` before the text, and `icon` is Font Awesome classes for the point's glyph, hidden from assistive technology and inked as the leading glyph.
+    Every member is optional and draws nothing when absent or empty, and a value that is not an array draws no list.
+    The companion passes no other member: one this line does not state is private, and a function in it is M10.
+  - `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
+    Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks, so the body narrows to make room and the companion keeps what it draws there short.
+    The companion fills it with phrasing content, a `<span>` for a mount target, for example of a published `Button` inside a Fabricate window; content there inherits the strip's muted ink and type.
+  - It draws a `<p>` with no role while it draws `text` alone, and a `<div>` with `role="note"` while it draws a `title`, an item or the `actions` slot, because a paragraph cannot hold them; with none of `title`, `text` and `items` the strip is a bare glyph, beside the `actions` slot where that is requested.
+    An `update` that moves it between the two replaces its root element; the mount, its handle and its claim on `target` are unchanged, and while `actions` is requested the root stays the `<div>`, so no `update` moves the slot.
+  - Its ink and fill are its own, so it needs no Fabricate ancestor: the body inks `--fab-text-muted` on the tone's translucent fill over `target`'s ground, and the title inks `--fab-text` at `neutral` and the tone's own text ink otherwise; it inherits `target`'s face.
+  - The title, an item's lead and the glyphs clear their floors, 4.5:1 for text and 3:1 for a glyph, at every tone in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title does not on `--fab-bg-3`, so the companion draws a callout on those four grounds.
+    The body, its text and each item's text, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, and at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
+    At `info`, `accent`, `warning` and `success` it falls short on `--fab-bg-1`, a Fabricate window's own ground, in the default palette, and at every tone but `neutral` it falls short on `--fab-bg-2`, so inside an `InspectorCard`; so the companion says in `title` whatever the reader must not miss.
+  - Rest `data-*` attributes land on the root.
+  - Fabricate draws nothing focusable in the note: an `update` that keeps `actions` keeps its slot, so focus stays on a control the companion drew there; one that omits `actions`, and `destroy`, remove that control, so where it holds focus the companion moves focus first.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attribute, and how Fabricate lays a callout out in its own entries and cards.
 
 ### The publishable subset
 
@@ -1401,6 +1426,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the well draws one `<div>` named as a `group` by its label, its kicker above the content slot, which it draws in normal flow on `--fab-bg-1`
 - **AND** an `update` that adds or drops `label` keeps the slot and focus in place, and the card's `destroy` ends the well and leaves the card's `target` empty
 - **AND** a mount into a target with no `.fabricate` ancestor throws M16
+
+#### Scenario: A published callout
+
+- **WHEN** a companion mounts `Callout` with `text` alone into a target under no Fabricate ancestor
+- **THEN** it draws one `<p>` with no role in its own ink on its own fill, and a tone outside its set draws `neutral`
+- **AND** with a `title`, `items` or `actions: true` it draws a `<div>` with `role="note"`, and the `actions` content slot is a `<span>` drawn in the strip after the body
+- **AND** an `update` that keeps `actions` keeps the slot and focus in place, and `destroy` leaves `target` empty
 
 #### Scenario: An overlay host
 

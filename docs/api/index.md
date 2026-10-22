@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field` and `Well`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well` and `Callout`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2055,6 +2055,7 @@ The published components, in publication order:
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
 | `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
+| `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2939,6 +2940,66 @@ well.slot('children').append(content);
 // `card.destroy()` also destroys the well mounted in its content slot.
 ```
 
+### Callout
+
+`Callout` draws the design system's callout: a standing statement, a rule or fact that is always true and stays put, beside a leading glyph in a rounded strip.
+It is never a live region and announces nothing, on mount or on `update`: a note the reader must hear when it appears is a [`Notice`](#notice).
+`tone` is `neutral`, `info`, `accent`, `warning`, `success` or `danger`, and defaults to `neutral`; a tone outside that set draws `neutral`, so a tone added later is additive.
+`info` is a standing note about live state, and `warning` a hazard the reader can still avoid.
+It repaints the edge, the fill, the glyph and the title, and the body keeps its muted ink at every tone.
+Colour is never the only carrier and the glyph is hidden from assistive technology, so say the state in words in your title or text.
+`title` is optional final display text, a short line drawn above the text.
+`text` is optional final display text, the note's sentence.
+`icon` is optional Font Awesome classes for the leading glyph, hidden from assistive technology; absent, the tone's own glyph is drawn.
+`items` is optional and is an array of `{ icon, lead, text }` points drawn under the body as a list: `lead` and `text` are final display text, the lead inked `--fab-text` before the text, and `icon` is Font Awesome classes for the point's glyph, hidden from assistive technology and inked as the leading glyph.
+Every member is optional and draws nothing when absent or empty, and a value that is not an array draws no list.
+Pass no other member: one this line does not state is private, and a function in it throws `"items" must not hold a function`.
+`actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
+Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks, so the body narrows to make room: keep what you draw there short.
+Fill it with phrasing content, a `<span>` for a mount target, for example of a published [`Button`](#button) inside a Fabricate window; content there inherits the strip's muted ink and type.
+It draws a `<p>` with no role while it draws `text` alone, and a `<div>` with `role="note"` while it draws a `title`, an item or the `actions` slot, because a paragraph cannot hold them; with none of `title`, `text` and `items` the strip is a bare glyph, beside the `actions` slot where that is requested.
+An `update` that moves it between the two replaces its root element; the mount, its handle and its claim on `target` are unchanged, and while `actions` is requested the root stays the `<div>`, so no `update` moves the slot.
+Its ink and fill are its own, so its root is `any` and it needs no Fabricate window: the body inks `--fab-text-muted` on the tone's translucent fill over `target`'s ground, and the title inks `--fab-text` at `neutral` and the tone's own text ink otherwise; it inherits `target`'s face.
+The title, an item's lead and the glyphs clear their floors, 4.5:1 for text and 3:1 for a glyph, at every tone in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title does not on `--fab-bg-3`, so draw a callout on those four grounds.
+The body, its text and each item's text, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, and at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
+At `info`, `accent`, `warning` and `success` it falls short on `--fab-bg-1`, a Fabricate window's own ground, in the default palette, and at every tone but `neutral` it falls short on `--fab-bg-2`, so inside an [`InspectorCard`](#inspectorcard); so say in `title` whatever the reader must not miss.
+Rest `data-*` attributes land on the root.
+Name them for your module, as `data-<module-id>-…`; `data-callout-*` names are the note's own and private, and a value you pass under one overwrites what the note writes.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+Fabricate draws nothing focusable in the note: an `update` that keeps `actions` keeps its slot, so focus stays on a control you drew there; one that omits `actions`, and `destroy`, remove that control, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its padding, corner, edge, gap and type figures, the glyph each tone draws by default, and how Fabricate lays a callout out in its own entries and cards are private.
+A `class` is refused because a rest key must be a `data-*` attribute.
+
+A worked note follows: the reagents a batch still lacks, with the control that answers it in the strip, mounted inside a Fabricate window, for example in an extension target, because a published `Button` needs one.
+
+```javascript
+// After `load(['Callout', 'Button'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('Callout')) return;
+
+const note = fabUi.mount('Callout', {
+  target,
+  props: {
+    tone: 'warning',
+    title: 'Two reagents run short',
+    items: [
+      { icon: 'fas fa-leaf', lead: 'Moonpetal', text: 'one held, two needed' },
+      { icon: 'fas fa-fire', lead: 'Ember salt', text: 'none held' },
+    ],
+    actions: true,
+  },
+});
+// A `<span>` mount target in the actions slot, a flex box so it is exactly as tall as the button.
+const buttonTarget = document.createElement('span');
+buttonTarget.style.display = 'flex';
+note.slot('actions').append(buttonTarget);
+fabUi.mount('Button', {
+  target: buttonTarget,
+  props: { children: 'Open the shopping list', onclick: () => acmeShop.open() },
+});
+// `note.destroy()` also destroys the button mounted in its actions slot.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3113,7 +3174,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field` and `Well` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well` and `Callout` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.

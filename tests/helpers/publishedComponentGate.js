@@ -165,6 +165,12 @@ function guardNames(ancestors) {
 export const DYNAMIC_ELEMENTS = Object.freeze({
   // `tag` and `href`, which could draw an `<a>`, are not published.
   'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
+  // The note draws a `div` while it holds a title, an item or the actions slot, else a `p`.
+  'src/ui/svelte/components/Callout.svelte: svelte:element': {
+    tags: ['div', 'p'],
+    keys: ['actions', 'items', 'title'],
+    heldBy: "tests/components/published-callout-mounted.test.js: Callout's host element",
+  },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
   // An `as` outside the three hosts draws a `div`, and no host is focusable; `SearchField` passes
   // the literal `as="label"`, and `field-source-contract` requires a literal `as` on every `<Field>`.

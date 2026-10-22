@@ -322,4 +322,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'Callout',
+    path: 'src/ui/svelte/components/Callout.svelte',
+    version: 1,
+    props: Object.freeze({
+      tone: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({ kind: 'data' }),
+      text: Object.freeze({ kind: 'data' }),
+      icon: Object.freeze({ kind: 'data' }),
+      items: Object.freeze({ kind: 'data' }),
+      actions: Object.freeze({ kind: 'slot', element: 'span' }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
 ]);
