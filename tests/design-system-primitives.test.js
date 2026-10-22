@@ -896,6 +896,18 @@ test('(a) a Well change publishes its three frames, then the specimen that mount
   assertBroadSignalFrames(file, frames);
 });
 
+test('(a) a Callout change publishes its four frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/Callout.svelte';
+  const frames = [
+    'manager-tool-parity-04-requirements-1280x720',
+    'player-salvage',
+    'manager-recipe-edit-results-failure-policy-never-present',
+    'manager-essence-edit-unscoped-on-craft',
+    'manager-published-callout-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [

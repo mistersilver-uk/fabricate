@@ -318,6 +318,14 @@ const WELL_CONTENT = `${WELL} [data-lab-well-content]`;
 /** Sized to the fixture's 320px ground and the height of its one card. */
 const WELL_WINDOW = Object.freeze({ width: 440, height: 320 });
 
+/** The callout fixture's ground, one section's published note by its key, and its actions host. */
+const CALLOUT_GROUND = '[data-lab-callout-ground]';
+const CALLOUT = (key) => `${CALLOUT_GROUND} > [data-lab-callout="${key}"] .manager-callout`;
+const CALLOUT_ACTIONS = `${CALLOUT('actions')} > .manager-callout-actions`;
+
+/** Sized to the fixture's 360px ground and the height of its four notes. */
+const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 480 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -904,6 +912,68 @@ export const CASES = Object.freeze([
     position: WELL_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Well.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-callout-specimen',
+    label:
+      'Specimen, mounted through the published seam — four standing notes, one per section, 8px apart on the window’s --fab-bg-1 ground, each a strip that sets its tone’s glyph beside its body inside a 1px edge at radius 11 and 12px of padding. Reading top to bottom: a neutral rule drawn from its text alone, a paragraph with no role, its sentence in the muted ink on the --fab-surface-soft fill; an info note, a div with the note role, headed Three crafters online in the info ink above its sentence, on the info fill inside the info edge; a warning note headed Two reagents run short above a list of two glyph-led points 8px apart, the leads Moonpetal and Ember salt in the strong ink, its leading glyph in the warning ink on the warning fill; and a danger note whose sentence This recipe has no result sits beside its actions, a published Add a result button, on the danger fill. The frame draws inside the manager window and is the evidence for it alone; what a note draws under no Fabricate ancestor and for a tone outside its set is the mounted suite’s, and its contrast on the four grounds is the contrast measurement’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own control in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-callout' },
+    steps: [],
+    // Both roots the fixture's effect mounted, the warning note's two points, and the button
+    // mounted in the danger note's actions slot.
+    expectSelector: `${CALLOUT_GROUND}:has(> [data-lab-callout="standing"] p.manager-callout:not([role])):has(> [data-lab-callout="warning"] div.manager-callout.is-warning[role="note"] [role="list"] > [role="listitem"] + [role="listitem"]) > [data-lab-callout="actions"] div.manager-callout.is-danger[role="note"] > .manager-callout-actions .fabricate-button`,
+    expectContained: [
+      ...['standing', 'info', 'warning', 'actions'].map((key) => ({
+        container: CALLOUT_GROUND,
+        target: CALLOUT(key),
+      })),
+      { container: CALLOUT_ACTIONS, target: `${CALLOUT_ACTIONS} .fabricate-button` },
+      { container: '.window-content', target: CALLOUT_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The paragraph root's strip, its own ink and fill; the info note's fill, edge and title
+        // ink; the warning note's glyph ink, its list's spacing and a lead's ink; the danger fill;
+        // and the actions host that spaces the slot, whose private wrapper and element take no box.
+        {
+          selector: CALLOUT('standing'),
+          styles:
+            'display: flex; padding: 12px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-radius: 11px; background-color: var(--fab-surface-soft); color: var(--fab-text-muted)',
+        },
+        {
+          selector: CALLOUT('info'),
+          styles:
+            'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+        },
+        {
+          selector: `${CALLOUT('info')} .manager-callout-title`,
+          styles: 'color: var(--fab-info-text); font-weight: 600',
+        },
+        { selector: `${CALLOUT('warning')} > i`, styles: 'color: var(--fab-warning-text)' },
+        {
+          selector: `${CALLOUT('warning')} .manager-callout-items`,
+          styles: 'display: grid; row-gap: 8px',
+        },
+        {
+          selector: `${CALLOUT('warning')} .manager-callout-item-lead`,
+          styles: 'color: var(--fab-text)',
+        },
+        { selector: CALLOUT('actions'), styles: 'background-color: var(--fab-danger-soft)' },
+        {
+          selector: CALLOUT_ACTIONS,
+          styles: 'display: inline-flex; flex-shrink: 0; column-gap: 8px',
+        },
+        { selector: `${CALLOUT_ACTIONS} > span`, styles: SLOT_BOX },
+        { selector: `${CALLOUT_ACTIONS} > span > span`, styles: SLOT_BOX },
+      ],
+    },
+    position: CALLOUT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Callout.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

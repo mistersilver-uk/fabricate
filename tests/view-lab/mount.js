@@ -776,6 +776,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-field': () => import('./fixtures/PublishedField.svelte'),
   // Issue 2601: a well in a card, its content slot holding one element of a companion's, by the same seam.
   'published-well': () => import('./fixtures/PublishedWell.svelte'),
+  // Issue 2601: four standing notes in both roots, one holding a published button in its actions.
+  'published-callout': () => import('./fixtures/PublishedCallout.svelte'),
 });
 // view-lab-region:end
 

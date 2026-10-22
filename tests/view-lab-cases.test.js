@@ -401,6 +401,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
+  'tests/view-lab/fixtures/PublishedCallout.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -847,6 +848,10 @@ const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${k
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 /** The published well inside the well fixture's card. */
 const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
+/** The published note in one section of the callout fixture, by its key, and the actions host. */
+const labCallout = (key) =>
+  `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
+const LAB_CALLOUT_ACTIONS = `${labCallout('actions')} > .manager-callout-actions`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1311,6 +1316,39 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_WELL} > div:not(.fab-well-label)`, styles: 'display: contents' },
     { selector: `${LAB_WELL} > div:not(.fab-well-label) > div`, styles: 'display: contents' },
     { selector: `${LAB_WELL} [data-lab-well-content]`, styles: 'display: flex; row-gap: 8px' },
+  ],
+  // The published callout (issue 2601): the paragraph root's strip, ink and fill, the info and
+  // warning notes' tone inks and fills, the items' spacing, and the actions host and its slot.
+  'manager-published-callout-specimen': [
+    {
+      selector: labCallout('standing'),
+      styles:
+        'display: flex; padding: 12px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-radius: 11px; background-color: var(--fab-surface-soft); color: var(--fab-text-muted)',
+    },
+    {
+      selector: labCallout('info'),
+      styles: 'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+    },
+    {
+      selector: `${labCallout('info')} .manager-callout-title`,
+      styles: 'color: var(--fab-info-text); font-weight: 600',
+    },
+    { selector: `${labCallout('warning')} > i`, styles: 'color: var(--fab-warning-text)' },
+    {
+      selector: `${labCallout('warning')} .manager-callout-items`,
+      styles: 'display: grid; row-gap: 8px',
+    },
+    {
+      selector: `${labCallout('warning')} .manager-callout-item-lead`,
+      styles: 'color: var(--fab-text)',
+    },
+    { selector: labCallout('actions'), styles: 'background-color: var(--fab-danger-soft)' },
+    {
+      selector: LAB_CALLOUT_ACTIONS,
+      styles: 'display: inline-flex; flex-shrink: 0; column-gap: 8px',
+    },
+    { selector: `${LAB_CALLOUT_ACTIONS} > span`, styles: 'display: contents' },
+    { selector: `${LAB_CALLOUT_ACTIONS} > span > span`, styles: 'display: contents' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5946,13 +5984,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-stage-bars-specimen',
       'manager-published-field-specimen',
       'manager-published-well-specimen',
+      'manager-published-callout-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, and the well fixture's well. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, and the callout fixture's notes. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -5962,9 +6001,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'StageBars',
   'Field',
   'Well',
+  'Callout',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field and Well and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well and Callout and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6583,6 +6623,54 @@ test('the well specimen case measures the well the well fixture mounts through t
   assert.ok(
     expectLayout.controls.some(({ selector }) => selector.endsWith('[data-lab-well-content]')),
     'the companion element the fixture draws is measured'
+  );
+});
+
+test('the callout specimen case measures both roots and the actions slot the callout fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedCallout.svelte');
+  for (const name of ['Callout', 'Button']) {
+    assert.ok(
+      holds(
+        instance,
+        (node) =>
+          node.type === 'CallExpression' &&
+          node.callee?.name === 'mount' &&
+          node.arguments[0]?.value === name
+      ),
+      `the fixture mounts ${name}`
+    );
+  }
+  for (const hook of ['data-lab-callout-ground', 'data-lab-callout']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const notes = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'NOTES').init.arguments[0].elements;
+  const keysOf = ({ properties }) => properties.map(({ key }) => key.name);
+  assert.deepEqual(
+    notes.map(({ elements }) => [elements[0].value, keysOf(elements[1])]),
+    [
+      ['standing', ['text']],
+      ['info', ['tone', 'title', 'text']],
+      ['warning', ['tone', 'title', 'items']],
+      ['actions', ['tone', 'text', 'actions']],
+    ],
+    'text alone draws the paragraph; a title, items or actions draw the note'
+  );
+  const { steps, expectSelector, expectLayout } = getCaseById('manager-published-callout-specimen');
+  assert.deepEqual(steps, [], 'a frame at rest');
+  for (const root of [
+    'p.manager-callout:not([role])',
+    'div.manager-callout.is-danger[role="note"]',
+  ]) {
+    assert.ok(expectSelector.includes(root), `the frame waits for ${root}`);
+  }
+  assert.ok(
+    expectLayout.controls.some(({ selector }) => selector.endsWith('> .manager-callout-actions')),
+    'the actions host that spaces the slot is measured'
   );
 });
 
