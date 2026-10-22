@@ -355,7 +355,7 @@
         {/if}
         <!-- ONE SENTENCE, WHICH ALSO INTRODUCES THE PAIR BELOW IT, where a standing statement plus
              an uppercase eyebrow made two headings the reference does not draw. `RadioCardGroup`'s
-             `<legend>` is therefore screen-reader-only, its shipped `is-config-cards` contract. -->
+             `<legend>` is therefore screen-reader-only; `legendVisible` would show it. -->
         <p class="manager-tool-requirements-summary" data-tool-prerequisites-summary>
           {text(
             'FABRICATE.Admin.Manager.Tools.Editor.RequiredAll',
