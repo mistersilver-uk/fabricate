@@ -301,10 +301,11 @@ const STAGE_BARS_KEYS = Object.freeze(['forge', 'brew', 'copy']);
 /** Sized to the fixture's 360px ground and the height of its three groups. */
 const STAGE_BARS_WINDOW = Object.freeze({ width: 480, height: 320 });
 
-/** The field fixture's ground, and its one section's companion input and caption kicker. */
+/** The field fixture's ground, and its one section's companion input and caption span. */
 const FIELD_GROUND = '[data-lab-field-ground]';
 const FIELD_SECTION = `${FIELD_GROUND} > [data-lab-field="name"]`;
 const FIELD_INPUT = `${FIELD_SECTION} .fabricate-field input`;
+const FIELD_CAPTION = `${FIELD_SECTION} #lab-published-field-caption`;
 
 /** Sized to the fixture's 320px ground and the height of its one field. */
 const FIELD_WINDOW = Object.freeze({ width: 440, height: 240 });
@@ -824,7 +825,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-field-specimen',
     label:
-      'Specimen, mounted through the published seam — one field holding the companion’s own content in its content slot, after two steps that type into it: Moonlit tonic typed into the input, then the right arrow at its end, which keeps keyboard focus on it. Reading top to bottom: the caption Recipe name in the small upper-case kicker type, drawn by a published kicker inside the companion’s caption span; the input across the column’s width holding Moonlit tonic, 38px tall at radius 9 on the window’s ground, its edge taken by the accent keyboard ring, 1px wide and inset over the edge; and the hint Shown on the recipe card in the muted ink beneath it. The frame draws inside the manager window; the census of the sheet and the mounted suite are the evidence for the player window',
+      'Specimen, mounted through the published seam — one field holding the companion’s own content in its content slot, after two steps that type into it: Moonlit tonic typed into the input, then the right arrow at its end, which keeps keyboard focus on it. Reading top to bottom: the caption Recipe name in the small upper-case kicker type, drawn by a published kicker inside the companion’s caption span, which the companion lays out as a flex box; the input across the column’s width holding Moonlit tonic, 38px tall at radius 9 on a --fab-bg-1 ground, its edge taken by the accent keyboard ring, 1px wide and inset over the edge; and the hint Shown on the recipe card in the muted ink beneath it. The frame draws inside the manager window and is the evidence for it alone; that the inset ring outranks the field’s 2px ring in any window is asserted on the order of the sheet’s rules',
     // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
     reaches: 'beyond',
     smokeLabels: [],
@@ -842,13 +843,15 @@ export const CASES = Object.freeze([
     ],
     expectLayout: {
       controls: [
-        // The caption's kicker type, the text input's chrome, and its inset keyboard ring.
+        // The caption span's flex box and its kicker type, the text input's chrome, and its inset
+        // keyboard ring; the ring's colour is read off the sheet, because a probe inside a void
+        // `<input>` resolves no `var()`.
+        { selector: FIELD_CAPTION, styles: 'display: flex' },
         { selector: `${FIELD_SECTION} .fab-kicker`, styles: 'font-size: 8.5px' },
         { selector: FIELD_INPUT, styles: 'height: 38px; border-radius: 9px' },
         {
           selector: `${FIELD_INPUT}:focus-visible`,
-          styles:
-            'outline-style: solid; outline-width: 1px; outline-offset: -1px; outline-color: var(--fab-accent)',
+          styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
         },
       ],
     },

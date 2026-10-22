@@ -1284,15 +1284,15 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'border-radius: 11px',
     },
   ],
-  // The published field (issue 2601): the caption's kicker type, the companion input's chrome, and
-  // its inset keyboard ring over its own edge.
+  // The published field (issue 2601): the caption span's flex box and its kicker type, the
+  // companion input's chrome, and its inset keyboard ring over its own edge.
   'manager-published-field-specimen': [
+    { selector: `${LAB_FIELD} #lab-published-field-caption`, styles: 'display: flex' },
     { selector: `${LAB_FIELD} .fab-kicker`, styles: 'font-size: 8.5px' },
     { selector: `${LAB_FIELD} .fabricate-field input`, styles: 'height: 38px; border-radius: 9px' },
     {
       selector: `${LAB_FIELD} .fabricate-field input:focus-visible`,
-      styles:
-        'outline-style: solid; outline-width: 1px; outline-offset: -1px; outline-color: var(--fab-accent)',
+      styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
   ],
 });
@@ -6484,7 +6484,17 @@ test('the field specimen case types into the input the field fixture draws in a 
       `the fixture writes ${hook}, which the case's selectors name`
     );
   }
-  const { steps, expectSelector } = getCaseById('manager-published-field-specimen');
+  const { steps, expectSelector, expectLayout } = getCaseById('manager-published-field-specimen');
+  assert.ok(
+    holds(
+      instance,
+      (node) => node.type === 'Literal' && node.value === 'lab-published-field-caption'
+    ),
+    'the fixture ids its caption span by the id the case measures'
+  );
+  assert.ok(
+    expectLayout.controls.some(({ selector }) => selector.endsWith('#lab-published-field-caption'))
+  );
   assert.deepEqual(
     steps.map(({ fill, press }) => fill ?? press),
     ['Moonlit tonic', 'ArrowRight'],

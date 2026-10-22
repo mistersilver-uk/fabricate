@@ -1,9 +1,9 @@
 <!--
   A View Lab specimen, not a Fabricate surface (issue 2601). It mounts one `Field` through the
   page-session seam `game.fabricate.api.ui` binds, as a companion does, and draws the companion's
-  own content in its content slot: a caption `<span id>` holding a published `Kicker`, a text input
-  that `aria-labelledby` names by that caption, and a `<small>` hint. Every word is a companion's
-  final text, so none is localized. `tests/view-lab/mount.js` mounts it for
+  own content in its content slot: a caption `<span id>` laid out as a flex box and holding a
+  published `Kicker`, a text input that `aria-labelledby` names by that caption, and a `<small id>`
+  hint its `aria-describedby` names. Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js` mounts it for
   `?specimen=published-field` only.
 
   The section records what the input holds as `data-lab-value`, empty until the first edit. The
@@ -14,6 +14,7 @@
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
 
   const CAPTION_ID = 'lab-published-field-caption';
+  const HINT_ID = 'lab-published-field-hint';
 
   let target = $state();
   let value = $state('');
@@ -23,14 +24,17 @@
     const doc = slot.ownerDocument;
     const caption = doc.createElement('span');
     caption.id = CAPTION_ID;
+    caption.style.display = 'flex';
     const input = doc.createElement('input');
     input.type = 'text';
     input.placeholder = 'Name the recipe';
     input.setAttribute('aria-labelledby', CAPTION_ID);
+    input.setAttribute('aria-describedby', HINT_ID);
     input.addEventListener('input', () => {
       value = input.value;
     });
     const hint = doc.createElement('small');
+    hint.id = HINT_ID;
     hint.textContent = 'Shown on the recipe card.';
     slot.append(caption, input, hint);
     return caption;
