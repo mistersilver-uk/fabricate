@@ -484,10 +484,11 @@ const PRIMITIVES = Object.freeze([
     // builds ``new RegExp(`\b${name}=(?:"([^"]*)"|\{`([^`]*)`\})`)``, so a
     // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured,
     // FOURTEEN of them — and the class-prop floor above requires exactly
-    // `classProps.length * components.length`, so it would red at 14 against 1. What that field would have bought — a guard on `Field` renaming
-    // or dropping its `class` prop — is bought instead by the mounted root-emission assertion in
-    // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
-    // fieldset, and by that suite's own mutation control.
+    // `classProps.length * components.length`, so it would red at 14 against 1. What that field
+    // would have bought — a guard on `Field` renaming or dropping its `class` prop — is bought
+    // instead by the mounted root-emission assertion in `tests/components/field-mounted.test.js`,
+    // which reads the RENDERED `className` off the fieldset, and by that suite's own mutation
+    // control.
     name: 'RadioCardGroup',
     components: Object.freeze(['src/ui/svelte/components/RadioCardGroup.svelte']),
     roots: Object.freeze(['fabricate-option-cards']),
@@ -511,10 +512,12 @@ const PRIMITIVES = Object.freeze([
       'manager-radio-card-group',
     ]),
     // Measured at this commit: 14 written; 36 family selectors (48, less the 15 route-scoped caller
-    // rules deleted and the 12 owned rules merged or deleted, plus 15 new); 35 owned.
+    // rules deleted and the 12 owned rules merged or deleted, plus 15 new); 35 owned. Each floor
+    // keeps the base entry's headroom: written 2 (12 against 10), family 5 (47 against 42),
+    // owned 4 (31 against 27), so 12, 31 and 31.
     writtenFloor: 12,
-    familyFloor: 30,
-    ownedFloor: 30,
+    familyFloor: 31,
+    ownedFloor: 31,
     // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
     // (9 attributes over 3 files against this one's 4 over 2) and is REFUSED all the same: it is
     // the option ROW, a descendant of the root, so a fixture carrying it satisfies the attribute
@@ -2304,20 +2307,23 @@ test('each primitive’s own scoped styles name no application root either', () 
   );
 });
 
-/** The classes each rule of a parsed component's scoped block names, `:global()` arguments included. */
-function scopedRuleClasses(ast) {
-  const classesIn = (node, out = []) => {
-    if (Array.isArray(node)) for (const child of node) classesIn(child, out);
+/** The data hooks the option cards' face is addressed by; a caller never selects on them. */
+const OPTION_FACE_HOOKS = /^data-(?:radio-card-(?:option|meta)|tool-choice-[\w-]+)$/;
+
+/** The classes and attributes each rule of a parsed component's scoped block names, `:global()` arguments included. */
+function scopedRuleNames(ast) {
+  const namesIn = (node, out = []) => {
+    if (Array.isArray(node)) for (const child of node) namesIn(child, out);
     else if (node && typeof node === 'object') {
-      if (node.type === 'ClassSelector') out.push(node.name);
-      for (const [key, value] of Object.entries(node)) if (key !== 'parent') classesIn(value, out);
+      if (node.type === 'ClassSelector' || node.type === 'AttributeSelector') out.push(node.name);
+      for (const [key, value] of Object.entries(node)) if (key !== 'parent') namesIn(value, out);
     }
     return out;
   };
   const rules = [];
   const walk = (nodes) => {
     for (const node of nodes ?? []) {
-      if (node.type === 'Rule') rules.push(classesIn(node.prelude));
+      if (node.type === 'Rule') rules.push(namesIn(node.prelude));
       walk(node.block?.children);
     }
   };
@@ -2340,19 +2346,30 @@ test('no caller’s scoped block restates the option cards’ face (issue 2467)'
     const ast = componentAstOf(file);
     if (primitive.components.includes(file) || !ast.css) continue;
     blocks += 1;
-    for (const classes of scopedRuleClasses(ast)) {
-      const named = classes.filter((cls) => family.test(cls));
-      const legendOnly = named.every((cls) => cls === 'manager-resolution-mode-legend');
-      if (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly)) {
-        offences.push(`${file}: ${classes.join(' ')}`);
+    for (const names of scopedRuleNames(ast)) {
+      const hooks = names.filter((name) => OPTION_FACE_HOOKS.test(name));
+      const named = names.filter((name) => family.test(name));
+      const legendOnly = named.every((name) => name === 'manager-resolution-mode-legend');
+      if (hooks.length > 0 || (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly))) {
+        offences.push(`${file}: ${names.join(' ')}`);
       }
     }
   }
-  assert.ok(blocks > 100, `only ${blocks} scoped blocks were read, so the absence below is vacuous`);
+  assert.ok(
+    blocks > 100,
+    `only ${blocks} scoped blocks were read, so the absence below is vacuous`
+  );
   assert.deepEqual(
     offences,
     [],
-    'a caller’s scoped block names the option-card family, and an unlayered block beats the sheet, ' +
-      'so it repaints the primitive on one route'
+    'a caller’s scoped block names the option-card family or its data hooks, and an unlayered ' +
+      'block beats the sheet, so it repaints the primitive on one route'
+  );
+  assert.deepEqual(
+    allSelectors().filter((selector) =>
+      /\[data-(?:radio-card-(?:option|meta)|tool-choice-)/.test(selector)
+    ),
+    [],
+    'the sheet selects on the option cards’ data hooks; the face is addressed by the primitive’s classes'
   );
 });
