@@ -1065,8 +1065,8 @@ A name composed from a value MUST be derived by a shared helper, because the alt
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
-The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
-A bar of several is named by its stage's `label`, else its `name`, so a caller passes `label` for an unnamed stage: `RunProgress` passes "Stage n of m" through its own key.
+A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
+An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.

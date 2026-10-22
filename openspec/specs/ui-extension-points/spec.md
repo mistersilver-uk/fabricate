@@ -999,12 +999,12 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`StageBars`.**
   - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
-  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption, and `label` is final display text that names the stage's bar.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
     A member other than `name`, `label` and `value` is private, and an empty `stages` draws the named group with no bar.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
-  - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, its position counted from `1` and then its `name`, which is hidden from assistive technology.
+  - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
     A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
   - `ariaLabel` is required and names the group, final display text, as "Forging progress".
     It also names the one bar of a one-stage list whose stage has no label or name.
