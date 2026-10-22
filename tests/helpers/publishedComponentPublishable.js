@@ -264,10 +264,11 @@ const through = (origin, path) =>
  * The places a published entry's closure spreads attributes from a value that is, or may be, data
  * the caller published, as `{ key, members }`: the published `data` key and the members read below
  * it, an `{#each}` item counting as the value it iterates, a `{@const}` as its initialiser and a
- * snippet parameter of the entry's own file as the arguments it is rendered with. `{ key: null }`
- * is a value that may be an item of a collection the entry does not publish. A spread of the
- * file's `$props()` rest, or of a script-level `const` or `$derived`, is no item. A child's
- * `$props()` key is what its parents pass it. Every other spread fails closed.
+ * snippet parameter of the entry's own file as the arguments that file renders it with (a snippet
+ * nothing in that file renders is unnameable). `{ key: null }` is a value that may be an item of a
+ * collection the entry does not publish. A spread of the file's `$props()` rest, or of a
+ * script-level `const` or `$derived`, is no item. A child's `$props()` key is what its parents
+ * pass it. Every other spread fails closed.
  */
 function spreadTracer(entry, reader) {
   const files = [...importClosure(entry.path, reader)].filter(isComponent);
@@ -377,7 +378,8 @@ function spreadTracer(entry, reader) {
         if (index === -1) continue;
         if (file !== entry.path) return [];
         const path = bindingPath(block.parameters[index], name);
-        return guarded(block, () => renderedWith(file, block.expression, index, path));
+        const rendered = guarded(block, () => renderedWith(file, block.expression, index, path));
+        return rendered.length === 0 ? [UNNAMEABLE] : rendered;
       }
       if (block.type === 'Fragment') {
         for (const { type, declaration } of block.nodes) {

@@ -214,6 +214,14 @@ describe('the ratchet against a base commit', () => {
     assert.deepEqual(outcome.failures, []);
   });
 
+  it('measures one base and one head, and throws on a third side', () => {
+    const measure = exclusionMeasure();
+    const read = (file) => readHeadFile(REPO_ROOT, file);
+    measure(read);
+    measure(read);
+    assert.throws(() => measure(read), /one base and one head/);
+  });
+
   it('fails a list that is missing at the head', () => {
     const repoState = repoWith({ [EXCLUSIONS_PATH]: LIST(['Alpha']), ...files() }, {});
     repoState.repo.git('rm', '-q', EXCLUSIONS_PATH);
@@ -442,14 +450,8 @@ describe('the per-item spreads of a published closure', () => {
     );
   });
 
-  it('ignores the rest spread, a snippet parameter and a text key', () => {
-    assert.deepEqual(
-      idsOf(
-        PROPS,
-        '{#snippet row(option)}<i {...option.data}></i>{/snippet}<div {...rest}></div><u {...tone.x}></u>'
-      ),
-      []
-    );
+  it('ignores the rest spread and a text key', () => {
+    assert.deepEqual(idsOf(PROPS, '<div {...rest}></div><u {...tone.x}></u>'), []);
   });
 
   it('ignores a spread of a script-level local', () => {
@@ -503,6 +505,30 @@ describe('the per-item spreads of a published closure', () => {
         '{#snippet row(o)}<i {...o.props}></i>{/snippet}{#each items as item}{@render row?.(item)}{/each}',
         ['Fx.items.props'],
       ],
+      'a snippet parameter of a snippet nothing renders': [
+        '{#snippet row(o)}<i {...o.props}></i>{/snippet}',
+        [UNNAMED],
+      ],
+      'a snippet parameter rendered through an alias': [
+        '{#snippet row(o)}<i {...o.props}></i>{/snippet}{@const draw = row}{#each items as item}{@render draw(item)}{/each}',
+        [UNNAMED],
+      ],
+      'a snippet parameter rendered with call': [
+        '{#snippet row(o)}<i {...o.props}></i>{/snippet}{#each items as item}{@render row.call(null, item)}{/each}',
+        [UNNAMED],
+      ],
+      'a computed member of an item': [
+        '{#each items as item}<i {...item[tone]}></i>{/each}',
+        [UNNAMED],
+      ],
+      'an array-pattern each context': [
+        '{#each items as [first]}<i {...first}></i>{/each}',
+        [UNNAMED],
+      ],
+      'an optional-chained member': [
+        '{#each items as item}<i {...item?.props}></i>{/each}',
+        ['Fx.items.props'],
+      ],
     };
     for (const [shape, [body, expected]] of Object.entries(cases)) {
       it(shape, () => {
@@ -519,6 +545,23 @@ describe('the per-item spreads of a published closure', () => {
         idsOf(
           `import Row from './Row.svelte'; ${PROPS}`,
           '{#each items as item}<Row {item} />{/each}',
+          extra
+        ),
+        ['Fx.items.props']
+      );
+    });
+
+    it('an item bound to a child component through bind:', () => {
+      const extra = {
+        'src/Row.svelte': COMPONENT(
+          'let { item = $bindable() } = $props();',
+          '<i {...item.props}></i>'
+        ),
+      };
+      assert.deepEqual(
+        idsOf(
+          `import Row from './Row.svelte'; ${PROPS}`,
+          '{#each items as item}<Row bind:item />{/each}',
           extra
         ),
         ['Fx.items.props']
@@ -547,6 +590,21 @@ describe('the per-item spreads of a published closure', () => {
         ),
         ['Fx.items.outcome.props']
       );
+    });
+
+    it('a snippet the entry declares and a child component renders', () => {
+      const list = {
+        'src/List.svelte': COMPONENT(
+          'let { items, row } = $props();',
+          '{#each items as it}{@render row(it)}{/each}'
+        ),
+      };
+      const script = `import List from './List.svelte'; ${PROPS}`;
+      const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
+      const inside = '<List {items}>' + SNIPPET + '</List>';
+      const passed = SNIPPET + '<List {items} {row} />';
+      assert.deepEqual(idsOf(script, inside, list), [UNNAMED]);
+      assert.deepEqual(idsOf(script, passed, list), [UNNAMED]);
     });
 
     it('but not a snippet parameter of a child component', () => {
