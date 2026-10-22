@@ -22,6 +22,8 @@
  * Limit: a value write is an assignment, an update, a `for…of` or `for…in` head or a `bind:`
  * directive naming the key's own local, so a write through an alias or a shadowing name is not
  * seen.
+ * Limit: an event beyond `CALLBACK_EVENTS` is admitted only on the tag its entry's `ENTRY_EVENTS`
+ * row names; which keys the handler acts on is that row's mounted clause's.
  * Limit: a script function counts as an event's only when it is a top-level declaration or `const`
  * function every reference to which is an admitted attribute's value, a call inside one, or a
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
@@ -31,7 +33,8 @@
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
  * whether a name is drawn in every state is the mounted suite's; a control in a closure file other
- * than the entry's is named by its `CLOSURE_NAMES` pin, which the mounted suite holds.
+ * than the entry's is named by its `CLOSURE_NAMES` pin, and one of the entry's own file named
+ * through an item it cannot follow by its `OWN_NAMES` pin, which the mounted suite holds.
  * Limit: whether a control draws text of its own follows the snippets its file defines, counts a
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
@@ -87,6 +90,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
+  // One tab button for each item of `tabs`.
+  'src/ui/svelte/components/EditorTabs.svelte: button': 'tabs',
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
@@ -152,6 +157,21 @@ const CLOSURE_NAMES = Object.freeze({
 });
 
 /**
+ * The reached controls of an entry's own file whose name the gate cannot follow, by id: the
+ * published keys whose items' text names it, and the mounted clause that reads its accessible name.
+ */
+const OWN_NAMES = Object.freeze({
+  // Each tab's `label`, which the entry's group states is required; its `aria-label` is written
+  // only under props the entry does not publish.
+  'src/ui/svelte/components/EditorTabs.svelte: button': {
+    entry: 'EditorTabs',
+    keys: ['tabs'],
+    heldBy:
+      'tests/components/published-editor-tabs-mounted.test.js: the published EditorTabs names',
+  },
+});
+
+/**
  * The callback keys an entry hands a closure child as the child's own callback, which the gate
  * does not follow into the child: the script function that calls the key, the child's prop it is
  * passed as, and the mounted clause that operates the child by pointer and by key.
@@ -199,14 +219,34 @@ const CALLBACK_EVENTS = Object.freeze({
   onkeydown: 'input',
 });
 
-/** Whether a reference is an admitted event attribute's whole value on a DOM element, or inside a function that is. */
-function isEventReference(ancestors) {
+/**
+ * The events an entry's group names beyond `CALLBACK_EVENTS`, by entry: each attribute with the
+ * one tag it is admitted on there, and the mounted clause that presses the keys the group names.
+ */
+const ENTRY_EVENTS = Object.freeze({
+  EditorTabs: {
+    onkeydown: {
+      tag: 'button',
+      heldBy:
+        'tests/components/published-editor-tabs-mounted.test.js: the keyboard on the published EditorTabs',
+    },
+  },
+});
+
+/**
+ * Whether a reference is an admitted event attribute's whole value on a DOM element, or inside a
+ * function that is; `extra` is the entry's `ENTRY_EVENTS` row.
+ */
+function isEventReference(ancestors, extra = {}) {
+  const admitted = (name) => Object.hasOwn(CALLBACK_EVENTS, name) || Object.hasOwn(extra, name);
   const at = ancestors.findLastIndex(
-    (ancestor) => ancestor.type === 'Attribute' && Object.hasOwn(CALLBACK_EVENTS, ancestor.name)
+    (ancestor) => ancestor.type === 'Attribute' && admitted(ancestor.name)
   );
   if (at < 1 || !DOM_ELEMENTS.has(ancestors[at - 1].type)) return false;
-  const only = CALLBACK_EVENTS[ancestors[at].name];
-  if (only !== null && ancestors[at - 1].name !== only) return false;
+  const { name } = ancestors[at];
+  const element = ancestors[at - 1].name;
+  const only = CALLBACK_EVENTS[name];
+  if (only !== null && only !== element && extra[name]?.tag !== element) return false;
   const [tag, value] = ancestors.slice(at + 1);
   return tag?.type === 'ExpressionTag' && (value === undefined || isFunction(value));
 }
@@ -229,10 +269,10 @@ function scriptFunctions(ast) {
  * call inside one (`'entry'`), a call inside a script function (that function's name), or else
  * `'other'`.
  */
-function functionSite(node, ancestors, bodies) {
+function functionSite(node, ancestors, bodies, extra) {
   const parent = ancestors.at(-1);
   const called = parent?.type === 'CallExpression' && parent.callee === node;
-  if (isEventReference(ancestors)) {
+  if (isEventReference(ancestors, extra)) {
     return parent?.type === 'ExpressionTag' || called ? 'entry' : 'other';
   }
   const body = ancestors.findLast((ancestor) => bodies.has(ancestor));
@@ -240,7 +280,7 @@ function functionSite(node, ancestors, bodies) {
 }
 
 /** Every reference's `functionSite`, by the script function it names; a declaring name is none. */
-function functionReferences(ast, functions) {
+function functionReferences(ast, functions, extra) {
   const bodies = new Map([...functions].map(([name, node]) => [node, name]));
   const found = new Map([...functions.keys()].map((name) => [name, []]));
   for (const root of [ast.module, ast.instance, ast.fragment]) {
@@ -250,7 +290,7 @@ function functionReferences(ast, functions) {
       const declares = parent?.id === node;
       const member = parent?.type === 'MemberExpression' && parent.property === node;
       if (declares || (member && !parent.computed)) return;
-      found.get(node.name).push(functionSite(node, ancestors, bodies));
+      found.get(node.name).push(functionSite(node, ancestors, bodies, extra));
     });
   }
   return found;
@@ -260,9 +300,9 @@ function functionReferences(ast, functions) {
  * The script functions only events reach, by node: the greatest set none of whose members is
  * referenced but as an event entry or a call from a member, then those of it an entry reaches.
  */
-function eventOnlyFunctions(ast) {
+function eventOnlyFunctions(ast, extra) {
   const functions = scriptFunctions(ast);
-  const references = functionReferences(ast, functions);
+  const references = functionReferences(ast, functions, extra);
   const kept = new Set(references.keys());
   let changed = true;
   while (changed) {
@@ -301,9 +341,9 @@ function isGuardRead(node, ancestors) {
  * Where each reference to `local` sits: `'event'` in an admitted event attribute or a script
  * function only events reach, `'guard'` or `'other'`; its own declaration is none.
  */
-function referenceSites(ast, local) {
+function referenceSites(ast, local, extra) {
   const sites = [];
-  const live = eventOnlyFunctions(ast);
+  const live = eventOnlyFunctions(ast, extra);
   const declares = (ancestor) =>
     ancestor.type === 'VariableDeclarator' && ancestor.init?.callee?.name === '$props';
   for (const root of [ast.module, ast.instance, ast.fragment]) {
@@ -314,7 +354,8 @@ function referenceSites(ast, local) {
         return;
       }
       if (ancestors.some(declares)) return;
-      const event = isEventReference(ancestors) || ancestors.some((ancestor) => live.has(ancestor));
+      const event =
+        isEventReference(ancestors, extra) || ancestors.some((ancestor) => live.has(ancestor));
       if (event) sites.push('event');
       else sites.push(isGuardRead(node, ancestors) ? 'guard' : 'other');
     });
@@ -358,12 +399,12 @@ function forwardedFaults(ast, key, local, { by, as }) {
  * What each `callback` key of an entry breaks: referenced outside an event, or called by none; a
  * key `forwarded` pins is judged by `forwardedFaults` instead.
  */
-function eventFaults(entry, ast, forwarded = FORWARDED_CALLBACKS) {
+function eventFaults(entry, ast, forwarded = FORWARDED_CALLBACKS, events = ENTRY_EVENTS) {
   const callbacks = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'callback');
   return callbacks.flatMap(({ key, local }) => {
     const pin = forwarded[entry.name]?.[key];
     if (pin) return forwardedFaults(ast, key, local, pin);
-    const sites = referenceSites(ast, local);
+    const sites = referenceSites(ast, local, events[entry.name]);
     return [
       ...(sites.includes('other') ? [`${key} ${OUTSIDE_AN_EVENT}`] : []),
       ...(sites.includes('event') ? [] : [`${key} ${NOTHING_CALLS}`]),
@@ -393,13 +434,14 @@ function isWrite(node, ancestors) {
 }
 
 /** Where each write of `local` sits: `'event'` as `referenceSites` reads one, else `'other'`. */
-function writeSites(ast, local) {
+function writeSites(ast, local, extra) {
   const sites = [];
-  const live = eventOnlyFunctions(ast);
+  const live = eventOnlyFunctions(ast, extra);
   for (const root of [ast.module, ast.instance, ast.fragment]) {
     walkWithAncestors(root, (node, ancestors) => {
       if (node.type !== 'Identifier' || node.name !== local || !isWrite(node, ancestors)) return;
-      const event = isEventReference(ancestors) || ancestors.some((ancestor) => live.has(ancestor));
+      const event =
+        isEventReference(ancestors, extra) || ancestors.some((ancestor) => live.has(ancestor));
       sites.push(event ? 'event' : 'other');
     });
   }
@@ -407,10 +449,12 @@ function writeSites(ast, local) {
 }
 
 /** What each `value` key of an entry breaks: written outside an event handler. */
-function valueWriteFaults(entry, ast) {
+function valueWriteFaults(entry, ast, events = ENTRY_EVENTS) {
   const values = propLocals(ast).filter(({ key }) => entry.props[key]?.kind === 'value');
   return values.flatMap(({ key, local }) =>
-    writeSites(ast, local).includes('other') ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`] : []
+    writeSites(ast, local, events[entry.name]).includes('other')
+      ? [`${key} ${WRITTEN_OUTSIDE_AN_EVENT}`]
+      : []
   );
 }
 
@@ -643,7 +687,12 @@ function nameParts(node) {
  * on a control drawn whatever the companion passes, outside `OPTIONAL_NAME_PINS`, each of those
  * `data` keys is required.
  */
-function nameFaults(control, pins, optional = OPTIONAL_NAME_PINS, names = CLOSURE_NAMES) {
+function nameFaults(
+  control,
+  pins,
+  optional = OPTIONAL_NAME_PINS,
+  names = { ...CLOSURE_NAMES, ...OWN_NAMES }
+) {
   const { id, node } = control;
   if (Object.hasOwn(names, id)) return closureNameFaults(control, names[id]);
   const parts = nameParts(node);
@@ -954,9 +1003,12 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual(unheldClauses(held), []);
   });
 
-  it('names a describe block of its mounted suite in each closure name and forwarded callback pin', () => {
+  it('names a describe block of its mounted suite in each name, forwarded callback and entry event pin', () => {
     const held = [
-      ...Object.values(CLOSURE_NAMES).map(({ heldBy }) => heldBy),
+      ...Object.values({ ...CLOSURE_NAMES, ...OWN_NAMES }).map(({ heldBy }) => heldBy),
+      ...Object.values(ENTRY_EVENTS).flatMap((events) =>
+        Object.values(events).map(({ heldBy }) => heldBy)
+      ),
       ...Object.values(FORWARDED_CALLBACKS).flatMap((keys) =>
         Object.values(keys).map(({ heldBy }) => heldBy)
       ),
@@ -965,12 +1017,22 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual(unheldClauses(held), []);
   });
 
-  it('pins a closure name only on a reach pin of a published entry, and forwards only a callback key', () => {
-    for (const [id, { entry }] of Object.entries(CLOSURE_NAMES)) {
-      assert.ok(Object.hasOwn(FOCUSABLE_REACH, id), `${id} is a reach pin`);
+  it('pins a name only on a reach pin of a published entry, in its own file or not as the table says, and forwards only a callback key', () => {
+    for (const [table, own] of [
+      [CLOSURE_NAMES, false],
+      [OWN_NAMES, true],
+    ]) {
+      for (const [id, { entry }] of Object.entries(table)) {
+        assert.ok(Object.hasOwn(FOCUSABLE_REACH, id), `${id} is a reach pin`);
+        const published = ENTRIES.find(({ name }) => name === entry);
+        assert.ok(published, `${id} names the published ${entry}`);
+        assert.equal(id.startsWith(`${published.path}: `), own, `${id} sits where its table says`);
+      }
+    }
+    for (const name of Object.keys(ENTRY_EVENTS)) {
       assert.ok(
-        ENTRIES.some(({ name }) => name === entry),
-        `${id} names the published ${entry}`
+        ENTRIES.some((entry) => entry.name === name),
+        `${name} is a published entry`
       );
     }
     for (const [name, keys] of Object.entries(FORWARDED_CALLBACKS)) {
@@ -1907,6 +1969,20 @@ describe('the called-from-an-event clause', () => {
       ]);
     });
   }
+
+  it('admits keydown on a button only for an entry whose events pin names that tag', () => {
+    const { ast } = templateOf(
+      'Keyed.svelte',
+      closed(PRESSES, '<button type="button" onkeydown={(event) => press(event)}>x</button>')
+    );
+    const entry = { name: 'Keyed', props: { onPress: callback } };
+    const pinned = { Keyed: { onkeydown: { tag: 'button', heldBy: 'a mounted clause' } } };
+    assert.deepEqual(eventFaults(entry, ast, FORWARDED_CALLBACKS, pinned), []);
+    const closedFaults = [`onPress ${OUTSIDE_AN_EVENT}`, `onPress ${NOTHING_CALLS}`];
+    assert.deepEqual(eventFaults(entry, ast, FORWARDED_CALLBACKS, {}), closedFaults);
+    const elsewhere = { Keyed: { onkeydown: { tag: 'div', heldBy: 'a mounted clause' } } };
+    assert.deepEqual(eventFaults(entry, ast, FORWARDED_CALLBACKS, elsewhere), closedFaults);
+  });
 
   for (const [claim, key, handler] of [
     ['the key as the whole value', 'onclick', '{onclick}'],

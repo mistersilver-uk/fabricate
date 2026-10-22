@@ -72,6 +72,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-tags-mounted.js': 'fixture',
   'tests/components/manager-tools-mounted.js': 'fixture',
   'tests/components/manager-world-scope-mounted.js': 'fixture',
+  'tests/helpers/accentRingContrast.js': 'corpus',
   'tests/helpers/buttonCascadeProbe.js': 'fixture',
   'tests/helpers/checkEvidenceFixtures.js': 'fixture',
   'tests/helpers/chipTone.js': 'legacy-scan',
