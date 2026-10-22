@@ -289,9 +289,10 @@ const SELECT_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
 const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
 
-/** The stage bars fixture's ground, and one of its sections by key. */
+/** The stage bars fixture's ground, and one of its sections by key: relative to the ground, for inside its `:has()`, and from the document. */
 const STAGE_BARS_GROUND = '[data-lab-stage-bars-ground]';
-const STAGE_BARS_SECTION = (key) => `${STAGE_BARS_GROUND} > [data-lab-stage-bars="${key}"]`;
+const STAGE_BARS_SECTION_IN_GROUND = (key) => `> [data-lab-stage-bars="${key}"]`;
+const STAGE_BARS_SECTION = (key) => `${STAGE_BARS_GROUND} ${STAGE_BARS_SECTION_IN_GROUND(key)}`;
 
 /** Each group `tests/view-lab/fixtures/PublishedStageBars.svelte` mounts, by its section's key. */
 const STAGE_BARS_KEYS = Object.freeze(['forge', 'brew', 'copy']);
@@ -791,7 +792,7 @@ export const CASES = Object.freeze([
     steps: [],
     // The current stage of the numbered group, the labelled bar of the unnumbered one, and the
     // lone bar named by its stage.
-    expectSelector: `${STAGE_BARS_GROUND}:has(${STAGE_BARS_SECTION('forge')} [data-stage-bars-stage="2"][data-stage-bars-state="accent"]):has(${STAGE_BARS_SECTION('brew')} [role="progressbar"][aria-label="Stage 3 of 3"]) > [data-lab-stage-bars="copy"] [role="progressbar"][aria-label="Copy"]`,
+    expectSelector: `${STAGE_BARS_GROUND}:has(${STAGE_BARS_SECTION_IN_GROUND('forge')} [data-stage-bars-stage="2"][data-stage-bars-state="accent"]):has(${STAGE_BARS_SECTION_IN_GROUND('brew')} [role="progressbar"][aria-label="Stage 3 of 3"]) ${STAGE_BARS_SECTION_IN_GROUND('copy')} [role="progressbar"][aria-label="Copy"]`,
     expectContained: [
       ...STAGE_BARS_KEYS.map((key) => ({
         container: STAGE_BARS_GROUND,

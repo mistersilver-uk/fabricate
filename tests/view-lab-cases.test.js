@@ -5847,7 +5847,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the thirteen specimens it mounts', () => {
+test('every published component seam module, and the host, selects the specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);

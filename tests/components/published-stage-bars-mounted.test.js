@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -18,6 +19,7 @@ import {
   shippedSeam,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
+import { stageBarsFixtureGroups } from '../helpers/publishedStageBarsFixture.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const harness = createMountedComponentHarness({
@@ -161,6 +163,69 @@ describe('the published StageBars under a bare ancestor', () => {
         assert.equal(caption.whiteSpace, 'nowrap');
         handle.destroy();
       }
+    );
+  });
+});
+
+describe('the stage bars View Lab specimen case against the DOM the fixture draws', () => {
+  const { expectSelector } = getCaseById('manager-published-stage-bars-specimen');
+
+  /** The fixture's ground, with a section for each group mounted into its last child; `rename` maps each section's key. */
+  function drawFixture(rename = (key) => key) {
+    const ground = document.createElement('div');
+    ground.setAttribute('data-lab-stage-bars-ground', '');
+    const mounted = [];
+    for (const [key, props] of stageBarsFixtureGroups()) {
+      const section = document.createElement('section');
+      section.setAttribute('data-lab-stage-bars', rename(key));
+      const heading = document.createElement('p');
+      const slot = document.createElement('div');
+      section.append(heading, slot);
+      ground.append(section);
+      const ui = shippedSeam({ ...seamParts, report: () => {} });
+      mounted.push(ui.mount('StageBars', { target: slot, props }));
+    }
+    const shell = companionTarget(targets);
+    shell.append(ground);
+    return { mounted };
+  }
+
+  it('matches once each group the fixture mounts is drawn', () => {
+    const { mounted } = drawFixture();
+    assert.ok(
+      document.querySelector(expectSelector),
+      'the case waits on a frame the fixture draws'
+    );
+    for (const handle of mounted) handle.destroy();
+  });
+
+  it('matches nothing once a section the selector names is not the one drawn', () => {
+    for (const renamed of ['forge', 'brew', 'copy']) {
+      const { mounted } = drawFixture((key) => (key === renamed ? `${key}-renamed` : key));
+      assert.equal(
+        document.querySelector(expectSelector),
+        null,
+        `a section no longer keyed ${renamed} is not found`
+      );
+      for (const handle of mounted) handle.destroy();
+      for (const shell of targets) shell.remove();
+      targets.length = 0;
+    }
+  });
+
+  it('names the stage, label and name the fixture draws', () => {
+    const [[, forge], [, brew], [, copy]] = stageBarsFixtureGroups();
+    assert.ok(
+      expectSelector.includes(`[data-stage-bars-stage="${forge.currentIndex}"]`),
+      'the forge group’s current stage'
+    );
+    assert.ok(
+      expectSelector.includes(`[aria-label="${brew.stages[2].label}"]`),
+      'the brew group’s third bar'
+    );
+    assert.ok(
+      expectSelector.includes(`[aria-label="${copy.stages[0].name}"]`),
+      'the copy group’s lone bar'
     );
   });
 });
