@@ -141,6 +141,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // Issue 2548: a browse list's loading and error forms, on the three frames that draw them.
+  'src/ui/svelte/components/ListState.svelte',
   // Issue 1782: the log list, on the journal's Finished list with a failed and a selected entry.
   'src/ui/svelte/components/LogList.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
@@ -909,6 +911,24 @@ test('(a) a ListRow change publishes a frame for every converted selectable site
   for (const { file, frame } of LIST_ROW_ADOPTERS) {
     assert.ok(existsSync(path.join(REPO_ROOT, file)), `${file} does not exist`);
     assert.ok(selected.includes(frame), `a ListRow change does not select '${frame}' for ${file}`);
+  }
+});
+
+test('(a) a ListState change publishes the three list-state frames', () => {
+  const file = 'src/ui/svelte/components/ListState.svelte';
+  const frames = [
+    'manager-systems-loading',
+    'manager-environments-load-error',
+    'manager-knowledge-loading',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a ListState change does not select '${caseId}'`);
   }
 });
 

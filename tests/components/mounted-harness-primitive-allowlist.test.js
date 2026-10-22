@@ -182,6 +182,9 @@ const SHARED_PRIMITIVES = [
   // The cross-reference list over it (issue 2321): the inventory inspector draws it in the player
   // window, and the recipe-item preview carries that inspector into the manager tree.
   'src/ui/svelte/components/XrefList.svelte',
+  // A browse list's loading and error forms (issue 2548): the systems library, the environment
+  // browser and the Knowledge roster draw it, in every manager tree that mounts one of them.
+  'src/ui/svelte/components/ListState.svelte',
   // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
   'src/ui/svelte/components/YieldScale.svelte',
   // The app navigation and its labelled rows (issue 1777): the manager root and the player shell

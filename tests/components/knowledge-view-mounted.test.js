@@ -53,6 +53,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     // The detail pane's load-failure notice (issue 1969).
     'src/ui/svelte/components/Notice.svelte',
+    // The roster's loading form (issue 2548), over the notice.
+    'src/ui/svelte/components/ListState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/components/Callout.svelte',
     // The shared chip (issue 883). The tab bar's count badge and both row types render it.

@@ -497,7 +497,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -589,7 +589,7 @@
     "note": "The badges are `Chip`s at the list density as `RunCard` renders its status, and the trailing cell is a `StatusToggle` and then a closed `ActionMenu`, as `SystemsBrowserView` wires its status cell and row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The switch reads On or Off, `SystemsBrowserView`’s own reading, and is named Enable or Disable and the system’s name. The kebab is `ActionMenu`’s `IconButton` trigger, 34px at radius 9 with the vertical `fa-ellipsis-vertical` every shipped menu uses."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -664,7 +664,7 @@
     "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "selectable dense — the Journal’s Active run",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -751,7 +751,7 @@
     "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars and the world-time countdown of `RunCard`’s `timing` snippet as the aside beneath the one button. The bolt arrives as the row’s `content` and the countdown as its `aside` snippet, each painted as `RunCard`’s scoped `.journal-run-card-bolt` and `.journal-run-card-countdown` paint it. Drawn differently: the countdown stands beneath the bars, because the flex line `RunCard` sets them on is its own scoped `.journal-run-card-timing`, where the drawing and the shipped row set it beside them."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "selectable dense — the Journal’s Active run",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -783,7 +783,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default with an aside — a leading thumb, block content beneath",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -837,7 +837,7 @@
     "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button as a `BandedBar`, because `ChanceBar` is app-scoped, its caption set beside the track as that row’s scoped `.gathering-task-chance` grid sets it. The caption rides inside the meter, which its `aria-label` names, where `GatheringTaskRow` draws `ChanceBar showCaption={false}` with the caption as an `aria-hidden` `Kicker` beside it; it draws the same. The badges are `Chip`s at the list density; `GatheringTaskRow`’s own `.gathering-task-callout` pill, in the same tones, is adoption debt that becomes `Chip density=\"list\"` under issue 2559."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "dense — the cross-reference and result form",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/XrefList.svelte",
@@ -862,7 +862,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/ViewToggle.svelte",
@@ -874,7 +874,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -901,7 +901,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -924,6 +924,40 @@
           "text": "#Alchemy"
         }
       ]
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list loading — the list’s form, not the row’s",
+    "draws": ".k-list-loading-default",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The crafting system library's loading body at the default density; the header above it stays the drawing's, because the list owns it.",
+    "props": {
+      "loading": true,
+      "loadingLabel": "Loading crafting systems…"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list loading — the list’s form, not the row’s",
+    "draws": ".k-list-loading-dense",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The Knowledge roster's loading body at the dense density.",
+    "props": {
+      "loading": true,
+      "loadingLabel": "Loading player characters…",
+      "density": "dense"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list error",
+    "draws": ".k-list-error",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The gathering environment browser's failed load, its detail the refused setting read's own message.",
+    "props": {
+      "error": "Could not load the gathering environments",
+      "errorDetail": "“fabricate.gatheringEnvironments” is not a registered game setting."
     }
   },
   {

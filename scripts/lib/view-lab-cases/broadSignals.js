@@ -186,6 +186,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-alchemy-workbench',
     'player-alchemy-chooser',
   ]),
+  // A browse list's loading and error forms (issue 2548): the systems library loading, the
+  // environment browser's failed load and the Knowledge roster loading.
+  'src/ui/svelte/components/ListState.svelte': Object.freeze([
+    'manager-systems-loading',
+    'manager-environments-load-error',
+    'manager-knowledge-loading',
+  ]),
   // The preview scale, the two historical branches no other frame draws, and the gathering
   // preview's authored-order scale, closed and with its breakdown open (issue 1644); then the
   // shared-model history rows at both widths (issue 2257).
