@@ -32,7 +32,12 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
 const COMPANION = 'tests/fixtures/published-components/companionReactivity.svelte.js';
-const MANIFEST_PATHS = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path);
+const pathsWhere = (lazy) =>
+  PUBLISHED_COMPONENT_MANIFEST.filter((entry) => (entry.lazy === true) === lazy).map(
+    (entry) => entry.path
+  );
+const EAGER_PATHS = pathsWhere(false);
+const LAZY_PATHS = pathsWhere(true);
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -45,6 +50,7 @@ const harness = createMountedComponentHarness({
 
 let runtime;
 let adapterComponents;
+let adapterLoaders;
 let companion;
 let createPublishedComponents;
 let probe;
@@ -73,8 +79,11 @@ const NOTE_FALLBACK = 'NO NOTE';
 
 before(async () => {
   await harness.setup();
-  ({ publishedComponentRuntime: runtime, COMPONENTS: adapterComponents } =
-    await harness.loadRuneModule(ADAPTER));
+  ({
+    publishedComponentRuntime: runtime,
+    COMPONENTS: adapterComponents,
+    LOADERS: adapterLoaders,
+  } = await harness.loadRuneModule(ADAPTER));
   companion = await harness.loadRuneModule(COMPANION);
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
@@ -227,10 +236,15 @@ describe('a text key on the real runtime', () => {
 });
 
 describe('the adapter', () => {
-  it("binds exactly the manifest paths, each to that path's own component", async () => {
+  // What each loader imports is `published-component-manifest.test.js`'s, read from the adapter.
+  it("binds exactly the eager manifest paths, each to that path's own component, and a loader to each lazy one", async () => {
     assert.ok(Object.isFrozen(adapterComponents));
-    assert.deepEqual(Object.keys(adapterComponents), MANIFEST_PATHS);
-    for (const path of MANIFEST_PATHS) {
+    assert.deepEqual(Object.keys(adapterComponents), EAGER_PATHS);
+    assert.ok(Object.isFrozen(adapterLoaders));
+    assert.deepEqual(Object.keys(adapterLoaders), LAZY_PATHS);
+    assert.ok(LAZY_PATHS.length > 0, 'an entry is lazy');
+    for (const path of LAZY_PATHS) assert.equal(typeof adapterLoaders[path], 'function', path);
+    for (const path of EAGER_PATHS) {
       const { default: component } = await harness.loadRuneModule(path);
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
     }

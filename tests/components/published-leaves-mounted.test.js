@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+import { deferredLoader } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
   FAULT_REPORT,
@@ -27,6 +28,7 @@ import {
   assertClipped,
   companionTarget,
   fabricateTarget,
+  harnessLoaders,
   recordEscapes,
   settle,
   shippedSeam,
@@ -49,17 +51,21 @@ let seamParts;
 let reports;
 let escaped;
 let targets;
+let testSeam;
 const recordEscape = (error) => {
   escaped.push(error);
 };
 
-const ui = () =>
+const freshSeam = () =>
   shippedSeam({
     ...seamParts,
     report: (...args) => {
       reports.push(args);
     },
   });
+
+/** The test's own seam, on which `load(['Rail'])` has resolved, since `Rail` is lazy. */
+const ui = () => testSeam;
 
 /** An empty target for `name`: bare, or inside the shell its entry in `LEAVES` names. */
 function targetFor(name) {
@@ -77,15 +83,17 @@ before(async () => {
   const { publishedComponentRuntime: runtime, COMPONENTS: components } =
     await harness.loadRuneModule(PUBLISHED_ADAPTER);
   const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
-  seamParts = { createPublishedComponents, runtime, components };
+  seamParts = { createPublishedComponents, runtime, components, loaders: harnessLoaders(harness) };
 });
 
 after(() => harness.teardown());
 
-beforeEach(() => {
+beforeEach(async () => {
   reports = [];
   escaped = [];
   targets = [];
+  testSeam = freshSeam();
+  await testSeam.load(['Rail']);
 });
 
 afterEach(() => {
@@ -653,6 +661,29 @@ describe('Rail under a bare ancestor', () => {
       assert.equal(label.textTransform, 'uppercase');
       handle.destroy();
     });
+  });
+});
+
+describe('Rail, which is lazy', () => {
+  const RAIL = 'src/ui/svelte/components/Rail.svelte';
+
+  it('refuses a mount (M19) and renders nothing until its one load resolves, then draws', async () => {
+    const pending = deferredLoader();
+    const seam = shippedSeam({ ...seamParts, loaders: { [RAIL]: pending.load } });
+    const target = companionTarget(targets);
+    const mountRail = () => seam.mount('Rail', { target, props: { label: 'Standing' } });
+    const unloaded = { name: 'TypeError', message: `${REFUSAL}"Rail" is not loaded` };
+    assert.throws(mountRail, unloaded);
+    const loads = [seam.load(['Rail']), seam.load(['Kicker', 'Rail'])];
+    assert.throws(mountRail, unloaded);
+    assert.equal(target.childNodes.length, 0, 'nothing is rendered');
+    assert.equal(pending.calls, 1, 'one import for two concurrent loads');
+    pending.resolve((await harness.loadRuneModule(RAIL)).default);
+    await Promise.all(loads);
+    const handle = mountRail();
+    assert.equal(target.querySelector('.fab-rail-label').textContent, 'Standing');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });
 

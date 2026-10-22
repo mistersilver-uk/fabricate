@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { cpSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join, dirname } from 'node:path';
+import { basename, join, dirname, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
@@ -12,6 +12,7 @@ import {
   ARCHIVE_CHUNK_GATE_LABEL,
   ARCHIVE_GATE_SKIPPED_MESSAGE,
   archiveNameMismatchMessage,
+  assertArchiveChunkCompleteness,
   releaseZipName
 } from '../scripts/lib/releaseZipChunks.js';
 // Imported, never retyped, for two reasons.
@@ -294,6 +295,27 @@ function escapeForRegExp(text) {
 /** Static `from "./x.js"` and side-effect `import "./x.js"` specifiers; a lazy `import()` is excluded. */
 const STATIC_IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*)["'](\.{1,2}\/[^"']+\.js)["']/g;
 
+/** A lazy `import("./x.js")` specifier. */
+const LAZY_IMPORT_SPECIFIER = /\bimport\(\s*["'](\.{1,2}\/[^"']+\.js)["']\s*\)/g;
+
+/** The dist-relative names `source`, the built file `name`, imports by `pattern`. */
+const importedBy = (name, source, pattern) =>
+  [...source.matchAll(pattern)].map((match) => posix.join(posix.dirname(name), match[1]));
+
+/** `dist/main.js` and every chunk it loads STATICALLY, each dist-relative name mapped to its source. */
+function startupModules(distDir) {
+  const sources = new Map();
+  const pending = ['main.js'];
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (sources.has(name)) continue;
+    const source = readFileSync(join(distDir, name), 'utf8');
+    sources.set(name, source);
+    pending.push(...importedBy(name, source, STATIC_IMPORT_SPECIFIER));
+  }
+  return sources;
+}
+
 /**
  * The source of the built file holding `literal`, among `dist/main.js` and every chunk it loads
  * STATICALLY.
@@ -301,19 +323,15 @@ const STATIC_IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*)["'](\.{1,2}\/[^"']+\.
  * @returns {string} that file's source, or `''` when no startup file holds the literal.
  */
 function startupModuleHolding(distDir, literal) {
-  const pending = ['main.js'];
-  const seen = new Set();
-  while (pending.length > 0) {
-    const name = pending.pop();
-    if (seen.has(name)) continue;
-    seen.add(name);
-    const source = readFileSync(join(distDir, name), 'utf8');
-    if (source.includes(literal)) return source;
-    for (const match of source.matchAll(STATIC_IMPORT_SPECIFIER)) {
-      pending.push(join(dirname(name), match[1]));
-    }
-  }
-  return '';
+  return [...startupModules(distDir).values()].find((source) => source.includes(literal)) ?? '';
+}
+
+/** The dist-relative name of every built module holding `literal`. */
+function builtModulesHolding(distDir, literal) {
+  const chunks = readdirSync(join(distDir, 'chunks')).map((name) => `chunks/${name}`);
+  return ['main.js', ...chunks]
+    .filter((name) => name.endsWith('.js'))
+    .filter((name) => readFileSync(join(distDir, name), 'utf8').includes(literal));
 }
 
 /**
@@ -399,6 +417,58 @@ test('a --no-zip build reports the archive gate as skipped and still succeeds', 
   // execFileSync throws on a non-zero exit, so reaching here at all is the exit-0 assertion; this
   // pins the successful build's own verdict alongside it.
   assert.ok(stdout.includes('Build complete. dist/ is valid.'), 'the build itself must succeed');
+});
+
+// Issue 2455: a class only the lazy `Rail` draws, and one only the eager `TierTrack` draws.
+const RAIL_LITERAL = 'fab-rail-label';
+const TIER_TRACK_LITERAL = 'fab-tier-track-list';
+
+/** The one built module holding `Rail`'s code, which the assertion first proves is one. */
+function railChunk(distDir) {
+  const holding = builtModulesHolding(distDir, RAIL_LITERAL);
+  assert.equal(holding.length, 1, `one built module holds ${RAIL_LITERAL}; found ${holding}`);
+  return holding[0];
+}
+
+test('the lazy Rail ships in a chunk the startup modules reach only through import(), and the eager TierTrack in a startup module', () => {
+  buildWithoutZip();
+  const distDir = join(REPO_ROOT, 'dist');
+  const chunk = railChunk(distDir);
+  const startup = startupModules(distDir);
+  assert.ok(!startup.has(chunk), `${chunk} is not loaded at startup`);
+  assert.equal(startupModuleHolding(distDir, RAIL_LITERAL), '', 'no startup module holds Rail');
+  assert.ok(
+    [...startup].some(([name, source]) =>
+      importedBy(name, source, LAZY_IMPORT_SPECIFIER).includes(chunk)
+    ),
+    `a startup module imports ${chunk} through import()`
+  );
+  assert.notEqual(startupModuleHolding(distDir, TIER_TRACK_LITERAL), '', 'TierTrack is eager');
+});
+
+test('the release archive gate passes an archive carrying the Rail chunk, and refuses one without it', async () => {
+  buildWithoutZip();
+  const distDir = join(REPO_ROOT, 'dist');
+  const chunk = railChunk(distDir);
+  const manifest = JSON.parse(readFileSync(join(distDir, 'module.json'), 'utf8'));
+  const staging = await mkdtemp(join(tmpdir(), 'fab-rail-archive-'));
+  try {
+    const whole = join(staging, 'whole.zip');
+    zipDirectory(distDir, whole);
+    const proved = assertArchiveChunkCompleteness({ zipPath: whole, manifest });
+    assert.ok(proved.referenced.includes(chunk), `the gate reaches ${chunk}`);
+
+    const short = join(staging, 'short');
+    cpSync(distDir, short, { recursive: true, filter: (path) => basename(path) !== posix.basename(chunk) });
+    const shortZip = join(staging, 'short.zip');
+    zipDirectory(short, shortZip);
+    assert.throws(
+      () => assertArchiveChunkCompleteness({ zipPath: shortZip, manifest }),
+      (error) => error.message.includes(`${chunk} (referenced by main.js)`)
+    );
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
 });
 
 // D9's negative composition proof. release.js's main() takes no `deps` and does `rm -rf dist` ->
