@@ -126,9 +126,8 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 2 },
   ],
   [
-    "the popover was recomposed onto the search popover's grid form at issue 2459, so this row " +
-      'stays target only for the entity-tint offering rule, owned by issue 2352 (library.html, ' +
-      'the TintPicker warn)',
+    "the popover is the search popover's grid form and the offering rule settled at issue 2352, " +
+      'so this row stays target only until issue 2459 flips it (library.html, the TintPicker warn)',
     { 'src/ui/svelte/components/TintPicker.svelte': 1 },
   ],
   [

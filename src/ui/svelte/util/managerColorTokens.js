@@ -1,5 +1,5 @@
-// The manager's ONE colour vocabulary (issue 1036): the eight `--fab-tag-*` palette keys in render
-// order, with their localization keys and English fallbacks. The labels are all a screen reader
+// The manager's ONE colour vocabulary (issue 1036): the ten offered `--fab-tag-*` palette keys in
+// render order, with their localization keys and English fallbacks. The labels are all a screen reader
 // gets from a colour cell (`aria-label` and `title`), so they live under a SHARED namespace —
 // `TintPicker` also draws the biome and character-modifier pickers, so the keys cannot sit
 // under `Essence.*`. Import-free, and `localize` is the caller's: every mount harness compiling
@@ -12,7 +12,9 @@ export const MANAGER_COLOR_TOKENS = Object.freeze([
   Object.freeze({ token: 'peach', label: 'Peach' }),
   Object.freeze({ token: 'butter', label: 'Butter' }),
   Object.freeze({ token: 'aqua', label: 'Aqua' }),
-  Object.freeze({ token: 'mauve', label: 'Mauve' })
+  Object.freeze({ token: 'mauve', label: 'Mauve' }),
+  Object.freeze({ token: 'verdant', label: 'Verdant' }),
+  Object.freeze({ token: 'azure', label: 'Azure' })
 ]);
 
 export const MANAGER_COLOR_TOKEN_KEYS = Object.freeze(

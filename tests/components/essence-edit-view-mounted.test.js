@@ -947,7 +947,7 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
     assert.equal(
       globalThis.document.querySelector('[data-manager-custom-color]'),
       null,
-      'the essence tint picker offers the eight presets and no free hex field'
+      'the essence tint picker offers the ten presets and no free hex field'
     );
     palette.querySelector('[data-manager-color-none]').click();
     flushSync();

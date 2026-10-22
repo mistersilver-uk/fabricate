@@ -1160,10 +1160,10 @@ EssenceDefinition = {
 2. `associatedSystemItemId` is a compatibility alias for `sourceComponentId`.
 3. Legacy `sourceItemUuid` values that match a managed component id are treated as source component ids during normalization and display.
 4. If an essence source component cannot be resolved, stored source evidence is retained so GM UI can show a stale-but-readable source state.
-5. `colorToken` is the GM-authored per-essence colour: a nullable key from the shared `--fab-tag-*` token palette (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`), stored as the bare token.
+5. `colorToken` is the GM-authored per-essence colour: a nullable key from the shared `--fab-tag-*` token palette (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `verdant`, `azure`), stored as the bare token.
    It has **no** `customColor` sibling — the palette is the whole vocabulary, because a free hex cannot be guaranteed legible against all seven themes.
    Normalization emits it in **both** branches of essence-definition normalization (the object branch and the legacy id-string branch), so a definition never reaches a surface with the field absent.
-   A `null` or unrecognized token renders as the theme accent, which is what every essence renders as today, so no migration is required.
+   A `null` token, or one naming no declared `--fab-tag-*` token, renders as the theme accent; a declared token outside the offered ten is retained and renders in its own tint though no colour editor offers it, so no migration is required.
 6. `enabled` defaults to **true** and is emitted in **both** branches of essence-definition normalization, as `colorToken` is.
    The object branch reads `entry.enabled !== false`; the legacy id-string branch emits `true`.
    No migration is required and adding one would be wrong: essence-definition normalization is a whitelist rebuild that has never emitted the key, so no stored definition carries one and an absent key already reads as enabled.

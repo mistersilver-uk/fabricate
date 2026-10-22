@@ -7,6 +7,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../scripts/lib/stylesheetSource.js';
+import { ESSENCE_COLOR_TOKENS } from '../src/ui/svelte/util/essenceIcons.js';
 import {
   MANAGER_COLOR_TOKENS,
   MANAGER_COLOR_TOKEN_KEYS,
@@ -16,12 +18,15 @@ import {
   tintSwatchStyle,
   validCustomHex,
 } from '../src/ui/svelte/util/managerColorTokens.js';
-import { ESSENCE_COLOR_TOKENS } from '../src/ui/svelte/util/essenceIcons.js';
+
+import { byCodePoint } from './helpers/codePointOrder.js';
+import { rulesIn, stripCssComments } from './helpers/styleBlockScan.js';
+import { themePalettes } from './helpers/themePaletteContrast.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const lang = JSON.parse(readFileSync(join(ROOT, 'lang', 'en.json'), 'utf8'));
 
-test('1036: the palette is the shipped eight, in the shipped order', () => {
+test('2352: the palette is the ten offered tints, verdant and azure after the original eight', () => {
   assert.deepEqual(MANAGER_COLOR_TOKEN_KEYS, [
     'sage',
     'mist',
@@ -31,11 +36,31 @@ test('1036: the palette is the shipped eight, in the shipped order', () => {
     'butter',
     'aqua',
     'mauve',
+    'verdant',
+    'azure',
   ]);
 });
 
+test('2352: every declared tint is offered unless it is a neutral or bound to a brand site', () => {
+  // The offering rule in design-system/spec.md: `bone` and `slate` are neutrals, and `ember` is
+  // bound to the Downtime companion tint. A token added to the stylesheet is offered only here.
+  const WITHHELD = ['bone', 'ember', 'slate'];
+  const themes = themePalettes(rulesIn(stripCssComments(readStylesheet())));
+  assert.equal(themes.size, 7, 'the sheet declares the seven palettes');
+  for (const [theme, tokens] of themes) {
+    const declared = [...tokens.keys()]
+      .map((property) => property.match(/^--fab-tag-([\w-]+)$/u)?.[1])
+      .filter(Boolean);
+    assert.deepEqual(
+      [...MANAGER_COLOR_TOKEN_KEYS].sort(byCodePoint),
+      declared.filter((token) => !WITHHELD.includes(token)).sort(byCodePoint),
+      `${theme}: the offered tints are its declared tints less the withheld three`
+    );
+  }
+});
+
 test('1036: it is the SAME vocabulary the essence colour normalizer accepts', () => {
-  // Two lists of the same eight keys is how a per-essence colour ends up authored and then
+  // Two lists of the same keys is how a per-essence colour ends up authored and then
   // silently normalized away, so they are asserted equal rather than each asserted correct.
   assert.deepEqual([...MANAGER_COLOR_TOKEN_KEYS], [...ESSENCE_COLOR_TOKENS]);
 });

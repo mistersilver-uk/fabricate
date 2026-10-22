@@ -97,7 +97,7 @@ async function placePanel(page) {
   }, PANEL);
 }
 
-/** Each swatch's `box-shadow` and its cell's `outline-style`, keyed by token (`none` for the ninth). */
+/** Each swatch's `box-shadow` and its cell's `outline-style`, keyed by token (`none` for No colour). */
 const paint = (cells) =>
   Object.fromEntries(
     [...globalThis.document.querySelectorAll(cells)].map((cell) => [
@@ -186,7 +186,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
     const page = await open({ colorToken: 'rose' });
     try {
       const tiles = await page.evaluate(paint, TILES);
-      assert.equal(Object.keys(tiles).length, 8, 'the eight presets rendered as tiles');
+      assert.equal(Object.keys(tiles).length, 10, 'the ten presets rendered as tiles');
       const ringed = Object.entries(tiles).filter(([, { ring }]) => ring !== 'none');
       assert.deepEqual(
         ringed.map(([token]) => token),
@@ -274,7 +274,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
           ),
         STRIP_CELLS
       );
-      assert.equal(durations.length, 8, 'eight strip cells rendered');
+      assert.equal(durations.length, 10, 'ten strip cells rendered');
       assert.deepEqual(new Set(durations), new Set(['0s']));
     } finally {
       await page.close();
@@ -303,7 +303,7 @@ describe('TintPicker — the selected ring and the keyboard cursor, rendered', (
     });
     try {
       const cells = await page.evaluate(paint, STRIP_CELLS);
-      assert.equal(Object.keys(cells).length, 9, 'eight presets and the No-colour cell rendered');
+      assert.equal(Object.keys(cells).length, 11, 'ten presets and the No-colour cell rendered');
       const ringed = Object.entries(cells).filter(([, { ring }]) => ring !== 'none');
       assert.deepEqual(
         ringed.map(([token]) => token),
@@ -393,7 +393,7 @@ describe('the tint trigger and tiles, over a core button transition', () => {
         ),
       TILES
     );
-    assert.equal(durations.length, 9, 'the trigger and eight tiles rendered');
+    assert.equal(durations.length, 11, 'the trigger and ten tiles rendered');
     assert.deepEqual(new Set(durations), new Set(['0s']));
   });
 

@@ -80,7 +80,7 @@ const hitAt = ([x, y]) => {
   return hit?.className ?? null;
 };
 
-/** The New-biome swatch opened below a spacer of `height` px in the 518px manager host. */
+/** The New-biome swatch opened below a spacer of `height` px in the manager host. */
 async function openSpacedTrigger(height) {
   const page = await openHost('component=color&wrap=biome-add');
   await page.evaluate((spacer) => {
@@ -142,7 +142,7 @@ describe('2459 TintPicker — the swatch trigger and its panel, rendered', () =>
       const placed = await page.evaluate(geometry, PANEL);
 
       assert.equal(placed.panel.right - placed.panel.left, 240, "the panel's border box is 240px");
-      assert.equal(placed.tiles.length, 8, 'eight tiles');
+      assert.equal(placed.tiles.length, 10, 'ten tiles, four to a row');
       const firstRow = placed.tiles.filter((tile) => tile.top === placed.tiles[0].top);
       assert.equal(
         new Set(firstRow.map((tile) => tile.left)).size,
@@ -184,10 +184,11 @@ describe('2459 TintPicker — the swatch trigger and its panel, rendered', () =>
     }
   });
 
-  it('flips above a swatch whose room below is short of the whole panel', async () => {
-    // In the 518px host the swatch then has 172px below it, past the 160px floor but short of the
-    // panel's ~254px, and 264px above, as the New-biome swatch sits in the 820px Lab window.
-    const page = await openSpacedTrigger(262);
+  it('flips above when the swatch sits within the floor of the bottom', async () => {
+    // The panel's three tile rows are taller than the host leaves on either side once the 160px
+    // floor is reserved, so the swatch has to sit within the floor of the host's bottom for the
+    // panel to flip above it; from this spacer up it does, with every row showing.
+    const page = await openSpacedTrigger(330);
     try {
       const placed = await page.evaluate(listFit, { panel: PANEL, trigger: TRIGGER });
       assert.ok(placed.panelBottom <= placed.triggerTop, 'the panel draws above the swatch');
