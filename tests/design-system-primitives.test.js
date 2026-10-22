@@ -901,6 +901,25 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
   }
 });
 
+test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/Well.svelte';
+  const frames = [
+    'manager-checks-crafting-advantage-keep',
+    'manager-checks-v3-count-under',
+    'player-crafting-roll-prompt-count-additional',
+    'manager-published-well-specimen',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Well change does not select '${caseId}'`);
+  }
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [
