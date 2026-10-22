@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field` and `Well`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -431,6 +431,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `Select` (issue 2454).
 - The published set continues with `StageBars` (issue 2455).
 - The published set continues with `Field` (issue 2601).
+- The published set continues with `Well` (issue 2601).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -449,7 +450,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field` too (issue 2601); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), `Field` too (issue 2601), and `Well` too (issue 2601); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -481,6 +482,7 @@ It returns `null` for an unknown key, for a content slot never requested, and af
 It is created by `target.ownerDocument`, carries `display: contents` and no other attribute, so its children lay out as the component's own would.
 The element Fabricate holds it in is private.
 - A child of a content slot that draws nothing still takes the host's gap.
+A host spaces a content slot's children by `gap`, except where its group states it draws them in normal flow, as `Well` does; the companion then fills that slot with one element of its own that lays out its content.
 - Fabricate attaches the element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and a companion's components, effects, listeners and bound values inside it keep running.
 Each detach and attach is a DOM removal and insertion, so the browser resets what it resets on those: an `<iframe>` reloads, playing media pauses, focus and scroll positions inside the slot element are lost, CSS animations restart, and a custom element receives `disconnectedCallback` and `connectedCallback`.
 That happens when the content slot is omitted and requested again, when an `update` makes the component replace the element holding it, and when a Foundry 14 window is detached or re-attached, which also moves the content to another document.
@@ -754,7 +756,7 @@ Each group states the accepted values of every key that entry publishes.
   - Its fill is `--fab-bg-2` and it states no ink or type, so its content is on that ground and inherits from `target`: a `Kicker` and a `Rail` label clear 4.5:1 there, and a `neutral` `Chip` does not.
   - It needs a Fabricate window ancestor and is drawn the same in the Manager, the player window and a Fabricate dialog.
   - It is an unnamed `<section>` with no role and takes no heading of its own; the companion heads its content, for example with a `Kicker`, as `h3` where it heads the whole card.
-  - A card is never nested in a card: the design system has two container levels, and the second, the well, is not yet published.
+  - A card is never nested in a card: the design system has two container levels, and the second is the published `Well`, which the companion mounts in the card's content slot.
   - The card never moves its content slot while it is requested.
 - **`EmptyState`.**
   - It is the design system's empty state (`<Empty>` in the library): a dashed panel that says what is absent and holds the way out.
@@ -1079,7 +1081,23 @@ Each group states the accepted values of every key that entry publishes.
   - The field never moves its content slot while it is requested.
   - It needs a Fabricate window ancestor, because its column and chrome come from Fabricate's module sheet.
   - Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
-- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails.
+- **`Well`.**
+  - It is the design system's well, the container level below a card, for a group of related content inside a card's content slot.
+    It draws no control and no text of its own but its label.
+  - `label` is optional final display text, drawn as the well's kicker in upper case above its content.
+    With it the well is a `group` named by it, so a screen reader may read the label twice, as the group's name and as the kicker's text, which is recorded and accepted; without it, an unnamed `<div>` with no role.
+    The companion passes sentence case.
+  - `children` is a content slot whose element is a `<div>`; the well draws the content slot's children in normal flow below its kicker, with no gap of its own, inside its own padding, so the companion adds no padding.
+    The companion fills the slot with one element of its own that lays out and spaces its content, as the content-slot rules state.
+  - The label is drawn by a `Kicker` as `p`, so the `Kicker` group's type and grounds apply; it is not a heading.
+  - Its fill is `--fab-bg-1`, or `--fab-bg-2` inside a Fabricate modal, whose body is itself `--fab-bg-1`, inside a 1px `--fab-border` edge.
+    It states no ink or type, so its content inherits from `target`, and a `Kicker` clears 4.5:1 on either fill.
+  - A well is never nested in a well: the design system has two container levels, the card and the well.
+  - Rest `data-*` attributes land on the well's root.
+  - It needs no Fabricate ancestor, and draws the same under any but a Fabricate modal.
+  - The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
+  - Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding, corner and edge figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
 
 ### The publishable subset
 
@@ -1373,6 +1391,12 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the field draws one `<div>` column holding the slot, and the input takes the field's chrome and its inset 1px ring
 - **AND** an `update` keeps focus on the input, and `destroy` leaves `target` empty
 - **AND** a mount that omits `as` throws M9, and one into a target with no `.fabricate` ancestor throws M16
+
+#### Scenario: A published well
+
+- **WHEN** a companion mounts `Well` with a `label` and `children: true` in a published `InspectorCard`'s content slot, and fills the well's content slot with one element of its own
+- **THEN** the well draws one `<div>` named as a `group` by its label, its kicker above the content slot, which it draws in normal flow on `--fab-bg-1`
+- **AND** an `update` that adds or drops `label` keeps the slot and focus in place, and the card's `destroy` ends the well and leaves `target` empty
 
 #### Scenario: An overlay host
 
