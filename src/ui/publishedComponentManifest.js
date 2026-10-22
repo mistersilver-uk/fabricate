@@ -285,4 +285,17 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'fabricate',
     overlays: true,
   }),
+  Object.freeze({
+    name: 'StageBars',
+    path: 'src/ui/svelte/components/StageBars.svelte',
+    version: 1,
+    props: Object.freeze({
+      stages: Object.freeze({ kind: 'data', required: true }),
+      currentIndex: Object.freeze({ kind: 'data' }),
+      numbered: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+    }),
+    rest: true,
+    root: 'any',
+  }),
 ]);

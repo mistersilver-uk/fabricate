@@ -6,9 +6,10 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper` and `SearchField` mount here as leaves; what each draws and refuses is
+ * `Stepper`, `SearchField` and `StageBars` mount here as leaves; what each draws and refuses is
  * `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
- * `published-stepper-mounted.test.js`'s and `published-search-mounted.test.js`'s.
+ * `published-stepper-mounted.test.js`'s, `published-search-mounted.test.js`'s and
+ * `published-stage-bars-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -271,6 +272,14 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('button').textContent.trim(),
     drawn: ['Ten rows', 'Twenty-five rows'],
   },
+  {
+    name: 'StageBars',
+    root: '.fab-stage-bars',
+    props: { stages: [{ name: 'Gather', value: 40 }], ariaLabel: 'Forging progress' },
+    next: { stages: [{ name: 'Gather', value: 80 }], ariaLabel: 'Forging progress' },
+    read: (root) => root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),
+    drawn: ['40', '80'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -388,6 +397,8 @@ describe('a key a leaf does not publish', () => {
     ['Select', 'label', 'is not a prop of Select'],
     ['Select', 'disabled', 'is not a prop of Select'],
     ['Select', 'triggerProps', 'is not a prop of Select'],
+    ['StageBars', 'ariaLabelledBy', 'is not a data attribute'],
+    ['StageBars', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
