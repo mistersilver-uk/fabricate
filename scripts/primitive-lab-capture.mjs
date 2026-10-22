@@ -26,12 +26,12 @@ import {
   createCaptureState,
   createDeadline,
   createManifestWriter,
-  exitCodeOf,
   failUnaccounted,
   panelWidth,
   parseCaptureArgs,
   planRequests,
   readCatalogueSections,
+  runOutcome,
   splitGitDiff,
 } from './lib/primitiveLabCapture.js';
 import { startLabServer } from './lib/primitiveLabSmoke.js';
@@ -192,12 +192,9 @@ async function run(argv) {
     writeManifest(state);
   }
   const manifest = captureManifest(state);
-  console.log(
-    `captured ${manifest.frames.length} unit(s) to ${output} ` +
-      `(${manifest.failures.length} failure(s), ${manifest.overflow.length} over the cap; ` +
-      `boot ${state.timings.bootMs ?? '-'} ms, total ${state.timings.totalMs} ms)`
-  );
-  return exitCodeOf(manifest, planned.requests.length);
+  const { lines, code } = runOutcome(manifest, planned.requests.length, output);
+  for (const line of lines) console.log(line);
+  return code;
 }
 
 try {

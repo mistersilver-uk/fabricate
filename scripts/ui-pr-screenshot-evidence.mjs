@@ -1574,6 +1574,8 @@ const LIBRARY_FRAME_FILE = /^[a-z0-9-]+\.png$/;
 const LIBRARY_FRAME_ID = /^[a-z0-9-]+$/;
 const LIBRARY_MANIFEST = 'manifest.json';
 const LIBRARY_UNLOCATED_PREFIX = 'unlocated:';
+const LIBRARY_ADDRESS_PREFIX = 'addr:';
+const LIBRARY_REMOVED_KIND = 'removed';
 const LIBRARY_TEXT_MAX = 200;
 const LIBRARY_NOT_CAPTURED_MAX = 20;
 const LIBRARY_SECTION_MAX = 20_000;
@@ -1652,9 +1654,15 @@ function manifestFrames(manifest, pngs) {
   return { frames, accounted, notCaptured };
 }
 
+/** The `addr:` keys of `removed` notes: deleted rows whose drawing the head library dropped. */
+const removedAddresses = manifest => listOf(manifest.notes)
+  .filter(note => note?.kind === LIBRARY_REMOVED_KIND && typeof note.key === 'string' && note.key.startsWith(LIBRARY_ADDRESS_PREFIX))
+  .map(note => note.key);
+
 /**
  * Reconciles the selected keys against the library artifact: the frames to publish, and a line
- * for every failure, overflow, unrecorded key, lab problem and unlocated hunk.
+ * for every failure, overflow, unrecorded key, lab problem and unlocated hunk, but none for a
+ * removed address.
  */
 function reconcileLibrary(targets, artifact) {
   const units = targets.filter(key => !key.startsWith(LIBRARY_UNLOCATED_PREFIX));
@@ -1677,6 +1685,7 @@ function reconcileLibrary(targets, artifact) {
     found.accounted.add(entryId(entry));
     notCaptured.push(`${entryId(entry)}: over the library unit cap`);
   }
+  for (const key of removedAddresses(manifest)) found.accounted.add(key);
   notCaptured.push(
     ...units.filter(unit => !found.accounted.has(unit)).map(key => `${key}: no record in the library manifest`),
     ...listOf(manifest.labProblems).map(problem => `Primitive Lab reported: ${problemText(problem)}`),

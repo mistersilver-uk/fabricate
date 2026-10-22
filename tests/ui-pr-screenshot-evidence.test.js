@@ -14,6 +14,9 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 
+import { REMOVED_NOTE_KIND, captureManifest } from '../scripts/lib/primitiveLabCapture.js';
+import { addressKey } from '../scripts/lib/primitiveLabUnits.js';
+
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -2958,6 +2961,46 @@ describe('publishing design-library frames (issue 2413)', () => {
     }
     assert.ok(!section.includes('- row:controls/4'), 'a captured unit is not listed');
     assert.ok(!section.includes('- entry:4:'), 'a unit whose frame was recorded is accounted for');
+  });
+
+  const GONE = addressKey('<Stepper>', 'signed');
+  const noteOf = (key, kind) => captureManifest({
+    notes: [{ key, kind, spec: '<Stepper>', cap: 'signed', reason: '<Stepper> has no unit captioned "signed"' }],
+  }).notes[0];
+  const removedNote = key => noteOf(key, REMOVED_NOTE_KIND);
+  const sectionFor = async (targets, overrides = {}) => librarySection((await publishLibrary({
+    library: { files: ['3-0-stepper.png'], manifest: manifestOf(overrides) },
+    targets,
+  })).written);
+
+  it('accounts for an address noted removed with no body line, and names it when no note says so', async () => {
+    const targets = `row:controls/4,${GONE}`;
+    const noted = await sectionFor(targets, { notes: [removedNote(GONE)] });
+    assert.ok(!noted.includes(GONE), noted);
+    assert.ok(!noted.includes('no record in the library manifest'), noted);
+    assert.ok(!noted.includes('has no unit captioned'), noted);
+    const bare = await sectionFor(targets);
+    assert.ok(bare.includes(`- ${GONE}: no record in the library manifest`), bare);
+  });
+
+  it('accounts for nothing from an address note of another kind', async () => {
+    const section = await sectionFor(`row:controls/4,${GONE}`, { notes: [noteOf(GONE, 'unlocated')] });
+    assert.ok(section.includes(`- ${GONE}: no record in the library manifest`), section);
+  });
+
+  it('changes nothing for a removed note off the selection, a removed non-address key, or an unlocated note', async () => {
+    const file = 'openspec/specs/design-system/library.html';
+    const targets = `row:controls/4,row:controls/9,unlocated:${file}:2`;
+    const bare = await sectionFor(targets);
+    assert.ok(bare.includes('- row:controls/9: no record in the library manifest'), bare);
+    assert.ok(bare.includes(`- could not locate 2 hunk(s) in ${file}; touched units may be missing`), bare);
+    for (const notes of [
+      [removedNote(GONE)],
+      [removedNote('row:controls/9')],
+      [{ key: `unlocated:${file}:2`, kind: 'unlocated', file, count: 2 }],
+    ]) {
+      assert.equal(await sectionFor(targets, { notes }), bare, JSON.stringify(notes));
+    }
   });
 
   it('escapes and cuts every manifest-sourced string', async () => {
