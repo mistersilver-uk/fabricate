@@ -506,6 +506,7 @@
         selectedValue={onBreak.mode}
         groupName="tool-on-break"
         columns={3}
+        layout="stacked"
         disabled={immune}
         data-radio-card-group="tool-on-break"
         optionDataAttr="data-tool-on-break-choice"

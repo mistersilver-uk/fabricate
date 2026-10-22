@@ -1149,6 +1149,7 @@
               selectedValue={defaults.onBreak?.mode ?? 'destroy'}
               groupName="world-tool-onbreak-mode"
               columns={3}
+              layout="stacked"
               legend={sectionLabel('onBreak')}
               data-radio-card-group="world-tool-onbreak-mode"
               optionDataAttr="data-world-tool-entry-onbreak-mode"

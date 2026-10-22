@@ -329,62 +329,6 @@
   line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own face is restated, at (0,4,0). Gap, padding, radius, radio and legend are the primitive's: the studio's 11px gap snapped to the primitive's own 12 (issue 1523). */
-.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
-  border: 1px solid var(--fab-border);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-surface-active);
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option-icon {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: var(--fab-text-subtle);
-  background: var(--fab-surface-active);
-  font-size: 11px;
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active
-  .manager-resolution-option-icon {
-  color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-.fabricate-manager .manager-checks-card .manager-resolution-option-name {
-  color: var(--fab-text);
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-option.is-active
-  .manager-resolution-option-name {
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-checks-card .manager-resolution-option-desc {
-  color: var(--fab-text-muted);
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
 /* ── The bands card's own "Preview against" control ── The rail's `Preview as` is a DIFFERENT control with a different subject (issue 1097). */
 .fabricate-manager .manager-checks-preview-against {
   display: flex;
@@ -1161,7 +1105,7 @@
   padding: var(--fab-space-3) var(--fab-space-4);
 }
 
-/* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive, so they carry the `manager-resolution-mode-card is-config-cards` contract rather than a bespoke grid of their own (issue 855). */
+/* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive and draw its face, rooted at `.fabricate-option-cards`; no rule here repaints it (issues 855, 2467). */
 
 /* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050. */
 

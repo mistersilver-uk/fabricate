@@ -569,11 +569,9 @@
 </InspectorCard>
 
 <style>
-  /* The card is the host the sheet's `.is-config-cards` radio reflow answers: that rule queries
-       `fabricate-option-host`, which the manager shell also carries, so without this the grid
-       reflowed only when the entire manager was narrow. `:global()` because `InspectorCard`
-       writes the element, and anchored on the two cards' `data-` hooks rather than the
-       `.manager-checks-card` modifier other studio cards share; each half stays at (0,2,0). */
+  /* The card is the host the option cards' reflow queries: without it the grid answers the
+       manager's own `fabricate-option-host` and reflows only when the whole manager is narrow.
+       `:global()` because `InspectorCard` writes the element; each half stays at (0,2,0). */
   :global(.fabricate-card[data-crafting-modifier-catalogue]),
   :global(.fabricate-card[data-crafting-modifier-policy-card]) {
     container: fabricate-option-host / inline-size;
@@ -592,17 +590,6 @@
   :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
   :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
-  }
-
-  /* THE RULE GRID'S OWN GUTTER, on this card only: `RadioCardGroup`'s gutter is one shared
-     value across the manager, and the design's differs here and differs again on the Outcomes
-     screen's otherwise identical group — the mockup disagreeing with itself rather than a
-     second scale to adopt. So this states the measured value where it is measured and leaves
-     the primitive alone, by the same unlayered `:global()` route the chips above take, anchored
-     per card for the reason the container rule states. Each half stays at (0,3,0). */
-  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options),
-  :global(.fabricate-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options) {
-    gap: var(--fab-space-3);
   }
 
   .manager-modifier-bounds-error {
