@@ -2104,7 +2104,10 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `alt` is as for `Avatar`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
-`tone` and `ink` are each `''`, `success` or `danger`: both outrank `tint`, and `ink` outranks `tone` on the glyph.
+`tone` is `''`, `success`, `danger` or `accent`, and it outranks `tint`.
+`ink` is `''`, `success`, `danger` or `neutral`, it outranks `tint`, and it outranks `tone` on the glyph.
+A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
+A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
 The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
@@ -2758,7 +2761,8 @@ A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `a
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless a component's section names the prop (`StatusToggle`'s section names `aria-labelledby`); publishing one later is additive.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
-Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
+Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a value to a prop's accepted values, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
+A value is added only to a prop whose section states that a value outside its accepted values draws as unset, as `Medallion`'s `tone` and `ink` do, so a Fabricate that predates the value draws the unset render and refuses nothing.
 Narrowing a component's root is a breaking change.
 The rest names a component reserves are fixed for its `version`, and reserving another is a narrowing; `describe` does not state them, so read them from the component's section.
 A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
