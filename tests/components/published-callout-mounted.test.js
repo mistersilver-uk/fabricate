@@ -198,6 +198,18 @@ describe('the published Callout draws its note', () => {
     handle.destroy();
   });
 
+  it('skips an item that is not an object and draws the rest, reporting nothing', async () => {
+    const kept = { icon: 'fas fa-leaf', lead: 'Moonpetal:', text: 'returns one' };
+    const { handle, root } = mountCallout({ items: [null, kept, 'loose', 7, undefined] });
+    await settle();
+    const points = [...root().querySelectorAll(':scope [role="list"] > [role="listitem"]')];
+    assert.equal(points.length, 1, 'only the object draws a point');
+    assert.equal(points[0].textContent.trim(), 'Moonpetal: returns one');
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, [], 'no render failure');
+  });
+
   it('is a bare glyph with none of title, text and items', async () => {
     const { handle, root } = mountCallout({});
     await settle();
@@ -306,6 +318,7 @@ describe("Callout's host element", () => {
       [{ items: 'button' }, 'p'],
       [{ items: { length: 1 } }, 'p'],
       [{ items: [{}] }, 'div'],
+      [{ items: [null, 'point'] }, 'p'],
       [{ actions: false }, 'p'],
       [{ actions: true }, 'div'],
     ];

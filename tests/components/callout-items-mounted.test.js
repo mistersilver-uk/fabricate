@@ -80,6 +80,19 @@ describe('Callout items', () => {
     assert.equal(row.querySelector('.manager-callout-item-text').textContent, 'Bare point.');
   });
 
+  it('draws the same points when a member that is not an object sits among them', async () => {
+    const clean = await harness.mount({ items: ITEMS, 'data-x': true });
+    const drawn = clean.querySelector('[data-x]').outerHTML;
+    harness.remount();
+    const items = [null, ITEMS[0], 'x', 3, ITEMS[1]];
+    const mixed = await harness.mount({ items, 'data-x': true });
+    assert.equal(
+      mixed.querySelector('[data-x]').outerHTML,
+      drawn,
+      'the valid points are unchanged'
+    );
+  });
+
   it('keeps the plain paragraph when there are no items', async () => {
     const root = await harness.mount({ text: 'Body', 'data-x': true });
     const note = root.querySelector('[data-x]');

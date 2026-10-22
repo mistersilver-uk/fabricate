@@ -13,7 +13,8 @@
   snippet drawn inside the strip so a note and the control answering it are one object, and an
   extra `class` are the rest; `text` may be omitted when `items` carry the body. `items`
   (`[{ icon, lead, text }]`) lists glyph-led points under the body, each glyph inked as the leading
-  one; every field of an item is optional and renders only when non-empty.
+  one; every field of an item is optional and renders only when non-empty, and a member that is not
+  an object is skipped.
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
@@ -49,7 +50,9 @@
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'neutral');
   const resolvedIcon = $derived(icon || DEFAULT_ICONS[resolvedTone]);
 
-  const points = $derived(Array.isArray(items) ? items : []);
+  const points = $derived(
+    Array.isArray(items) ? items.filter((item) => item !== null && typeof item === 'object') : []
+  );
 
   // A `<p>` cannot legally contain a heading-shaped child, a button or a list, so the root follows
   // content.
