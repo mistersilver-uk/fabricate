@@ -770,19 +770,24 @@ test('the library\'s "Ruled out" section draws one Merged well per merged name o
   );
 });
 
-test('the <ValidationSummary> specimen names every prop its shipped component declares', () => {
-  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<ValidationSummary>');
-  assert.ok(row, 'no manifest row names <ValidationSummary>, so there is no component to read');
-  const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
-  const block = library.blocks.find((entry) => entry.names.includes('ValidationSummary'));
-  const named = new Set(block?.apiNames);
-  assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
-  assert.deepEqual(
-    props.filter((name) => !named.has(name)),
-    [],
-    'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
-  );
-});
+/** Shipped entries whose Svelte API is pinned to every prop their component declares. */
+const PROP_PINNED_ENTRIES = ['ValidationSummary', 'ArmedDangerButton'];
+
+for (const name of PROP_PINNED_ENTRIES) {
+  test(`the <${name}> specimen names every prop its shipped component declares`, () => {
+    const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === `<${name}>`);
+    assert.ok(row, `no manifest row names <${name}>, so there is no component to read`);
+    const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
+    const block = library.blocks.find((entry) => entry.names.includes(name));
+    const named = new Set(block?.apiNames);
+    assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
+    assert.deepEqual(
+      props.filter((prop) => !named.has(prop)),
+      [],
+      'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
+    );
+  });
+}
 
 test('a divergent entry names the issue that decided it', () => {
   // NO DOMAIN GUARD, and that is deliberate rather than an omission.
@@ -858,7 +863,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
-  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   // Issue 2510: ChoiceGroupAwardHeader and the four PickerRow* parts below each have one caller.
   'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',

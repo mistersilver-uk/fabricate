@@ -187,7 +187,7 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
 `NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
-`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 48 naming headings declare 77 distinct names.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 49 naming headings declare 78 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -240,7 +240,7 @@ Every specimen in `openspec/specs/design-system/library.html` and every row of t
 An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
-The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 46 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 49 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the per-file deferral exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
@@ -440,7 +440,7 @@ A recorded decision to LOCATE a component outside the shared directory rests on 
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
 `ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
 A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
-`ArmedDangerButton` writes `fabricate-button is-danger`, adding only `Button`'s own `is-size-38` at its `size="38"` rung (issue 2257 D10; issue 2540 retired the token beside it), so the `Button` entry already roots every rule that paints it.
+`ArmedDangerButton` is the worked case: issue 1509 moved it into the shared directory while it wrote `fabricate-button is-danger` by hand, and it renders `Button` at `role="danger"` (issue 2563), so the `Button` entry roots every rule that paints it.
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
@@ -960,6 +960,7 @@ A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY p
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 `Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
+`ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
@@ -1041,6 +1042,12 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **WHEN** a control begins an operation that takes perceptible time
 - **THEN** it sets `aria-busy` and changes its label
 - **AND** any spinner it renders is decorative and `aria-hidden`
+
+#### Scenario: A confirmed destructive write keeps its focus
+
+- **WHEN** a GM confirms an armed `ArmedDangerButton` and its caller sets `busy`
+- **THEN** the control keeps keyboard focus, carries `aria-busy` and `aria-disabled` and no `disabled`, and its label and accessible name read its `busyLabel`
+- **AND** a press while it is busy confirms nothing
 
 #### Scenario: A change writes its own motion
 
