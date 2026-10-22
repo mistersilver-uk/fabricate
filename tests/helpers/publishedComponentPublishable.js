@@ -9,9 +9,10 @@
 import { byCodePoint } from './codePointOrder.js';
 import { manifestRows } from './designSystemRatchet.js';
 import { readHeadFile } from './mergeBaseRatchet.js';
-import { identifierNames, parseModule, walkNodes, walkWithAncestors } from './moduleAst.js';
+import { parseModule, walkNodes, walkWithAncestors } from './moduleAst.js';
 import {
   DYNAMIC_ELEMENTS,
+  componentTags,
   focusableElements,
   importClosure,
   isComponent,
@@ -24,7 +25,7 @@ import { readsGlobal } from './svelteStructureContract.js';
 export const EXCLUSIONS_PATH = 'scripts/lib/publishedComponentExclusions.json';
 export const PUBLISHED_MANIFEST_PATH = 'src/ui/publishedComponentManifest.js';
 
-export const FOUNDRY_GLOBALS = Object.freeze([
+const FOUNDRY_GLOBALS = Object.freeze([
   'game',
   'foundry',
   'Hooks',
@@ -46,37 +47,31 @@ export const OVERLAY_ACTIONS = Object.freeze([
 ]);
 
 /** The files that may name `resolveOverlayHost`: its own, and the action that acquires through the chain. */
-export const HOST_RESOLVER_HOMES = Object.freeze([
+const HOST_RESOLVER_HOMES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);
 
-const parsesOf = new WeakMap();
-
-/** `reader` with each parse of a path made once, so a closure scan of many entries reads each file once. */
-export function cachedReader(reader) {
-  if (!parsesOf.has(reader)) {
-    const memo = (parse) => {
-      const seen = new Map();
-      return (file) => {
-        if (!seen.has(file)) seen.set(file, parse(file));
-        return seen.get(file);
-      };
+/**
+ * A reader over `readFile`, which answers a path's text or `undefined`; `has` says which. Each parse
+ * of a path is made once, so a closure scan of many entries reads each file once.
+ */
+function readerOver(readFile) {
+  const sources = new Proxy({}, { get: (_target, file) => readFile(file) });
+  const base = syntheticReader(sources);
+  const memo = (parse) => {
+    const seen = new Map();
+    return (file) => {
+      if (!seen.has(file)) seen.set(file, parse(file));
+      return seen.get(file);
     };
-    parsesOf.set(reader, {
-      ...reader,
-      component: memo(reader.component),
-      componentScope: memo(reader.componentScope),
-      module: memo(reader.module),
-    });
-  }
-  return parsesOf.get(reader);
-}
-
-/** A cached reader over `textOf`, which answers a path's text or `undefined`; `has` says which. */
-export function readerOver(textOf) {
-  const sources = new Proxy({}, { get: (_target, file) => textOf(file) });
-  return { ...cachedReader(syntheticReader(sources)), has: (file) => textOf(file) !== undefined };
+  };
+  return {
+    component: memo(base.component),
+    componentScope: memo(base.componentScope),
+    module: memo(base.module),
+    has: (file) => readFile(file) !== undefined,
+  };
 }
 
 /** The value a manifest's literal spells, for the `Object.freeze`, object, array and scalar forms it uses. */
@@ -95,8 +90,9 @@ function literalValue(node) {
 }
 
 /** The published entries `src/ui/publishedComponentManifest.js` spells, read from text rather than imported. */
-export function publishedManifestOf(textOf) {
-  const text = textOf(PUBLISHED_MANIFEST_PATH);
+function publishedManifestOf(readFile) {
+  // ratchet-exempt(source-pin): parsed to an AST at once; the base side cannot import the manifest, so it is read as text
+  const text = readFile(PUBLISHED_MANIFEST_PATH);
   if (text === undefined) return [];
   const declaration = parseModule(text).ast.body.find(
     (statement) =>
@@ -106,8 +102,8 @@ export function publishedManifestOf(textOf) {
 }
 
 /** The exclusion list's rows, or `null` when the file is absent. */
-export function exclusionsOf(textOf) {
-  const text = textOf(EXCLUSIONS_PATH);
+function exclusionsOf(readFile) {
+  const text = readFile(EXCLUSIONS_PATH);
   return text === undefined ? null : (JSON.parse(text).exclusions ?? []);
 }
 
@@ -117,12 +113,12 @@ export function contextAt(dir) {
 }
 
 /** The context one side of the comparison evaluates: the base commit's files or the head's. */
-export function contextOf(textOf) {
+export function contextOf(readFile) {
   return {
-    rows: manifestRows(textOf),
-    manifest: publishedManifestOf(textOf),
-    exclusions: exclusionsOf(textOf),
-    reader: readerOver(textOf),
+    rows: manifestRows(readFile),
+    manifest: publishedManifestOf(readFile),
+    exclusions: exclusionsOf(readFile),
+    reader: readerOver(readFile),
   };
 }
 
@@ -130,7 +126,7 @@ export function contextOf(textOf) {
  * Every design-system row with scope `shared`, and every recorded non-member with a library
  * specimen, as the paths a companion could be offered.
  */
-export function candidatePaths(rows) {
+function candidatePaths(rows) {
   return rows
     .filter((row) => row.scope === 'shared' || (row.scope === undefined && row.library))
     .map((row) => row.path)
@@ -242,64 +238,231 @@ export function ratchetReport(context) {
 const unchained = (expression) =>
   expression.type === 'ChainExpression' ? expression.expression : expression;
 
-/**
- * Where the value an expression reads comes from, as `{ key, members }`: the published `data` key
- * and the members read below it, an `{#each}` item counting as the value it iterates. `null` is a
- * value that is neither an item nor a published local; `{ key: null }` is an item of a collection
- * the entry does not publish, which no `STRIPPED_ITEM_MEMBERS` row can name.
- */
-function originOf(expression, ancestors, locals) {
-  const node = unchained(expression);
-  if (node.type === 'MemberExpression') {
-    const base = originOf(node.object, ancestors, locals);
-    if (base === null) return null;
-    const named = !node.computed && node.property.type === 'Identifier';
-    return named && base.key
-      ? { key: base.key, members: [...base.members, node.property.name] }
-      : { key: null };
+/** A value that is, or may hold, an item of a collection the entry does not publish (or a whole one). */
+const UNNAMEABLE = Object.freeze({ key: null });
+
+/** The names a binding pattern introduces. */
+function boundNames(pattern) {
+  if (pattern.type === 'Identifier') return [pattern.name];
+  if (pattern.type === 'AssignmentPattern') return boundNames(pattern.left);
+  if (pattern.type === 'RestElement') return boundNames(pattern.argument);
+  if (pattern.type === 'ArrayPattern') {
+    return pattern.elements.filter(Boolean).flatMap((element) => boundNames(element));
   }
-  if (node.type !== 'Identifier') return null;
-  const at = ancestors.findLastIndex(
-    (block) => block.type === 'EachBlock' && identifierNames(block.context).has(node.name)
+  return pattern.properties.flatMap((property) =>
+    boundNames(property.type === 'RestElement' ? property : property.value)
   );
-  if (at !== -1)
-    return originOf(ancestors[at].expression, ancestors.slice(0, at), locals) ?? { key: null };
-  return locals.has(node.name) ? { key: locals.get(node.name), members: [] } : null;
-}
-
-/** The spreads of one closure file that `originOf` traces, as `{ origin }` per spread. */
-function itemSpreadsIn(file, entry, reader) {
-  const ast = reader.component(file);
-  const published = file === entry.path ? publishedLocals(entry, ast) : new Map();
-  const locals = new Map([...published].filter(([, key]) => entry.props[key].kind === 'data'));
-  const origins = [];
-  walkWithAncestors(ast.fragment, (node, ancestors) => {
-    if (node.type !== 'SpreadAttribute' || unchained(node.expression).type !== 'MemberExpression') {
-      return;
-    }
-    const origin = originOf(node.expression, ancestors, locals);
-    if (origin !== null) origins.push(origin);
-  });
-  return origins;
 }
 
 /**
- * Each `{...x.y}` a published entry's closure spreads where `x` is an `{#each}` item or a
- * published `data` local, as `<Entry>.<key>.<member>`; one whose collection the entry does not
- * publish is `<file>: a spread of an item the entry does not publish`, which no row can name.
+ * The members from the value a pattern binds down to `name`: `[]` for the pattern itself, `null`
+ * for a name reached through a rest, an array or a computed key, `undefined` for a name the
+ * pattern does not bind.
  */
-export function itemSpreadIds(entry, reader) {
-  return [...importClosure(entry.path, reader)]
-    .filter(isComponent)
-    .flatMap((file) =>
-      itemSpreadsIn(file, entry, reader).map((origin) =>
-        origin.key
-          ? [entry.name, origin.key, ...origin.members].join('.')
-          : `${file}: a spread of an item the entry does not publish`
-      )
-    )
-    .sort(byCodePoint);
+function bindingPath(pattern, name) {
+  if (!boundNames(pattern).includes(name)) return undefined;
+  if (pattern.type === 'Identifier') return [];
+  if (pattern.type === 'AssignmentPattern') return bindingPath(pattern.left, name);
+  if (pattern.type !== 'ObjectPattern') return null;
+  const property = pattern.properties.find(
+    (candidate) =>
+      candidate.type === 'Property' &&
+      boundNames(candidate.value).includes(name) &&
+      !candidate.computed
+  );
+  const inner = property && bindingPath(property.value, name);
+  return inner ? [property.key.name ?? property.key.value, ...inner] : null;
 }
+
+const through = (origin, path) =>
+  origin.key === null || path === null
+    ? UNNAMEABLE
+    : { key: origin.key, members: [...origin.members, ...path] };
+
+/**
+ * The places a published entry's closure spreads attributes from a value that is, or may be, data
+ * the caller published, as `{ key, members }`: the published `data` key and the members read below
+ * it, an `{#each}` item counting as the value it iterates, a `{@const}` as its initialiser and a
+ * snippet parameter of the entry's own file as the arguments it is rendered with. `{ key: null }`
+ * is a value that may be an item of a collection the entry does not publish. A spread of the
+ * file's `$props()` rest, or of a script-level `const` or `$derived`, is no item. A child's
+ * `$props()` key is what its parents pass it. Every other spread fails closed.
+ */
+function spreadTracer(entry, reader) {
+  const files = [...importClosure(entry.path, reader)].filter(isComponent);
+  const asts = new Map(files.map((file) => [file, reader.component(file)]));
+  const ancestorsOf = new Map(
+    files.map((file) => {
+      const found = new Map();
+      walkWithAncestors(asts.get(file).fragment, (node, ancestors) => found.set(node, ancestors));
+      return [file, found];
+    })
+  );
+  const topLevel = (ast) =>
+    [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
+  const scriptLocals = new Map(
+    files.map((file) => {
+      const ast = asts.get(file);
+      const names = new Set();
+      for (const statement of topLevel(ast)) {
+        if (statement.type !== 'VariableDeclaration') continue;
+        for (const { id, init } of statement.declarations) {
+          const callee = init?.callee;
+          const derived = callee?.name === '$derived' || callee?.object?.name === '$derived';
+          if (callee?.name === '$props') {
+            const rest = id.properties?.find((property) => property.type === 'RestElement');
+            if (rest) names.add(rest.argument.name);
+          } else if (statement.kind === 'const' || derived) {
+            for (const name of boundNames(id)) names.add(name);
+          }
+        }
+      }
+      return [file, names];
+    })
+  );
+  const active = new Set();
+  const guarded = (id, trace) => {
+    if (active.has(id)) return [];
+    active.add(id);
+    try {
+      return trace();
+    } finally {
+      active.delete(id);
+    }
+  };
+
+  const renderedWith = (file, snippet, index, path) => {
+    const rendered = [...ancestorsOf.get(file)].filter(
+      ([node]) => node.type === 'RenderTag' && renderCall(node).callee?.name === snippet.name
+    );
+    return rendered.flatMap(([tag, ancestors]) => {
+      const argument = renderCall(tag).arguments[index];
+      return argument ? originsOf(argument, file, ancestors).map((o) => through(o, path)) : [];
+    });
+  };
+
+  const passedTo = (file, key) =>
+    guarded(`${file}:${key}`, () =>
+      files.flatMap((parent) =>
+        componentTags(parent, asts.get(parent))
+          .filter(([child]) => child === file)
+          .flatMap(([, tag]) =>
+            tag.attributes
+              .filter((attribute) => attribute.name === key)
+              .map((attribute) =>
+                attribute.type === 'BindDirective'
+                  ? attribute.expression
+                  : attribute.value?.expression
+              )
+              .filter(Boolean)
+              .flatMap((expression) =>
+                originsOf(expression, parent, ancestorsOf.get(parent).get(tag))
+              )
+          )
+      )
+    );
+
+  function fromScope(name, file) {
+    const ast = asts.get(file);
+    const prop = propLocals(ast).find((candidate) => candidate.local === name);
+    if (file === entry.path) {
+      const key = publishedLocals(entry, ast).get(name);
+      if (key !== undefined) return entry.props[key].kind === 'data' ? [{ key, members: [] }] : [];
+      if (prop) return [];
+    }
+    if (scriptLocals.get(file).has(name)) return [];
+    return prop ? passedTo(file, prop.key) : [UNNAMEABLE];
+  }
+
+  function nameOrigins(name, file, ancestors) {
+    for (let at = ancestors.length - 1; at >= 0; at--) {
+      const block = ancestors[at];
+      const above = ancestors.slice(0, at);
+      if (block.type === 'EachBlock') {
+        if (block.index === name) return [];
+        const path = bindingPath(block.context, name);
+        if (path === undefined) continue;
+        const source = guarded(block, () => originsOf(block.expression, file, above));
+        return source.length === 0 ? [UNNAMEABLE] : source.map((o) => through(o, path));
+      }
+      if (block.type === 'AwaitBlock') {
+        const bound = [block.value, block.error].filter(Boolean);
+        if (bound.some((pattern) => boundNames(pattern).includes(name))) return [UNNAMEABLE];
+      }
+      if (block.type === 'SnippetBlock') {
+        const index = block.parameters.findIndex(
+          (pattern) => bindingPath(pattern, name) !== undefined
+        );
+        if (index === -1) continue;
+        if (file !== entry.path) return [];
+        const path = bindingPath(block.parameters[index], name);
+        return guarded(block, () => renderedWith(file, block.expression, index, path));
+      }
+      if (block.type === 'Fragment') {
+        for (const { type, declaration } of block.nodes) {
+          if (type !== 'ConstTag') continue;
+          for (const { id, init } of declaration.declarations) {
+            const path = bindingPath(id, name);
+            if (path === undefined) continue;
+            const held = guarded(init, () => originsOf(init, file, ancestors.slice(0, at + 1)));
+            return held.map((o) => through(o, path));
+          }
+        }
+      }
+    }
+    return fromScope(name, file);
+  }
+
+  function originsOf(expression, file, ancestors) {
+    const node = unchained(expression);
+    if (node.type === 'Identifier') return nameOrigins(node.name, file, ancestors);
+    if (node.type === 'Literal') return [];
+    if (node.type !== 'MemberExpression') return [UNNAMEABLE];
+    const named = !node.computed && node.property.type === 'Identifier';
+    return originsOf(node.object, file, ancestors).map((base) =>
+      through(base, named ? [node.property.name] : null)
+    );
+  }
+
+  return {
+    files,
+    spreads: (file) =>
+      [...ancestorsOf.get(file)]
+        .filter(([node]) => node.type === 'SpreadAttribute')
+        .flatMap(([node, ancestors]) => originsOf(node.expression, file, ancestors)),
+  };
+}
+
+/**
+ * Each spread a published entry's closure draws from published `data`, as `{ id, nameable }`: a
+ * nameable id is `<Entry>.<key>` then each member read below it. A spread of a whole item, of an
+ * item of a collection the entry does not publish, or of a value no rule traces is `<file>: …`,
+ * which no `STRIPPED_ITEM_MEMBERS` row can name. A spread inside a child component's snippet is
+ * not traced.
+ */
+function itemSpreads(entry, reader) {
+  const tracer = spreadTracer(entry, reader);
+  const spreads = tracer.files.flatMap((file) =>
+    tracer.spreads(file).map((origin) => {
+      if (origin.key === null) {
+        return { id: `${file}: a spread of an item the entry does not publish`, nameable: false };
+      }
+      if (origin.members.length === 0) {
+        return {
+          id: `${file}: a spread of a whole item of ${entry.name}.${origin.key}`,
+          nameable: false,
+        };
+      }
+      return { id: [entry.name, origin.key, ...origin.members].join('.'), nameable: true };
+    })
+  );
+  const distinct = new Map(spreads.map((spread) => [spread.id, spread]));
+  return [...distinct.values()].sort((a, b) => byCodePoint(a.id, b.id));
+}
+
+/** The ids of `itemSpreads`. */
+export const itemSpreadIds = (entry, reader) =>
+  itemSpreads(entry, reader).map((spread) => spread.id);
 
 /**
  * What `stripped` (`STRIPPED_ITEM_MEMBERS`) breaks against the spreads the published closures
@@ -307,13 +470,19 @@ export function itemSpreadIds(entry, reader) {
  * hold or whose entry is not published.
  */
 export function strippedMemberFaults({ manifest, reader }, stripped) {
-  const spread = new Set(manifest.flatMap((entry) => itemSpreadIds(entry, reader)));
+  const spreads = new Map(
+    manifest.flatMap((entry) => itemSpreads(entry, reader)).map((spread) => [spread.id, spread])
+  );
   return [
-    ...[...spread]
-      .filter((id) => !stripped.includes(id))
-      .map((id) => `${id} is spread per item and not stripped: add it to STRIPPED_ITEM_MEMBERS`),
+    ...[...spreads.values()]
+      .filter(({ id }) => !stripped.includes(id))
+      .map(({ id, nameable }) =>
+        nameable
+          ? `${id} is spread per item and not stripped: add it to STRIPPED_ITEM_MEMBERS`
+          : `${id}: no STRIPPED_ITEM_MEMBERS row can name it; spread a member of a published data key, or drop the spread`
+      ),
     ...stripped
-      .filter((id) => !spread.has(id))
+      .filter((id) => !spreads.has(id))
       .map((id) => `${id} is stripped and no published closure spreads it`),
   ];
 }
@@ -339,12 +508,12 @@ function reasonFault({ path, reason }, paths) {
 /**
  * What the exclusion list and the published set break at one side: a missing list, a row with no
  * reason or a repeated path, a listed path that is published, is no candidate or fails a static
- * rule, and a publishable candidate that is neither published nor listed.
+ * rule, and a publishable candidate that is neither published nor listed. `report` is
+ * `ratchetReport(context)`, which a caller that also prints it computes once.
  */
-export function exclusionFailures(context) {
+export function exclusionFailures(context, report = ratchetReport(context)) {
   const { exclusions, rows } = context;
   if (exclusions === null) return [`${EXCLUSIONS_PATH} is missing`];
-  const report = ratchetReport(context);
   const candidates = new Set(report.candidates);
   const published = new Set(report.published);
   const listed = new Set();
