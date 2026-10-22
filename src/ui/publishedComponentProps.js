@@ -122,7 +122,11 @@ const STRIPPED_PATHS = Map.groupBy(
   ({ id }) => id
 );
 
-/** `value` with the member `path` ends at dropped from each item it holds, as a new tree. */
+/**
+ * `value` with the member that `path` ends at dropped from each item it holds, as a new tree. An
+ * array is read item by item and an object as one item; a value that is not an array or a plain
+ * object (a primitive, `null`) is returned as it is.
+ */
 export function withoutMember(value, path) {
   if (Array.isArray(value)) return value.map((item) => withoutMember(item, path));
   if (!hasPlainPrototype(value)) return value;
@@ -184,8 +188,9 @@ function assertRequired(entry, copy) {
 }
 
 /**
- * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. Each key
- * is configurable, so the seam can drop an absent callback key from it.
+ * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. A `data`
+ * value in it lacks the members `STRIPPED_ITEM_MEMBERS` names, and the caller's own object is never
+ * changed. Each key is configurable, so the seam can drop an absent callback key from it.
  */
 export function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
