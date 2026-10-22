@@ -531,6 +531,25 @@ describe('mountMany on the real runtime', () => {
     assert.equal(instance.liveMountCount(), 2);
     for (const handle of handles) handle.destroy();
   });
+
+  it('refuses M6 for a target a stale mount left holding a node, where mount ends that mount', async () => {
+    const instance = seam();
+    const [item] = batchOf(['Old']);
+    const stale = instance.publicApi.mount('PublishedProbe', item);
+    await settle();
+    // Svelte's trailing empty text anchor is the mount's root, so removing it alone leaves the rest.
+    item.target.lastChild.remove();
+    assert.ok(item.target.firstChild, 'the probe element is still in the target');
+    assert.throws(
+      () => instance.publicApi.mountMany('PublishedProbe', [item]),
+      refusedWith('target must be empty')
+    );
+    assert.equal(stale.update({ text: 'Still' }), true, 'the stale handle is still live');
+    const fresh = instance.publicApi.mount('PublishedProbe', { ...item, props: { text: 'New' } });
+    assert.equal(stale.update({}), false, 'mount ended the stale mount');
+    assert.equal(textOf(item.target), 'New');
+    fresh.destroy();
+  });
 });
 
 describe("a companion's own reactive context", () => {

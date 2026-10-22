@@ -419,6 +419,38 @@ describe('the published Select hosts its list', () => {
     assert.equal(overlayHost.children.length, 0, 'destroy leaves no container');
   });
 
+  it('in each item’s own overlayHost through mountMany, a fault telling only its own onFault', async () => {
+    const faults = [[], []];
+    const props = { ...NAMED, onChange: () => {} };
+    const items = faults.map((told) => {
+      const target = fabricateTarget(shells, 'fabricate fabricate-app');
+      const overlayHost = companionHost(target.parentElement);
+      const onFault = (error) => {
+        told.push(error);
+      };
+      return { target, props, overlayHost, onFault };
+    });
+    const batch = ui().mountMany('Select', items);
+    handles.push(...batch);
+    flushSync();
+    const [first, second] = items;
+    const panel = await open(first.target.querySelector('button'));
+    assert.ok(containerOf(panel).parentElement === first.overlayHost, 'its own host');
+    assert.equal(second.overlayHost.children.length, 0, 'not the other item’s host');
+    batch[0].update({ ...props, options: [null] });
+    flushSync();
+    await settle();
+    assert.deepEqual(
+      faults.map((told) => told.length),
+      [1, 0],
+      'only the faulting item’s onFault'
+    );
+    const other = await open(second.target.querySelector('button'));
+    assert.ok(containerOf(other).parentElement === second.overlayHost, 'its own host');
+    assert.equal(first.overlayHost.children.length, 0, 'the first item’s host is clear');
+    assert.equal(faults[1].length, 0, 'the second item faulted nothing');
+  });
+
   it('in the nearest .fabricate-manager above target, inside an app root', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
     const manager = document.createElement('div');

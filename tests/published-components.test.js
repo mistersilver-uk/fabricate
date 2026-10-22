@@ -243,6 +243,31 @@ describe('mount refuses before it can draw', () => {
     assert.equal(mounts.length, 0);
   });
 
+  it('M5 and M6 are judged before the props, and a stale claim is ended before a props refusal', () => {
+    const { ui } = seamWith();
+    const held = new FakeTarget();
+    const live = ui.mount('Zeta', { target: held, props: zetaProps() });
+    assert.throws(
+      () => ui.mount('Zeta', { target: held, props: [] }),
+      refusal('target already holds a published component')
+    );
+    assert.equal(live.update(zetaProps()), true, 'a refused mount leaves the live one');
+    const full = new FakeTarget();
+    full.childNodes.push({ role: 'companion text' });
+    assert.throws(
+      () => ui.mount('Zeta', { target: full, props: [] }),
+      refusal('target must be empty')
+    );
+    const target = new FakeTarget();
+    const stale = ui.mount('Zeta', { target, props: zetaProps() });
+    target.replaceChildren();
+    assert.throws(
+      () => ui.mount('Zeta', { target, props: [] }),
+      refusal('props must be a plain object')
+    );
+    assert.equal(stale.update(zetaProps()), false, 'the stale claim was ended first');
+  });
+
   it('M7: refuses props that are not a plain object, and accepts a foreign-realm plain one', () => {
     const { ui, mounts } = seamWith();
     class Props {}

@@ -670,6 +670,22 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.ok(prose.includes("`typeof fabUi.mountMany === 'function'`"), 'and how to detect it');
   });
 
+  it('spells the descriptor’s members, in publication order, as the spec and the docs do', () => {
+    const [, ...members] = Object.keys(publishedUi());
+    const descriptor = `{ schemaVersion: 1, ${members.join(', ')} }`;
+    for (const [where, prose] of [
+      ['the spec', SPECIFIED],
+      ['the docs', DOCUMENTED],
+    ]) {
+      const stated = [...prose.matchAll(/ is a frozen `(\{ schemaVersion: 1[^`]*\})`/gu)];
+      assert.deepEqual(
+        stated.map(([, spelled]) => spelled),
+        [descriptor],
+        `${where} spells the descriptor once, with every member`
+      );
+    }
+  });
+
   it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
     const names = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.restOn === 'control').map(
       (entry) => entry.name
