@@ -388,7 +388,7 @@
       "anchorStyle": "margin-left: 16px"
     },
     "props": {
-      "dialogNameAttribute": "Choose an icon",
+      "panelLabel": "Choose an icon",
       "minWidth": 300,
       "maxWidth": 300,
       "showFilteredCount": true,

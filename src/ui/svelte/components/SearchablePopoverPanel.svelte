@@ -22,8 +22,8 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { localize } from '../util/foundryBridge.js';
   import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
+  import { pickerCopy } from '../util/pickerOptionModel.js';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
@@ -31,8 +31,8 @@
   let {
     popoverClass = '',
     compactOptionRows = false,
-    dialogNameAttribute = undefined,
-    dialogNamedBy = undefined,
+    panelLabel = '',
+    panelLabelledBy = '',
     anchor = null,
     popoverLayout,
     horizontalAlign = 'left',
@@ -71,6 +71,7 @@
     header = undefined,
     footer = undefined,
     keyHints = false,
+    copy = pickerCopy(),
     footerAction = null,
     chooseOption,
     optionIsSelected,
@@ -94,14 +95,11 @@
 
   const focusSearch = () => search?.focus();
   const squareTileList = $derived(isGrid && squareTiles);
+  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
+  const dialogNamedBy = $derived(panelLabelledBy || undefined);
 
   // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
-  const KEY_HINTS = {
-    grid: ['FABRICATE.Common.Picker.KeyHints.Grid', '←↑↓→ move · ↵ pick · esc close'],
-    list: ['FABRICATE.Common.Picker.KeyHints.List', '↑↓ move · ↵ pick · esc close'],
-  };
-  const [hintKey, hintFallback] = $derived(KEY_HINTS[gridColumns > 1 ? 'grid' : 'list']);
-  const keyHintText = $derived(localize(hintKey) === hintKey ? hintFallback : localize(hintKey));
+  const keyHintText = $derived(copy(gridColumns > 1 ? 'gridHints' : 'listHints'));
 </script>
 
 <div

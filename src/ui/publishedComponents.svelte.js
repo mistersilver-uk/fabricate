@@ -22,6 +22,7 @@ import Meter from './svelte/components/Meter.svelte';
 import Notice from './svelte/components/Notice.svelte';
 import Rail from './svelte/components/Rail.svelte';
 import SearchField from './svelte/components/SearchField.svelte';
+import Select from './svelte/components/Select.svelte';
 import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
@@ -48,6 +49,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/StatusToggle.svelte': StatusToggle,
   'src/ui/svelte/components/Stepper.svelte': Stepper,
   'src/ui/svelte/components/SearchField.svelte': SearchField,
+  'src/ui/svelte/components/Select.svelte': Select,
 });
 
 // A Svelte 5 component is a function, and this one draws nothing: an overlay container is mounted

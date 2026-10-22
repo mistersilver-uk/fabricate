@@ -14,6 +14,7 @@ export const ROLL_PROMPT_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/apps/crafting/rollPromptTarget.js',
   // The footer note measures its own clipping (issue 2007).
   'src/ui/svelte/apps/crafting/noteOverflow.js',

@@ -2,6 +2,8 @@
 import { flushSync, mount, unmount } from 'svelte';
 
 import { FABRICATE_THEME_ATTRIBUTE } from '../../../theme.js';
+import { mountWithLocalizer } from '../../util/appLocalizer.js';
+import { localize } from '../../util/foundryBridge.js';
 import { APPLICATION_HOST_SELECTOR, createStandaloneOverlayLayer } from '../../util/overlayHost.js';
 import { activeRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
@@ -62,7 +64,7 @@ export async function openRollPromptModal(
   {
     doc = globalThis.document,
     loadComponent = () => import('./RollPrompt.svelte'),
-    mountComponent = mount,
+    mountComponent = mountWithLocalizer(mount, localize),
     unmountComponent = unmount,
     resolveApplication = applicationOf,
   } = {}
