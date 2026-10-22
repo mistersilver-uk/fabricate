@@ -671,6 +671,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
   ]),
+  // The arm-then-confirm control (issue 2563): the three bulk-delete cards and a knowledge row, armed.
+  'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze([
+    'manager-recipes-bulk-delete-armed',
+    'manager-components-bulk-delete-armed',
+    'manager-essences-bulk-delete-armed',
+    'manager-knowledge-delete-armed',
+  ]),
   // The pager's two player forms (the inventory's persistent bar and the recipe browser's threshold
   // one), its manager footer on a second page, and the journal's compact pager.
   'src/ui/svelte/components/Pagination.svelte': Object.freeze([

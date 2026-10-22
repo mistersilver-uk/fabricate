@@ -94,6 +94,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 2420: the manager's title band, on the seven frames ManagerTitleBar's cases draw.
   'src/ui/svelte/components/AppTitleBar.svelte',
+  // Issue 2563: the arm-then-confirm control, on the four frames that draw its armed face.
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   // Issue 1522: identity art picked as a picture, on the frames that draw each of its states.
   'src/ui/svelte/components/ArtPicker.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
@@ -281,10 +283,7 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * this programme removes its own entry; the only accepted edits are a REMOVAL (issue 1116) and a
  * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
-const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/components/ArmedDangerButton.svelte',
-  'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-];
+const PRIMITIVES_WITH_NO_FRAME = ['src/ui/svelte/components/CollapsibleGroupHeader.svelte'];
 
 test('the inputs every property below quantifies over are alive', () => {
   // A guard that stopped looking at anything must not keep reporting success.

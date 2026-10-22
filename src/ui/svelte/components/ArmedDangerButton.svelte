@@ -1,53 +1,39 @@
 <!--
-  Inline two-step confirmation for a high-frequency destructive ROW action: the first click arms the
-  button, the second executes. It sits alongside `services.confirmDialog` for the heavyweight cases.
+  The manager's inline two-step destructive control: the first press arms it and the second
+  confirms. It is a caller of `Button` at `role="danger"`; `services.confirmDialog` owns the
+  heavyweight cases.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `token` | `<action>:<documentId>` | `''` | The stable arm token. See the invariants: NEVER a row index. |
-  | `armed` | boolean | `false` | Whether THIS button holds the single armed token. Mutual exclusion is the owner's invariant. |
-  | `idleLabel` / `armedLabel` / `busyLabel` / `idleIcon` / `armedIcon` / `busyIcon` | localized strings / Font Awesome classes | `''` / trash, triangle-exclamation, spinner | Button copy and glyph per face; `idleIcon=""` suppresses the IDLE glyph only. |
-  | `idleAriaLabel` / `armedAriaLabel` / `ariaDescribedBy` | consequence sentences / element id | `''` | Each sentence must contain its state's visible label; `ariaDescribedBy` names an element describing the consequence and is omitted rather than emitted empty. |
-  | `disabled` | boolean | `false` | Disables both arming and confirming. |
-  | `busy` | boolean | `false` | An optional third face for a caller whose confirm starts a write it can await. Not a variant of `armed` — see the invariants. |
-  | `showTitle` | boolean | `true` | Whether the accessible name is ALSO a hover `title`. |
-  | `size` | `''` \| `'38'` | `''` | `Button`'s control-height rung: `'38'` stands it among the page header's 38px actions (issue 2257 D10); anything else draws the family's 34. |
+  | `token` | `<action>:<documentId>` | `''` | The arm token, keyed on the target document id and never a row index, because a surface that re-projects its rows turns an index into a misfire on another record. |
+  | `armed` | boolean | `false` | Whether this control holds the owner's single armed token; mutual exclusion is the owner's invariant. |
+  | `idleLabel` / `armedLabel` / `busyLabel` / `idleIcon` / `armedIcon` / `busyIcon` | localized strings / Font Awesome classes | `''` / trash, triangle-exclamation, spinner | Copy and glyph per face; `idleIcon=""` drops the idle glyph only, and no caller may suppress the armed glyph. |
+  | `idleAriaLabel` / `armedAriaLabel` / `ariaDescribedBy` | consequence sentences / element id | `''` | Each sentence contains its face's visible label (WCAG 2.5.3 Label in Name), and the busy face's name is `busyLabel`; `ariaDescribedBy` is omitted rather than emitted empty. |
+  | `disabled` | boolean | `false` | Native, and refuses arming and confirming. Disabling a focused button fires blur in Chromium and Firefox, which disarms an armed control and leaves the keyboard on `document.body`; happy-dom fires no such blur. |
+  | `busy` | boolean | `false` | The caller's own in-flight flag, never derived from `armed`. It is `Button`'s `busy`: `aria-busy` and `aria-disabled` and never `disabled`, so the control keeps focus and refuses the press. |
+  | `showTitle` | boolean | `true` | Whether the accessible name is also a hover `title`. |
+  | `size` | `''` \| `'38'` | `''` | `Button`'s rung: `'38'` stands it among the page header's 38px actions, and anything else draws 34. |
 
   Callbacks:
-  - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)`.
+  - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)` — `onDisarm` reports only the local
+    Escape and blur disarms; every other disarm is the owner's.
 
   Exports:
-  - `focus()` — puts the keyboard back after an awaited write REFUSED, since confirming disables the
-    control, moving focus to `document.body`, and re-enabling does not bring it back.
+  - `focus()` — puts the keyboard back on the control when the caller's native `disabled`
+    dropped it to the document body.
 
   Invariants:
-  - It is a real `<button type="button">`, and it WRITES THE FAMILY ROOT, `fabricate-button`, FIRST:
-    it is a consumer of the `fabricate-button`
-    CSS contract rather than of `Button.svelte` — a deferral
-    `tests/manager-button-source-contract.test.js` pins — and a carrier without that root matches
-    nothing in the family. It is shared without being a family root of its
-    own, which `openspec/specs/design-system/spec.md` admits.
-  - It emits `data-keyboard-focus="true"`: Foundry's `KeyboardManager#hasFocus` is false for a formless
-    button without it, so every keybinding (Space, the arrows, Escape) would fire while it is focused.
-  - THE CALLER KEYS THE ARMED TOKEN ON THE TARGET DOCUMENT ID, NEVER A ROW INDEX, because a surface
-    that re-projects rows asynchronously turns an index-keyed token into a destructive misfire: arm
-    row 2, let another client delete row 0, re-project, and the second click hits a different copy.
-  - THE ICON SWAPS AS WELL AS THE LABEL, so the armed state survives greyscale and does not rest on
-    the danger fill; no caller may suppress the ARMED glyph. `aria-label` carries the full
-    consequence sentence in both states, each containing that state's visible label, because WCAG
-    2.5.3 Label in Name makes a control whose name omits the visible string unactivatable by speech.
-  - DISARM IS THE OWNER'S JOB for character/tab/search/publish changes; this component reports only
-    the local `Escape` and `blur` disarms plus the confirm.
-  - THE BUSY FACE IS NOT DERIVED FROM `armed`, and reading "armed AND disabled" as "in flight" fails
-    INVISIBLY: disabling a focused button fires blur in Chromium and Firefox, so the control disarms
-    the moment the caller sets its in-flight flag and an `armed`-derived busy face drops back to the
-    IDLE label for the whole write — and happy-dom does not fire that blur, so a mounted assertion
-    passes on behaviour that does not hold in a browser. Hence `busy` is the caller's own flag,
-    `faceOf` reads it FIRST, blur is a no-op while busy, and the busy face carries `data-busy` and
-    `aria-busy` and no state class.
+  - The glyph swaps with the label, so the armed face survives greyscale.
+  - `faceOf` reads `busy` first, and Escape and blur disarm only while armed and not busy, so a
+    blur during the write cannot clear the owner's token — pinned by
+    `tests/components/bulk-delete-card-mounted.test.js`.
+  - The busy face carries `data-busy` and never `is-armed` — pinned by
+    `tests/components/armed-danger-button-mounted.test.js`.
 -->
 <script>
+  import Button from './Button.svelte';
+
   let {
     token = '',
     armed = false,
@@ -111,24 +97,21 @@
   }
 </script>
 
-<button
-  bind:this={element}
-  type="button"
-  class="fabricate-button is-danger"
-  data-keyboard-focus="true"
-  class:is-size-38={atRung38}
-  class:is-armed={armed}
+<Button
+  role="danger"
+  size={atRung38 ? '38' : ''}
+  {icon}
+  busy={inFlight}
+  disabled={disabled === true}
+  class={armed && !inFlight ? 'is-armed' : ''}
+  bind:element
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
   aria-describedby={ariaDescribedBy || undefined}
-  aria-busy={inFlight ? 'true' : undefined}
   title={showTitle ? consequence : undefined}
-  disabled={isInert}
   onclick={handleClick}
   onkeydown={handleKeydown}
-  onblur={handleBlur}
+  onblur={handleBlur}><span>{label}</span></Button
 >
-  {#if icon}<i class={icon} aria-hidden="true"></i>{/if}<span>{label}</span>
-</button>

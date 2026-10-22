@@ -368,47 +368,36 @@
     "content": ["Alternative"]
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "danger",
-      "icon": "fas fa-trash"
-    },
-    "content": ["Delete essence"]
+      "idleLabel": "Delete essence",
+      "idleAriaLabel": "Delete essence"
+    }
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "danger"
-    },
-    "content": ["Confirm delete"]
+      "armed": true,
+      "armedLabel": "Confirm delete",
+      "armedAriaLabel": "Confirm delete"
+    }
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "ghost"
-    },
-    "content": ["Cancel"]
-  },
-  {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
-    "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
-    "props": {
-      "role": "danger",
-      "icon": "fas fa-clock",
-      "busy": true
-    },
-    "content": ["Deleting…"]
+      "busy": true,
+      "busyLabel": "Deleting…",
+      "busyIcon": "fas fa-clock"
+    }
   },
   {
     "spec": "<Toggle>",

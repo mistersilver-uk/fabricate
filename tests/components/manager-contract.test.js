@@ -2640,9 +2640,13 @@ describe('CraftingSystemManager source contract', () => {
 
   // A real focusable button, not the prototype's span affordance.
   defineStructureContract('arms a real button rather than a span', ARMED_DANGER_BUTTON, {
-    elements: ['button'],
-    binds: ['this'],
-    attributes: [['type', 'button']],
+    renders: ['Button'],
+    binds: ['element'],
+    passesValues: [['Button', 'role', 'danger']],
+    passesPropsNo: [
+      ['Button', 'aria-busy'],
+      ['Button', 'aria-disabled'],
+    ],
     writes: ['data-armed', 'data-arm-token', 'aria-label'],
     names: ['armed', 'token', 'consequence', 'handleBlur'],
     reads: ['event.key'],

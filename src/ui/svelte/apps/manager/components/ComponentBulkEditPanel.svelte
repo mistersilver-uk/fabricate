@@ -415,7 +415,7 @@
     announcement = next;
   }
 
-  // ONLY WHEN FOCUS IS ACTUALLY NOWHERE: the confirm's own `disabled` left it on `<body>`.
+  // ONLY WHEN FOCUS IS ACTUALLY NOWHERE: a caller's native `disabled`, or another focus loss, left it on `<body>`.
   function restoreFocusToControl() {
     if (typeof document === 'undefined') return false;
     const active = document.activeElement;

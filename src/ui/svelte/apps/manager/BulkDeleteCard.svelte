@@ -6,7 +6,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `heading` / `rows` / `standingHint` | string, `Array<{ key, text, count? }>`, string | `''`, `[]`, `''` | the title; the impact statement in order, already localized and pluralized, with `key` becoming the per-row hook's VALUE; and an always-rendered sentence for a consequence that is a PROPERTY rather than a count. `standingHint` is NOT in `aria-describedby`, which points at the impact list alone. |
-  | the three face labels, the two accessible names, and `armedAnnouncement` / `disarmedAnnouncement` / `outcomeAnnouncement` | string | `''` | each accessible name MUST CONTAIN its face's visible label (WCAG 2.5.3 Label in Name). `outcomeAnnouncement` also returns focus to the re-enabled control when focus is on `<body>`, BEFORE the sentence — `util/announceAfterFocus.js`'s rule — and a SUCCESSFUL delete unmounts this card, so its outcome is the caller's toast instead. |
+  | the three face labels, the two accessible names, and `armedAnnouncement` / `disarmedAnnouncement` / `outcomeAnnouncement` | string | `''` | each accessible name MUST CONTAIN its face's visible label (WCAG 2.5.3 Label in Name). `outcomeAnnouncement` also returns focus to the control when focus has fallen to `<body>`, BEFORE the sentence — `util/announceAfterFocus.js`'s rule — and a SUCCESSFUL delete unmounts this card, so its outcome is the caller's toast instead. |
   | `token`, `armed` / `busy` / `disabled`, `onArm` / `onDisarm` / `onConfirm`, and the four `*Attr` hook names | | `false` / `''` | `token` is the arm token and the STEM OF BOTH GENERATED IDS, since a view can hold more than one card; `busy` is the caller's OWN in-flight flag and must never be derived from `armed` — see `ArmedDangerButton.svelte` for the blur race. |
 
   Invariants:
@@ -89,7 +89,7 @@
     return document.activeElement !== active;
   }
 
-  /** Deferred past this flush: the control is re-enabled in it, and focusing it disabled is a no-op. */
+  /** Deferred past this flush: the restore runs once the DOM has settled, and focusing a disabled control is a no-op. */
   function speakOutcome(outcome) {
     announcementTicket += 1;
     const ticket = announcementTicket;
