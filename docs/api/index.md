@@ -2161,6 +2161,8 @@ The glyph is hidden from assistive technology and the tone is colour alone, so `
 `InfoStrip` draws a read-only strip of current values under a kicker.
 `label` is required and is the kicker, which names the group.
 `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+A fact takes no other member that Fabricate reads.
+Its `props` member, which the component spreads onto the fact as attributes, is dropped from a copy of every fact on `mount` and on `update` and never written, so a `data-action`, a `class` or an `aria-label` there reaches no element, and your own object is unchanged.
 `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
 ### Kicker

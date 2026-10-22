@@ -423,7 +423,7 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
-- A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
+- Fabricate drops a stripped per-item member and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset names the members that are stripped.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), and `Select` too (issue 2454); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
@@ -665,7 +665,7 @@ Each group states the accepted values of every key that entry publishes.
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
   Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
-- **Private and undocumented:** every per-item `props` spread; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Private and undocumented:** every per-item `props` spread, which Fabricate drops from the copy it renders and never writes; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
   It is not a refusal.
@@ -995,6 +995,65 @@ Each group states the accepted values of every key that entry publishes.
   - An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus the companion moves focus first.
   - A select is drawn only in a Fabricate window, which gives the companion no signal when Foundry 14 moves it between windows, and needs none: a list opened after the move is placed and heard in the window that then holds the trigger, as Overlays states.
 - **Private:** `Select`'s sizes beyond each rung's height and corner, its tick, chevron and colours beyond what its group states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, the list's placement and width, and how Fabricate redraws a select in its own toolbars, rows, cards and dialogs.
+
+### The publishable subset
+
+Each term is defined here and used in this sense throughout.
+The _design-system manifest_ is `scripts/lib/designSystemPrimitives.json`.
+The _published manifest_ is the frozen entry list that `components` mirrors.
+A _candidate_ is a design-system row with scope `shared`, or a recorded non-member that has a library specimen.
+The _publishable subset_ is the candidates that pass the static rules below.
+The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
+
+- **A candidate is publishable when it passes every static rule.**
+  - Its import closure reads no Foundry global, so it does not reach the Foundry bridge.
+  - Every element admission rule 9 judges is marked as that rule asks, and every `svelte:element` in its closure is pinned to the tags it can draw.
+  - Every required prop, a `$props()` key with no default, is carried by a shipped kind; a snippet a component calls with arguments is never a slot, and a prop that is drawn as a component is not data.
+  - Its closure reaches `resolveOverlayHost` only through `anchoredPopover.js`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
+  - The ancestor a component needs sets its `root` and never excludes it.
+- **Every publishable candidate is published or listed.**
+A component that becomes publishable is published, or listed, in the same change.
+- **A row of the exclusion list is `{ path, reason }`.**
+A `reason` is a code, a colon and free text, and the code is one of `no-consumer` (no companion consumer asks for it), `domain-coupled` (its props take a Fabricate record shape), `part-of:<path>` (an internal part of the component at that path), `event-argument` (a callback it takes needs a DOM event or node), `item-spread` (an unstripped per-item attribute spread) or `pending:#<number>` (an open issue publishes it).
+A `pending` row names an open issue and is the first row to leave the list.
+- **The list only shrinks.**
+Against the merge base, a path in the list and not in the base list fails unless it did not pass the static rules at the base, whether or not it was then a candidate.
+Where the list is absent at the base there is no list comparison, which seeds it; where the base holds it and the head does not, the check fails.
+A row's reason is the exemption channel, because the list is JSON and carries no `ratchet-exempt` marker.
+- **A listed path is stale, and fails, when it is published, is not a candidate or fails a static rule.**
+A reason is non-empty after trimming and a path is listed once.
+The list commits human decisions only, so no total or baseline is committed and no assertion pins the number of rows.
+- **Limit.**
+A change that makes a listed component fail a static rule drops it from the list without a review of that drop.
+- **A per-item spread is stripped or the check fails.**
+A spread `{...x.y}` whose root `x` is an `{#each}` item, or a published `data` local, inside a published closure fails unless `STRIPPED_ITEM_MEMBERS` names `<Entry>.<key>.<member>`, with any members that hold the items between the key and the member dropped.
+Today the one member is `InfoStrip.facts.props`.
+A row is stale when no published closure spreads it, in either direction.
+- **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
+It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
+A function anywhere in the value is still M10, and a value that is not data is still M11.
+A dropped `aria-label` is release-noted.
+
+#### Scenario: A publishable candidate that is neither published nor listed
+
+- **WHEN** a change makes a design-system candidate pass every static rule and neither publishes it nor adds it to the exclusion list
+- **THEN** the ratchet fails and names the remedy: publish it, or add it to `scripts/lib/publishedComponentExclusions.json` with a reason
+
+#### Scenario: A stale listed path
+
+- **WHEN** the exclusion list names a path that is published, is no candidate or now fails a static rule
+- **THEN** the ratchet fails for that row
+
+#### Scenario: The list only shrinks
+
+- **WHEN** a change removes a row, or adds one for a component that failed a static rule at the base
+- **THEN** the ratchet passes and reports a removal as `shrank`
+- **AND** a row added for a component that was publishable at the base fails
+
+#### Scenario: A stripped per-item member
+
+- **WHEN** a companion mounts `InfoStrip` with a fact whose `props` is `{ 'data-action': 'close', class: 'x' }`
+- **THEN** the fact renders neither attribute and the companion's object is unchanged
 
 ### Mounting and its refusals
 
