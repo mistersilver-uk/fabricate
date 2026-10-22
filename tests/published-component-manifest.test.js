@@ -34,7 +34,8 @@
  * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice`,
- * `Callout` and `IconButton`, and `Callout`'s `items[].icon`), or an unprefixed state class.
+ * `Callout` and `IconButton`, `Callout`'s `items[].icon` and `EditorTabs`' `tabs[].icon`), or an
+ * unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.

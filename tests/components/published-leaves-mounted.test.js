@@ -101,13 +101,13 @@ afterEach(() => {
   for (const shell of targets) shell.remove();
 });
 
-/** Each leaf's root, a mount and an update that changes `read`, and the shell its root needs. */
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
   { id: 'inputs', label: 'Inputs' },
   { id: 'outputs', label: 'Outputs' },
 ]);
 
+/** Each leaf's root, a mount and an update that changes `read`, and the shell its root needs. */
 const LEAVES = Object.freeze([
   {
     name: 'Avatar',
