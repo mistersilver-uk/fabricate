@@ -3020,39 +3020,62 @@ A navigation provider's `mount` callback may not, because it returns synchronous
 
 `mountMany(name, items)` draws one component into several targets in one call, such as a `Meter` in each row of a list.
 `items` is an array, and each item is what you would pass `mount` as its options, `{ target, props, onFault, overlayHost }`.
-It returns a frozen array of handles, one for each item and in the same order, and each handle is the one `mount` would have returned; an empty array returns a frozen empty array.
+Each item has its own `onFault` and `overlayHost`, and nothing is shared across the call.
+It returns a frozen array of handles, one for each item and in the same order, and each handle is the one `mount` would have returned.
+An empty array returns a frozen empty array.
 Detect it with `typeof fabUi.mountMany === 'function'`.
 
 ```javascript
-// Once `fabricate.ready` has fired; `Meter` never needs `load`. `party` is your own list.
-const handles = fabUi.mountMany(
-  'Meter',
-  party.map((member) => ({
-    target: this.element.querySelector(`[data-hp-meter="${member.id}"]`), // Empty, and yours.
-    props: {
-      label: `${member.name}'s hit points`,
-      value: member.hp,
-      max: member.maxHp,
-      valueText: `${member.hp} of ${member.maxHp} hit points`,
-    },
-  }))
-);
+#meters = [];
 
-for (const handle of handles) handle.destroy(); // Each handle is destroyed on its own.
+// In your ApplicationV2, once `fabricate.ready` has fired. `Meter` never needs `load`.
+// `#party` is your own list.
+_onRender(context, options) {
+  super._onRender(context, options);
+  const fabUi = game.fabricate?.api?.ui;
+  if (typeof fabUi?.mountMany !== 'function') return;
+  for (const handle of this.#meters) handle.destroy(); // A re-render replaced the old targets.
+  this.#meters = fabUi.mountMany(
+    'Meter',
+    this.#party.map((member) => ({
+      target: this.element.querySelector(`[data-hp-meter="${member.id}"]`), // Empty, and yours.
+      props: {
+        label: `${member.name}'s hit points`,
+        value: member.hp,
+        max: member.maxHp,
+        valueText: `${member.hp} of ${member.maxHp} hit points`,
+      },
+    }))
+  );
+}
+
+async _preClose(options) {
+  for (const handle of this.#meters) handle.destroy(); // Each handle is destroyed on its own.
+  await super._preClose(options);
+}
 ```
 
-It checks the whole call before it draws anything, so a refused call draws nothing and you correct it and call again.
+`mountMany` checks the whole call before it draws anything, so a refused call draws nothing and you correct it and call again.
+The first problem it finds is the one it throws, with the message `mount` would give.
 It checks the name first, as `mount` does, so it throws `not registered`, `mount before ready`, `"<name>" is not published`, or, for a lazy component before `load` has resolved for it, `"<name>" is not loaded`.
-It then throws `items must be an array` for anything that is not an array, a single item included: it never reads one item as a list of one.
-It then checks each item in order exactly as `mount` checks its options, apart from the stale-mount case below, and throws the first message `mount` would have thrown for that item.
+It then throws `items must be an array` for anything that is not an array, a single item included, because it never reads one item as a list of one.
+It reads the length of `items` once and follows no iterator, so an item added while the call is checked is not drawn.
+It then checks each item in order exactly as `mount` checks its options, apart from the stale-mount case below.
 An item that is not an object, or a hole in the array, has no `target`, so it throws `target must be an element`.
 Two items that name the same `target` throw `target already holds a published component`.
-The check ends no earlier mount: a mount whose content you cleared without destroying it is ended only when its target's item is drawn.
-A target that still holds anything, a node such a mount left included, throws `target must be empty`, where `mount` would end that mount first; destroy its handle or empty the target before you call.
-A target you mean to place in another item's content slot is not inside it yet, so a component that needs a Fabricate ancestor refuses it; mount the outer items first and the nested ones in a later call.
-When an earlier item's draw ends a stale mount whose detached slot holds a later item's target, the later item is still drawn where sequential `mount` calls would refuse it; mount nested targets in a later call.
-Once the call has been checked, a fault while one item renders is that item's own: its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
-There is no call that destroys them all: destroying one handle leaves the others live, so destroy each handle on every path that ends its mount.
+The check ends no earlier mount.
+A mount whose content you cleared without destroying it is ended only when its target's item is drawn.
+If that mount left a node in the target, `mountMany` throws `target must be empty`, where `mount` would end that mount first and draw.
+Destroy that mount's handle or empty the target before you call.
+A target you mean to place inside the content slot of another item of the same call is not inside it yet.
+A component that needs a Fabricate ancestor refuses that target, so mount the outer items first and the nested ones in a later call.
+A stale mount can also have a content slot that holds a later item's target, when an earlier item's draw ends that stale mount.
+The later item is still drawn, into the detached slot, where separate `mount` calls would refuse it for a component that needs a Fabricate ancestor.
+Mount nested targets in a later call.
+Once the call has been checked, a fault while one item renders is that item's own.
+Its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
+There is no call that destroys them all.
+Destroying one handle leaves the others live, so destroy each handle on every path that ends its mount.
 
 ### Overlays
 

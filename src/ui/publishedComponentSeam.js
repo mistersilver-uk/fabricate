@@ -1,11 +1,11 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
- * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`,
- * draws its own content in a content slot, is told of a contained fault through `onFault` (issue
- * 2451), is told of a press through a callback prop, sets an ARIA attribute on a control through
- * an `aria` prop (issue 2452), reads and sets a bound value through a `value` prop (issue 2453),
- * hosts an entry's overlays through `overlayHost` (issue 2454), and loads a lazy entry and mounts
- * several at once through `mountMany` (issue 2455).
+ * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`.
+ * It draws its own content in a content slot, is told of a contained fault through `onFault`
+ * and of a press through a callback prop, sets an ARIA attribute on a control through an `aria`
+ * prop, reads and sets a bound value through a `value` prop, and hosts an entry's overlays through
+ * `overlayHost`. `load` fetches a lazy entry's code, and `mountMany` mounts one entry into
+ * several targets in one checked call.
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
  * `mount`, `unmount`, `flush`, the empty `overlay` component and each lazy entry's loader.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
@@ -341,13 +341,14 @@ function createMountLifecycle({ runtime, report }) {
     return handleFor(entry, record, end);
   }
 
-  // M5: a claim holds only while its root is still inside the target.
+  // M5: a claim holds only while its root is still inside the target. It ends nothing, so
+  // `mountMany` can check every item with it before any claim is made.
   function assertUnheld(target) {
     const held = claims.get(target);
     if (held?.root && target.contains(held.root)) throw refuse(HELD);
   }
 
-  // M5, then M6 once a stale claim is destroyed.
+  // `mount`'s claim check: M5, then a stale claim is destroyed, then M6.
   function claimTarget(target) {
     assertUnheld(target);
     const stale = claims.get(target);
@@ -359,15 +360,13 @@ function createMountLifecycle({ runtime, report }) {
   return { start, assertUnheld, claimTarget, owner, liveCount: () => live.size };
 }
 
+// M6. It destroys no stale claim, so it refuses a target holding a node that claim left, where
+// `claimTarget` destroys the claim first and may then pass.
 function assertEmpty(target) {
   if (target.firstChild) throw refuse('target must be empty');
 }
 
-/**
- * `mount` and `mountMany` over one seam's `entries`. `mountMany` judges the name, then that `items`
- * is an array (M21), then every item as `mount` judges its options, before it claims or renders
- * anything; a stale claim is ended only as its item renders, and a fault is that item's own.
- */
+/** `mount` and `mountMany` over one seam's `entries`, sharing one name check and one options read. */
 function createMounting({
   entries,
   loading,
@@ -387,7 +386,8 @@ function createMounting({
     return entry;
   }
 
-  // M4, M16 and M18; a value that is not an object reads as no options.
+  // M4, M16 and M18; a value that is not an object reads as no options. It claims and renders
+  // nothing, so `mountMany` can read every item before any is drawn.
   function readRequest(entry, options) {
     const { target, props = {}, onFault, overlayHost } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
@@ -412,6 +412,17 @@ function createMounting({
     return render(entry, request, copyProps(entry, request.props));
   }
 
+  /**
+   * Draws `name` into each item's target in order, or throws and draws nothing. The checks run in
+   * this order and the first refusal is thrown unchanged: the name (M1, M2, M3, M19), `items` being
+   * an array (M21), then each item as `mount` checks its options. That is its target, a repeat of an
+   * earlier target (M5), M5 and M6 against the claims, then its `props`. The check is pure: it makes
+   * no claim and ends no stale claim, and each item's props are copied there. `mount` differs in one
+   * case: it ends a stale claim before M6, so a target holding a node that claim left is M6 here
+   * where `mount` passes. A later target inside the detached slot of a stale mount an earlier item's
+   * draw ends is drawn, where sequential `mount` calls refuse it (M16). A fault while an item renders
+   * is that item's own: its handle is inert, only its own `onFault` is told, and the rest stay live.
+   */
   function mountMany(name, items) {
     const entry = entryToMount(name);
     if (!Array.isArray(items)) throw refuse('items must be an array');
