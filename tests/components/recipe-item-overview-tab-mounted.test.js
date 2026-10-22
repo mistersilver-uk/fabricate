@@ -14,6 +14,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',

@@ -26,4 +26,5 @@ export {
 } from './foundryHooks.js';
 export { localize, formatList } from './foundryLocalize.js';
 export { notifyInfo, notifyWarn, notifyError } from './foundryNotify.js';
+export { foundryTooltips } from './foundryTooltip.js';
 export { isGameMaster } from './foundryUser.js';

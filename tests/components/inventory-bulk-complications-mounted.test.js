@@ -26,6 +26,7 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     // The player window's own shared roster (issue 1514).

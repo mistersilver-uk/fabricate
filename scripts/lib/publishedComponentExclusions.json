@@ -1,6 +1,10 @@
 {
   "exclusions": [
     {
+      "path": "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte",
+      "reason": "domain-coupled: its severity, visibility, trigger sentence and activities are Fabricate complication records, and its three variants are the complication screens' own."
+    },
+    {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
       "reason": "no-consumer: a companion confirms a destructive press in its own dialog, so Fabricate's arm-then-confirm state is not offered."
     },
@@ -19,6 +23,10 @@
     {
       "path": "src/ui/svelte/components/FilterBar.svelte",
       "reason": "no-consumer: a toolbar section around the manager's filter controls; a companion arranges its own published controls."
+    },
+    {
+      "path": "src/ui/svelte/components/IconButton.svelte",
+      "reason": "pending:#2601: the glyph-only button is published once its tooltip reaches Fabricate through context."
     },
     {
       "path": "src/ui/svelte/components/ListRow.svelte",
@@ -55,6 +63,10 @@
     {
       "path": "src/ui/svelte/components/StageCard.svelte",
       "reason": "domain-coupled: its stage, facts, io and presentation props are Fabricate run records."
+    },
+    {
+      "path": "src/ui/svelte/components/StageNav.svelte",
+      "reason": "no-consumer: stageLabel, positionLabel and returnLabel are function props Fabricate calls while it renders, which no shipped kind carries, and view is bindable; a companion pages with published Buttons."
     },
     {
       "path": "src/ui/svelte/components/ToggleCard.svelte",

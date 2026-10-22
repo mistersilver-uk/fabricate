@@ -20,7 +20,7 @@ const namespaces = await Promise.all(
   concerns.map(async (modulePath) => [modulePath, await load(modulePath)])
 );
 
-test('the barrel names the same 28 symbols as its concern modules, together', () => {
+test('the barrel names the same 29 symbols as its concern modules, together', () => {
   const owned = new Map();
   for (const [modulePath, namespace] of namespaces) {
     for (const name of Object.keys(namespace)) {
@@ -29,7 +29,7 @@ test('the barrel names the same 28 symbols as its concern modules, together', ()
     }
   }
 
-  assert.equal(Object.keys(barrel).length, 28, 'the bridge surface is 28 symbols wide');
+  assert.equal(Object.keys(barrel).length, 29, 'the bridge surface is 29 symbols wide');
   assert.deepEqual(
     Object.keys(barrel).sort(),
     [...owned.keys()].sort(),
@@ -58,5 +58,5 @@ test('FOUNDRY_BRIDGE_RAW_MODULES is the frozen closure a mounted manifest declar
     FOUNDRY_BRIDGE_RAW_MODULES.includes(BARREL_PATH),
     'the barrel itself is what the manifests name'
   );
-  assert.equal(concerns.length, 8, 'the eight concern modules travel with it');
+  assert.equal(concerns.length, 9, 'the nine concern modules travel with it');
 });

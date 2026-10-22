@@ -1191,8 +1191,10 @@ A component outside that directory is not bound by this requirement, even where 
 ### Requirement: An icon button shows its name under pointer and keyboard focus alike
 
 An `IconButton` MUST write its name, or its `tooltip` when one is passed, as plain tooltip text — Foundry's `data-tooltip-text`, which no localize lookup or HTML path reaches — so Foundry's tooltip shows it on pointer hover.
+It writes that attribute in every tree, whatever context the tree was mounted with, because the attribute reads no global.
 Keyboard focus MUST show the same tooltip, and only under `:focus-visible`, so a pointer focus adds no second tooltip.
-Blur, a click and Escape MUST each close the button's own tooltip and never another element's.
+It opens that tooltip through the `APP_TOOLTIPS` context's facade, `{ show(element, text), hide(element), owns(element) }`, which reads `game.tooltip` when it is called, so the component reads no Foundry global; the application mixin, the roll prompt host and the published runtime each hand their trees the bridge's facade, and a tree mounted with none opens no tooltip on focus.
+Blur, a click and Escape MUST each close the button's own tooltip and never another element's, and so MUST unmounting the button and an update that changes the text it shows or disables it.
 No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` suppresses the primitive's own tooltip, on hover and focus alike, rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
 `tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
 
@@ -1210,6 +1212,11 @@ No `IconButton` carries a native `title`: a caller's hand-written `title`, `data
 
 - **WHEN** the button blurs or the user presses Escape
 - **THEN** its own tooltip closes and no other
+
+#### Scenario: An icon button in a tree with no tooltip context
+
+- **WHEN** an icon button is mounted in a tree no Fabricate root hands the `APP_TOOLTIPS` facade, and a user Tabs to it
+- **THEN** it still writes its name as `data-tooltip-text`, and its focus opens no tooltip
 
 ### Requirement: The Foundry contract binds every primitive
 

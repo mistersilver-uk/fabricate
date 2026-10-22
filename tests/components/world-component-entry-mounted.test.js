@@ -83,6 +83,7 @@ const dropZoneHarness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',

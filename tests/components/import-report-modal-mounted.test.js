@@ -14,6 +14,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-report-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',

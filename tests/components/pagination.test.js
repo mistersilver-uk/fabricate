@@ -23,7 +23,11 @@ const PAGINATION = 'src/ui/svelte/components/Pagination.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-pagination-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
+  ],
   compiledModules: [...PAGINATION_COMPILED_MODULES],
   componentPath: PAGINATION,
 });

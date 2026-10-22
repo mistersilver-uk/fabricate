@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-recipe-tiers-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     // The tier's adjustment labels (issue 2005).

@@ -2,9 +2,11 @@
  * View Lab mount entry. The page signals completion with `data-view-lab-ready` /
  * `data-view-lab-error` on `<body>`; the driver waits on those and never on a timer.
  */
-import { flushSync, mount } from 'svelte';
+import { flushSync, mount as svelteMount } from 'svelte';
 
 import { APP_CHROME } from '../../scripts/lib/foundryChromeSpec.js';
+import { mountWithLocalizer } from '../../src/ui/svelte/util/appLocalizer.js';
+import { foundryTooltips, localize } from '../../src/ui/svelte/util/foundryBridge.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
 import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
 import {
@@ -16,6 +18,12 @@ import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
 import { installLabChatLog } from './labChatLog.js';
 import { seedRollPromptFixture } from './rollPromptFixtures.js';
+
+/**
+ * Svelte's `mount` as a Fabricate root calls it: each tree takes the bridge's `localize`, which
+ * reads the shim's `game.i18n`, and its tooltip facade, which drives the shim's `game.tooltip`.
+ */
+const mount = mountWithLocalizer(svelteMount, localize, foundryTooltips);
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
 const ERROR_ATTRIBUTE = 'data-view-lab-error';
