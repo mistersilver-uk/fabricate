@@ -60,9 +60,7 @@ describe('essence colour tokens (issue 917)', () => {
     );
   });
 
-  it('accepts verdant and azure, and renders a tint it does not offer in the accent', () => {
-    // Issue 2352 D5: a build predating verdant and azure reads them as unrecognized, so the
-    // essence falls back to the theme accent while its stored token is kept.
+  it('accepts verdant and azure, and normalizes a withheld tint to null', () => {
     assert.equal(normalizeEssenceColorToken('verdant'), 'verdant');
     assert.equal(normalizeEssenceColorToken('--fab-tag-azure'), 'azure');
     assert.equal(normalizeEssenceColorToken('ember'), null, 'a withheld tint is not offered');

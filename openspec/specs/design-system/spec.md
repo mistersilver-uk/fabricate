@@ -741,7 +741,9 @@ Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svel
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
 By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, and the other ten are offered, `verdant` and `azure` after the original eight in that order.
 Collision with a semantic token does NOT disqualify a tint: in the default palette five offered tints collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple`, `butter` with `--fab-warning`, `verdant` with `--fab-success` and `azure` with `--fab-drop-rate-uncommon`.
-An offered tint is additive persisted vocabulary and takes no migration: a build that predates `verdant` and `azure` folds a biome carrying one onto `sage` and renders an essence carrying one in the theme accent.
+An offered tint is additive persisted vocabulary and takes no migration, because all thirteen tokens are declared in every build since issue 1229.
+A build that predates `verdant` and `azure` still draws an essence carrying one in that tint wherever the essence is drawn as a chip or tile; its colour editors do not offer the token, and the stored token is kept until the GM edits that essence's colour.
+The same build folds a gathering biome carrying one onto `sage` on read and writes `sage` back on its next save of the gathering configuration, so a downgrade loses that biome's tint.
 
 A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
 All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the ten offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
@@ -788,12 +790,12 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 #### Scenario: A caller renders the tint picker without opting in to a hex
 
 - **WHEN** a caller renders `TintPicker` without passing `allowCustom`
-- **THEN** the palette offers the ten tokens and no free-hex field
+- **THEN** the palette offers the ten offered tints, in order, and no free-hex field
 
-#### Scenario: A withheld tint is offered
+#### Scenario: The offered tints stop following the offering rule
 
-- **WHEN** `managerColorTokens.js` offers `ember`, `bone` or `slate`, or omits `verdant` or `azure`
-- **THEN** `tests/manager-color-tokens.test.js` fails the offering rule
+- **WHEN** `managerColorTokens.js` offers a declared `--fab-tag-*` token that is a neutral or bound (`bone`, `slate`, `ember`), or omits a declared token that is neither
+- **THEN** `manager-color-tokens` fails and names the theme whose declared set disagrees
 
 ### Requirement: The token namespace is one generation and names its purpose
 

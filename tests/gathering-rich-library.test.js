@@ -476,7 +476,7 @@ test('rich gathering service preserves explicit biome record labels icons and co
 
 test('rich gathering service keeps every offered tint on a biome and folds any other onto sage', () => {
   // The service's biome vocabulary cannot import the manager palette, so this holds them equal.
-  // A build predating a tint folds it the same way, which is issue 2352 D5's stated downgrade.
+  // A build predating a tint folds it the same way and persists the fold on its next save, which is issue 2352 D5's stated downgrade.
   const tokens = [...MANAGER_COLOR_TOKEN_KEYS, 'ember', 'bone', 'slate'];
   const { service } = makeRichState({
     config: {

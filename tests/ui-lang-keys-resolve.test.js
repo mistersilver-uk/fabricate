@@ -110,7 +110,7 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       'base is only checked for existing. The ordinals below are therefore NAMES rather than ' +
       'positions: renumbering them on every count change is churn nobody can verify. One is ' +
       '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
-      '1036), the shared base the eight colour-token labels are localized under. Another is ' +
+      '1036), the shared base the colour-token labels are localized under. Another is ' +
       '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in ' +
       '`src/migration/migrateRetireCraftingModToken.js` (issue 1094), the base its four ' +
       'per-cause notice clauses are localized under — the clauses are separate keys so the ' +
