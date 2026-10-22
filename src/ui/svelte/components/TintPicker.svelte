@@ -1,4 +1,3 @@
-<!-- ratchet-exempt(design-system): the popover is the search popover's grid form and the offering rule settled at issue 2352, so this row stays target only until issue 2459 flips it (library.html, the TintPicker warn) -->
 <!--
   The manager's colour palette and the library's `<TintPicker>` specimen, imported by six files: two
   open it as a popover (the gathering biome's edit palette through `anchor`, the new-biome one

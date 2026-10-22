@@ -126,11 +126,6 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 2 },
   ],
   [
-    "the popover is the search popover's grid form and the offering rule settled at issue 2352, " +
-      'so this row stays target only until issue 2459 flips it (library.html, the TintPicker warn)',
-    { 'src/ui/svelte/components/TintPicker.svelte': 1 },
-  ],
-  [
     'InlineRenameField is a new manager-only member at target, because it replaces ' +
       'PartyNameField and RealmNameField and so has two callers (issue 1521)',
     { 'src/ui/svelte/apps/manager/InlineRenameField.svelte': 1 },
