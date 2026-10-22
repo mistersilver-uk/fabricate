@@ -4,19 +4,16 @@
  * form animates, and the status line is 11.5px in the muted ink.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { renderedPageHead } from '../helpers/renderedPageHead.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 
 const harnessOf = (name, compiled) =>
@@ -63,19 +60,9 @@ async function markupOf(name, compiled, propsOf) {
   return markup;
 }
 
-/**
- * Core's layered sheet with its reset's border-box sizing, the module sheet in `layer(modules)`,
- * and the scoped styles unlayered.
- */
-const page = (rows, states) => `<!doctype html><html><head><meta charset="utf-8">
-<style>${read('tests/fixtures/foundry-core-min.css')}
-@layer reset{*,*::before,*::after{box-sizing:border-box}}</style>
-<style>@layer modules {${readStylesheet()}}</style>
-${['Medallion', 'ListState']
-  .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
-  .join('\n')}
-<style>:root{--font-primary:Arial,sans-serif}</style>
-</head><body class="game"><div class="fabricate fabricate-manager" style="width:1000px">
+/** Each density's row beside its loading form, in a manager root. */
+const page = (rows, states) => `${renderedPageHead(['Medallion', 'ListState'])}
+<body class="game"><div class="fabricate fabricate-manager" style="width:1000px">
   <span data-probe="muted" style="color:var(--fab-text-muted)"></span>
   ${Object.keys(DENSITIES)
     .map(
