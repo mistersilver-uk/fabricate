@@ -31,6 +31,7 @@ import {
   titledIconButtons,
   assertNoTitledIconButton,
   compareStrings,
+  labCaseSelector,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -435,10 +436,24 @@ export function registerSystemsCases() {
     });
     flushSync();
 
-    assert.ok(target.textContent.includes('Loading crafting systems...'));
+    // The list's loading form (issue 2548): the hook names the busy region, whose status line
+    // states the load; the `{shown} of {total}` chip would claim a false 0 of 0.
+    const region = target.querySelector(':scope .manager-table-scroll [data-systems-loading]');
+    assert.ok(region, 'the loading region keeps its hook');
+    assert.equal(region.getAttribute('aria-busy'), 'true');
+    assert.equal(
+      region.querySelector('[role="status"]')?.textContent,
+      'Loading crafting systems...'
+    );
+    assert.equal(region.querySelectorAll('.fabricate-list-state-row.is-dense').length, 0);
+    assert.equal(target.querySelectorAll(':scope .manager-table-scroll .manager-empty').length, 0);
+    assert.equal(target.textContent.includes('0 of 0'), false);
+    assert.ok(
+      Boolean(target.querySelector(labCaseSelector('manager-systems-loading'))),
+      'the manager-systems-loading frame asserts this form'
+    );
     assert.equal(target.textContent.includes('No crafting systems yet'), false);
     assert.equal(target.textContent.includes('Set up your first system'), false);
-    assert.ok(target.querySelector('[data-systems-loading]'));
   });
 
   it('toggles systems library row status without selecting the row', async () => {

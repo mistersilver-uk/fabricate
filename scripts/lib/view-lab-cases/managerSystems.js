@@ -91,7 +91,10 @@ export const CASES = Object.freeze([
     query: { systemsLoading: '1' },
     steps: [],
     expectView: 'systems',
-    expectSelector: '.fabricate-manager .manager-table-scroll [data-systems-loading]',
+    // The list's busy region and its status line, with no `{shown} of {total}` chip above it.
+    expectSelector:
+      '.fabricate-manager .manager-main > .fabricate-filter-bar:not(:has(.manager-chip))' +
+      ' ~ .manager-table-scroll > [data-systems-loading][aria-busy="true"] > [role="status"]',
     kinds: ['manager', 'systems'],
     // No pattern for a shared component: it is a broad signal, so no case's `sourceMatches` sees it.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],

@@ -115,6 +115,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/environment/TimeOfDayBar.svelte',
     'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
+    // The empty environment list's first steps (issue 2548).
+    'src/ui/svelte/apps/manager/environment/EnvironmentsEmptyActions.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',

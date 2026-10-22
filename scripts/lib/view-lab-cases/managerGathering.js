@@ -100,10 +100,12 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism', environmentsError: '1' },
     steps: ['Gathering'],
     expectView: 'environments',
-    // The failure panel's own glyph, a direct child of its stack: the empty-environments panel
-    // carries the same glyph on its "Review events" button, so a descendant match would pass.
+    // The danger notice in the list body under the kept filter bar, with no empty panel and no
+    // `{shown} of {total}` chip.
     expectSelector:
-      '.fabricate-manager .manager-table-scroll > .manager-empty > div > i.fa-exclamation-triangle',
+      '.fabricate-manager .manager-environments-toolbar:not(:has(.manager-chip))' +
+      ' ~ .manager-table-scroll:not(:has(.manager-empty))' +
+      ' > [data-environments-error][role="status"][data-notice-tone="danger"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/],
   }),
