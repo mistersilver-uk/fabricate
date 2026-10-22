@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { BAND_TONES } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 import { openLayoutContext, renderWithCascade } from '../helpers/layout-harness.js';
+import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 import {
   blockFor,
@@ -28,6 +29,7 @@ import {
   CHECKS_REDIRECT_VIEW,
   CHECKS_VIEWS,
   MODIFIER_BOUNDS_ROW_WIDTHS,
+  OPTION_CARD_COPIES,
   bandStripFixture,
   checkEditorSource,
   checksRollEdges,
@@ -41,6 +43,16 @@ import {
 } from './manager-layout-tools-fixtures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+test('the static option-card copies carry only classes RadioCardGroup writes', () => {
+  for (const [name, copy] of Object.entries(OPTION_CARD_COPIES)) {
+    assert.deepEqual(
+      classesNotWritten(copy),
+      [],
+      `the ${name} copy has drifted from the component`
+    );
+  }
+});
 
 test('Tool library renders 210px and 340px fixed columns through the 832px product root', async () => {
   for (const width of [1212, 832]) {

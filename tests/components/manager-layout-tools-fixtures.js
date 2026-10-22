@@ -19,6 +19,36 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const enPath = resolve(__dirname, '../../lang/en.json');
 export const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
+// The option-card DOM that `RadioCardGroup` emits for each geometry fixture; `OPTION_CARD_COPIES`
+// is what the drift guard in `manager-layout-tools.js` holds to the component's classes.
+const TOOL_ON_BREAK_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards is-stacked" data-radio-card-group="tool-on-break">
+              <legend class="manager-resolution-mode-legend">On-break action</legend>
+              <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
+                <label class="manager-resolution-option is-active" data-radio-card-option="destroy" data-tool-on-break-choice="destroy"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-trash"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Destroy the item</span><span class="manager-resolution-option-desc" data-tool-choice-description>The tool is consumed and removed.</span></span><input type="radio" name="tool-on-break" value="destroy" checked></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="flagBroken" data-tool-on-break-choice="flagBroken"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-triangle-exclamation"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Mark as broken</span><span class="manager-resolution-option-desc" data-tool-choice-description>Sets a broken flag; appends " (Broken)".</span></span><input type="radio" name="tool-on-break" value="flagBroken"></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="replaceWith" data-tool-on-break-choice="replaceWith"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-arrow-right-arrow-left"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Replace with component</span><span class="manager-resolution-option-desc" data-tool-choice-description>Replace it with a managed Component that can participate in repair routes.</span></span><input type="radio" name="tool-on-break" value="replaceWith"></span></label>
+              </div>
+            </fieldset>`;
+const DC_SOURCE_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+          <legend class="manager-resolution-mode-legend">DC source</legend>
+          <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+            <label class="manager-resolution-option is-active" data-dc-mode-option="static"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Static</span></span><input type="radio" name="dc-mode" value="static" checked></span></label>
+            <label class="manager-resolution-option" data-dc-mode-option="dynamic"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Dynamic</span></span><input type="radio" name="dc-mode" value="dynamic"></span></label>
+          </div>
+        </fieldset>`;
+const MODIFIER_POLICY_CARDS = `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <legend class="manager-resolution-mode-legend">How they combine</legend>
+        <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Add all</span></span><input type="radio" name="modifier-policy" value="addAll" checked></span></label>
+          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Highest</span></span><input type="radio" name="modifier-policy" value="highest"></span></label>
+        </div>
+      </fieldset>`;
+export const OPTION_CARD_COPIES = Object.freeze({
+  'tool on-break': TOOL_ON_BREAK_CARDS,
+  'DC source': DC_SOURCE_CARDS,
+  'modifier policy': MODIFIER_POLICY_CARDS,
+});
+
 export async function readRenderedToolGeometry(width, view) {
   const context = await openLayoutContext({
     viewport: { width, height: 720 },
@@ -33,14 +63,7 @@ export async function readRenderedToolGeometry(width, view) {
           <div class="fabricate-tabs manager-tool-editor-tabs manager-editor-tabs" role="tablist"><button type="button" role="tab" id="tool-tab-breakage" class="manager-editor-tab-button is-active" aria-selected="true"><span>Breakage</span></button><button type="button" role="tab" id="tool-tab-requirements" class="manager-editor-tab-button" aria-selected="false"><span>Requirements</span><span class="manager-editor-tab-count">2</span></button><button type="button" role="tab" id="tool-tab-validation" class="manager-editor-tab-button" aria-selected="false"><span>Validation</span><span class="manager-chip is-neutral is-mono is-inspector manager-editor-tab-badge">✓</span></button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards is-stacked" data-radio-card-group="tool-breakage-mode">
-              <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
-              <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
-                <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-hourglass-half"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span><input type="radio" name="tool-breakage-mode" value="limitedUses" checked></span></label>
-                <label class="manager-resolution-option" data-radio-card-option="breakageChance"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-percent"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Breakage chance</span><span class="manager-resolution-option-desc" data-tool-choice-description>A % chance to break each use.</span></span><input type="radio" name="tool-breakage-mode" value="breakageChance"></span></label>
-                <label class="manager-resolution-option" data-radio-card-option="diceExpression"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-dice-d20"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Dice expression</span><span class="manager-resolution-option-desc" data-tool-choice-description>Roll a separate breakage check.</span></span><input type="radio" name="tool-breakage-mode" value="diceExpression"></span></label>
-              </div>
-            </fieldset></section>
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div>${TOOL_ON_BREAK_CARDS}</section>
           </div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div><ul class="manager-tool-preview-rules"><li>5 uses</li></ul></aside></div>
         </main>`
         : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
@@ -126,13 +149,7 @@ export async function checksRollEdges(page, tiersWrapperClass) {
         <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
       </div>
       <div class="manager-checks-card-body">
-        <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
-          <legend class="manager-resolution-mode-legend">DC source</legend>
-          <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
-            <label class="manager-resolution-option is-active" data-dc-mode-option="static"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Static</span></span><input type="radio" name="dc-mode" value="static" checked></span></label>
-            <label class="manager-resolution-option" data-dc-mode-option="dynamic"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Dynamic</span></span><input type="radio" name="dc-mode" value="dynamic"></span></label>
-          </div>
-        </fieldset>
+        ${DC_SOURCE_CARDS}
         <div class="manager-checks-difficulty-fields">
           <div class="manager-checks-difficulty-field is-dc">
             <span class="manager-checks-difficulty-label">Base DC</span>
@@ -225,13 +242,7 @@ export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
       <h3 class="manager-card-title">Named modifiers</h3>
-      <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
-        <legend class="manager-resolution-mode-legend">How they combine</legend>
-        <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
-          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Add all</span></span><input type="radio" name="modifier-policy" value="addAll" checked></span></label>
-          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Highest</span></span><input type="radio" name="modifier-policy" value="highest"></span></label>
-        </div>
-      </fieldset>
+      ${MODIFIER_POLICY_CARDS}
     </section>`;
   await page.setContent(
     `<style>${css}</style>` +
