@@ -202,6 +202,11 @@ describe('the published StageBars under a bare ancestor', () => {
         const caption = getComputedStyle(target.querySelector('.fab-stage-bars-caption'));
         assert.equal(caption.color, 'rgb(7, 8, 9)');
         assert.equal(caption.whiteSpace, 'nowrap');
+        assert.equal(
+          getComputedStyle(target.querySelector('.fab-stage-bars-number')).fontWeight,
+          '500',
+          'the position is set in the mono face, which ships no weight above 500'
+        );
         handle.destroy();
       }
     );
