@@ -395,12 +395,12 @@ describe('RecipeDetail mounted behavior', () => {
     const group = section.querySelector(':scope fieldset');
     assert.deepEqual(
       [
-        group.classList.contains('is-config-cards'),
+        group.classList.contains('fabricate-option-cards'),
         group.classList.contains('is-legend-visible'),
         group.querySelector(':scope > legend')?.textContent.trim(),
       ],
       [true, true, 'FABRICATE.App.Crafting.Detail.IngredientSetsTitle'],
-      'the group writes the `is-config-cards` class string and shows its "Ingredient options" legend'
+      'the group writes its `fabricate-option-cards` root and shows its "Ingredient options" legend'
     );
 
     const cardA = section.querySelector('[data-set-id="set-a"]');

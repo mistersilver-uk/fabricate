@@ -365,7 +365,7 @@
         <RadioCardGroup
           legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
           options={gateModeOptions}
-          selectedValue={prerequisites.gateMode}
+          value={prerequisites.gateMode}
           groupName="tool-gate-mode"
           columns={2}
           data-radio-card-group="tool-gate-mode"

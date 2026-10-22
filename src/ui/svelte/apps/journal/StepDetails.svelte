@@ -345,7 +345,7 @@
         value: route.id,
         label: route.name || localize('FABRICATE.App.Journal.Stage.RouteOrdinal', { n: index + 1 }),
       }))}
-      selectedValue={availability?.selectedIngredientSetId ?? ''}
+      value={availability?.selectedIngredientSetId ?? ''}
       groupName={`journal-route-${step?.stepId}`}
       disabled={!editable || busy}
       onChange={chooseRoute}

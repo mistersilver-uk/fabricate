@@ -333,7 +333,7 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
         options={breakageModeOptions}
-        selectedValue={breakageChoice}
+        value={breakageChoice}
         groupName="tool-breakage-mode"
         columns={2}
         data-radio-card-group="tool-breakage-mode"
@@ -455,7 +455,7 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
         options={breakabilityOptions}
-        selectedValue={tool?.checkBreakable === false ? 'immune' : 'breakable'}
+        value={tool?.checkBreakable === false ? 'immune' : 'breakable'}
         groupName="tool-check-breakable"
         columns={2}
         data-radio-card-group="tool-breakability"
@@ -502,7 +502,7 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}
         options={onBreakOptions}
-        selectedValue={onBreak.mode}
+        value={onBreak.mode}
         groupName="tool-on-break"
         columns={3}
         layout="stacked"

@@ -1275,7 +1275,7 @@
                 legendKey="FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading"
                 legend="Alchemy check"
                 options={ALCHEMY_CHECK_MODE_OPTIONS}
-                selectedValue={alchemyCheckMode}
+                value={alchemyCheckMode}
                 groupName="crafting-alchemy-checkmode"
                 columns={2}
                 data-crafting-alchemy-checkmode

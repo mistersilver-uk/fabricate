@@ -53,7 +53,7 @@
   legendKey="FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle"
   legend="Award mode"
   options={OPTIONS}
-  selectedValue={selected}
+  value={selected}
   groupName={name}
   columns={2}
   optionDataAttr="data-award-mode-option"

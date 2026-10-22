@@ -220,7 +220,7 @@
     legendKey="FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title"
     legend="Gathering resolution"
     options={resolutionModeOptions}
-    selectedValue={taskResolutionMode}
+    value={taskResolutionMode}
     groupName={`gathering-task-resolution-${task.id}`}
     columns={3}
     layout="stacked"
