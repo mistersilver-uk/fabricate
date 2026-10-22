@@ -737,16 +737,16 @@ And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the se
 
 Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one; the one exception is the gathering biome, whose stored option carries a `customColor` sibling (see `gathering-and-harvesting`, the biome vocabulary), and no other model accepts a free hex.
 `TintPicker` offers free-hex entry only to a caller that passes `allowCustom`, which defaults to `false`, and a caller passes it only when its stored model carries a `customColor` sibling.
-Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
+Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers ten of them, so adding a token to the stylesheet does not add it to a picker.
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
-By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
-Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
-Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
+By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, and the other ten are offered, `verdant` and `azure` after the original eight in that order.
+Collision with a semantic token does NOT disqualify a tint: in the default palette five offered tints collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple`, `butter` with `--fab-warning`, `verdant` with `--fab-success` and `azure` with `--fab-drop-rate-uncommon`.
+An offered tint is additive persisted vocabulary and takes no migration: a build that predates `verdant` and `azure` folds a biome carrying one onto `sage` and renders an essence carrying one in the theme accent.
 
 A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
-All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the eight offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
+All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the ten offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
 In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `ironblood-forge` one tagged Mist renders a warm red-brown — in both cases the picker’s own label is wrong.
-The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
+The five tints added later — `ember`, `verdant`, `azure`, `bone` and `slate` — hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
 Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
@@ -788,7 +788,12 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 #### Scenario: A caller renders the tint picker without opting in to a hex
 
 - **WHEN** a caller renders `TintPicker` without passing `allowCustom`
-- **THEN** the palette offers only its preset tokens and no free-hex field
+- **THEN** the palette offers the ten tokens and no free-hex field
+
+#### Scenario: A withheld tint is offered
+
+- **WHEN** `managerColorTokens.js` offers `ember`, `bone` or `slate`, or omits `verdant` or `azure`
+- **THEN** `tests/manager-color-tokens.test.js` fails the offering rule
 
 ### Requirement: The token namespace is one generation and names its purpose
 
