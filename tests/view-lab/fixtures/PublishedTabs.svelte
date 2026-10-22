@@ -2,7 +2,7 @@
   A View Lab specimen, not a Fabricate surface (issue 2601). It mounts one `EditorTabs` through
   the page-session seam `game.fabricate.api.ui` binds, as a companion does: three tabs of a reagent
   sheet, two with a glyph, under `activePanelOnly`, and the one panel the companion draws beneath
-  the strip, named by the tab that shows it. Its `onSelect` passes the reached tab back as
+  the strip, named by the tab that shows it and a tab stop, since it holds no control. Its `onSelect` passes the reached tab back as
   `activeTab` in its own `update`, before any `await`, and shows that tab's panel. Every word is a
   companion's final text, so none is localized. `tests/view-lab/mount.js` mounts it for
   `?specimen=published-tabs` only.
@@ -57,6 +57,7 @@
   <div
     id={`${STEM}-panel-${shown}`}
     role="tabpanel"
+    tabindex="0"
     aria-labelledby={`${STEM}-tab-${shown}`}
     data-lab-tabs-panel
   >

@@ -15,6 +15,8 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { fixtureLiteral } from '../helpers/labFixtureLiterals.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
@@ -542,5 +544,89 @@ describe('what the published EditorTabs refuses', () => {
       message: `${REFUSAL}EditorTabs needs a Fabricate window ancestor`,
     });
     assert.equal(shell.childNodes.length, 0);
+  });
+});
+
+describe('the tabs View Lab specimen case against the DOM the fixture draws', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedTabs.svelte';
+  const viewCase = getCaseById('manager-published-tabs-specimen');
+  const count = (selector) => document.querySelectorAll(selector).length;
+
+  /**
+   * The fixture's ground: its strip mounted into the target, and the one panel its selection
+   * shows; `update` false is a companion whose `onSelect` passes no `activeTab` back.
+   */
+  function drawFixture({ update = true } = {}) {
+    const stem = fixtureLiteral(FIXTURE, 'STEM');
+    const panels = fixtureLiteral(FIXTURE, 'PANELS');
+    const ground = document.createElement('div');
+    ground.setAttribute('data-lab-tabs', '');
+    const slot = document.createElement('div');
+    slot.setAttribute('data-lab-tabs-target', '');
+    const panel = document.createElement('div');
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('tabindex', '0');
+    panel.setAttribute('data-lab-tabs-panel', '');
+    const show = (id) => {
+      panel.id = `${stem}-panel-${id}`;
+      panel.setAttribute('aria-labelledby', `${stem}-tab-${id}`);
+      panel.textContent = panels[id];
+    };
+    show('inputs');
+    ground.append(slot, panel);
+    fabricateTarget(targets).append(ground);
+    let active = 'inputs';
+    const props = () => ({
+      tabs: fixtureLiteral(FIXTURE, 'TABS'),
+      activeTab: active,
+      ariaLabel: 'Reagent sections',
+      idStem: stem,
+      activePanelOnly: true,
+      onSelect: (id) => {
+        if (update) {
+          active = id;
+          handle.update(props());
+        }
+        show(id);
+      },
+    });
+    const handle = ui().mount('EditorTabs', { target: slot, props: props() });
+    return { handle, outputs: () => document.getElementById(`${stem}-tab-outputs`) };
+  }
+
+  /** Focuses and presses the case's one step on the one element it names. */
+  function runStep() {
+    const [step] = viewCase.steps;
+    assert.equal(count(step.selector), 1, 'the step names one tab');
+    const node = document.querySelector(step.selector);
+    node.focus();
+    press(node, step.press);
+  }
+
+  it('waits on exactly one element, the reached tab, once the step and the update have run', async () => {
+    const { handle, outputs } = drawFixture();
+    await settle();
+    assert.equal(count(viewCase.expectSelector), 0, 'not before the step');
+    runStep();
+    await settle();
+    assert.equal(count(viewCase.expectSelector), 1, 'one element after it');
+    assert.ok(document.querySelector(viewCase.expectSelector) === outputs(), 'the Outputs tab');
+    for (const selector of [
+      viewCase.expectCenterHit,
+      ...viewCase.expectLayout.controls.map((control) => control.selector),
+    ]) {
+      assert.equal(count(selector), 1, `${selector} names one element`);
+    }
+    handle.destroy();
+  });
+
+  it('waits on nothing when the companion’s onSelect passes no update', async () => {
+    const { handle, outputs } = drawFixture({ update: false });
+    await settle();
+    runStep();
+    await settle();
+    assert.ok(document.activeElement === outputs(), 'focus moved to Outputs');
+    assert.equal(count(viewCase.expectSelector), 0, 'its selection was never drawn');
+    handle.destroy();
   });
 });
