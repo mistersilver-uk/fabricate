@@ -6,12 +6,13 @@
 
   Props: characters (already filtered), totalCount (unfiltered, drives empty-vs-no-match),
   selectedActorId, searchTerm, onSearch(term), onSelect(actorId), loading (the snapshot read is in
-  flight: a compact loading panel replaces every other claim), error (the read failed: the search
-  field renders alone, because an empty or no-match panel would describe a finished read).
+  flight: the list's dense loading form replaces every other claim), error (the read failed: the
+  search field renders alone, because an empty or no-match panel would describe a finished read).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import ListState from '../../../components/ListState.svelte';
   import Avatar from '../../../components/Avatar.svelte';
   import SearchField from '../../../components/SearchField.svelte';
 
@@ -59,71 +60,71 @@
   />
 
   <div class="manager-knowledge-roster-scroll">
-    {#if loading}
-      <EmptyState
-        compact
-        icon="fas fa-spinner fa-spin"
-        title={text(
-          'FABRICATE.Admin.Manager.Knowledge.RosterLoadingTitle',
-          'Loading player characters...'
-        )}
-        data-knowledge-roster-loading
-      />
-    {:else if error}
-      <!-- The detail pane carries the failure notice; the roster makes no claim at all. -->
-    {:else if totalCount === 0}
-      <EmptyState
-        compact
-        icon="fas fa-user-slash"
-        title={text('FABRICATE.Admin.Manager.Knowledge.RosterEmptyTitle', 'No player characters')}
-        hint={text(
-          'FABRICATE.Admin.Manager.Knowledge.RosterEmptyHint',
-          'Assign a player character in this world to audit its recipe knowledge.'
-        )}
-      />
-    {:else if characters.length === 0}
-      <EmptyState
-        compact
-        icon="fas fa-search"
-        title={text(
-          'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle',
-          'No characters match this search'
-        )}
-        hint={text(
-          'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchHint',
-          'Clear the search to show every player character.'
-        )}
-      />
-    {:else}
-      <!-- A plain button stack, not list/listitem: `<button role="listitem">` loses its button
+    <ListState
+      {loading}
+      loadingLabel={text(
+        'FABRICATE.Admin.Manager.Knowledge.RosterLoadingTitle',
+        'Loading player characters...'
+      )}
+      density="dense"
+      loadingProps={{ 'data-knowledge-roster-loading': true }}
+    >
+      {#if error}
+        <!-- The detail pane carries the failure notice; the roster makes no claim at all. -->
+      {:else if totalCount === 0}
+        <EmptyState
+          compact
+          icon="fas fa-user-slash"
+          title={text('FABRICATE.Admin.Manager.Knowledge.RosterEmptyTitle', 'No player characters')}
+          hint={text(
+            'FABRICATE.Admin.Manager.Knowledge.RosterEmptyHint',
+            'Assign a player character in this world to audit its recipe knowledge.'
+          )}
+        />
+      {:else if characters.length === 0}
+        <EmptyState
+          compact
+          icon="fas fa-search"
+          title={text(
+            'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle',
+            'No characters match this search'
+          )}
+          hint={text(
+            'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchHint',
+            'Clear the search to show every player character.'
+          )}
+        />
+      {:else}
+        <!-- A plain button stack, not list/listitem: `<button role="listitem">` loses its button
            semantics and its `aria-pressed`. The section's own `aria-label` names the group. -->
-      <div class="manager-knowledge-roster-list">
-        {#each characters as character (character.id)}
-          <button
-            type="button"
-            class="manager-knowledge-roster-row"
-            class:is-selected={character.id === selectedActorId}
-            class:is-untracked={character.tracked !== true}
-            aria-pressed={character.id === selectedActorId}
-            data-knowledge-actor={character.id}
-            onclick={() => onSelect(character.id)}
-          >
-            <Avatar art={character.img} name={character.name} size={32} alt="" />
-            <span class="manager-knowledge-roster-copy">
-              <strong class="manager-knowledge-roster-name" title={character.name}
-                >{character.name}</strong
-              >
-              {#if character.tracked === true}
-                <small class="manager-knowledge-roster-meta">{metaFor(character)}</small>
-              {:else}
-                <small class="manager-knowledge-roster-meta" data-knowledge-untracked>
-                  {text('FABRICATE.Admin.Manager.Knowledge.NothingTracked', 'Nothing tracked')}
-                </small>
-              {/if}
-            </span>
-          </button>
-        {/each}
-      </div>
-    {/if}
+        <div class="manager-knowledge-roster-list">
+          {#each characters as character (character.id)}
+            <button
+              type="button"
+              class="manager-knowledge-roster-row"
+              class:is-selected={character.id === selectedActorId}
+              class:is-untracked={character.tracked !== true}
+              aria-pressed={character.id === selectedActorId}
+              data-knowledge-actor={character.id}
+              onclick={() => onSelect(character.id)}
+            >
+              <Avatar art={character.img} name={character.name} size={32} alt="" />
+              <span class="manager-knowledge-roster-copy">
+                <strong class="manager-knowledge-roster-name" title={character.name}
+                  >{character.name}</strong
+                >
+                {#if character.tracked === true}
+                  <small class="manager-knowledge-roster-meta">{metaFor(character)}</small>
+                {:else}
+                  <small class="manager-knowledge-roster-meta" data-knowledge-untracked>
+                    {text('FABRICATE.Admin.Manager.Knowledge.NothingTracked', 'Nothing tracked')}
+                  </small>
+                {/if}
+              </span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </ListState>
   </div>
 </section>

@@ -82,6 +82,23 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
   }),
   managerCase({
+    // The startup form: the manager is open but Fabricate has not finished starting (issue 2548).
+    id: 'manager-systems-loading',
+    label: 'Manager — System library loading',
+    // `beyond`: the smoke opens the manager after startup finishes.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { systemsLoading: '1' },
+    steps: [],
+    expectView: 'systems',
+    // The list's busy region and its status line, with no `{shown} of {total}` chip above it.
+    expectSelector:
+      '.fabricate-manager .manager-main > .fabricate-filter-bar:not(:has(.manager-chip))' +
+      ' ~ .manager-table-scroll > [data-systems-loading][aria-busy="true"] > [role="status"]',
+    kinds: ['manager', 'systems'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-systems-empty',
     label: 'Manager — System library empty',
     // `beyond`: the smoke seeds a system before it opens the manager, so it never shows an empty library.

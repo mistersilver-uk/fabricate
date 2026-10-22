@@ -2659,6 +2659,48 @@ test('the Knowledge loading and error frames reach their state through the snaps
   }
 });
 
+test('the list-state frames reach their state through the readiness gate and the environment store', () => {
+  // Neither state is reachable in the smoke, so each case is `beyond`; the lab shuts
+  // `game.fabricate.ready` before the manager is built (the admin store then publishes its startup
+  // state and waits on a hook the lab never fires), and makes the shared environment store throw.
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  for (const [id, param] of [
+    ['manager-systems-loading', 'systemsLoading'],
+    ['manager-environments-load-error', 'environmentsError'],
+  ]) {
+    const capture = getCaseById(id);
+    assert.equal(capture.query?.[param], '1', `${id} does not set ${param}`);
+    assert.equal(capture.reaches, 'beyond', `${id} claims the smoke reaches it`);
+    assert.deepEqual(capture.smokeLabels, [], `${id} names a smoke label`);
+    assert.equal(capture.themeVariants, undefined, `${id} declares theme variants`);
+    assert.match(
+      mountSource,
+      new RegExp(String.raw`${param}: params\.get\('${param}'\) === '1'`),
+      `mount.js does not read ${param}`
+    );
+  }
+  assert.match(
+    mountSource,
+    /if \(params\.systemsLoading\) game\.fabricate\.ready = false;\s*mounted = await mountAppFor\(/,
+    'mount.js does not shut the readiness gate before the app is mounted'
+  );
+  assert.match(
+    mountSource,
+    /await settle\(\[built\.frame\][^\n]*\n\s*if \(params\.systemsLoading\) game\.fabricate\.ready = fabricateReady;/,
+    'mount.js does not restore the readiness gate after the first settle'
+  );
+  assert.match(
+    mountSource,
+    /params\.environmentsError\)\s*\{[^}]*getGatheringEnvironmentStore\(\)\.listBySystem = \(\) => \{\s*throw new Error\(\s*'"fabricate\.gatheringEnvironments" is not a registered game setting'/,
+    'mount.js does not make the shared environment store throw the unregistered-setting error'
+  );
+  assert.doesNotMatch(
+    mountSource,
+    /isFabricateReady\s*[:=]/,
+    'a shadowed isFabricateReady makes onFabricateReady fire at once and refresh recurse'
+  );
+});
+
 test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
   // WHY THIS EXISTS AT ALL is the reason its parties counterpart above does: an over-match is
   // INVISIBLE in a screenshot.

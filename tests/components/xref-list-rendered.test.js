@@ -4,18 +4,15 @@
  * the pointer and the keyboard, and a row that does not takes neither.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { chromium } from 'playwright';
 
-import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { renderedPageHead } from '../helpers/renderedPageHead.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 
 const harness = createMountedComponentHarness({
@@ -53,20 +50,9 @@ const CASES = Object.freeze({
   },
 });
 
-/**
- * Core's layered sheet with its reset's border-box sizing (as `select-popover-width.test.js`
- * restates it), which the 22px mark's border sits inside; the module sheet in `layer(modules)`;
- * the scoped styles unlayered.
- */
-const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
-<style>${read('tests/fixtures/foundry-core-min.css')}
-@layer reset{*,*::before,*::after{box-sizing:border-box}}</style>
-<style>@layer modules {${readStylesheet()}}</style>
-${['Medallion', 'Kicker', 'XrefList']
-  .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
-  .join('\n')}
-<style>:root{--font-primary:Arial,sans-serif}</style>
-</head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">
+/** The three lists in an app root, the 22px mark's border inside the head's border-box reset. */
+const page = (markup) => `${renderedPageHead(['Medallion', 'Kicker', 'XrefList'])}
+<body class="game"><div class="fabricate fabricate-app" style="width:1000px">
   <div data-case="linking" style="width:320px">${markup.linking}</div>
   <div data-case="optOut" style="width:320px">${markup.optOut}</div>
   <div data-case="readOnly" style="width:320px">${markup.readOnly}</div>

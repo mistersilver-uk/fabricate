@@ -90,6 +90,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchField.svelte',
     // The parties pane's refusal banner is the shared notice as of issue 1515.
     'src/ui/svelte/components/Notice.svelte',
+    // The environment list's loading and error forms (issue 2548), over the notice.
+    'src/ui/svelte/components/ListState.svelte',
     'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
@@ -113,6 +115,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/environment/TimeOfDayBar.svelte',
     'src/ui/svelte/apps/manager/environment/GatheringConditionPanel.svelte',
+    // The empty environment list's first steps (issue 2548).
+    'src/ui/svelte/apps/manager/environment/EnvironmentsEmptyActions.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',

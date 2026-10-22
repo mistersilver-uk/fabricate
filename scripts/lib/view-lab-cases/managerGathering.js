@@ -91,6 +91,25 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // The load-failure form: the environment store's read throws (issue 2548).
+    id: 'manager-environments-load-error',
+    label: 'Manager — Environments load error',
+    // `beyond`: the smoke's environment store never fails.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', environmentsError: '1' },
+    steps: ['Gathering'],
+    expectView: 'environments',
+    // The danger notice in the list body under the kept filter bar, with no empty panel and no
+    // `{shown} of {total}` chip.
+    expectSelector:
+      '.fabricate-manager .manager-environments-toolbar:not(:has(.manager-chip))' +
+      ' ~ .manager-table-scroll:not(:has(.manager-empty))' +
+      ' > [data-environments-error][role="status"][data-notice-tone="danger"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-environments-browse-stacked',
     label: 'Manager — Environments browse stacked',
     smokeLabels: ['manager-environments-browse-stacked'],

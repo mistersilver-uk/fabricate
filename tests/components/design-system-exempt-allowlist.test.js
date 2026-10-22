@@ -209,6 +209,10 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte': 3 },
   ],
   [
+    'errorProps is hook-only data-* attributes forwarded to the notice',
+    { 'src/ui/svelte/components/ListState.svelte': 1 },
+  ],
+  [
     'the spread is `hooks.expression`, the one `data-*` name its caller spells, or nothing',
     { 'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte': 2 },
   ],

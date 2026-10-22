@@ -134,6 +134,11 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Hold the manager's readiness gate shut through the first settle, for the crafting system
+    // library's startup form; and make the environment store's read throw, for the gathering
+    // browser's load-failure form (issue 2548).
+    systemsLoading: params.get('systemsLoading') === '1',
+    environmentsError: params.get('environmentsError') === '1',
     // Refuse every editor save the save-failed frames photograph (issue 1522).
     saveFails: params.get('saveFails') === '1',
     // Strip Herbalism's progressive formula, for the System Overview's blocker (issue 1522).
@@ -711,6 +716,13 @@ async function mountManagerApp(content, params) {
       : {}),
   });
   if (params.noEssenceScope) game.fabricate.getEssenceScopeStore = () => null;
+  if (params.environmentsError) {
+    // The shared instance, so the manager's services and its store reach the same throw; the
+    // message is the one `game.settings.get` raises for an unregistered setting.
+    game.fabricate.getGatheringEnvironmentStore().listBySystem = () => {
+      throw new Error('"fabricate.gatheringEnvironments" is not a registered game setting');
+    };
+  }
   const props = app._prepareSvelteProps();
   const services = props.services;
   if (params.downtimeProvider) {
@@ -1073,8 +1085,14 @@ async function boot() {
         side: params.chatLog === '1' ? 'right' : 'left',
       });
     }
+    // The admin store reads `game.fabricate.ready` as it is built, so the gate is shut before the
+    // mount and reopened once the first settle has photographed nothing but the startup form. The
+    // `fabricate.ready` hook the store then waits on never fires in the lab.
+    const fabricateReady = params.systemsLoading ? game.fabricate.ready : null;
+    if (params.systemsLoading) game.fabricate.ready = false;
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
+    if (params.systemsLoading) game.fabricate.ready = fabricateReady;
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.
     assertNoLabInducedClipping(built.frame, determinismStyle);
