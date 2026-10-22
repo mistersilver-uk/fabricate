@@ -67,6 +67,7 @@ import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
 import {
+  calledName,
   importedModules,
   lazilyImportedModules,
   parseModule,
@@ -937,6 +938,38 @@ function drawnByAny(entries, reader = SHIPPED) {
 const ADAPTER = 'src/ui/publishedComponents.svelte.js';
 const adapterSpecifierOf = (path) => `./${path.slice('src/ui/'.length)}`;
 
+/** The initialiser of the adapter's exported `const name`. */
+function adapterConstant(name) {
+  const { ast } = moduleAstOf(ADAPTER);
+  const exported = ast.body.flatMap((node) =>
+    node.type === 'ExportNamedDeclaration' && node.declaration?.kind === 'const'
+      ? node.declaration.declarations
+      : []
+  );
+  const declarator = exported.find((candidate) => candidate.id.name === name);
+  assert.ok(declarator, `the adapter exports const ${name}`);
+  return declarator.init;
+}
+
+/** Is `loader` `() => import(…).then((module) => module.default)`? */
+function resolvesDefault(loader) {
+  const call = loader.type === 'ArrowFunctionExpression' ? loader.body : null;
+  const then = call?.type === 'CallExpression' ? call.callee : null;
+  const pick = call?.arguments?.[0];
+  const parameter = pick?.params?.[0]?.name;
+  return (
+    then?.type === 'MemberExpression' &&
+    then.object.type === 'ImportExpression' &&
+    then.property.name === 'then' &&
+    call.arguments.length === 1 &&
+    pick.type === 'ArrowFunctionExpression' &&
+    pick.body.type === 'MemberExpression' &&
+    parameter !== undefined &&
+    pick.body.object.name === parameter &&
+    pick.body.property.name === 'default'
+  );
+}
+
 describe('a lazy entry, whose code load fetches (issue 2455)', () => {
   it('is stated by no entry before Kicker, the first published with load', () => {
     const first = PUBLISHED_COMPONENT_MANIFEST.findIndex((entry) => entry.name === 'Kicker');
@@ -966,6 +999,34 @@ describe('a lazy entry, whose code load fetches (issue 2455)', () => {
       assert.equal(statically.includes(specifier), !lazy, `${entry.name}: a static import`);
       assert.equal(lazily.includes(specifier), lazy, `${entry.name}: an import()`);
     }
+  });
+
+  it('binds each lazy path a loader that imports that path alone and resolves its default', () => {
+    const loaders = adapterConstant('LOADERS');
+    assert.equal(calledName(loaders), 'freeze');
+    const properties = loaders.arguments[0].properties;
+    const lazyPaths = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true).map(
+      (entry) => entry.path
+    );
+    assert.deepEqual(
+      properties.map((property) => property.key.value),
+      lazyPaths
+    );
+    for (const { key, value } of properties) {
+      assert.deepEqual(lazilyImportedModules(value), [adapterSpecifierOf(key.value)], key.value);
+      assert.ok(resolvesDefault(value), `${key.value}'s loader resolves the module's default`);
+    }
+  });
+
+  it('is registered by the adapter as the exported REGISTRATION', () => {
+    const { ast } = moduleAstOf(ADAPTER);
+    const registers = [...walkNodes(ast)].filter((node) => calledName(node) === 'register');
+    assert.equal(registers.length, 1);
+    assert.deepEqual(
+      registers[0].arguments.map((argument) => argument.name),
+      ['REGISTRATION']
+    );
+    assert.equal(adapterConstant('REGISTRATION').type, 'CallExpression');
   });
 });
 
