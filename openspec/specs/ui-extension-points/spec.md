@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars` and lazy entries; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -386,8 +386,9 @@ It resolves `undefined` once every named entry's code is loaded: an eager entry 
 It rejects with the M3 `TypeError` for a name that is not published, before it fetches anything, and with the loader's error when a lazy entry's code cannot be fetched.
 It does not wait for `fabricate.ready`, so M2 still applies to `mount`.
 - A lazy entry's code is fetched once per page session: concurrent and later calls share the one fetch, and a failed fetch is not retried, so every later `load` naming the entry rejects with the same error and `mount` keeps refusing it with M19.
-A fetch that fails because the browser runs a stale copy of Fabricate also raises Fabricate's reload notice, shared with the Manager's so one shows at a time, at most once per page session.
-A fetch that fails before Foundry has created its notifications raises that notice at `ready`.
+A fetch the host refuses to serve as a code-split chunk, which is what a browser running a stale copy of Fabricate causes, also logs a console error and raises Fabricate's reload notice, which names no window.
+That notice is shared with the Manager's so one shows at a time, and is raised at most once per page session.
+A fetch that fails before Foundry has created its notifications holds the notice until `ready`.
 Fabricate draws and announces nothing else for a load: a companion draws its own pending state until `load` settles and, on a rejection, its own error state, announced through its own live region.
 - A companion calls `load` once, keeps the promise, and mounts only after it has resolved and Fabricate is ready.
 - `api.ui` is bound at `init` and rebound at `ready` as the same object.
@@ -403,7 +404,7 @@ Giving an existing key `requiredWhen` is a narrowing.
 It is not part of the described shape: a companion learns that an entry reserves rest names from that entry's group, never from `describe`.
 The names `restOn` reserves are fixed for the entry's `version`; reserving another is a narrowing.
 `overlays` is `true` where the component opens an overlay, and is otherwise absent; `describe` answers it on every entry as a boolean.
-`lazy` is `true` where the entry's code is fetched by `load` rather than with Fabricate's entry script, and is otherwise absent; `describe` does not state it, and no entry published before `load` states it.
+`lazy` is `true` where the entry's code is fetched by `load` rather than with Fabricate's entry script, and is otherwise absent; `describe` does not state it.
 - The published set opens with `TierTrack` (issue 2424), whose props and accepted values are stated by the design-system requirement "A position along an ordered set of named tiers renders through TierTrack".
 - The published set continues with `Avatar`, `Medallion`, `FillBar`, `Meter`, `BandedBar`, `StatBox` and `InfoStrip` (issue 2448), in that order.
 - The published set continues with `Kicker` and `Chip` (issue 2451), in that order.
@@ -432,13 +433,13 @@ A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `a
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
 - `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), and `StageBars` too (issue 2455); a companion calls it for each before mounting.
-- `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` refuses it with M19 until `load` has resolved for it.
+- `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` refuses it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
 It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
 It refuses a `lazy` that is not a boolean with an `Error` ending `<name> has an unknown lazy "<value>"`, a lazy entry its runtime binds to no loader or to a component with one ending `<name> is lazy, so its runtime binds a loader and no component`, and an entry that is not lazy bound to a loader with one ending `<name> is not lazy, so its runtime binds no loader`.
-- Before Fabricate's runtime registers, `load` resolves for eager names and rejects a lazy name with the M1 `Error`, as `mount` throws it there.
+- Before Fabricate's runtime registers, `load` resolves for eager names and rejects a published lazy name with the M1 `Error`, as `mount` throws it there; a name that is not published is still M3.
 - Fabricate's runtime adapter registers once; a second registration throws an `Error` ending `already registered`, and the first runtime stays.
 - A breaking change to one entry — removing or renaming a prop, narrowing a prop's accepted values, or narrowing its required root — bumps that entry's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes.
 - `schemaVersion` changes only with the seam's own shape.
@@ -1125,7 +1126,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M16 | `target` is outside the entry's required ancestor root; checked directly after M4 | `<name> needs a Fabricate window ancestor`, or `<name> needs a Fabricate manager ancestor` |
 | M17 | A `callback` key holding a value that is not a function | `"<key>" must be a function` |
 | M18 | `overlayHost` is not `undefined`, and is not an element of `target.ownerDocument`, by `nodeType` and never `instanceof`; checked on every entry, directly after M16 | `overlayHost must be an element in the target's document` |
-| M19 | The entry is lazy and `load` has not resolved for it: it was never requested, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
+| M19 | The entry is lazy and its code is not loaded: `load` never requested it, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
 | M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -1180,7 +1181,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
 It opens no portal, popover, tooltip or dialog, writes nothing to `document.body`, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus, and makes no network request except to load an image path the companion passes.
-`load` is the one call that fetches code, a lazy entry's, and `mount` fetches none.
+`load` is the one call that fetches code, and only a lazy entry's; `mount` fetches none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
 - **Caller strings are final display text**, rendered verbatim and never treated as a localization key; a published component makes no `game.i18n` call and has no default copy or accessible name, so the companion localises them first.
@@ -1378,7 +1379,17 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 #### Scenario: A lazy entry before its load resolves
 
-- **WHEN** a companion calls `mount('Rail', …)` before `load(['Rail'])` has resolved
+- **WHEN** a companion calls `mount('Rail', …)` once Fabricate is ready and before `load(['Rail'])` has resolved
 - **THEN** it throws `"Rail" is not loaded` and renders nothing
 - **AND** once `load(['Rail'])` has resolved, the same call mounts the rail
-- **AND** two calls of `load(['Rail'])` made together fetch its code once
+
+#### Scenario: Two loads of a lazy entry
+
+- **WHEN** a companion calls `load(['Rail'])` twice before the first call has settled
+- **THEN** Fabricate fetches the rail's code once and both Promises settle together
+
+#### Scenario: A lazy entry whose code cannot be fetched
+
+- **WHEN** the fetch of a lazy entry's code fails
+- **THEN** `load(['Rail'])` rejects with the loader's own error, and every later `load` naming the entry rejects with that same error without fetching again
+- **AND** `mount('Rail', …)` throws `"Rail" is not loaded`
