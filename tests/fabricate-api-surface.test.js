@@ -407,13 +407,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       EmptyState: {
         version: 1,
-        props: {
-          icon: optional,
-          title: optional,
-          hint: optional,
-          filtered: optional,
-          children: slot,
-        },
+        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
         rest: true,
         root: 'any',
         overlays: false,
@@ -507,12 +501,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       StageBars: {
         version: 1,
-        props: {
-          stages: required,
-          currentIndex: optional,
-          numbered: optional,
-          ariaLabel: required,
-        },
+        props: { stages: required, currentIndex: optional, numbered: optional, ariaLabel: required },
         rest: true,
         root: 'any',
         overlays: false,
@@ -526,10 +515,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);
-    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end)
-      .trimEnd()
-      .split('\n')
-      .slice(2);
+    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
     assert.deepEqual(
       rows,
       ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
@@ -597,11 +583,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       return text.slice(start, end);
     };
     const specified = between(SPECIFIED, '\n### Interactive components\n', '\n### ');
-    const documented = between(
-      DOCUMENTED,
-      '\n### Ownership and theme\n',
-      '\n## Data Persistence\n'
-    );
+    const documented = between(DOCUMENTED, '\n### Ownership and theme\n', '\n## Data Persistence\n');
     const tokens = [...new Set(specified.match(/`[^`]+`/gu))];
     assert.ok(tokens.length > 15, 'the spec states its interactive rule in backticked values');
     // The docs write a root bare, as their components table does, where the spec quotes it.
@@ -849,11 +831,7 @@ describe('the real facade routes each public member to its collaborator', () => 
       (builder.recipeManager ?? builder._recipeManager).resolveToolStates(null, [], []);
     assert.deepEqual(built.slice(0, 2).map(consulted), [station, station]);
     assert.deepEqual(built.slice(2).map(consulted), [null, null]);
-    assert.equal(
-      built[2],
-      facade._getCraftingListingBuilder(),
-      'no station keeps the cached builder'
-    );
+    assert.equal(built[2], facade._getCraftingListingBuilder(), 'no station keeps the cached builder');
     assert.equal(built[3], facade._getRunJournalBuilder());
     assert.notEqual(built[0], built[2]);
     assert.equal(facade.recipeManager, recipeManager);
@@ -1041,11 +1019,7 @@ test('the Journal composition emitter survives socket serialization with its opt
 // The GM's reply emits `{ recipients }` behind the authority's claim, which no ledger-free test reaches.
 defineStructureContract(
   'the composition emitter forwards its options bag',
-  {
-    file: 'src/bootstrap/journalOperations.js',
-    fn: 'createJournalCommandsForFabricate',
-    property: 'emit',
-  },
+  { file: 'src/bootstrap/journalOperations.js', fn: 'createJournalCommandsForFabricate', property: 'emit' },
   { callsWith: [['emit', 'options']] }
 );
 
