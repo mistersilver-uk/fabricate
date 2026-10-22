@@ -82,6 +82,21 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
   }),
   managerCase({
+    // The startup form: the manager is open but Fabricate has not finished starting (issue 2548).
+    id: 'manager-systems-loading',
+    label: 'Manager — System library loading',
+    // `beyond`: the smoke opens the manager after startup finishes.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { systemsLoading: '1' },
+    steps: [],
+    expectView: 'systems',
+    expectSelector: '.fabricate-manager .manager-table-scroll [data-systems-loading]',
+    kinds: ['manager', 'systems'],
+    // No pattern for a shared component: it is a broad signal, so no case's `sourceMatches` sees it.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-systems-empty',
     label: 'Manager — System library empty',
     // `beyond`: the smoke seeds a system before it opens the manager, so it never shows an empty library.

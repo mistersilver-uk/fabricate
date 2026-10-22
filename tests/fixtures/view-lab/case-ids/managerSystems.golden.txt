@@ -1,6 +1,7 @@
 manager-recipes-editor-roundtrip
 manager-default-selection
 manager-systems-row-menu-open
+manager-systems-loading
 manager-systems-empty
 manager-selected-normal
 manager-selected-condition-select-long-option

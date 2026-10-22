@@ -91,6 +91,23 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // The load-failure form: the environment store's read throws (issue 2548).
+    id: 'manager-environments-load-error',
+    label: 'Manager — Environments load error',
+    // `beyond`: the smoke's environment store never fails.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', environmentsError: '1' },
+    steps: ['Gathering'],
+    expectView: 'environments',
+    // The failure panel's own glyph, a direct child of its stack: the empty-environments panel
+    // carries the same glyph on its "Review events" button, so a descendant match would pass.
+    expectSelector:
+      '.fabricate-manager .manager-table-scroll > .manager-empty > div > i.fa-exclamation-triangle',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-environments-browse-stacked',
     label: 'Manager — Environments browse stacked',
     smokeLabels: ['manager-environments-browse-stacked'],
