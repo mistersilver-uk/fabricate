@@ -3455,7 +3455,8 @@
   color: var(--fab-text);
 }
 
-.fabricate-option-cards .manager-resolution-option-desc {
+.fabricate-option-cards .manager-resolution-option-desc,
+.fabricate-option-cards .manager-resolution-option-reason {
   color: var(--fab-text-muted);
   font-size: 10.5px;
   font-weight: 400;
@@ -3501,22 +3502,6 @@
 .fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-desc,
 .fabricate-option-cards .manager-resolution-option.is-disabled input[type='radio'] {
   opacity: 0.45;
-}
-
-/* "Coming soon" badge inline with the option name. Theme tokens only. */
-.fabricate-option-cards .manager-resolution-option-badge {
-  display: inline-block;
-  margin-left: var(--fab-space-2);
-  padding: 1px var(--fab-space-chip);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  color: var(--fab-text-muted);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: middle;
-  background: var(--fab-overlay-light-04);
 }
 
 /* The radio: a 16px ring on bg-1, 1px at rest and 4px of accent when chosen, drawn over Foundry's native control (issues 1509, 1373). */
