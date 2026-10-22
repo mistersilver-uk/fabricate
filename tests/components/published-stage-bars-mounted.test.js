@@ -146,6 +146,47 @@ describe('the published StageBars under a bare ancestor', () => {
     assert.deepEqual(barNames(target), ['Gather', 'Refine']);
     handle.destroy();
     await settle();
+    assert.equal(target.children.length, 0, 'destroy leaves the companion target empty');
+    assert.deepEqual(reports, []);
+  });
+
+  it('moves the current bar on update and keeps the bar it moved from', async () => {
+    const { target, handle } = mountStages({
+      stages: [
+        { name: 'Gather', value: 10 },
+        { name: 'Refine', value: 0 },
+        { name: 'Temper', value: 0 },
+      ],
+      currentIndex: 0,
+      ariaLabel: 'Forging progress',
+    });
+    const [before] = target.querySelectorAll('[role="progressbar"]');
+    const currents = () =>
+      [...target.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-current')
+      );
+    assert.deepEqual(currents(), ['step', null, null]);
+    assert.equal(
+      handle.update({
+        stages: [
+          { name: 'Gather', value: 10 },
+          { name: 'Refine', value: 0 },
+          { name: 'Temper', value: 0 },
+        ],
+        currentIndex: 2,
+        ariaLabel: 'Forging progress',
+      }),
+      true
+    );
+    await settle();
+    assert.deepEqual(currents(), [null, null, 'step']);
+    assert.ok(
+      target.querySelector('[role="progressbar"]') === before,
+      'the same bar node, so nothing remounted'
+    );
+    handle.destroy();
+    await settle();
+    assert.equal(target.children.length, 0);
     assert.deepEqual(reports, []);
   });
 
