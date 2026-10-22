@@ -1,13 +1,15 @@
 /** A SHARED PICKER MUST PAINT WHEREVER IT IS MOUNTED (issues 1464 and 1470). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import test from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import { collectWorkingTreeSources, repoRoot, stripComments } from '../helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../helpers/styleBlockScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
+import { svelteFiles } from '../helpers/svelteTemplateScan.js';
 
 const STYLESHEET = 'styles/fabricate.css';
 
@@ -2302,6 +2304,27 @@ test('each primitive’s own scoped styles name no application root either', () 
   );
 });
 
+/** The classes each rule of a parsed component's scoped block names, `:global()` arguments included. */
+function scopedRuleClasses(ast) {
+  const classesIn = (node, out = []) => {
+    if (Array.isArray(node)) for (const child of node) classesIn(child, out);
+    else if (node && typeof node === 'object') {
+      if (node.type === 'ClassSelector') out.push(node.name);
+      for (const [key, value] of Object.entries(node)) if (key !== 'parent') classesIn(value, out);
+    }
+    return out;
+  };
+  const rules = [];
+  const walk = (nodes) => {
+    for (const node of nodes ?? []) {
+      if (node.type === 'Rule') rules.push(classesIn(node.prelude));
+      walk(node.block?.children);
+    }
+  };
+  walk(ast.css?.children);
+  return rules;
+}
+
 test('no caller’s scoped block restates the option cards’ face (issue 2467)', () => {
   // Two callers place the group's own legend in their heading; neither paints a card.
   const LEGEND_PLACEMENT = new Set([
@@ -2312,15 +2335,16 @@ test('no caller’s scoped block restates the option cards’ face (issue 2467)'
   const family = new RegExp(`^(?:${primitive.family})$`);
   const offences = [];
   let blocks = 0;
-  for (const [file, source] of Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))) {
-    const styleAt = source.lastIndexOf('<style>');
-    if (primitive.components.includes(file) || styleAt < source.indexOf('</script>')) continue;
+  for (const absolute of svelteFiles(join(repoRoot, 'src'))) {
+    const file = relative(repoRoot, absolute).split(sep).join('/');
+    const ast = componentAstOf(file);
+    if (primitive.components.includes(file) || !ast.css) continue;
     blocks += 1;
-    for (const selector of selectorsIn(source.slice(styleAt))) {
-      const named = classesOf(selector).filter((cls) => family.test(cls));
+    for (const classes of scopedRuleClasses(ast)) {
+      const named = classes.filter((cls) => family.test(cls));
       const legendOnly = named.every((cls) => cls === 'manager-resolution-mode-legend');
       if (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly)) {
-        offences.push(`${file}: ${selector}`);
+        offences.push(`${file}: ${classes.join(' ')}`);
       }
     }
   }

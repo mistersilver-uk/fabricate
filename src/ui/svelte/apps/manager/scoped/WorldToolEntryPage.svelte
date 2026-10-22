@@ -1155,9 +1155,7 @@
               optionDataAttr="data-world-tool-entry-onbreak-mode"
               onChange={(mode) => patchSection('onBreak', { mode })}
             />
-            <!--
-              THE MODE'S OWN CONTROL, WHICH THE SCREEN HAD FOR NEITHER MODE: a GM could select.
-            -->
+            <!-- THE MODE'S OWN CONTROL, WHICH THE SCREEN HAD FOR NEITHER MODE: a GM could select. -->
             {#if (defaults.onBreak?.mode ?? 'destroy') === 'replaceWith'}
               <ToolReplacementTarget
                 {componentOptions}

@@ -1,8 +1,5 @@
-/** The classes `RadioCardGroup` writes, read from its source, so a static copy of its DOM can be held to them (issue 2467). */
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-const repoRoot = resolve(import.meta.dirname, '../..');
+/** The classes `RadioCardGroup` writes, read from its template's AST, so a static copy of its DOM can be held to them (issue 2467). */
+import { componentAstOf } from './parsedSource.js';
 
 /** What the chip's `Medallion` writes at `size={30}`, chosen (`tone`) or at rest (`ink`). */
 const MEDALLION_CHIP_CLASSES = Object.freeze([
@@ -13,21 +10,38 @@ const MEDALLION_CHIP_CLASSES = Object.freeze([
   'is-ink-neutral',
 ]);
 
-/** Every class token the component's markup can write, with `Field`'s root and `Medallion`'s chip classes. */
-export function optionCardsClassesWritten() {
-  const source = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/components/RadioCardGroup.svelte'),
-    'utf8'
-  );
-  const markup = source.slice(source.indexOf('</script>'), source.lastIndexOf('<style>'));
-  const written = new Set(['fabricate-field', ...MEDALLION_CHIP_CLASSES]);
-  for (const [, plain, template] of markup.matchAll(/class=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
-    const literal = (plain ?? template).replaceAll(/\$\{[^}]*\}/g, ' ');
-    for (const token of literal.split(/\s+/)) if (token) written.add(token);
+/** Every string a template subtree spells: text, string literals and template quasis. */
+function stringsIn(node, out = []) {
+  if (Array.isArray(node)) {
+    for (const child of node) stringsIn(child, out);
+  } else if (node && typeof node === 'object') {
+    if (node.type === 'Text') out.push(node.data);
+    if (node.type === 'Literal' && typeof node.value === 'string') out.push(node.value);
+    if (node.type === 'TemplateElement') out.push(node.value.cooked);
+    for (const [key, value] of Object.entries(node)) if (key !== 'parent') stringsIn(value, out);
   }
-  for (const [, token] of markup.matchAll(/'\s(is-[\w-]+)'/g)) written.add(token);
-  for (const [, token] of markup.matchAll(/class:([\w-]+)/g)) written.add(token);
-  return written;
+  return out;
+}
+
+/** Every `class` attribute value and `class:` directive name in a template subtree. */
+function classTokensIn(node, out = new Set()) {
+  if (Array.isArray(node)) {
+    for (const child of node) classTokensIn(child, out);
+  } else if (node && typeof node === 'object') {
+    if (node.type === 'Attribute' && node.name === 'class') {
+      for (const token of stringsIn(node.value).join(' ').split(/\s+/)) if (token) out.add(token);
+    }
+    if (node.type === 'ClassDirective') out.add(node.name);
+    for (const [key, value] of Object.entries(node))
+      if (key !== 'parent') classTokensIn(value, out);
+  }
+  return out;
+}
+
+/** Every class token the component's markup can write, with `Field`'s root and the chip's classes. */
+export function optionCardsClassesWritten() {
+  const ast = componentAstOf('src/ui/svelte/components/RadioCardGroup.svelte');
+  return new Set(['fabricate-field', ...MEDALLION_CHIP_CLASSES, ...classTokensIn(ast.fragment)]);
 }
 
 /** The class tokens a fixture's markup carries that the component never writes; an option's icon is data. */

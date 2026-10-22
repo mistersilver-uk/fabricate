@@ -149,7 +149,7 @@ async function inHost(hostId, check) {
 const readCase = (tab, caseId) =>
   tab.evaluate((id) => {
     const rect = (element) => element && element.getBoundingClientRect().toJSON();
-    const style = (element, pseudo) => element && getComputedStyle(element, pseudo);
+    const style = (element) => element && getComputedStyle(element);
     const group = document.querySelector(`[data-case="${id}"]`);
     const options = group.querySelector('.manager-resolution-mode-options');
     return {
@@ -158,7 +158,7 @@ const readCase = (tab, caseId) =>
       cards: [...group.querySelectorAll('.manager-resolution-option')].map((card) => {
         const part = (selector) => card.querySelector(selector);
         const cs = style(card);
-        const before = style(card, '::before');
+        const before = getComputedStyle(card, '::before');
         const medallion = part('[data-tool-choice-icon] .fab-medallion');
         return {
           card: rect(card),
