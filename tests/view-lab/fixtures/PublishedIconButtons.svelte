@@ -5,8 +5,8 @@
   default rung, the two compact rungs, a disabled one, and a disclosure whose `onclick` shows the
   notes region the companion draws beneath it and passes `aria-expanded` in its own `update`.
   Every word is a companion's final text, so none is localized. `tests/view-lab/mount.js` mounts
-  it for `?specimen=published-icon-buttons` only, through the tooltip facade a Fabricate root
-  hands its tree, so keyboard focus reaches the lab's `game.tooltip`.
+  it for `?specimen=published-icon-buttons` only; each button's tree takes the tooltip facade the
+  published runtime's `mount` hands it, so keyboard focus reaches the lab's `game.tooltip`.
 
   The ground is one 360px column on `--fab-bg-1` that spaces its rows by 8px; each row's target is
   `display: flex`, as the spec asks of a companion. A case addresses the ground by

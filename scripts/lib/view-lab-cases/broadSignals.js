@@ -293,7 +293,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches
   // only its neutral state, so the specimen that mounts it through the published seam (issue 2601)
-  // draws every role and rung.
+  // shows every role, the two compact sizes and the keyboard-focused ghost-danger.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',

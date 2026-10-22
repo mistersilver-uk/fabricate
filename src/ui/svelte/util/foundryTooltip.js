@@ -1,7 +1,8 @@
 /**
  * The tooltip facade a Fabricate root hands its tree as `APP_TOOLTIPS`. Each call reads
- * `game.tooltip` when it runs, because the manager exists only after `init` and a module may swap
- * its class; with none, `show` and `hide` do nothing and `owns` answers false.
+ * `game.tooltip` when it runs, because the facade is built at import and Foundry constructs the
+ * manager, from `CONFIG.ux.TooltipManager`, only after `init`; with none, `show` and `hide` do
+ * nothing and `owns` answers false.
  */
 export const foundryTooltips = Object.freeze({
   /** Show `text` as plain text beside `element`. */

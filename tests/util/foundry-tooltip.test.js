@@ -1,6 +1,6 @@
 /**
  * The tooltip facade a Fabricate root hands its tree (issue 2601) reads `game.tooltip` on each
- * call, so a manager that appears after `init` or is swapped later is the one it drives.
+ * call, never at import, so the manager Foundry constructs after `init` is the one it drives.
  */
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe('foundryTooltips', () => {
-  it('shows plain text on the manager `game.tooltip` holds when it is called', () => {
+  it('shows plain text on the manager `game.tooltip` holds when it is called, not one read earlier', () => {
     const first = manager();
     setGame({ tooltip: first });
     foundryTooltips.show(button, 'Remove Iron ingot');
