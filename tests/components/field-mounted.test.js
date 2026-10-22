@@ -48,6 +48,7 @@ const radioHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
   ],
   componentPath: 'src/ui/svelte/components/RadioCardGroup.svelte',
 });

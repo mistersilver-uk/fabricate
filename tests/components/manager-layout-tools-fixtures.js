@@ -33,12 +33,12 @@ export async function readRenderedToolGeometry(width, view) {
           <div class="fabricate-tabs manager-tool-editor-tabs manager-editor-tabs" role="tablist"><button type="button" role="tab" id="tool-tab-breakage" class="manager-editor-tab-button is-active" aria-selected="true"><span>Breakage</span></button><button type="button" role="tab" id="tool-tab-requirements" class="manager-editor-tab-button" aria-selected="false"><span>Requirements</span><span class="manager-editor-tab-count">2</span></button><button type="button" role="tab" id="tool-tab-validation" class="manager-editor-tab-button" aria-selected="false"><span>Validation</span><span class="manager-chip is-neutral is-mono is-inspector manager-editor-tab-badge">✓</span></button></div>
           <div class="manager-tool-edit-composition"><section class="manager-tool-editor-panel" data-tool-editor-panel><div class="manager-tool-tab-stack">
             <section class="manager-tool-authority-readonly"><span class="manager-tool-authority-icon">A</span><div><p class="manager-kicker">System breakage</p><h3>Tool-specific</h3><p>Set for every Tool from the Tools library.</p></div><span class="manager-chip">System-wide</span></section>
-            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-radio-card-group="tool-breakage-mode">
+            <section class="manager-tool-breakage-method"><div class="manager-tool-section-heading"><div><p class="manager-kicker">Breakage</p><h3>How this Tool breaks</h3></div><p>Each Tool tracks its own breakage. Pick the method for this one.</p></div><fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards is-stacked" data-radio-card-group="tool-breakage-mode">
               <legend class="manager-resolution-mode-legend">Breakage mechanic</legend>
               <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 3">
-                <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><input type="radio" name="tool-breakage-mode" value="limitedUses" checked><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-hourglass-half"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span></label>
-                <label class="manager-resolution-option" data-radio-card-option="breakageChance"><input type="radio" name="tool-breakage-mode" value="breakageChance"><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-percent"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Breakage chance</span><span class="manager-resolution-option-desc" data-tool-choice-description>A % chance to break each use.</span></span></label>
-                <label class="manager-resolution-option" data-radio-card-option="diceExpression"><input type="radio" name="tool-breakage-mode" value="diceExpression"><span class="manager-resolution-option-icon" data-tool-choice-icon><i class="fas fa-dice-d20"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name" data-tool-choice-title>Dice expression</span><span class="manager-resolution-option-desc" data-tool-choice-description>Roll a separate breakage check.</span></span></label>
+                <label class="manager-resolution-option is-active" data-radio-card-option="limitedUses"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-hourglass-half"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Limited uses</span><span class="manager-resolution-option-desc" data-tool-choice-description>A fixed number of uses, then it breaks.</span></span><input type="radio" name="tool-breakage-mode" value="limitedUses" checked></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="breakageChance"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-percent"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Breakage chance</span><span class="manager-resolution-option-desc" data-tool-choice-description>A % chance to break each use.</span></span><input type="radio" name="tool-breakage-mode" value="breakageChance"></span></label>
+                <label class="manager-resolution-option" data-radio-card-option="diceExpression"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon" data-tool-choice-icon><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-dice-d20"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name" data-tool-choice-title>Dice expression</span><span class="manager-resolution-option-desc" data-tool-choice-description>Roll a separate breakage check.</span></span><input type="radio" name="tool-breakage-mode" value="diceExpression"></span></label>
               </div>
             </fieldset></section>
           </div></section><aside class="manager-tool-preview" data-tool-behavior-preview><div class="manager-tool-preview-identity"><div><h3>Smith's Hammer</h3></div></div><ul class="manager-tool-preview-rules"><li>5 uses</li></ul></aside></div>
@@ -93,7 +93,7 @@ export async function readRenderedToolGeometry(width, view) {
         authorityCopy: rect('.manager-tool-authority-readonly p:last-child'),
         choiceOptions: rect('.manager-resolution-mode-options'),
         choices: rects('.manager-resolution-option'),
-        choiceBodies: rects('.manager-resolution-option-body'),
+        choiceBodies: rects('.manager-resolution-option-text'),
         panelContainerType: styleValue('[data-tool-editor-panel]', 'containerType'),
         panelPaddingInline: Number.parseFloat(
           styleValue('[data-tool-editor-panel]', 'paddingLeft')
@@ -129,12 +129,8 @@ export async function checksRollEdges(page, tiersWrapperClass) {
         <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">DC source</legend>
           <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
-            <label class="manager-resolution-option is-active" data-dc-mode-option="static">
-              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Static</span></span>
-            </label>
-            <label class="manager-resolution-option" data-dc-mode-option="dynamic">
-              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Dynamic</span></span>
-            </label>
+            <label class="manager-resolution-option is-active" data-dc-mode-option="static"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Static</span></span><input type="radio" name="dc-mode" value="static" checked></span></label>
+            <label class="manager-resolution-option" data-dc-mode-option="dynamic"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Dynamic</span></span><input type="radio" name="dc-mode" value="dynamic"></span></label>
           </div>
         </fieldset>
         <div class="manager-checks-difficulty-fields">
@@ -223,17 +219,8 @@ export async function checksRollEdges(page, tiersWrapperClass) {
   });
 }
 
-// The Modifiers card and its "How they combine" combination-rule grid (issue 1096 follow-up,
-// found by pointing the visual-parity tooling at the real app). The studio's own control scale
-// for a combination-rule card is scoped `.manager-checks-card .manager-resolution-mode-card
-// .is-config-cards .manager-resolution-option`, so it only fires when the CARD ancestor carries
-// `manager-checks-card`. `CraftingModifierCatalogueCard` shipped wrapped in the bare shared
-// `.fabricate-card` shell instead — the identical defect the recipe-tier list above was
-// fixed for — so the card took the generic 8px radius and translucent fill, and the
-// combination-rule cards fell back to the shared `RadioCardGroup` primitive's own generic
-// padding and gap instead of the studio's 13px/11px. Both now sit on the scale's 12 (issue
-// 1523), so the studio's `--fab-bg-1` card face is what still tells the two apart. Real
-// Chromium + the real stylesheet, for the same reason the tier-row measurement above needs both.
+// The Modifiers card and its "How they combine" combination-rule grid, in the studio's flush card
+// or the bare shared shell: the option cards are the primitive's in both (issue 2467).
 export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
@@ -241,12 +228,8 @@ export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
       <fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
         <legend class="manager-resolution-mode-legend">How they combine</legend>
         <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
-          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
-            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Add all</span></span>
-          </label>
-          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest">
-            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Highest</span></span>
-          </label>
+          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Add all</span></span><input type="radio" name="modifier-policy" value="addAll" checked></span></label>
+          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest"><span class="manager-resolution-option-head"><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Highest</span></span><input type="radio" name="modifier-policy" value="highest"></span></label>
         </div>
       </fieldset>
     </section>`;
@@ -261,18 +244,21 @@ export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
     const round = (value) => Math.round(value * 100) / 100;
     const section = document.querySelector('[data-crafting-modifier-catalogue]');
     const sectionCs = getComputedStyle(section);
-    const option = document.querySelector('.manager-resolution-option');
-    const optionCs = getComputedStyle(option);
+    const [chosen, resting] = document.querySelectorAll('.manager-resolution-option');
+    const optionCs = getComputedStyle(chosen);
+    const restingCs = getComputedStyle(resting);
     return {
       cardRadius: round(parseFloat(sectionCs.borderTopLeftRadius)),
-      cardBackground: sectionCs.backgroundColor,
-      optionPaddingLeft: round(parseFloat(optionCs.paddingLeft)),
-      optionPaddingTop: round(parseFloat(optionCs.paddingTop)),
-      optionGap: optionCs.columnGap,
-      // The second card, at rest: the first is chosen, and its chosen face is the primitive's.
-      optionBackground: getComputedStyle(document.querySelectorAll('.manager-resolution-option')[1])
-        .backgroundColor,
-      optionRadius: round(parseFloat(optionCs.borderTopLeftRadius)),
+      option: {
+        paddingLeft: round(parseFloat(optionCs.paddingLeft)),
+        paddingTop: round(parseFloat(optionCs.paddingTop)),
+        radius: round(parseFloat(optionCs.borderTopLeftRadius)),
+        gap: getComputedStyle(document.querySelector('.manager-resolution-mode-options')).columnGap,
+        chosenBorder: optionCs.borderTopColor,
+        restBorder: restingCs.borderTopColor,
+        restBackground: restingCs.backgroundColor,
+        nameSize: getComputedStyle(chosen.querySelector('.manager-resolution-option-name')).fontSize,
+      },
     };
   });
 }

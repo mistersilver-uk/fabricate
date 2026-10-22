@@ -480,10 +480,9 @@ const PRIMITIVES = Object.freeze([
     // ── RADIOCARDGROUP (issue 1509). The manager's radio-card group, rooted at the class it emits.
     // IT DECLARES NO `classProps`, AND THAT IS A DECISION WITH A MEASURED REASON. `classPropValues`
     // builds ``new RegExp(`\b${name}=(?:"([^"]*)"|\{`([^`]*)`\})`)``, so a
-    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured, TWELVE
-    // of them, at `RadioCardGroup.svelte:90, 95, 97, 98, 102, 105, 120, 124, 125, 127, 131, 137` —
-    // and the class-prop floor above requires exactly `classProps.length * components.length`, so
-    // it would red at 12 against 1. What that field would have bought — a guard on `Field` renaming
+    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured,
+    // FOURTEEN of them — and the class-prop floor above requires exactly
+    // `classProps.length * components.length`, so it would red at 14 against 1. What that field would have bought — a guard on `Field` renaming
     // or dropping its `class` prop — is bought instead by the mounted root-emission assertion in
     // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
     // fieldset, and by that suite's own mutation control.
@@ -500,17 +499,20 @@ const PRIMITIVES = Object.freeze([
       'manager-resolution-mode-note',
       'manager-resolution-mode-options',
       'manager-resolution-option',
+      'manager-resolution-option-head',
       'manager-resolution-option-icon',
+      'manager-resolution-option-text',
       'manager-resolution-option-body',
       'manager-resolution-option-name',
       'manager-resolution-option-desc',
       'manager-resolution-option-badge',
       'manager-radio-card-group',
     ]),
-    // Measured at this commit: 12 written, 47 family selectors, 31 owned.
-    writtenFloor: 10,
-    familyFloor: 42,
-    ownedFloor: 27,
+    // Measured at this commit: 14 written; 36 family selectors (48, less the 15 route-scoped caller
+    // rules deleted and the 12 owned rules merged or deleted, plus 15 new); 35 owned.
+    writtenFloor: 12,
+    familyFloor: 30,
+    ownedFloor: 30,
     // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
     // (9 attributes over 3 files against this one's 4 over 2) and is REFUSED all the same: it is
     // the option ROW, a descendant of the root, so a fixture carrying it satisfies the attribute
@@ -1529,7 +1531,7 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
  * The entries whose ROOT ELEMENT is another entry's, so TWO namespace roots land on ONE element.
  */
 const CO_ROOTED_PAIRS = Object.freeze([
-  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 40 }),
+  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 28 }),
   Object.freeze({ host: 'Field', guest: 'ModifierPillSelect', hostFloor: 20, guestFloor: 11 }),
 ]);
 
@@ -1695,11 +1697,26 @@ test('the application-root-attribute clause names a caller’s own container', (
     )
   );
   assert.ok(
-    callerContainerSelectors.length >= 19,
+    callerContainerSelectors.length >= 11,
     `only ${callerContainerSelectors.length} selectors were recognised by the ` +
-      'application-root-attribute clause across every entry, against a floor of 19. A lower number means the clause ' +
+      'application-root-attribute clause across every entry, against a floor of 11. A lower number means the clause ' +
       'has stopped recognising a caller’s own container and those rules would wrongly enter the ' +
       'owned set below.'
+  );
+});
+
+test('the option cards’ one caller rule is the Difficulty fields’ margin', () => {
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const written = classesWrittenBy(primitive);
+  assert.deepEqual(
+    pickerSelectors(written, primitive).filter(
+      (selector) => !isPrimitiveOwned(selector, written, primitive)
+    ),
+    [
+      '.fabricate-manager .manager-checks-card .manager-resolution-mode-card + .manager-checks-difficulty-fields',
+    ],
+    'a caller rule names the option-card family again. The face is the primitive’s alone, so a ' +
+      'route that repaints it draws a second face; state the difference in the primitive instead.'
   );
 });
 
@@ -2282,5 +2299,36 @@ test('each primitive’s own scoped styles name no application root either', () 
       'usually to say they deliberately have none, and the `</script>` guard above is what ' +
       'keeps that prose out of this clause. A lower number means the reader has stopped ' +
       'finding the real blocks and this clause examined nothing.'
+  );
+});
+
+test('no caller’s scoped block restates the option cards’ face (issue 2467)', () => {
+  // Two callers place the group's own legend in their heading; neither paints a card.
+  const LEGEND_PLACEMENT = new Set([
+    'src/ui/svelte/apps/manager/CraftingSettingsView.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+  ]);
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const family = new RegExp(`^(?:${primitive.family})$`);
+  const offences = [];
+  let blocks = 0;
+  for (const [file, source] of Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))) {
+    const styleAt = source.lastIndexOf('<style>');
+    if (primitive.components.includes(file) || styleAt < source.indexOf('</script>')) continue;
+    blocks += 1;
+    for (const selector of selectorsIn(source.slice(styleAt))) {
+      const named = classesOf(selector).filter((cls) => family.test(cls));
+      const legendOnly = named.every((cls) => cls === 'manager-resolution-mode-legend');
+      if (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly)) {
+        offences.push(`${file}: ${selector}`);
+      }
+    }
+  }
+  assert.ok(blocks > 100, `only ${blocks} scoped blocks were read, so the absence below is vacuous`);
+  assert.deepEqual(
+    offences,
+    [],
+    'a caller’s scoped block names the option-card family, and an unlayered block beats the sheet, ' +
+      'so it repaints the primitive on one route'
   );
 });
