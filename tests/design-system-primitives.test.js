@@ -815,6 +815,22 @@ test('(a) a change to each leaf issue 2448 published, or to a primitive one draw
   }
 });
 
+/** `file`'s broad-signal override names exactly `frames`, in order, and a change to it selects each. */
+function assertBroadSignalFrames(file, frames) {
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(
+      selected.has(caseId),
+      `a ${path.basename(file, '.svelte')} change does not select '${caseId}'`
+    );
+  }
+}
+
 test('(a) a Stepper change publishes its two frames, then the two specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/Stepper.svelte';
   const frames = [
@@ -823,15 +839,7 @@ test('(a) a Stepper change publishes its two frames, then the two specimens that
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a Stepper change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam', () => {
@@ -844,15 +852,7 @@ test('(a) a Select change publishes its four frames, then the two specimens that
     'manager-published-select-specimen',
     'manager-published-select-layer',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a Select change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a StageBars change publishes its two run frames, then the specimen that mounts it through the seam', () => {
@@ -862,15 +862,7 @@ test('(a) a StageBars change publishes its two run frames, then the specimen tha
     'fabricate-journal-lifecycle-waiting-auto-eligible',
     'manager-published-stage-bars-specimen',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a StageBars change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a Field change publishes its twelve frames, then the specimen that mounts it through the seam', () => {
@@ -890,15 +882,7 @@ test('(a) a Field change publishes its twelve frames, then the specimen that mou
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a Field change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a Well change publishes its three frames, then the specimen that mounts it through the seam', () => {
@@ -909,15 +893,7 @@ test('(a) a Well change publishes its three frames, then the specimen that mount
     'player-crafting-roll-prompt-count-additional',
     'manager-published-well-specimen',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a Well change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
@@ -930,15 +906,7 @@ test('(a) a Notice change publishes the five specimens that mount it, after the 
     'manager-published-notice-dismiss-focus',
     'manager-published-notice-dismissed',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a Notice change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) a ViewToggle change publishes the essence browser in both arrangements', () => {
@@ -968,15 +936,7 @@ test('(a) a ListState change publishes the three list-state frames', () => {
     'manager-environments-load-error',
     'manager-knowledge-loading',
   ];
-  assert.deepEqual(
-    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
-    frames,
-    `${file} names its frames`
-  );
-  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
-  for (const caseId of frames) {
-    assert.ok(selected.has(caseId), `a ListState change does not select '${caseId}'`);
-  }
+  assertBroadSignalFrames(file, frames);
 });
 
 test('(a) the representative pair survives an override, additively', () => {
