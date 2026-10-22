@@ -2107,6 +2107,7 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `tone` is `''`, `success`, `danger` or `accent`, and it outranks `tint`.
 `ink` is `''`, `success`, `danger` or `neutral`, it outranks `tint`, and it outranks `tone` on the glyph.
 A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
+A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
 A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
 The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.

@@ -7,11 +7,12 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `layout` | `'row'` \| `'stacked'` | `'row'` | Chip beside the text, or chip over it. The caller states it (`stacked` on three or more tracks); it is never derived from `columns`, and a reflowed card keeps it. |
-  | `configCards` | boolean | `true` | Stated at every call site, because the retired shim defaulted it to `false`. |
+  | `columns` | number | `2` | Tracks per row. The group reflows to one track when its `fabricate-option-host` (a card or panel that names itself, else the manager) is 620px wide or narrower. |
+  | `configCards` | boolean | `true` | Draws an option's `icon` as the leading chip. The `is-config-cards` class it writes is read by no rule. |
 
   Snippets:
-  - `optionBody(option)` — read-only content beneath the card's head, at the text column; the
-    radio stays the card's only control.
+  - `optionBody(option)` — read-only content beneath the card's head: at the text column in a row
+    card that has a chip, at the card padding otherwise. The radio stays the card's only control.
 
   Rest spread:
   - `{...rest}` lands on the `<Field>` fieldset root, written after `class`, and carries the
@@ -21,7 +22,9 @@
   - The face is the primitive's alone; the one caller rule naming its family is a margin, pinned
     by `searchable-popover-area-scope.test.js` and `option-cards-specimen-geometry.test.js`.
   - The chip is `Medallion` inside a wrapper that owns the disabled dim, because `Medallion`
-    takes no rest props and no sheet rule names `.fab-medallion`.
+    takes no rest props and no sheet rule names `.fab-medallion`. At rest it is `ink="neutral"`,
+    and a chosen card's is `tone="accent"`.
+  - A disabled option, or a disabled group, dims each part to .45 and never the card.
   - `option.meta` is typed in this scoped block, which is unlayered, so the sheet cannot repaint it.
   - It declares no font floor: its root is also `Field`'s fieldset, whose (0,1,1) floor reaches
     every radio (`searchable-popover-area-scope.test.js`).
