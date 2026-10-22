@@ -1079,13 +1079,21 @@ describe('a lazy entry', () => {
     assert.equal(target.childNodes.length, 1);
   });
 
-  it('calls its loader once, inside the first load, for concurrent and later loads', async () => {
+  it('M2: refuses an unloaded mount before ready as mount before ready, ahead of M19', () => {
+    const { ui } = lazySeam(deferredLoader().load, { isReady: () => false });
+    assert.throws(
+      () => ui.mount('Lazy', { target: new FakeTarget() }),
+      refusal('mount before ready')
+    );
+  });
+
+  it('calls its loader once for concurrent and later loads', async () => {
     const pending = deferredLoader();
     const { ui } = lazySeam(pending.load);
     const loads = [ui.load(['Lazy']), ui.load(['Zeta', 'Lazy']), ui.load('Lazy')];
-    assert.equal(pending.calls, 1, 'one call, made before load returned');
     pending.resolve(LAZY_COMPONENT);
     assert.deepEqual(await Promise.all(loads), [undefined, undefined, undefined]);
+    assert.equal(pending.calls, 1, 'one call for three concurrent loads');
     await ui.load(['Lazy']);
     assert.equal(pending.calls, 1);
   });
@@ -1141,6 +1149,20 @@ describe('a lazy entry', () => {
         Array.from({ length: expected }, () => failure)
       );
     }
+  });
+
+  it("rejects with the loader's error when reportLoadFailure throws", async () => {
+    const failure = new TypeError(CHUNK_FAILURE);
+    let reports = 0;
+    const { ui } = lazySeam(() => Promise.reject(failure), {
+      reportLoadFailure: () => {
+        reports += 1;
+        throw new Error('the notice failed');
+      },
+    });
+    await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+    await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+    assert.equal(reports, 1);
   });
 
   it('rejects before registration as mount throws there, while an eager name resolves', async () => {

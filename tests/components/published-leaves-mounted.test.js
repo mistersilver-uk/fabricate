@@ -677,9 +677,9 @@ describe('Rail, which is lazy', () => {
     const loads = [seam.load(['Rail']), seam.load(['Kicker', 'Rail'])];
     assert.throws(mountRail, unloaded);
     assert.equal(target.childNodes.length, 0, 'nothing is rendered');
-    assert.equal(pending.calls, 1, 'one import for two concurrent loads');
     pending.resolve((await harness.loadRuneModule(RAIL)).default);
     await Promise.all(loads);
+    assert.equal(pending.calls, 1, 'one import for two concurrent loads');
     const handle = mountRail();
     assert.equal(target.querySelector('.fab-rail-label').textContent, 'Standing');
     handle.destroy();
