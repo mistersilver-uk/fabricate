@@ -96,12 +96,12 @@
   const modes = $derived([
     {
       value: 'fixed',
-      fallback: amount.fixedLabel || text('FABRICATE.Admin.Manager.Recipe.AmountFixed', 'Fixed'),
+      label: amount.fixedLabel || text('FABRICATE.Admin.Manager.Recipe.AmountFixed', 'Fixed'),
       disabled,
     },
     {
       value: 'rolled',
-      fallback: amount.rolledLabel || text('FABRICATE.Admin.Manager.Recipe.AmountRolled', 'Rolled'),
+      label: amount.rolledLabel || text('FABRICATE.Admin.Manager.Recipe.AmountRolled', 'Rolled'),
       disabled,
     },
   ]);

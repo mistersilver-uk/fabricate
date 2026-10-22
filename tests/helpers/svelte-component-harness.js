@@ -182,6 +182,8 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   // The listbox cursor's arithmetic (issue 1503).
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  // The app root's localizer context, which localizes the picker's own copy (issue 2454).
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -706,14 +708,15 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       teardownDOM();
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
     },
-    async mount(props = {}) {
+    // `context` is the Svelte context map a Fabricate root mounts its tree with (issue 2454).
+    async mount(props = {}, { context } = {}) {
       // Cross a macrotask boundary BEFORE building the next tree.
       await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
       // THE MOUNT TARGET IS AN APPLICATION ROOT (issue 1466).
       target.className = rootClass;
       document.body.appendChild(target);
-      mounted = createClassComponent({ component: Component, target, props });
+      mounted = createClassComponent({ component: Component, target, props, context });
       flushSync();
       await tick();
       flushSync();

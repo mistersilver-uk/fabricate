@@ -116,6 +116,30 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: SegmentedControl takes already-localized option labels
+
+`SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
+An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
+`SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` and `EditorTabs` keep a lang key plus fallback, because neither is a published-seam entry and neither is held by this rule.
+
+#### Scenario: A caller's key has no translation
+
+- **WHEN** a caller builds an option from a key the active language lacks
+- **THEN** the segment renders the caller's English fallback as its `label`
+
+#### Scenario: The closure stays clear of Foundry
+
+- **WHEN** the import closure of `SegmentedControl` or `ViewToggle` is computed
+- **THEN** it holds no module outside those two components and reaches no Foundry global
+
+#### Scenario: An icon-only segment
+
+- **WHEN** `iconOnly` is set
+- **THEN** each segment's `title` is its `label`
+- **AND** the clipped label stays its accessible name
+
 ### Requirement: A list's arrangement switch renders through ViewToggle
 
 A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
@@ -741,16 +765,18 @@ And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the se
 
 Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one; the one exception is the gathering biome, whose stored option carries a `customColor` sibling (see `gathering-and-harvesting`, the biome vocabulary), and no other model accepts a free hex.
 `TintPicker` offers free-hex entry only to a caller that passes `allowCustom`, which defaults to `false`, and a caller passes it only when its stored model carries a `customColor` sibling.
-Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
+Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers ten of them, so adding a token to the stylesheet does not add it to a picker.
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
-By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
-Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
-Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
+By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, and the other ten are offered, `verdant` and `azure` after the original eight in that order.
+Collision with a semantic token does NOT disqualify a tint: in the default palette five offered tints collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple`, `butter` with `--fab-warning`, `verdant` with `--fab-success` and `azure` with `--fab-drop-rate-uncommon`.
+An offered tint is additive persisted vocabulary and takes no migration, because all thirteen tokens are declared in every build since issue 1229.
+A build that predates `verdant` and `azure` still draws an essence carrying one in that tint wherever the essence is drawn as a chip or tile; its colour editors do not offer the token, and the stored token is kept until the GM edits that essence's colour.
+The same build folds a gathering biome carrying one onto `sage` on read and writes `sage` back on its next save of the gathering configuration, so a downgrade loses that biome's tint.
 
 A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
-All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the eight offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
+All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the ten offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
 In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `ironblood-forge` one tagged Mist renders a warm red-brown — in both cases the picker’s own label is wrong.
-The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
+The five tints added later — `ember`, `verdant`, `azure`, `bone` and `slate` — hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
 Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
@@ -793,7 +819,12 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 #### Scenario: A caller renders the tint picker without opting in to a hex
 
 - **WHEN** a caller renders `TintPicker` without passing `allowCustom`
-- **THEN** the palette offers only its preset tokens and no free-hex field
+- **THEN** the palette offers the ten offered tints, in order, and no free-hex field
+
+#### Scenario: The offered tints stop following the offering rule
+
+- **WHEN** `managerColorTokens.js` offers a declared `--fab-tag-*` token that is a neutral or bound (`bone`, `slate`, `ember`), or omits a declared token that is neither
+- **THEN** `manager-color-tokens` fails and names the theme whose declared set disagrees
 
 ### Requirement: The token namespace is one generation and names its purpose
 
@@ -1206,6 +1237,7 @@ Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
 The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at six shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
+The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in the search-suppressed shape only; the inline query's close control carries it too (issue 2454).
 Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
 An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
 The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
@@ -1684,6 +1716,7 @@ The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, 
 The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
 With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
+The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
 A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
 It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
 

@@ -53,22 +53,22 @@
   const statusOptions = $derived([
     {
       value: 'all',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.All'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.All'),
       badge: counts.all ?? 0,
     },
     {
       value: 'ready',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.Ready'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.Ready'),
       badge: counts.ready ?? 0,
     },
     {
       value: 'inProgress',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.InProgress'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.InProgress'),
       badge: counts.inProgress ?? 0,
     },
     {
       value: 'paused',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.Paused'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.Paused'),
       badge: counts.paused ?? 0,
     },
   ]);

@@ -111,8 +111,8 @@ async function shippedMarkup() {
   });
   await harness.setup();
   const options = [
-    { value: 'a', fallback: 'A' },
-    { value: 'b', fallback: 'B' },
+    { value: 'a', label: 'A' },
+    { value: 'b', label: 'B' },
   ];
   const markup = {};
   try {

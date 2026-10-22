@@ -28,6 +28,7 @@
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import CheckCharacterValueField from './CheckCharacterValueField.svelte';
   import { isIntegerLiteral } from './countInsetModel.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
 
   let {
     field,
@@ -44,13 +45,14 @@
   const OPTIONS = [
     {
       value: 'number',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Count.InputNumber',
-      fallback: 'Number',
+      label: localizeOr('FABRICATE.Admin.Manager.Checks.Count.InputNumber', 'Number'),
     },
     {
       value: 'value',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
-      fallback: 'Character value',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
+        'Character value'
+      ),
     },
   ];
 

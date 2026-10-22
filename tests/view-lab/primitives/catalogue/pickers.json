@@ -388,7 +388,7 @@
       "anchorStyle": "margin-left: 16px"
     },
     "props": {
-      "dialogNameAttribute": "Choose an icon",
+      "panelLabel": "Choose an icon",
       "minWidth": 300,
       "maxWidth": 300,
       "showFilteredCount": true,
@@ -441,7 +441,7 @@
     "fixture": "TintPickerPopoverOpen",
     "slot": {
       "width": 272,
-      "height": 340
+      "height": 402
     },
     "note": "Opened as the New-biome swatch opens it (issue 2459): the fixture's trigger snippet stands where the swatch would, the panel is open from the start and portaled to the Lab's root below it, and No colour is offered with a handler, as the drawing draws it.",
     "undrawn": {

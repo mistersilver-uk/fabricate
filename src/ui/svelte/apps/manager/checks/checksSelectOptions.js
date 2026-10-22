@@ -1,5 +1,6 @@
 /**
- * The checks studio's eight converted select vocabularies and their `<Select>` rows (issue 1510).
+ * The checks studio's converted select vocabularies and their `<Select>` rows (issue 1510), and the
+ * outcome toggle's segments.
  * Every label is carried verbatim from the `<option>` it replaced and every list keeps its authored
  * order. Localized copy arrives through an injected `text`, so this stays an import-free leaf — the
  * reason the previewed-record mapper lives here rather than beside `buildPreviewRecords`, whose own
@@ -100,6 +101,50 @@ const OUTCOME_TIER = Object.freeze({
   fallback: 'Outcome tier',
 });
 
+/** The outcome toggle's segments, good, neutral, bad, so the neutral default sits in the middle. */
+export const OUTCOME_CHOICES = Object.freeze({
+  progressive: [
+    {
+      value: 'success',
+      variant: 'success',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardAll',
+      fallback: 'Award all',
+    },
+    {
+      value: 'none',
+      variant: 'neutral',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
+      fallback: 'No effect',
+    },
+    {
+      value: 'failure',
+      variant: 'danger',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardNone',
+      fallback: 'Award none',
+    },
+  ],
+  standard: [
+    {
+      value: 'success',
+      variant: 'success',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceSuccess',
+      fallback: 'Automatic success',
+    },
+    {
+      value: 'none',
+      variant: 'neutral',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
+      fallback: 'No effect',
+    },
+    {
+      value: 'failure',
+      variant: 'danger',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceFailure',
+      fallback: 'Automatic failure',
+    },
+  ],
+});
+
 /** `addTrigger` reads the first entry, so the order is the authored default, not a presentation choice. */
 export function conditionTypesFor(kind, { counting = false } = {}) {
   return [
@@ -110,11 +155,11 @@ export function conditionTypesFor(kind, { counting = false } = {}) {
   ].filter(Boolean);
 }
 
-/** A `{value, labelKey, fallback}` vocabulary in the picker's `{value, label}` option shape. */
+/** A `{value, labelKey, fallback, ...}` vocabulary as `{value, label, ...}` options; extras pass through. */
 export function localizedOptions(vocabulary, text) {
-  return vocabulary.map((entry) => ({
-    value: entry.value,
-    label: text(entry.labelKey, entry.fallback),
+  return vocabulary.map(({ labelKey, fallback, ...rest }) => ({
+    ...rest,
+    label: text(labelKey, fallback),
   }));
 }
 

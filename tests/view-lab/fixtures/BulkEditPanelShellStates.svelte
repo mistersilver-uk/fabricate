@@ -24,18 +24,15 @@
   const STATUS = [
     {
       value: 'unchanged',
-      labelKey: 'FABRICATE.Admin.Manager.BulkEdit.Unchanged',
-      fallback: 'Unchanged',
+      label: 'Unchanged',
     },
     {
       value: 'enable',
-      labelKey: 'FABRICATE.Admin.Manager.Essence.BulkEdit.Enable',
-      fallback: 'Enable',
+      label: 'Enable',
     },
     {
       value: 'disable',
-      labelKey: 'FABRICATE.Admin.Manager.Essence.BulkEdit.Disable',
-      fallback: 'Disable',
+      label: 'Disable',
     },
   ];
 

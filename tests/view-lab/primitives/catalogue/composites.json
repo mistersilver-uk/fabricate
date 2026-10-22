@@ -1098,15 +1098,15 @@
       "severities": [
         {
           "value": "Minor",
-          "fallback": "Minor"
+          "label": "Minor"
         },
         {
           "value": "Major",
-          "fallback": "Major"
+          "label": "Major"
         },
         {
           "value": "Severe",
-          "fallback": "Severe"
+          "label": "Severe"
         }
       ],
       "shownHint": "They see the complication when it fires.",

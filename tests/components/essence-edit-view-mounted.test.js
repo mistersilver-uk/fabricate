@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -946,7 +947,7 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
     assert.equal(
       globalThis.document.querySelector('[data-manager-custom-color]'),
       null,
-      'the essence tint picker offers the eight presets and no free hex field'
+      'the essence tint picker offers the ten presets and no free hex field'
     );
     palette.querySelector('[data-manager-color-none]').click();
     flushSync();

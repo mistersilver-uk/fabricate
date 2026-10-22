@@ -559,12 +559,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // body visible is the only state in which the control is more than a chevron.
   'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
-  // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), and the two specimens
+  // that mount it through the published seam open its list in an overlay host and on the
+  // standalone layer (issue 2454).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
     'manager-component-edit-category-list',
     'interactables-manager-region-open',
+    'manager-published-select-specimen',
+    'manager-published-select-layer',
   ]),
   // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([

@@ -185,18 +185,14 @@
   }
 
   const statusOptions = $derived([
-    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
-    { value: 'on', labelKey: 'FABRICATE.Admin.Manager.StatusOn', fallback: 'On' },
-    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.StatusOff', fallback: 'Off' },
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Recipe.FilterAll', 'All') },
+    { value: 'on', label: text('FABRICATE.Admin.Manager.StatusOn', 'On') },
+    { value: 'off', label: text('FABRICATE.Admin.Manager.StatusOff', 'Off') },
   ]);
   const lockOptions = $derived([
-    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
-    {
-      value: 'unlocked',
-      labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked',
-      fallback: 'Unlocked',
-    },
-    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' },
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Recipe.FilterAll', 'All') },
+    { value: 'unlocked', label: text('FABRICATE.Admin.Manager.Recipe.Unlocked', 'Unlocked') },
+    { value: 'locked', label: text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked') },
   ]);
 
   const SORT_LABELS = {

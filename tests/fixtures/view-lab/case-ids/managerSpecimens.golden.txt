@@ -9,3 +9,5 @@ manager-published-notice-dismissed
 manager-published-steppers-specimen
 manager-published-steppers-button-focus
 manager-published-search-specimen
+manager-published-select-specimen
+manager-published-select-layer

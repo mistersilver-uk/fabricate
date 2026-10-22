@@ -437,7 +437,7 @@
   const membershipSegments = $derived(
     membershipOptions.map((option) => ({
       value: option,
-      fallback: membershipLabels[option],
+      label: membershipLabels[option],
       count: model.project({ entries, searchOf, membership: option, systemId }).rows.length,
     }))
   );
