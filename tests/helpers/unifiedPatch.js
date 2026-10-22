@@ -10,10 +10,8 @@ export function unifiedPatch(before, after) {
   try {
     writeFileSync(path.join(dir, 'a'), before);
     writeFileSync(path.join(dir, 'b'), after);
-    const run = spawnSync('git', ['diff', '--no-index', '--no-color', '-U3', 'a', 'b'], {
-      cwd: dir,
-      encoding: 'utf8',
-    });
+    const args = ['diff', '--no-index', '--no-color', '-U3', 'a', 'b'];
+    const run = spawnSync('git', args, { cwd: dir, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the dev-tool contract
     const at = run.stdout.indexOf('\n@@');
     return at === -1 ? '' : run.stdout.slice(at + 1);
   } finally {
