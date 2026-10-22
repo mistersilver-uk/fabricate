@@ -6,7 +6,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` / `max` | number / number | `0` / `100` | The fill is `value / max` to the whole percent, clamped; a `max` of zero or less reads full, because nothing is owed. `aria-valuenow` is the clamped value. |
-  | `segments` | `{ value?, tone?, color? }[]` | `[]` | The fill's segments in order, painted by `FillBar`'s `tone` and `color`: each but the last spans its finite, non-negative `value` up to the fill's end, the last spans the rest, and one spanning nothing is not drawn. Fewer than two drawn draw one fill, in the first entry's paint when none spans anything. |
+  | `segments` | `{ value?, tone?, color? }[]` | `[]` | The fill's segments in order, painted by `FillBar`'s `tone` and `color`: each but the last spans its finite, non-negative `value` up to the fill's end, the last spans the rest, and one spanning nothing is not drawn (at most 1e-9, an absolute bound, so a `max` near 1e-8 or less reads every entry as nothing). Fewer than two drawn draw one fill, in the first entry's paint when none spans anything. |
   | `valueText` | string | `''` | The caller-formatted reading, already localized, announced as `aria-valuetext`. |
   | `label` / `labelId` | string / string | `''` / `''` | Exactly one: `labelId` names the meter by an element the caller renders; `label` renders visually hidden inside it. With neither, no label is drawn and a rest `aria-label` names it. |
 
