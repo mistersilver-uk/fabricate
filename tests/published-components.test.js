@@ -21,6 +21,7 @@ import {
   TABLE,
   ZETA,
   ZETA_COMPONENT,
+  deferredLoader,
   drained,
   exactly,
   fakeRuntime,
@@ -1038,6 +1039,132 @@ describe('load', () => {
   });
 });
 
+// An entry stating `lazy: true` is bound to a loader and no component (issue 2455).
+const LAZY_COMPONENT = Object.freeze({ role: 'Lazy' });
+const LAZY = Object.freeze({
+  name: 'Lazy',
+  path: 'src/ui/svelte/components/Lazy.svelte',
+  version: 1,
+  props: { value: { kind: 'data' } },
+  rest: false,
+  root: 'any',
+  lazy: true,
+});
+const CHUNK_FAILURE = 'Failed to fetch dynamically imported module: https://x/chunks/Lazy-ab12.js';
+
+function lazySeam(loader, options = {}) {
+  return seamWith({ table: [ZETA, LAZY], loaders: { [LAZY.path]: loader }, ...options });
+}
+
+describe('a lazy entry', () => {
+  it('M19: refuses a mount until load has resolved for it, directly after M3, rendering nothing', async () => {
+    const pending = deferredLoader();
+    const { ui, mounts } = lazySeam(pending.load);
+    const target = new FakeTarget();
+    for (const options of [
+      { target, props: { value: 1 } },
+      { target: {}, props: { nope: 1 } },
+    ]) {
+      assert.throws(() => ui.mount('Lazy', options), refusal('"Lazy" is not loaded'));
+    }
+    const loading = ui.load(['Lazy']);
+    assert.throws(() => ui.mount('Lazy', { target }), refusal('"Lazy" is not loaded'));
+    assert.throws(() => ui.mount('Nope', { target }), refusal('"Nope" is not published'));
+    assert.equal(target.childNodes.length, 0);
+    assert.equal(mounts.length, 0);
+    pending.resolve(LAZY_COMPONENT);
+    assert.equal(await loading, undefined);
+    ui.mount('Lazy', { target, props: { value: 1 } });
+    assert.equal(mounts[0].props.component, LAZY_COMPONENT, 'the component its loader resolved');
+    assert.equal(target.childNodes.length, 1);
+  });
+
+  it('calls its loader once, inside the first load, for concurrent and later loads', async () => {
+    const pending = deferredLoader();
+    const { ui } = lazySeam(pending.load);
+    const loads = [ui.load(['Lazy']), ui.load(['Zeta', 'Lazy']), ui.load('Lazy')];
+    assert.equal(pending.calls, 1, 'one call, made before load returned');
+    pending.resolve(LAZY_COMPONENT);
+    assert.deepEqual(await Promise.all(loads), [undefined, undefined, undefined]);
+    await ui.load(['Lazy']);
+    assert.equal(pending.calls, 1);
+  });
+
+  it('rejects with M3 for a name that is not published before any loader runs', async () => {
+    const pending = deferredLoader();
+    const { ui } = lazySeam(pending.load);
+    await assert.rejects(ui.load(['Lazy', 'Nope']), refusal('"Nope" is not published'));
+    assert.equal(pending.calls, 0);
+  });
+
+  it("rejects with the loader's error, keeps it and never calls the loader again, so M19 stays", async () => {
+    const failure = new Error('offline');
+    for (const loader of [
+      () => Promise.reject(failure),
+      () => {
+        throw failure;
+      },
+    ]) {
+      let calls = 0;
+      const { ui } = lazySeam(() => {
+        calls += 1;
+        return loader();
+      });
+      let loading;
+      assert.doesNotThrow(() => {
+        loading = ui.load(['Lazy']);
+      });
+      await assert.rejects(loading, (error) => error === failure);
+      await assert.rejects(ui.load(['Zeta', 'Lazy']), (error) => error === failure);
+      assert.equal(calls, 1, 'a failed fetch is not retried');
+      const target = new FakeTarget();
+      assert.throws(() => ui.mount('Lazy', { target }), refusal('"Lazy" is not loaded'));
+    }
+  });
+
+  it('hands a chunk-load failure to reportLoadFailure once, and no other failure', async () => {
+    for (const [failure, expected] of [
+      [new TypeError(CHUNK_FAILURE), 1],
+      [new Error('Lazy.svelte threw while it evaluated'), 0],
+    ]) {
+      const reported = [];
+      const { ui } = lazySeam(() => Promise.reject(failure), {
+        reportLoadFailure: (error) => {
+          reported.push(error);
+        },
+      });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+      }
+      assert.deepEqual(
+        reported,
+        Array.from({ length: expected }, () => failure)
+      );
+    }
+  });
+
+  it('rejects before registration as mount throws there, while an eager name resolves', async () => {
+    const seam = createPublishedComponents({ table: [ZETA, LAZY], isReady: () => true });
+    await assert.rejects(seam.publicApi.load(['Lazy']), (error) => {
+      assert.equal(error.constructor, Error);
+      assert.match(error.message, exactly(`${PREFIX}not registered`));
+      return true;
+    });
+    assert.equal(await seam.publicApi.load(['Zeta']), undefined);
+  });
+
+  it('is described as an eager entry is, with no lazy member', () => {
+    const { ui } = lazySeam(deferredLoader().load);
+    assert.deepEqual(ui.describe('Lazy'), {
+      version: 1,
+      props: { value: { kind: 'data', required: false } },
+      rest: false,
+      root: 'any',
+      overlays: false,
+    });
+  });
+});
+
 describe('a faulted mount', () => {
   it('reports once, unmounts once, releases the claim and goes inert', () => {
     const { seam, ui, mounts, unmounts, reports } = seamWith();
@@ -1308,6 +1435,60 @@ describe('registration', () => {
     assert.equal(mounts.length, 1, 'the first runtime still mounts');
     assert.equal(second.mounts.length, 0);
   });
+
+  for (const lazy of ['true', 1, null]) {
+    it(`refuses a manifest entry whose lazy is ${String(lazy)}, naming the entry and the value`, () => {
+      const seam = createPublishedComponents({ table: [{ ...ALPHA, lazy }], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {}, loaders: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(error.message, exactly(`${PREFIX}Alpha has an unknown lazy "${lazy}"`));
+          return true;
+        }
+      );
+    });
+  }
+
+  const LAZY_BINDING = `${PREFIX}Lazy is lazy, so its runtime binds a loader and no component`;
+  const EAGER_BINDING = `${PREFIX}Alpha is not lazy, so its runtime binds no loader`;
+  for (const [claim, table, components, loaders, message] of [
+    ['a lazy entry bound to no loader', [LAZY], {}, {}, LAZY_BINDING],
+    [
+      'a lazy entry bound to a loader that is no function',
+      [LAZY],
+      {},
+      { [LAZY.path]: 'x' },
+      LAZY_BINDING,
+    ],
+    [
+      'a lazy entry bound to a component beside its loader',
+      [LAZY],
+      { [LAZY.path]: LAZY_COMPONENT },
+      { [LAZY.path]: () => LAZY_COMPONENT },
+      LAZY_BINDING,
+    ],
+    ['an eager entry bound to a loader', [ALPHA], {}, { [ALPHA.path]: () => {} }, EAGER_BINDING],
+    [
+      'an eager entry stating lazy: false bound to a loader',
+      [{ ...ALPHA, lazy: false }],
+      {},
+      { [ALPHA.path]: () => {} },
+      EAGER_BINDING,
+    ],
+  ]) {
+    it(`refuses ${claim}, and stays unregistered`, () => {
+      const seam = createPublishedComponents({ table, isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components, loaders }),
+        (error) => error.constructor === Error && exactly(message).test(error.message)
+      );
+      assert.throws(
+        () => seam.publicApi.mount(table[0].name, { target: new FakeTarget() }),
+        (error) => exactly(`${PREFIX}not registered`).test(error.message)
+      );
+    });
+  }
 
   it('treats only a boolean true as required', () => {
     const loose = { ...ALPHA, props: { value: { kind: 'data', required: 'yes' } } };

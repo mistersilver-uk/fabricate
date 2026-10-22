@@ -27,7 +27,7 @@ export const STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE =
   'Fabricate | this browser is running a cached entry script from an earlier version of Fabricate; reload to complete the update.';
 
 /** Is this rejection the host refusing to fetch a code-split chunk? */
-function isChunkLoadFailure(error) {
+export function isChunkLoadFailure(error) {
   const message = error?.message;
   if (typeof message !== 'string' || !message) return false;
   const text = message.toLowerCase();
