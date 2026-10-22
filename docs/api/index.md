@@ -3088,26 +3088,29 @@ An item's other members are private and Fabricate draws nothing from them; a fun
 `activeTab` is the `id` of the selected tab and defaults to `''`: that tab is drawn selected, carries `aria-selected="true"` and is the strip's one tab stop, with `tabindex="0"` where every other tab has `-1`; when it names no item no tab is selected and the first tab is the tab stop.
 `onSelect` is a required callback, called with one argument, the `id` of the tab a press or a key reaches, the selected tab's included.
 The strip holds no selection: it draws a tab selected only once an `update` passes that `id` as `activeTab`, so make that `update` from inside `onSelect`, before any `await`.
+Until that `update`, focus rests on a tab drawn unselected with `tabindex="-1"` while the previous tab stays the tab stop; if you decline a selection, move focus back to the tab stop.
 `ariaLabel` is required and is the strip's name, final display text, as "Reagent sections".
 `idStem` is required and is the stem of every id the strip writes: a tab's `id` is `<idStem>-tab-<id>`, and its `aria-controls` names `<idStem>-panel-<id>`.
 It is the first published prop Fabricate builds ids from, so make it unique in the document with your module id, as `acme-reagents`.
-Draw each panel outside `target` with `id="<idStem>-panel-<id>"`, `role="tabpanel"` and `aria-labelledby="<idStem>-tab-<id>"`.
+Draw each panel outside `target`, after it in document order so `Tab` moves from the tab into the panel, with `id="<idStem>-panel-<id>"`, `role="tabpanel"` and `aria-labelledby="<idStem>-tab-<id>"`, and give it `tabindex="0"` when it holds no focusable element.
 `activePanelOnly` is `true` or `false` and defaults to `false`: `true` writes `aria-controls` on the selected tab alone, for a strip whose panels you draw one at a time; with `false` every tab writes it, so every panel it names exists in the document, or a screen reader may report the relationship as broken.
 The strip is horizontal and selects as focus moves: `ArrowRight` and `ArrowLeft` move focus to the next and the previous tab, wrapping at either end, `Home` to the first and `End` to the last, and then call `onSelect` with the `id` of the tab focus reached.
 Those four keys have their default prevented and still bubble to a `keydown` listener of yours above `target`; the strip handles no other key, so `ArrowUp` and `ArrowDown` move nothing, and `Enter` and `Space` press the focused tab as a native button does.
+A key pressed with `Alt`, `Ctrl` or `Meta` held is left to the platform, so `Alt+ArrowLeft` still goes back where the browser binds it.
 A press, by pointer, `Enter` or `Space`, calls `onSelect` and focuses its tab.
 Focus moves only among the strip's tabs, on a press and on those four keys, and never out of `target`.
-To return focus to the strip, focus `target.querySelector('[aria-selected="true"]')`, the selected tab.
+To return focus to the strip, focus `target.querySelector('[role="tab"][tabindex="0"]')`, the strip's one tab stop: the selected tab, or the first tab when `activeTab` names none.
 An `update` keeps every tab whose `id` it keeps, so focus stays on it; one that drops the focused tab's item, and `destroy`, remove that tab, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The strip adds no listener of its own to the document, so with the pointer over a tab Escape still reaches a listener of yours above `target`.
 Rest `data-*` is for your own hooks, and lands on the tablist, never on a tab.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 It needs a Fabricate window ancestor, because its row, its tabs and their ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
+The row wraps onto a further row when `target` is narrower than its tabs, and a selected tab on an upper row then draws its underline above the row below.
 Your own window or dialog carries no Fabricate root, so the strip is refused there with `EditorTabs needs a Fabricate window ancestor`.
 The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side; leave that much inside any edge of your own that clips.
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the strip on one of those four grounds.
 Its padding, rule, type and colour figures beyond what this section states, and how Fabricate draws a tab strip in its own editors, are private.
-`badges`, `annotated`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab never draws a mark, a padlock, a description or a name of its own.
+`badges`, `annotated`, `danger`, a `class` and Fabricate's own hook and id-stem props are refused, because a rest key must be a `data-*` attribute, so a tab never draws a mark, a padlock, a description or a name of its own.
 
 A worked strip follows: two sections of a reagent sheet you draw inside a Fabricate window, for example in an extension target, with one panel shown at a time.
 
@@ -3126,7 +3129,9 @@ const props = () => ({
   tabs: sections,
   activeTab: shown,
   ariaLabel: 'Reagent sections',
-  idStem: 'acme-reagents', // Your panels: id="acme-reagents-panel-<id>", role="tabpanel".
+  // Your panels, after `target`: id="acme-reagents-panel-<id>", role="tabpanel",
+  // aria-labelledby="acme-reagents-tab-<id>", and tabindex="0" where one holds no control.
+  idStem: 'acme-reagents',
   activePanelOnly: true,
   onSelect: (id) => {
     shown = id;

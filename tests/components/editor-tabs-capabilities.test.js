@@ -1,9 +1,10 @@
 /**
  * The four `EditorTabs` capabilities issue 1779 adds — the tab-stop fallback, the per-tab name
  * override, the per-tab description and the premium padlock, the last three read only under
- * `annotated` — plus click-to-focus, Escape passing a strip that shows no description (issue
- * 2627), the sheet rules that draw the description, and the scoped danger rules (spec.md "A tab
- * strip always keeps a tab stop, and names and describes a tab from its own entry").
+ * `annotated` — plus the strip's own name, the modifier keys it leaves to the platform,
+ * click-to-focus, Escape passing a strip that shows no description (issue 2627), the sheet rules
+ * that draw the description, and the scoped danger rules (spec.md "A tab strip always keeps a tab
+ * stop, and names and describes a tab from its own entry").
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -88,6 +89,44 @@ describe('the tab stop falls back to the first tab', () => {
     assert.deepEqual(attributeOf(root, 'tabindex'), ['0', '-1']);
     assert.deepEqual(attributeOf(root, 'aria-selected'), ['false', 'false']);
   });
+});
+
+describe('the strip’s own name and the keys it leaves', () => {
+  it('names the tablist by ariaLabel, and writes no aria-label when it is empty', async () => {
+    const root = await harness.mount({ tabs: TABS, activeTab: 'overview', ariaLabel: 'Sections' });
+    const tablist = () => root.querySelector('[role="tablist"]');
+    assert.equal(tablist().getAttribute('aria-label'), 'Sections');
+    await harness.setProps({ ariaLabel: '' });
+    await settle();
+    assert.ok(!tablist().hasAttribute('aria-label'), 'an empty name writes no attribute');
+  });
+
+  for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+    it(`leaves a key pressed with ${modifier} held to the platform`, async () => {
+      const selected = [];
+      const root = await harness.mount({
+        tabs: TABS,
+        activeTab: 'inputs',
+        onSelect: (id) => {
+          selected.push(id);
+        },
+      });
+      const inputs = button(root, 'inputs');
+      inputs.focus();
+      for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+        const event = new globalThis.KeyboardEvent('keydown', {
+          key,
+          [modifier]: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        inputs.dispatchEvent(event);
+        assert.ok(!event.defaultPrevented, `${key} keeps its default`);
+      }
+      assert.ok(globalThis.document.activeElement === inputs, 'focus stays put');
+      assert.deepEqual(selected, [], 'and nothing is selected');
+    });
+  }
 });
 
 describe('a tab entry may override its accessible name', () => {
