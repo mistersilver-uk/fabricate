@@ -1,14 +1,17 @@
 /**
- * The page session's one reporter for a deferred chunk that failed to load (issue 1565): the
- * crafting system manager and a lazy published entry share it (issue 2455), so a stale cache
- * raises one reload notice at a time. Not GM-gated, because `openRecipeManager` is macro-reachable.
+ * The page session's one reporter for a deferred chunk that failed to load (issue 1565), so a stale
+ * cache raises one reload notice at a time: the crafting system manager raises its own copy on each
+ * failure, and a lazy published entry (issue 2455) a neutral copy once per page. Neither is
+ * GM-gated: `openRecipeManager` is macro-reachable, and any client may load a published entry.
  */
 import {
   DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
+  buildDeferredPartFailureNotice,
   createDeferredChunkFailureReporter,
 } from '../utils/deferredEntryNotice.js';
 
 // Closures, since both `ui.notifications` members touch private fields and throw when unbound.
+// `ui.notifications` exists from `Game#initializeUI`, so a failure before then waits for `ready`.
 export const reportDeferredChunkFailure = createDeferredChunkFailureReporter({
   notify: (message, options) => ui.notifications?.error?.(message, options),
   hasNotice: (notice) => ui.notifications?.has?.(notice),
@@ -16,4 +19,10 @@ export const reportDeferredChunkFailure = createDeferredChunkFailureReporter({
   // declared-pure call only when its return value is used, as this concise arrow's is.
   log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
   localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)),
+  canNotify: () => Boolean(globalThis.ui?.notifications),
+  whenReady: (flush) => globalThis.Hooks?.once?.('ready', flush),
 });
+
+/** The published seam's `reportLoadFailure`: the neutral reload notice through the one reporter. */
+export const reportPublishedLoadFailure = (error) =>
+  reportDeferredChunkFailure(error, { buildNotice: buildDeferredPartFailureNotice, once: true });

@@ -236,7 +236,8 @@ describe('a text key on the real runtime', () => {
 });
 
 describe('the adapter', () => {
-  // What each loader imports is `published-component-manifest.test.js`'s, read from the adapter.
+  // `published-component-manifest.test.js` pins, from the adapter's source, that each loader
+  // imports its own path's module through `import()` alone and resolves its default export.
   it("binds exactly the eager manifest paths, each to that path's own component, and a loader to each lazy one", async () => {
     assert.ok(Object.isFrozen(adapterComponents));
     assert.deepEqual(Object.keys(adapterComponents), EAGER_PATHS);
@@ -249,6 +250,22 @@ describe('the adapter', () => {
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
     }
     assert.equal(runtime.unmount.constructor.name, 'Function', 'never async');
+  });
+
+  it("registers its own tables, its runtime and the shared reporter's published-load entry", async () => {
+    const { REGISTRATION } = await harness.loadRuneModule(ADAPTER);
+    const reporter = await harness.loadRawModule('src/ui/deferredChunkFailureReport.js');
+    assert.ok(Object.isFrozen(REGISTRATION));
+    assert.ok(REGISTRATION.components === adapterComponents, 'its components');
+    assert.ok(REGISTRATION.loaders === adapterLoaders, 'its loaders');
+    for (const [key, value] of Object.entries(runtime)) {
+      assert.ok(REGISTRATION[key] === value, `its runtime's ${key}`);
+    }
+    assert.equal(typeof reporter.reportPublishedLoadFailure, 'function');
+    assert.ok(
+      REGISTRATION.reportLoadFailure === reporter.reportPublishedLoadFailure,
+      "the reporter module's own published-load entry"
+    );
   });
 });
 

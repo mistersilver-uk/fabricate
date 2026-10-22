@@ -2992,7 +2992,7 @@ It does not wait for `fabricate.ready`, so `mount` still throws `mount before re
 `TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate fetches its code only when `load` names it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
-When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice; otherwise it draws and announces nothing, so draw your own pending state until `load` settles and your own error state, announced through your own live region, when it rejects.
+When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice, shared with the Manager's so one shows at a time; otherwise it draws and announces nothing, so draw your own pending state until `load` settles and your own error state, announced through your own live region, when it rejects.
 Once loaded, a lazy component mounts, draws and behaves exactly as it would if Fabricate loaded it with its entry script.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 

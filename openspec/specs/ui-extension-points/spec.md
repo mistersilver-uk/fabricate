@@ -386,7 +386,8 @@ It resolves `undefined` once every named entry's code is loaded: an eager entry 
 It rejects with the M3 `TypeError` for a name that is not published, before it fetches anything, and with the loader's error when a lazy entry's code cannot be fetched.
 It does not wait for `fabricate.ready`, so M2 still applies to `mount`.
 - A lazy entry's code is fetched once per page session: concurrent and later calls share the one fetch, and a failed fetch is not retried, so every later `load` naming the entry rejects with the same error and `mount` keeps refusing it with M19.
-A fetch that fails because the browser runs a stale copy of Fabricate also raises Fabricate's reload notice, the one the Manager raises, while none is on screen.
+A fetch that fails because the browser runs a stale copy of Fabricate also raises Fabricate's reload notice, shared with the Manager's so one shows at a time, at most once per page session.
+A fetch that fails before Foundry has created its notifications raises that notice at `ready`.
 Fabricate draws and announces nothing else for a load: a companion draws its own pending state until `load` settles and, on a rejection, its own error state, announced through its own live region.
 - A companion calls `load` once, keeps the promise, and mounts only after it has resolved and Fabricate is ready.
 - `api.ui` is bound at `init` and rebound at `ready` as the same object.
