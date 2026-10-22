@@ -369,6 +369,7 @@ describe('a key a leaf does not publish', () => {
     ['Avatar', 'class', 'is not a prop of Avatar'],
     ['Medallion', 'src', 'is not a prop of Medallion'],
     ['FillBar', 'class', 'is not a data attribute'],
+    ['FillBar', 'shares', 'is not a data attribute'],
     ['StatBox', 'valueDataAttr', 'is not a data attribute'],
     ['Meter', 'aria-label', 'is not a data attribute'],
     ['Meter', 'labelId', 'is not a data attribute'],
@@ -1233,6 +1234,84 @@ describe('Meter under a bare ancestor', () => {
     assert.equal(getComputedStyle(target.querySelector('.fab-meter')).position, 'relative');
     handle.destroy();
   });
+});
+
+describe('Meter in segments through the seam', () => {
+  const POOLED = Object.freeze({
+    label: 'Pooled days',
+    value: 7,
+    max: 12,
+    valueText: '7 of 12 days: yours 3, others 4',
+    segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+  });
+  const segmentsOf = (target) => [...target.querySelectorAll('.fab-fill-bar-share')];
+  const tonesOf = (target) =>
+    segmentsOf(target).map((share) => [...share.classList].find((name) => name.startsWith('is-')));
+  /** Each drawn segment's share of the fill, from its grow factor. */
+  const sharesOf = (target) => {
+    const grows = segmentsOf(target).map((share) => Number(share.style.flexGrow));
+    const total = grows.reduce((sum, grow) => sum + grow, 0);
+    return grows.map((grow) => grow / total);
+  };
+  const assertShares = (target, expected) => {
+    const actual = sharesOf(target);
+    assert.equal(actual.length, expected.length, `${expected.length} segments drawn`);
+    for (const [index, share] of actual.entries()) {
+      assert.ok(Math.abs(share - expected[index]) < 1e-6, `segment ${index} is ${expected[index]}`);
+    }
+  };
+  let stopRecording;
+  before(() => {
+    stopRecording = recordEscapes(recordEscape);
+  });
+  after(() => stopRecording());
+
+  it('draws the scenario as two abutting segments of a 58% fill, announcing the one reading', async () => {
+    const { target, handle } = mountLeaf('Meter', POOLED);
+    await settle();
+    const meter = target.querySelector('[role="meter"]');
+    assert.equal(meter.getAttribute('aria-valuenow'), '7');
+    assert.equal(meter.getAttribute('aria-valuetext'), POOLED.valueText);
+    const fill = target.querySelector('.fab-fill-bar-fill');
+    assert.equal(fill.style.width, '58%');
+    assert.ok(fill.classList.contains('is-stacked'));
+    assertShares(target, [3 / 7, 4 / 7]);
+    assert.deepEqual(tonesOf(target), ['is-accent', 'is-neutral']);
+
+    assert.equal(handle.update({ ...POOLED, segments: [{ tone: 'accent' }] }), true);
+    await settle();
+    assert.equal(segmentsOf(target).length, 0, 'one entry draws no segment element');
+    assert.ok(target.querySelector('.fab-fill-bar-fill').classList.contains('is-accent'));
+    assert.equal(target.querySelector('.fab-fill-bar').dataset.fillBarTone, 'accent');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('stops a three-entry list where the fill ends', async () => {
+    const { target, handle } = mountLeaf('Meter', {
+      label: 'Stamina',
+      value: 8,
+      max: 10,
+      segments: [{ value: 6 }, { value: 6 }, { tone: 'danger' }],
+    });
+    await settle();
+    assertShares(target, [6 / 8, 2 / 8]);
+    assert.deepEqual(tonesOf(target), ['is-success', 'is-success']);
+    handle.destroy();
+  });
+
+  for (const segments of [null, {}]) {
+    it(`contains segments: ${JSON.stringify(segments)} as a fault: reported once, target emptied, handle inert`, async () => {
+      const { target, handle } = mountLeaf('Meter', { ...POOLED, segments });
+      await settle();
+      assert.deepEqual(escaped, [], 'nothing escapes the boundary');
+      assert.equal(reports.length, 1);
+      assert.deepEqual(reports[0].slice(0, 2), [FAULT_REPORT, 'Meter']);
+      assert.ok(reports[0][2] instanceof TypeError, 'the read of a collection that is no list');
+      assert.equal(target.childNodes.length, 0);
+      assert.equal(handle.update(POOLED), false);
+    });
+  }
 });
 
 describe('FillBar under a bare ancestor', () => {
