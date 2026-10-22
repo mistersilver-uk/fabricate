@@ -269,4 +269,20 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'Select',
+    path: 'src/ui/svelte/components/Select.svelte',
+    version: 1,
+    props: Object.freeze({
+      options: Object.freeze({ kind: 'data', required: true }),
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      placeholder: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
+    }),
+    rest: false,
+    root: 'fabricate',
+    overlays: true,
+  }),
 ]);

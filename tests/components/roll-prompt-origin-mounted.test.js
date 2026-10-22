@@ -16,6 +16,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     HOST,
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/rollPromptOrigin.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/theme.js',

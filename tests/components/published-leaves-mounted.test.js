@@ -246,6 +246,31 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('input').value,
     drawn: ['', 'iron'],
   },
+  {
+    name: 'Select',
+    under: 'fabricate',
+    root: '.fabricate-picker',
+    props: {
+      options: [
+        { value: 10, label: 'Ten rows' },
+        { value: 25, label: 'Twenty-five rows' },
+      ],
+      value: 10,
+      ariaLabel: 'Rows per page',
+      onChange() {},
+    },
+    next: {
+      options: [
+        { value: 10, label: 'Ten rows' },
+        { value: 25, label: 'Twenty-five rows' },
+      ],
+      value: 25,
+      ariaLabel: 'Rows per page',
+      onChange() {},
+    },
+    read: (root) => root.querySelector('button').textContent.trim(),
+    drawn: ['Ten rows', 'Twenty-five rows'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -332,6 +357,9 @@ describe('a key a leaf does not publish', () => {
     ['SearchField', 'onChange', 'is not a data attribute'],
     ['SearchField', 'inputProps', 'is not a data attribute'],
     ['SearchField', 'class', 'is not a data attribute'],
+    ['Select', 'label', 'is not a prop of Select'],
+    ['Select', 'disabled', 'is not a prop of Select'],
+    ['Select', 'triggerProps', 'is not a prop of Select'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

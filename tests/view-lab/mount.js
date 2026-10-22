@@ -749,6 +749,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-values': () => import('./fixtures/PublishedValues.svelte'),
   // Issue 2453: search fields whose bound value reports each query, by the same seam.
   'published-search': () => import('./fixtures/PublishedSearch.svelte'),
+  // Issue 2454: selects whose lists open in an overlay host and on the standalone layer, by the same seam.
+  'published-select': () => import('./fixtures/PublishedSelect.svelte'),
 });
 // view-lab-region:end
 

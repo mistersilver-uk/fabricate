@@ -36,11 +36,7 @@ const THEME = 'data-fabricate-theme';
 const harness = createMountedComponentHarness({
   repoRoot: resolve(import.meta.dirname, '../..'),
   tmpPrefix: 'fabricate-published-overlays-',
-  rawModules: [
-    ...PUBLISHED_RAW_MODULES,
-    'src/ui/svelte/actions/anchoredPopover.js',
-    'src/ui/svelte/actions/portal.js',
-  ],
+  rawModules: PUBLISHED_RAW_MODULES,
   runeModules: PUBLISHED_RUNE_MODULES,
   compiledModules: [...PUBLISHED_COMPILED_MODULES, PROBE],
   componentPath: PROBE,
@@ -338,7 +334,14 @@ describe('destroy and a fault close every open overlay', () => {
     try {
       const { handle, panel } = openProbe(companionTarget(shells));
       const container = containerOf(panel);
-      assert.deepEqual(listeners.still(), ['click', 'click', 'click', 'resize', 'scroll'], 'bound');
+      // Svelte binds every event a loaded component delegates to each mount root, as many times
+      // as it has roots, and the published `Select`'s picker delegates `keydown` and `mousedown`.
+      const bound = ['click', 'keydown', 'mousedown', 'resize', 'scroll'];
+      assert.deepEqual(
+        [...new Set(listeners.still())].sort((a, b) => a.localeCompare(b)),
+        bound,
+        'bound'
+      );
       handle.destroy();
       await settle();
       assert.ok(!panel.isConnected && !container.isConnected, 'no panel and no container');

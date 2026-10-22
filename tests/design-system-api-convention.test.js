@@ -167,12 +167,6 @@ const EXCEPTIONS = Object.freeze([
     reason: 'a function returning one row’s attributes, where `<part>Props` names a fixed object',
   },
   {
-    component: 'SearchablePopoverPanel',
-    name: 'dialogNameAttribute',
-    fault: suffixed('Attribute'),
-    reason: 'an internal part with one caller, handed the name its parent already derived',
-  },
-  {
     component: 'PickerRowNameField',
     name: 'describedBy',
     fault: 'is a retired spelling',
@@ -225,13 +219,6 @@ const EXCEPTIONS = Object.freeze([
     name: REST,
     fault: 'spreads its rest on <input>, which is not the root',
     reason: 'rest lands on the host’s interactive element, which on the checkbox host is the input',
-  },
-  {
-    component: 'Select',
-    name: REST,
-    fault: 'declares a rest spread it writes on no element',
-    reason:
-      'rest reaches the `<Field>` root in the labelled form only; the bare root is the picker’s',
   },
 ]);
 

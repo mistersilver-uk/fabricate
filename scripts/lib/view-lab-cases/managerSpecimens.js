@@ -263,6 +263,32 @@ const SEARCH_CONTAINMENT = Object.freeze([
 /** Sized to the fixture's 320px ground and the height of its three fields. */
 const SEARCH_WINDOW = Object.freeze({ width: 480, height: 360 });
 
+/** The select fixture's ground, one of its sections by key, and a part of that section's select. */
+const SELECT_GROUND = '[data-lab-select-ground]';
+const SELECT_SECTION = (key) => `[data-lab-select="${key}"]`;
+const LAB_SELECT = (key, part) => `${SELECT_GROUND} ${SELECT_SECTION(key)} ${part}`;
+const SELECT_TRIGGER = '.fabricate-select-trigger';
+
+/** The list the ground hosts as `hosted`'s `overlayHost`, in the container the seam mounts there. */
+const HOSTED_LIST = `${SELECT_GROUND} > div > .fabricate-select-popover`;
+/** The list the seam's standalone layer hosts for `layer`, whose frame carries no app root. */
+const LAYER_LIST =
+  'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover';
+/** One option of a list, by the value the fixture passes. */
+const SELECT_OPTION = (list, value) => `${list} [data-popover-option="${value}"]`;
+
+/** Each trigger inside the ground, and the ground inside the window. */
+const SELECT_CONTAINMENT = Object.freeze([
+  ...['hosted', 'layer'].map((key) => ({
+    container: SELECT_GROUND,
+    target: LAB_SELECT(key, SELECT_TRIGGER),
+  })),
+  { container: '.window-content', target: SELECT_GROUND },
+]);
+
+/** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
+const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -687,6 +713,61 @@ export const CASES = Object.freeze([
     position: SEARCH_WINDOW,
     kinds: ['manager', 'specimen'],
     // `SearchField.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-specimen',
+    label:
+      'Specimen, mounted through the published seam — two selects, each beneath the text that names it, after one step: a press on Rows per page, which opened its list inside the ground the companion passed as its overlay host. The list reads 10, ticked and filled as the chosen row, then 25 and All, drawn over the ground below the trigger, clipped by nothing and ending above Sort recipes by, which stays closed, uncovered and showing its placeholder. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select' },
+    steps: [{ selector: LAB_SELECT('hosted', SELECT_TRIGGER) }],
+    // The list the press opened, in the overlay host, with the chosen row marked, and the second
+    // select's trigger left uncovered beneath it.
+    expectSelector: `${SELECT_GROUND}:has(${SELECT_SECTION('hosted')} ${SELECT_TRIGGER}[aria-expanded="true"]) > div > .fabricate-select-popover [data-popover-option="10"][aria-selected="true"]`,
+    expectCenterHit: [SELECT_OPTION(HOSTED_LIST, '25'), LAB_SELECT('layer', SELECT_TRIGGER)],
+    expectContained: [...SELECT_CONTAINMENT, { container: SELECT_GROUND, target: HOSTED_LIST }],
+    expectLayout: {
+      controls: [
+        // The inline rung's declared corner, and the panel's own.
+        { selector: LAB_SELECT('hosted', SELECT_TRIGGER), styles: 'border-radius: 7px' },
+        { selector: HOSTED_LIST, styles: 'border-radius: 11px' },
+      ],
+    },
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-layer',
+    label:
+      'Specimen, mounted through the published seam — the same two selects after three steps: All chosen from the list of Rows per page, whose callback passed all back so the trigger reads All; then a press on Sort recipes by, which passed no overlay host and whose window carries no app root, so its list opened on the standalone layer over the window. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each choice.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select' },
+    steps: [
+      { selector: LAB_SELECT('hosted', SELECT_TRIGGER) },
+      { selector: SELECT_OPTION(HOSTED_LIST, 'all') },
+      { selector: LAB_SELECT('layer', SELECT_TRIGGER) },
+    ],
+    // The choice the companion passed back, and the list the last press opened on the layer.
+    expectSelector: `body:has(${SELECT_SECTION('hosted')}[data-lab-value="all"]) > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover [data-popover-option="tier"]`,
+    expectCenterHit: SELECT_OPTION(LAYER_LIST, 'tier'),
+    expectContained: SELECT_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The form rung's declared corner, and the panel's own on the layer.
+        { selector: LAB_SELECT('layer', SELECT_TRIGGER), styles: 'border-radius: 9px' },
+        { selector: LAYER_LIST, styles: 'border-radius: 11px' },
+      ],
+    },
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

@@ -70,6 +70,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
