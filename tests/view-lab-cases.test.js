@@ -399,6 +399,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSearch.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
+  'tests/view-lab/fixtures/PublishedField.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -841,6 +842,8 @@ const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 
 const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
 /** A part of one published select of the select fixture, by its section's key. */
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
+/** The one section of the field fixture. */
+const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1279,6 +1282,17 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: 'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover',
       styles: 'border-radius: 11px',
+    },
+  ],
+  // The published field (issue 2601): the caption's kicker type, the companion input's chrome, and
+  // its inset keyboard ring over its own edge.
+  'manager-published-field-specimen': [
+    { selector: `${LAB_FIELD} .fab-kicker`, styles: 'font-size: 8.5px' },
+    { selector: `${LAB_FIELD} .fabricate-field input`, styles: 'height: 38px; border-radius: 9px' },
+    {
+      selector: `${LAB_FIELD} .fabricate-field input:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 1px; outline-offset: -1px; outline-color: var(--fab-accent)',
     },
   ],
 });
@@ -5913,13 +5927,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-select-specimen',
       'manager-published-select-layer',
       'manager-published-stage-bars-specimen',
+      'manager-published-field-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, and the stage bars fixture's groups. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, and the field fixture's column. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -5927,9 +5942,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'SearchField',
   'Select',
   'StageBars',
+  'Field',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select and StageBars and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars and Field and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6448,6 +6464,36 @@ test('the stage bars specimen case names the groups the stage bars fixture mount
     expectLayout.oneLineRows.endsWith(' .fab-stage-bars') &&
       expectLayout.unclipped.endsWith(' .fab-stage-bars-caption'),
     'each group’s bars are held on one line, and every caption whole'
+  );
+});
+
+test('the field specimen case types into the input the field fixture draws in a field it mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedField.svelte');
+  const mounted = (name) =>
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === name
+    );
+  assert.ok(mounted('Field') && mounted('Kicker'), 'the fixture mounts Field and Kicker');
+  for (const hook of ['data-lab-field-ground', 'data-lab-field', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector } = getCaseById('manager-published-field-specimen');
+  assert.deepEqual(
+    steps.map(({ fill, press }) => fill ?? press),
+    ['Moonlit tonic', 'ArrowRight'],
+    'a value typed, then a key that leaves keyboard focus on the input'
+  );
+  assert.equal(new Set(steps.map(({ selector }) => selector)).size, 1, 'both on the one input');
+  assert.ok(
+    expectSelector.includes('[data-lab-value="Moonlit tonic"]'),
+    'the frame is taken only once the companion recorded the edit'
   );
 });
 

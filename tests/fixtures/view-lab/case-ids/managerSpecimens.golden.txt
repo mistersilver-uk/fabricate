@@ -12,3 +12,4 @@ manager-published-search-specimen
 manager-published-select-specimen
 manager-published-select-layer
 manager-published-stage-bars-specimen
+manager-published-field-specimen
