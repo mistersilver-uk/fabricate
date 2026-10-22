@@ -10,7 +10,7 @@
   | `armed` | boolean | `false` | Whether this control holds the owner's single armed token; mutual exclusion is the owner's invariant. |
   | `idleLabel` / `armedLabel` / `busyLabel` / `idleIcon` / `armedIcon` / `busyIcon` | localized strings / Font Awesome classes | `''` / trash, triangle-exclamation, spinner | Copy and glyph per face; `idleIcon=""` drops the idle glyph only, and no caller may suppress the armed glyph. |
   | `idleAriaLabel` / `armedAriaLabel` / `ariaDescribedBy` | consequence sentences / element id | `''` | Each sentence contains its face's visible label (WCAG 2.5.3 Label in Name), and the busy face's name is `busyLabel`; `ariaDescribedBy` is omitted rather than emitted empty. |
-  | `disabled` | boolean | `false` | Native, and refuses arming and confirming. Disabling a focused button fires blur in Chromium and Firefox and leaves the keyboard on `document.body`, which happy-dom never reproduces. |
+  | `disabled` | boolean | `false` | Native, and refuses arming and confirming. Disabling a focused button fires blur in Chromium and Firefox, which disarms an armed control and leaves the keyboard on `document.body`; happy-dom fires no such blur. |
   | `busy` | boolean | `false` | The caller's own in-flight flag, never derived from `armed`. It is `Button`'s `busy`: `aria-busy` and `aria-disabled` and never `disabled`, so the control keeps focus and refuses the press. |
   | `showTitle` | boolean | `true` | Whether the accessible name is also a hover `title`. |
   | `size` | `''` \| `'38'` | `''` | `Button`'s rung: `'38'` stands it among the page header's 38px actions, and anything else draws 34. |
@@ -26,8 +26,10 @@
   Invariants:
   - The glyph swaps with the label, so the armed face survives greyscale.
   - `faceOf` reads `busy` first, and Escape and blur disarm only while armed and not busy, so a
-    blur during the write cannot clear the owner's token — pinned by `bulk-delete-card-mounted`.
-  - The busy face carries `data-busy` and never `is-armed`.
+    blur during the write cannot clear the owner's token — pinned by
+    `tests/components/bulk-delete-card-mounted.test.js`.
+  - The busy face carries `data-busy` and never `is-armed` — pinned by
+    `tests/components/armed-danger-button-mounted.test.js`.
 -->
 <script>
   import Button from './Button.svelte';
