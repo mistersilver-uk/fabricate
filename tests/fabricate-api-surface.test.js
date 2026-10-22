@@ -286,6 +286,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Well',
       'Callout',
       'IconButton',
+      'EditorTabs',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -548,6 +549,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           disabled: optional,
           onclick: { kind: 'callback', required: true },
           'aria-expanded': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'fabricate',
+        overlays: false,
+      },
+      EditorTabs: {
+        version: 1,
+        props: {
+          tabs: required,
+          activeTab: optional,
+          onSelect: { kind: 'callback', required: true },
+          ariaLabel: required,
+          idStem: required,
+          activePanelOnly: optional,
         },
         rest: true,
         root: 'fabricate',

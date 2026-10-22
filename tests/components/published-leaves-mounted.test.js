@@ -6,10 +6,11 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField`, `StageBars` and `IconButton` mount here as leaves; what each draws and
- * refuses is `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
- * `published-stepper-mounted.test.js`'s, `published-search-mounted.test.js`'s,
- * `published-stage-bars-mounted.test.js`'s and `published-icon-button-mounted.test.js`'s.
+ * `Stepper`, `SearchField`, `StageBars`, `IconButton` and `EditorTabs` mount here as leaves; what
+ * each draws and refuses is `published-button-mounted.test.js`'s,
+ * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
+ * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
+ * `published-icon-button-mounted.test.js`'s and `published-editor-tabs-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -101,6 +102,12 @@ afterEach(() => {
 });
 
 /** Each leaf's root, a mount and an update that changes `read`, and the shell its root needs. */
+/** Two tabs, each its required `id` and `label`. */
+const REAGENT_TABS = Object.freeze([
+  { id: 'inputs', label: 'Inputs' },
+  { id: 'outputs', label: 'Outputs' },
+]);
+
 const LEAVES = Object.freeze([
   {
     name: 'Avatar',
@@ -323,6 +330,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.getAttribute('aria-label'),
     drawn: ['Remove Iron ingot', 'Remove Ember salt'],
   },
+  {
+    name: 'EditorTabs',
+    under: 'fabricate',
+    root: '.fabricate-tabs',
+    props: { tabs: REAGENT_TABS, ariaLabel: 'Reagent sections', idStem: 'acme', onSelect() {} },
+    next: { tabs: REAGENT_TABS, ariaLabel: 'Reagent pages', idStem: 'acme', onSelect() {} },
+    read: (root) => root.getAttribute('aria-label'),
+    drawn: ['Reagent sections', 'Reagent pages'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -450,6 +466,8 @@ describe('a key a leaf does not publish', () => {
     ['Callout', 'class', 'is not a data attribute'],
     ['IconButton', 'tooltip', 'is not a data attribute'],
     ['IconButton', 'class', 'is not a data attribute'],
+    ['EditorTabs', 'annotated', 'is not a data attribute'],
+    ['EditorTabs', 'containerClass', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
