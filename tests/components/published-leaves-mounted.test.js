@@ -319,6 +319,33 @@ describe('each published leaf through the seam', () => {
   }
 });
 
+describe("InfoStrip's per-item props", () => {
+  it('renders no member of a fact’s props, on mount and on update, and leaves the caller’s object', async () => {
+    const attributes = {
+      'data-action': 'close',
+      class: 'x',
+      title: 'Hidden',
+      'aria-label': 'Hidden',
+    };
+    const facts = [{ icon: 'fas fa-sun', value: 'Clear', props: { ...attributes } }];
+    const { target, handle } = mountLeaf('InfoStrip', { label: 'Conditions', facts });
+    const drawn = () => target.querySelector('.fabricate-info-strip-fact');
+    const named = () =>
+      Object.keys(attributes)
+        .filter((name) => name !== 'class')
+        .filter((name) => drawn().hasAttribute(name));
+    assert.deepEqual(named(), []);
+    assert.equal(drawn().classList.contains('x'), false);
+    handle.update({ label: 'Conditions', facts: [{ value: 'Storm', props: { ...attributes } }] });
+    await settle();
+    assert.equal(drawn().textContent.trim(), 'Storm');
+    assert.deepEqual(named(), []);
+    assert.equal(drawn().classList.contains('x'), false);
+    assert.deepEqual(facts[0].props, attributes);
+    assert.deepEqual(reports, []);
+  });
+});
+
 describe('a key a leaf does not publish', () => {
   const UNPUBLISHED = [
     ['Avatar', 'class', 'is not a prop of Avatar'],
