@@ -201,6 +201,7 @@ function rowHarness(componentPath, compiledModules) {
   return createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-row-hook-parity-',
+    rawModules: ['src/ui/svelte/util/appLocalizer.js'],
     compiledModules: [...compiledModules, componentPath],
     componentPath,
   });

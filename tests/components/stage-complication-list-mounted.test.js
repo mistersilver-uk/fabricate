@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',

@@ -347,7 +347,10 @@ const premiumAdCss = scopedComponentCss(resolve(repoRoot, PREMIUM_AD));
 const premiumAdHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-premium-ad-geometry-',
-  rawModules: ['src/ui/svelte/apps/manager/premiumIconsAdModel.js'],
+  rawModules: [
+    'src/ui/svelte/apps/manager/premiumIconsAdModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
+  ],
   compiledModules: [
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',

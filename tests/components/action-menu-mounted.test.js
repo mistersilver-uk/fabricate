@@ -19,6 +19,7 @@ const RAW_MODULES = [
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',
+  'src/ui/svelte/util/appLocalizer.js',
 ];
 const COMPILED_MODULES = [
   'src/ui/svelte/components/IconButton.svelte',

@@ -23,6 +23,7 @@ const harness = createMountedComponentHarness({
     'src/gatheringImageDefaults.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/apps/manager/environment/recordNodePool.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',

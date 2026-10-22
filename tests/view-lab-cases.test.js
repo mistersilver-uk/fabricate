@@ -57,7 +57,8 @@ import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
-import { componentAstOf } from './helpers/parsedSource.js';
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { scopedComponentCss } from './helpers/scoped-component-css.js';
@@ -402,6 +403,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedField.svelte',
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
+  'tests/view-lab/fixtures/PublishedIconButtons.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -852,6 +854,8 @@ const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 const labCallout = (key) =>
   `[data-lab-callout-ground] > [data-lab-callout="${key}"] .manager-callout`;
 const LAB_CALLOUT_ACTIONS = `${labCallout('actions')} > .manager-callout-actions`;
+/** The published icon button in one row of the icon button fixture, by its key. */
+const labIconButton = (key) => `[data-lab-icon-buttons] > [data-lab-icon-button="${key}"] button`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1363,6 +1367,37 @@ const NON_VERB_CONTROLS = Object.freeze({
     },
     { selector: `${LAB_CALLOUT_ACTIONS} > span`, styles: 'display: contents' },
     { selector: `${LAB_CALLOUT_ACTIONS} > span > span`, styles: 'display: contents' },
+  ],
+  // The published icon button (issue 2601): each role's face and each rung's square, the disabled
+  // face, the keyboard-focused ghost-danger's ring and face, and the pressed disclosure's hover.
+  'manager-published-icon-buttons-specimen': [
+    {
+      selector: labIconButton('neutral'),
+      styles:
+        'width: 34px; height: 34px; border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+    },
+    {
+      selector: labIconButton('primary'),
+      styles: 'color: var(--fab-success-text); border-top-color: var(--fab-success-border)',
+    },
+    {
+      selector: labIconButton('ghost'),
+      styles:
+        'height: 28px; border-top-color: rgba(0, 0, 0, 0); background-color: rgba(0, 0, 0, 0)',
+    },
+    {
+      selector: labIconButton('danger'),
+      styles: 'color: var(--fab-danger-text); border-top-color: var(--fab-danger-border)',
+    },
+    {
+      selector: `${labIconButton('ghost-danger')}:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-danger-text); background-color: var(--fab-danger-soft)',
+    },
+    { selector: labIconButton('size-24'), styles: 'width: 24px; height: 24px' },
+    { selector: labIconButton('size-26'), styles: 'width: 26px; height: 26px' },
+    { selector: labIconButton('disabled'), styles: 'opacity: 0.62' },
+    { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5999,13 +6034,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-field-specimen',
       'manager-published-well-specimen',
       'manager-published-callout-specimen',
+      'manager-published-icon-buttons-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, and the callout fixture's notes. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, and the icon button fixture's buttons. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6016,9 +6052,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Field',
   'Well',
   'Callout',
+  'IconButton',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well and Callout and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout and IconButton and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6705,6 +6742,124 @@ test('the callout specimen case measures both roots and the actions slot the cal
     leads.length > 0 && leads.every(({ selector }) => selector.includes(':first-child ')),
     'a lead is measured on one of the warning note’s two points, never both'
   );
+});
+
+test('the icon buttons specimen case presses and keyboard-focuses the buttons the fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedIconButtons.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'IconButton'
+    ),
+    'the fixture mounts IconButton through the seam’s mount'
+  );
+  for (const hook of ['data-lab-icon-buttons', 'data-lab-icon-button', 'data-lab-icon-notes']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const rows = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'ROWS').init.arguments[0].elements;
+  const propOf = ({ elements }, name) =>
+    elements[2].properties.find(({ key }) => key.name === name)?.value.value;
+  assert.deepEqual(
+    rows.map((row) => [propOf(row, 'role') ?? 'neutral', propOf(row, 'size') ?? '']),
+    [
+      ['neutral', ''],
+      ['primary', ''],
+      ['ghost', ''],
+      ['danger', ''],
+      ['ghost-danger', ''],
+      ['neutral', '24'],
+      ['neutral', '26'],
+      ['neutral', ''],
+    ],
+    'each published role at the default rung, then each compact rung'
+  );
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-icon-buttons-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [
+      /\[data-lab-icon-button="([a-z-]+)"\] button$/.exec(step.selector)?.[1],
+      step.press ?? 'click',
+    ]),
+    [
+      ['expand', 'click'],
+      ['danger', 'Tab'],
+    ],
+    'a press on the disclosure, then Tab from the danger button onto the ghost-danger one'
+  );
+  for (const effect of [
+    'button[aria-expanded="true"]',
+    '[data-lab-icon-notes]:not([hidden])',
+    '[data-lab-icon-button="ghost-danger"] button[aria-describedby="tooltip"]:focus-visible',
+  ]) {
+    assert.ok(expectSelector.includes(effect), `the frame waits for ${effect}`);
+  }
+  assert.ok(
+    expectLayout.controls.some(({ selector }) =>
+      selector.endsWith('"ghost-danger"] button:focus-visible')
+    ),
+    'the keyboard ring is measured on the button the Tab focused'
+  );
+});
+
+test('the icon buttons specimen case holds every row the fixture draws, and the disclosure, inside the ground', () => {
+  const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedIconButtons.svelte');
+  const rows = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'ROWS').init.arguments[0].elements;
+  const { expectContained } = getCaseById('manager-published-icon-buttons-specimen');
+  const held = expectContained.flatMap(({ container, target }) => {
+    const key = /^\[data-lab-icon-buttons\] > \[data-lab-icon-button="([a-z0-9-]+)"\]$/.exec(
+      target
+    );
+    return key && container === '[data-lab-icon-buttons]' ? [key[1]] : [];
+  });
+  assert.deepEqual(held, [...rows.map(({ elements }) => elements[0].value), 'expand']);
+});
+
+test('the lab mounts each tree as a Fabricate root does, with the localizer and the tooltip facade', () => {
+  const { ast } = moduleAstOf(LAB_MOUNT_PATH);
+  const imported = new Map(
+    ast.body
+      .filter((node) => node.type === 'ImportDeclaration')
+      .flatMap(({ source, specifiers }) =>
+        specifiers.map(({ local, imported: name }) => [
+          local.name,
+          `${name?.name} from ${source.value}`,
+        ])
+      )
+  );
+  const wrapper = ast.body
+    .flatMap((node) => (node.type === 'VariableDeclaration' ? node.declarations : []))
+    .find((declarator) => declarator.id.name === 'mount');
+  const call = [
+    wrapper?.init?.callee?.name,
+    ...(wrapper?.init?.arguments ?? []).map((arg) => arg.name),
+  ];
+  assert.deepEqual(call, ['mountWithLocalizer', 'svelteMount', 'localize', 'foundryTooltips']);
+  assert.deepEqual(
+    call.map((name) => imported.get(name)),
+    [
+      'mountWithLocalizer from ../../src/ui/svelte/util/appLocalizer.js',
+      'mount from svelte',
+      'localize from ../../src/ui/svelte/util/foundryBridge.js',
+      'foundryTooltips from ../../src/ui/svelte/util/foundryBridge.js',
+    ]
+  );
+  const bare = [...walkNodes(ast)].filter(
+    (node) => node.type === 'Identifier' && node.name === 'svelteMount'
+  );
+  assert.equal(bare.length, 2, 'Svelte’s mount is imported and read by the wrapper alone');
 });
 
 test('every specimen case names a LAB_SPECIMENS key, and every key has a case', () => {

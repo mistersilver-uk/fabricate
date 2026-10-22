@@ -13,7 +13,11 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
-const RAW_MODULES = [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES];
+const RAW_MODULES = [
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
+  'src/ui/svelte/util/appLocalizer.js',
+];
 
 const sentenceHarness = createMountedComponentHarness({
   repoRoot,
