@@ -38,7 +38,11 @@ export function createEntryLoading({ entries, runtime }) {
           loaded.set(entry.path, component);
         },
         (error) => {
-          if (isChunkLoadFailure(error)) reportLoadFailure?.(error);
+          try {
+            if (isChunkLoadFailure(error)) reportLoadFailure?.(error);
+          } catch {
+            // The loader's error is the one `load` rejects with.
+          }
           throw error;
         }
       );
