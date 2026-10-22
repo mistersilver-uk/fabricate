@@ -210,7 +210,7 @@ describe("a companion's content in the published Well", () => {
     content.append(chipTarget);
     const chip = seam.mount('Chip', { target: chipTarget, props: { children: 'Ready' } });
     await settle();
-    const drawn = target.querySelector('.fabricate-card .fab-well');
+    const drawn = target.querySelector(':scope > .fabricate-card .fab-well');
     assert.ok(drawn?.contains(content), 'the companion content sits in the well, in the card');
     assert.equal(drawn.querySelector('.manager-chip').textContent, 'Ready');
     card.destroy();
