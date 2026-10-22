@@ -57,7 +57,8 @@ import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
-import { componentAstOf } from './helpers/parsedSource.js';
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { scopedComponentCss } from './helpers/scoped-component-css.js';
@@ -6809,6 +6810,56 @@ test('the icon buttons specimen case presses and keyboard-focuses the buttons th
     ),
     'the keyboard ring is measured on the button the Tab focused'
   );
+});
+
+test('the icon buttons specimen case holds every row the fixture draws, and the disclosure, inside the ground', () => {
+  const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedIconButtons.svelte');
+  const rows = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'ROWS').init.arguments[0].elements;
+  const { expectContained } = getCaseById('manager-published-icon-buttons-specimen');
+  const held = expectContained.flatMap(({ container, target }) => {
+    const key = /^\[data-lab-icon-buttons\] > \[data-lab-icon-button="([a-z0-9-]+)"\]$/.exec(
+      target
+    );
+    return key && container === '[data-lab-icon-buttons]' ? [key[1]] : [];
+  });
+  assert.deepEqual(held, [...rows.map(({ elements }) => elements[0].value), 'expand']);
+});
+
+test('the lab mounts each tree as a Fabricate root does, with the localizer and the tooltip facade', () => {
+  const { ast } = moduleAstOf(LAB_MOUNT_PATH);
+  const imported = new Map(
+    ast.body
+      .filter((node) => node.type === 'ImportDeclaration')
+      .flatMap(({ source, specifiers }) =>
+        specifiers.map(({ local, imported: name }) => [
+          local.name,
+          `${name?.name} from ${source.value}`,
+        ])
+      )
+  );
+  const wrapper = ast.body
+    .flatMap((node) => (node.type === 'VariableDeclaration' ? node.declarations : []))
+    .find((declarator) => declarator.id.name === 'mount');
+  const call = [
+    wrapper?.init?.callee?.name,
+    ...(wrapper?.init?.arguments ?? []).map((arg) => arg.name),
+  ];
+  assert.deepEqual(call, ['mountWithLocalizer', 'svelteMount', 'localize', 'foundryTooltips']);
+  assert.deepEqual(
+    call.map((name) => imported.get(name)),
+    [
+      'mountWithLocalizer from ../../src/ui/svelte/util/appLocalizer.js',
+      'mount from svelte',
+      'localize from ../../src/ui/svelte/util/foundryBridge.js',
+      'foundryTooltips from ../../src/ui/svelte/util/foundryBridge.js',
+    ]
+  );
+  const bare = [...walkNodes(ast)].filter(
+    (node) => node.type === 'Identifier' && node.name === 'svelteMount'
+  );
+  assert.equal(bare.length, 2, 'Svelte’s mount is imported and read by the wrapper alone');
 });
 
 test('every specimen case names a LAB_SPECIMENS key, and every key has a case', () => {
