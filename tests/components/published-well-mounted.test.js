@@ -1,8 +1,8 @@
 /**
  * The published `Well` on Fabricate's real Svelte runtime (issue 2601), through a fresh seam
- * registered with the adapter's own table: the well root under no Fabricate ancestor, its kicker
- * and group name, its content slot drawn in normal flow, its two fills, an `update` that keeps the
- * slot and focus in place, a well nested in a published `InspectorCard`, and its refusals.
+ * registered with the adapter's own table: the well root in a Fabricate window, its kicker and
+ * group name, its content slot drawn in normal flow, its two fills, an `update` that keeps the slot
+ * and focus in place, a well nested in a published `InspectorCard`, and its refusals.
  * Limit: happy-dom computes no accessible name and draws no frame, so a name is read off
  * `aria-label` and a fill off the computed `background-color`.
  */
@@ -82,7 +82,7 @@ afterEach(() => {
 });
 
 /** A well mounted with `props` into `target`: its handle and its root as drawn now. */
-function mountWell(props = LABELLED, target = companionTarget(targets)) {
+function mountWell(props = LABELLED, target = fabricateTarget(targets)) {
   const handle = ui().mount('Well', { target, props });
   return { target, handle, root: () => target.firstElementChild };
 }
@@ -104,8 +104,19 @@ function drawContent(slot) {
   return { content, input };
 }
 
+/** An empty target inside Fabricate's own in-window modal, in a Fabricate window. */
+function modalTarget() {
+  const target = fabricateTarget(targets);
+  const modal = document.createElement('div');
+  modal.className = 'fabricate-modal';
+  target.append(modal);
+  const inModal = document.createElement('div');
+  modal.append(inModal);
+  return inModal;
+}
+
 /** The refusal `mount` throws for `props`, with nothing rendered. */
-function assertRefused(props, tail, target = companionTarget(targets)) {
+function assertRefused(props, tail, target = fabricateTarget(targets)) {
   assert.throws(() => ui().mount('Well', { target, props }), {
     name: 'TypeError',
     message: REFUSAL + tail,
@@ -122,12 +133,12 @@ describe('the published Well draws its well', () => {
         children: { kind: 'slot', required: false },
       },
       rest: true,
-      root: 'any',
+      root: 'fabricate',
       overlays: false,
     });
   });
 
-  it('draws one unnamed div root under no Fabricate ancestor, with rest on it and nothing focusable', async () => {
+  it('draws one unnamed div root in a Fabricate window, with rest on it and nothing focusable', async () => {
     const { target, handle, root } = mountWell({ children: true, 'data-companion-well': 'batch' });
     await settle();
     assert.equal(target.children.length, 1, 'one root in target');
@@ -172,7 +183,7 @@ describe('the published Well draws its well', () => {
       assert.equal(well.backgroundColor, 'rgb(1, 2, 3)', '--fab-bg-1');
       assert.equal(getComputedStyle(handle.slot('children')).display, 'contents');
       handle.destroy();
-      const modal = mountWell(LABELLED, fabricateTarget(targets, 'fabricate-modal'));
+      const modal = mountWell(LABELLED, modalTarget());
       await settle();
       assert.equal(getComputedStyle(modal.root()).backgroundColor, 'rgb(4, 5, 6)', '--fab-bg-2');
       modal.handle.destroy();
@@ -193,6 +204,10 @@ describe("a companion's content in the published Well", () => {
       assert.ok(handle.slot('children') === slot, 'the same slot element');
       assert.ok(root().contains(content), 'still attached in the well');
       assert.ok(document.activeElement === input, 'still the input');
+      const named = Boolean(props.label);
+      assert.equal(root().getAttribute('role'), named ? 'group' : null, 'role follows the label');
+      assert.equal(root().getAttribute('aria-label'), named ? props.label : null);
+      assert.equal(Boolean(root().querySelector('.fab-kicker')), named, 'kicker follows the label');
     }
     handle.destroy();
   });
@@ -235,5 +250,9 @@ describe('the published Well refuses', () => {
 
   it('a function for its label (M10)', () => {
     assertRefused({ label: () => 'Reagents' }, '"label" must not hold a function');
+  });
+
+  it('a target outside a Fabricate window (M16)', () => {
+    assertRefused(LABELLED, 'Well needs a Fabricate window ancestor', companionTarget(targets));
   });
 });

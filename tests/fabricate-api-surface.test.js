@@ -519,7 +519,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: { label: optional, children: slot },
         rest: true,
-        root: 'any',
+        root: 'fabricate',
         overlays: false,
       },
     });

@@ -299,6 +299,7 @@ const LEAVES = Object.freeze([
   },
   {
     name: 'Well',
+    under: 'fabricate',
     root: '.fab-well',
     props: {},
     next: { label: 'Chosen reagents' },

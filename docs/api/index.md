@@ -2054,7 +2054,7 @@ The published components, in publication order:
 | `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
-| `Well` | 1 | `any` | `label`, `children` (slot) | yes |
+| `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2894,21 +2894,26 @@ With it the well is a `group` named by it, so a screen reader may read the label
 Pass sentence case.
 `children` is a content slot whose element is a `<div>`; the well draws the content slot's children in normal flow below its kicker, with no gap of its own, inside its own padding, so add no padding.
 Fill the slot with one element of your own that lays out and spaces your content, as [Mounting, updating and destroying](#mounting-updating-and-destroying) states.
+Children you append to the slot directly, not inside that one element, lay out in ordinary block and inline flow: inline ones share a line and block ones keep their own margins.
 The label is drawn by a `Kicker` as `p`, so [Kicker](#kicker)'s type and grounds apply; it is not a heading.
-Its fill is `--fab-bg-1`, or `--fab-bg-2` inside a Fabricate modal, whose body is itself `--fab-bg-1`, inside a 1px `--fab-border` edge.
-It states no ink or type, so your content inherits from `target`, and a `Kicker` clears 4.5:1 on either fill.
+Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate modal.
+A Fabricate modal is the dialog Fabricate draws itself inside its own window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
+It states no ink or type, so your content inherits the Fabricate window's ink from `target`, and a `Kicker` clears 4.5:1 on either fill.
 Never nest a well in a well: the design system has two container levels, the card and the well.
+Fabricate does not refuse a well nested in a well; this section only says not to.
 Rest `data-*` attributes land on the well's root.
-`Well` needs no Fabricate ancestor, so its root is `any`, and it draws the same under any but a Fabricate modal.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+`Well` needs a Fabricate window ancestor, so its root is `fabricate`, and it draws the same in every Fabricate window but for its fill inside a Fabricate modal.
 The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
 Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 Its padding, corner and edge figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt are private.
 A `class` is refused because a rest key must be a `data-*` attribute.
 
-A worked well follows: a labelled group of the reagents you hold for a batch, in a card.
+A worked well follows: a labelled group of the reagents you hold for a batch, in a card mounted inside a Fabricate window, for example in an extension target.
 
 ```javascript
 // After `load(['InspectorCard', 'Well'])` has resolved and `fabricate.ready` has fired.
+// `target` sits inside a Fabricate window, as both roots require.
 const fabUi = game.fabricate?.api?.ui;
 if (!fabUi?.components.includes('Well')) return;
 
@@ -2926,6 +2931,7 @@ content.style.flexDirection = 'column';
 content.style.gap = '8px';
 for (const reagent of acmeBatch.reagents) {
   const line = document.createElement('p');
+  line.style.margin = '0'; // Foundry's own paragraph margin would add to the gap.
   line.textContent = reagent.name;
   content.append(line);
 }
@@ -3107,7 +3113,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars` and `Field` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field` and `Well` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.

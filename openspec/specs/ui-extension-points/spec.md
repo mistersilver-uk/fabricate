@@ -1089,12 +1089,15 @@ Each group states the accepted values of every key that entry publishes.
     The companion passes sentence case.
   - `children` is a content slot whose element is a `<div>`; the well draws the content slot's children in normal flow below its kicker, with no gap of its own, inside its own padding, so the companion adds no padding.
     The companion fills the slot with one element of its own that lays out and spaces its content, as the content-slot rules state.
+    Children appended to the slot directly, not inside that one element, lay out in ordinary block and inline flow: inline ones share a line and block ones keep their own margins.
   - The label is drawn by a `Kicker` as `p`, so the `Kicker` group's type and grounds apply; it is not a heading.
-  - Its fill is `--fab-bg-1`, or `--fab-bg-2` inside a Fabricate modal, whose body is itself `--fab-bg-1`, inside a 1px `--fab-border` edge.
-    It states no ink or type, so its content inherits from `target`, and a `Kicker` clears 4.5:1 on either fill.
+  - Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate modal.
+    A Fabricate modal is Fabricate's own in-window modal, the `.fabricate-modal` dialog that `Modal.svelte` draws inside a Fabricate window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
+    It states no ink or type, so its content inherits the Fabricate window's ink from `target`, and a `Kicker` clears 4.5:1 on either fill.
   - A well is never nested in a well: the design system has two container levels, the card and the well.
+    Fabricate does not refuse a well nested in a well; the group only says not to.
   - Rest `data-*` attributes land on the well's root.
-  - It needs no Fabricate ancestor, and draws the same under any but a Fabricate modal.
+  - It needs a Fabricate window ancestor, and draws the same in every Fabricate window but for its fill inside a Fabricate modal.
   - The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
   - Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
 - **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding, corner and edge figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt.
@@ -1394,9 +1397,10 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 #### Scenario: A published well
 
-- **WHEN** a companion mounts `Well` with a `label` and `children: true` in a published `InspectorCard`'s content slot, and fills the well's content slot with one element of its own
+- **WHEN** a companion mounts `Well` with a `label` and `children: true` in a published `InspectorCard`'s content slot inside a Fabricate window, and fills the well's content slot with one element of its own
 - **THEN** the well draws one `<div>` named as a `group` by its label, its kicker above the content slot, which it draws in normal flow on `--fab-bg-1`
 - **AND** an `update` that adds or drops `label` keeps the slot and focus in place, and the card's `destroy` ends the well and leaves `target` empty
+- **AND** a mount into a target with no `.fabricate` ancestor throws M16
 
 #### Scenario: An overlay host
 

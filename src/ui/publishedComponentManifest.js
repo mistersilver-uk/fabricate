@@ -320,6 +320,6 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       children: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
-    root: 'any',
+    root: 'fabricate',
   }),
 ]);

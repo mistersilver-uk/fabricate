@@ -871,7 +871,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-well-specimen',
     label:
-      'Specimen, mounted through the published seam — one card holding a well, as a companion groups its own content: the card’s heading Moonlit tonic, a published kicker, and beneath it a well on the --fab-bg-1 fill inside a 1px edge at radius 9 and 12px of padding, headed by its label Chosen reagents in the 8.5px upper-case kicker type, 8px above its content. Below the label, in the well’s normal flow, the companion’s one element lays out the line Moonpetal, silverleaf and ember salt and, 8px beneath it, a positive Ready chip. The frame draws inside the manager window and is the evidence for it alone; the well’s fill inside a Fabricate modal and its draw under no Fabricate ancestor are the mounted suite’s',
+      'Specimen, mounted through the published seam — one card holding a well, as a companion groups its own content: the card’s heading Moonlit tonic, a published kicker, and beneath it a well on the --fab-bg-1 fill inside a 1px edge at radius 9 and 12px of padding, headed by its label Chosen reagents in the 8.5px upper-case kicker type, 8px above its content. Below the label, in the well’s normal flow, the companion’s one element lays out the line Moonpetal, silverleaf and ember salt and, 8px beneath it, a positive Ready chip. The frame draws inside the manager window and is the evidence for it alone; the well’s fill inside a Fabricate modal and its refusal outside a Fabricate window are the mounted suite’s',
     // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
     reaches: 'beyond',
     smokeLabels: [],
