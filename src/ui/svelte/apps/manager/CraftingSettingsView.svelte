@@ -41,11 +41,8 @@
   // The recipe-visibility radio-card options. `global | restricted | item |
   // knowledge` mirror the visibility matrix; icons/copy follow the prototype.
   // The shared RadioCardGroup renders label + description per option; the `icon`
-  // field rides along for parity with the design and is drawn as the leading glyph
-  // tile.
-
-  // ISSUE 1509 FOLDED THE `ResolutionModeCard` SHIM AWAY, and the three call sites
-  // below render the primitive directly.
+  // field rides along for parity with the design and is drawn as the leading
+  // glyph tile.
   //
   // For a non-alchemy system these read as GATING (a recipe is hidden until the
   // mode's condition is met). An alchemy system is REVEAL-not-gate: brewing is never
