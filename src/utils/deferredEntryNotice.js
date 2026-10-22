@@ -2,9 +2,10 @@
  * Telling a client it is running a STALE ENTRY SCRIPT (issue 1565). Foundry serves the module's
  * entry at a stable URL, so a cache in front of it can hand back an earlier build whose hashed
  * chunks are gone. Two signals, because they fail at different moments:
- * {@link buildDeferredChunkFailureNotice} on the rejection, {@link buildStaleEntryNotice} at
- * startup. Neither is GM-gated, and neither claims reopening recovers — only a reload does, and
- * the copy escalates to a cache-bypassing one. Pure, because nothing in `src/main.js` is testable.
+ * {@link buildDeferredChunkFailureNotice} (a window) or {@link buildDeferredPartFailureNotice} (a
+ * lazy published part) on the rejection, {@link buildStaleEntryNotice} at startup. None is
+ * GM-gated, and none claims reopening recovers — only a reload does, and the copy escalates to a
+ * cache-bypassing one. Pure, because nothing in `src/main.js` is testable.
  */
 
 import { localizeWith } from './localizeWithFallback.js';
@@ -54,7 +55,10 @@ export function buildDeferredChunkFailureNotice(error, localize) {
   );
 }
 
-/** The notice for a deferred part that is not a window, raised for a chunk-load failure alone. */
+/**
+ * The notice for a lazy published part: its caller reports a chunk-load failure alone, so the copy
+ * names a stale cache.
+ */
 export function buildDeferredPartFailureNotice(_error, localize) {
   return localizeWith(
     localize,
@@ -94,9 +98,11 @@ function isNoticeLive(hasNotice, retained) {
 }
 
 /**
- * The reporter for a failed deferred load: one console line per failure and one notice at a time,
- * each call naming its notice's builder; a `once` builder raises at most one notice per reporter.
- * While `canNotify()` is false the latest notice waits for the flush handed to `whenReady`.
+ * The reporter for a failed deferred load: it logs one console line per failure and raises one
+ * notice at a time, built by the `buildNotice` its call names (the window notice by default).
+ * A call with `once` raises its builder's notice at most once per reporter, and a notice a live
+ * one suppresses is not used up. While `canNotify()` is false only the latest notice waits, and
+ * `whenReady` is handed the flush that raises it.
  */
 export function createDeferredChunkFailureReporter({
   notify,
