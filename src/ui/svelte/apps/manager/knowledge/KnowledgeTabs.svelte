@@ -14,6 +14,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
   import { KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS } from './knowledgeStudio.js';
 
   let {
@@ -52,12 +53,11 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   badges={marks}
   onSelect={onChange}
-  ariaLabelKey="FABRICATE.Admin.Manager.Knowledge.Tabs.Label"
-  ariaLabel="Knowledge sections"
+  ariaLabel={localizeOr('FABRICATE.Admin.Manager.Knowledge.Tabs.Label', 'Knowledge sections')}
   idStem="knowledge"
   tabDataAttr="data-knowledge-tab"
   countDataAttr="data-knowledge-tab-count"

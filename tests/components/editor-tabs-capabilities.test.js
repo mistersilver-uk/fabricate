@@ -1,8 +1,9 @@
 /**
  * The four `EditorTabs` capabilities issue 1779 adds — the tab-stop fallback, the per-tab name
- * override, the per-tab description and the premium padlock — plus click-to-focus, the sheet rules
- * that draw the description, and the scoped danger rules (spec.md "A tab strip always keeps a tab
- * stop, and names and describes a tab from its own entry").
+ * override, the per-tab description and the premium padlock, the last three read only under
+ * `annotated` — plus click-to-focus, the sheet rules that draw the description, and the scoped
+ * danger rules (spec.md "A tab strip always keeps a tab stop, and names and describes a tab from
+ * its own entry").
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -12,10 +13,7 @@ import { flushSync, tick } from 'svelte';
 
 import { censusRules } from '../../scripts/lib/stylesheetSelectorCensus.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { APP_LOCALIZER_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -25,21 +23,14 @@ const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-capabilities-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: APP_LOCALIZER_RAW_MODULES,
   compiledModules: ['src/ui/svelte/components/Chip.svelte', PRIMITIVE],
   componentPath: PRIMITIVE,
 });
 
-let shippedLocalize;
-before(async () => {
-  await harness.setup();
-  shippedLocalize = globalThis.game.i18n.localize;
-});
+before(() => harness.setup());
 after(() => harness.teardown());
-afterEach(() => {
-  globalThis.game.i18n.localize = shippedLocalize;
-  harness.remount();
-});
+afterEach(() => harness.remount());
 
 async function settle() {
   flushSync();
@@ -48,14 +39,15 @@ async function settle() {
 }
 
 const TABS = Object.freeze([
-  { id: 'overview', icon: 'fas fa-circle-info', labelKey: 'x.Overview', label: 'Overview' },
-  { id: 'inputs', icon: 'fas fa-list', labelKey: 'x.Inputs', label: 'Inputs' },
-  { id: 'outputs', icon: 'fas fa-box', labelKey: 'x.Outputs', label: 'Outputs' },
+  { id: 'overview', icon: 'fas fa-circle-info', label: 'Overview' },
+  { id: 'inputs', icon: 'fas fa-list', label: 'Inputs' },
+  { id: 'outputs', icon: 'fas fa-box', label: 'Outputs' },
 ]);
 
-const DESCRIBED = Object.freeze(
-  TABS.map((tab) => ({ ...tab, tooltipKey: `x.${tab.id}.Tip`, tooltip: `About ${tab.label}` }))
-);
+const DESCRIBED = Object.freeze(TABS.map((tab) => ({ ...tab, tooltip: `About ${tab.label}` })));
+
+/** A mount whose tab entries' names, descriptions and padlocks are read. */
+const annotated = (props) => harness.mount({ ...props, annotated: true });
 
 const buttons = (root) => [...root.querySelectorAll('[role="tab"]')];
 const button = (root, id) => root.querySelector(`#editor-tab-${id}`);
@@ -99,28 +91,23 @@ describe('the tab stop falls back to the first tab', () => {
 });
 
 describe('a tab entry may override its accessible name', () => {
-  it('writes the localized override, and no attribute for an entry without one', async () => {
-    globalThis.game.i18n.localize = (key) => (key === 'x.Name' ? 'Open the inputs' : key);
-    const root = await harness.mount({
-      tabs: [TABS[0], { ...TABS[1], ariaLabelKey: 'x.Name', ariaLabel: 'Inputs (fallback)' }],
-      activeTab: 'overview',
-    });
+  const NAMED = [TABS[0], { ...TABS[1], ariaLabel: 'Open the inputs' }];
+
+  it('writes the override, and no attribute for an entry without one', async () => {
+    const root = await annotated({ tabs: NAMED, activeTab: 'overview' });
     assert.equal(button(root, 'inputs').getAttribute('aria-label'), 'Open the inputs');
     assert.ok(!button(root, 'overview').hasAttribute('aria-label'), 'no override, no attribute');
   });
 
-  it('falls back to the English name when the key is untranslated', async () => {
-    const root = await harness.mount({
-      tabs: [{ ...TABS[0], ariaLabelKey: 'x.Missing', ariaLabel: 'Open the overview' }],
-      activeTab: 'overview',
-    });
-    assert.equal(button(root, 'overview').getAttribute('aria-label'), 'Open the overview');
+  it('writes no override from a strip that is not annotated', async () => {
+    const root = await harness.mount({ tabs: NAMED, activeTab: 'overview' });
+    assert.ok(!button(root, 'inputs').hasAttribute('aria-label'));
   });
 });
 
 describe('a tab entry may carry a description', () => {
   it('renders each description beside the tablist and points its tab at it', async () => {
-    const root = await harness.mount({
+    const root = await annotated({
       tabs: DESCRIBED,
       activeTab: 'overview',
       idStem: 'world-downtime',
@@ -152,7 +139,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('honours a tooltip id stem of the caller`s own', async () => {
-    const root = await harness.mount({
+    const root = await annotated({
       tabs: DESCRIBED,
       activeTab: 'overview',
       tooltipIdStem: 'x-tip',
@@ -162,7 +149,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('shows the hovered tab over the focused one and falls back to focus when hover leaves', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     assert.deepEqual(shown(root), [], 'nothing is described before any interaction');
 
     fire(button(root, 'overview'), 'focus');
@@ -187,7 +174,7 @@ describe('a tab entry may carry a description', () => {
 
   it('hides the shown description on Escape until that tab is next hovered or focused', async () => {
     const selected = [];
-    const root = await harness.mount({
+    const root = await annotated({
       tabs: DESCRIBED,
       activeTab: 'inputs',
       onSelect: (id) => {
@@ -217,7 +204,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('re-shows a dismissed description when its tab is next focused', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'inputs' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'inputs' });
     const inputs = button(root, 'inputs');
     fire(inputs, 'focus');
     await settle();
@@ -231,7 +218,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('dismisses the hovered description, not the focused one, and leaves the focused one armed', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     const overview = button(root, 'overview');
     fire(overview, 'focus');
     fire(button(root, 'outputs'), 'mouseenter');
@@ -244,7 +231,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('describes only the entries that carry a description in a mixed strip', async () => {
-    const root = await harness.mount({ tabs: [DESCRIBED[0], TABS[1]], activeTab: 'overview' });
+    const root = await annotated({ tabs: [DESCRIBED[0], TABS[1]], activeTab: 'overview' });
     assert.ok(!button(root, 'inputs').hasAttribute('aria-describedby'));
     const described = [...root.querySelectorAll('[aria-describedby]')];
     assert.equal(described.length, 1);
@@ -254,17 +241,14 @@ describe('a tab entry may carry a description', () => {
     }
   });
 
-  it('describes an entry that names only a description key', async () => {
-    globalThis.game.i18n.localize = (key) => (key === 'x.Tip' ? 'About the overview' : key);
-    const root = await harness.mount({
-      tabs: [{ ...TABS[0], tooltipKey: 'x.Tip' }],
-      activeTab: 'overview',
-    });
-    assert.equal(tooltip(root, 'overview')?.textContent, 'About the overview');
+  it('draws no description from a strip that is not annotated', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    assert.equal(root.querySelectorAll('[role="tooltip"]').length, 0);
+    assert.deepEqual(attributeOf(root, 'aria-describedby'), [null, null, null]);
   });
 
   it('keeps a description shown while the pointer crosses onto it, and hides it after', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     const outputs = button(root, 'outputs');
     fire(outputs, 'mouseenter');
     await settle();
@@ -280,7 +264,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('hides a hover-shown description on Escape with focus outside the strip, and keeps the window open', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     const reached = [];
     const onPage = (event) => {
       reached.push(event.key);
@@ -301,7 +285,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('places the shown description above its tab, start-aligned and clamped inside the ancestor', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     const anchor = globalThis.document.createElement('div');
     define(anchor, { clientWidth: 600, clientHeight: 80 });
     define(button(root, 'inputs'), { offsetParent: anchor, offsetLeft: 120, offsetTop: 40 });
@@ -326,7 +310,7 @@ describe('a tab entry may carry a description', () => {
   });
 
   it('leaves the sheet`s fallback when the tab and its description share no measured ancestor', async () => {
-    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
     fire(button(root, 'overview'), 'mouseenter');
     await settle();
     assert.ok(!tooltip(root, 'overview').hasAttribute('style'), 'nothing measured');
@@ -341,7 +325,7 @@ describe('a tab entry may carry a description', () => {
 
   it('focuses the tab a pointer click selects', async () => {
     const selected = [];
-    const root = await harness.mount({
+    const root = await annotated({
       tabs: DESCRIBED,
       activeTab: 'overview',
       onSelect: (id) => {
@@ -368,7 +352,7 @@ describe('a tier-gated tab carries the premium padlock', () => {
   const locks = (node) => node.querySelectorAll('.manager-editor-tab-lock');
 
   it('draws one hidden padlock per gated tab and none on an ungated one', async () => {
-    const root = await harness.mount({ tabs: GATED, activeTab: 'overview' });
+    const root = await annotated({ tabs: GATED, activeTab: 'overview' });
     assert.deepEqual(
       buttons(root).map((node) => locks(node).length),
       [1, 0, 1]
@@ -380,7 +364,7 @@ describe('a tier-gated tab carries the premium padlock', () => {
 
   it('keeps a gated tab focusable and selectable by click and by arrow', async () => {
     const selected = [];
-    const root = await harness.mount({
+    const root = await annotated({
       tabs: GATED,
       activeTab: 'overview',
       onSelect: (id) => {
@@ -396,7 +380,7 @@ describe('a tier-gated tab carries the premium padlock', () => {
   });
 
   it('keeps the stop, the selection and focus when the focused tab re-renders gated', async () => {
-    const root = await harness.mount({ tabs: TABS, activeTab: 'inputs' });
+    const root = await annotated({ tabs: TABS, activeTab: 'inputs' });
     const inputs = button(root, 'inputs');
     inputs.focus();
     await harness.setProps({ tabs: GATED });
@@ -406,7 +390,7 @@ describe('a tier-gated tab carries the premium padlock', () => {
     assert.equal(inputs.getAttribute('tabindex'), '0');
     assert.equal(inputs.getAttribute('aria-selected'), 'true');
     harness.remount();
-    const gated = await harness.mount({ tabs: GATED, activeTab: 'overview' });
+    const gated = await annotated({ tabs: GATED, activeTab: 'overview' });
     const overview = button(gated, 'overview');
     overview.focus();
     assert.equal(overview.getAttribute('aria-selected'), 'true');

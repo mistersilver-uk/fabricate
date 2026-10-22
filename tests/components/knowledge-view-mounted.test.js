@@ -23,6 +23,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
+    // The editor tab strip's severity names localize through the app root's context.
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.

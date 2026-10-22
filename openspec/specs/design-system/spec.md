@@ -122,7 +122,8 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
 The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
 `SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
-The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` and `EditorTabs` keep a lang key plus fallback, because neither is a published-seam entry and neither is held by this rule.
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` keeps a lang key plus fallback, because it is not a published-seam entry and is not held by this rule.
+`EditorTabs` takes its tab labels, names and descriptions and its strip's name as final display text the caller resolves, with `localizeTabs` from `util/localizeOr.js` for a tab list; it localizes only the severity names it builds for a Validation tab, through the `APP_LOCALIZER` context, so a tree mounted with none draws their English and calls no `game.i18n`.
 
 #### Scenario: A caller's key has no translation
 
@@ -1486,6 +1487,7 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 The tab-strip primitive's roving tab stop is the selected tab, or the first rendered tab when the selected id names no rendered tab, while `aria-selected` stays bound to the selected id.
 A tab entry MAY override its accessible name, and an overriding name MUST contain the tab's visible label.
 A tab entry MAY carry a description that the strip renders as a `role="tooltip"` element beside the tablist rather than inside it — a tablist owns only tabs — referenced by the tab's `aria-describedby`.
+The strip reads an entry's name override, description and `tierGated` only when its caller passes `annotated`; without it each tab is drawn from its id, glyph and label alone.
 A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
 The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
 A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.

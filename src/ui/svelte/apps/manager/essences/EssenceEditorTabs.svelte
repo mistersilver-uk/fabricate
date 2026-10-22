@@ -21,6 +21,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { ESSENCE_EDITOR_TABS } from './essenceStudio.js';
 
@@ -93,12 +94,11 @@
 </script>
 
 <EditorTabs
-  tabs={editorTabs}
+  tabs={localizeTabs(editorTabs)}
   {activeTab}
   {badges}
   onSelect={onChange}
-  ariaLabelKey="FABRICATE.Admin.Manager.Essence.Tabs.Label"
-  ariaLabel="Essence editor sections"
+  ariaLabel={localizeOr('FABRICATE.Admin.Manager.Essence.Tabs.Label', 'Essence editor sections')}
   idStem="essence"
   tabDataAttr="data-essence-tab"
   containerClass="manager-essence-editor-tabs manager-editor-tabs"

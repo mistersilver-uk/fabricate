@@ -369,14 +369,12 @@
     {
       id: 'rules',
       icon: 'fas fa-cube',
-      labelKey: 'FABRICATE.Admin.Manager.Component.TabRules',
-      label: 'Component rules',
+      label: text('FABRICATE.Admin.Manager.Component.TabRules', 'Component rules'),
     },
     {
       id: 'validation',
       icon: 'fas fa-clipboard-check',
-      labelKey: 'FABRICATE.Admin.Manager.Component.TabValidation',
-      label: 'Validation',
+      label: text('FABRICATE.Admin.Manager.Component.TabValidation', 'Validation'),
     },
   ]);
   const badges = $derived({ validation: validation.badge });
@@ -392,7 +390,7 @@
     if (route) activeTab = route.id;
     announceValidationOutcome({
       root: editorRoot,
-      routeLabel: route ? text(route.labelKey, route.label) : '',
+      routeLabel: route ? route.label : '',
       focus: () => focusValidationTarget(editorRoot, focusTarget),
       fallbackPanel: tabPanel,
       announce: (sentence) => {
@@ -1066,8 +1064,7 @@
       {activeTab}
       {badges}
       onSelect={(tab) => (activeTab = tab)}
-      ariaLabelKey="FABRICATE.Admin.Manager.Component.TabsLabel"
-      ariaLabel="Component rules sections"
+      ariaLabel={text('FABRICATE.Admin.Manager.Component.TabsLabel', 'Component rules sections')}
       idStem="component-rules"
       tabDataAttr="data-component-edit-tab"
       badgeDataAttr="data-component-edit-tab-badge"
