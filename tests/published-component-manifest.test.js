@@ -66,8 +66,13 @@ import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
 import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
-import { parseModule, walkNodes } from './helpers/moduleAst.js';
-import { componentAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
+import {
+  importedModules,
+  lazilyImportedModules,
+  parseModule,
+  walkNodes,
+} from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { drawnClosure, drawsNode } from './helpers/publishedClosureDrawn.js';
 import {
   BARE_BUTTON_ANCESTORS,
@@ -928,6 +933,42 @@ function drawnByAny(entries, reader = SHIPPED) {
   return (file, node) => closures.some((closure) => drawsNode(closure, file, node));
 }
 
+/** The adapter, and its specifier for a manifest path, which is relative to `src/ui/`. */
+const ADAPTER = 'src/ui/publishedComponents.svelte.js';
+const adapterSpecifierOf = (path) => `./${path.slice('src/ui/'.length)}`;
+
+describe('a lazy entry, whose code load fetches (issue 2455)', () => {
+  it('is stated by no entry before Kicker, the first published with load', () => {
+    const first = PUBLISHED_COMPONENT_MANIFEST.findIndex((entry) => entry.name === 'Kicker');
+    assert.ok(first > 0, 'Kicker is published after TierTrack');
+    const early = PUBLISHED_COMPONENT_MANIFEST.slice(0, first);
+    assert.deepEqual(
+      early.filter((entry) => Object.hasOwn(entry, 'lazy')),
+      []
+    );
+  });
+
+  it('is Rail alone, pinned by name', () => {
+    const lazy = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true);
+    assert.deepEqual(
+      lazy.map((entry) => entry.name),
+      ['Rail']
+    );
+  });
+
+  it('is imported by the adapter through import() alone, and an eager entry statically alone', () => {
+    const { ast } = moduleAstOf(ADAPTER);
+    const statically = importedModules(ast);
+    const lazily = lazilyImportedModules(ast);
+    for (const entry of PUBLISHED_COMPONENT_MANIFEST) {
+      const specifier = adapterSpecifierOf(entry.path);
+      const lazy = entry.lazy === true;
+      assert.equal(statically.includes(specifier), !lazy, `${entry.name}: a static import`);
+      assert.equal(lazily.includes(specifier), lazy, `${entry.name}: an import()`);
+    }
+  });
+});
+
 describe('each entry matches its component declaration', () => {
   it('keeps a declared rest unpublished only where it lands on a tag no published key draws', () => {
     assert.deepEqual(Object.keys(UNPUBLISHED_REST), ['src/ui/svelte/components/Select.svelte']);
@@ -948,7 +989,7 @@ describe('each entry matches its component declaration', () => {
   for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      const optional = new Set(['restOn', 'overlays']);
+      const optional = new Set(['restOn', 'overlays', 'lazy']);
       const keys = Object.keys(entry).filter((key) => !optional.has(key));
       assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
       assert.ok(
@@ -959,6 +1000,7 @@ describe('each entry matches its component declaration', () => {
         !Object.hasOwn(entry, 'overlays') || entry.overlays === true,
         'overlays is true or absent'
       );
+      assert.ok(!Object.hasOwn(entry, 'lazy') || entry.lazy === true, 'lazy is true or absent');
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);

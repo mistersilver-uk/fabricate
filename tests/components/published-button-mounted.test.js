@@ -24,6 +24,7 @@ import {
   PUBLISHED_SEAM,
   companionTarget,
   fabricateTarget,
+  harnessLoaders,
   recordEscapes,
   settle,
   shippedSeam,
@@ -66,12 +67,19 @@ const ui = () =>
     },
   });
 
+/** A fresh seam on which `load([name])` has resolved, since `Rail` is lazy. */
+async function loadedUi(name) {
+  const seam = ui();
+  await seam.load([name]);
+  return seam;
+}
+
 before(async () => {
   await harness.setup();
   const { publishedComponentRuntime: runtime, COMPONENTS: components } =
     await harness.loadRuneModule(PUBLISHED_ADAPTER);
   const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
-  seamParts = { createPublishedComponents, runtime, components };
+  seamParts = { createPublishedComponents, runtime, components, loaders: harnessLoaders(harness) };
   stopRecording = recordEscapes((error) => {
     escaped.push(error);
   });
@@ -366,7 +374,8 @@ describe('what the published Button refuses', () => {
       const target = companionTarget(targets);
       // One value per name, the last the list gives it, which is a string for each.
       const rest = Object.fromEntries(RESERVED_REST_NAMES);
-      const handle = ui().mount(name, { target, props: { ...props, ...rest } });
+      const seam = await loadedUi(name);
+      const handle = seam.mount(name, { target, props: { ...props, ...rest } });
       await settle();
       const root = target.firstElementChild;
       assert.deepEqual(
@@ -632,10 +641,11 @@ describe('an aria key on the published Button', () => {
     ['Rail', { label: 'Standing' }, '"aria-expanded" is not a data attribute'],
     ['Avatar', { name: 'Ada' }, '"aria-expanded" is not a prop of Avatar'],
   ]) {
-    it(`leaves ${name} refusing aria-expanded as it did`, () => {
+    it(`leaves ${name} refusing aria-expanded as it did`, async () => {
       const target = companionTarget(targets);
+      const seam = await loadedUi(name);
       assert.throws(
-        () => ui().mount(name, { target, props: { ...props, 'aria-expanded': false } }),
+        () => seam.mount(name, { target, props: { ...props, 'aria-expanded': false } }),
         { name: 'TypeError', message: REFUSAL + tail }
       );
       assert.equal(target.childNodes.length, 0, 'nothing is rendered');
