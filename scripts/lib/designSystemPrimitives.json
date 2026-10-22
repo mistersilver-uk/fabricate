@@ -534,7 +534,15 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match. `shipped` at issue 2257 (D22): its kicker is the shipped `Kicker` inside the span its id names, because the hand-rolled subtle ink measured under the 4.5:1 floor; `run-kicker-contrast.test.js` holds the muted ink at 4.5:1 on the run ground in seven themes."
+      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`', but it supplies the label of an unnamed stage of several, \"Stage n of m\", through the `FABRICATE.Common.StageBars.Unnamed` key. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match. `shipped` at issue 2257 (D22): its kicker is the shipped `Kicker` inside the span its id names, because the hand-rolled subtle ink measured under the 4.5:1 floor; `run-kicker-contrast.test.js` holds the muted ink at 4.5:1 on the run ground in seven themes."
+    },
+    {
+      "path": "src/ui/svelte/components/StageBars.svelte",
+      "library": "<StageBars>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1782 builds the specified stage instrument over `FillBar`: a named `group` of `progressbar`s, one bar per stage, each named by its stage's `label`, else its `name`, else, in a one-stage list, by the group's own name. Its importers are `src/ui/svelte/components/RunProgress.svelte`, which the journal's run card and run detail render and which labels an unnamed stage of several \"Stage n of m\" through the `FABRICATE.Common.StageBars.Unnamed` key, and `src/ui/publishedComponents.svelte.js`, the seam's runtime adapter: issue 2455 publishes it through `game.fabricate.api.ui` for the premium companion, whose downtime activities run in stages, to draw a staged activity's progress with Fabricate's own instrument, so its stylesheet also renders under a companion's ancestor and is held by the published manifest's ancestor gate. Its library specimen reads `shipped`, its caption inks `--fab-text-muted`, which `stage-bars-caption-contrast.test.js` holds at 4.5:1 in seven themes, and its broad-signal override names the run detail's stage track, a run card's and its specimen mounted through the seam."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte",
@@ -922,15 +930,6 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage` and `-future-stage`, it matches its canonical spec, and its library specimen reads `shipped`."
-    },
-    {
-      "path": "src/ui/svelte/components/StageBars.svelte",
-      "library": "<StageBars>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/components/RunProgress.svelte"
-      ],
-      "why": "Issue 1782 builds the specified stage instrument over `FillBar`: a named `group` of stage-named `progressbar`s, one bar per stage. ONE importer, `src/ui/svelte/components/RunProgress.svelte`, which the journal's run card and run detail render, so it is below the two-importer membership bar on the `RunActionBar` precedent. Its library specimen reads `shipped`, and its broad-signal override names the run detail's stage track and a run card's."
     },
     {
       "path": "src/ui/svelte/components/LogList.svelte",

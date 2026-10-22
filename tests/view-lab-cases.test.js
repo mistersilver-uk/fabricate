@@ -388,8 +388,7 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
- * mount page, its companion stand-in, and the three specimen fixtures whose cases act on what
- * they mount.
+ * mount page, its companion stand-in, and the specimen fixtures whose cases name what they mount.
  */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
@@ -399,6 +398,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
   'tests/view-lab/fixtures/PublishedSelect.svelte',
+  'tests/view-lab/fixtures/PublishedStageBars.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -766,6 +766,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-overview-routing-check-permitted',
   'manager-recipe-edit-overview-routing-distinct',
   'manager-recipe-edit-overview-routing-multistep',
+  // The published stage bars (issue 2455): each group's bars on one line, each caption whole.
+  'manager-published-stage-bars-specimen',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
@@ -5845,7 +5847,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the twelve specimens it mounts', () => {
+test('every published component seam module, and the host, selects the specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5868,22 +5870,24 @@ test('every published component seam module, and the host, selects the twelve sp
       'manager-published-search-specimen',
       'manager-published-select-specimen',
       'manager-published-select-layer',
+      'manager-published-stage-bars-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, and the select fixture's selects. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, and the stage bars fixture's groups. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
   'Stepper',
   'SearchField',
   'Select',
+  'StageBars',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField and Select and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select and StageBars and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6356,6 +6360,52 @@ test('the select specimen cases act on what the select fixture mounts through th
     layered.expectSelector.includes('[data-lab-select="hosted"][data-lab-value="all"]') &&
       layered.expectSelector.includes('> .fabricate.fabricate-standalone-overlay >'),
     'the frame is taken once the choice was passed back and the list is open on the layer'
+  );
+});
+
+test('the stage bars specimen case names the groups the stage bars fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedStageBars.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'StageBars'
+    ),
+    'the fixture mounts StageBars through the seam’s mount'
+  );
+  for (const hook of ['data-lab-stage-bars-ground', 'data-lab-stage-bars']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const groups = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'GROUPS').init.arguments[0].elements;
+  const { expectSelector, expectContained, expectLayout } = getCaseById(
+    'manager-published-stage-bars-specimen'
+  );
+  assert.deepEqual(
+    expectContained.flatMap(
+      ({ target }) => /\[data-lab-stage-bars="([a-z]+)"\]/.exec(target)?.[1] ?? []
+    ),
+    groups.map((group) => group.elements[0].value),
+    'one containment check per group, in fixture order'
+  );
+  for (const key of ['forge', 'brew', 'copy']) {
+    assert.ok(
+      expectSelector.includes(`[data-lab-stage-bars="${key}"]`),
+      `the frame is taken only once the ${key} group is drawn`
+    );
+  }
+  assert.ok(
+    expectLayout.oneLineRows.endsWith(' .fab-stage-bars') &&
+      expectLayout.unclipped.endsWith(' .fab-stage-bars-caption'),
+    'each group’s bars are held on one line, and every caption whole'
   );
 });
 

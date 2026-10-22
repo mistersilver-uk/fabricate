@@ -674,22 +674,18 @@
       "numbered": false,
       "stages": [
         {
-          "id": "draw",
           "name": "Draw",
           "value": 100
         },
         {
-          "id": "fold",
           "name": "Fold",
           "value": 100
         },
         {
-          "id": "grind",
           "name": "Grind",
           "value": 45
         },
         {
-          "id": "finish",
           "name": "Finish",
           "value": 0
         }
