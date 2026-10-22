@@ -22,6 +22,7 @@ export function defineAccentRingContrast(ownRing) {
   const themes = themePalettes(rules);
   const listing = (selector) =>
     rules.filter((rule) => splitSelectorList(rule.selector).includes(selector));
+  const ringShortfalls = (ground) => shortfalls(themes, '--fab-accent', [ground], RING_CONTRAST);
 
   const rings = [MODULE_RING, ownRing];
   for (const selector of rings) {
@@ -40,11 +41,11 @@ export function defineAccentRingContrast(ownRing) {
 
   for (const ground of RING_GROUNDS) {
     test(`the ring clears 3:1 on ${ground} in every theme`, () => {
-      assert.deepEqual(shortfalls(themes, '--fab-accent', [ground], RING_CONTRAST), []);
+      assert.deepEqual(ringShortfalls(ground), []);
     });
   }
 
   test('the ring falls short of 3:1 on --fab-bg-3 in two themes, so the group names four grounds', () => {
-    assert.equal(shortfalls(themes, '--fab-accent', ['--fab-bg-3'], RING_CONTRAST).length, 2);
+    assert.equal(ringShortfalls('--fab-bg-3').length, 2);
   });
 }
