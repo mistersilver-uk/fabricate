@@ -5,8 +5,10 @@
   `game.fabricate.api.ui` binds, as a companion does: one mount per section, each into an element
   it owns. A mount's third member lists the mounts made inside its `children`
   content slot, each into a `div` the fixture appends there. The effect's teardown destroys the
-  outer handles only, so the seam ends the nested ones. Every word is a companion's final text, so
-  none is localized, and the art is the lab world's own, so
+  outer handles only, so the seam ends the nested ones. It keeps the Promise `load(['Rail'])`
+  returned and mounts once that has settled, as a companion does, because `Rail` is lazy (issue
+  2455); `tests/view-lab/mount.js` awaits the same `loaded` before the frame is measured. Every
+  word is a companion's final text, so none is localized, and the art is the lab world's own, so
   `tests/view-lab-fixture-assets.test.js` resolves it. `tests/view-lab/mount.js` mounts it for
   `?specimen=published-leaves` only.
 
@@ -20,8 +22,13 @@
   content slot holds its way out, a published button that hugs its label in a `display: flex`
   target.
 -->
-<script>
+<script module>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
+
+  export const loaded = publishedComponentSeam.publicApi.load(['Rail']);
+</script>
+
+<script>
   import { LAB_SYSTEM_IDS, buildLabContent } from '../world/labContent.js';
 
   const smithing = buildLabContent().systems.find(({ id }) => id === LAB_SYSTEM_IDS.SMITHING);
@@ -125,10 +132,14 @@
   ]);
 
   const targets = $state([]);
+  const { mount } = publishedComponentSeam.publicApi;
+  let ready = $state(false);
+  loaded.then(() => {
+    ready = true;
+  });
 
   $effect(() => {
-    if (MOUNTS.some((_, index) => !targets[index])) return undefined;
-    const { mount } = publishedComponentSeam.publicApi;
+    if (!ready || MOUNTS.some((_, index) => !targets[index])) return undefined;
     const handles = MOUNTS.map(([name, props, nested = []], index) => {
       const handle = mount(name, { target: targets[index], props });
       for (const [nestedName, nestedProps] of nested) {

@@ -509,8 +509,8 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     });
     assert.deepEqual(
       Object.keys(ui),
-      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
-      'the descriptor a bind publishes, `load` last'
+      ['schemaVersion', 'components', 'describe', 'mount', 'load', 'mountMany'],
+      'the descriptor a bind publishes, `mountMany` last'
     );
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
@@ -647,6 +647,41 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         stated.filter((token) => !prose.includes(token)),
         [],
         `${where} states each reserved name and the tail that refuses it`
+      );
+    }
+  });
+
+  it('states mountMany’s M21 tail in the spec’s row and, with M5 and M19, in the docs’ subsection', () => {
+    const tail = (id) => {
+      const rows = SPECIFIED.split('\n').filter((line) => line.startsWith(`| ${id} |`));
+      assert.equal(rows.length, 1, `one ${id} row`);
+      return /`([^`]+)` \|$/u.exec(rows[0])[1];
+    };
+    assert.equal(tail('M21'), 'items must be an array');
+    const from = DOCUMENTED.indexOf('\n### Mounting several at once\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mountMany subsection, then another heading');
+    const prose = DOCUMENTED.slice(from, to);
+    assert.deepEqual(
+      ['M5', 'M19', 'M21'].map(tail).filter((stated) => !prose.includes(`\`${stated}\``)),
+      [],
+      'the subsection states each tail mountMany adds to or repeats from mount'
+    );
+    assert.ok(prose.includes("`typeof fabUi.mountMany === 'function'`"), 'and how to detect it');
+  });
+
+  it('spells the descriptor’s members, in publication order, as the spec and the docs do', () => {
+    const [, ...members] = Object.keys(publishedUi());
+    const descriptor = `{ schemaVersion: 1, ${members.join(', ')} }`;
+    for (const [where, prose] of [
+      ['the spec', SPECIFIED],
+      ['the docs', DOCUMENTED],
+    ]) {
+      const stated = [...prose.matchAll(/ is a frozen `(\{ schemaVersion: 1[^`]*\})`/gu)];
+      assert.deepEqual(
+        stated.map(([, spelled]) => spelled),
+        [descriptor],
+        `${where} spells the descriptor once, with every member`
       );
     }
   });

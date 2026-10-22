@@ -4,10 +4,8 @@ import {
   createGatheringResultCreator,
 } from './gatheringResultCreation.js';
 import {
-  DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
   STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
   buildStaleEntryNotice,
-  createDeferredChunkFailureReporter,
 } from './utils/deferredEntryNotice.js';
 import { createMemoizedLoad } from './utils/memoizedModuleLoad.js';
 import {
@@ -51,6 +49,7 @@ import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 import './ui/publishedComponents.svelte.js';
+import { reportDeferredChunkFailure } from './ui/deferredChunkFailureReport.js';
 
 
 // A lazy chunk, so non-GM players never download the manager (issue 1565). A rejection clears the
@@ -63,19 +62,6 @@ const loadCraftingSystemManagerAppClass = createMemoizedLoad(() =>
 
 const showCraftingSystemManagerApp = () =>
   loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
-
-/**
- * Not GM-gated: `openRecipeManager` is macro-reachable (issue 1565). The injected functions are
- * closures, since both `ui.notifications` members touch private fields and throw when unbound.
- */
-const reportManagerLoadFailure = createDeferredChunkFailureReporter({
-  notify: (message, options) => ui.notifications?.error?.(message, options),
-  hasNotice: (notice) => ui.notifications?.has?.(notice),
-  // `console.error`, which `tests/release-build.test.js` pins in the built bundle: Rolldown keeps a
-  // declared-pure call only when its return value is used, as this concise arrow's is.
-  log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
-  localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key))
-});
 
 /**
  * Warn once per session that the entry script is stale (issue 1565): the `esmodules` entry has no
@@ -396,7 +382,7 @@ const io = {
   bindFabricateGlobal: () => bindFabricateGlobal(fabricate, io),
   loadCraftingSystemManagerAppClass,
   processFabricateWorldTime,
-  reportManagerLoadFailure,
+  reportManagerLoadFailure: reportDeferredChunkFailure,
   reportStaleEntryScript,
   runComponentFlagAutoStamp,
   runInteractableMarkerSync,

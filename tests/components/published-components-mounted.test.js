@@ -1,9 +1,9 @@
 /**
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
- * microtask timing, a `text` key's one element, the target claim, three fault paths and their
- * `onFault` notice, destroy on a removed target, ancestor independence, and a companion's own
- * reactive contexts; then the adapter's table and `TierTrack`.
+ * microtask timing, a `text` key's one element, the target claim, a batch through `mountMany`,
+ * three fault paths and their `onFault` notice, destroy on a removed target, ancestor independence,
+ * and a companion's own reactive contexts; then the adapter's table and `TierTrack`.
  * The other shipped entries are `published-leaves-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
@@ -32,7 +32,12 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
 const COMPANION = 'tests/fixtures/published-components/companionReactivity.svelte.js';
-const MANIFEST_PATHS = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.path);
+const pathsWhere = (lazy) =>
+  PUBLISHED_COMPONENT_MANIFEST.filter((entry) => (entry.lazy === true) === lazy).map(
+    (entry) => entry.path
+  );
+const EAGER_PATHS = pathsWhere(false);
+const LAZY_PATHS = pathsWhere(true);
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -45,6 +50,7 @@ const harness = createMountedComponentHarness({
 
 let runtime;
 let adapterComponents;
+let adapterLoaders;
 let companion;
 let createPublishedComponents;
 let probe;
@@ -73,8 +79,11 @@ const NOTE_FALLBACK = 'NO NOTE';
 
 before(async () => {
   await harness.setup();
-  ({ publishedComponentRuntime: runtime, COMPONENTS: adapterComponents } =
-    await harness.loadRuneModule(ADAPTER));
+  ({
+    publishedComponentRuntime: runtime,
+    COMPONENTS: adapterComponents,
+    LOADERS: adapterLoaders,
+  } = await harness.loadRuneModule(ADAPTER));
   companion = await harness.loadRuneModule(COMPANION);
   ({ createPublishedComponents } = await harness.loadRawModule(SEAM));
   probe = await harness.loadRuneModule(PROBE);
@@ -227,14 +236,36 @@ describe('a text key on the real runtime', () => {
 });
 
 describe('the adapter', () => {
-  it("binds exactly the manifest paths, each to that path's own component", async () => {
+  // `published-component-manifest.test.js` pins, from the adapter's source, that each loader
+  // imports its own path's module through `import()` alone and resolves its default export.
+  it("binds exactly the eager manifest paths, each to that path's own component, and a loader to each lazy one", async () => {
     assert.ok(Object.isFrozen(adapterComponents));
-    assert.deepEqual(Object.keys(adapterComponents), MANIFEST_PATHS);
-    for (const path of MANIFEST_PATHS) {
+    assert.deepEqual(Object.keys(adapterComponents), EAGER_PATHS);
+    assert.ok(Object.isFrozen(adapterLoaders));
+    assert.deepEqual(Object.keys(adapterLoaders), LAZY_PATHS);
+    assert.ok(LAZY_PATHS.length > 0, 'an entry is lazy');
+    for (const path of LAZY_PATHS) assert.equal(typeof adapterLoaders[path], 'function', path);
+    for (const path of EAGER_PATHS) {
       const { default: component } = await harness.loadRuneModule(path);
       assert.ok(adapterComponents[path] === component, `${path} is bound to its own default`);
     }
     assert.equal(runtime.unmount.constructor.name, 'Function', 'never async');
+  });
+
+  it("registers its own tables, its runtime and the shared reporter's published-load entry", async () => {
+    const { REGISTRATION } = await harness.loadRuneModule(ADAPTER);
+    const reporter = await harness.loadRawModule('src/ui/deferredChunkFailureReport.js');
+    assert.ok(Object.isFrozen(REGISTRATION));
+    assert.ok(REGISTRATION.components === adapterComponents, 'its components');
+    assert.ok(REGISTRATION.loaders === adapterLoaders, 'its loaders');
+    for (const [key, value] of Object.entries(runtime)) {
+      assert.ok(REGISTRATION[key] === value, `its runtime's ${key}`);
+    }
+    assert.equal(typeof reporter.reportPublishedLoadFailure, 'function');
+    assert.ok(
+      REGISTRATION.reportLoadFailure === reporter.reportPublishedLoadFailure,
+      "the reporter module's own published-load entry"
+    );
   });
 });
 
@@ -433,6 +464,94 @@ describe('a target claim on the real runtime', () => {
   });
 });
 
+describe('mountMany on the real runtime', () => {
+  const REFUSED = /^TypeError: Fabricate \| published components: /;
+  const refusedWith = (tail) => new RegExp(`${REFUSED.source}${tail}$`);
+  const batchOf = (texts) =>
+    texts.map((text) => ({ target: companionTarget(targets), props: { text } }));
+
+  it('draws each item into its own bare target, in order, and one destroy leaves the rest', async () => {
+    const instance = seam();
+    const items = batchOf(['A', 'B', 'C']);
+    const handles = instance.publicApi.mountMany('PublishedProbe', items);
+    assert.ok(Object.isFrozen(handles));
+    assert.deepEqual(
+      items.map(({ target }) => textOf(target)),
+      ['A', 'B', 'C'],
+      'each in place when mountMany returns'
+    );
+    handles[1].destroy();
+    assert.equal(items[1].target.childNodes.length, 0);
+    assert.equal(handles[0].update({ text: 'A2' }), true);
+    assert.equal(handles[2].update({ text: 'C2' }), true);
+    await settle();
+    assert.deepEqual(
+      items.map(({ target }) => textOf(target)),
+      ['A2', undefined, 'C2']
+    );
+    assert.equal(instance.liveMountCount(), 2);
+    for (const handle of handles) handle.destroy();
+  });
+
+  it('renders nothing when one item is invalid, a repeated target is M5, a non-array M21', () => {
+    const instance = seam();
+    const items = batchOf(['A', 'B', 'C']);
+    const invalid = [
+      [
+        [items[0], { ...items[1], props: { class: 'x' } }, items[2]],
+        '"class" is not a data attribute',
+      ],
+      [
+        [items[0], items[1], { ...items[2], target: items[0].target }],
+        'target already holds a published component',
+      ],
+      [items[0], 'items must be an array'],
+    ];
+    for (const [batch, tail] of invalid) {
+      assert.throws(() => instance.publicApi.mountMany('PublishedProbe', batch), refusedWith(tail));
+      for (const { target } of items) assert.equal(target.childNodes.length, 0, tail);
+      assert.equal(instance.liveMountCount(), 0, tail);
+    }
+  });
+
+  it('leaves a stale claim un-ended when a later item is refused, and ends it as its item renders', async () => {
+    const instance = seam();
+    const [item, other] = batchOf(['New', 'Other']);
+    const stale = instance.publicApi.mount('PublishedProbe', { ...item, props: { text: 'Old' } });
+    await settle();
+    item.target.replaceChildren();
+    assert.throws(
+      () => instance.publicApi.mountMany('PublishedProbe', [item, { ...other, target: 5 }]),
+      refusedWith('target must be an element')
+    );
+    assert.equal(stale.update({ text: 'Still' }), true, 'not ended by the validation pass');
+    const handles = instance.publicApi.mountMany('PublishedProbe', [item, other]);
+    assert.equal(stale.update({}), false, 'ended as its item rendered');
+    assert.equal(textOf(item.target), 'New');
+    assert.equal(instance.liveMountCount(), 2);
+    for (const handle of handles) handle.destroy();
+  });
+
+  it('refuses M6 for a target a stale mount left holding a node, where mount ends that mount', async () => {
+    const instance = seam();
+    const [item] = batchOf(['Old']);
+    const stale = instance.publicApi.mount('PublishedProbe', item);
+    await settle();
+    // Svelte's trailing empty text anchor is the mount's root, so removing it alone leaves the rest.
+    item.target.lastChild.remove();
+    assert.ok(item.target.firstChild, 'the probe element is still in the target');
+    assert.throws(
+      () => instance.publicApi.mountMany('PublishedProbe', [item]),
+      refusedWith('target must be empty')
+    );
+    assert.equal(stale.update({ text: 'Still' }), true, 'the stale handle is still live');
+    const fresh = instance.publicApi.mount('PublishedProbe', { ...item, props: { text: 'New' } });
+    assert.equal(stale.update({}), false, 'mount ended the stale mount');
+    assert.equal(textOf(item.target), 'New');
+    fresh.destroy();
+  });
+});
+
 describe("a companion's own reactive context", () => {
   it('mounts from inside an $effect without that effect tracking the mount', () => {
     const ui = seam().publicApi;
@@ -551,6 +670,30 @@ describe('a published component that faults', () => {
       assert.deepEqual(escaped, []);
     });
   }
+
+  it('keeps a render fault to its own item: inert, its own onFault once, the rest live', async () => {
+    const instance = seam();
+    const told = [[], [], []];
+    const items = [{ text: 'A' }, { throwAt: 'init' }, { text: 'C' }].map((props, index) => ({
+      target: companionTarget(targets),
+      props,
+      onFault: (error) => {
+        told[index].push(error);
+      },
+    }));
+    const handles = instance.publicApi.mountMany('PublishedProbe', items);
+    await settle();
+    assert.equal(handles[1].update({}), false);
+    assert.equal(items[1].target.childNodes.length, 0);
+    assert.deepEqual(told, [[], [probe.PROBE_FAULTS.init], []]);
+    assert.deepEqual(escaped, []);
+    assert.deepEqual(reports, [[FAULT_REPORT, 'PublishedProbe', probe.PROBE_FAULTS.init]]);
+    assert.equal(handles[0].update({ text: 'A2' }), true);
+    await settle();
+    assert.equal(textOf(items[0].target), 'A2');
+    assert.equal(textOf(items[2].target), 'C');
+    for (const handle of handles) handle.destroy();
+  });
 
   it('contains a fault Svelte delivers inside flushSync', async () => {
     const instance = seam();

@@ -731,6 +731,12 @@ async function mountManagerApp(content, params) {
 }
 
 // view-lab-region:lab-specimens
+/** A specimen's module once the `loaded` Promise it exports, if any, has settled (issue 2455). */
+async function afterLoaded(module) {
+  await module.loaded;
+  return module;
+}
+
 /**
  * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
  * shipped component, directly or through the published seam a companion calls (issue 2424), in a
@@ -742,7 +748,8 @@ const LAB_SPECIMENS = Object.freeze({
   // Issue 2424: the published tier track, mounted through the seam a companion calls.
   'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
   // Issue 2448's seven data-only leaves, then issue 2451's `Kicker` and `Chip`, by the same seam.
-  'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
+  // `Rail` is lazy (issue 2455), so the frame is measured only once its chunk has loaded.
+  'published-leaves': () => import('./fixtures/PublishedLeaves.svelte').then(afterLoaded),
   // Issue 2452: notices whose action reports each press through a callback, by the same seam.
   'published-controls': () => import('./fixtures/PublishedControls.svelte'),
   // Issue 2452: steppers whose edits report each number through a callback, by the same seam.

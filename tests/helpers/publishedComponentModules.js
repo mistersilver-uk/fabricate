@@ -6,6 +6,8 @@
  */
 import assert from 'node:assert/strict';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+
 export const PUBLISHED_SEAM = 'src/ui/publishedComponentSeam.js';
 export const PUBLISHED_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
@@ -15,6 +17,10 @@ export const CALLBACK_REPORT = 'Fabricate | Published component callback failed:
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
+  'src/ui/publishedComponentLoading.js',
+  'src/ui/deferredChunkFailureReport.js',
+  'src/utils/deferredEntryNotice.js',
+  'src/utils/localizeWithFallback.js',
   'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentCallbacks.js',
   'src/ui/publishedComponentValues.js',
@@ -116,11 +122,38 @@ export function recordEscapes(record) {
   };
 }
 
-/** A fresh seam over the shipped manifest, registered with the adapter's own `components` table. */
-export function shippedSeam({ createPublishedComponents, runtime, components, report }) {
+const LAZY_ENTRIES = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true);
+
+/** A loader for each lazy path that rejects, for a suite that never loads one. */
+const UNLOADED = Object.freeze(
+  Object.fromEntries(
+    LAZY_ENTRIES.map(({ path }) => [
+      path,
+      () => Promise.reject(new Error(`this suite injects no loader for ${path}`)),
+    ])
+  )
+);
+
+/**
+ * A fresh seam over the shipped manifest, registered with the adapter's own `components` table and
+ * the suite's `loaders`, since no suite resolves the adapter's own `import()` (issue 2455).
+ */
+export function shippedSeam({
+  createPublishedComponents,
+  runtime,
+  components,
+  loaders = UNLOADED,
+  report,
+}) {
   const instance = createPublishedComponents({ isReady: () => true, report });
-  instance.register({ ...runtime, components });
+  instance.register({ ...runtime, components, loaders });
   return instance.publicApi;
+}
+
+/** Each lazy manifest path's loader, resolving the component the harness compiled for it. */
+export function harnessLoaders(harness) {
+  const loadDefault = async (path) => (await harness.loadRuneModule(path)).default;
+  return Object.fromEntries(LAZY_ENTRIES.map(({ path }) => [path, () => loadDefault(path)]));
 }
 
 export function assertClipped(element, what) {

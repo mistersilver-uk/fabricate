@@ -9,6 +9,7 @@ import test from 'node:test';
 import {
   DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
   buildDeferredChunkFailureNotice,
+  buildDeferredPartFailureNotice,
   buildStaleEntryNotice,
   createDeferredChunkFailureReporter,
   openDeferredApp,
@@ -19,7 +20,7 @@ import {
 const noLocalizer = () => undefined;
 
 /** A reporter over recording stubs. */
-function reporterHarness({ hasNotice, handle } = {}) {
+function reporterHarness({ hasNotice, handle, canNotify, whenReady } = {}) {
   const logged = [];
   const notified = [];
   let nextId = 0;
@@ -38,6 +39,8 @@ function reporterHarness({ hasNotice, handle } = {}) {
     },
     localize: noLocalizer,
     hasNotice,
+    canNotify,
+    whenReady,
   });
   return { report, logged, notified };
 }
@@ -228,6 +231,102 @@ test('a hasNotice-less, id-less or throwing probe never throws and always notifi
   throwing.report(CHUNK_FAILURE);
   throwing.report(CHUNK_FAILURE);
   assert.equal(throwing.notified.length, 2, 'a throwing probe degrades to notifying');
+});
+
+const PART = Object.freeze({ buildNotice: buildDeferredPartFailureNotice, once: true });
+
+test('the deferred-part notice names no window, and a localized key wins', () => {
+  const neutral = buildDeferredPartFailureNotice(CHUNK_FAILURE, noLocalizer);
+  assert.match(neutral, /^Part of Fabricate could not load/);
+  assert.match(neutral, /bypassing the cache/i);
+  assert.doesNotMatch(neutral, /crafting system manager/i);
+  const keys = [];
+  const localized = buildDeferredPartFailureNotice(CHUNK_FAILURE, (key) => {
+    keys.push(key);
+    return 'Localizzato';
+  });
+  assert.equal(localized, 'Localizzato');
+  assert.deepEqual(keys, ['FABRICATE.Update.DeferredPartStale']);
+});
+
+test('each call raises its own builder’s notice, one notice at a time across both', () => {
+  let live = false;
+  const { report, notified } = reporterHarness({ hasNotice: () => live });
+  report(CHUNK_FAILURE, PART);
+  assert.match(notified[0].message, /^Part of Fabricate could not load/);
+  live = true;
+  report(CHUNK_FAILURE);
+  assert.equal(notified.length, 1, 'no manager notice over a live deferred-part notice');
+  live = false;
+  report(CHUNK_FAILURE);
+  assert.match(notified[1].message, /^Fabricate could not open the crafting system manager/);
+  assert.deepEqual(
+    notified.map(({ options }) => options),
+    [{ console: false }, { console: false }]
+  );
+});
+
+test('a once builder raises one notice per reporter, while the default keeps re-notifying', () => {
+  const { report, logged, notified } = reporterHarness({ hasNotice: () => false });
+  report(CHUNK_FAILURE, PART);
+  report(CHUNK_FAILURE, PART);
+  assert.equal(logged.length, 2, 'the console carries each failure');
+  assert.equal(notified.length, 1, 'the deferred-part notice is raised once');
+  report(CHUNK_FAILURE);
+  report(CHUNK_FAILURE);
+  assert.equal(notified.length, 3);
+});
+
+test('a once builder suppressed by a live notice is not spent', () => {
+  let live = true;
+  const { report, notified } = reporterHarness({ hasNotice: () => live });
+  report(CHUNK_FAILURE);
+  report(CHUNK_FAILURE, PART);
+  live = false;
+  report(CHUNK_FAILURE, PART);
+  assert.equal(notified.length, 2);
+  assert.match(notified[1].message, /^Part of Fabricate could not load/);
+});
+
+test('a failure before notices can be raised waits for one ready flush, which raises the latest', () => {
+  let ready = false;
+  const flushes = [];
+  const { report, logged, notified } = reporterHarness({
+    hasNotice: () => false,
+    canNotify: () => ready,
+    whenReady: (flush) => {
+      flushes.push(flush);
+    },
+  });
+  report(CHUNK_FAILURE);
+  report(CHUNK_FAILURE, PART);
+  assert.equal(logged.length, 2, 'the console line is written at once');
+  assert.equal(notified.length, 0);
+  assert.equal(flushes.length, 1, 'one flush is scheduled');
+  ready = true;
+  flushes[0]();
+  assert.equal(notified.length, 1);
+  assert.match(notified[0].message, /^Part of Fabricate could not load/);
+  flushes[0]();
+  assert.equal(notified.length, 1, 'a flush raises a waiting notice once');
+});
+
+test('a report once notices can be raised supersedes the waiting one', () => {
+  let ready = false;
+  const flushes = [];
+  const { report, notified } = reporterHarness({
+    hasNotice: () => false,
+    canNotify: () => ready,
+    whenReady: (flush) => {
+      flushes.push(flush);
+    },
+  });
+  report(CHUNK_FAILURE, PART);
+  ready = true;
+  report(CHUNK_FAILURE);
+  flushes[0]();
+  assert.equal(notified.length, 1);
+  assert.match(notified[0].message, /^Fabricate could not open the crafting system manager/);
 });
 
 test('openDeferredApp reports and resolves; openDeferredAppRethrowing reports and rejects', async () => {
