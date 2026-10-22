@@ -253,8 +253,13 @@ describe('RadioCardGroup names each radio by its title and describes it by what 
     });
   const cardOf = (root, value) => root.querySelector(`[data-radio-card-option="${value}"]`);
   const radioOf = (root, value) => cardOf(root, value).querySelector('input[type="radio"]');
-  const describedIds = (radio) => (radio.getAttribute('aria-describedby') ?? '').split(' ');
   const byId = (id) => document.querySelector(`[id="${id}"]`);
+  const describedIds = (radio) => {
+    const ids = (radio.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
+    for (const id of ids)
+      assert.ok(byId(id), `aria-describedby lists ${id}, which resolves to nothing`);
+    return ids;
+  };
 
   it('labels every radio by its own title element', async () => {
     const root = await mountGroup();
@@ -333,6 +338,24 @@ describe('RadioCardGroup names each radio by its title and describes it by what 
     assert.ok(radio.disabled, 'an empty reason still disables its option');
     assert.ok(!root.querySelector('[data-radio-card-reason]'), 'and draws no reason element');
     assert.equal(describedIds(radio).length, 1, 'its description is the only id described');
+  });
+
+  it('keeps the first non-empty reason for a value and lets a later empty one disable only', async () => {
+    const root = await mountGroup({
+      disabledOptions: [
+        { value: 'later', reason: 'Early reason' },
+        { value: 'later', reason: '' },
+        { value: 'open', reason: '' },
+        { value: 'open', reason: 'Late reason' },
+      ],
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-radio-card-reason]')].map((node) => node.textContent),
+      ['Late reason', 'Early reason'],
+      'a later empty reason does not erase an earlier one, and a later one fills an empty one'
+    );
+    assert.ok(radioOf(root, 'later').disabled && radioOf(root, 'open').disabled);
+    assert.equal(describedIds(radioOf(root, 'later')).length, 2, 'the description and the reason');
   });
 
   it('never calls onChange for a change dispatched on a disabled radio', async () => {
