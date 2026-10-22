@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { withoutMember } from '../src/ui/publishedComponentProps.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -1313,5 +1314,119 @@ describe('registration', () => {
     const { ui } = seamWith({ table: [loose] });
     assert.deepEqual(ui.describe('Alpha').props.value, { kind: 'data', required: false });
     ui.mount('Alpha', { target: new FakeTarget(), props: {} });
+  });
+});
+
+// `InfoStrip` spreads each fact's `props` as attributes, so the seam drops that member; `Meter`'s
+// `segments` and `Ticker`'s `facts` are not stripped, so an item there keeps every member it was given.
+const STRIP_TABLE = Object.freeze([
+  {
+    name: 'InfoStrip',
+    path: 'src/ui/svelte/components/InfoStrip.svelte',
+    version: 1,
+    props: { label: { kind: 'data' }, facts: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'InfoStrip' }),
+  },
+  {
+    name: 'Meter',
+    path: 'src/ui/svelte/components/Meter.svelte',
+    version: 1,
+    props: { segments: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'Meter' }),
+  },
+  {
+    name: 'Ticker',
+    path: 'src/ui/svelte/components/Ticker.svelte',
+    version: 1,
+    props: { facts: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'Ticker' }),
+  },
+]);
+const ATTRIBUTES = Object.freeze({ 'data-action': 'close', class: 'x', 'aria-label': 'Hidden' });
+const fact = (value) => ({ icon: 'fas fa-sun', value, props: { ...ATTRIBUTES } });
+
+describe('a per-item member the seam strips', () => {
+  const stripping = () => seamWith({ table: STRIP_TABLE });
+  const target = () => new FakeTarget();
+
+  it('is dropped from every fact on mount, and nothing else is', () => {
+    const { ui, mounts } = stripping();
+    ui.mount('InfoStrip', { target: target(), props: { facts: [fact('Clear'), fact('Storm')] } });
+    assert.deepEqual(mounts[0].props.initial.facts, [
+      { icon: 'fas fa-sun', value: 'Clear' },
+      { icon: 'fas fa-sun', value: 'Storm' },
+    ]);
+  });
+
+  it('is dropped on update too', () => {
+    const { ui, mounts } = stripping();
+    const handle = ui.mount('InfoStrip', { target: target(), props: { facts: [fact('Clear')] } });
+    assert.equal(handle.update({ facts: [fact('Storm')] }), true);
+    assert.deepEqual(mounts[0].instance.updates[0].facts, [{ icon: 'fas fa-sun', value: 'Storm' }]);
+  });
+
+  it('is dropped from a copy, and never from the caller’s object', () => {
+    const { ui, mounts } = stripping();
+    const facts = [fact('Clear')];
+    ui.mount('InfoStrip', { target: target(), props: { facts } });
+    assert.deepEqual(facts, [fact('Clear')], 'the caller keeps its props member');
+    assert.notEqual(mounts[0].props.initial.facts, facts);
+    assert.notEqual(mounts[0].props.initial.facts[0], facts[0]);
+  });
+
+  it('tolerates a facts value that is not an array, and an item that is null or a primitive', () => {
+    const { ui, mounts } = stripping();
+    for (const facts of ['Clear', 7, null, true, {}]) {
+      ui.mount('InfoStrip', { target: target(), props: { facts } });
+    }
+    assert.deepEqual(
+      mounts.map((mount) => mount.props.initial.facts),
+      ['Clear', 7, null, true, {}]
+    );
+    ui.mount('InfoStrip', { target: target(), props: { facts: [null, 'x', 3, fact('Clear')] } });
+    assert.deepEqual(mounts[5].props.initial.facts, [
+      null,
+      'x',
+      3,
+      { icon: 'fas fa-sun', value: 'Clear' },
+    ]);
+  });
+
+  it('is judged first: a function in the member is still M10, and a non-data item is M11', () => {
+    const { ui } = stripping();
+    const mount = (facts) => () => ui.mount('InfoStrip', { target: target(), props: { facts } });
+    assert.throws(
+      mount([{ value: 'x', props: { onclick: () => {} } }]),
+      refusal('"facts" must not hold a function')
+    );
+    assert.throws(mount([new Date()]), refusal('"facts" must be data'));
+  });
+
+  it('is private to its own key: a member of another entry passes through', () => {
+    const { ui, mounts } = stripping();
+    const segments = [{ tone: 'danger', props: { 'data-x': 1 } }];
+    ui.mount('Meter', { target: target(), props: { segments } });
+    assert.deepEqual(mounts[0].props.initial.segments, segments);
+  });
+
+  it('is private to its own entry: another entry’s key of the same name passes through', () => {
+    const { ui, mounts } = stripping();
+    const facts = [fact('Clear')];
+    ui.mount('Ticker', { target: target(), props: { facts } });
+    assert.deepEqual(mounts[0].props.initial.facts, facts);
+  });
+
+  it('drops a member at a nested path from the items below it', () => {
+    const tiers = [{ yields: [{ props: { a: 1 }, name: 'x' }, { name: 'y' }], props: { b: 2 } }];
+    assert.deepEqual(withoutMember(tiers, ['yields', 'props']), [
+      { yields: [{ name: 'x' }, { name: 'y' }], props: { b: 2 } },
+    ]);
+    assert.deepEqual(tiers[0].yields[0].props, { a: 1 }, 'the value it was given is unchanged');
   });
 });

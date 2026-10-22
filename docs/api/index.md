@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2052,6 +2052,7 @@ The published components, in publication order:
 | `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
+| `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2161,6 +2162,9 @@ The glyph is hidden from assistive technology and the tone is colour alone, so `
 `InfoStrip` draws a read-only strip of current values under a kicker.
 `label` is required and is the kicker, which names the group.
 `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+A fact takes no other member: `props`, which the component would spread onto the fact as attributes, is dropped from a copy of every fact on `mount` and on `update` and is never written.
+A `data-action`, a `class`, a `title` or an `aria-label` there reaches no element, and your own object is unchanged.
+Put a hook or a tooltip on your own `target` element, and carry each fact's meaning in its `label` and `value` text.
 `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
 ### Kicker
@@ -2776,6 +2780,42 @@ const props = () => ({
 const select = fabUi.mount('Select', { target, props: props() });
 ```
 
+### StageBars
+
+`StageBars` draws how far a staged process has come: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value; it draws no control.
+`stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
+So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
+A member other than `name`, `label` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+`currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
+`numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
+A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so keep each name short.
+`ariaLabel` is required and names the group, final display text, as "Forging progress".
+It also names the one bar of a one-stage list whose stage has no label or name.
+Rest `data-*` attributes land on the group root.
+`StageBars` needs no Fabricate ancestor, so its root is `any`, and it draws the same under any ancestor.
+It is not a live region: an `update` redraws the bars in place and announces nothing.
+Its track height and corner, its gaps, its caption's face, size and ink, each tone's colours, and what it draws for a `currentIndex` outside the list are private.
+`ariaLabelledBy` is not published at version 1, so it is refused with `"ariaLabelledBy" is not a data attribute`.
+
+A worked stage group follows: the stages of your own forging project, each named by its own title.
+
+```javascript
+// After `load(['StageBars'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('StageBars')) return;
+
+// Your heading above `target`: <h3>Forging progress</h3>.
+const props = () => ({
+  ariaLabel: 'Forging progress', // The words your heading draws.
+  currentIndex: acmeForge.stage,
+  stages: acmeForge.stages.map((stage) => ({ name: stage.title, value: stage.percent })),
+});
+const bars = fabUi.mount('StageBars', { target, props: props() });
+// After your own stage advances, pass every prop again.
+bars.update(props());
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
@@ -2947,7 +2987,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
 It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField` and `Select` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript

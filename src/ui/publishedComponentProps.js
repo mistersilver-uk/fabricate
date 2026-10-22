@@ -104,6 +104,48 @@ function copyValue(value, key) {
   return value;
 }
 
+/**
+ * The per-item members the seam drops from a copy of a published `data` value, each as
+ * `<Entry>.<key>.<member>`: the entry's `data` key, then any members that hold the items below it
+ * (an array is read item by item, an object as one item), then the member dropped. A component
+ * that spreads such a member as attributes would otherwise let a caller write them.
+ * `tests/published-component-ratchet.test.js` holds this list against the spreads the published
+ * closures draw.
+ */
+export const STRIPPED_ITEM_MEMBERS = Object.freeze(['InfoStrip.facts.props']);
+
+const STRIPPED_PATHS = Map.groupBy(
+  STRIPPED_ITEM_MEMBERS.map((spec) => {
+    const [entry, key, ...path] = spec.split('.');
+    return { id: `${entry}.${key}`, path };
+  }),
+  ({ id }) => id
+);
+
+/**
+ * `value` with the member that `path` ends at dropped from each item it holds, as a new tree. An
+ * array is read item by item and an object as one item; a value that is not an array or a plain
+ * object (a primitive, `null`) is returned as it is.
+ */
+export function withoutMember(value, path) {
+  if (Array.isArray(value)) return value.map((item) => withoutMember(item, path));
+  if (!hasPlainPrototype(value)) return value;
+  const [head, ...below] = path;
+  const copy = {};
+  for (const [name, field] of Object.entries(value)) {
+    if (name === head && below.length === 0) continue;
+    const kept = name === head ? withoutMember(field, below) : field;
+    Object.defineProperty(copy, name, { value: kept, enumerable: true, writable: true });
+  }
+  return copy;
+}
+
+/** The validated copy of one `data` value, less the per-item members `STRIPPED_ITEM_MEMBERS` names. */
+function strippedCopy(entry, key, value) {
+  const stripped = STRIPPED_PATHS.get(`${entry.name}.${key}`) ?? [];
+  return stripped.reduce((kept, { path }) => withoutMember(kept, path), value);
+}
+
 /** Each shipped prop kind's copier; registration refuses a kind this table does not hold. */
 export const SHIPPED_KINDS = Object.freeze({
   data: (value, key) => copyData(value, key, new Set()),
@@ -146,8 +188,9 @@ function assertRequired(entry, copy) {
 }
 
 /**
- * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. Each key
- * is configurable, so the seam can drop an absent callback key from it.
+ * The validated copy one mount or update renders: M7, M8, M10-M15, M17 and M20, then M9. A `data`
+ * value in it lacks the members `STRIPPED_ITEM_MEMBERS` names, and the caller's own object is never
+ * changed. Each key is configurable, so the seam can drop an absent callback key from it.
  */
 export function copyProps(entry, props) {
   if (!hasPlainPrototype(props)) throw refuse('props must be a plain object');
@@ -155,8 +198,9 @@ export function copyProps(entry, props) {
   for (const [key, raw] of Object.entries(props)) {
     const kind = kindOf(entry, key);
     if (!kind && !entry.rest) throw refuse(`"${key}" is not a prop of ${entry.name}`);
-    const value = SHIPPED_KINDS[kind ?? 'data'](raw, key);
-    if (!kind) assertRestKey(entry, key, value);
+    const copied = SHIPPED_KINDS[kind ?? 'data'](raw, key);
+    if (!kind) assertRestKey(entry, key, copied);
+    const value = kind === 'data' ? strippedCopy(entry, key, copied) : copied;
     const own = { value, enumerable: true, writable: true, configurable: true };
     Object.defineProperty(copy, key, own);
   }

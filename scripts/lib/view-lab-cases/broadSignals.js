@@ -112,10 +112,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-finished-failure',
     'fabricate-journal-lifecycle-finished-cancelled',
   ]),
-  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's.
+  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's,
+  // then its specimen mounted through the published seam (issue 2455).
   'src/ui/svelte/components/StageBars.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
+    'manager-published-stage-bars-specimen',
   ]),
   // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage.
   'src/ui/svelte/components/Meter.svelte': Object.freeze([

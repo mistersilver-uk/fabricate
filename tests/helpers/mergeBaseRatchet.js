@@ -249,7 +249,7 @@ export function readBaseCorpus(base, root, { cwd = REPO_ROOT, include = () => tr
   );
 }
 
-function readHeadFile(cwd, file) {
+export function readHeadFile(cwd, file) {
   try {
     return readFileSync(path.join(cwd, file), 'utf8');
   } catch (error) {
@@ -679,9 +679,10 @@ export function compareToBase({
 
 /**
  * Report a comparison to a `node:test` context: a skip, shrink, net or exemption as a diagnostic,
- * and any failure as a thrown error that says how to fix or exempt it.
+ * and any failure as a thrown error that says how to fix or exempt it. A family with no
+ * `ratchet-exempt` marker channel passes `{ markers: false }` so the error does not offer one.
  */
-export function reportComparison(t, result, guidance = '') {
+export function reportComparison(t, result, guidance = '', { markers = true } = {}) {
   const note = (line) => t?.diagnostic?.(line);
   if (result.skipped) {
     note(`skipped (${result.skipped}): ${result.reason}`);
@@ -695,8 +696,10 @@ export function reportComparison(t, result, guidance = '') {
     `${result.family}: ${result.failures.length} regression(s) against base ${result.base.slice(0, 12)}:\n  ` +
       result.failures.join('\n  ') +
       (guidance ? `\n\n${guidance}` : '') +
-      `\n\nFix it, or record why it is legitimate with a ratchet-exempt(${result.family}): <reason> ` +
-      'comment at the site (`//` in JS, `/* */` in CSS, `<!-- -->` in Svelte and HTML). If this ' +
+      (markers
+        ? `\n\nFix it, or record why it is legitimate with a ratchet-exempt(${result.family}): <reason> ` +
+          'comment at the site (`//` in JS, `/* */` in CSS, `<!-- -->` in Svelte and HTML). If this '
+        : '\n\nIf this ') +
       `names code you did not touch, origin/main may be stale: ${REFRESH_HINT}.`
   );
 }

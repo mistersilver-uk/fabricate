@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -25,7 +24,7 @@ const banded = createHarness(
   [component('Kicker')],
   ['src/ui/svelte/util/dropRateTier.js']
 );
-const stages = createHarness('StageBars', [], [...FOUNDRY_BRIDGE_RAW_MODULES]);
+const stages = createHarness('StageBars', []);
 const harnesses = [meter, banded, stages];
 
 before(async () => {
@@ -197,12 +196,18 @@ describe('BandedBar (mounted)', () => {
 });
 
 describe('StageBars (mounted)', () => {
-  it('is a named group of stage-named progress bars, toned by position', async () => {
+  /** A second mount in the same test, after the first is destroyed. */
+  async function remountStages(props) {
+    stages.remount();
+    return stages.mount(props);
+  }
+
+  it('is a named group of progress bars, each named by its label, else its name, toned by position', async () => {
     const root = await stages.mount({
       stages: [
-        { id: 'draw', name: 'Draw', value: 100 },
-        { id: 'fold', name: 'Fold', value: 45 },
-        { id: 'grind', value: 0 },
+        { name: 'Draw', value: 100 },
+        { name: 'Fold', label: 'Fold the billet', value: 45 },
+        { value: 0 },
       ],
       currentIndex: 1,
       ariaLabel: 'Progress',
@@ -215,10 +220,12 @@ describe('StageBars (mounted)', () => {
       bars.map((bar) => [bar.getAttribute('aria-label'), bar.getAttribute('aria-valuenow')]),
       [
         ['Draw', '100'],
-        ['Fold', '45'],
-        ['FABRICATE.Common.StageBars.Unnamed:{"index":3,"count":3}', '0'],
-      ]
+        ['Fold the billet', '45'],
+        [null, '0'],
+      ],
+      'a stage of several with neither label nor name has no name of its own'
     );
+    assert.ok(!bars[2].hasAttribute('aria-labelledby'), 'and borrows none');
     assert.deepEqual(
       [...group.querySelectorAll('[data-stage-bars-state]')].map(
         (stage) => stage.dataset.stageBarsState
@@ -230,12 +237,19 @@ describe('StageBars (mounted)', () => {
       [null, 'step', null],
       'the current stage is not told by colour alone'
     );
-    assert.equal(
-      group.querySelectorAll('.fab-stage-bars-caption').length,
-      3,
-      'numbered by default'
+    assert.deepEqual(
+      [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) => caption.textContent),
+      ['1 Draw', '2 Fold', '3 '],
+      'numbered by default, each caption its position and its name, never its label'
     );
     assert.ok(!group.querySelector('button'), 'choosing a stage is not this instrument');
+  });
+
+  it('draws an empty named group for no stages', async () => {
+    const root = await stages.mount({ stages: [], ariaLabel: 'Progress' });
+    const group = root.querySelector('[role="group"]');
+    assert.equal(group.getAttribute('aria-label'), 'Progress');
+    assert.equal(group.children.length, 0);
   });
 
   it('names the group by the caller kicker and draws no captions when unnumbered', async () => {
@@ -259,5 +273,83 @@ describe('StageBars (mounted)', () => {
     const bar = root.querySelector('[role="progressbar"]');
     assert.equal(bar.getAttribute('aria-label'), 'Progress');
     assert.ok(!bar.hasAttribute('aria-labelledby'), 'exactly one naming route');
+  });
+
+  it("names a lone stage by its own label, else its own name, before the group's name", async () => {
+    const named = await stages.mount({
+      stages: [{ name: 'Copy', value: 70 }],
+      ariaLabel: 'Progress',
+    });
+    assert.equal(
+      named.querySelector('[role="progressbar"]').getAttribute('aria-label'),
+      'Copy',
+      "a lone stage's own name beats the group's"
+    );
+    const labelled = await remountStages({
+      stages: [{ name: 'Copy', label: 'Copy the scroll', value: 70 }],
+      ariaLabel: 'Progress',
+    });
+    assert.equal(
+      labelled.querySelector('[role="progressbar"]').getAttribute('aria-label'),
+      'Copy the scroll',
+      "and its label beats both the name and the group's"
+    );
+  });
+
+  it('clamps a value to 0–100, reads a non-numeric one as 0, and tones only a full bar by its value', async () => {
+    const root = await stages.mount({
+      stages: [
+        { name: 'A', value: 150 },
+        { name: 'B', value: -5 },
+        { name: 'C', value: 'x' },
+        { name: 'D', value: '45' },
+      ],
+      ariaLabel: 'Progress',
+    });
+    const bars = [...root.querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-valuenow')),
+      ['100', '0', '0', '45']
+    );
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-stage-bars-state]')].map(
+        (stage) => stage.dataset.stageBarsState
+      ),
+      ['success', 'neutral', 'neutral', 'neutral'],
+      'a filled bar reads success, and no other bar but the current one is toned'
+    );
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-current')),
+      ['step', null, null, null],
+      'the current stage defaults to the first, and a filled current bar still carries it'
+    );
+  });
+
+  it('draws a bar for every stage whatever a stage carries, and marks no current one out of range', async () => {
+    const duplicated = await stages.mount({
+      stages: [
+        { id: 'a', name: 'X', value: 1 },
+        { id: 'a', name: 'Y', value: 2 },
+      ],
+      ariaLabel: 'Progress',
+    });
+    assert.deepEqual(
+      [...duplicated.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-label')
+      ),
+      ['X', 'Y'],
+      'a private id two stages share keys nothing'
+    );
+    const outOfRange = await remountStages({
+      stages: [{ name: 'A', value: 1 }, null],
+      currentIndex: 7,
+      ariaLabel: 'Progress',
+    });
+    const bars = [...outOfRange.querySelectorAll('[role="progressbar"]')];
+    assert.equal(bars.length, 2, 'a null entry still draws its bar');
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-current')),
+      [null, null]
+    );
   });
 });

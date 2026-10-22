@@ -1,14 +1,13 @@
 <!--
   One bar per stage, side by side: the progress instrument of a staged run. The row is a named
-  `group`, and each bar is a `progressbar` named by its stage, so an unfilled stage still reads as
-  a stage.
+  `group`, and each bar is a `progressbar` with its own value.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `stages` | `{ id?, name?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is already localized; an unnamed stage is announced as "Stage {index} of {count}", and the only stage of a one-stage list takes the group's own name. |
+  | `stages` | `{ name?, label?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is the visible caption and `label` the bar's accessible name, both final text; a bar is named by `label`, else `name`, else, in a one-stage list only, by the group's own name, so an unnamed stage of several has no name and its caller passes `label`. A stage is keyed by its index, so `id` is private. `[]` draws an empty named group. |
   | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills and carries `aria-current="step"`. A finished bar reads success and the rest neutral. |
-  | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name. |
+  | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name, in muted ink and the mono face, the position at weight 500. |
   | `ariaLabel` / `ariaLabelledBy` | string / string | `''` / `''` | Exactly one names the group; `ariaLabelledBy` where the caller renders the kicker. |
 
   Rest spread:
@@ -19,7 +18,6 @@
     `tests/components/instruments-mounted.test.js`.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
   import FillBar from './FillBar.svelte';
 
   let {
@@ -41,12 +39,11 @@
     return index === currentIndex ? 'accent' : 'neutral';
   }
 
-  function nameOf(stage, index) {
-    if (stage?.name) return { label: stage.name };
-    if (stages.length === 1 && ariaLabelledBy) return { by: ariaLabelledBy };
-    if (stages.length === 1 && ariaLabel) return { label: ariaLabel };
-    const position = { index: index + 1, count: stages.length };
-    return { label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
+  function nameOf(stage) {
+    const label = stage?.label || stage?.name;
+    if (label) return { label };
+    if (stages.length !== 1) return {};
+    return ariaLabelledBy ? { by: ariaLabelledBy } : { label: ariaLabel };
   }
 </script>
 
@@ -57,9 +54,9 @@
   aria-labelledby={ariaLabelledBy || undefined}
   {...rest}
 >
-  {#each stages as stage, index (stage?.id ?? index)}
+  {#each stages as stage, index (index)}
     {@const tone = toneOf(stage, index)}
-    {@const name = nameOf(stage, index)}
+    {@const name = nameOf(stage)}
     <span class="fab-stage-bars-stage" data-stage-bars-stage={index} data-stage-bars-state={tone}>
       <span
         class="fab-stage-bars-track"
@@ -106,7 +103,7 @@
 
   .fab-stage-bars-caption {
     overflow: hidden;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
@@ -115,6 +112,6 @@
   }
 
   .fab-stage-bars-number {
-    font-weight: 700;
+    font-weight: 500;
   }
 </style>

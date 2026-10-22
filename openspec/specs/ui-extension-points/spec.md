@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -408,9 +408,10 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - The published set continues with `Stepper` (issue 2452).
 - The published set continues with `SearchField` (issue 2453).
 - The published set continues with `Select` (issue 2454).
+- The published set continues with `StageBars` (issue 2455).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
-- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
+- A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
 - A `$bindable` prop is published only as a `value` key; an element-ref bindable (`Chip`'s and `Button`'s `element`) never is.
 - A prop that would draw a control (`Chip`'s `removable`, `removeLabel`, `onRemove`, `disabled` and its element-name prop `tag`) is not published at version 1; publishing one later is additive.
 - `Notice`'s `blocking` and `evidence`, and `EmptyState`'s `compact`, `inline`, `note`, `field` and `fill`, are not published at version 1; publishing one later is additive.
@@ -423,8 +424,8 @@ The names `restOn` reserves are fixed for the entry's `version`; reserving anoth
 - An ARIA attribute is published only as an `aria` key an entry's group names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
-- A per-item `props` member is private and is not an attribute channel: Fabricate may stop honouring it without a `version` bump.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), and `Select` too (issue 2454); a companion calls it for each before mounting.
+- Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), and `StageBars` too (issue 2455); a companion calls it for each before mounting.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
 It refuses a `requiredWhen` that is not a string, that names no other `data` key of the entry or a key that is itself `required` or `requiredWhen`, that sits on a `slot`, `aria` or `value` key, or that sits beside `required`, with an `Error` ending `<name> "<key>" has an unknown requiredWhen "<other>"`.
 It refuses a `value` key whose `initial` is not a string, number, boolean or `null` with one ending `<name> "<key>" has an initial that is not a string, number, boolean or null`, and an entry that lists a value key's synthesised `on<Key>Change` as a key of its own with one ending `<name> "<on<Key>Change>" collides with the change callback of "<key>"`.
@@ -660,12 +661,13 @@ Each group states the accepted values of every key that entry publishes.
 - **`InfoStrip`.**
   - `label` is required and is the kicker, which names the group.
   - `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+  - A fact takes no `props` member: it is a stripped member, dropped and never written (see the publishable subset).
   - `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 - **Tones.**
   Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 - **Colour.**
   Colour is never the only carrier of a state: wherever a companion passes a `tone`, `tint`, `ink`, `fill` or `color`, it says the same thing in text beside the component.
-- **Private and undocumented:** every per-item `props` spread; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
+- **Private and undocumented:** a fact's `props` member, a stripped member that Fabricate drops from the copy it renders and never writes, so an `InfoStrip` fact takes none; a `size` off its ladder; `Medallion`'s own default size; a `color` that is not a token reference; the `hazard-mid` fill; a `tint` written with its `--fab-tag-` prefix.
 - **Wrong-typed collections.**
   A collection of the wrong type (`rows: null`) is a contained fault, reported under the entry's name.
   It is not a refusal.
@@ -996,6 +998,96 @@ Each group states the accepted values of every key that entry publishes.
   - A select is drawn only in a Fabricate window, which gives the companion no signal when Foundry 14 moves it between windows, and needs none: a list opened after the move is placed and heard in the window that then holds the trigger, as Overlays states.
 - **Private:** `Select`'s sizes beyond each rung's height and corner, its tick, chevron and colours beyond what its group states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, the list's placement and width, and how Fabricate redraws a select in its own toolbars, rows, cards and dialogs.
 
+### The issue 2455 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`StageBars`.**
+  - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+    A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
+    So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
+    A member other than `name`, `label` and `value` is private, and an empty `stages` draws the named group with no bar.
+  - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
+  - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
+    A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
+  - `ariaLabel` is required and names the group, final display text, as "Forging progress".
+    It also names the one bar of a one-stage list whose stage has no label or name.
+  - Rest `data-*` attributes land on the group root.
+  - It needs no Fabricate ancestor, and draws the same under any.
+  - It is not a live region: an `update` redraws the bars in place and announces nothing.
+- **Private:** `StageBars`' track height and corner, its gaps, its caption's face, size and ink, each tone's colours, a stage's `id`, what it draws for a `currentIndex` outside the list, and how Fabricate draws a stage group in its own run card and run detail.
+
+### The publishable subset
+
+Each term is defined here and used in this sense throughout.
+The _design-system manifest_ is `scripts/lib/designSystemPrimitives.json`.
+The _published manifest_ is `src/ui/publishedComponentManifest.js`, the frozen entry list that `components` mirrors.
+A _candidate_ is a `designSystemPrimitives` row with scope `shared`, or a `notAPrimitive` row whose `library` is not `null` (it has a library specimen).
+The _publishable subset_ is the candidates that pass the static rules below.
+The _exclusion list_ is `scripts/lib/publishedComponentExclusions.json`, which holds a reasoned row for each publishable candidate that is not yet published.
+A _stripped member_ is a per-item member of a published `data` key that `STRIPPED_ITEM_MEMBERS` in `src/ui/publishedComponentProps.js` names.
+
+- **A candidate is publishable when it passes every static rule.**
+  - Its import closure reads none of the Foundry globals `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` and `getDocumentClass` (a local binding of the name is no read), so it does not reach the Foundry bridge.
+  - Every element admission rule 9 judges is marked as that rule asks, and every `svelte:element` in its closure is pinned to the tags it can draw.
+  - Every required prop, a `$props()` key with no default, is carried by a shipped kind; a snippet a component calls with arguments is never a slot, and a prop that is drawn as a component is not data.
+  - Its closure reaches `resolveOverlayHost` only through `anchoredPopover.js`, and a published entry whose closure reaches an overlay action carries `overlays: true`; being an overlay is not a reason to list a component.
+  - The ancestor a component needs is not a static rule: it sets the entry's `root` and never excludes the component.
+- **Every publishable candidate is published or listed.**
+A component that becomes publishable is published, or listed, in the same change.
+- **A row of the exclusion list is `{ path, reason }`.**
+A `reason` is, after trimming, `<code>: <text>` with non-empty text, and the code is one of `no-consumer` (no companion consumer asks for it), `domain-coupled` (its props take a Fabricate record shape), `part-of:<path>` (an internal part of the component at that path, which is a design-system row), `event-argument` (a callback it takes needs a DOM event or node), `item-spread` (an unstripped per-item attribute spread) or `pending:#<number>` (an open issue publishes it).
+A `pending` row names an open issue and is the first row to leave the list.
+- **The list only shrinks.**
+Against the merge base, a path in the list and not in the base list fails unless it did not pass the static rules at the base, whether or not it was then a candidate.
+The static rules are judged at the base with the `svelte:element` pins the head holds.
+Where the list is absent at the base there is no list comparison, which seeds it; where the base holds it and the head does not, the check fails.
+A row's reason is the exemption channel, because the list is JSON and carries no `ratchet-exempt` marker.
+- **A listed path is stale, and fails, when it is published, is not a candidate or fails a static rule.**
+A row whose reason is not `<code>: <text>` with a code from that set, or whose `part-of` path is no design-system row, fails, and a path is listed once.
+The list commits human decisions only, so no total or baseline is committed and no assertion pins the number of rows.
+- **Limit.**
+A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
+- **A per-item spread is stripped or the check fails, and the check fails closed.**
+Every spread attribute in a published closure is traced to the published `data` it comes from.
+A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local, a published key that is not `data`, and a literal.
+A spread of a member of published `data` passes only when it is a stripped member.
+Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
+A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
+An `{#each}` item (destructured or not), an `{@const}` alias, a snippet parameter of the entry's own file and a child component's `$props()` key are traced to the data they hold.
+A failing spread of a whole item, of an expression no rule traces or of an unpublished collection is reported with a message that no row can name it.
+The one stripped member is `InfoStrip.facts.props`.
+A row fails when no published closure spreads that member, whether its key is not `data`, its entry is not published or the component stopped spreading it.
+A spread inside a snippet declared in a child component's file is not traced.
+A snippet the entry declares is traced only through the `{@render}` tags of the entry's own file, so one nothing there renders by name fails closed, whether the render is aliased, made with `.call`, or done by a child component the snippet is passed to.
+These shapes are not traced, and are tracked in issue 2607: a `const` or `$derived` alias of published data, a snippet passed to a child component as a prop (the child's own render of it is not followed), a child drawn through `svelte:component` or a `{@const}` component alias, and a quoted attribute such as `item="{item}"`.
+- **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
+It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
+A function anywhere in the value is still M10, and a value that is not data is still M11.
+A dropped `aria-label` is release-noted.
+
+#### Scenario: A publishable candidate that is neither published nor listed
+
+- **WHEN** a change makes a design-system candidate pass every static rule and neither publishes it nor adds it to the exclusion list
+- **THEN** the ratchet fails and names the remedy: publish it, or add it to `scripts/lib/publishedComponentExclusions.json` with a reason
+
+#### Scenario: A stale listed path
+
+- **WHEN** the exclusion list names a path that is published, is no candidate or now fails a static rule
+- **THEN** the ratchet fails for that row
+
+#### Scenario: The list only shrinks
+
+- **WHEN** a change removes a row and publishes its component, or adds a row for a component that failed a static rule at the base
+- **THEN** the ratchet passes and reports a removal as `shrank`
+- **AND** a row added for a component that was publishable at the base fails
+
+#### Scenario: A stripped per-item member
+
+- **WHEN** a companion mounts `InfoStrip` with a fact whose `props` is `{ 'data-action': 'close', class: 'x' }`
+- **THEN** the fact renders neither attribute and the companion's object is unchanged
+
 ### Mounting and its refusals
 
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
@@ -1084,7 +1176,7 @@ An entry whose `overlays` is `true` opens its overlay and may write the standalo
 - **A published component whose `root` is `'any'` states everything it needs in its own `<style>`**, and it MUST NOT depend on a `.fabricate`, `.fabricate-manager` or `.fabricate-app` ancestor, the global `.visually-hidden` utility, a `--fab-manager-*` token, `@container` on an app-root container name, or a `--font-primary` read whose fallback does not end in a literal.
 - A published component that states the UI face MUST state it as `var(--font-body, var(--font-primary, sans-serif))` or another expression whose last fallback is a literal, so it resolves with no Foundry variable.
 - A published component's import closure MUST NOT read `game`, `foundry`, `Hooks`, `CONFIG`, `CONST`, `ui`, `canvas`, `fromUuid`, `fromUuidSync` or `getDocumentClass`.
-- A published component's rest keys are `data-*` attributes (M13), so a published `Meter` and `InfoStrip` are each named by their required `label`, and a single-row `BandedBar` by its row's `name`, which its docs section states as required.
+- A published component's rest keys are `data-*` attributes (M13), so a published `Meter` and `InfoStrip` are each named by their required `label`, and a single-row `BandedBar` by its row's `name`, which its docs section states as required; each bar of a `StageBars` of two or more stages is named by its stage's `label` or `name`, which its docs section states as required too.
 - A published component relies on one host baseline, Foundry core's element reset (universal `box-sizing: border-box`), which every document that holds `api.ui` carries; `Avatar` and `Medallion` take their edge length's box model from it.
 - A published component inherits from `target` every inherited text property its own rules do not state, so the companion sets none on `target`.
 - `Avatar`, `Medallion`, `Chip` and a `Kicker` drawn as `span` are inline marks: the companion gives their `target` `display: flex`, so the mark is a flex item as every Fabricate site draws it and `target` is exactly as tall as the mark.
@@ -1193,6 +1285,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **AND** Escape or a press outside the open list closes it without calling `onChange`
 - **AND** a mount whose `options` hold `1` and `'1'` faults when its list opens, calling `onFault` once with the target empty
 - **AND** a mount that omits `options` throws M9, and one that passes a `data-*` key throws M8
+
+#### Scenario: A published stage group
+
+- **WHEN** a companion mounts `StageBars` with `stages` and `ariaLabel` into a target under no Fabricate ancestor
+- **THEN** it draws a group named by `ariaLabel` holding one `progressbar` per stage, each named by its stage's `label`, else its `name`
+- **AND** the one bar of a one-stage list whose stage has neither takes the group's name, and an empty `stages` draws the named group with no bar
+- **AND** its import closure reads no Foundry global
 
 #### Scenario: An overlay host
 
