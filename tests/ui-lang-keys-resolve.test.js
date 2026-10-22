@@ -13,8 +13,8 @@ const SRC_ROOT = join(ROOT, 'src');
 
 // Assertion B's four leaf-reference shapes.
 const LEAF_KEY_PATTERNS = [
-  // text('FABRICATE…') / format("FABRICATE…") / localize('FABRICATE…')
-  /\b(?:text|format|localize)\(\s*(['"])(FABRICATE[^'"]*)\1/g,
+  // text('FABRICATE…') / format("FABRICATE…") / localize('FABRICATE…') / localizeOr('FABRICATE…')
+  /\b(?:text|format|localize|localizeOr)\(\s*(['"])(FABRICATE[^'"]*)\1/g,
   // labelKey: 'FABRICATE…' / descKey: "FABRICATE…"
   /\b(?:labelKey|descKey)\s*:\s*(['"])(FABRICATE[^'"]*)\1/g,
   // [COMPUTED]: 'FABRICATE…' lookup-table entries.

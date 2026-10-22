@@ -143,10 +143,10 @@
   );
 
   const membershipFilters = $derived(
-    componentMembershipFilters({
-      members: (itemCards || []).length,
-      world: (itemCards || []).length + ghostRows.length,
-    })
+    componentMembershipFilters(
+      { members: (itemCards || []).length, world: (itemCards || []).length + ghostRows.length },
+      text
+    )
   );
 
   /** The ghost half of the cohort, after the membership segment and the search term. The zero state

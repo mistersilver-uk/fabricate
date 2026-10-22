@@ -190,25 +190,22 @@
     })
   );
 
-  // The cohort segments, in the shape the shared segmented control reads. It localizes each label
-  // itself and the tally rides its `count` slot, so the two filter keys interpolate no `{count}`.
+  // The cohort segments, in the shape the shared segmented control reads. The tally rides its
+  // `count` slot, so the two filter keys interpolate no `{count}`.
   const membershipFilters = $derived([
     {
       value: 'in',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterInSystem',
-      fallback: 'In this system',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterInSystem', 'In this system'),
       count: memberRows.length,
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
-      fallback: 'All world tools',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterAllWorld', 'All world tools'),
       count: memberRows.length + ghostRows.length,
     },
     {
       value: 'over',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterOverriding',
-      fallback: 'Overriding',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterOverriding', 'Overriding'),
     },
   ]);
 

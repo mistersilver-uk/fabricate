@@ -247,20 +247,17 @@
   const severityOptions = $derived([
     {
       value: 'minor',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.minor',
-      fallback: 'Minor',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.minor', 'Minor'),
       variant: 'info',
     },
     {
       value: 'major',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.major',
-      fallback: 'Major',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.major', 'Major'),
       variant: 'warning',
     },
     {
       value: 'severe',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.severe',
-      fallback: 'Severe',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.severe', 'Severe'),
       variant: 'danger',
     },
   ]);
@@ -268,13 +265,11 @@
   const matchOptions = $derived([
     {
       value: 'any',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Match.any',
-      fallback: 'Any',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Match.any', 'Any'),
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Match.all',
-      fallback: 'All',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Match.all', 'All'),
     },
   ]);
 

@@ -60,7 +60,7 @@
   );
 
   const filters = $derived(
-    componentEntrySystemFilters({ total: rows.length, members: memberRows.length })
+    componentEntrySystemFilters({ total: rows.length, members: memberRows.length }, text)
   );
 
   /** Reveal the non-member cohort and focus its search field. */

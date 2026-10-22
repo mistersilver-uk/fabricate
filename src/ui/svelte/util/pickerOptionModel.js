@@ -111,6 +111,33 @@ export function watchAnchor(
   return () => observer.disconnect();
 }
 
+/** The picker's own copy, each entry as `[key, fallback]`. */
+export const PICKER_COPY = Object.freeze({
+  error: Object.freeze(['FABRICATE.Common.Picker.Error', 'The list could not load']),
+  loading: Object.freeze(['FABRICATE.Common.Picker.Loading', 'Loading…']),
+  noMatches: Object.freeze(['FABRICATE.Common.Picker.NoMatches', 'No matches']),
+  gridHints: Object.freeze([
+    'FABRICATE.Common.Picker.KeyHints.Grid',
+    '←↑↓→ move · ↵ pick · esc close',
+  ]),
+  listHints: Object.freeze([
+    'FABRICATE.Common.Picker.KeyHints.List',
+    '↑↓ move · ↵ pick · esc close',
+  ]),
+});
+
+/**
+ * `(name) => text`: the `PICKER_COPY` entry `name` translated by `localize`, the app root's
+ * localizer, else its fallback, which is what a tree mounted with none draws (issue 2454).
+ */
+export function pickerCopy(localize) {
+  return (name) => {
+    const [key, fallback] = PICKER_COPY[name];
+    const translated = typeof localize === 'function' ? localize(key) : '';
+    return translated && translated !== key ? translated : fallback;
+  };
+}
+
 /** A list holding nothing takes the caller's hint and detail; a list the query emptied takes the no-matches line and no detail. */
 export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, emptyDetail }) {
   const filteredToNothing = total > 0 && matched === 0;

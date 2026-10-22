@@ -121,8 +121,7 @@
   ].map(([value, name, icon]) => ({
     value,
     icon,
-    labelKey: `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${name}`,
-    fallback: name,
+    label: text(`FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${name}`, name),
   }));
 
   function addBiome(chosen) {

@@ -489,6 +489,33 @@ describe('JournalView mounted behavior', () => {
     assert.deepEqual(calls.status, ['inProgress']);
   });
 
+  it('labels every status tab with its localized text and the count it carries', async () => {
+    const statuses = english.FABRICATE.App.Journal.Filters.Status;
+    const prefix = 'FABRICATE.App.Journal.Filters.Status.';
+    const localize = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = (key) =>
+      key.startsWith(prefix) ? statuses[key.slice(prefix.length)] ?? key : localize(key);
+    try {
+      const run = makeCraftingRun();
+      const { store } = makeJournal({
+        activePageItems: [run], activeRuns: [run], activeCount: 6,
+        activeCounts: { all: 6, ready: 1, inProgress: 4, paused: 1 },
+      });
+      const target = await harness.mount({ services: makeServices(store) });
+      const group = target.querySelector('[data-journal-status-filter]');
+      assert.deepEqual(
+        [...group.querySelectorAll('.manager-segment-label')].map((node) => node.textContent),
+        [statuses.All, statuses.Ready, statuses.InProgress, statuses.Paused]
+      );
+      assert.deepEqual(
+        [...group.querySelectorAll('.manager-segment-count')].map((node) => node.textContent),
+        ['6', '1', '4', '1']
+      );
+    } finally {
+      globalThis.game.i18n.localize = localize;
+    }
+  });
+
   it('selects by the full run model so equal ids in different run types stay distinct', async () => {
     const crafting = makeCraftingRun({ id: 'same' });
     const gathering = makeGatheringRun({ id: 'same' });

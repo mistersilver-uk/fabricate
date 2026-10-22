@@ -192,11 +192,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452 and 2453
+ * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453 and 2454
  * headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -257,7 +257,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
   });
 
-  it('publishes exactly the pinned components, each described as pinned with its root and no overlay, and documents them', () => {
+  it('publishes exactly the pinned components, each described as pinned with its root and whether it opens an overlay, and documents them', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
@@ -280,6 +280,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'StatusToggle',
       'Stepper',
       'SearchField',
+      'Select',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -482,6 +483,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: true,
         root: 'fabricate',
         overlays: false,
+      },
+      Select: {
+        version: 1,
+        props: {
+          options: required,
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          placeholder: optional,
+          size: optional,
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: true,
       },
     });
     assert.deepEqual(

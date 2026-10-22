@@ -35,6 +35,7 @@
   import {
     CONDITION_OPERATORS,
     DICE_AGGREGATES,
+    OUTCOME_CHOICES,
     conditionTypesFor,
     diceGroupOptions,
     localizedOptions,
@@ -81,50 +82,12 @@
   const operatorOptions = $derived(localizedOptions(CONDITION_OPERATORS, localizeOr));
   const diceGroupRows = $derived(diceGroupOptions(diceGroups));
 
-  // Outcome toggle segments, good→neutral→bad so the neutral default sits in the middle; a
-  // progressive check has no pass/fail, only a value, so it relabels.
+  // A progressive check has no pass/fail, only a value, so its outcome toggle relabels.
   const outcomeChoices = $derived(
-    kind === 'progressive'
-      ? [
-          {
-            value: 'success',
-            variant: 'success',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardAll',
-            fallback: 'Award all',
-          },
-          {
-            value: 'none',
-            variant: 'neutral',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
-            fallback: 'No effect',
-          },
-          {
-            value: 'failure',
-            variant: 'danger',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardNone',
-            fallback: 'Award none',
-          },
-        ]
-      : [
-          {
-            value: 'success',
-            variant: 'success',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceSuccess',
-            fallback: 'Automatic success',
-          },
-          {
-            value: 'none',
-            variant: 'neutral',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
-            fallback: 'No effect',
-          },
-          {
-            value: 'failure',
-            variant: 'danger',
-            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceFailure',
-            fallback: 'Automatic failure',
-          },
-        ]
+    localizedOptions(
+      OUTCOME_CHOICES[kind === 'progressive' ? 'progressive' : 'standard'],
+      localizeOr
+    )
   );
 
   // DISABLED on the radio itself, not merely dimmed, for an outcomeTier condition: that pin
@@ -140,23 +103,22 @@
   const TIER_STEP_MODES = [
     {
       value: 'none',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeNone',
-      fallback: 'No step',
+      label: localizeOr('FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeNone', 'No step'),
     },
     {
       value: 'up',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeUp',
-      fallback: 'Step up',
+      label: localizeOr('FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeUp', 'Step up'),
     },
     {
       value: 'down',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeDown',
-      fallback: 'Step down',
+      label: localizeOr('FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeDown', 'Step down'),
     },
     {
       value: 'target',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeTarget',
-      fallback: 'Target tier',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeTarget',
+        'Target tier'
+      ),
     },
   ];
 

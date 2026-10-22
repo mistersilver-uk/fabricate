@@ -2,9 +2,10 @@
  * What the published component gates share (issue 2452): the three parses a gate reads of a file,
  * an entry's import closure, a component's declared props, the pinned tags of each
  * `svelte:element`, admission rule 9's scan of one component with each element's hook and guards,
- * and every stylesheet a published root's selectors are read from.
- * `tests/published-component-manifest.test.js` and `tests/published-component-controls.test.js`
- * import them.
+ * every stylesheet a published root's selectors are read from, and the ancestor and Foundry
+ * dependencies of a closure. `tests/published-component-manifest.test.js`,
+ * `tests/published-component-controls.test.js` and `tests/segmented-control-closure.test.js` import
+ * them.
  */
 import assert from 'node:assert/strict';
 import { posix, resolve } from 'node:path';
@@ -23,7 +24,7 @@ import {
 } from './moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from './parsedSource.js';
 import { readScannedDirectory, repoRoot } from './sourceScan.js';
-import { parseComponentScope } from './svelteStructureContract.js';
+import { parseComponentScope, readsGlobal } from './svelteStructureContract.js';
 
 export const byName = (a, b) => a.localeCompare(b);
 
@@ -60,7 +61,10 @@ export function importClosure(path, reader, seen = new Set()) {
   return seen;
 }
 
-/** Each `$props()` key with its local name and whether it is `$bindable`. */
+/**
+ * Each `$props()` key with its local name, whether it is `$bindable`, and its default as
+ * `fallback`: the node it is assigned, `$bindable`'s argument, or `undefined`.
+ */
 export function propLocals(ast) {
   for (const node of walkNodes(ast.instance)) {
     if (node.type !== 'VariableDeclarator' || node.init?.callee?.name !== '$props') continue;
@@ -68,10 +72,12 @@ export function propLocals(ast) {
       .filter((property) => property.type === 'Property')
       .map((property) => {
         const value = property.value;
-        const local = value.type === 'AssignmentPattern' ? value.left.name : value.name;
-        const bindable =
-          value.type === 'AssignmentPattern' && value.right.callee?.name === '$bindable';
-        return { key: property.key.name ?? property.key.value, local, bindable };
+        const defaulted = value.type === 'AssignmentPattern';
+        const local = defaulted ? value.left.name : value.name;
+        const bindable = defaulted && value.right.callee?.name === '$bindable';
+        const stated = defaulted ? value.right : undefined;
+        const fallback = bindable ? stated.arguments[0] : stated;
+        return { key: property.key.name ?? property.key.value, local, bindable, fallback };
       });
   }
   return [];
@@ -228,7 +234,7 @@ const TEMPLATE_BINDERS = Object.freeze({
 });
 
 /** Every name a template block of one component binds, wherever in the template. */
-function templateBindings(ast) {
+export function templateBindings(ast) {
   const bound = new Set();
   for (const node of walkNodes(ast.fragment)) {
     for (const binder of TEMPLATE_BINDERS[node.type]?.(node) ?? []) {
@@ -443,8 +449,8 @@ function pinFaults(id, pin, read, spelled) {
   return faults;
 }
 
-/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
-function componentTags(file, ast) {
+/** Each local one parsed file imports from a relative specifier, by the path it resolves to. */
+export function relativeImports(file, ast) {
   const imported = new Map();
   const statements = [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
   for (const statement of statements) {
@@ -452,6 +458,12 @@ function componentTags(file, ast) {
     const path = posix.join(posix.dirname(file), statement.source.value);
     for (const specifier of statement.specifiers) imported.set(specifier.local.name, path);
   }
+  return imported;
+}
+
+/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
+export function componentTags(file, ast) {
+  const imported = relativeImports(file, ast);
   return [...walkNodes(ast.fragment)]
     .filter((node) => node.type === 'Component' && imported.has(node.name))
     .map((node) => [imported.get(node.name), node]);
@@ -461,11 +473,13 @@ function componentTags(file, ast) {
  * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
  * naming those props and the pinned tags by the child's path: it states one of them on the child's
  * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`entryFile`)
- * may spread its rest local, which holds `data-*` keys alone (M13).
+ * may spread its rest local, which holds `data-*` keys alone (M13). A tag `drawn` answers no
+ * published closure draws is not judged (issue 2454).
  */
-function passedFaults(file, ast, defaulted, entryFile) {
+function passedFaults(file, ast, defaulted, entryFile, drawn) {
   const rest = entryFile ? restLocal(ast) : null;
-  return componentTags(file, ast).flatMap(([child, node]) => {
+  const tags = componentTags(file, ast).filter(([, node]) => drawn(file, node));
+  return tags.flatMap(([child, node]) => {
     const { keys = [], tags = [] } = defaulted.get(child) ?? {};
     if (keys.length === 0) return [];
     const literalTag = (value) => tags.includes(staticText({ value }));
@@ -487,9 +501,10 @@ function passedFaults(file, ast, defaulted, entryFile) {
  * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
  * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
  * reads, a keyed pin that is not `open` states `heldBy`, no file under `src/` is `open`, and no
- * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal.
+ * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal,
+ * from a tag `drawnTag(file, node)` answers a published closure draws.
  */
-export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
+export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS, drawnTag = () => true) {
   const faults = [];
   const drawn = new Set();
   const defaulted = new Map();
@@ -511,7 +526,7 @@ export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
     }
   }
   const passed = files.flatMap(({ file, ast, published }) =>
-    passedFaults(file, ast, defaulted, published.size > 0)
+    passedFaults(file, ast, defaulted, published.size > 0, drawnTag)
   );
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
   return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
@@ -581,7 +596,7 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
 }
 
 /** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */
-function restLocal(ast) {
+export function restLocal(ast) {
   const declarators = [...walkNodes(ast.instance)].filter(
     (node) => node.type === 'VariableDeclarator' && isCallTo(node.init, '$props')
   );
@@ -1061,4 +1076,71 @@ export function unheldClauses(heldBys) {
       .map((node) => node.arguments[0]?.value);
     return !described.includes(title);
   });
+}
+
+const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
+const APP_TOKENS = ['var(--fab-manager-'];
+/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
+const MANAGER_ROOTS = new Set(['fabricate-manager']);
+const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
+// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
+const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
+export const FOUNDRY_GLOBALS = [
+  'game',
+  'foundry',
+  'Hooks',
+  'CONFIG',
+  'CONST',
+  'ui',
+  'canvas',
+  'fromUuid',
+  'fromUuidSync',
+  'getDocumentClass',
+];
+
+/** The static class names one template node writes, by attribute or directive. */
+export function classNames(node) {
+  if (node.type === 'ClassDirective') return [node.name];
+  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
+  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
+}
+
+/**
+ * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
+ * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
+ */
+export function ancestorDependencies(ast, root = 'any') {
+  if (root === 'manager') return [];
+  const windowed = root === 'fabricate';
+  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
+  const found = new Set();
+  for (const node of walkNodes(ast.css)) {
+    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
+    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
+    if (node.type !== 'Declaration') continue;
+    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
+    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
+      found.add('unguarded var(--font-primary)');
+    }
+  }
+  for (const node of walkNodes(ast.fragment)) {
+    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
+  }
+  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
+}
+
+/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
+export function foundryReads(file, reader) {
+  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
+  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
+}
+
+/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
+export function closureDependencies(path, reader = SHIPPED, root = 'any') {
+  return [...importClosure(path, reader)].flatMap((file) =>
+    [
+      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
+      ...foundryReads(file, reader),
+    ].map((rule) => `${file}: ${rule}`)
+  );
 }
