@@ -26,6 +26,7 @@ import {
   createCaptureState,
   createDeadline,
   createManifestWriter,
+  describeRun,
   exitCodeOf,
   failUnaccounted,
   panelWidth,
@@ -192,11 +193,7 @@ async function run(argv) {
     writeManifest(state);
   }
   const manifest = captureManifest(state);
-  console.log(
-    `captured ${manifest.frames.length} unit(s) to ${output} ` +
-      `(${manifest.failures.length} failure(s), ${manifest.overflow.length} over the cap; ` +
-      `boot ${state.timings.bootMs ?? '-'} ms, total ${state.timings.totalMs} ms)`
-  );
+  for (const line of describeRun(manifest, output)) console.log(line);
   return exitCodeOf(manifest, planned.requests.length);
 }
 

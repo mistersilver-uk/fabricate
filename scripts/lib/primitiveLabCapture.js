@@ -86,6 +86,7 @@ function ordinalRequest(key, { entries, units }, entry, unit) {
  * Turn target keys into capture requests: rows and deleted-row addresses by `(spec, cap)`, entries
  * and units by ordinal with the heading and caption this checkout's library gives them, and
  * `coverage` as the first row of every catalogue section, each request keeping the key `coverage`.
+ * Only a deleted-row address carries `deletedRow: true`.
  *
  * @param {string[]} keys Target keys, highest signal first.
  * @param {{sections: {section: string, rows: object[]}[], library: string|null}} checkout This
@@ -107,7 +108,9 @@ export function planRequests(keys, { sections, library }) {
         break;
       }
       case 'addr': {
-        take({ request: { key, kind: 'address', spec: parsed.spec, cap: parsed.cap } });
+        take({
+          request: { key, kind: 'address', spec: parsed.spec, cap: parsed.cap, deletedRow: true },
+        });
         break;
       }
       case 'entry':
@@ -319,9 +322,35 @@ export function parseCaptureArgs(argv) {
   return { ...options, keys: parseTargets(rest.join(',')) };
 }
 
-/** Non-zero when any key failed, or when units were requested and none was captured. */
-export function exitCodeOf({ frames, failures }, requested) {
-  return failures.length > 0 || (requested > 0 && frames.length === 0) ? 1 : 0;
+/**
+ * Non-zero when any key failed, or when units were requested and none was captured; a `removed`
+ * note is not a requested unit, and no other note kind is subtracted.
+ */
+export function exitCodeOf({ frames, failures, notes = [] }, requested) {
+  const live = requested - notes.filter((note) => note.kind === 'removed').length;
+  return failures.length > 0 || (live > 0 && frames.length === 0) ? 1 : 0;
+}
+
+/**
+ * The run's log lines: the summary, then one line per `removed` note, control characters stripped.
+ *
+ * @param {object} manifest `captureManifest`'s result.
+ * @param {string} output The directory the frames went to.
+ * @returns {string[]} The summary first.
+ */
+export function describeRun(manifest, output) {
+  const removed = manifest.notes.filter((note) => note.kind === 'removed');
+  const { bootMs, totalMs } = manifest.timings;
+  const plain = (text) => String(text ?? '').replaceAll(/\p{Cc}/gu, '');
+  return [
+    `captured ${manifest.frames.length} unit(s) to ${output} ` +
+      `(${manifest.failures.length} failure(s), ${removed.length} removed with their drawing, ` +
+      `${manifest.overflow.length} over the cap; boot ${bootMs ?? '-'} ms, total ${totalMs} ms)`,
+    ...removed.map(
+      ({ spec, cap, reason }) =>
+        `removed with its drawing: ${[spec, cap].filter(Boolean).map(plain).join(' · ')} (${plain(reason)})`
+    ),
+  ];
 }
 
 /** A capture run's mutable record, which the manifest is written from. */
@@ -476,24 +505,31 @@ function failUnit(state, unit, reason) {
   for (const key of unit.keys) state.failures.push({ id: key, reason });
 }
 
-/** Fail every requested key no frame or failure accounts for yet, so none goes unreported. */
+/** Fail every requested key no frame, failure or note accounts for yet, so none goes unreported. */
 export function failUnaccounted(state, requests, reason) {
   const accounted = new Set([
     ...state.frames.flatMap((frame) => frame.targets),
     ...state.failures.map((failure) => failure.id),
+    ...state.notes.map((note) => note.key),
   ]);
   for (const { key } of requests) {
     if (!accounted.has(key)) state.failures.push({ id: key, reason });
   }
 }
 
-/** Resolve every request in the reference page, keeping the resolved in request order. */
+/**
+ * Resolve every request in the reference page, keeping the resolved in request order; a deleted
+ * row's address the library no longer draws becomes a `removed` note, any other miss a failure.
+ */
 async function resolveInReference(reference, requests, state, deadline) {
   const results = await bounded(reference.evaluate(resolveRequests, requests), deadline);
   const resolved = [];
   for (const [index, result] of results.entries()) {
-    if (result.error) state.failures.push({ id: requests[index].key, reason: result.error });
-    else resolved.push({ key: requests[index].key, ...result });
+    const { key, spec, cap, deletedRow } = requests[index];
+    if (result.error && deletedRow) {
+      state.notes.push({ key, kind: 'removed', spec, cap: cap ?? null, reason: result.error });
+    } else if (result.error) state.failures.push({ id: key, reason: result.error });
+    else resolved.push({ key, ...result });
   }
   return resolved;
 }

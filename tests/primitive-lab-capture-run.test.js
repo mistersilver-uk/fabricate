@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -16,6 +16,7 @@ import { Window } from 'happy-dom';
 import {
   OUTPUT_DIRECTORY,
   captureLibrary,
+  captureManifest,
   clipUnion,
   createCaptureState,
   createDeadline,
@@ -28,7 +29,9 @@ import {
   readLabels,
   resolveRequests,
 } from '../scripts/lib/primitiveLabCapture.js';
-import { LIBRARY_PATH, scanLibraryRegions } from '../scripts/lib/primitiveLabUnits.js';
+import { CATALOGUE_DIRECTORY, parseCatalogueRows } from '../scripts/lib/primitiveLabCatalogue.js';
+import { selectLibraryTargets } from '../scripts/lib/primitiveLabSelection.js';
+import { LIBRARY_PATH, addressKey, scanLibraryRegions } from '../scripts/lib/primitiveLabUnits.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IN_PAGE = new Set([resolveRequests, readLabels, measureUnit]);
@@ -39,8 +42,8 @@ const entry = (heading, captions) => [
   ...captions.map((cap) => `  <div class="unit"><span class="cap">${cap}</span><i>x</i></div>`),
   '</div>',
 ];
-const libraryOf = (heading = '&lt;Chip&gt;') =>
-  ['<section>', ...entry(heading, ['filter', 'removable', 'tag']), '</section>'].join('\n');
+const libraryOf = (heading = '&lt;Chip&gt;', captions = ['filter', 'removable', 'tag']) =>
+  ['<section>', ...entry(heading, captions), '</section>'].join('\n');
 
 /** A document holding `html`, closed after the test. */
 function documentOf(t, html) {
@@ -71,16 +74,26 @@ function fakePage(doc, { report = { error: null, mounted: 3 }, hangs = [] } = {}
 }
 
 /** Requests for every unit of the fixture library, and an io that records what it was handed. */
-function harness(t, { lab = {}, labHtml = libraryOf(), passedAfter = Infinity } = {}) {
-  const library = libraryOf();
-  const keys = ['unit:0.0', 'unit:0.1', 'unit:0.2'];
-  const { requests } = planRequests(keys, { sections: [], library });
+function harness(t, options = {}) {
+  const {
+    lab = {},
+    labHtml = libraryOf(),
+    passedAfter = Infinity,
+    library = libraryOf(),
+  } = options;
+  const { keys = ['unit:0.0', 'unit:0.1', 'unit:0.2'], sections = [] } = options;
+  const { requests } = planRequests(keys, { sections, library });
   const pages = {
-    reference: fakePage(documentOf(t, library)),
+    reference: fakePage(documentOf(t, options.referenceHtml ?? library)),
     lab: fakePage(documentOf(t, labHtml), lab),
   };
   let checks = 0;
   const written = { frames: [], manifests: [] };
+  const writeManifest =
+    options.writeManifest ??
+    ((state) => {
+      written.manifests.push({ frames: state.frames.length, failures: state.failures.length });
+    });
   const io = {
     baseUrl: 'https://lab.test',
     now: () => 0,
@@ -92,9 +105,7 @@ function harness(t, { lab = {}, labHtml = libraryOf(), passedAfter = Infinity } 
     writeFrame: async (id) => {
       written.frames.push(id);
     },
-    writeManifest: (state) => {
-      written.manifests.push({ frames: state.frames.length, failures: state.failures.length });
-    },
+    writeManifest,
   };
   return { requests, pages, io, written, state: createCaptureState() };
 }
@@ -215,6 +226,15 @@ test('the arguments name a base, an output directory and the targets', () => {
   assert.equal(exitCodeOf({ frames: [], failures: [] }, 0), 0);
 });
 
+test('a removed note is not a requested unit, and no other note or failure is subtracted', () => {
+  const removed = { key: 'addr:x', kind: 'removed' };
+  assert.equal(exitCodeOf({ frames: [], failures: [], notes: [removed, removed] }, 2), 0);
+  assert.equal(exitCodeOf({ frames: [], failures: [{}], notes: [removed] }, 1), 1);
+  assert.equal(exitCodeOf({ frames: [], failures: [], notes: [removed] }, 2), 1);
+  const unlocated = { key: 'unlocated:a:1', kind: 'unlocated' };
+  assert.equal(exitCodeOf({ frames: [], failures: [], notes: [unlocated] }, 1), 1);
+});
+
 test('the manifest lands whole, by a rename', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'lab-manifest-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -247,4 +267,133 @@ test('the deadline reports what is left of it', () => {
   assert.equal(deadline.remaining(), 300);
   now = 900;
   assert.equal(deadline.remaining(), 0);
+});
+
+const REMOVED_KEYS = [
+  'unit:0.0',
+  addressKey('<Chip>', 'gone'),
+  addressKey('<Gone>', 'x'),
+  addressKey('<Chip>', 'removable'),
+];
+
+test('a deleted row the library no longer draws is a removed note; one it still draws is captured', async (t) => {
+  const run = harness(t, { keys: REMOVED_KEYS });
+  await captureLibrary(run.requests, run.pages, run.state, run.io);
+  assert.deepEqual(run.written.frames, ['00-0-chip-filter', '00-1-chip-removable']);
+  assert.deepEqual(run.state.failures, []);
+  assert.deepEqual(
+    run.state.notes.map(({ key, kind, spec, cap }) => ({ key, kind, spec, cap })),
+    [
+      { key: REMOVED_KEYS[1], kind: 'removed', spec: '<Chip>', cap: 'gone' },
+      { key: REMOVED_KEYS[2], kind: 'removed', spec: '<Gone>', cap: 'x' },
+    ]
+  );
+  assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 0);
+});
+
+test('only a deleted row address is let go: every other unresolved request still fails', async (t) => {
+  const sections = [{ section: 'controls', rows: [{ spec: '<Chip>', cap: 'ghost' }] }];
+  const run = harness(t, {
+    keys: ['row:controls/0', 'coverage', 'unit:0.1'],
+    sections,
+    referenceHtml: libraryOf('&lt;Chip&gt;', ['filter', 'drifted', 'tag']),
+  });
+  run.requests.push({ key: 'by-hand', kind: 'address', spec: '<Chip>', cap: 'ghost' });
+  await captureLibrary(run.requests, run.pages, run.state, run.io);
+  assert.deepEqual(
+    run.state.failures.map(({ id }) => id),
+    ['row:controls/0', 'coverage', 'unit:0.1', 'by-hand']
+  );
+  assert.deepEqual(run.state.notes, []);
+  assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 1);
+});
+
+/** `rows` as a catalogue file, one row per `  {` block. */
+const catalogueText = (rows) => `${JSON.stringify(rows, null, 2)}\n`;
+
+/** The hunks `git diff` writes from `before` to `after`. */
+function unifiedPatch(before, after) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'lab-capture-patch-'));
+  try {
+    writeFileSync(path.join(dir, 'a'), before);
+    writeFileSync(path.join(dir, 'b'), after);
+    const diff = spawnSync('git', ['diff', '--no-index', '--no-color', '-U3', 'a', 'b'], {
+      cwd: dir,
+      encoding: 'utf8',
+    }).stdout;
+    return diff.slice(diff.indexOf('\n@@') + 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('a row deleted with its drawing is selected, planned, captured as a note, and exits 0', async (t) => {
+  const row = (cap) => ({ spec: '<Chip>', cap, draws: '.k-chip', path: 'Chip.svelte' });
+  const before = catalogueText([row('filter'), row('removable'), row('tag')]);
+  const after = catalogueText([row('filter'), row('tag')]);
+  const file = `${CATALOGUE_DIRECTORY}/controls.json`;
+  const selected = selectLibraryTargets([file], {
+    patches: { [file]: unifiedPatch(before, after) },
+    source: {
+      readText: (name) => (name === file ? after : null),
+      catalogueSections: () => ['controls'],
+    },
+  });
+  const keys = selected.map(({ key }) => key);
+  assert.deepEqual(keys, ['row:controls/1', addressKey('<Chip>', 'removable')]);
+  const sections = [{ section: 'controls', rows: parseCatalogueRows(after) }];
+  const drawn = (captions) => libraryOf('&lt;Chip&gt;', captions);
+  const [library, bare] = [drawn(['filter', 'tag']), drawn(['filter'])];
+  const run = harness(t, { keys, sections, library, labHtml: library });
+  await captureLibrary(run.requests, run.pages, run.state, run.io);
+  assert.deepEqual(run.written.frames, ['00-1-chip-tag']);
+  assert.deepEqual(run.state.failures, []);
+  assert.deepEqual(captureManifest(run.state).notes, [
+    {
+      key: keys[1],
+      kind: 'removed',
+      spec: '<Chip>',
+      cap: 'removable',
+      reason: '<Chip> has no unit captioned "removable"',
+    },
+  ]);
+  assert.equal(exitCodeOf(captureManifest(run.state), run.requests.length), 0);
+  const gone = harness(t, { keys, sections, library: bare, labHtml: bare });
+  await captureLibrary(gone.requests, gone.pages, gone.state, gone.io);
+  assert.deepEqual(
+    gone.state.failures.map(({ id }) => id),
+    ['row:controls/1']
+  );
+  assert.equal(exitCodeOf(captureManifest(gone.state), gone.requests.length), 1);
+});
+
+test('every catalogue row resolves as an address in the real library, so a miss means a removal', (t) => {
+  const html = readFileSync(path.join(ROOT, LIBRARY_PATH), 'utf8');
+  const rows = readCatalogueSections(ROOT).flatMap((section) => section.rows);
+  assert.ok(rows.length > 50, `${rows.length} rows`);
+  const keys = rows.map((one) => addressKey(one.spec, one.cap ?? null));
+  const { requests } = planRequests(keys, { sections: [], library: html });
+  const errors = resolveRequests(requests, documentOf(t, html)).flatMap((result) =>
+    result.error ? [result.error] : []
+  );
+  assert.equal(requests.length, rows.length);
+  assert.deepEqual(errors, []);
+});
+
+test('a capture that stops after resolving fails its live keys and not a removed one', async (t) => {
+  const run = harness(t, {
+    keys: REMOVED_KEYS,
+    writeManifest: () => {
+      throw new Error('disk full');
+    },
+  });
+  await captureLibrary(run.requests, run.pages, run.state, run.io);
+  assert.deepEqual(reasonsOf(run.state), [
+    'unit:0.0: capture stopped: disk full',
+    `${REMOVED_KEYS[3]}: capture stopped: disk full`,
+  ]);
+  assert.deepEqual(
+    run.state.notes.map(({ key }) => key),
+    [REMOVED_KEYS[1], REMOVED_KEYS[2]]
+  );
 });
