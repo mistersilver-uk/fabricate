@@ -1317,8 +1317,9 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: `${LAB_WELL} > div:not(.fab-well-label) > div`, styles: 'display: contents' },
     { selector: `${LAB_WELL} [data-lab-well-content]`, styles: 'display: flex; row-gap: 8px' },
   ],
-  // The published callout (issue 2601): the paragraph root's strip, ink and fill, the info and
-  // warning notes' tone inks and fills, the items' spacing, and the actions host and its slot.
+  // The published callout (issue 2601): the paragraph root's strip, ink and fill, the info, accent,
+  // warning and success notes' tone inks and fills, the items' spacing, and the actions host and
+  // its slot.
   'manager-published-callout-specimen': [
     {
       selector: labCallout('standing'),
@@ -1333,13 +1334,26 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: `${labCallout('info')} .manager-callout-title`,
       styles: 'color: var(--fab-info-text); font-weight: 600',
     },
+    {
+      selector: labCallout('accent'),
+      styles:
+        'background-color: var(--fab-accent-soft); border-top-color: var(--fab-accent-border)',
+    },
+    { selector: `${labCallout('accent')} > i`, styles: 'color: var(--fab-accent-text)' },
+    {
+      selector: labCallout('success'),
+      styles:
+        'background-color: var(--fab-success-soft); border-top-color: var(--fab-success-border)',
+    },
+    { selector: `${labCallout('success')} > i`, styles: 'color: var(--fab-success-text)' },
+    { selector: labCallout('warning'), styles: 'background-color: var(--fab-warning-soft)' },
     { selector: `${labCallout('warning')} > i`, styles: 'color: var(--fab-warning-text)' },
     {
       selector: `${labCallout('warning')} .manager-callout-items`,
       styles: 'display: grid; row-gap: 8px',
     },
     {
-      selector: `${labCallout('warning')} .manager-callout-item-lead`,
+      selector: `${labCallout('warning')} .manager-callout-item:first-child .manager-callout-item-lead`,
       styles: 'color: var(--fab-text)',
     },
     { selector: labCallout('actions'), styles: 'background-color: var(--fab-danger-soft)' },
@@ -6655,15 +6669,29 @@ test('the callout specimen case measures both roots and the actions slot the cal
     [
       ['standing', ['text']],
       ['info', ['tone', 'title', 'text']],
+      ['accent', ['tone', 'text']],
       ['warning', ['tone', 'title', 'items']],
+      ['success', ['tone', 'text']],
       ['actions', ['tone', 'text', 'actions']],
     ],
-    'text alone draws the paragraph; a title, items or actions draw the note'
+    'one note per published tone; text alone draws the paragraph; a title, items or actions draw the note'
   );
+  const toneOf = ({ elements }) =>
+    elements[1].properties.find(({ key }) => key.name === 'tone')?.value.value ?? 'neutral';
+  assert.deepEqual(notes.map(toneOf), [
+    'neutral',
+    'info',
+    'accent',
+    'warning',
+    'success',
+    'danger',
+  ]);
   const { steps, expectSelector, expectLayout } = getCaseById('manager-published-callout-specimen');
   assert.deepEqual(steps, [], 'a frame at rest');
   for (const root of [
     'p.manager-callout:not([role])',
+    'p.manager-callout.is-accent',
+    'p.manager-callout.is-success',
     'div.manager-callout.is-danger[role="note"]',
   ]) {
     assert.ok(expectSelector.includes(root), `the frame waits for ${root}`);
@@ -6671,6 +6699,11 @@ test('the callout specimen case measures both roots and the actions slot the cal
   assert.ok(
     expectLayout.controls.some(({ selector }) => selector.endsWith('> .manager-callout-actions')),
     'the actions host that spaces the slot is measured'
+  );
+  const leads = expectLayout.controls.filter(({ selector }) => selector.includes('item-lead'));
+  assert.ok(
+    leads.length > 0 && leads.every(({ selector }) => selector.includes(':first-child ')),
+    'a lead is measured on one of the warning note’s two points, never both'
   );
 });
 

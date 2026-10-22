@@ -323,8 +323,8 @@ const CALLOUT_GROUND = '[data-lab-callout-ground]';
 const CALLOUT = (key) => `${CALLOUT_GROUND} > [data-lab-callout="${key}"] .manager-callout`;
 const CALLOUT_ACTIONS = `${CALLOUT('actions')} > .manager-callout-actions`;
 
-/** Sized to the fixture's 360px ground and the height of its four notes. */
-const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 480 });
+/** Sized to the fixture's 360px ground and the height of its six notes. */
+const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 560 });
 
 export const CASES = Object.freeze([
   managerCase({
@@ -917,17 +917,17 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-callout-specimen',
     label:
-      'Specimen, mounted through the published seam — four standing notes, one per section, 8px apart on the window’s --fab-bg-1 ground, each a strip that sets its tone’s glyph beside its body inside a 1px edge at radius 11 and 12px of padding. Reading top to bottom: a neutral rule drawn from its text alone, a paragraph with no role, its sentence in the muted ink on the --fab-surface-soft fill; an info note, a div with the note role, headed Three crafters online in the info ink above its sentence, on the info fill inside the info edge; a warning note headed Two reagents run short above a list of two glyph-led points 8px apart, the leads Moonpetal and Ember salt in the strong ink, its leading glyph in the warning ink on the warning fill; and a danger note whose sentence This recipe has no result sits beside its actions, a published Add a result button, on the danger fill. The frame draws inside the manager window and is the evidence for it alone; what a note draws under no Fabricate ancestor and for a tone outside its set is the mounted suite’s, and its contrast on the four grounds is the contrast measurement’s',
+      'Specimen, mounted through the published seam — six standing notes, one per section and one per published tone, 8px apart on the fixture’s own --fab-bg-1 ground, each a strip that sets its tone’s glyph beside its body inside a 1px edge at radius 11 and 12px of padding. Reading top to bottom: a neutral rule drawn from its text alone, a paragraph with no role, its sentence in the muted ink on the --fab-surface-soft fill; an info note, a div with the note role, headed Three crafters online in the info ink above its sentence, on the info fill inside the info edge; an accent paragraph, its glyph in the accent ink on the accent fill inside the accent edge; a warning note headed Two reagents run short above a list of two glyph-led points 8px apart, the leads Moonpetal: and Ember salt: in the strong ink, its leading glyph in the warning ink on the warning fill; a success paragraph, its glyph in the success ink on the success fill inside the success edge; and a danger note whose sentence Deleting a system removes its recipes for every player sits beside its actions, a neutral published Read the rules button, on the danger fill. The frame draws inside the manager window and is the evidence for it alone; what a note draws under no Fabricate ancestor and for a tone outside its set is the mounted suite’s, and its contrast on the four grounds is the contrast measurement’s',
     // Beyond the smoke: a companion mounts it through `api.ui` and draws its own control in it.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-callout' },
     steps: [],
-    // Both roots the fixture's effect mounted, the warning note's two points, and the button
-    // mounted in the danger note's actions slot.
-    expectSelector: `${CALLOUT_GROUND}:has(> [data-lab-callout="standing"] p.manager-callout:not([role])):has(> [data-lab-callout="warning"] div.manager-callout.is-warning[role="note"] [role="list"] > [role="listitem"] + [role="listitem"]) > [data-lab-callout="actions"] div.manager-callout.is-danger[role="note"] > .manager-callout-actions .fabricate-button`,
+    // Both roots the fixture's effect mounted, the accent and success paragraphs, the warning
+    // note's two points, and the button mounted in the danger note's actions slot.
+    expectSelector: `${CALLOUT_GROUND}:has(> [data-lab-callout="standing"] p.manager-callout:not([role])):has(> [data-lab-callout="accent"] p.manager-callout.is-accent):has(> [data-lab-callout="success"] p.manager-callout.is-success):has(> [data-lab-callout="warning"] div.manager-callout.is-warning[role="note"] [role="list"] > [role="listitem"] + [role="listitem"]) > [data-lab-callout="actions"] div.manager-callout.is-danger[role="note"] > .manager-callout-actions .fabricate-button`,
     expectContained: [
-      ...['standing', 'info', 'warning', 'actions'].map((key) => ({
+      ...['standing', 'info', 'accent', 'warning', 'success', 'actions'].map((key) => ({
         container: CALLOUT_GROUND,
         target: CALLOUT(key),
       })),
@@ -937,8 +937,9 @@ export const CASES = Object.freeze([
     expectLayout: {
       controls: [
         // The paragraph root's strip, its own ink and fill; the info note's fill, edge and title
-        // ink; the warning note's glyph ink, its list's spacing and a lead's ink; the danger fill;
-        // and the actions host that spaces the slot, whose private wrapper and element take no box.
+        // ink; the accent and success fills, edges and glyph inks; the warning note's fill, glyph
+        // ink, its list's spacing and the first lead's ink; the danger fill; and the actions host
+        // that spaces the slot, whose private wrapper and element take no box.
         {
           selector: CALLOUT('standing'),
           styles:
@@ -953,13 +954,21 @@ export const CASES = Object.freeze([
           selector: `${CALLOUT('info')} .manager-callout-title`,
           styles: 'color: var(--fab-info-text); font-weight: 600',
         },
+        ...['accent', 'success'].flatMap((tone) => [
+          {
+            selector: CALLOUT(tone),
+            styles: `background-color: var(--fab-${tone}-soft); border-top-color: var(--fab-${tone}-border)`,
+          },
+          { selector: `${CALLOUT(tone)} > i`, styles: `color: var(--fab-${tone}-text)` },
+        ]),
+        { selector: CALLOUT('warning'), styles: 'background-color: var(--fab-warning-soft)' },
         { selector: `${CALLOUT('warning')} > i`, styles: 'color: var(--fab-warning-text)' },
         {
           selector: `${CALLOUT('warning')} .manager-callout-items`,
           styles: 'display: grid; row-gap: 8px',
         },
         {
-          selector: `${CALLOUT('warning')} .manager-callout-item-lead`,
+          selector: `${CALLOUT('warning')} .manager-callout-item:first-child .manager-callout-item-lead`,
           styles: 'color: var(--fab-text)',
         },
         { selector: CALLOUT('actions'), styles: 'background-color: var(--fab-danger-soft)' },

@@ -1,10 +1,11 @@
 <!--
-  A View Lab specimen, not a Fabricate surface (issue 2601). It mounts four `Callout`s through the
-  page-session seam `game.fabricate.api.ui` binds, as a companion does, one per section: a neutral
-  standing rule drawn from `text` alone, an `info` note with a title, a `warning` note whose items
-  list two points, and a `danger` note whose `actions` content slot holds a published `Button` in a
-  `<span>` target of the companion's own. Every word is a companion's final text, so none is
-  localized. `tests/view-lab/mount.js` mounts it for `?specimen=published-callout` only.
+  A View Lab specimen, not a Fabricate surface (issue 2601). It mounts six `Callout`s through the
+  page-session seam `game.fabricate.api.ui` binds, as a companion does, one per section and one per
+  published tone: a neutral standing rule drawn from `text` alone, an `info` note with a title, an
+  `accent` and a `success` note from `text` alone, a `warning` note whose items list two points, and
+  a `danger` note whose `actions` content slot holds a neutral published `Button` in a `<span>`
+  target of the companion's own. Every word is a companion's final text, so none is localized.
+  `tests/view-lab/mount.js` mounts it for `?specimen=published-callout` only.
 
   The ground is one 360px column on `--fab-bg-1` that spaces its sections by 8px. A case addresses
   the ground by `data-lab-callout-ground` and a section by `data-lab-callout`.
@@ -23,18 +24,27 @@
         text: 'Each sees the recipes this system shares.',
       },
     ],
+    ['accent', { tone: 'accent', text: 'Quality rolls use the best tool held.' }],
     [
       'warning',
       {
         tone: 'warning',
         title: 'Two reagents run short',
         items: [
-          { icon: 'fas fa-leaf', lead: 'Moonpetal', text: 'one held, two needed' },
-          { icon: 'fas fa-fire', lead: 'Ember salt', text: 'none held' },
+          { icon: 'fas fa-leaf', lead: 'Moonpetal:', text: 'one held, two needed' },
+          { icon: 'fas fa-fire', lead: 'Ember salt:', text: 'none held' },
         ],
       },
     ],
-    ['actions', { tone: 'danger', text: 'This recipe has no result.', actions: true }],
+    ['success', { tone: 'success', text: 'Every recipe here has a result.' }],
+    [
+      'actions',
+      {
+        tone: 'danger',
+        text: 'Deleting a system removes its recipes for every player.',
+        actions: true,
+      },
+    ],
   ]);
 
   let targets = $state({});
@@ -49,7 +59,7 @@
     slot.append(buttonTarget);
     const button = mount('Button', {
       target: buttonTarget,
-      props: { children: 'Add a result', onclick() {} },
+      props: { role: 'neutral', children: 'Read the rules', onclick() {} },
     });
     return () => {
       button.destroy();
