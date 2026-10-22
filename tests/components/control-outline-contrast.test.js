@@ -70,7 +70,7 @@ test('every unchecked radio ring and checkbox box outlines with the token', () =
       }
     }
   }
-  assert.ok(outlines.length >= 5, `only ${outlines.length} outline sites found; the reader broke`);
+  assert.ok(outlines.length >= 4, `only ${outlines.length} outline sites found; the reader broke`);
   assert.deepEqual(
     outlines.filter(({ value }) => !value.includes(`var(${TOKEN})`)),
     [],

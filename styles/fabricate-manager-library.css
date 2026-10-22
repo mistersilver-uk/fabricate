@@ -3533,6 +3533,7 @@
   appearance: none;
   -webkit-appearance: none;
   background: var(--fab-bg-1);
+  background-clip: padding-box;
   cursor: inherit;
 }
 
