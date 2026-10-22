@@ -596,16 +596,24 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       text
         .split('\n')
         .filter((line) => line.startsWith("A host spaces a content slot's children by `gap`"));
-    for (const [where, text] of [
-      ['the spec', SPECIFIED],
-      ['the docs', DOCUMENTED],
+    for (const [where, text, whole] of [
+      [
+        'the spec',
+        SPECIFIED,
+        "A host spaces a content slot's children by `gap`, except where its group states it draws them in normal flow, as `Well` does; the companion then fills that slot with one element of its own that lays out its content.",
+      ],
+      [
+        'the docs',
+        DOCUMENTED,
+        "A host spaces a content slot's children by `gap`, except where its section states it draws them in normal flow, as [`Well`](#well) does; you then fill that slot with one element of your own that lays out its content.",
+      ],
     ]) {
-      const lines = exception(text);
-      assert.equal(lines.length, 1, `${where} states it once`);
-      assert.match(lines[0], /except where its \w+ states it draws them in normal flow, as \S*Well/u);
+      assert.deepEqual(exception(text), [whole], `${where} states it once, tail and all`);
     }
     const flowed = (entries) =>
-      entries.filter(([, prose]) => prose.includes(' in normal flow ')).map(([name]) => name);
+      entries
+        .filter(([, prose]) => /\bin (?:the )?normal flow\b/u.test(prose))
+        .map(([name]) => name);
     assert.deepEqual(flowed([...specifiedComponentGroups()]), ['Well'], 'one spec group');
     const sections = documentedComponentSections().map((section) => [
       section.slice(0, section.indexOf('\n')),

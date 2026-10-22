@@ -6543,10 +6543,38 @@ test('the well specimen case measures the well the well fixture mounts through t
     holds(fragment, (node) => node.type === 'Attribute' && node.name === 'data-lab-well-ground'),
     'the fixture writes the ground hook the case names'
   );
-  for (const literal of ['data-lab-well-content', 'Chosen reagents', 'flex', '8px']) {
+  assert.ok(
+    holds(instance, (node) => node.type === 'Literal' && node.value === 'Chosen reagents'),
+    'the fixture labels the well as the case names it'
+  );
+  const hooked = new Set();
+  holds(instance, (node) => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee?.property?.name === 'setAttribute' &&
+      node.arguments[0]?.value === 'data-lab-well-content'
+    ) {
+      hooked.add(node.callee.object?.name);
+    }
+    return false;
+  });
+  assert.equal(hooked.size, 1, 'one element carries the content hook');
+  const [content] = hooked;
+  for (const [property, value] of [
+    ['display', 'flex'],
+    ['gap', '8px'],
+  ]) {
     assert.ok(
-      holds(instance, (node) => node.type === 'Literal' && node.value === literal),
-      `the fixture's companion element states ${literal}, which the case reads`
+      holds(
+        instance,
+        (node) =>
+          node.type === 'AssignmentExpression' &&
+          node.left?.object?.object?.name === content &&
+          node.left.object.property?.name === 'style' &&
+          node.left.property?.name === property &&
+          node.right?.value === value
+      ),
+      `the hooked element ${content} states ${property}: ${value}, which the case reads`
     );
   }
   const { steps, expectSelector, expectLayout } = getCaseById('manager-published-well-specimen');
