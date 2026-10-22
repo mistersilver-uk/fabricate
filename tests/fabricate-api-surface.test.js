@@ -285,6 +285,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Field',
       'Well',
       'Callout',
+      'IconButton',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -535,6 +536,21 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
+      },
+      IconButton: {
+        version: 1,
+        props: {
+          icon: required,
+          ariaLabel: required,
+          role: optional,
+          size: optional,
+          disabled: optional,
+          onclick: { kind: 'callback', required: true },
+          'aria-expanded': { kind: 'aria', required: false },
+        },
+        rest: true,
+        root: 'fabricate',
         overlays: false,
       },
     });

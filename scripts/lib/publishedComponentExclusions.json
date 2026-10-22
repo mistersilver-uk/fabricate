@@ -25,10 +25,6 @@
       "reason": "no-consumer: a toolbar section around the manager's filter controls; a companion arranges its own published controls."
     },
     {
-      "path": "src/ui/svelte/components/IconButton.svelte",
-      "reason": "pending:#2601: the glyph-only button is published once its tooltip reaches Fabricate through context."
-    },
-    {
       "path": "src/ui/svelte/components/ListRow.svelte",
       "reason": "event-argument: onOpen is called with the click event, which a companion callback cannot receive."
     },

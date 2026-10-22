@@ -6,10 +6,10 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField` and `StageBars` mount here as leaves; what each draws and refuses is
- * `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
- * `published-stepper-mounted.test.js`'s, `published-search-mounted.test.js`'s and
- * `published-stage-bars-mounted.test.js`'s.
+ * `Stepper`, `SearchField`, `StageBars` and `IconButton` mount here as leaves; what each draws and
+ * refuses is `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
+ * `published-stepper-mounted.test.js`'s, `published-search-mounted.test.js`'s,
+ * `published-stage-bars-mounted.test.js`'s and `published-icon-button-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -314,6 +314,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.textContent.trim(),
     drawn: ['Salvage returns half.', 'Salvage returns all.'],
   },
+  {
+    name: 'IconButton',
+    under: 'fabricate',
+    root: '.fabricate-icon-button',
+    props: { icon: 'fas fa-trash', ariaLabel: 'Remove Iron ingot', onclick() {} },
+    next: { icon: 'fas fa-trash', ariaLabel: 'Remove Ember salt', onclick() {} },
+    read: (root) => root.getAttribute('aria-label'),
+    drawn: ['Remove Iron ingot', 'Remove Ember salt'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -439,6 +448,8 @@ describe('a key a leaf does not publish', () => {
     ['Field', 'caption', 'is not a data attribute'],
     ['Well', 'class', 'is not a data attribute'],
     ['Callout', 'class', 'is not a data attribute'],
+    ['IconButton', 'tooltip', 'is not a data attribute'],
+    ['IconButton', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

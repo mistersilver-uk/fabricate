@@ -2,9 +2,9 @@
  * The published component seam's Svelte runtime (issue 2426): Fabricate's own `mount`, `unmount`,
  * boundary host, the `flush` a value key's resync runs (issue 2453) and the empty component an
  * overlay container mounts (issue 2454), with each eager manifest `path` bound to its component
- * and each lazy one to a loader that imports its chunk (issue 2455), and the reporter a failed
- * chunk load is handed to. `main.js` imports it for the registration side effect, so the plain
- * seam never imports Svelte.
+ * and each lazy one to a loader that imports its chunk (issue 2455), the reporter a failed chunk
+ * load is handed to, and the tooltip facade each tree it mounts takes (issue 2601). `main.js`
+ * imports it for the registration side effect, so the plain seam never imports Svelte.
  */
 import { flushSync, mount, unmount, untrack } from 'svelte';
 
@@ -18,6 +18,7 @@ import Chip from './svelte/components/Chip.svelte';
 import EmptyState from './svelte/components/EmptyState.svelte';
 import Field from './svelte/components/Field.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
+import IconButton from './svelte/components/IconButton.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
 import InspectorCard from './svelte/components/InspectorCard.svelte';
 import Kicker from './svelte/components/Kicker.svelte';
@@ -33,6 +34,8 @@ import Stepper from './svelte/components/Stepper.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
 import Well from './svelte/components/Well.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
+import { APP_TOOLTIPS } from './svelte/util/appLocalizer.js';
+import { foundryTooltips } from './svelte/util/foundryTooltip.js';
 
 // Keyed by eager manifest `path`; `published-components-mounted.test.js` holds the two equal.
 export const COMPONENTS = Object.freeze({
@@ -58,6 +61,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Field.svelte': Field,
   'src/ui/svelte/components/Well.svelte': Well,
   'src/ui/svelte/components/Callout.svelte': Callout,
+  'src/ui/svelte/components/IconButton.svelte': IconButton,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.
@@ -73,7 +77,14 @@ const EmptyOverlay = () => {};
 export const publishedComponentRuntime = Object.freeze({
   host: PublishedComponentHost,
   overlay: EmptyOverlay,
-  mount: (host, options) => untrack(() => mount(host, options)),
+  // Each tree takes the tooltip facade, so a published `IconButton` opens its tooltip on focus.
+  mount: (host, options) =>
+    untrack(() =>
+      mount(host, {
+        ...options,
+        context: new Map([...(options?.context ?? []), [APP_TOOLTIPS, foundryTooltips]]),
+      })
+    ),
   // Svelte's own Promise, never an `async` wrapper or `{ outro: true }`: the seam reports its
   // rejection, and either would move that report after `onFault` or let the throw escape.
   unmount: (instance) => unmount(instance),

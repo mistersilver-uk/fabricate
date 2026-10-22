@@ -87,6 +87,7 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
+  'src/ui/svelte/components/IconButton.svelte: button': 'always',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // The picker's own trigger, past every trigger form `Select` does not pass.

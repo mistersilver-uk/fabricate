@@ -369,6 +369,7 @@ const shippedAriaKeys = () =>
 const ARIA_KEY_SUITES = Object.freeze({
   Button: 'tests/components/published-button-mounted.test.js',
   StatusToggle: 'tests/components/published-toggle-mounted.test.js',
+  IconButton: 'tests/components/published-icon-button-mounted.test.js',
 });
 
 /**
@@ -1086,7 +1087,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges twenty focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges twenty-one focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the IconButton, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1098,6 +1099,7 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(judged.sort(byName), [
       'src/ui/svelte/components/Button.svelte: svelte:element',
       'src/ui/svelte/components/Chip.svelte: button',
+      'src/ui/svelte/components/IconButton.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/SearchablePopover.svelte: button',
@@ -1157,6 +1159,7 @@ describe('each entry matches its component declaration', () => {
         'StatusToggle.onclick: 0',
         'Stepper.onChange: 1',
         'Select.onChange: 1',
+        'IconButton.onclick: 0',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -1170,6 +1173,7 @@ describe('each entry matches its component declaration', () => {
         'Button.aria-describedby',
         'StatusToggle.aria-labelledby',
         'StatusToggle.aria-describedby',
+        'IconButton.aria-expanded',
       ],
       'an aria key needs a mounted clause that reads the attribute off the control, and a group line that states its values'
     );
@@ -2706,6 +2710,7 @@ describe('the module sheet and every component style against the published Inspe
         'Select',
         'Field',
         'Well',
+        'IconButton',
       ],
       'an entry with a required root needs a census of its own'
     );

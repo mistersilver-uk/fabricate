@@ -337,4 +337,21 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'any',
   }),
+  Object.freeze({
+    name: 'IconButton',
+    path: 'src/ui/svelte/components/IconButton.svelte',
+    version: 1,
+    props: Object.freeze({
+      icon: Object.freeze({ kind: 'data', required: true }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      role: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      onclick: Object.freeze({ kind: 'callback', required: true }),
+      'aria-expanded': Object.freeze({ kind: 'aria' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+    restOn: 'control',
+  }),
 ]);
