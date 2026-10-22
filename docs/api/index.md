@@ -2135,6 +2135,7 @@ Each entry but the last spans its `value`, a finite number of zero or more on th
 An entry that spans nothing is not drawn, so the segments drawn always make up the fill exactly.
 A list that draws one segment or none draws one fill as before: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
 The segments abut with no gap and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
+No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
 The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so always state each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
 Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1: before them a second or later entry was reserved and an entry's `value` was unnamed and so private, and a one-entry list draws as it did.
 `describe` cannot tell you whether the running Fabricate draws segments: one that predates them draws the whole fill in the first entry's paint and refuses nothing, so the text beside the meter carries the segments on either.
