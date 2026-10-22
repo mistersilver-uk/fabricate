@@ -8,7 +8,7 @@
  */
 import { flushSync, mount, unmount, untrack } from 'svelte';
 
-import { reportDeferredChunkFailure } from './deferredChunkFailureReport.js';
+import { reportPublishedLoadFailure } from './deferredChunkFailureReport.js';
 import { publishedComponentSeam } from './publishedComponentSeam.js';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
@@ -74,10 +74,13 @@ export const publishedComponentRuntime = Object.freeze({
   flush: () => flushSync(),
 });
 
-// ratchet-exempt(lint): main.js imports this module for its registration, as appFactory's apps do.
-publishedComponentSeam.register({
+// What the adapter registers; `published-components-mounted.test.js` pins its bindings.
+export const REGISTRATION = Object.freeze({
   ...publishedComponentRuntime,
   components: COMPONENTS,
   loaders: LOADERS,
-  reportLoadFailure: reportDeferredChunkFailure,
+  reportLoadFailure: reportPublishedLoadFailure,
 });
+
+// ratchet-exempt(lint): main.js imports this module for its registration, as appFactory's apps do.
+publishedComponentSeam.register(REGISTRATION);

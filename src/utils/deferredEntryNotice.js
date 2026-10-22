@@ -54,6 +54,16 @@ export function buildDeferredChunkFailureNotice(error, localize) {
   );
 }
 
+/** The notice for a deferred part that is not a window, raised for a chunk-load failure alone. */
+export function buildDeferredPartFailureNotice(_error, localize) {
+  return localizeWith(
+    localize,
+    'FABRICATE.Update.DeferredPartStale',
+    undefined,
+    'Part of Fabricate could not load because this browser is still running an earlier version of the module. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS.'
+  );
+}
+
 /** A version is comparable only when it is a non-empty string. */
 function comparableVersion(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -83,13 +93,47 @@ function isNoticeLive(hasNotice, retained) {
   }
 }
 
-/** The reporter for a failed deferred load: one console line per failure, one notice at a time. */
-export function createDeferredChunkFailureReporter({ notify, log, localize, hasNotice }) {
+/**
+ * The reporter for a failed deferred load: one console line per failure and one notice at a time,
+ * each call naming its notice's builder; a `once` builder raises at most one notice per reporter.
+ * While `canNotify()` is false the latest notice waits for the flush handed to `whenReady`.
+ */
+export function createDeferredChunkFailureReporter({
+  notify,
+  log,
+  localize,
+  hasNotice,
+  canNotify = () => true,
+  whenReady,
+}) {
   let retained = null;
-  return (error) => {
-    log(error);
+  let pending = null;
+  const spent = new Set();
+
+  function raise({ error, buildNotice, once }) {
+    if (once && spent.has(buildNotice)) return;
     if (isNoticeLive(hasNotice, retained)) return;
-    retained = notify(buildDeferredChunkFailureNotice(error, localize), { console: false }) ?? null;
+    if (once) spent.add(buildNotice);
+    retained = notify(buildNotice(error, localize), { console: false }) ?? null;
+  }
+
+  function flush() {
+    const queued = pending;
+    pending = null;
+    if (queued) raise(queued);
+  }
+
+  return (error, { buildNotice = buildDeferredChunkFailureNotice, once = false } = {}) => {
+    log(error);
+    const notice = { error, buildNotice, once };
+    if (canNotify()) {
+      pending = null;
+      raise(notice);
+      return;
+    }
+    const waiting = pending !== null;
+    pending = notice;
+    if (!waiting) whenReady?.(flush);
   };
 }
 
