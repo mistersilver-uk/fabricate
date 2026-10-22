@@ -1033,7 +1033,9 @@ An `{#each}` item (destructured or not), an `{@const}` alias, a snippet paramete
 A failing spread of a whole item, of an expression no rule traces or of an unpublished collection is reported with a message that no row can name it.
 The one stripped member is `InfoStrip.facts.props`.
 A row fails when no published closure spreads that member, whether its key is not `data`, its entry is not published or the component stopped spreading it.
-A spread inside a child component's snippet is not traced.
+A spread inside a snippet declared in a child component's file is not traced.
+A snippet the entry declares is traced only through the `{@render}` tags of the entry's own file, so one nothing there renders by name fails closed, whether the render is aliased, made with `.call`, or done by a child component the snippet is passed to.
+These shapes are not traced, and are tracked in issue 2607: a `const` or `$derived` alias of published data, a snippet passed to a child component as a prop (the child's own render of it is not followed), a child drawn through `svelte:component` or a `{@const}` component alias, and a quoted attribute such as `item="{item}"`.
 - **The seam drops a stripped member from a copy of every item on `mount` and on `update`.**
 It does so silently, never from the caller's object, and it tolerates a value that is not an array and an item that is `null` or a primitive.
 A function anywhere in the value is still M10, and a value that is not data is still M11.
