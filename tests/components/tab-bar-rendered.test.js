@@ -11,10 +11,7 @@ import { chromium } from 'playwright';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { readDesignLibrary } from '../helpers/designLibrary.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { APP_LOCALIZER_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { rulesIn, styleTextFor } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -30,7 +27,7 @@ const CORE_BUTTON = '@layer blocks{button{height:28px;overflow:hidden}}';
 
 const TABS = Object.freeze(
   [['tiers'], ['outcomes'], ['validation'], ['settings', { tierGated: true }]].map(
-    ([id, extra]) => ({ id, labelKey: `x.${id}`, label: `Section ${id}`, ...extra })
+    ([id, extra]) => ({ id, label: `Section ${id}`, ...extra })
   )
 );
 const count = { vehicle: 'count', label: 3 };
@@ -250,7 +247,7 @@ async function mountedMarkup() {
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-tab-bar-rendered-',
-    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+    rawModules: APP_LOCALIZER_RAW_MODULES,
     compiledModules: [component('Chip'), component('EditorTabs')],
     componentPath: component('EditorTabs'),
   });
@@ -258,7 +255,13 @@ async function mountedMarkup() {
   const markup = {};
   try {
     for (const [key, { props, badges = BADGED }] of Object.entries(MOUNTS)) {
-      const root = await harness.mount({ tabs: TABS, activeTab: currentOf(key), badges, ...props });
+      const root = await harness.mount({
+        tabs: TABS,
+        activeTab: currentOf(key),
+        annotated: true,
+        badges,
+        ...props,
+      });
       markup[key] = root.innerHTML;
       harness.remount();
     }

@@ -14,8 +14,8 @@ import { chromium } from 'playwright';
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import {
+  APP_LOCALIZER_RAW_MODULES,
   FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -44,7 +44,7 @@ const MOUNTS = Object.freeze({
   'editor-tab-badge': {
     name: 'EditorTabs',
     props: {
-      tabs: [{ id: 'overview', labelKey: 'x.Overview', label: 'Overview' }],
+      tabs: [{ id: 'overview', label: 'Overview' }],
       activeTab: 'overview',
       badges: { overview: 3 },
     },
@@ -74,7 +74,7 @@ const HARNESS = Object.freeze({
   Stepper: { compiled: [], raw: [] },
   EditorTabs: {
     compiled: [component('Chip')],
-    raw: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+    raw: APP_LOCALIZER_RAW_MODULES,
   },
   ItemDropZone: {
     compiled: [component('IconButton'), component('Medallion'), component('Button')],
