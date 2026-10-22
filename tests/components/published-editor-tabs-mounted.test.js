@@ -490,7 +490,7 @@ describe('the published EditorTabs and the document', () => {
     }
   });
 
-  it('lets Escape reach a listener above target with the pointer over a tab and focus outside the strip', async () => {
+  it('lets Escape reach a keydown listener on the document with the pointer over a tab and focus outside the strip', async () => {
     const { handle, tab } = mountStrip();
     await settle();
     const heard = [];

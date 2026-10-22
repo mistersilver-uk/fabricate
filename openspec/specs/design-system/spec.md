@@ -123,7 +123,8 @@ An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, valid
 The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
 `SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
 The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` keeps a lang key plus fallback, because it is not a published-seam entry and is not held by this rule.
-`EditorTabs` takes its tab labels, names and descriptions and its strip's name as final display text the caller resolves, with `localizeTabs` from `util/localizeOr.js` for a tab list; it localizes only the severity names it builds for a Validation tab, through the `APP_LOCALIZER` context, so a tree mounted with none draws their English and calls no `game.i18n`.
+`EditorTabs` takes its tab labels, accessible-name overrides and descriptions and its strip's `ariaLabel` as final display text the caller resolves, with `localizeTabs` from `util/localizeOr.js` for a tab list; no tab carries `labelKey`, `ariaLabelKey` or `tooltipKey` and the strip takes no `ariaLabelKey`.
+It localizes only the severity names it builds for a Validation tab, through the `APP_LOCALIZER` context, so a tree mounted with none draws their English and calls no `game.i18n`.
 
 #### Scenario: A caller's key has no translation
 
@@ -1491,7 +1492,7 @@ The strip reads an entry's name override, description and `tierGated` only when 
 A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
 The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
 A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.
-Only a tab that carries a description shows one, and the strip listens for that Escape on its document only while a description shows, so with the pointer over a tab that carries none Escape reaches every listener above the strip.
+Only a tab that carries a description shows one, and the strip listens for that Escape on its document only while a description shows, so with the pointer over a tab that carries none the strip stops no Escape.
 A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
@@ -1518,7 +1519,7 @@ Apart from that fallback, an entry naming none of these renders exactly what it 
 #### Scenario: Escape passes a strip that shows no description
 
 - **WHEN** the pointer rests on a tab that carries no description and focus is outside the strip
-- **THEN** Escape reaches a listener above the strip
+- **THEN** Escape reaches a `keydown` listener on the strip's document
 
 ### Requirement: An ordered row opens in place to its editing body
 

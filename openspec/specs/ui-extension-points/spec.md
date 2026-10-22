@@ -1176,7 +1176,7 @@ Each group states the accepted values of every key that entry publishes.
   - The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the button on one of those four grounds.
 - **`EditorTabs`.**
-  - It is the design system's tab strip, `<TabBar>` in the library: a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels the companion draws.
+  - It is the design system's tab strip (`<TabBar>` in the library): a `role="tablist"` row of native `<button type="button">` tabs, one for each item of `tabs`, for moving between panels the companion draws.
     It draws no panel, and no mark, padlock or description on a tab.
   - `tabs` is required and is an array of `{ id, label, icon }` items, one tab each, drawn in that order.
     `id` is required and is an id-safe token of letters, digits, `-` and `_`, unique in the strip, as `inputs`; Fabricate builds ids from it and checks nothing about it.
@@ -1189,7 +1189,7 @@ Each group states the accepted values of every key that entry publishes.
     Until that `update`, focus rests on a tab drawn unselected with `tabindex="-1"` while the previous tab stays the tab stop; a companion that declines a selection moves focus back to the tab stop.
   - `ariaLabel` is required and is the strip's name, final display text, as "Reagent sections".
   - `idStem` is required and is the stem of every id the strip writes: a tab's `id` is `<idStem>-tab-<id>`, and its `aria-controls` names `<idStem>-panel-<id>`.
-    It is the first published key Fabricate builds ids from, so the companion makes it unique in the document with its module id, as `acme-reagents`.
+    Fabricate builds ids from it, so the companion makes it unique in the document with its module id, as `acme-reagents`.
     The companion draws each panel outside `target`, after it in document order so `Tab` moves from the tab into the panel, with `id="<idStem>-panel-<id>"`, `role="tabpanel"` and `aria-labelledby="<idStem>-tab-<id>"`, and gives it `tabindex="0"` when it holds no focusable element.
   - `activePanelOnly` is `true` or `false` and defaults to `false`: `true` writes `aria-controls` on the selected tab alone, for a companion that draws one panel at a time; with `false` every tab writes it, so every panel it names exists in the document, or a screen reader may report the relationship as broken.
   - The strip is horizontal and selects as focus moves: `ArrowRight` and `ArrowLeft` move focus to the next and the previous tab, wrapping at either end, `Home` to the first and `End` to the last, and then call `onSelect` with the `id` of the tab focus reached.
@@ -1199,10 +1199,11 @@ Each group states the accepted values of every key that entry publishes.
   - Focus moves only among the strip's tabs, on a press and on those four keys, and never out of `target`.
     To return focus to the strip, the companion focuses `target.querySelector('[role="tab"][tabindex="0"]')`, the strip's one tab stop: the selected tab, or the first tab when `activeTab` names none.
   - An `update` keeps every tab whose `id` it keeps, so focus stays on it; one that drops the focused tab's item, and `destroy`, remove that tab, so where it holds focus the companion moves focus first.
-  - The strip adds no listener of its own to the document, so with the pointer over a tab Escape still reaches a listener above `target`.
+  - The strip adds no listener of its own to the document and stops the propagation of no key, so wherever the pointer rests, Escape reaches the companion's `keydown` listeners on its path, the document's among them.
   - Rest `data-*` attributes land on the tablist, never on a tab.
   - It needs a Fabricate window ancestor, because its row, its tabs and their ring come from Fabricate's module sheet, and it is drawn the same in the Manager and the player window.
     The row wraps onto a further row when `target` is narrower than its tabs, and a selected tab on an upper row then draws its underline above the row below.
+    A companion's own window or dialog carries no Fabricate root, so the strip is refused there (M16).
   - The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
 - **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards; `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors; `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors.
