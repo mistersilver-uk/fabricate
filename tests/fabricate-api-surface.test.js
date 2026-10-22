@@ -407,7 +407,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       EmptyState: {
         version: 1,
-        props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
+        props: {
+          icon: optional,
+          title: optional,
+          hint: optional,
+          filtered: optional,
+          children: slot,
+        },
         rest: true,
         root: 'any',
         overlays: false,
@@ -501,7 +507,12 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       },
       StageBars: {
         version: 1,
-        props: { stages: required, currentIndex: optional, numbered: optional, ariaLabel: required },
+        props: {
+          stages: required,
+          currentIndex: optional,
+          numbered: optional,
+          ariaLabel: required,
+        },
         rest: true,
         root: 'any',
         overlays: false,
@@ -509,13 +520,16 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     });
     assert.deepEqual(
       Object.keys(ui),
-      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
-      'the descriptor a bind publishes, `load` last'
+      ['schemaVersion', 'components', 'describe', 'mount', 'load', 'mountMany'],
+      'the descriptor a bind publishes, `mountMany` last'
     );
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
     const end = DOCUMENTED.indexOf('\n\n', start);
-    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end).trimEnd().split('\n').slice(2);
+    const rows = DOCUMENTED.slice(start, end === -1 ? undefined : end)
+      .trimEnd()
+      .split('\n')
+      .slice(2);
     assert.deepEqual(
       rows,
       ui.components.map((name) => documentedComponentRow(name, ui.describe(name))),
@@ -583,7 +597,11 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       return text.slice(start, end);
     };
     const specified = between(SPECIFIED, '\n### Interactive components\n', '\n### ');
-    const documented = between(DOCUMENTED, '\n### Ownership and theme\n', '\n## Data Persistence\n');
+    const documented = between(
+      DOCUMENTED,
+      '\n### Ownership and theme\n',
+      '\n## Data Persistence\n'
+    );
     const tokens = [...new Set(specified.match(/`[^`]+`/gu))];
     assert.ok(tokens.length > 15, 'the spec states its interactive rule in backticked values');
     // The docs write a root bare, as their components table does, where the spec quotes it.
@@ -649,6 +667,25 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         `${where} states each reserved name and the tail that refuses it`
       );
     }
+  });
+
+  it('states mountMany’s M21 tail in the spec’s row and, with M5 and M19, in the docs’ subsection', () => {
+    const tail = (id) => {
+      const rows = SPECIFIED.split('\n').filter((line) => line.startsWith(`| ${id} |`));
+      assert.equal(rows.length, 1, `one ${id} row`);
+      return /`([^`]+)` \|$/u.exec(rows[0])[1];
+    };
+    assert.equal(tail('M21'), 'items must be an array');
+    const from = DOCUMENTED.indexOf('\n### Mounting several at once\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mountMany subsection, then another heading');
+    const prose = DOCUMENTED.slice(from, to);
+    assert.deepEqual(
+      ['M5', 'M19', 'M21'].map(tail).filter((stated) => !prose.includes(`\`${stated}\``)),
+      [],
+      'the subsection states each tail mountMany adds to or repeats from mount'
+    );
+    assert.ok(prose.includes("`typeof fabUi.mountMany === 'function'`"), 'and how to detect it');
   });
 
   it('names every reserved family in the spec group and the docs section of each entry whose rest lands on a control', () => {
@@ -812,7 +849,11 @@ describe('the real facade routes each public member to its collaborator', () => 
       (builder.recipeManager ?? builder._recipeManager).resolveToolStates(null, [], []);
     assert.deepEqual(built.slice(0, 2).map(consulted), [station, station]);
     assert.deepEqual(built.slice(2).map(consulted), [null, null]);
-    assert.equal(built[2], facade._getCraftingListingBuilder(), 'no station keeps the cached builder');
+    assert.equal(
+      built[2],
+      facade._getCraftingListingBuilder(),
+      'no station keeps the cached builder'
+    );
     assert.equal(built[3], facade._getRunJournalBuilder());
     assert.notEqual(built[0], built[2]);
     assert.equal(facade.recipeManager, recipeManager);
@@ -1000,7 +1041,11 @@ test('the Journal composition emitter survives socket serialization with its opt
 // The GM's reply emits `{ recipients }` behind the authority's claim, which no ledger-free test reaches.
 defineStructureContract(
   'the composition emitter forwards its options bag',
-  { file: 'src/bootstrap/journalOperations.js', fn: 'createJournalCommandsForFabricate', property: 'emit' },
+  {
+    file: 'src/bootstrap/journalOperations.js',
+    fn: 'createJournalCommandsForFabricate',
+    property: 'emit',
+  },
   { callsWith: [['emit', 'options']] }
 );
 

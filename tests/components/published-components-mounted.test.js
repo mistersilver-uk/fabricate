@@ -1,9 +1,9 @@
 /**
  * The published component seam on Fabricate's real Svelte runtime (issue 2426), drawing the
  * test-only probe into bare companion-owned targets: replace-not-merge on one root node, the
- * microtask timing, a `text` key's one element, the target claim, three fault paths and their
- * `onFault` notice, destroy on a removed target, ancestor independence, and a companion's own
- * reactive contexts; then the adapter's table and `TierTrack`.
+ * microtask timing, a `text` key's one element, the target claim, a batch through `mountMany`,
+ * three fault paths and their `onFault` notice, destroy on a removed target, ancestor independence,
+ * and a companion's own reactive contexts; then the adapter's table and `TierTrack`.
  * The other shipped entries are `published-leaves-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
@@ -464,6 +464,75 @@ describe('a target claim on the real runtime', () => {
   });
 });
 
+describe('mountMany on the real runtime', () => {
+  const REFUSED = /^TypeError: Fabricate \| published components: /;
+  const refusedWith = (tail) => new RegExp(`${REFUSED.source}${tail}$`);
+  const batchOf = (texts) =>
+    texts.map((text) => ({ target: companionTarget(targets), props: { text } }));
+
+  it('draws each item into its own bare target, in order, and one destroy leaves the rest', async () => {
+    const instance = seam();
+    const items = batchOf(['A', 'B', 'C']);
+    const handles = instance.publicApi.mountMany('PublishedProbe', items);
+    assert.ok(Object.isFrozen(handles));
+    assert.deepEqual(
+      items.map(({ target }) => textOf(target)),
+      ['A', 'B', 'C'],
+      'each in place when mountMany returns'
+    );
+    handles[1].destroy();
+    assert.equal(items[1].target.childNodes.length, 0);
+    assert.equal(handles[0].update({ text: 'A2' }), true);
+    assert.equal(handles[2].update({ text: 'C2' }), true);
+    await settle();
+    assert.deepEqual(
+      items.map(({ target }) => textOf(target)),
+      ['A2', undefined, 'C2']
+    );
+    assert.equal(instance.liveMountCount(), 2);
+    for (const handle of handles) handle.destroy();
+  });
+
+  it('renders nothing when one item is invalid, a repeated target is M5, a non-array M21', () => {
+    const instance = seam();
+    const items = batchOf(['A', 'B', 'C']);
+    const invalid = [
+      [
+        [items[0], { ...items[1], props: { class: 'x' } }, items[2]],
+        '"class" is not a data attribute',
+      ],
+      [
+        [items[0], items[1], { ...items[2], target: items[0].target }],
+        'target already holds a published component',
+      ],
+      [items[0], 'items must be an array'],
+    ];
+    for (const [batch, tail] of invalid) {
+      assert.throws(() => instance.publicApi.mountMany('PublishedProbe', batch), refusedWith(tail));
+      for (const { target } of items) assert.equal(target.childNodes.length, 0, tail);
+      assert.equal(instance.liveMountCount(), 0, tail);
+    }
+  });
+
+  it('leaves a stale claim un-ended when a later item is refused, and ends it as its item renders', async () => {
+    const instance = seam();
+    const [item, other] = batchOf(['New', 'Other']);
+    const stale = instance.publicApi.mount('PublishedProbe', { ...item, props: { text: 'Old' } });
+    await settle();
+    item.target.replaceChildren();
+    assert.throws(
+      () => instance.publicApi.mountMany('PublishedProbe', [item, { ...other, target: 5 }]),
+      refusedWith('target must be an element')
+    );
+    assert.equal(stale.update({ text: 'Still' }), true, 'not ended by the validation pass');
+    const handles = instance.publicApi.mountMany('PublishedProbe', [item, other]);
+    assert.equal(stale.update({}), false, 'ended as its item rendered');
+    assert.equal(textOf(item.target), 'New');
+    assert.equal(instance.liveMountCount(), 2);
+    for (const handle of handles) handle.destroy();
+  });
+});
+
 describe("a companion's own reactive context", () => {
   it('mounts from inside an $effect without that effect tracking the mount', () => {
     const ui = seam().publicApi;
@@ -582,6 +651,30 @@ describe('a published component that faults', () => {
       assert.deepEqual(escaped, []);
     });
   }
+
+  it('keeps a render fault to its own item: inert, its own onFault once, the rest live', async () => {
+    const instance = seam();
+    const told = [[], [], []];
+    const items = [{ text: 'A' }, { throwAt: 'init' }, { text: 'C' }].map((props, index) => ({
+      target: companionTarget(targets),
+      props,
+      onFault: (error) => {
+        told[index].push(error);
+      },
+    }));
+    const handles = instance.publicApi.mountMany('PublishedProbe', items);
+    await settle();
+    assert.equal(handles[1].update({}), false);
+    assert.equal(items[1].target.childNodes.length, 0);
+    assert.deepEqual(told, [[], [probe.PROBE_FAULTS.init], []]);
+    assert.deepEqual(escaped, []);
+    assert.deepEqual(reports, [[FAULT_REPORT, 'PublishedProbe', probe.PROBE_FAULTS.init]]);
+    assert.equal(handles[0].update({ text: 'A2' }), true);
+    await settle();
+    assert.equal(textOf(items[0].target), 'A2');
+    assert.equal(textOf(items[2].target), 'C');
+    for (const handle of handles) handle.destroy();
+  });
 
   it('contains a fault Svelte delivers inside flushSync', async () => {
     const instance = seam();

@@ -32,9 +32,16 @@ import {
 } from './helpers/publishedComponentFakes.js';
 
 describe('the published-components descriptor', () => {
-  it('is frozen, with exactly its five members and schema version 1', () => {
+  it('is frozen, with exactly its six members and schema version 1', () => {
     const { ui } = seamWith();
-    assert.deepEqual(Object.keys(ui), ['schemaVersion', 'components', 'describe', 'mount', 'load']);
+    assert.deepEqual(Object.keys(ui), [
+      'schemaVersion',
+      'components',
+      'describe',
+      'mount',
+      'load',
+      'mountMany',
+    ]);
     assert.equal(ui.schemaVersion, 1);
     assert.ok(Object.isFrozen(ui));
   });

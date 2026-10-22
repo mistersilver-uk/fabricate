@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2815,7 +2815,7 @@ bars.update(props());
 
 ### The descriptor
 
-`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
+`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
 `describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes, `root` is the Fabricate ancestor its `target` needs and `overlays` says whether it opens an overlay, described under [Overlays](#overlays); it returns `null` for a name that is not published.
 A prop's `kind` is `data`, `text`, `slot`, `callback`, `aria` or `value`.
@@ -2865,6 +2865,7 @@ An ARIA attribute is published only as an `aria` prop a component's section name
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless a component's section names the prop (`StatusToggle`'s section names `aria-labelledby`); publishing one later is additive.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+`mountMany(name, items)` draws one component into several targets, as [Mounting several at once](#mounting-several-at-once) describes.
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
 Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
 Narrowing a component's root is a breaking change.
@@ -3014,6 +3015,42 @@ async _onRender(context, options) {
 
 An ApplicationV2 `_onRender` may await the promise, but handle its rejection where you keep it: Foundry awaits `_onRender`, so a rejection there fails the render and skips the `render` hooks.
 A navigation provider's `mount` callback may not, because it returns synchronously, so content drawn there mounts its published components when the kept promise settles.
+
+### Mounting several at once
+
+`mountMany(name, items)` draws one component into several targets in one call, such as a `Meter` in each row of a list.
+`items` is an array, and each item is what you would pass `mount` as its options, `{ target, props, onFault, overlayHost }`.
+It returns a frozen array of handles, one for each item and in the same order, and each handle is the one `mount` would have returned; an empty array returns a frozen empty array.
+Detect it with `typeof fabUi.mountMany === 'function'`.
+
+```javascript
+// Once `fabricate.ready` has fired; `Meter` never needs `load`. `party` is your own list.
+const handles = fabUi.mountMany(
+  'Meter',
+  party.map((member) => ({
+    target: this.element.querySelector(`[data-hp-meter="${member.id}"]`), // Empty, and yours.
+    props: {
+      label: `${member.name}'s hit points`,
+      value: member.hp,
+      max: member.maxHp,
+      valueText: `${member.hp} of ${member.maxHp} hit points`,
+    },
+  }))
+);
+
+for (const handle of handles) handle.destroy(); // Each handle is destroyed on its own.
+```
+
+It checks the whole call before it draws anything, so a refused call draws nothing and you correct it and call again.
+It checks the name first, as `mount` does, so it throws `not registered`, `mount before ready`, `"<name>" is not published`, or, for a lazy component before `load` has resolved for it, `"<name>" is not loaded`.
+It then throws `items must be an array` for anything that is not an array, a single item included: it never reads one item as a list of one.
+It then checks each item in order exactly as `mount` checks its options, and throws the first message `mount` would have thrown for that item.
+An item that is not an object, or a hole in the array, has no `target`, so it throws `target must be an element`.
+Two items that name the same `target` throw `target already holds a published component`.
+The check ends no earlier mount: a mount whose content you cleared without destroying it is ended only when its target's item is drawn.
+A target inside a content slot of another item of the same call cannot be checked before that item is drawn, so mount the outer items first and the nested ones in a later call.
+Once the call has been checked, a fault while one item renders is that item's own: its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
+There is no call that destroys them all: destroying one handle leaves the others live, so destroy each handle on every path that ends its mount.
 
 ### Overlays
 

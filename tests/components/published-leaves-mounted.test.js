@@ -685,6 +685,29 @@ describe('Rail, which is lazy', () => {
     handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
+
+  it('refuses mountMany (M19), ahead of M21, until its load resolves, then draws every item', async () => {
+    const pending = deferredLoader();
+    const seam = shippedSeam({ ...seamParts, loaders: { [RAIL]: pending.load } });
+    const items = ['Standing', 'Renown', 'Favour'].map((label) => ({
+      target: companionTarget(targets),
+      props: { label },
+    }));
+    const unloaded = { name: 'TypeError', message: `${REFUSAL}"Rail" is not loaded` };
+    assert.throws(() => seam.mountMany('Rail', items), unloaded);
+    assert.throws(() => seam.mountMany('Rail', items[0]), unloaded);
+    const loading = seam.load(['Rail']);
+    assert.throws(() => seam.mountMany('Rail', items), unloaded);
+    for (const { target } of items) assert.equal(target.childNodes.length, 0, 'nothing rendered');
+    pending.resolve((await harness.loadRuneModule(RAIL)).default);
+    await loading;
+    const handles = seam.mountMany('Rail', items);
+    assert.deepEqual(
+      items.map(({ target }) => target.querySelector('.fab-rail-label').textContent),
+      ['Standing', 'Renown', 'Favour']
+    );
+    for (const handle of handles) handle.destroy();
+  });
 });
 
 describe('EmptyState under a bare ancestor', () => {

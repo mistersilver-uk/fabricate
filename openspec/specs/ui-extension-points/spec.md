@@ -369,11 +369,11 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars` and lazy entries; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
-- **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.**
+- **`game.fabricate.api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.**
 - `components` is a frozen list of the published names in manifest order; a name is appended, never interleaved.
 - `describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where `props` is `{ <key>: { kind: 'data' | 'text' | 'slot' | 'callback' | 'aria' | 'value', required: boolean, requiredWhen?: string } }`, `rest` says whether the component takes data attributes, `root` is its required ancestor root, and `overlays` says whether it opens an overlay; it returns `null` for a name that is not published.
 `requiredWhen` is present only where the manifest states it, and `required` is then `false`.
@@ -391,6 +391,17 @@ That notice is shared with the Manager's so one shows at a time, and is raised a
 A fetch that fails before Foundry has created its notifications holds the notice until `ready`.
 Fabricate draws and announces nothing else for a load: a companion draws its own pending state until `load` settles and, on a rejection, its own error state, announced through its own live region.
 - A companion calls `load` once, keeps the promise, and mounts only after it has resolved and Fabricate is ready.
+- `mountMany(name, items)` mounts one published entry into several targets in one call, where `items` is an array of `{ target, props = {}, onFault, overlayHost }`, each item read as `mount`'s options.
+It returns a frozen array of handles in item order, each as `mount` returns it, and a frozen empty array for an empty `items`.
+It judges `items` with `Array.isArray` and coerces nothing, so a single item, or any other value that is not an array, is M21.
+It judges the name with M1, M2, M3 and M19, then M21, then each item in order with every refusal `mount` makes for the same arguments, before it claims a target or renders anything: it throws the first refusal unchanged and renders nothing.
+A hole in `items`, or an item that is not an object, reads as no options, as `mount` reads them, so it is M4.
+A target that two items name is M5.
+That judgement is pure: it ends no stale claim, and a stale claim is ended only as its own item renders.
+A target inside a content slot of another item of the same call cannot be judged before that item renders, so a companion mounts it in a later call.
+Once every item is judged, a render fault is that item's own: its handle is inert, only its `onFault` is called, and the other mounts stay live.
+Destroying one handle leaves the others live, and there is no call that destroys them all.
+A companion detects it with `typeof ui.mountMany === 'function'`.
 - `api.ui` is bound at `init` and rebound at `ready` as the same object.
 It exists once Fabricate's own `init` listener has run, so a companion reads it in `setup` or later, never in its own `init`, and its `mount` throws until the `fabricate.ready` hook has fired.
 - `api.ui` is not a member of either navigation context, and neither context gains a component or a mount function.
@@ -1098,7 +1109,8 @@ A dropped `aria-label` is release-noted.
 
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
 Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam calls `flushSync` only as the value resync: before an `on<Key>Change` delivery and once after it when the delivery changed the value, inside the user's event, never inside an effect or flush, and not once the mount has ended.
-- `mount` throws only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
+- `mount` and `mountMany` throw only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
+- `mountMany` throws M1 to M20 where `mount` throws them for the same name and an item, and M21 where its `items` is not an array.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 | | Condition | Message tail |
@@ -1123,6 +1135,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 | M18 | `overlayHost` is not `undefined`, and is not an element of `target.ownerDocument`, by `nodeType` and never `instanceof`; checked on every entry, directly after M16 | `overlayHost must be an element in the target's document` |
 | M19 | The entry is lazy and its code is not loaded: `load` never requested it, its fetch is pending, or its fetch failed; checked directly after M3 | `"<name>" is not loaded` |
 | M20 | A `value` key holding a value that is not a string, number, boolean or `null` (a function is M10) | `"<key>" must be a string, number, boolean or null` |
+| M21 | `mountMany`'s `items` is not an array, by `Array.isArray`; checked after M3 and M19, and before any item | `items must be an array` |
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
@@ -1328,6 +1341,19 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 - **WHEN** a companion mounts into a target that holds a live mount
 - **THEN** `mount` throws, and the earlier mount is untouched
+
+#### Scenario: Mounting several at once
+
+- **WHEN** a companion calls `mountMany(name, items)` with a published name and an array of valid items after Fabricate is ready
+- **THEN** Fabricate renders each item into its own `target` and returns a frozen array of their handles in item order
+- **AND** destroying one handle leaves the other mounts live
+
+#### Scenario: A batch that cannot be mounted
+
+- **WHEN** a companion calls `mountMany` with one invalid item among valid ones
+- **THEN** it throws the refusal `mount` throws for that item, and nothing is rendered into any item's `target`
+- **AND** two items that name the same `target` throw M5, and an `items` that is not an array, a single item included, throws M21
+- **AND** `mountMany('Rail', items)` before `load(['Rail'])` has resolved throws M19
 
 #### Scenario: Destroy is idempotent
 
