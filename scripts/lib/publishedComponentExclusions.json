@@ -1,0 +1,84 @@
+{
+  "exclusions": [
+    {
+      "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
+      "reason": "no-consumer: a companion confirms a destructive press in its own dialog, so Fabricate's arm-then-confirm state is not offered."
+    },
+    {
+      "path": "src/ui/svelte/components/ChanceSlider.svelte",
+      "reason": "no-consumer: a percentage slider whose resolveColor runs while Fabricate renders; a companion sets a number through Stepper."
+    },
+    {
+      "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
+      "reason": "domain-coupled: its options are crafting candidate records, and held, claimed and candidateReading are read while Fabricate renders."
+    },
+    {
+      "path": "src/ui/svelte/components/EssencePool.svelte",
+      "reason": "domain-coupled: its thresholds, allocation and sources are Fabricate essence records, and its readings run while Fabricate renders."
+    },
+    {
+      "path": "src/ui/svelte/components/Field.svelte",
+      "reason": "pending:#2601: needs a caption prop from the design-system rail, or `as` required at div with a published Kicker as the caption."
+    },
+    {
+      "path": "src/ui/svelte/components/FilterBar.svelte",
+      "reason": "no-consumer: a toolbar section around the manager's filter controls; a companion arranges its own published controls."
+    },
+    {
+      "path": "src/ui/svelte/components/ListRow.svelte",
+      "reason": "event-argument: onOpen is called with the click event, which a companion callback cannot receive."
+    },
+    {
+      "path": "src/ui/svelte/components/LogList.svelte",
+      "reason": "item-spread: each entry spreads entry.props and entry.outcome.props as attributes."
+    },
+    {
+      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+      "reason": "no-consumer: three data props over a ladder whose yield-name title and four per-item attribute channels are fixed when it is published."
+    },
+    {
+      "path": "src/ui/svelte/components/RowDisclosure.svelte",
+      "reason": "no-consumer: a row's chevron toggle; a companion discloses with a published Button and aria-expanded."
+    },
+    {
+      "path": "src/ui/svelte/components/SearchablePopover.svelte",
+      "reason": "part-of:src/ui/svelte/components/Select.svelte: the picker engine Select publishes; its trigger, option and header snippets take arguments."
+    },
+    {
+      "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
+      "reason": "part-of:src/ui/svelte/components/SearchablePopover.svelte: the portaled panel SearchablePopover draws, which takes the popover's state as props."
+    },
+    {
+      "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+      "reason": "no-consumer: a selection box for gate lists and row headers; a companion's binary control is StatusToggle."
+    },
+    {
+      "path": "src/ui/svelte/components/StageCard.svelte",
+      "reason": "domain-coupled: its stage, facts, io and presentation props are Fabricate run records."
+    },
+    {
+      "path": "src/ui/svelte/components/ToggleCard.svelte",
+      "reason": "no-consumer: a titled card around StatusToggle, which is published on its own."
+    },
+    {
+      "path": "src/ui/svelte/components/Typeahead.svelte",
+      "reason": "no-consumer: its source and itemLabel run while Fabricate renders, so they are no callback; a companion searches with SearchField."
+    },
+    {
+      "path": "src/ui/svelte/components/Well.svelte",
+      "reason": "pending:#2601: needs the content-slot gap clause of issue 2427 before it is published."
+    },
+    {
+      "path": "src/ui/svelte/components/WorldClockChip.svelte",
+      "reason": "no-consumer: three data props over Chip's private clock presentation, with one Fabricate caller; publishing it later is additive."
+    },
+    {
+      "path": "src/ui/svelte/components/XrefList.svelte",
+      "reason": "item-spread: each row spreads item.attrs as attributes."
+    },
+    {
+      "path": "src/ui/svelte/components/YieldScale.svelte",
+      "reason": "domain-coupled: its entries, roll and labels are Fabricate yield records."
+    }
+  ]
+}

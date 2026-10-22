@@ -61,7 +61,7 @@ import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
-import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
+import { RESERVED_ON_A_CONTROL, STRIPPED_ITEM_MEMBERS } from '../src/ui/publishedComponentProps.js';
 import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
 import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
@@ -123,6 +123,7 @@ import {
   tagKeys,
   unheldClauses,
 } from './helpers/publishedComponentGate.js';
+import { OVERLAY_ACTIONS, hostResolverImports } from './helpers/publishedComponentPublishable.js';
 
 /**
  * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
@@ -805,32 +806,17 @@ describe('the manifest', () => {
   });
 });
 
-/** The overlay actions admission rule 10 names: a closure that reaches one opens an overlay. */
-const OVERLAY_ACTIONS = Object.freeze([
-  'src/ui/svelte/actions/anchoredPopover.js',
-  'src/ui/svelte/actions/dismissOnOutsideClick.js',
-  'src/ui/svelte/actions/portal.js',
-  'src/ui/svelte/actions/typeaheadPanel.js',
-]);
-
-/** The files that may name `resolveOverlayHost`: its own, and the action that acquires through the chain. */
-const HOST_RESOLVER_HOMES = Object.freeze([
-  'src/ui/svelte/actions/anchoredPopover.js',
-  'src/ui/svelte/util/overlayHost.js',
-]);
-
-/** The files of `entry`'s closure that import `resolveOverlayHost`, which ignores the overlay chain. */
-function hostResolverImports(entry, reader) {
-  return [...importClosure(entry.path, reader)]
-    .filter((file) => !HOST_RESOLVER_HOMES.includes(file))
-    .filter((file) => {
-      const ast = isComponent(file) ? reader.component(file) : reader.module(file).ast;
-      return [...walkNodes(ast)].some(
-        (node) => node.type === 'ImportSpecifier' && node.imported?.name === 'resolveOverlayHost'
-      );
-    })
-    .sort(byName);
-}
+describe('the per-item members the seam strips (issue 2455)', () => {
+  it('are InfoStrip facts props alone, each a member of a published data key', () => {
+    assert.ok(Object.isFrozen(STRIPPED_ITEM_MEMBERS));
+    assert.deepEqual([...STRIPPED_ITEM_MEMBERS], ['InfoStrip.facts.props']);
+    for (const spec of STRIPPED_ITEM_MEMBERS) {
+      const [name, key] = spec.split('.');
+      const entry = PUBLISHED_COMPONENT_MANIFEST.find((published) => published.name === name);
+      assert.equal(entry?.props[key]?.kind, 'data', spec);
+    }
+  });
+});
 
 /**
  * Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action, and
@@ -845,7 +831,7 @@ function overlayFaults(entry, reader = SHIPPED) {
   }
   if (entry.overlays !== true)
     return reached.map((file) => `reaches ${file} and is not overlays: true`);
-  return hostResolverImports(entry, reader).map(
+  return hostResolverImports(entry.path, reader).map(
     (file) => `is overlays: true and ${file} imports resolveOverlayHost, which ignores the chain`
   );
 }
@@ -912,7 +898,7 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
   it('names Modal as unpublishable until it acquires through the chain', () => {
     const modal = { name: 'Modal', path: 'src/ui/svelte/components/Modal.svelte', overlays: true };
     assert.ok(
-      hostResolverImports(modal, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
+      hostResolverImports(modal.path, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
       'Modal still portals through resolveOverlayHost'
     );
   });
