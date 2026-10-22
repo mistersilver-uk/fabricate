@@ -616,7 +616,7 @@ describe('the tabs View Lab specimen case against the DOM the fixture draws', ()
       },
     });
     const handle = ui().mount('EditorTabs', { target: slot, props: props() });
-    return { handle, outputs: () => document.getElementById(`${stem}-tab-outputs`) };
+    return { handle, outputs: () => document.querySelector(`#${stem}-tab-outputs`) };
   }
 
   /** Focuses and presses the case's one step on the one element it names. */
