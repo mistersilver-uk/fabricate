@@ -272,8 +272,8 @@
   );
 
   const TAG_MATCH_OPTIONS = [
-    { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any of' },
-    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All of' },
+    { value: 'any', label: localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of') },
+    { value: 'all', label: localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All of') },
   ];
   const tagMatchOptions = $derived(
     disabled

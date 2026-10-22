@@ -116,6 +116,30 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: SegmentedControl takes already-localized option labels
+
+`SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
+An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
+`SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` and `EditorTabs` keep a lang key plus fallback, because neither is a published-seam entry and neither is held by this rule.
+
+#### Scenario: A caller's key has no translation
+
+- **WHEN** a caller builds an option from a key the active language lacks
+- **THEN** the segment renders the caller's English fallback as its `label`
+
+#### Scenario: The closure stays clear of Foundry
+
+- **WHEN** the import closure of `SegmentedControl` or `ViewToggle` is computed
+- **THEN** it holds no module outside those two components and reaches no Foundry global
+
+#### Scenario: An icon-only segment
+
+- **WHEN** `iconOnly` is set
+- **THEN** each segment's `title` is its `label`
+- **AND** the clipped label stays its accessible name
+
 ### Requirement: A list's arrangement switch renders through ViewToggle
 
 A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
@@ -707,6 +731,9 @@ A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside t
 Four background levels carry all depth: `--fab-bg-0` is the page ground, `--fab-bg-1` is rails, rows and wells, `--fab-bg-2` is cards and panels, and `--fab-bg-3` is icon chips.
 A well on a modal body, which is itself `--fab-bg-1`, takes the next level, `--fab-bg-2`, so its fill stays distinct from the body.
 Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-raised` on hover, and `--fab-surface-active` when pressed or selected.
+A radio card departs from that ladder in three ways: it rests on `--fab-bg-2`, its hover moves its border alone to `--fab-border-strong`, and its chosen card layers `--fab-surface-soft` over the `--fab-bg-2` ground behind `--fab-accent-border` (issue 2467).
+Its hover keeps the rest ground because `--fab-text-muted` on the raised ground computes under 4.5:1 in four of the seven palettes, at 4.33:1 in `foundry-native`.
+Its description inks `--fab-text-muted` and clears 4.5:1 at rest and chosen in every palette, at 4.99:1 on `--fab-bg-2` and 4.60:1 on `--fab-surface-soft` over `--fab-bg-2` in `foundry-native`, its weakest.
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
 The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip that carries no tint of its own, and the tag row's `+ Tag`, ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1; a tinted chip keeps its tint's ink.
@@ -716,7 +743,8 @@ That outline MUST meet WCAG 1.4.11's 3:1 against the control's surface in every 
 A switch's off track is a translucent `--fab-surface-soft` wash clipped to its padding box rather than an enclosed fill, so its surface is the ground beneath it — `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2`, or `--fab-surface-soft` on `--fab-bg-2` (a card) — and its edge is measured there.
 Measured on the shipped surfaces it clears 3.34:1 at its weakest on a selection control and 3.11:1 on a switch's off track over a card in `ironblood-forge`, where `--fab-border` and `--fab-border-strong`, which those outlines drew before, measured 1.52 to 2.21:1.
 A FILLED control clips its fill to the padding box, so its outline composites over the surround rather than over its own fill.
-The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a radio card's dot on the gathering task editor's option cards measures 2.03:1 against that surround in `hearth-herb`, and a large checkbox on a selected row 2.76:1 in `hearth-herb`.
+The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a large checkbox on a selected row measures 2.76:1 in `hearth-herb`.
+A radio card's unchecked ring has no shortfall: its surround is its own card's `--fab-bg-2` rest ground, where it measures 3.34:1 at its weakest, in `ironblood-forge`, and 3.40:1 in `hearth-herb` (issue 2467).
 `tests/components/control-outline-contrast.test.js` holds the single declaration, the 3:1 floor on `--fab-bg-0`, `--fab-bg-1` and `--fab-bg-2` in all seven palettes, every outline site, and the padding-box clip on every filled one.
 The switch's off knob is `--fab-text-muted` and MUST clear 3:1 against its off track, `--fab-surface-soft`, composited over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and over `--fab-surface-soft` on `--fab-bg-2` (a card), in every palette (issue 2492); `control-outline-contrast` holds it beside the outline floor.
 A labelled `Select`'s note (`.fabricate-select-note`) inks `--fab-text-muted` at 10.5px, weight 400, line height 1.5, a recorded correction of the specimen's subtle `k-hint` (issue 2315).
@@ -737,16 +765,18 @@ And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the se
 
 Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one; the one exception is the gathering biome, whose stored option carries a `customColor` sibling (see `gathering-and-harvesting`, the biome vocabulary), and no other model accepts a free hex.
 `TintPicker` offers free-hex entry only to a caller that passes `allowCustom`, which defaults to `false`, and a caller passes it only when its stored model carries a `customColor` sibling.
-Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
+Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers ten of them, so adding a token to the stylesheet does not add it to a picker.
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
-By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
-Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
-Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
+By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, and the other ten are offered, `verdant` and `azure` after the original eight in that order.
+Collision with a semantic token does NOT disqualify a tint: in the default palette five offered tints collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple`, `butter` with `--fab-warning`, `verdant` with `--fab-success` and `azure` with `--fab-drop-rate-uncommon`.
+An offered tint is additive persisted vocabulary and takes no migration, because all thirteen tokens are declared in every build since issue 1229.
+A build that predates `verdant` and `azure` still draws an essence carrying one in that tint wherever the essence is drawn as a chip or tile; its colour editors do not offer the token, and the stored token is kept until the GM edits that essence's colour.
+The same build folds a gathering biome carrying one onto `sage` on read and writes `sage` back on its next save of the gathering configuration, so a downgrade loses that biome's tint.
 
 A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
-All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the eight offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
+All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the ten offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
 In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `ironblood-forge` one tagged Mist renders a warm red-brown — in both cases the picker’s own label is wrong.
-The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
+The five tints added later — `ember`, `verdant`, `azure`, `bone` and `slate` — hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
 Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
@@ -756,7 +786,8 @@ Whether a surface floats or sits is a judgement no pattern can read from a decla
 The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those two tokens.
 A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
-The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+The checked radio's dot of a tool bonus row, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+A radio card's checked radio draws a 4px accent border ring and no shadow.
 No rule in that scope draws depth through another channel: no `drop-shadow()`, no `text-shadow` other than `none`, and no `--fab-shadow-*` declaration outside the theme blocks.
 `tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds all of them to that set absolutely, the player apps included.
 
@@ -788,7 +819,12 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 #### Scenario: A caller renders the tint picker without opting in to a hex
 
 - **WHEN** a caller renders `TintPicker` without passing `allowCustom`
-- **THEN** the palette offers only its preset tokens and no free-hex field
+- **THEN** the palette offers the ten offered tints, in order, and no free-hex field
+
+#### Scenario: The offered tints stop following the offering rule
+
+- **WHEN** `managerColorTokens.js` offers a declared `--fab-tag-*` token that is a neutral or bound (`bone`, `slate`, `ember`), or omits a declared token that is neither
+- **THEN** `manager-color-tokens` fails and names the theme whose declared set disagrees
 
 ### Requirement: The token namespace is one generation and names its purpose
 
@@ -1021,7 +1057,8 @@ The inline strip's cells keep the states above.
 A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
 A caller that marks selection inside the tile's own content (a swatch's inset ring) states its own ground as a descendant rule from its `popoverClass` (see the picker requirement), so the tile's ground does not compete with that mark.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
-So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
+So a selected row takes `--fab-surface-active` behind `--fab-accent-border`.
+A radio card group draws no bar either: its one answer is the chosen card's `--fab-accent-border` edge over `--fab-surface-soft` and its radio's 4px accent ring (issue 2467).
 Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
 
 A KEYBOARD CURSOR is a fourth state and takes a different CHANNEL rather than a fourth fill rung.
@@ -1207,6 +1244,7 @@ Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
 The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at six shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
+The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in the search-suppressed shape only; the inline query's close control carries it too (issue 2454).
 Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
 An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
 The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
@@ -1685,6 +1723,7 @@ The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, 
 The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
 With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
 `keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
+The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
 A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
 It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
 

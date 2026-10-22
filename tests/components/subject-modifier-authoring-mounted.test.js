@@ -319,6 +319,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
@@ -359,6 +360,7 @@ const gatheringHarness = createMountedComponentHarness({
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',

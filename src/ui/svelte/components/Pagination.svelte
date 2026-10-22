@@ -85,7 +85,7 @@
       ),
     ]
       .sort((a, b) => a - b)
-      .map((n) => ({ value: n, labelKey: '', fallback: String(n) }))
+      .map((n) => ({ value: n, label: String(n) }))
   );
 </script>
 

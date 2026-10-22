@@ -22,6 +22,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -48,6 +49,7 @@ const radioHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
   ],
   componentPath: 'src/ui/svelte/components/RadioCardGroup.svelte',
 });

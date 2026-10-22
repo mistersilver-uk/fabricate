@@ -43,8 +43,7 @@
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
     `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
-  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
-    its own chrome refusing focus above all — are stated there rather than restated here.
+  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, which states the invariants inside it.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
     position is STAMPED with a generation derived from the list, where an `$effect` reset would land
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
@@ -55,8 +54,7 @@
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
     while open. ESCAPE IS HANDLED IN ONE PLACE in every mode: `dismissOnOutsideClick` on the picker
     root registers a DOCUMENT-level capture-phase keydown, so it does not depend on the key reaching
-    the portaled panel, which the inline field — a sibling of the trigger in another subtree — never
-    would.
+    the portaled panel, which a key in the inline field, outside the panel, never does.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -65,16 +63,18 @@
     handing this component the caller's trigger ELEMENT, because `bind:this` cannot cross a snippet
     boundary; it and its function are created ONCE at component scope, attachments being guarded by
     identity.
+  - THE PICKER'S OWN COPY is localized by the `APP_LOCALIZER` context `mountWithLocalizer` sets at a
+    Fabricate root; a tree mounted without it draws `PICKER_COPY`'s English fallbacks.
 -->
 <script>
-  import { tick, untrack } from 'svelte';
+  import { getContext, tick, untrack } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
   import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { localize } from '../util/foundryBridge.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
@@ -89,6 +89,7 @@
     latestSourceRequest,
     listedOptions,
     optionListGeneration as listGenerationOf,
+    pickerCopy,
     pickerEmptiness,
     refiningSource,
     renderedOptionOrder,
@@ -98,11 +99,7 @@
   } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
-
-  function localizedText(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  const copy = pickerCopy(getContext(APP_LOCALIZER));
 
   let {
     options = [],
@@ -207,8 +204,8 @@
       query: normalizedSearch,
       loading,
       error,
-      errorText: localizedText('FABRICATE.Common.Picker.Error', 'The list could not load'),
-      loadingText: localizedText('FABRICATE.Common.Picker.Loading', 'Loading…'),
+      errorText: copy('error'),
+      loadingText: copy('loading'),
     })
   );
 
@@ -236,14 +233,11 @@
     filteredCountLabel(filteredCountTemplate, filteredOptions.length, totalCount)
   );
 
-  const noMatchesText = $derived(
-    noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
-  );
   const emptiness = $derived(
     pickerEmptiness({
       total: totalCount,
       matched: filteredOptions.length,
-      noMatchesText,
+      noMatchesText: noMatchesHint || copy('noMatches'),
       emptyHint,
       emptyDetail,
     })
@@ -360,9 +354,6 @@
     triggerOnKeydown?.(event);
   }
 
-  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
-  const dialogNamedBy = $derived(panelLabelledBy || undefined);
-
   const triggerAttributes = $derived({
     ...triggerProps,
     type: 'button',
@@ -453,6 +444,8 @@
       <button
         type="button"
         class="manager-travel-picker-inline-close"
+        data-picker-inline-close=""
+        data-keyboard-focus="true"
         aria-label={inlineCloseLabel || undefined}
         title={inlineCloseLabel || undefined}
         onclick={() => close()}
@@ -476,7 +469,13 @@
       class={triggerClass}>{@render triggerBody()}</Button
     >
   {:else}
-    <button bind:this={triggerElement} class={triggerClass} {...triggerAttributes}>
+    <button
+      bind:this={triggerElement}
+      class={triggerClass}
+      {...triggerAttributes}
+      type="button"
+      data-keyboard-focus="true"
+    >
       {@render triggerBody()}
     </button>
   {/if}
@@ -490,8 +489,8 @@
       {popoverLayout}
       {popoverClass}
       {compactOptionRows}
-      {dialogNameAttribute}
-      {dialogNamedBy}
+      {panelLabel}
+      {panelLabelledBy}
       {horizontalAlign}
       {minWidth}
       {maxWidth}
@@ -528,6 +527,7 @@
       {header}
       {footer}
       {keyHints}
+      {copy}
       {footerAction}
       {chooseOption}
       {optionIsSelected}

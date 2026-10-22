@@ -1,13 +1,15 @@
 /** A SHARED PICKER MUST PAINT WHEREVER IT IS MOUNTED (issues 1464 and 1470). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import test from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import { collectWorkingTreeSources, repoRoot, stripComments } from '../helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../helpers/styleBlockScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
+import { svelteFiles } from '../helpers/svelteTemplateScan.js';
 
 const STYLESHEET = 'styles/fabricate.css';
 
@@ -480,13 +482,13 @@ const PRIMITIVES = Object.freeze([
     // ── RADIOCARDGROUP (issue 1509). The manager's radio-card group, rooted at the class it emits.
     // IT DECLARES NO `classProps`, AND THAT IS A DECISION WITH A MEASURED REASON. `classPropValues`
     // builds ``new RegExp(`\b${name}=(?:"([^"]*)"|\{`([^`]*)`\})`)``, so a
-    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured, TWELVE
-    // of them, at `RadioCardGroup.svelte:90, 95, 97, 98, 102, 105, 120, 124, 125, 127, 131, 137` —
-    // and the class-prop floor above requires exactly `classProps.length * components.length`, so
-    // it would red at 12 against 1. What that field would have bought — a guard on `Field` renaming
-    // or dropping its `class` prop — is bought instead by the mounted root-emission assertion in
-    // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
-    // fieldset, and by that suite's own mutation control.
+    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured,
+    // FOURTEEN of them — and the class-prop floor above requires exactly
+    // `classProps.length * components.length`, so it would red at 14 against 1. What that field
+    // would have bought — a guard on `Field` renaming or dropping its `class` prop — is bought
+    // instead by the mounted root-emission assertion in `tests/components/field-mounted.test.js`,
+    // which reads the RENDERED `className` off the fieldset, and by that suite's own mutation
+    // control.
     name: 'RadioCardGroup',
     components: Object.freeze(['src/ui/svelte/components/RadioCardGroup.svelte']),
     roots: Object.freeze(['fabricate-option-cards']),
@@ -500,17 +502,22 @@ const PRIMITIVES = Object.freeze([
       'manager-resolution-mode-note',
       'manager-resolution-mode-options',
       'manager-resolution-option',
+      'manager-resolution-option-head',
       'manager-resolution-option-icon',
+      'manager-resolution-option-text',
       'manager-resolution-option-body',
       'manager-resolution-option-name',
       'manager-resolution-option-desc',
       'manager-resolution-option-badge',
       'manager-radio-card-group',
     ]),
-    // Measured at this commit: 12 written, 47 family selectors, 31 owned.
-    writtenFloor: 10,
-    familyFloor: 42,
-    ownedFloor: 27,
+    // Measured at this commit: 14 written; 36 family selectors (48, less the 15 route-scoped caller
+    // rules deleted and the 12 owned rules merged or deleted, plus 15 new); 35 owned. Each floor
+    // keeps the base entry's headroom: written 2 (12 against 10), family 5 (47 against 42),
+    // owned 4 (31 against 27), so 12, 31 and 31.
+    writtenFloor: 12,
+    familyFloor: 31,
+    ownedFloor: 31,
     // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
     // (9 attributes over 3 files against this one's 4 over 2) and is REFUSED all the same: it is
     // the option ROW, a descendant of the root, so a fixture carrying it satisfies the attribute
@@ -1529,7 +1536,7 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
  * The entries whose ROOT ELEMENT is another entry's, so TWO namespace roots land on ONE element.
  */
 const CO_ROOTED_PAIRS = Object.freeze([
-  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 40 }),
+  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 28 }),
   Object.freeze({ host: 'Field', guest: 'ModifierPillSelect', hostFloor: 20, guestFloor: 11 }),
 ]);
 
@@ -1695,11 +1702,26 @@ test('the application-root-attribute clause names a caller’s own container', (
     )
   );
   assert.ok(
-    callerContainerSelectors.length >= 19,
+    callerContainerSelectors.length >= 11,
     `only ${callerContainerSelectors.length} selectors were recognised by the ` +
-      'application-root-attribute clause across every entry, against a floor of 19. A lower number means the clause ' +
+      'application-root-attribute clause across every entry, against a floor of 11. A lower number means the clause ' +
       'has stopped recognising a caller’s own container and those rules would wrongly enter the ' +
       'owned set below.'
+  );
+});
+
+test('the option cards’ one caller rule is the Difficulty fields’ margin', () => {
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const written = classesWrittenBy(primitive);
+  assert.deepEqual(
+    pickerSelectors(written, primitive).filter(
+      (selector) => !isPrimitiveOwned(selector, written, primitive)
+    ),
+    [
+      '.fabricate-manager .manager-checks-card .manager-resolution-mode-card + .manager-checks-difficulty-fields',
+    ],
+    'a caller rule names the option-card family again. The face is the primitive’s alone, so a ' +
+      'route that repaints it draws a second face; state the difference in the primitive instead.'
   );
 });
 
@@ -2282,5 +2304,72 @@ test('each primitive’s own scoped styles name no application root either', () 
       'usually to say they deliberately have none, and the `</script>` guard above is what ' +
       'keeps that prose out of this clause. A lower number means the reader has stopped ' +
       'finding the real blocks and this clause examined nothing.'
+  );
+});
+
+/** The data hooks the option cards' face is addressed by; a caller never selects on them. */
+const OPTION_FACE_HOOKS = /^data-(?:radio-card-(?:option|meta)|tool-choice-[\w-]+)$/;
+
+/** The classes and attributes each rule of a parsed component's scoped block names, `:global()` arguments included. */
+function scopedRuleNames(ast) {
+  const namesIn = (node, out = []) => {
+    if (Array.isArray(node)) for (const child of node) namesIn(child, out);
+    else if (node && typeof node === 'object') {
+      if (node.type === 'ClassSelector' || node.type === 'AttributeSelector') out.push(node.name);
+      for (const [key, value] of Object.entries(node)) if (key !== 'parent') namesIn(value, out);
+    }
+    return out;
+  };
+  const rules = [];
+  const walk = (nodes) => {
+    for (const node of nodes ?? []) {
+      if (node.type === 'Rule') rules.push(namesIn(node.prelude));
+      walk(node.block?.children);
+    }
+  };
+  walk(ast.css?.children);
+  return rules;
+}
+
+test('no caller’s scoped block restates the option cards’ face (issue 2467)', () => {
+  // Two callers place the group's own legend in their heading; neither paints a card.
+  const LEGEND_PLACEMENT = new Set([
+    'src/ui/svelte/apps/manager/CraftingSettingsView.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+  ]);
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const family = new RegExp(`^(?:${primitive.family})$`);
+  const offences = [];
+  let blocks = 0;
+  for (const absolute of svelteFiles(join(repoRoot, 'src'))) {
+    const file = relative(repoRoot, absolute).split(sep).join('/');
+    const ast = componentAstOf(file);
+    if (primitive.components.includes(file) || !ast.css) continue;
+    blocks += 1;
+    for (const names of scopedRuleNames(ast)) {
+      const hooks = names.filter((name) => OPTION_FACE_HOOKS.test(name));
+      const named = names.filter((name) => family.test(name));
+      const legendOnly = named.every((name) => name === 'manager-resolution-mode-legend');
+      if (hooks.length > 0 || (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly))) {
+        offences.push(`${file}: ${names.join(' ')}`);
+      }
+    }
+  }
+  assert.ok(
+    blocks > 100,
+    `only ${blocks} scoped blocks were read, so the absence below is vacuous`
+  );
+  assert.deepEqual(
+    offences,
+    [],
+    'a caller’s scoped block names the option-card family or its data hooks, and an unlayered ' +
+      'block beats the sheet, so it repaints the primitive on one route'
+  );
+  assert.deepEqual(
+    allSelectors().filter((selector) =>
+      /\[data-(?:radio-card-(?:option|meta)|tool-choice-)/.test(selector)
+    ),
+    [],
+    'the sheet selects on the option cards’ data hooks; the face is addressed by the primitive’s classes'
   );
 });

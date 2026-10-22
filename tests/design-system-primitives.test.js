@@ -832,6 +832,27 @@ test('(a) a Stepper change publishes its two frames, then the two specimens that
   }
 });
 
+test('(a) a Select change publishes its four frames, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/Select.svelte';
+  const frames = [
+    'manager-recipes-bulk-edit-check-tier',
+    'manager-recipe-edit-ingredients-kind-list',
+    'manager-component-edit-category-list',
+    'interactables-manager-region-open',
+    'manager-published-select-specimen',
+    'manager-published-select-layer',
+  ];
+  assert.deepEqual(
+    [...(BROAD_SIGNAL_CASE_OVERRIDES[file] ?? [])],
+    frames,
+    `${file} names its frames`
+  );
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of frames) {
+    assert.ok(selected.has(caseId), `a Select change does not select '${caseId}'`);
+  }
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [

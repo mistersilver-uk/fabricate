@@ -398,6 +398,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedControls.svelte',
   'tests/view-lab/fixtures/PublishedValues.svelte',
   'tests/view-lab/fixtures/PublishedSearch.svelte',
+  'tests/view-lab/fixtures/PublishedSelect.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -836,6 +837,8 @@ const DISMISSAL = (tone) =>
 const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
 /** A part of one published search field of the search fixture, by its section's key. */
 const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
+/** A part of one published select of the select fixture, by its section's key. */
+const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1258,6 +1261,22 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
       styles: 'border-color: var(--fab-accent)',
+    },
+  ],
+  // The published selects (issue 2454): each rung's declared corner, and the panel's own, in the
+  // overlay host the companion passed and on the standalone layer.
+  'manager-published-select-specimen': [
+    { selector: labSelect('hosted', '.fabricate-select-trigger'), styles: 'border-radius: 7px' },
+    {
+      selector: '[data-lab-select-ground] > div > .fabricate-select-popover',
+      styles: 'border-radius: 11px',
+    },
+  ],
+  'manager-published-select-layer': [
+    { selector: labSelect('layer', '.fabricate-select-trigger'), styles: 'border-radius: 9px' },
+    {
+      selector: 'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover',
+      styles: 'border-radius: 11px',
     },
   ],
 });
@@ -5826,7 +5845,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the ten specimens it mounts', () => {
+test('every published component seam module, and the host, selects the twelve specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5847,16 +5866,24 @@ test('every published component seam module, and the host, selects the ten speci
       'manager-published-steppers-specimen',
       'manager-published-steppers-button-focus',
       'manager-published-search-specimen',
+      'manager-published-select-specimen',
+      'manager-published-select-layer',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, and the search fixture's field. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle', 'Stepper', 'SearchField']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, and the select fixture's selects. */
+const SPECIMENED_ELSEWHERE = new Set([
+  'TierTrack',
+  'StatusToggle',
+  'Stepper',
+  'SearchField',
+  'Select',
+]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper and SearchField and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField and Select and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6274,6 +6301,61 @@ test('the search specimen case acts on what the search fixture mounts through th
     expectSelector.endsWith('.fabricate-search:focus-within') &&
       expectCenterHit.endsWith('[data-lab-search="transform"] input'),
     'the frame is taken with focus in the field that transformed'
+  );
+});
+
+test('the select specimen cases act on what the select fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedSelect.svelte');
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Select' &&
+        node.arguments[1]?.properties?.some(({ key }) => key?.name === 'overlayHost')
+    ),
+    'the fixture mounts Select through the seam’s mount, passing an overlayHost'
+  );
+  for (const hook of ['data-lab-select-ground', 'data-lab-select', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const opened = getCaseById('manager-published-select-specimen');
+  assert.deepEqual(
+    opened.steps.map((step) => /\[data-lab-select="([a-z]+)"\]/.exec(step.selector)?.[1]),
+    ['hosted'],
+    'one press, on the select whose list the ground hosts'
+  );
+  assert.ok(
+    opened.expectSelector.startsWith('[data-lab-select-ground]:has(') &&
+      opened.expectSelector.includes('> div > .fabricate-select-popover'),
+    'the frame is taken only once the list is open in the overlay host'
+  );
+  assert.deepEqual(
+    opened.expectCenterHit,
+    [
+      '[data-lab-select-ground] > div > .fabricate-select-popover [data-popover-option="25"]',
+      '[data-lab-select-ground] [data-lab-select="layer"] .fabricate-select-trigger',
+    ],
+    'the open hosted list is hit at a row, and leaves the second select’s trigger uncovered'
+  );
+  const layered = getCaseById('manager-published-select-layer');
+  assert.deepEqual(
+    layered.steps.map(({ selector }) => selector.split(' ').at(-1)),
+    ['.fabricate-select-trigger', '[data-popover-option="all"]', '.fabricate-select-trigger'],
+    'a choice in the hosted list, then a press on the select with no overlayHost'
+  );
+  assert.ok(
+    layered.expectSelector.includes('[data-lab-select="hosted"][data-lab-value="all"]') &&
+      layered.expectSelector.includes('> .fabricate.fabricate-standalone-overlay >'),
+    'the frame is taken once the choice was passed back and the list is open on the layer'
   );
 });
 

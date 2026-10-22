@@ -234,6 +234,7 @@ function createMockServices(overrides = {}) {
 // Import the store factory
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 const { DEFAULT_ESSENCE_ICON } = await import('../../src/ui/svelte/util/essenceIcons.js');
+const { MANAGER_COLOR_TOKEN_KEYS } = await import('../../src/ui/svelte/util/managerColorTokens.js');
 const { PF2E_CURRENCY_PRESETS } = await import('../../src/config/currencyPresets.js');
 
 /**
@@ -5532,6 +5533,32 @@ describe('createAdminStore', () => {
           },
         ],
         'each default biome gets its own colour token, not a single flat fallback'
+      );
+    });
+
+    it('keeps every offered tint on a biome and folds any other onto sage (issue 2352)', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      const tokens = [...MANAGER_COLOR_TOKEN_KEYS, 'ember', 'bone', 'slate'];
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            vocabularies: {
+              biomes: { values: tokens.map((colorToken) => ({ id: `b-${colorToken}`, colorToken })) },
+            },
+          },
+        },
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const { values } = get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes;
+
+      assert.deepEqual(
+        values.map((biome) => biome.colorToken),
+        [...MANAGER_COLOR_TOKEN_KEYS, 'sage', 'sage', 'sage'],
+        "the store's biome vocabulary is the manager palette; a withheld tint folds to sage"
       );
     });
 

@@ -61,13 +61,17 @@
   const SOURCE_OPTIONS = [
     {
       value: 'path',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourcePath',
-      fallback: 'Value on the crafting character',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourcePath',
+        'Value on the crafting character'
+      ),
     },
     {
       value: 'macro',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourceMacro',
-      fallback: 'Read and spend macros',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourceMacro',
+        'Read and spend macros'
+      ),
     },
   ];
 

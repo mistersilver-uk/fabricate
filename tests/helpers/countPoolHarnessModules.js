@@ -8,6 +8,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -23,6 +24,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
   'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
   // The pool's additional-dice group and its macro wells (issue 2008).
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/util/dropUtils.js',

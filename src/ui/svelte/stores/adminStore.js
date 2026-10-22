@@ -198,15 +198,10 @@ const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
 });
 const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
 const GATHERING_VOCABULARY_DIMENSIONS = new Set(['biomes']);
+// prettier-ignore
 const GATHERING_BIOME_COLOR_TOKENS = new Set([
-  'sage',
-  'mist',
-  'lavender',
-  'rose',
-  'peach',
-  'butter',
-  'aqua',
-  'mauve',
+  'sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve',
+  'verdant', 'azure',
 ]);
 const DEFAULT_GATHERING_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_GATHERING_BIOME_METADATA = Object.freeze({

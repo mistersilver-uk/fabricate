@@ -230,27 +230,27 @@
   );
 
   const sourceTypeOptions = $derived([
-    { value: 'tool', fallback: text('FABRICATE.Canvas.Manage.TypeTool', 'Tool') },
+    { value: 'tool', label: text('FABRICATE.Canvas.Manage.TypeTool', 'Tool') },
     {
       value: 'gatheringTask',
-      fallback: text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task'),
+      label: text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task'),
     },
   ]);
 
   const visualModeOptions = $derived([
     {
       value: 'marker',
-      fallback: text('FABRICATE.Canvas.Manage.PromoteMarkerVisible', 'Visible marker'),
+      label: text('FABRICATE.Canvas.Manage.PromoteMarkerVisible', 'Visible marker'),
     },
     {
       value: 'none',
-      fallback: text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)'),
+      label: text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)'),
     },
   ]);
 
   const markerKindOptions = $derived([
-    { value: 'Tile', fallback: text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile') },
-    { value: 'Drawing', fallback: text('FABRICATE.Canvas.Manage.MarkerDrawing', 'Drawing') },
+    { value: 'Tile', label: text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile') },
+    { value: 'Drawing', label: text('FABRICATE.Canvas.Manage.MarkerDrawing', 'Drawing') },
   ]);
 
   // Reset the picked source when the system or the type changes so we never carry

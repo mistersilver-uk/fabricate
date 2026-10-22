@@ -2125,7 +2125,7 @@ describe('Tool Studio editor (mounted)', () => {
     // `proto:2334` is one muted sentence that states the AND rule AND introduces the gate pair.
     const cardText = root.querySelector('[data-tool-rule-card="prerequisites"]').textContent;
     assert.equal(cardText.includes('Which prerequisites'), false, 'no list eyebrow');
-    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet.
+    // `RadioCardGroup` hides its legend through the sheet unless `legendVisible` is set.
     assert.ok(
       !root.querySelector('[data-tool-rule-card="prerequisites"] .is-legend-visible'),
       'and no visible gate-pair legend — the sentence above it is the introduction'

@@ -61,6 +61,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',

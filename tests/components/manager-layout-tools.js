@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { BAND_TONES } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 import { openLayoutContext, renderWithCascade } from '../helpers/layout-harness.js';
+import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 import {
   blockFor,
@@ -28,6 +29,7 @@ import {
   CHECKS_REDIRECT_VIEW,
   CHECKS_VIEWS,
   MODIFIER_BOUNDS_ROW_WIDTHS,
+  OPTION_CARD_COPIES,
   bandStripFixture,
   checkEditorSource,
   checksRollEdges,
@@ -41,6 +43,16 @@ import {
 } from './manager-layout-tools-fixtures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+test('the static option-card copies carry only classes RadioCardGroup writes', () => {
+  for (const [name, copy] of Object.entries(OPTION_CARD_COPIES)) {
+    assert.deepEqual(
+      classesNotWritten(copy),
+      [],
+      `the ${name} copy has drifted from the component`
+    );
+  }
+});
 
 test('Tool library renders 210px and 340px fixed columns through the 832px product root', async () => {
   for (const width of [1212, 832]) {
@@ -593,7 +605,7 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
   );
 });
 
-test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
+test('the combination-rule cards draw the one option-card face in the studio card and the bare shell', async () => {
   const context = await openLayoutContext({
     viewport: { width: 960, height: 700 },
     deviceScaleFactor: 1,
@@ -606,24 +618,21 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       'fabricate-card is-flush manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
-    // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
-    assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
-    assert.equal(fixed.optionPaddingTop, 12, "the combination-rule card's padding is 12px");
-    assert.equal(fixed.optionRadius, 11, "the combination-rule card's radius is 11px");
+    // The library's `<OptionCards>`: padding 12, radius 11, cards 8px apart, a 12.5px title.
+    assert.deepEqual(
+      [fixed.option.paddingLeft, fixed.option.paddingTop, fixed.option.radius],
+      [12, 12, 11]
+    );
+    assert.equal(fixed.option.gap, '8px', 'the cards sit on the 8px rung, not a per-card gutter');
+    assert.equal(fixed.option.nameSize, '12.5px');
+    assert.notEqual(fixed.option.chosenBorder, fixed.option.restBorder, 'the chosen card is edged');
 
-    // MUTATION PROOF, same page: reintroducing the defect.
-    const broken = await modifiersCombinationRuleMetrics(page, 'fabricate-card');
-    // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, and the studio's
-    // 11px option gap snapped to the primitive's own 12 (issue 1523), so the shell no longer
-    // differs there; the combination-rule card's own face below carries the proof.
-    assert.equal(broken.cardRadius, 11, 'the shared card is on the 11px card rung too');
-    assert.equal(broken.cardBackground, fixed.cardBackground, 'and on the same fill');
-    assert.equal(broken.optionGap, fixed.optionGap, 'and the option gap is the primitive’s 12px');
-    assert.notEqual(
-      broken.optionBackground,
-      fixed.optionBackground,
-      `expected the bare shell to drop the combination-rule cards off the studio's --fab-bg-1 ` +
-        `rest face (bare: ${broken.optionBackground})`
+    // HOST INDEPENDENCE, same page: the bare shell is the control, and the face must not move.
+    const bare = await modifiersCombinationRuleMetrics(page, 'fabricate-card');
+    assert.deepEqual(
+      bare.option,
+      fixed.option,
+      'the option cards take no face from the studio card'
     );
   } finally {
     await context.close();
@@ -644,7 +653,7 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
     withoutComments(modifierCatalogueSource),
     /<InspectorCard\s+flush\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
     'the modifiers card must be a flush manager-checks-card, or it falls back to the bare ' +
-      '.fabricate-card shell and the combination-rule cards fall back to the generic scale'
+      '.fabricate-card shell and loses the studio card contract'
   );
 });
 

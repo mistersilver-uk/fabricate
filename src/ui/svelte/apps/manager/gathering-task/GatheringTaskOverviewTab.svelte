@@ -223,6 +223,7 @@
     selectedValue={taskResolutionMode}
     groupName={`gathering-task-resolution-${task.id}`}
     columns={3}
+    layout="stacked"
     legendVisible={false}
     data-gathering-task-resolution-mode
     optionDataAttr="data-gathering-task-resolution-option"

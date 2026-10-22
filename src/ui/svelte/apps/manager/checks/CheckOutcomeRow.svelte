@@ -49,12 +49,12 @@
   const outcomeSegments = $derived([
     {
       value: 'success',
-      fallback: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'),
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'),
       variant: 'success',
     },
     {
       value: 'failure',
-      fallback: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'),
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'),
       variant: 'danger',
     },
   ]);

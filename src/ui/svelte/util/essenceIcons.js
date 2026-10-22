@@ -17,7 +17,9 @@ export const ESSENCE_COLOR_TOKENS = Object.freeze([
   'peach',
   'butter',
   'aqua',
-  'mauve'
+  'mauve',
+  'verdant',
+  'azure'
 ]);
 
 // Null is a FIRST-CLASS state, not a failure: an essence with no authored colour renders in the

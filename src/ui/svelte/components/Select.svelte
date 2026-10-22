@@ -140,8 +140,6 @@
     onChange(chosen);
   }
 
-  const restTarget = $derived(labelled ? rest : {});
-
   $effect(() => {
     if (labelled || Object.keys(rest).length === 0) return;
     console.warn(
@@ -251,7 +249,7 @@
 {/snippet}
 
 {#if labelled}
-  <Field as="div" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
+  <Field as="div" class={`fabricate-select-field ${extraClass}`} {...rest}>
     <span class="fabricate-select-caption" id={captionId}>{label}</span>
     {@render control()}
     {#if error}

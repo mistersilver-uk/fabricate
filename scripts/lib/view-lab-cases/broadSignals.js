@@ -430,11 +430,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-component-complications-macro-linked',
     'manager-component-complications-macro-missing',
   ]),
-  // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
+  // The radio-card group (issue 1373), the player's crafting routes (issue 1778), and the
+  // Crafting Settings, Checks Studio and Journal faces it converged (issue 2467).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
     'player-crafting-ingredient-routed',
+    'manager-crafting-settings',
+    'manager-checks-crafting-modifiers',
+    'fabricate-journal-lifecycle-ingredient-route',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
@@ -555,12 +559,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // body visible is the only state in which the control is more than a chevron.
   'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
-  // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), and the two specimens
+  // that mount it through the published seam open its list in an overlay host and on the
+  // standalone layer (issue 2454).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
     'manager-component-edit-category-list',
     'interactables-manager-region-open',
+    'manager-published-select-specimen',
+    'manager-published-select-layer',
   ]),
   // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([

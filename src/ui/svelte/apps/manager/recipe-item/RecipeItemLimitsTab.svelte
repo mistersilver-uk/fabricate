@@ -79,26 +79,22 @@
   const WHEN_SPENT_OPTIONS = [
     {
       value: 'destroyed',
-      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed',
-      fallback: 'Destroyed',
+      label: text('FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed', 'Destroyed'),
     },
     {
       value: 'inert',
-      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Inert',
-      fallback: 'Becomes inert',
+      label: text('FABRICATE.Admin.Manager.RecipeItem.Limits.Inert', 'Becomes inert'),
     },
   ];
   const LEARN_SCOPE_OPTIONS = [
     {
       value: 'perInstance',
-      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopePerCopy',
-      fallback: 'Per copy',
+      label: text('FABRICATE.Admin.Manager.RecipeItem.Limits.ScopePerCopy', 'Per copy'),
       icon: 'fas fa-book',
     },
     {
       value: 'total',
-      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopeTotal',
-      fallback: 'Across all copies',
+      label: text('FABRICATE.Admin.Manager.RecipeItem.Limits.ScopeTotal', 'Across all copies'),
       icon: 'fas fa-layer-group',
     },
   ];

@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
   import SearchField from '../../components/SearchField.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
@@ -67,7 +68,12 @@
   // than in the markup because `SegmentedControl` renders the slot only for a FINITE number, so
   // a missing key has to arrive as 0 rather than as `undefined`.
   const pillOptions = $derived(
-    PILLS.map((pill) => ({ ...pill, count: Number(counts?.[pill.value] ?? 0) }))
+    PILLS.map((pill) => ({
+      value: pill.value,
+      icon: pill.icon,
+      label: localizeOr(pill.labelKey),
+      count: Number(counts?.[pill.value] ?? 0),
+    }))
   );
 
   // The caption this control is named by, per instance: the inventory header can be rendered

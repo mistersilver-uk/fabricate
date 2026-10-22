@@ -1273,12 +1273,6 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active .manager-resolution-option-icon',
-    'var(--fab-accent-soft)',
-    'the chosen card’s icon well, a mark inside the surface',
-  ],
-  [
-    MODULE_SHEET,
     '.fabricate-manager .manager-selected-tag-pill button:hover, .fabricate-manager .manager-selected-tag-pill button:focus-visible',
     'var(--fab-success-soft)',
     'the remove inside a success pill hovers in the pill’s family',
@@ -1315,9 +1309,9 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-option-cards .manager-resolution-option.is-active',
-    'var(--fab-accent-soft)',
-    'a radio card’s answer: accent-soft under the 3px bar',
+    '.fabricate-option-cards .manager-resolution-option.is-active::before',
+    'var(--fab-surface-soft)',
+    'a radio card’s answer: surface-soft layered over the bg-2 rest ground, the specimen’s gradient drawn flat',
   ],
   [
     MODULE_SHEET,

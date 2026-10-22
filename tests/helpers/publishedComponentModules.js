@@ -23,6 +23,14 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/theme.js',
   'src/ui/svelte/util/dropRateTier.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  'src/ui/svelte/util/overlayBounds.js',
+  'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
 ]);
 
 export const PUBLISHED_RUNE_MODULES = Object.freeze(['src/ui/publishedComponents.svelte.js']);
@@ -48,6 +56,9 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

@@ -13,6 +13,8 @@
  */
 import { mount, unmount } from 'svelte';
 import { createSvelteApplicationMixin } from './SvelteApplicationMixinCore.js';
+import { mountWithLocalizer } from './util/appLocalizer.js';
+import { localize } from './util/foundryBridge.js';
 
 /**
  * ReactivePropsBox wraps a plain object so that its top-level properties
@@ -37,7 +39,7 @@ function createReactiveProps(initial) {
 export default function SvelteApplicationMixin(Base) {
   return createSvelteApplicationMixin(Base, {
     createReactiveProps,
-    mountFn: mount,
+    mountFn: mountWithLocalizer(mount, localize),
     unmountFn: unmount
   });
 }

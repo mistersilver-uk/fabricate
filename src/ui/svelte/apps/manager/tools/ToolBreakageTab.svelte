@@ -478,8 +478,7 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <!-- STILL A `<fieldset disabled>`, the immune state's whole mechanism: one attribute rather
-         than `disabled` passed down three controls. -->
+    <!-- STILL A `<fieldset disabled>`: one attribute is the immune state's whole mechanism. -->
     <!-- THE CONTROL HALF of the validation row action. The `onBreak` and `repair` checks are both
          about what is authored INSIDE this fieldset, so the fieldset is the destination; it is not
          natively focusable, hence the tabindex and the keyboard-focus attribute. IT CAN BE
@@ -506,6 +505,7 @@
         selectedValue={onBreak.mode}
         groupName="tool-on-break"
         columns={3}
+        layout="stacked"
         disabled={immune}
         data-radio-card-group="tool-on-break"
         optionDataAttr="data-tool-on-break-choice"
