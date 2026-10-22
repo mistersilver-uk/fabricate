@@ -1,9 +1,10 @@
 /**
  * The module sheet and every component style against the published `Field` (issue 2601): the
  * selectors that name its root class, which of them a published field can match, where those sit
- * and what they draw, and the classes its file spells on the root. Two rules draw the field itself;
- * the rest that reach it are the chrome the sheet draws on a control the companion puts in its
- * content slot, which the Field group states.
+ * and what they draw, and the classes its file spells on the root. Two family rules name the field
+ * itself, its column and a child `<span>` caption, the second unreachable in a published mount; the
+ * rest that reach it are the chrome the sheet draws on a control the companion puts in its content
+ * slot, which the Field group states.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, and takes
  * on trust that no extension target sits under one of `FIELD.ancestors`.
  */
@@ -53,7 +54,10 @@ const TEXT_LIKE_EXCLUSION =
   ":not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])";
 const INSET_RING = `${LIBRARY}: .fabricate-field :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible`;
 
-/** The two rules that draw the field itself: its column, and the caption a child `<span>` takes. */
+/**
+ * The two family rules: the column, and the caption of a child `<span>`, named by selector but
+ * unreachable in a published mount because the slot's wrapper is the root's only child.
+ */
 const FIELD_FAMILY_RULES = Object.freeze([
   `${LIBRARY}: .fabricate-field.fabricate-field`,
   `${LIBRARY}: .fabricate-field > span:where(:first-child)`,

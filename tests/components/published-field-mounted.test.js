@@ -176,7 +176,7 @@ describe("a companion's caption and input in the published Field", () => {
     handle.destroy();
   });
 
-  it('holds the caption a level below the column, so the sheet draws no kicker on it', async () => {
+  it("holds the caption as a child of the content slot's element, never of the column, so the sheet draws no kicker on it", async () => {
     const { handle, target } = mountField();
     await settle();
     const { caption } = drawCaptionAndInput(handle.slot('children'));
@@ -220,10 +220,12 @@ describe("a companion's caption and input in the published Field", () => {
   });
 });
 
-// The clause `DYNAMIC_ELEMENTS` names for the field's pinned tags.
+// The clause `DYNAMIC_ELEMENTS` names for the field's pinned tags. The console warning such an `as`
+// draws is Field's own development diagnostic, private and outside the published contract.
 describe("Field's host element", () => {
   it('draws a <div> for an as outside its three hosts, every control tag included', async () => {
-    for (const as of ['button', 'a', 'input', 'select', 'textarea', 'span', 'h1']) {
+    const values = ['button', 'a', 'input', 'select', 'textarea', 'span', 'h1'];
+    for (const as of values) {
       const { target, handle, root } = mountField({ ...COLUMN, as });
       await settle();
       assert.equal(target.children.length, 1, 'one root');
@@ -231,7 +233,12 @@ describe("Field's host element", () => {
       assert.ok(!target.querySelector(FOCUSABLE), 'nothing focusable');
       handle.destroy();
     }
-    assert.deepEqual(reports, []);
+    assert.deepEqual(reports, [], 'the seam reports nothing');
+    assert.deepEqual(
+      warnings.map(([message]) => String(message).startsWith('Fabricate | Field: ')),
+      values.map(() => true),
+      'one Field warning per mount, and none from the seam'
+    );
   });
 });
 
