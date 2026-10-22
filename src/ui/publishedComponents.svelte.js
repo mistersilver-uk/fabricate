@@ -30,6 +30,7 @@ import StatBox from './svelte/components/StatBox.svelte';
 import StatusToggle from './svelte/components/StatusToggle.svelte';
 import Stepper from './svelte/components/Stepper.svelte';
 import TierTrack from './svelte/components/TierTrack.svelte';
+import Well from './svelte/components/Well.svelte';
 import PublishedComponentHost from './svelte/published/PublishedComponentHost.svelte';
 
 // Keyed by eager manifest `path`; `published-components-mounted.test.js` holds the two equal.
@@ -54,6 +55,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Select.svelte': Select,
   'src/ui/svelte/components/StageBars.svelte': StageBars,
   'src/ui/svelte/components/Field.svelte': Field,
+  'src/ui/svelte/components/Well.svelte': Well,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

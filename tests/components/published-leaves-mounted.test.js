@@ -297,6 +297,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.getAttribute('data-companion-field'),
     drawn: ['name', 'title'],
   },
+  {
+    name: 'Well',
+    under: 'fabricate',
+    root: '.fab-well',
+    props: {},
+    next: { label: 'Chosen reagents' },
+    read: (root) => root.getAttribute('aria-label'),
+    drawn: [null, 'Chosen reagents'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -420,6 +429,7 @@ describe('a key a leaf does not publish', () => {
     ['Field', 'class', 'is not a data attribute'],
     ['Field', 'label', 'is not a data attribute'],
     ['Field', 'caption', 'is not a data attribute'],
+    ['Well', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -587,6 +597,7 @@ const SLOT_LEAVES = [
   ['InspectorCard', '.fabricate-card'],
   ['EmptyState', '.manager-empty > div'],
   ['Field', '.fabricate-field'],
+  ['Well', '.fab-well'],
 ];
 
 describe('a slot key through the shipped seam', () => {

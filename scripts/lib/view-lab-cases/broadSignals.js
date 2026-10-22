@@ -662,11 +662,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
-  // and the roll prompt's additional-dice control.
+  // the roll prompt's additional-dice control, and the specimen that mounts it through the
+  // published seam (issue 2601).
   'src/ui/svelte/components/Well.svelte': Object.freeze([
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
+    'manager-published-well-specimen',
   ]),
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
   'src/ui/svelte/components/Chip.svelte': Object.freeze([

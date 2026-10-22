@@ -310,6 +310,14 @@ const FIELD_CAPTION = `${FIELD_SECTION} #lab-published-field-caption`;
 /** Sized to the fixture's 320px ground and the height of its one field. */
 const FIELD_WINDOW = Object.freeze({ width: 440, height: 240 });
 
+/** The well fixture's ground, the published well inside its card, and the companion's element. */
+const WELL_GROUND = '[data-lab-well-ground]';
+const WELL = `${WELL_GROUND} .fabricate-card .fab-well`;
+const WELL_CONTENT = `${WELL} [data-lab-well-content]`;
+
+/** Sized to the fixture's 320px ground and the height of its one card. */
+const WELL_WINDOW = Object.freeze({ width: 440, height: 320 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -858,6 +866,44 @@ export const CASES = Object.freeze([
     position: FIELD_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Field.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-well-specimen',
+    label:
+      'Specimen, mounted through the published seam — one card holding a well, as a companion groups its own content: the card’s heading Moonlit tonic, a published kicker, and beneath it a well on the --fab-bg-1 fill inside a 1px edge at radius 9 and 12px of padding, headed by its label Chosen reagents in the 8.5px upper-case kicker type, 8px above its content. Below the label, in the well’s normal flow, the companion’s one element lays out the line Moonpetal, silverleaf and ember salt and, 8px beneath it, a positive Ready chip. The frame draws inside the manager window and is the evidence for it alone; the well’s fill inside a Fabricate modal and its refusal outside a Fabricate window are the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own content in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-well' },
+    steps: [],
+    // The well the fixture's effect mounted in the card, named by its label, holding the chip
+    // mounted in the companion's element.
+    expectSelector: `${WELL_GROUND} .fabricate-card .fab-well[role="group"][aria-label="Chosen reagents"] [data-lab-well-content] .manager-chip`,
+    expectContained: [
+      { container: `${WELL_GROUND} .fabricate-card`, target: WELL },
+      { container: WELL_GROUND, target: `${WELL_GROUND} .fabricate-card` },
+      { container: '.window-content', target: WELL_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The well's box in normal flow, its kicker and the space below it, the private wrapper and
+        // slot element that take no box, and the companion's own column that spaces its content.
+        {
+          selector: WELL,
+          styles:
+            'display: block; padding: 12px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-radius: 9px; background-color: var(--fab-bg-1)',
+        },
+        { selector: `${WELL} > .fab-well-label`, styles: 'margin-bottom: 8px' },
+        { selector: `${WELL} > .fab-well-label .fab-kicker`, styles: 'font-size: 8.5px' },
+        { selector: `${WELL} > div:not(.fab-well-label)`, styles: SLOT_BOX },
+        { selector: `${WELL} > div:not(.fab-well-label) > div`, styles: SLOT_BOX },
+        { selector: WELL_CONTENT, styles: 'display: flex; row-gap: 8px' },
+      ],
+    },
+    position: WELL_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Well.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

@@ -311,4 +311,15 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'Well',
+    path: 'src/ui/svelte/components/Well.svelte',
+    version: 1,
+    props: Object.freeze({
+      label: Object.freeze({ kind: 'data' }),
+      children: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);

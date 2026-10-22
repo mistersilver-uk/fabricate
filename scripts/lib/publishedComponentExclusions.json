@@ -65,10 +65,6 @@
       "reason": "no-consumer: source and itemLabel are function props Fabricate calls while it renders, which no shipped kind carries; a companion searches with SearchField."
     },
     {
-      "path": "src/ui/svelte/components/Well.svelte",
-      "reason": "pending:#2601: needs the content-slot gap clause of issue 2427 before it is published."
-    },
-    {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",
       "reason": "no-consumer: three data props over Chip's private clock presentation, with one Fabricate caller; publishing it later is additive."
     },

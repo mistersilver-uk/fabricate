@@ -400,6 +400,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSelect.svelte',
   'tests/view-lab/fixtures/PublishedStageBars.svelte',
   'tests/view-lab/fixtures/PublishedField.svelte',
+  'tests/view-lab/fixtures/PublishedWell.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -844,6 +845,8 @@ const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${k
 const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
 /** The one section of the field fixture. */
 const LAB_FIELD = '[data-lab-field-ground] > [data-lab-field="name"]';
+/** The published well inside the well fixture's card. */
+const LAB_WELL = '[data-lab-well-ground] .fabricate-card .fab-well';
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1294,6 +1297,20 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: `${LAB_FIELD} .fabricate-field input:focus-visible`,
       styles: 'outline-style: solid; outline-width: 1px; outline-offset: -1px',
     },
+  ],
+  // The published well (issue 2601): its box in normal flow on its fill, its kicker and the space
+  // below it, the slot's two boxless elements, and the companion's own spacing column.
+  'manager-published-well-specimen': [
+    {
+      selector: LAB_WELL,
+      styles:
+        'display: block; padding: 12px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-radius: 9px; background-color: var(--fab-bg-1)',
+    },
+    { selector: `${LAB_WELL} > .fab-well-label`, styles: 'margin-bottom: 8px' },
+    { selector: `${LAB_WELL} > .fab-well-label .fab-kicker`, styles: 'font-size: 8.5px' },
+    { selector: `${LAB_WELL} > div:not(.fab-well-label)`, styles: 'display: contents' },
+    { selector: `${LAB_WELL} > div:not(.fab-well-label) > div`, styles: 'display: contents' },
+    { selector: `${LAB_WELL} [data-lab-well-content]`, styles: 'display: flex; row-gap: 8px' },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -5928,13 +5945,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-select-layer',
       'manager-published-stage-bars-specimen',
       'manager-published-field-specimen',
+      'manager-published-well-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, and the field fixture's column. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, and the well fixture's well. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -5943,9 +5961,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Select',
   'StageBars',
   'Field',
+  'Well',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars and Field and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field and Well and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -6504,6 +6523,66 @@ test('the field specimen case types into the input the field fixture draws in a 
   assert.ok(
     expectSelector.includes('[data-lab-value="Moonlit tonic"]'),
     'the frame is taken only once the companion recorded the edit'
+  );
+});
+
+test('the well specimen case measures the well the well fixture mounts through the seam inside a card', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedWell.svelte');
+  const mounted = (name) =>
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === name
+    );
+  for (const name of ['InspectorCard', 'Kicker', 'Well', 'Chip']) {
+    assert.ok(mounted(name), `the fixture mounts ${name}`);
+  }
+  assert.ok(
+    holds(fragment, (node) => node.type === 'Attribute' && node.name === 'data-lab-well-ground'),
+    'the fixture writes the ground hook the case names'
+  );
+  assert.ok(
+    holds(instance, (node) => node.type === 'Literal' && node.value === 'Chosen reagents'),
+    'the fixture labels the well as the case names it'
+  );
+  const hooked = new Set();
+  holds(instance, (node) => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee?.property?.name === 'setAttribute' &&
+      node.arguments[0]?.value === 'data-lab-well-content'
+    ) {
+      hooked.add(node.callee.object?.name);
+    }
+    return false;
+  });
+  assert.equal(hooked.size, 1, 'one element carries the content hook');
+  const [content] = hooked;
+  for (const [property, value] of [
+    ['display', 'flex'],
+    ['gap', '8px'],
+  ]) {
+    assert.ok(
+      holds(
+        instance,
+        (node) =>
+          node.type === 'AssignmentExpression' &&
+          node.left?.object?.object?.name === content &&
+          node.left.object.property?.name === 'style' &&
+          node.left.property?.name === property &&
+          node.right?.value === value
+      ),
+      `the hooked element ${content} states ${property}: ${value}, which the case reads`
+    );
+  }
+  const { steps, expectSelector, expectLayout } = getCaseById('manager-published-well-specimen');
+  assert.deepEqual(steps, [], 'a frame at rest');
+  assert.ok(expectSelector.includes('[aria-label="Chosen reagents"]'), 'named by its label');
+  assert.ok(
+    expectLayout.controls.some(({ selector }) => selector.endsWith('[data-lab-well-content]')),
+    'the companion element the fixture draws is measured'
   );
 });
 

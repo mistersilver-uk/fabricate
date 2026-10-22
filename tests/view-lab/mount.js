@@ -774,6 +774,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
   // Issue 2601: a field whose content slot holds a companion's caption, input and hint, by the same seam.
   'published-field': () => import('./fixtures/PublishedField.svelte'),
+  // Issue 2601: a well in a card, its content slot holding one element of a companion's, by the same seam.
+  'published-well': () => import('./fixtures/PublishedWell.svelte'),
 });
 // view-lab-region:end
 

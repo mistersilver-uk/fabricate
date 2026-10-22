@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field` and `Well`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2054,6 +2054,7 @@ The published components, in publication order:
 | `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
+| `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2242,7 +2243,7 @@ For a tooltip pass `data-tooltip-text`, not `data-tooltip`, which Foundry locali
 Its fill is `--fab-bg-2` and it states no ink or type, so your content is on that ground and inherits from `target`: a `Kicker` and a `Rail` label clear 4.5:1 there, and a `neutral` `Chip` does not.
 It needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager, the player window and a Fabricate dialog.
 It is an unnamed `<section>` with no role and takes no heading of its own; head its content yourself, for example with a `Kicker`, as `h3` where it heads the whole card.
-Never nest a card in a card: the design system has two container levels, and the second, the well, is not yet published.
+Never nest a card in a card: the design system has two container levels, and the second is the published [`Well`](#well), which you mount in the card's content slot.
 The card's padding, gap, corner and border figures are private, and so is how Fabricate redraws a card inside its own Checks rail and inspectors.
 The card never moves its content slot while it is requested.
 Rest `data-*` is for your own hooks.
@@ -2884,6 +2885,60 @@ fabUi.mount('Kicker', {
 // `field.destroy()` also destroys the kicker mounted in its content slot.
 ```
 
+### Well
+
+`Well` draws the design system's well, the container level below a card, for a group of related content inside a card's content slot.
+It draws no control and no text of its own but its label.
+`label` is optional final display text, drawn as the well's kicker in upper case above your content.
+With it the well is a `group` named by it, so a screen reader may read the label twice, as the group's name and as the kicker's text; without it, an unnamed `<div>` with no role.
+Pass sentence case.
+`children` is a content slot whose element is a `<div>`; the well draws the content slot's children in normal flow below its kicker, with no gap of its own, inside its own padding, so add no padding.
+Fill the slot with one element of your own that lays out and spaces your content, as [Mounting, updating and destroying](#mounting-updating-and-destroying) states.
+Children you append to the slot directly, not inside that one element, lay out in ordinary block and inline flow: inline ones share a line and block ones keep their own margins.
+The label is drawn by a `Kicker` as `p`, so [Kicker](#kicker)'s type and grounds apply; it is not a heading.
+Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate dialog.
+A Fabricate dialog is the dialog Fabricate draws itself in its own window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
+It states no ink or type, so your content inherits the Fabricate window's ink from `target`, and a `Kicker` clears 4.5:1 on either fill.
+Never nest a well in a well: the design system has two container levels, the card and the well.
+Fabricate does not refuse a well nested in a well; this section only says not to.
+Rest `data-*` attributes land on the well's root.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+`Well` needs a Fabricate window ancestor, so its root is `fabricate`, and it draws the same in every Fabricate window but for its fill inside a Fabricate dialog.
+The well never moves its content slot while it is requested, and an `update` that adds or drops `label` keeps the slot in place.
+Fabricate draws nothing focusable in the well: an `update` keeps the well and its content slot, so focus stays on a control you drew there; `destroy` removes them, so where that control holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt are private.
+A `class` is refused because a rest key must be a `data-*` attribute.
+
+A worked well follows: a labelled group of the reagents you hold for a batch, in a card mounted inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['InspectorCard', 'Well'])` has resolved and `fabricate.ready` has fired.
+// `target` sits inside a Fabricate window, as both roots require.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('Well')) return;
+
+const card = fabUi.mount('InspectorCard', { target, props: { children: true } });
+const wellTarget = document.createElement('div');
+card.slot('children').append(wellTarget); // The well's place, inside the card.
+const well = fabUi.mount('Well', {
+  target: wellTarget,
+  props: { label: 'Chosen reagents', children: true },
+});
+// One element of your own lays out and spaces what the well holds.
+const content = document.createElement('div');
+content.style.display = 'flex';
+content.style.flexDirection = 'column';
+content.style.gap = '8px';
+for (const reagent of acmeBatch.reagents) {
+  const line = document.createElement('p');
+  line.style.margin = '0'; // Foundry's own paragraph margin would add to the gap.
+  line.textContent = reagent.name;
+  content.append(line);
+}
+well.slot('children').append(content);
+// `card.destroy()` also destroys the well mounted in its content slot.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -2989,6 +3044,7 @@ Fill a content slot by mounting a component of your own into its element, or by 
 In a `<span>` content slot what you append is phrasing content, a `<span>` for a mount target.
 Style and attribute your own elements and never the slot element: a class, role, `tabindex` or ARIA attribute on it is unsupported.
 A child of a content slot that draws nothing still takes the host's gap.
+A host spaces a content slot's children by `gap`, except where its section states it draws them in normal flow, as [`Well`](#well) does; you then fill that slot with one element of your own that lays out its content.
 Focusable content you draw in a content slot is yours to mark `data-keyboard-focus="true"`.
 A `<button>` you draw there states `type="button"`: an untyped button submits the `<form>` it is in, and in Foundry that closes a DialogV2 and saves a document sheet.
 Put `data-action` on nothing you draw there: the window dispatches a click on any `data-action` inside it, `close`, `tab` and `toggleControls` in every window and each button's name in a DialogV2.
@@ -3057,7 +3113,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars` and `Field` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field` and `Well` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
