@@ -6,20 +6,20 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `loading` | boolean | `false` | Masks `error` and the body. |
-  | `loadingLabel` | string | `''` | Already localized, and required while `loading`: the status line names the region. |
+  | `loadingLabel` | string | `''` | Already localized, and required while `loading`: the status line states what is loading. |
   | `skeletonRows` | 1 to 6 | `3` | Any other value draws 3. |
   | `density` | `'default'` \| `'dense'` | `'default'` | The selectable ListRow density the rows preview; any other value reads `'default'`. |
   | `error` | string | `''` | The already-localized notice title; `''` is no error. |
   | `errorDetail` | string | `''` | Plain text beneath the title, rendered escaped. |
-  | `loadingProps` / `errorProps` | `{ 'data-*': value }` | `{}` | Hooks on the loading region and the notice; a key not starting `data-` is dropped, and `true` writes `""`. |
+  | `loadingProps` / `errorProps` | `{ 'data-*': value }` | `{}` | Hooks on the loading region and the notice; a key not starting `data-`, or an error key starting `data-notice-`, is dropped, and `true` writes `""`. |
 
   Snippets:
   - `children` — the ready body, rendered with no element around it.
 
   Invariants:
   - No `class` and no rest spread, because the component has no single root.
-  - Loading is an `aria-busy` region holding a `role="status"` line over `aria-hidden` static rows
-    with nothing focusable; the error is a non-blocking danger `Notice` — pinned by
+  - Loading is a region carrying only `aria-busy`, holding a `role="status"` line over `aria-hidden`
+    static rows with nothing focusable; the error is a non-blocking danger `Notice` — pinned by
     `tests/components/list-state-mounted.test.js`.
   - A skeleton row stands the selectable ListRow's border-box height at its density — pinned by
     `tests/components/list-state-rendered.test.js`.
@@ -39,11 +39,12 @@
     children = null,
   } = $props();
 
-  /** The `data-*` entries of `props`: `true` writes an empty value, and `false` or nullish none. */
-  const hooksOf = (props) =>
+  /** `props`' `data-*` entries not under `reserved`: `true` writes `""`, false or null none. */
+  const hooksOf = (props, reserved = null) =>
     Object.fromEntries(
       Object.entries(props ?? {})
-        .filter(([key, value]) => key.startsWith('data-') && value != null && value !== false)
+        .filter(([key]) => key.startsWith('data-') && !(reserved && key.startsWith(reserved)))
+        .filter(([, value]) => value != null && value !== false)
         .map(([key, value]) => [key, value === true ? '' : value])
     );
 
@@ -53,7 +54,7 @@
   const rows = $derived(Array.from({ length: rowCount }, (_, index) => index));
   const dense = $derived(density === 'dense');
   const loadingHooks = $derived(hooksOf(loadingProps));
-  const errorHooks = $derived(hooksOf(errorProps));
+  const errorHooks = $derived(hooksOf(errorProps, 'data-notice-'));
 </script>
 
 {#if loading}

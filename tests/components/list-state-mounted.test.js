@@ -37,7 +37,7 @@ describe('ListState (issue 2548)', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  it('(a) draws loading as an aria-busy region whose status line names it, over three rows', async () => {
+  it('(a) draws loading as an aria-busy region holding a status line over three rows', async () => {
     const target = await harness.mount({ loading: true, loadingLabel: LABEL, children: body() });
     const region = regionOf(target);
     assert.ok(Boolean(region), 'the loading region renders');
@@ -141,12 +141,20 @@ describe('ListState (issue 2548)', () => {
 
     const failed = await harness.mount({
       error: TITLE,
-      errorProps: { role: 'alert', 'aria-live': 'assertive', class: 'x', tone: 'info' },
+      errorProps: {
+        role: 'alert',
+        'aria-live': 'assertive',
+        class: 'x',
+        tone: 'info',
+        'data-notice-tone': 'info',
+        'data-notice-probe': 'x',
+      },
     });
     const notice = failed.querySelector('.fab-notice');
     assert.equal(notice.getAttribute('role'), 'status', 'the notice stays non-blocking');
     assert.equal(notice.getAttribute('aria-live'), 'polite');
-    assert.equal(notice.getAttribute('data-notice-tone'), 'danger', 'and danger');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'danger', 'its own tone hook');
+    assert.ok(!notice.hasAttribute('data-notice-probe'), 'no data-notice-* key reaches the notice');
     assert.ok(!notice.hasAttribute('tone') && !notice.classList.contains('x'));
   });
 
@@ -184,5 +192,26 @@ describe('ListState (issue 2548)', () => {
       }
       harness.remount();
     }
+  });
+
+  it('(k) moves between loading, error and ready within one mount', async () => {
+    const readyWithNoForm = (target, when) => {
+      assert.ok(Boolean(target.querySelector('.probe-body')), `${when}: the body renders`);
+      assert.ok(!regionOf(target), `${when}: no loading region`);
+      assert.ok(!target.querySelector('[aria-busy]'), `${when}: no region is busy`);
+      assert.ok(!target.querySelector('.fab-notice'), `${when}: no notice`);
+    };
+    const target = await harness.mount({ loading: true, loadingLabel: LABEL, children: body() });
+    assert.ok(Boolean(regionOf(target)), 'it mounts loading');
+    readyWithNoForm(await harness.setProps({ loading: false }), 'loading cleared');
+
+    await harness.setProps({ error: TITLE, errorDetail: DETAIL });
+    assert.ok(Boolean(target.querySelector('.fab-notice')), 'an error replaces the body');
+    assert.ok(!target.querySelector('.probe-body'), 'and the body leaves');
+    readyWithNoForm(await harness.setProps({ error: '' }), 'error cleared');
+
+    await harness.setProps({ loading: true });
+    assert.equal(regionOf(target)?.getAttribute('aria-busy'), 'true', 'ready returns to loading');
+    assert.ok(!target.querySelector('.probe-body'), 'and the body leaves again');
   });
 });
