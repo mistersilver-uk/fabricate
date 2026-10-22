@@ -398,7 +398,9 @@ It judges the name with M1, M2, M3 and M19, then M21, then each item in order wi
 A hole in `items`, or an item that is not an object, reads as no options, as `mount` reads them, so it is M4.
 A target that two items name is M5.
 That judgement is pure: it ends no stale claim, and a stale claim is ended only as its own item renders.
-A target inside a content slot of another item of the same call cannot be judged before that item renders, so a companion mounts it in a later call.
+So a target that a stale mount has not left empty is M6 for `mountMany`, where `mount` would end that mount and pass; a companion destroys the stale handle or empties the target first.
+A target you mean to place in another item's content slot is not inside it yet, so an entry that needs a Fabricate ancestor refuses it; mount the outer items first and the nested ones in a later call.
+When an earlier item's render ends a stale mount whose detached slot holds a later item's target, the later item still renders where sequential `mount` calls would refuse M16; a companion mounts nested targets in a later call.
 Once every item is judged, a render fault is that item's own: its handle is inert, only its `onFault` is called, and the other mounts stay live.
 Destroying one handle leaves the others live, and there is no call that destroys them all.
 A companion detects it with `typeof ui.mountMany === 'function'`.
@@ -1110,7 +1112,7 @@ A dropped `aria-label` is release-noted.
 - **`mount` is synchronous, renders on Fabricate's own Svelte runtime, and returns with the DOM in place.**
 Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and the seam calls `flushSync` only as the value resync: before an `on<Key>Change` delivery and once after it when the delivery changed the value, inside the user's event, never inside an effect or flush, and not once the mount has ended.
 - `mount` and `mountMany` throw only the fixed validation errors below, each message prefixed with `Fabricate | published components:` and a space, and each a `TypeError` except M1, which is an `Error`.
-- `mountMany` throws M1 to M20 where `mount` throws them for the same name and an item, and M21 where its `items` is not an array.
+- `mountMany` throws M1 to M20 where `mount` throws them for the same name and an item, except that a target a stale mount has not left empty is M6, and M21 where its `items` is not an array.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 | | Condition | Message tail |
@@ -1140,6 +1142,7 @@ Effects and the scoped stylesheet apply on Fabricate's next microtask flush, and
 
 - **A target holds a mount only while its handle is live and the target still contains the mount's root.**
 Otherwise `mount` destroys the stale entry first, then checks that the target is empty.
+`mountMany` checks that the target is empty before it destroys anything, and destroys a stale entry only as that item renders.
 - Props are copied at call time and snapshotted with Fabricate's `$state.snapshot`, so a companion's reactive proxies never enter Fabricate's reactive graph.
 
 ### Updating and destroying

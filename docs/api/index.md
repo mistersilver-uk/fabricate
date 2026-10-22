@@ -3044,11 +3044,13 @@ for (const handle of handles) handle.destroy(); // Each handle is destroyed on i
 It checks the whole call before it draws anything, so a refused call draws nothing and you correct it and call again.
 It checks the name first, as `mount` does, so it throws `not registered`, `mount before ready`, `"<name>" is not published`, or, for a lazy component before `load` has resolved for it, `"<name>" is not loaded`.
 It then throws `items must be an array` for anything that is not an array, a single item included: it never reads one item as a list of one.
-It then checks each item in order exactly as `mount` checks its options, and throws the first message `mount` would have thrown for that item.
+It then checks each item in order exactly as `mount` checks its options, apart from the stale-mount case below, and throws the first message `mount` would have thrown for that item.
 An item that is not an object, or a hole in the array, has no `target`, so it throws `target must be an element`.
 Two items that name the same `target` throw `target already holds a published component`.
 The check ends no earlier mount: a mount whose content you cleared without destroying it is ended only when its target's item is drawn.
-A target inside a content slot of another item of the same call cannot be checked before that item is drawn, so mount the outer items first and the nested ones in a later call.
+A target that still holds anything, a node such a mount left included, throws `target must be empty`, where `mount` would end that mount first; destroy its handle or empty the target before you call.
+A target you mean to place in another item's content slot is not inside it yet, so a component that needs a Fabricate ancestor refuses it; mount the outer items first and the nested ones in a later call.
+When an earlier item's draw ends a stale mount whose detached slot holds a later item's target, the later item is still drawn where sequential `mount` calls would refuse it; mount nested targets in a later call.
 Once the call has been checked, a fault while one item renders is that item's own: its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
 There is no call that destroys them all: destroying one handle leaves the others live, so destroy each handle on every path that ends its mount.
 
