@@ -120,11 +120,14 @@ function mountStrip(overrides = {}, onSelect = undefined) {
   };
 }
 
-const press = (node, key) => {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+const press = (node, key, held = {}) => {
+  const event = new KeyboardEvent('keydown', { key, ...held, bubbles: true, cancelable: true });
   node.dispatchEvent(event);
   return event;
 };
+
+/** The docs' focus return: the strip's one tab stop. */
+const FOCUS_RETURN = '[role="tab"][tabindex="0"]';
 
 const attributeOf = (nodes, name) => nodes.map((node) => node.getAttribute(name));
 const authoredClasses = (node) => [...node.classList].filter((name) => !name.startsWith('svelte-'));
@@ -233,10 +236,8 @@ describe('the published EditorTabs', () => {
 
   it('runs the docs section’s worked strip as written', async () => {
     const docs = readFileSync(resolve(repoRoot, 'docs/api/index.md'), 'utf8');
-    const section = docs.slice(
-      docs.indexOf('\n### EditorTabs\n'),
-      docs.indexOf('\n### The descriptor\n')
-    );
+    const start = docs.indexOf('\n### EditorTabs\n');
+    const section = docs.slice(start, docs.indexOf('\n### ', start + 1));
     const code = /```javascript\n([\s\S]*?)```/u.exec(section)?.[1];
     assert.ok(code, 'the section carries one worked example');
     const target = fabricateTarget(targets);
@@ -371,6 +372,22 @@ describe('the keyboard on the published EditorTabs', () => {
   }
 });
 
+describe('the keys a modifier holds on the published EditorTabs', () => {
+  for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+    it(`leaves each of its four keys pressed with ${modifier} held to the platform`, async () => {
+      const { handle, calls, tab } = mountStrip({ activeTab: 'outputs' });
+      await settle();
+      tab('outputs').focus();
+      for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+        assert.ok(!press(tab('outputs'), key, { [modifier]: true }).defaultPrevented, key);
+      }
+      assert.ok(document.activeElement === tab('outputs'), 'no focus moved');
+      assert.deepEqual(calls, [], 'no onSelect');
+      handle.destroy();
+    });
+  }
+});
+
 describe('a selection on the published EditorTabs', () => {
   it('calls onSelect once with the pressed tab’s id, and again for the tab already selected, and focuses the pressed tab', async () => {
     const { handle, calls, tab } = mountStrip();
@@ -401,7 +418,15 @@ describe('a selection on the published EditorTabs', () => {
     assert.ok(document.activeElement === reached, 'focus stays on it');
     assert.deepEqual(attributeOf(tabs(), 'aria-selected'), ['false', 'true', 'false']);
     assert.deepEqual(attributeOf(tabs(), 'tabindex'), ['-1', '0', '-1']);
-    assert.ok(target.querySelector('[aria-selected="true"]') === reached, 'the focus return');
+    assert.ok(target.querySelector(FOCUS_RETURN) === reached, 'the focus return');
+    handle.destroy();
+  });
+
+  it('returns focus to the first tab, the tab stop, when activeTab names none', async () => {
+    const { target, handle, tab } = mountStrip({ activeTab: 'missing' });
+    await settle();
+    assert.ok(!target.querySelector('[aria-selected="true"]'), 'no tab is selected');
+    assert.ok(target.querySelector(FOCUS_RETURN) === tab('inputs'), 'the first tab');
     handle.destroy();
   });
 

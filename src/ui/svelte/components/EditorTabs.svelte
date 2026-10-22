@@ -27,7 +27,7 @@
     name has no common stem and is read by the smoke harness, the View Lab registry and ~25 mounted
     assertions; and the button `id` and `aria-controls` stem has its PANEL ids rendered by the
     caller. No converted site changes a rendered id or class.
-  - THE CALLER RESOLVES EVERY STRING IT PASSES (`localizeTabs` in `util/localizeOr.js` does it for
+  - The caller resolves every string it passes (`localizeTabs` in `util/localizeOr.js` does it for
     a tab list); the strip localizes only the severity names it builds, through `APP_LOCALIZER`, so
     a tree mounted with none draws their English and calls no `game.i18n`.
   - THE MARK FAMILY IS CLOSED, AND WHICH MARK A STRIP DRAWS IS DECIDED BY WHAT IT MEANS.
@@ -48,8 +48,9 @@
     1 warning" on its button; the marks' DOM and the strip's pixels do not change. A tab that sets its own
     `ariaLabel`, or any mark that names itself, keeps that name.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
-    `activeTab`. The hovered described tab's description shows, else the focused one's, and Escape
-    hides it until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
+    `activeTab`. The hovered tab's description shows, else the focused tab's when none is hovered;
+    a hovered tab that carries none shows none, and Escape hides it until that tab is next hovered
+    or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
     A description stays shown while the pointer is over it, and a hover-shown one takes Escape even
     with focus outside the strip, stopping it before the window's keybindings so the host stays open;
     the strip listens on its document only while a description shows.
@@ -321,6 +322,7 @@
   }
 
   function onKeydown(event, index) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'Escape') {
       if (shownTooltipId !== null) dismissedTabId = shownTooltipId;
       return;
@@ -338,7 +340,7 @@
   bind:this={tablistNode}
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
-  aria-label={ariaLabel}
+  aria-label={ariaLabel || undefined}
   {...rest}
 >
   {#each tabs as tab, index (tab.id)}

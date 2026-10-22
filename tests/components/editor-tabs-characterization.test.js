@@ -36,7 +36,6 @@ const TABS = Object.freeze([
   {
     id: 'validation',
     icon: 'fas fa-triangle-exclamation',
-
     label: 'Validation',
   },
 ]);
