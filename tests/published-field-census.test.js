@@ -1,0 +1,209 @@
+/**
+ * The module sheet and every component style against the published `Field` (issue 2601): the
+ * selectors that name its root class, which of them a published field can match, where those sit
+ * and what they draw, and the classes its file spells on the root. Two rules draw the field itself;
+ * the rest that reach it are the chrome the sheet draws on a control the companion puts in its
+ * content slot, which the Field group states.
+ * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits, and takes
+ * on trust that no extension target sits under one of `FIELD.ancestors`.
+ */
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import {
+  classesOf,
+  compoundsOf,
+  dataHooksOf,
+  entryNamed,
+  placementFaults,
+  publishedManagerClasses,
+  shippedCensus,
+  spelledStrings,
+  staleAncestors,
+  syntheticCensus,
+} from './helpers/publishedComponentCensus.js';
+import { SHIPPED, byName, declarationsOf, isStrip } from './helpers/publishedComponentGate.js';
+
+/**
+ * The published field's root: no published key writes a class on it, and the classes under which
+ * a rule redraws a field of Fabricate's own or the control inside it.
+ */
+const FIELD = Object.freeze({
+  root: 'fabricate-field',
+  writable: new Set(),
+  ancestors: new Set([
+    'manager-checks-rail',
+    'fabricate-rule-row',
+    'manager-character-modifier-row-bounds',
+    'manager-vocabulary-form-fields',
+    'manager-recipe-steps-editor',
+    'manager-recipe-range-cell',
+    'manager-drop-editor-card',
+    'manager-character-modifier-row-card',
+    'manager-economy-regen-grid',
+    'manager-import-mapping-controls',
+    'manager-currency-strategy',
+    'manager-currency-subunit-builder',
+  ]),
+  drawsChildren: true,
+});
+
+const LIBRARY = 'styles/fabricate-manager-library.css';
+const TEXT_LIKE_EXCLUSION =
+  ":not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])";
+const INSET_RING = `${LIBRARY}: .fabricate-field :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible`;
+
+/** The two rules that draw the field itself: its column, and the caption a child `<span>` takes. */
+const FIELD_FAMILY_RULES = Object.freeze([
+  `${LIBRARY}: .fabricate-field.fabricate-field`,
+  `${LIBRARY}: .fabricate-field > span:where(:first-child)`,
+]);
+
+/** The seventeen rules that draw a text input, a textarea or a `<small>` the companion puts in the slot. */
+const FIELD_SLOT_CHROME = Object.freeze([
+  'styles/fabricate-manager-shell.css: .fabricate-field :is(input, textarea)',
+  ...['text', 'url', 'email', 'tel', 'password'].map(
+    (type) => `${LIBRARY}: .fabricate-field input[type="${type}"]`
+  ),
+  `${LIBRARY}: .fabricate-field input:not([type])`,
+  `${LIBRARY}: .fabricate-field textarea`,
+  `${LIBRARY}: .fabricate-field.fabricate-field input${TEXT_LIKE_EXCLUSION}`,
+  `${LIBRARY}: .fabricate-field.fabricate-field input${TEXT_LIKE_EXCLUSION}`,
+  `${LIBRARY}: .fabricate-field.fabricate-field textarea`,
+  `${LIBRARY}: .fabricate-field :is(input, textarea):focus`,
+  `${LIBRARY}: .fabricate-field input:focus-visible`,
+  `${LIBRARY}: .fabricate-field textarea:focus-visible`,
+  INSET_RING,
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-field.fabricate-field textarea',
+  'styles/fabricate-manager-recipe-editor.css: .fabricate-field.fabricate-field small',
+]);
+
+const writtenOf = (census) =>
+  census.map(({ written }) => written.replaceAll(/\s+/g, ' ')).sort(byName);
+const reachingOf = (census) => census.filter(({ safe }) => !safe);
+const ringOf = (rows, written) =>
+  rows.filter((row) => row.written === written).map(({ rule }) => declarationsOf(rule));
+
+describe('the module sheet and every component style against the published Field', () => {
+  // The 47: the two family rules and the seventeen slot-chrome rules; fifteen caller rules under a
+  // pinned ancestor, four of them in components; and thirteen on a class no published key writes,
+  // ten of them in components.
+  it('reaches a published field through its two family rules and seventeen slot-chrome rules, of 47 that name its root', () => {
+    const census = shippedCensus(FIELD, 'Field');
+    assert.deepEqual(
+      writtenOf(reachingOf(census)),
+      [...FIELD_FAMILY_RULES, ...FIELD_SLOT_CHROME].sort(byName)
+    );
+    assert.equal(census.length, 47, 'the census of every selector naming the root');
+    const inPartials = census.filter(({ written }) => written.startsWith('styles/')).length;
+    assert.equal(inPartials, 33, 'the partials were read');
+    assert.deepEqual(
+      staleAncestors(FIELD, census, publishedManagerClasses()),
+      [],
+      'each pinned ancestor keeps at least one selector off a published field'
+    );
+    assert.deepEqual(
+      [Object.keys(entryNamed('Field').props), entryNamed('Field').root],
+      [['as', 'children'], 'fabricate'],
+      'a published class, caption, label host or wider root reopens the census'
+    );
+  });
+
+  it('draws a published field alike under any ancestor', () => {
+    const reaching = reachingOf(shippedCensus(FIELD, 'Field'));
+    assert.deepEqual(placementFaults(reaching, FIELD, []), []);
+  });
+
+  it('draws the inset 1px ring on a text-like input in the slot, the 2px ring on any other, and strips the host focus once', () => {
+    const reaching = reachingOf(shippedCensus(FIELD, 'Field'));
+    const ring = (width, offset) => [
+      ['outline', `${width} solid var(--fab-accent)`],
+      ['outline-offset', offset],
+    ];
+    assert.deepEqual(ringOf(reaching, INSET_RING), [ring('1px', '-1px')]);
+    for (const written of [
+      `${LIBRARY}: .fabricate-field input:focus-visible`,
+      `${LIBRARY}: .fabricate-field textarea:focus-visible`,
+    ]) {
+      assert.deepEqual(ringOf(reaching, written), [ring('2px', '2px')], written);
+    }
+    const strips = reaching.filter(({ written }) => written.endsWith(':focus'));
+    assert.equal(strips.length, 1, 'one strip');
+    assert.ok(isStrip(strips[0].rule), 'it removes the host outline and glow');
+    const ringed = new Set([
+      ...strips,
+      ...reaching.filter(({ written }) => written.endsWith(':focus-visible')),
+    ]);
+    const drawsARing = ([property]) =>
+      property === 'all' || property === 'box-shadow' || property.startsWith('outline');
+    assert.deepEqual(
+      reaching
+        .filter((row) => !ringed.has(row))
+        .flatMap(({ written, rule }) =>
+          declarationsOf(rule)
+            .filter(drawsARing)
+            .map(() => written)
+        ),
+      [],
+      'no other reaching rule draws or strips a ring'
+    );
+  });
+
+  it('holds the classes the census calls writable to the classes Field.svelte spells and a sheet rule names on the root', () => {
+    const tokens = spelledStrings(entryNamed('Field').path, SHIPPED).flatMap((spelled) =>
+      spelled.split(/\s+/)
+    );
+    const onRoot = new Set(
+      shippedCensus(FIELD, 'Field').flatMap(({ complex }) =>
+        compoundsOf(complex)
+          .map((compound) => classesOf(compound))
+          .filter((classes) => classes.includes(FIELD.root))
+          .flat()
+      )
+    );
+    assert.deepEqual(
+      [...new Set(tokens)].filter((token) => onRoot.has(token)),
+      [FIELD.root, ...FIELD.writable],
+      'a class the file spells that a rule names on the root is writable'
+    );
+  });
+
+  it('reads one data-* name in a reaching rule, on the control in the slot and never on the root', () => {
+    const reaching = reachingOf(shippedCensus(FIELD, 'Field'));
+    assert.deepEqual(dataHooksOf(reaching), ['data-recipe-option-formula']);
+    const onRoot = reaching.filter(({ complex }) =>
+      compoundsOf(complex)
+        .filter((compound) => classesOf(compound).includes(FIELD.root))
+        .some((compound) => compound.selectors.some((part) => part.type === 'AttributeSelector'))
+    );
+    assert.deepEqual(onRoot, [], 'so the field reserves no rest name');
+  });
+});
+
+describe('the field census, synthetic', () => {
+  const reachingIn = (css) =>
+    writtenOf(reachingOf(syntheticCensus(FIELD, `${css} { gap: 0 }`, { spelled: new Set() })));
+
+  for (const selector of [
+    '.fabricate-manager .manager-checks-rail .fabricate-field input',
+    '.fabricate-field.fabricate-field.is-wide',
+    '.fabricate-field.span-2',
+    '.fabricate-field .manager-unspelled',
+  ]) {
+    it(`admits ${selector}, which a published field cannot take`, () => {
+      assert.deepEqual(reachingIn(selector), []);
+    });
+  }
+
+  for (const selector of [
+    '.fabricate-field',
+    '.fabricate .fabricate-field input',
+    '.fabricate-field[data-x]',
+    '.fabricate-manager .manager-unpinned-row .fabricate-field',
+    '.fabricate-field > span',
+  ]) {
+    it(`refuses ${selector}, which nothing keeps off a published field`, () => {
+      assert.deepEqual(reachingIn(selector), [`sheet.css: ${selector}`]);
+    });
+  }
+});
