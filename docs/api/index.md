@@ -3034,14 +3034,14 @@ It is for a button whose press shows and hides a region you draw, as the [`Butto
 Its glyph may follow the state: pass the other `icon` in the same `update`, as `fas fa-chevron-up` while the region is shown.
 The tooltip is `ariaLabel`, plain text that is never read as HTML.
 Fabricate writes it as `data-tooltip-text` on the button in every mount, and Foundry's own hover listener shows it after a delay while the pointer rests on the button.
-Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, read when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `ariaLabel` or passes `disabled: true`; it closes only its own tooltip, and Escape still reaches a `keydown` listener of yours above `target`.
-While either tooltip is open, the one hover shows or the one keyboard focus opens, Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader reads the name a second time as its description.
+Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `ariaLabel` or passes `disabled: true`; it closes only its own tooltip, and Escape still reaches a `keydown` listener of yours above `target`.
+While either tooltip is open, the one hover shows or the one keyboard focus opens, Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader may read the name a second time as its description.
 You cannot suppress that second reading at version 1, so keep `ariaLabel` a short verb phrase.
 Rest `data-*` is for your own hooks.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on IconButton`.
 That includes `data-tooltip-text`, so the tooltip says only what `ariaLabel` says.
-`data-locked` is refused the same way, because Foundry pins a copy of a tooltip it opens on a button carrying it, and the closes this section states never reach that copy.
+`data-locked` is refused the same way, because Foundry pins a copy of any tooltip it opens on an element carrying `data-locked`, and the closes this section states never reach that copy.
 It needs a Fabricate window ancestor, because its face and ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the button is refused there with `IconButton needs a Fabricate window ancestor`.
 Give `target` `display: flex` and align your own content to the button by centring.
@@ -3436,14 +3436,15 @@ A published component draws a control only where its section says so, and each c
   Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, names or describes nothing, and keeping it unique is yours.
   In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything you appended to `body` stays behind.
 - In Foundry 13 and 14 the tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
-  A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it, or when `IconButton` opens its own under keyboard focus, as its section states.
+  A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it, or on `IconButton`, whose own tooltip opens on its button under the pointer and keyboard focus alike, as its section states.
   Restore the prop once the tooltip has closed, which you can see when `game.tooltip.element` is no longer your control or after calling `game.tooltip.deactivate()` yourself: call `update` without the prop, `await` anything once that `update` has returned (`await Promise.resolve()` is enough), and call `update` with it again.
   Without the `await` between them Fabricate may draw the two as the second alone, which writes nothing, and a restore you make while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
   Where a component's rest lands on the control itself, `data-cursor` is refused: at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
   Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
-- A control opens no tooltip of its own at version 1, Fabricate's or Foundry's, except `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states: no prop names one, and the HTML `title` attribute is refused as a rest key.
+- A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
+  The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.
