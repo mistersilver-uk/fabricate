@@ -3391,9 +3391,6 @@
 
 /* A card packs its parts to its top, so a card a sibling stretches keeps the extra height at its foot. It is isolated so the chosen ground's `::before` paints over the bg-2 rest and under the content. */
 .fabricate-option-cards .manager-resolution-option {
-  /* ratchet-exempt(design-system): the chip is `<IconChip>`'s 30 rung, and the option body's inset is this width plus the 8px gap. */
-  --manager-resolution-option-chip: 30px;
-
   position: relative;
   isolation: isolate;
   display: grid;
@@ -3469,9 +3466,9 @@
   min-width: 0;
 }
 
-/* In a row card the option body starts at the text column: the card padding with no chip, the chip plus the gap with one. */
+/* In a row card the option body starts at the text column: the card padding with no chip, and 38px in with one, the 30px chip plus the 8px head gap (a clearance in the spec's 34-42px exemption). */
 .fabricate-option-cards:not(.is-stacked) .manager-resolution-option:has(.manager-resolution-option-icon) > .manager-resolution-option-body {
-  margin-left: calc(var(--manager-resolution-option-chip) + var(--fab-space-2));
+  margin-left: 38px;
 }
 
 /* `layout="stacked"`: the chip and the radio share the first line and the text runs beneath both, at any track count. */
@@ -3506,10 +3503,6 @@
   opacity: 0.45;
 }
 
-.fabricate-option-cards .manager-resolution-option.is-disabled input[type='radio'] {
-  cursor: not-allowed;
-}
-
 /* "Coming soon" badge inline with the option name. Theme tokens only. */
 .fabricate-option-cards .manager-resolution-option-badge {
   display: inline-block;
@@ -3540,7 +3533,7 @@
   appearance: none;
   -webkit-appearance: none;
   background: var(--fab-bg-1);
-  cursor: pointer;
+  cursor: inherit;
 }
 
 /* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
