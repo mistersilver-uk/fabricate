@@ -1,9 +1,9 @@
 /**
  * The four `EditorTabs` capabilities issue 1779 adds — the tab-stop fallback, the per-tab name
  * override, the per-tab description and the premium padlock, the last three read only under
- * `annotated` — plus click-to-focus, the sheet rules that draw the description, and the scoped
- * danger rules (spec.md "A tab strip always keeps a tab stop, and names and describes a tab from
- * its own entry").
+ * `annotated` — plus click-to-focus, Escape passing a strip that shows no description (issue
+ * 2627), the sheet rules that draw the description, and the scoped danger rules (spec.md "A tab
+ * strip always keeps a tab stop, and names and describes a tab from its own entry").
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -281,6 +281,49 @@ describe('a tab entry may carry a description', () => {
       assert.deepEqual(reached, ['Escape'], 'with nothing shown, Escape passes through');
     } finally {
       globalThis.document.removeEventListener('keydown', onPage);
+    }
+  });
+
+  it('lets Escape pass with the pointer over a tab that carries no description (issue 2627)', async () => {
+    const root = await annotated({ tabs: [DESCRIBED[0], TABS[1]], activeTab: 'overview' });
+    const reached = [];
+    const onPage = (event) => {
+      reached.push(event.key);
+    };
+    globalThis.document.addEventListener('keydown', onPage);
+    try {
+      fire(button(root, 'inputs'), 'mouseenter');
+      await settle();
+      assert.deepEqual(shown(root), [], 'an undescribed tab shows nothing');
+      press(globalThis.document.body, 'Escape');
+      assert.deepEqual(reached, ['Escape'], 'the page hears that Escape');
+    } finally {
+      globalThis.document.removeEventListener('keydown', onPage);
+    }
+  });
+
+  it('listens on its document only while a description shows (issue 2627)', async () => {
+    const { document } = globalThis;
+    const capturing = [];
+    const spy = (method, sign) =>
+      function (type, listener, options) {
+        if (type === 'keydown' && options === true) capturing.push(sign);
+        return method.call(this, type, listener, options);
+      };
+    const [add, remove] = [document.addEventListener, document.removeEventListener];
+    document.addEventListener = spy(add, '+');
+    document.removeEventListener = spy(remove, '-');
+    try {
+      const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
+      assert.deepEqual(capturing, [], 'a described strip showing nothing binds nothing');
+      fire(button(root, 'inputs'), 'mouseenter');
+      await settle();
+      assert.deepEqual(capturing, ['+'], 'a shown description binds the listener');
+      await leave(button(root, 'inputs'));
+      assert.deepEqual(capturing, ['+', '-'], 'hiding it unbinds the listener');
+    } finally {
+      document.addEventListener = add;
+      document.removeEventListener = remove;
     }
   });
 

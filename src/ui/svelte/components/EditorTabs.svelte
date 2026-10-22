@@ -48,10 +48,11 @@
     1 warning" on its button; the marks' DOM and the strip's pixels do not change. A tab that sets its own
     `ariaLabel`, or any mark that names itself, keeps that name.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
-    `activeTab`. The hovered tab's description shows, else the focused tab's, and Escape hides it
-    until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
+    `activeTab`. The hovered described tab's description shows, else the focused one's, and Escape
+    hides it until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
     A description stays shown while the pointer is over it, and a hover-shown one takes Escape even
-    with focus outside the strip, stopping it before the window's keybindings so the host stays open.
+    with focus outside the strip, stopping it before the window's keybindings so the host stays open;
+    the strip listens on its document only while a description shows.
 -->
 <script>
   import { getContext } from 'svelte';
@@ -115,7 +116,7 @@
   let dismissedTabId = $state(null);
   const shownTooltipId = $derived.by(() => {
     const candidate = hoveredTabId ?? focusedTabId;
-    return candidate === dismissedTabId ? null : candidate;
+    return candidate === dismissedTabId || !describedIds.has(candidate) ? null : candidate;
   });
 
   const VEHICLES = new Set(['count', 'issue', 'dot']);
@@ -134,8 +135,10 @@
   });
   $effect(() => () => clearTimeout(hoverClear));
 
-  // Capturing at the document runs ahead of Foundry's window-level keybindings.
+  // Capturing at the document runs ahead of Foundry's window-level keybindings; it binds while a
+  // description shows, on the document the strip is in at that moment.
   $effect(() => {
+    if (shownTooltipId === null) return undefined;
     const host = tablistNode?.ownerDocument;
     host?.addEventListener('keydown', onDocumentKeydown, true);
     return () => host?.removeEventListener('keydown', onDocumentKeydown, true);

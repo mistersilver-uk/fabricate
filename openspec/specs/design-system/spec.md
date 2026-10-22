@@ -1491,6 +1491,7 @@ The strip reads an entry's name override, description and `tierGated` only when 
 A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
 The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
 A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.
+Only a tab that carries a description shows one, and the strip listens for that Escape on its document only while a description shows, so with the pointer over a tab that carries none Escape reaches every listener above the strip.
 A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
@@ -1513,6 +1514,11 @@ Apart from that fallback, an entry naming none of these renders exactly what it 
 - **WHEN** a description is shown by hover and focus is outside the strip
 - **THEN** Escape hides it
 - **AND** the window stays open
+
+#### Scenario: Escape passes a strip that shows no description
+
+- **WHEN** the pointer rests on a tab that carries no description and focus is outside the strip
+- **THEN** Escape reaches a listener above the strip
 
 ### Requirement: An ordered row opens in place to its editing body
 
