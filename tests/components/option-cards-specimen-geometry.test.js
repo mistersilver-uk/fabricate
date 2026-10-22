@@ -165,6 +165,8 @@ const readCase = (tab, caseId) =>
           paddingLeft: Number.parseFloat(cs.paddingLeft),
           borderLeft: Number.parseFloat(cs.borderLeftWidth),
           rowGap: cs.rowGap,
+          background: cs.backgroundColor,
+          border: cs.borderTopColor,
           position: cs.position,
           isolation: cs.isolation,
           before: {
@@ -172,11 +174,13 @@ const readCase = (tab, caseId) =>
             zIndex: before.zIndex,
             pointerEvents: before.pointerEvents,
           },
+          beforeBackground: before.backgroundColor,
           chip: rect(part('[data-tool-choice-icon]')),
           chipClasses: medallion
             ? [...medallion.classList].filter((c) => !c.startsWith('svelte-'))
             : [],
           glyph: medallion && style(medallion.querySelector('i')).color,
+          glyphSize: medallion && style(medallion.querySelector('i')).fontSize,
           text: rect(part('.manager-resolution-option-text')),
           name: {
             box: rect(part('[data-tool-choice-title]')),
@@ -276,6 +280,16 @@ for (const hostId of Object.keys(HOSTS)) {
         assert.equal(resting.glyph, await tokenColour(tab, '--fab-text-secondary'));
       }));
 
+    it('paints a resting card bg-2 with the border token, and the chosen one accent-edged over the soft surface', () =>
+      inHost(hostId, async (tab) => {
+        const [chosen, resting] = (await readCase(tab, 'row')).cards;
+        assert.equal(resting.background, await tokenColour(tab, '--fab-bg-2'));
+        assert.equal(resting.border, await tokenColour(tab, '--fab-border'));
+        assert.equal(chosen.border, await tokenColour(tab, '--fab-accent-border'));
+        assert.equal(chosen.beforeBackground, await tokenColour(tab, '--fab-surface-soft'));
+        assert.equal(chosen.glyphSize, '12px', 'the chip glyph is the 12px rung');
+      }));
+
     it('layers the chosen ground on an isolated card, so it shows and never takes the pointer', () =>
       inHost(hostId, async (tab) => {
         const [chosen, resting] = (await readCase(tab, 'row')).cards;
@@ -326,6 +340,20 @@ for (const hostId of Object.keys(HOSTS)) {
         assert.equal(hovered.borderTopColor, await tokenColour(tab, '--fab-border-strong'));
       }));
 
+    it('leaves the border of a chosen or a disabled card alone on hover', () =>
+      inHost(hostId, async (tab) => {
+        for (const selector of [
+          '[data-case="row"] .manager-resolution-option.is-active',
+          '[data-case="disabled"] .manager-resolution-option.is-disabled',
+        ]) {
+          const border = () => tab.$eval(selector, (card) => getComputedStyle(card).borderTopColor);
+          const rest = await border();
+          await tab.hover(selector);
+          assert.equal(await border(), rest, `${selector} keeps its border on hover`);
+          await tab.mouse.move(0, 0);
+        }
+      }));
+
     it('keeps a focused chosen radio a 4px ring with no shadow', () =>
       inHost(hostId, async (tab) => {
         await tab.keyboard.press('Tab');
@@ -352,6 +380,27 @@ for (const hostId of Object.keys(HOSTS)) {
         const [, later] = (await readCase(tab, 'disabled')).cards;
         assert.deepEqual([...later.opacity, later.radio.opacity], ['0.45', '0.45', '0.45', '0.45']);
         assert.equal(later.own, '1');
+      }));
+
+    it('reflows to one track at 620px of host and not at 621px', () =>
+      inHost(hostId, async (tab) => {
+        const tracksAt = async (width) => {
+          await tab.$eval(
+            HOSTS[hostId].container,
+            (node, content) => {
+              // The query measures the content box, so a padded host is widened by its padding.
+              const cs = getComputedStyle(node);
+              const gutter = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+                .map((key) => Number.parseFloat(cs[key]))
+                .reduce((sum, value) => sum + value, 0);
+              node.style.width = `${content + (cs.boxSizing === 'border-box' ? gutter : 0)}px`;
+            },
+            width
+          );
+          return (await readCase(tab, 'row')).tracks;
+        };
+        assert.equal(await tracksAt(621), 2, '621px keeps the two tracks');
+        assert.equal(await tracksAt(620), 1, '620px falls to one');
       }));
 
     it('falls to one track below 620px of host, keeping each layout', () =>
