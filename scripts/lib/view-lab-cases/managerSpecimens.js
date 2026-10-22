@@ -1114,7 +1114,8 @@ export const CASES = Object.freeze([
         },
         {
           selector: TABLIST,
-          styles: 'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
+          styles:
+            'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
         },
       ],
     },
