@@ -2673,8 +2673,9 @@ test('the list-state frames reach their state through the readiness gate and the
     assert.equal(capture.reaches, 'beyond', `${id} claims the smoke reaches it`);
     assert.deepEqual(capture.smokeLabels, [], `${id} names a smoke label`);
     assert.equal(capture.themeVariants, undefined, `${id} declares theme variants`);
-    assert.ok(
-      mountSource.includes(`${param}: params.get('${param}') === '1'`),
+    assert.match(
+      mountSource,
+      new RegExp(String.raw`${param}: params\.get\('${param}'\) === '1'`),
       `mount.js does not read ${param}`
     );
   }

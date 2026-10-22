@@ -445,6 +445,7 @@ export function registerSystemsCases() {
       region.querySelector('[role="status"]')?.textContent,
       'Loading crafting systems...'
     );
+    assert.ok(region.querySelectorAll('.fabricate-list-state-row').length > 0, 'rows draw');
     assert.equal(region.querySelectorAll('.fabricate-list-state-row.is-dense').length, 0);
     assert.equal(target.querySelectorAll(':scope .manager-table-scroll .manager-empty').length, 0);
     assert.equal(target.textContent.includes('0 of 0'), false);
