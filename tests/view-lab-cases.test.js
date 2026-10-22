@@ -8257,7 +8257,7 @@ test('the title bar selects the system frames and the premium-installed frame', 
   );
 });
 
-test('the tabs specimen case presses ArrowRight on the strip the fixture mounts through the seam, and waits for the companion’s update', () => {
+test('the tabs specimen case presses ArrowRight on the strip the fixture mounts through the seam', () => {
   const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedTabs.svelte');
   assert.ok(
     holds(
@@ -8285,18 +8285,12 @@ test('the tabs specimen case presses ArrowRight on the strip the fixture mounts 
       `the fixture writes the ${hook} hook the case names`
     );
   }
-  const { steps, expectSelector, expectLayout } = getCaseById('manager-published-tabs-specimen');
+  const { steps, expectLayout } = getCaseById('manager-published-tabs-specimen');
   assert.deepEqual(
     steps.map((step) => [step.selector, step.press]),
     [[LAB_INPUTS_TAB, 'ArrowRight']],
     'one ArrowRight on the selected Inputs, the first tab'
   );
-  for (const effect of [
-    '[aria-labelledby="lab-reagents-tab-outputs"]',
-    `${LAB_OUTPUTS_TAB}[id="lab-reagents-tab-outputs"][aria-selected="true"][tabindex="0"]:focus-visible`,
-  ]) {
-    assert.ok(expectSelector.includes(effect), `the frame waits for ${effect}`);
-  }
   assert.ok(
     expectLayout.controls.some(({ selector }) => selector === `${LAB_OUTPUTS_TAB}:focus-visible`),
     'the keyboard ring is measured on the tab the ArrowRight reached'

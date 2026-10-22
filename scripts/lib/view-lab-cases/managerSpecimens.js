@@ -1091,7 +1091,7 @@ export const CASES = Object.freeze([
     steps: [{ selector: INPUTS_TAB, press: 'ArrowRight' }],
     // The reached tab selected by the companion's own update, its panel shown, and keyboard focus
     // on it, which only the ArrowRight and the update it led to produce.
-    expectSelector: `${TABS_GROUND}:has(> [data-lab-tabs-panel][aria-labelledby="lab-reagents-tab-outputs"]) ${OUTPUTS_TAB}[id="lab-reagents-tab-outputs"][aria-selected="true"][tabindex="0"]:focus-visible`,
+    expectSelector: `${TABS_GROUND}:has(> [data-lab-tabs-panel][aria-labelledby="lab-reagents-tab-outputs"])${OUTPUTS_TAB.slice(TABS_GROUND.length)}[id="lab-reagents-tab-outputs"][aria-selected="true"][tabindex="0"]:focus-visible`,
     expectCenterHit: OUTPUTS_TAB,
     expectContained: [
       { container: TABS_GROUND, target: TABS_TARGET },
