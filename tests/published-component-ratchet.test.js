@@ -4,15 +4,22 @@
  * reason, a listed path is not stale, and the list only shrinks against the merge base, except for
  * a path that failed a static rule there. The per-item spreads a published closure draws are held
  * against `STRIPPED_ITEM_MEMBERS` both ways.
- * Limit: a PR that makes a listed component fail a static rule drops it from the list unreviewed.
+ * Limit: a PR that makes a listed component fail a static rule, or stops it being a candidate,
+ * drops it from the list unreviewed.
  */
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 import { STRIPPED_ITEM_MEMBERS } from '../src/ui/publishedComponentProps.js';
 
 import { MANIFEST_PATH } from './helpers/designSystemRatchet.js';
-import { REPO_ROOT, compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
+import {
+  REPO_ROOT,
+  compareToBase,
+  readHeadFile,
+  reportComparison,
+} from './helpers/mergeBaseRatchet.js';
 import { syntheticReader } from './helpers/publishedComponentGate.js';
 import {
   EXCLUSIONS_PATH,
@@ -45,13 +52,14 @@ const GUIDANCE =
 /**
  * A measure of the exclusion list's rows on each side of the comparison: the base's own, and the
  * head's less a row for a path that failed a static rule at the base (a new row for it is allowed).
- * With no list at the base nothing is compared, which seeds the list.
+ * With no list at the base nothing is compared, which seeds the list. Called base first, then head.
  */
 function exclusionMeasure() {
   const sides = [];
-  return (textOf) => {
-    const context = contextOf(textOf);
+  return (readFile) => {
+    const context = contextOf(readFile);
     sides.push(context);
+    if (sides.length > 2) throw new Error('exclusionMeasure measures one base and one head');
     const [base] = sides;
     if (sides.length === 2 && base.exclusions === null) return [];
     const baseListed = new Set((base.exclusions ?? []).map((row) => row.path));
@@ -77,7 +85,8 @@ function runRatchet({ cwd = REPO_ROOT, base } = {}) {
     base,
   });
   const head = contextAt(cwd);
-  return { result, head, failures: exclusionFailures(head) };
+  const report = ratchetReport(head);
+  return { result, head, report, failures: exclusionFailures(head, report) };
 }
 
 describe('the publishable subset', () => {
@@ -89,7 +98,7 @@ describe('the publishable subset', () => {
   });
 
   it('prints the report, and holds its invariants rather than its totals', (t) => {
-    const report = ratchetReport(ratchet().head);
+    const { report } = ratchet();
     const { staticFailures, ...counted } = report;
     t.diagnostic(
       JSON.stringify({
@@ -110,12 +119,16 @@ describe('the publishable subset', () => {
       [],
       'every listed and published path is a candidate'
     );
-    const failing = new Set(Object.keys(staticFailures));
-    assert.ok(report.publishable.every((path) => !failing.has(path)));
   });
 
   it('only shrinks against the merge base', (t) => {
-    reportComparison(t, ratchet().result, GUIDANCE);
+    reportComparison(t, ratchet().result, GUIDANCE, { markers: false });
+  });
+
+  it('keeps the exclusion list to decisions only: no totals', () => {
+    const list = JSON.parse(readHeadFile(REPO_ROOT, EXCLUSIONS_PATH));
+    assert.deepEqual(Object.keys(list), ['exclusions']);
+    for (const row of list.exclusions) assert.deepEqual(Object.keys(row), ['path', 'reason']);
   });
 
   it('holds STRIPPED_ITEM_MEMBERS against the per-item spreads the published closures draw', () => {
@@ -201,7 +214,7 @@ describe('the ratchet against a base commit', () => {
     assert.deepEqual(outcome.failures, []);
   });
 
-  it('fails a list deleted after the base held it', () => {
+  it('fails a list that is missing at the head', () => {
     const repoState = repoWith({ [EXCLUSIONS_PATH]: LIST(['Alpha']), ...files() }, {});
     repoState.repo.git('rm', '-q', EXCLUSIONS_PATH);
     const outcome = ratchetOf(repoState);
@@ -213,6 +226,30 @@ describe('the ratchet against a base commit', () => {
       repoWith({ [EXCLUSIONS_PATH]: LIST(), ...files() }, { [EXCLUSIONS_PATH]: LIST(['Alpha']) })
     );
     assert.deepEqual(outcome.result.failures, [`${EXCLUSIONS_PATH}: ${path('Alpha')} is new (1)`]);
+  });
+
+  it('fails a path added to the list that was publishable at the base though no candidate there', () => {
+    const outcome = ratchetOf(
+      repoWith(
+        { [MANIFEST_PATH]: ROWS(), [EXCLUSIONS_PATH]: LIST(), ...files() },
+        { [MANIFEST_PATH]: ROWS('Alpha'), [EXCLUSIONS_PATH]: LIST(['Alpha']) }
+      )
+    );
+    assert.deepEqual(outcome.result.failures, [`${EXCLUSIONS_PATH}: ${path('Alpha')} is new (1)`]);
+  });
+
+  it('reports a regression without offering a ratchet-exempt marker', () => {
+    const { result } = ratchetOf(
+      repoWith({ [EXCLUSIONS_PATH]: LIST(), ...files() }, { [EXCLUSIONS_PATH]: LIST(['Alpha']) })
+    );
+    assert.throws(
+      () => reportComparison({}, result, GUIDANCE, { markers: false }),
+      (error) => error.message.includes('is new (1)') && !/ratchet-exempt\(/.test(error.message)
+    );
+    assert.throws(
+      () => reportComparison({}, result, GUIDANCE),
+      /ratchet-exempt\(published-component\)/
+    );
   });
 
   it('allows a path to be added that did not pass the static rules at the base', () => {
@@ -255,7 +292,8 @@ describe('the ratchet against a base commit', () => {
         },
       },
       outcome.result,
-      GUIDANCE
+      GUIDANCE,
+      { markers: false }
     );
     assert.equal(notes.length, 1);
     assert.match(notes[0], new RegExp(`^shrank: .*${path('Beta')}`));
@@ -371,6 +409,7 @@ describe('the static rules of a publishable component', () => {
 
   it('holds the shipped closures to the rules they publish under', () => {
     const { manifest, reader } = contextAt(REPO_ROOT);
+    assert.deepEqual(manifest, JSON.parse(JSON.stringify(PUBLISHED_COMPONENT_MANIFEST)));
     for (const entry of manifest) {
       assert.deepEqual(publishableFaults(entry.path, { manifest, reader }), [], entry.name);
     }
@@ -413,10 +452,115 @@ describe('the per-item spreads of a published closure', () => {
     );
   });
 
+  it('ignores a spread of a script-level local', () => {
+    assert.deepEqual(
+      idsOf(
+        `${PROPS} const attrs = $derived({ a: 1 }); const { b, ...others } = $derived(rest);`,
+        '<div {...rest}></div><u {...attrs}></u><s {...others}></s><i {...b.x}></i>'
+      ),
+      []
+    );
+  });
+
   it('cannot name a spread off an item of a collection the entry does not publish', () => {
     assert.deepEqual(idsOf(PROPS, '{#each [1, 2] as item}<span {...item.props}></span>{/each}'), [
       'src/Fx.svelte: a spread of an item the entry does not publish',
     ]);
+  });
+
+  describe('fails closed on a spread of', () => {
+    const UNNAMED = 'src/Fx.svelte: a spread of an item the entry does not publish';
+    const WHOLE = 'src/Fx.svelte: a spread of a whole item of Fx.items';
+    const cases = {
+      'a whole item': ['{#each items as item}<i {...item}></i>{/each}', [WHOLE]],
+      'a published data local': ['<i {...items}></i>', [WHOLE]],
+      'a destructured each context': [
+        '{#each items as { props }}<i {...props}></i>{/each}',
+        ['Fx.items.props'],
+      ],
+      'a nested destructured member': [
+        '{#each items as { props: { extra } }}<i {...extra}></i>{/each}',
+        ['Fx.items.props.extra'],
+      ],
+      'an @const alias': [
+        '{#each items as item}{@const p = item.props}<i {...p}></i>{/each}',
+        ['Fx.items.props'],
+      ],
+      'a nullish fallback': [
+        '{#each items as item}<i {...(item.props ?? {})}></i>{/each}',
+        [UNNAMED],
+      ],
+      'a call': ['{#each items as item}<i {...pick(item)}></i>{/each}', [UNNAMED]],
+      'an each over a script-level derived': [
+        '{#each mapped as m}<i {...m.attrs}></i>{/each}',
+        [UNNAMED],
+      ],
+      'a snippet parameter rendered with an item': [
+        '{#snippet row(o)}<i {...o.props}></i>{/snippet}{#each items as item}{@render row(item)}{/each}',
+        ['Fx.items.props'],
+      ],
+      'a snippet parameter rendered with an optional call': [
+        '{#snippet row(o)}<i {...o.props}></i>{/snippet}{#each items as item}{@render row?.(item)}{/each}',
+        ['Fx.items.props'],
+      ],
+    };
+    for (const [shape, [body, expected]] of Object.entries(cases)) {
+      it(shape, () => {
+        const script = `${PROPS} const mapped = $derived(items.map((i) => i)); const pick = (i) => i;`;
+        assert.deepEqual(idsOf(script, body), expected);
+      });
+    }
+
+    it('an item a child component is given', () => {
+      const extra = {
+        'src/Row.svelte': COMPONENT('let { item } = $props();', '<i {...item.props}></i>'),
+      };
+      assert.deepEqual(
+        idsOf(
+          `import Row from './Row.svelte'; ${PROPS}`,
+          '{#each items as item}<Row {item} />{/each}',
+          extra
+        ),
+        ['Fx.items.props']
+      );
+    });
+
+    it('a child prop whose parents pass no item', () => {
+      const extra = {
+        'src/Row.svelte': COMPONENT('let { attrs } = $props();', '<i {...attrs}></i>'),
+      };
+      assert.deepEqual(
+        idsOf(
+          `import Row from './Row.svelte'; ${PROPS} const attrs = $derived({});`,
+          '<Row {attrs} />',
+          extra
+        ),
+        []
+      );
+    });
+
+    it('a snippet parameter read through nested members', () => {
+      assert.deepEqual(
+        idsOf(
+          PROPS,
+          '{#snippet log(entry)}<i {...entry.outcome.props}></i>{/snippet}{#each items as entry}{@render log(entry)}{/each}'
+        ),
+        ['Fx.items.outcome.props']
+      );
+    });
+
+    it('but not a snippet parameter of a child component', () => {
+      const extra = {
+        'src/Row.svelte': COMPONENT(
+          'let { rows } = $props();',
+          '{#snippet row(option)}<i {...option.data}></i>{/snippet}{#each rows as r}{@render row(r)}{/each}'
+        ),
+      };
+      assert.deepEqual(
+        idsOf(`import Row from './Row.svelte'; ${PROPS}`, '<Row rows={tone} />', extra),
+        []
+      );
+    });
   });
 
   it('fails a spread no row strips, and a row no closure spreads', () => {
@@ -437,6 +581,15 @@ describe('the per-item spreads of a published closure', () => {
     );
     assert.deepEqual(strippedMemberFaults({ manifest: [], reader }, ['Fx.items.props']), [
       'Fx.items.props is stripped and no published closure spreads it',
+    ]);
+  });
+
+  it('says no row can name a spread it cannot name', () => {
+    const reader = syntheticReader({
+      'src/Fx.svelte': COMPONENT(PROPS, '{#each items as item}<i {...item}></i>{/each}'),
+    });
+    assert.deepEqual(strippedMemberFaults({ manifest: [ENTRY], reader }, []), [
+      'src/Fx.svelte: a spread of a whole item of Fx.items: no STRIPPED_ITEM_MEMBERS row can name it; spread a member of a published data key, or drop the spread',
     ]);
   });
 });
