@@ -2213,6 +2213,7 @@ Pass sentence case.
 `children` is a content slot whose element is a `<div>`; the rail draws the content slot's children in a column it spaces, the first a little further below the label.
 A child that draws nothing still takes its gap, so remove or hide an empty one.
 The rail draws no box, fill or padding.
+It is lazy, so `mount('Rail', …)` throws `"Rail" is not loaded` until `load(['Rail'])` has resolved, as [Mounting, updating and destroying](#mounting-updating-and-destroying) describes.
 The label takes `Kicker`'s ink, size, weight and tracking, so the same four grounds apply; it inherits `target`'s face and line height, which a `Kicker` states for itself.
 It is not a heading.
 The rail never moves its content slot while it is requested.
@@ -2912,7 +2913,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
 - `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
-A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
 A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
@@ -2985,9 +2986,14 @@ A refusal that an `update` throws inside your function is reported the same way 
 A value that is not an array is read as one name.
 It never throws synchronously, and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
-It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
+It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
+It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
 `TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
+`Rail` is lazy: Fabricate fetches its code only when `load` names it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
+A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
+When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice; otherwise it draws and announces nothing, so draw your own pending state until `load` settles and your own error state, announced through your own live region, when it rejects.
+Once loaded, a lazy component mounts, draws and behaves exactly as it would if Fabricate loaded it with its entry script.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
