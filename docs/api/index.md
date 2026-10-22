@@ -2131,14 +2131,18 @@ It draws one fill; a fill in segments is a `Meter`.
 `value` is read against `max`.
 `max` defaults to 100, and a `max` of zero or less reads full.
 `segments` is an array of `{ value?, tone?, color? }`, drawn in order as segments of the one fill; `tone` and `color` are each as `FillBar`'s, and an empty array draws `success`.
-Each entry but the last spans its `value`, a finite number of zero or more on the scale of `max` (any other reads 0), and stops where the fill ends; the last spans the rest of the fill, and its `value` is not read.
-An entry that spans nothing is not drawn, so the segments drawn always make up the fill exactly.
-A list that draws one segment or none draws one fill as before: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
-The segments abut with no gap and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
+Each entry but the last spans its `value`, a finite number of zero or more on the scale of `max`, and stops where the fill ends.
+Any other `value` reads 0, a numeric string and `Infinity` included, and a `null` entry reads as `{}`.
+The last entry spans the rest of the fill, and its `value` is not read.
+An entry that spans 1e-9 or less on the scale of `max` is not drawn, so the segments drawn make up the fill.
+That bound is absolute, so a `max` of 1e-9 or less reads every entry as nothing.
+A list that draws one segment or none draws one fill: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
 No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
 The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so always state each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
-Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1: before them a second or later entry was reserved and an entry's `value` was unnamed and so private, and a one-entry list draws as it did.
-`describe` cannot tell you whether the running Fabricate draws segments: one that predates them draws the whole fill in the first entry's paint and refuses nothing, so the text beside the meter carries the segments on either.
+A `segments` that is not an array (`null`, an object, a string or a number) is a fault: Fabricate logs it, empties `target` and the handle goes inert, as [for any published component that faults](#mounting-updating-and-destroying).
+Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1.
+A Fabricate that predates segments draws the whole fill in the first entry's paint and refuses nothing, and `describe` cannot tell you which one is running, so the text beside the meter carries the segments on either.
 `valueText` is the reading, announced in place of the bare number.
 Pass `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
 `label` is required and is the meter's name, drawn visually hidden.
