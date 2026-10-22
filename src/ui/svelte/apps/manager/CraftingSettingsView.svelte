@@ -42,14 +42,10 @@
   // knowledge` mirror the visibility matrix; icons/copy follow the prototype.
   // The shared RadioCardGroup renders label + description per option; the `icon`
   // field rides along for parity with the design and is drawn as the leading glyph
-  // tile whenever `configCards` is on, which every site in this file passes.
+  // tile.
 
   // ISSUE 1509 FOLDED THE `ResolutionModeCard` SHIM AWAY, and the three call sites
-  // below render the primitive directly. `legendFallback`/`hintFallback` are its
-  // `legend`/`hint`, and `variant="config-card"` is `configCards={true}` — stated
-  // EXPLICITLY rather than left to the default, because the shim derived the flag
-  // from `variant` and defaulted it to FALSE while the primitive defaults it to
-  // TRUE, so an omission here would be a silent face change rather than a no-op.
+  // below render the primitive directly.
   //
   // For a non-alchemy system these read as GATING (a recipe is hidden until the
   // mode's condition is met). An alchemy system is REVEAL-not-gate: brewing is never
@@ -232,11 +228,10 @@
               hintKey="FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint"
               hint="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
               options={resolutionModeOptions}
-              selectedValue={systemResolutionModeValue}
+              value={systemResolutionModeValue}
               groupName="manager-crafting-resolution-mode"
               data-crafting-resolution-mode
               optionDataAttr="data-crafting-resolution-mode-option"
-              configCards={true}
               onChange={handleResolutionModeChange}
             />
           </section>
@@ -257,11 +252,10 @@
               legendKey="FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading"
               legend="Recipe visibility"
               options={visibilityModeOptions}
-              selectedValue={visibilityMode}
+              value={visibilityMode}
               groupName="manager-crafting-visibility-mode"
               data-crafting-visibility-mode
               optionDataAttr="data-crafting-visibility-mode-option"
-              configCards={true}
               onChange={(mode) => onSetVisibilityMode(mode)}
             />
           </section>
@@ -290,11 +284,10 @@
                 hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
                 hint="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
                 options={salvageResolutionModeOptions}
-                selectedValue={systemSalvageResolutionModeValue}
+                value={systemSalvageResolutionModeValue}
                 groupName="manager-crafting-salvage-resolution-mode"
                 data-crafting-salvage-resolution-mode
                 optionDataAttr="data-crafting-salvage-resolution-mode-option"
-                configCards={true}
                 onChange={handleSalvageResolutionModeChange}
               />
             </section>

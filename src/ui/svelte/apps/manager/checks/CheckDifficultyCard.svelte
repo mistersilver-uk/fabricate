@@ -288,7 +288,7 @@
         legend="What the roll is measured against"
         legendVisible
         options={SOURCE_OPTIONS}
-        selectedValue={normalized.target.source}
+        value={normalized.target.source}
         groupName="check-target-source"
         columns={2}
         optionDataAttr="data-check-target-source-option"
@@ -306,7 +306,7 @@
         legend={dcSourceLegend[1]}
         legendVisible
         options={DC_MODE_OPTIONS}
-        selectedValue={resolvedDcMode}
+        value={resolvedDcMode}
         groupName="check-dc-mode"
         columns={2}
         optionDataAttr="data-dc-mode-option"

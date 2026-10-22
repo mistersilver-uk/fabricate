@@ -516,7 +516,7 @@
       legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
       legend="How they combine"
       options={policyOptions}
-      selectedValue={selectedPolicy}
+      value={selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
       data-crafting-modifier-policy

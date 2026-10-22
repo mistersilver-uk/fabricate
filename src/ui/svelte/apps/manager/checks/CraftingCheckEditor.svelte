@@ -396,7 +396,7 @@
           legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
           legend="Check type"
           options={TYPE_OPTIONS}
-          selectedValue={type}
+          value={type}
           groupName="crafting-check-type"
           columns={2}
           optionDataAttr="data-check-type-option"
