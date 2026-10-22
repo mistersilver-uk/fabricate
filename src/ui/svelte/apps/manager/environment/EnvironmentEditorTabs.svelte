@@ -8,6 +8,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
 
@@ -40,12 +41,14 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {badges}
   {onSelect}
-  ariaLabelKey="FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label"
-  ariaLabel="Environment editor sections"
+  ariaLabel={localizeOr(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label',
+    'Environment editor sections'
+  )}
   idStem="environment"
   tabDataAttr="data-environment-tab-button"
   containerClass="manager-environment-tabs"

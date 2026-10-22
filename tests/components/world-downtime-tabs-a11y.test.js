@@ -25,7 +25,11 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-downtime-tabs-a11y-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
+  ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',

@@ -65,8 +65,8 @@ definePrimitiveAdoptionContract({
     ],
     loweredExpected: 1,
   },
-  // `activePanelOnly` and `danger` are declared `= false` props.
-  booleanProps: Object.freeze(['activePanelOnly', 'danger']),
+  // `activePanelOnly`, `annotated` and `danger` are declared `= false` props.
+  booleanProps: Object.freeze(['activePanelOnly', 'annotated', 'danger']),
   rawRemedy:
     'these components hand-roll the tab button that ' +
     'src/ui/svelte/components/EditorTabs.svelte owns. Render `<EditorTabs>` instead — the ' +

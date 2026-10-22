@@ -22,6 +22,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   let { activeTab = 'overview', badges = {}, onSelect = () => {} } = $props();
 
@@ -54,12 +55,14 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {badges}
   {onSelect}
-  ariaLabelKey="FABRICATE.Admin.Manager.RecipeItem.Tabs.Label"
-  ariaLabel="Recipe item editor sections"
+  ariaLabel={localizeOr(
+    'FABRICATE.Admin.Manager.RecipeItem.Tabs.Label',
+    'Recipe item editor sections'
+  )}
   idStem="recipe-item"
   tabDataAttr="data-recipe-item-tab-button"
   badgeDataAttr="data-recipe-item-tab-badge"

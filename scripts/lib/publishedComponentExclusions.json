@@ -17,6 +17,10 @@
       "reason": "domain-coupled: its options are crafting candidate records, and held, claimed and candidateReading are read while Fabricate renders."
     },
     {
+      "path": "src/ui/svelte/components/EditorTabs.svelte",
+      "reason": "pending:#2601: the tab strip is published once its keyboard and its tab buttons' names are pinned."
+    },
+    {
       "path": "src/ui/svelte/components/EssencePool.svelte",
       "reason": "domain-coupled: its thresholds, allocation and sources are Fabricate essence records, and its readings run while Fabricate renders."
     },

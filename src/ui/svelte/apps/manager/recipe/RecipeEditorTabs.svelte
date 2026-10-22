@@ -20,6 +20,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   let {
     activeTab = 'overview',
@@ -89,12 +90,11 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {badges}
   {onSelect}
-  ariaLabelKey="FABRICATE.Admin.Manager.Recipe.Tabs.Label"
-  ariaLabel="Recipe editor sections"
+  ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}
   idStem="recipe"
   tabDataAttr="data-recipe-tab-button"
   activePanelOnly

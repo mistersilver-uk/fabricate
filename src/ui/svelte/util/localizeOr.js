@@ -8,7 +8,20 @@ import { localize } from './foundryBridge.js';
  * chosen template's `{name}` placeholders are filled by one replacer on either path and an unsupplied
  * one stays verbatim; without it the template is returned as written. Core `format` is never called.
  */
-export function localizeOr(key, fallback, data) {
+export function localizeOr(key, fallback, data = null) {
   const template = key ? localizeWith(localize, key, undefined, fallback ?? key) : (fallback ?? '');
   return data == null ? template : fill(template, data);
+}
+
+/**
+ * A tab list for `EditorTabs` with each tab's `labelKey`, `ariaLabelKey` and `tooltipKey` resolved
+ * by `localizeOr` over its `label`, `ariaLabel` and `tooltip`, and the keys dropped.
+ */
+export function localizeTabs(tabs) {
+  return tabs.map(({ labelKey, ariaLabelKey, tooltipKey, ...tab }) => ({
+    ...tab,
+    label: localizeOr(labelKey, tab.label),
+    ariaLabel: localizeOr(ariaLabelKey, tab.ariaLabel),
+    tooltip: localizeOr(tooltipKey, tab.tooltip),
+  }));
 }
