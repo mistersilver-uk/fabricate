@@ -613,6 +613,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'a second frame that draws the strip outside the manager, in the player app`s inventory',
     ],
     [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-published-tabs-specimen',
+      'the specimen that mounts the strip through the published seam, keyboard-selected',
+    ],
+    [
       'src/ui/svelte/components/Callout.svelte',
       'manager-essence-edit-unscoped-on-craft',
       'the one frame that draws the `items` form, the essence On craft primer',
@@ -914,6 +919,34 @@ test('(a) an IconButton change publishes its two frames, then the specimen that 
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) an EditorTabs change publishes its twenty frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/EditorTabs.svelte';
+  const frames = [
+    'manager-system-edit-normal',
+    'manager-recipe-item-overview',
+    'manager-recipe-item-validation',
+    'manager-checks-section-badged-and-dotted',
+    'manager-environment-edit-events',
+    'manager-knowledge-learned-lost-copy',
+    'interactables-browser-tasks',
+    'manager-world-downtime-tracking-described',
+    'manager-world-downtime-narrow-settings',
+    'manager-tool-parity-05-validation-1280x720',
+    'manager-tool-parity-06-breakage-900x700',
+    'manager-essence-edit-validation',
+    'manager-recipe-edit-validation',
+    'manager-gathering-task-editor-normal',
+    'manager-component-edit-validation',
+    'world-component-entry-validation',
+    'world-essence-entry',
+    'world-tool-entry-validation',
+    'player-salvage',
+    'player-gathering-events',
+    'manager-published-tabs-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });
