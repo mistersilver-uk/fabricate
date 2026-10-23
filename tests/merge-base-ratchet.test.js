@@ -465,7 +465,7 @@ test('large stylesheet changes preserve the exemption on its original repeated s
   ];
   const base = stylesheet('base');
   const head = stylesheet('head');
-  const selectorKey = 'styles/fabricate.css\\0repeated selector (top level) | :root';
+  const selectorKey = 'styles/fabricate.css::repeated selector (top level) | :root';
   const findings = (lines) =>
     lines.flatMap((line, index) =>
       line === ':root {' || line === ':root,'
@@ -480,12 +480,12 @@ test('large stylesheet changes preserve the exemption on its original repeated s
   const current = findings(head);
   assert.equal(original.length, 3);
   assert.equal(current.length, 3);
-  const aligned = alignLines(base.join('\\n'), head.join('\\n'));
+  const aligned = alignLines(base.join('\n'), head.join('\n'));
   assert.ok(aligned, 'large changed regions must not discard all the stable line matches');
   assert.equal(aligned.get(current[2].line - 1), original[2].line - 1);
 
   const compare = (nextHead) => {
-    const sites = keyByAlignment(base.join('\\n'), nextHead.join('\\n'), original, findings(nextHead));
+    const sites = keyByAlignment(base.join('\n'), nextHead.join('\n'), original, findings(nextHead));
     return netOfSiteMarkers(sites.base, sites.head);
   };
   const unchanged = compare(head);
