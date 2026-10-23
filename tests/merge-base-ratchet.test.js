@@ -23,7 +23,7 @@ import {
   reportComparison,
   resolveRatchetBase,
 } from './helpers/mergeBaseRatchet.js';
-import { alignLines, siteText } from './helpers/siteMarkers.js';
+import { alignLines, keyByAlignment, netOfSiteMarkers, siteText } from './helpers/siteMarkers.js';
 import { createTempGitRepo, envWithoutGitLocation } from './helpers/temp-git-repo.js';
 
 const GIT = resolveExecutable('git');
@@ -441,6 +441,99 @@ test('lines align past their markers, and files too far apart do not align at al
   );
   const many = (tag) => Array.from({ length: 2100 }, (_, index) => `${tag} ${index}`).join('\n');
   assert.equal(alignLines(many('base'), many('head')), null);
+});
+
+test('large stylesheet changes preserve the exemption on its original repeated selector', () => {
+  const churn = (label) => Array.from({ length: 600 }, (_, i) => `--${label}-${i}: ${i};`);
+  const exemption = '/* ratchet-exempt(design-system): derived tokens need their own root */';
+  const stylesheet = (label) => [
+    ':root {',
+    '  --font: serif;',
+    '}',
+    ':root,',
+    ':root[data-theme="fabricate"],',
+    '.fabricate[data-theme="fabricate"] {',
+    ...churn(`${label}-palette`),
+    '}',
+    exemption,
+    ':root,',
+    '.fabricate[data-fabricate-theme] {',
+    '  --control-outline: var(--text);',
+    '}',
+    ...churn(`${label}-other`),
+    '.last-rule { color: red; }',
+  ];
+  const base = stylesheet('base');
+  const head = stylesheet('head');
+  const selectorKey = 'styles/fabricate.css::repeated selector (top level) | :root';
+  const findings = (lines) =>
+    lines.flatMap((line, index) =>
+      line === ':root {' || line === ':root,'
+        ? [
+            {
+              key: selectorKey,
+              line: index + 1,
+              marker: lines[index - 1] === exemption ? { reason: 'derived tokens' } : null,
+            },
+          ]
+        : []
+    );
+  const original = findings(base);
+  const current = findings(head);
+  assert.equal(original.length, 3);
+  assert.equal(current.length, 3);
+  const aligned = alignLines(base.join('\n'), head.join('\n'));
+  assert.ok(aligned, 'large changed regions must not discard all the stable line matches');
+  assert.equal(aligned.get(current[2].line - 1), original[2].line - 1);
+  const closers = (lines) => [
+    lines.indexOf('}', lines.indexOf('  --font: serif;') + 2),
+    lines.indexOf('}', lines.indexOf('  --control-outline: var(--text);')),
+  ];
+  const baseClosers = closers(base);
+  for (const [i, at] of closers(head).entries()) {
+    assert.equal(aligned.get(at), baseClosers[i], 'a line between anchors keeps its own match');
+  }
+
+  const compare = (nextHead) => {
+    const sites = keyByAlignment(
+      base.join('\n'),
+      nextHead.join('\n'),
+      original,
+      findings(nextHead)
+    );
+    return netOfSiteMarkers(sites.base, sites.head);
+  };
+  const unchanged = compare(head);
+  assert.equal(unchanged.base.length, 2);
+  assert.equal(unchanged.head.length, 2, 'existing exempt selector must stay exempt');
+  assert.equal(unchanged.fresh.length, 0);
+
+  const newSelector = [...head];
+  newSelector.splice(newSelector.indexOf(exemption), 0, ':root,');
+  assert.equal(
+    compare(newSelector).head.length,
+    3,
+    'a genuinely added selector still fails the gate'
+  );
+
+  const newMarked = [...head];
+  newMarked.splice(newMarked.indexOf(exemption), 0, exemption, ':root,');
+  assert.equal(compare(newMarked).fresh.length, 1, 'a new marked selector is still reported');
+});
+
+test('a region too different to align stays unpinned while its neighbours align', () => {
+  const churn = (label) => Array.from({ length: 1100 }, (_, i) => `${label}-${i}`);
+  const file = (label, tail) => ['top', ...churn(label), 'mid', '}', 'inner', '}', tail];
+  const base = file('base', 'tail-base');
+  const head = file('head', 'tail-head');
+  const aligned = alignLines(base.join('\n'), head.join('\n'));
+  assert.ok(aligned, 'the aligned neighbours are kept');
+  for (const line of ['top', 'mid', 'inner']) {
+    assert.equal(aligned.get(head.indexOf(line)), base.indexOf(line));
+  }
+  assert.equal(aligned.get(head.indexOf('}')), base.indexOf('}'));
+  assert.equal(aligned.get(head.lastIndexOf('}')), base.lastIndexOf('}'));
+  assert.equal(aligned.has(1), false, 'an unalignable region is never guessed');
 });
 
 test('a gate skips without reading base when its corpus is untouched, and compares when it is', () => {

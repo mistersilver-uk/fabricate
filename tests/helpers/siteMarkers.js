@@ -18,7 +18,7 @@ export function siteText(line) {
     .trim();
 }
 
-/** Beyond this many edits a file's lines are not aligned, and every finding is matched by text. */
+/** Beyond this many edits a region's lines are not aligned, and its findings are matched by text. */
 const ALIGN_LIMIT = 2000;
 
 function backtrack(trace, start, a, b, kept) {
@@ -60,8 +60,77 @@ function alignMiddle(a, b, start, kept) {
 }
 
 /**
+ * The lines that occur exactly once on each side, as [base, head] index pairs, in the longest
+ * chain that increases on both sides. A repeated line is never an anchor.
+ */
+function orderedAnchors(a, b) {
+  const unique = (lines) => {
+    const sites = new Map();
+    for (const [index, line] of lines.entries()) {
+      if (line === '') continue;
+      sites.set(line, sites.has(line) ? -1 : index);
+    }
+    return sites;
+  };
+  const head = unique(b);
+  const candidates = [...unique(a)]
+    .filter(([line, index]) => index >= 0 && (head.get(line) ?? -1) >= 0)
+    .map(([line, index]) => [index, head.get(line)]);
+  const tails = [];
+  const tailIndices = [];
+  const previous = [];
+  for (const [index, [, headIndex]] of candidates.entries()) {
+    let low = 0;
+    let high = tails.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (tails[middle] < headIndex) low = middle + 1;
+      else high = middle;
+    }
+    previous[index] = low === 0 ? -1 : tailIndices[low - 1];
+    tails[low] = headIndex;
+    tailIndices[low] = index;
+  }
+  const ordered = [];
+  let at = tailIndices.at(-1) ?? -1;
+  while (at >= 0) {
+    ordered.push(candidates[at]);
+    at = previous[at];
+  }
+  return ordered.toReversed();
+}
+
+/**
+ * A large diff may exceed Myers' edit budget even though many individual lines are unchanged.
+ * Anchor those unchanged lines by unique content, then run bounded Myers between consecutive
+ * anchors. Regions still too different stay unaligned; never guess an identical selector's site.
+ */
+function alignAnchored(a, b, start, kept) {
+  const anchors = orderedAnchors(a, b);
+  if (anchors.length === 0) return;
+  let fromA = 0;
+  let fromB = 0;
+  const gap = (toA, toB) => {
+    const matched = new Map();
+    if (alignMiddle(a.slice(fromA, toA), b.slice(fromB, toB), 0, matched)) {
+      for (const [targetIndex, sourceIndex] of matched) {
+        kept.set(start + fromB + targetIndex, start + fromA + sourceIndex);
+      }
+    }
+  };
+  for (const [sourceIndex, targetIndex] of anchors) {
+    gap(sourceIndex, targetIndex);
+    kept.set(start + targetIndex, start + sourceIndex);
+    fromA = sourceIndex + 1;
+    fromB = targetIndex + 1;
+  }
+  gap(a.length, b.length);
+}
+
+/**
  * The head line index each base line a shortest edit script keeps maps to, over the lines'
- * {@link siteText}, so adding a marker to a line keeps it; `null` when the files differ too much.
+ * {@link siteText}, so adding a marker to a line keeps it. Large diffs retain uniquely anchored
+ * matches and any bounded gaps; `null` means no lines could be aligned.
  *
  * @returns {Map<number, number>|null} 0-based head index to 0-based base index.
  */
@@ -77,8 +146,11 @@ export function alignLines(baseText, headText) {
   for (; endA > start && endB > start && a[endA - 1] === b[endB - 1]; endA -= 1, endB -= 1) {
     kept.set(endB - 1, endA - 1);
   }
-  const middle = alignMiddle(a.slice(start, endA), b.slice(start, endB), start, kept);
-  return middle ? kept : null;
+  const middleA = a.slice(start, endA);
+  const middleB = b.slice(start, endB);
+  if (alignMiddle(middleA, middleB, start, kept)) return kept;
+  alignAnchored(middleA, middleB, start, kept);
+  return kept.size > 0 ? kept : null;
 }
 
 /**
