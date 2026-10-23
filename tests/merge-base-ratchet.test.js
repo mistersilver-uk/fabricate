@@ -469,11 +469,13 @@ test('large stylesheet changes preserve the exemption on its original repeated s
   const findings = (lines) =>
     lines.flatMap((line, index) =>
       line === ':root {' || line === ':root,'
-        ? [{
-            key: selectorKey,
-            line: index + 1,
-            marker: lines[index - 1] === exemption ? { reason: 'derived tokens' } : null,
-          }]
+        ? [
+            {
+              key: selectorKey,
+              line: index + 1,
+              marker: lines[index - 1] === exemption ? { reason: 'derived tokens' } : null,
+            },
+          ]
         : []
     );
   const original = findings(base);
@@ -485,7 +487,12 @@ test('large stylesheet changes preserve the exemption on its original repeated s
   assert.equal(aligned.get(current[2].line - 1), original[2].line - 1);
 
   const compare = (nextHead) => {
-    const sites = keyByAlignment(base.join('\n'), nextHead.join('\n'), original, findings(nextHead));
+    const sites = keyByAlignment(
+      base.join('\n'),
+      nextHead.join('\n'),
+      original,
+      findings(nextHead)
+    );
     return netOfSiteMarkers(sites.base, sites.head);
   };
   const unchanged = compare(head);
@@ -495,7 +502,11 @@ test('large stylesheet changes preserve the exemption on its original repeated s
 
   const newSelector = [...head];
   newSelector.splice(newSelector.indexOf(exemption), 0, ':root,');
-  assert.equal(compare(newSelector).head.length, 3, 'a genuinely added selector still fails the gate');
+  assert.equal(
+    compare(newSelector).head.length,
+    3,
+    'a genuinely added selector still fails the gate'
+  );
 });
 
 test('a gate skips without reading base when its corpus is untouched, and compares when it is', () => {
