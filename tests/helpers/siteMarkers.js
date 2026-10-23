@@ -18,7 +18,7 @@ export function siteText(line) {
     .trim();
 }
 
-/** Beyond this many edits a file's lines are not aligned, and every finding is matched by text. */
+/** Beyond this many edits a region's lines are not aligned, and its findings are matched by text. */
 const ALIGN_LIMIT = 2000;
 
 function backtrack(trace, start, a, b, kept) {
@@ -60,9 +60,8 @@ function alignMiddle(a, b, start, kept) {
 }
 
 /**
- * Find unchanged lines that occur exactly once on each side, keeping the longest ordered chain.
- * The large-file fallback uses these anchors to split one unalignable diff into smaller regions
- * without pairing repeated lines by text alone.
+ * The lines that occur exactly once on each side, as [base, head] index pairs, in the longest
+ * chain that increases on both sides. A repeated line is never an anchor.
  */
 function orderedAnchors(a, b) {
   const unique = (lines) => {
@@ -76,8 +75,7 @@ function orderedAnchors(a, b) {
   const head = unique(b);
   const candidates = [...unique(a)]
     .filter(([line, index]) => index >= 0 && (head.get(line) ?? -1) >= 0)
-    .map(([line, index]) => [index, head.get(line)])
-    .sort(([left], [right]) => left - right);
+    .map(([line, index]) => [index, head.get(line)]);
   const tails = [];
   const tailIndices = [];
   const previous = [];
