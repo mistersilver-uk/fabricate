@@ -5,9 +5,23 @@
  */
 export const APP_LOCALIZER = Symbol('fabricate.appLocalizer');
 
-/** Svelte's `mount` for a Fabricate root: each tree carries `localize` beside the caller's context. */
-export const mountWithLocalizer = (mount, localize) => (component, options) =>
+/**
+ * The context holding the tooltip facade `{ show(element, text), hide(element), owns(element) }`
+ * a root hands its tree, so `IconButton` opens a focus tooltip without reading `game`; a tree
+ * mounted with none opens none (issue 2601).
+ */
+export const APP_TOOLTIPS = Symbol('fabricate.appTooltips');
+
+/**
+ * Svelte's `mount` for a Fabricate root: each tree carries `localize`, and `tooltips` when given,
+ * beside the caller's context.
+ */
+export const mountWithLocalizer = (mount, localize, tooltips) => (component, options) =>
   mount(component, {
     ...options,
-    context: new Map([...(options?.context ?? []), [APP_LOCALIZER, localize]]),
+    context: new Map([
+      ...(options?.context ?? []),
+      [APP_LOCALIZER, localize],
+      ...(tooltips ? [[APP_TOOLTIPS, tooltips]] : []),
+    ]),
   });

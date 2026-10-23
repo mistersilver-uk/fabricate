@@ -318,6 +318,34 @@ const WELL_CONTENT = `${WELL} [data-lab-well-content]`;
 /** Sized to the fixture's 320px ground and the height of its one card. */
 const WELL_WINDOW = Object.freeze({ width: 440, height: 320 });
 
+/** The callout fixture's ground, one section's published note by its key, and its actions host. */
+const CALLOUT_GROUND = '[data-lab-callout-ground]';
+const CALLOUT = (key) => `${CALLOUT_GROUND} > [data-lab-callout="${key}"] .manager-callout`;
+const CALLOUT_ACTIONS = `${CALLOUT('actions')} > .manager-callout-actions`;
+
+/** Sized to the fixture's 360px ground and the height of its six notes. */
+const CALLOUT_WINDOW = Object.freeze({ width: 480, height: 560 });
+
+/** The icon button fixture's ground, one row and its published button by key, and the notes. */
+const ICON_BUTTONS = '[data-lab-icon-buttons]';
+const ICON_ROW = (key) => `${ICON_BUTTONS} > [data-lab-icon-button="${key}"]`;
+const ICON_BUTTON = (key) => `${ICON_ROW(key)} button`;
+const ICON_NOTES = `${ICON_BUTTONS} > [data-lab-icon-notes]`;
+const ICON_BUTTON_KEYS = Object.freeze([
+  'neutral',
+  'primary',
+  'ghost',
+  'danger',
+  'ghost-danger',
+  'size-24',
+  'size-26',
+  'disabled',
+  'expand',
+]);
+
+/** Sized to the fixture's 360px ground and the height of its nine rows and the notes beneath. */
+const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -904,6 +932,138 @@ export const CASES = Object.freeze([
     position: WELL_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Well.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-callout-specimen',
+    label:
+      'Specimen, mounted through the published seam — six standing notes, one per section and one per published tone, 8px apart on the fixture’s own --fab-bg-1 ground, each a strip that sets its tone’s glyph beside its body inside a 1px edge at radius 11 and 12px of padding. Reading top to bottom: a neutral rule drawn from its text alone, a paragraph with no role, its sentence in the muted ink on the --fab-surface-soft fill; an info note, a div with the note role, headed Three crafters online in the info ink above its sentence, on the info fill inside the info edge; an accent paragraph, its glyph in the accent ink on the accent fill inside the accent edge; a warning note headed Two reagents run short above a list of two glyph-led points 8px apart, the leads Moonpetal: and Ember salt: in the strong ink, its leading glyph in the warning ink on the warning fill; a success paragraph, its glyph in the success ink on the success fill inside the success edge; and a danger note whose sentence Deleting a system removes its recipes for every player sits beside its actions, a neutral published Read the rules button, on the danger fill. The frame draws inside the manager window and is the evidence for it alone; what a note draws under no Fabricate ancestor and for a tone outside its set is the mounted suite’s, and its contrast on the four grounds is the contrast measurement’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and draws its own control in it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-callout' },
+    steps: [],
+    // Both roots the fixture's effect mounted, the accent and success paragraphs, the warning
+    // note's two points, and the button mounted in the danger note's actions slot.
+    expectSelector: `${CALLOUT_GROUND}:has(> [data-lab-callout="standing"] p.manager-callout:not([role])):has(> [data-lab-callout="accent"] p.manager-callout.is-accent):has(> [data-lab-callout="success"] p.manager-callout.is-success):has(> [data-lab-callout="warning"] div.manager-callout.is-warning[role="note"] [role="list"] > [role="listitem"] + [role="listitem"]) > [data-lab-callout="actions"] div.manager-callout.is-danger[role="note"] > .manager-callout-actions .fabricate-button`,
+    expectContained: [
+      ...['standing', 'info', 'accent', 'warning', 'success', 'actions'].map((key) => ({
+        container: CALLOUT_GROUND,
+        target: CALLOUT(key),
+      })),
+      { container: CALLOUT_ACTIONS, target: `${CALLOUT_ACTIONS} .fabricate-button` },
+      { container: '.window-content', target: CALLOUT_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The paragraph root's strip, its own ink and fill; the info note's fill, edge and title
+        // ink; the accent and success fills, edges and glyph inks; the warning note's fill, glyph
+        // ink, its list's spacing and the first lead's ink; the danger fill; and the actions host
+        // that spaces the slot, whose private wrapper and element take no box.
+        {
+          selector: CALLOUT('standing'),
+          styles:
+            'display: flex; padding: 12px; border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-border); border-radius: 11px; background-color: var(--fab-surface-soft); color: var(--fab-text-muted)',
+        },
+        {
+          selector: CALLOUT('info'),
+          styles:
+            'background-color: var(--fab-info-soft); border-top-color: var(--fab-info-border)',
+        },
+        {
+          selector: `${CALLOUT('info')} .manager-callout-title`,
+          styles: 'color: var(--fab-info-text); font-weight: 600',
+        },
+        ...['accent', 'success'].flatMap((tone) => [
+          {
+            selector: CALLOUT(tone),
+            styles: `background-color: var(--fab-${tone}-soft); border-top-color: var(--fab-${tone}-border)`,
+          },
+          { selector: `${CALLOUT(tone)} > i`, styles: `color: var(--fab-${tone}-text)` },
+        ]),
+        { selector: CALLOUT('warning'), styles: 'background-color: var(--fab-warning-soft)' },
+        { selector: `${CALLOUT('warning')} > i`, styles: 'color: var(--fab-warning-text)' },
+        {
+          selector: `${CALLOUT('warning')} .manager-callout-items`,
+          styles: 'display: grid; row-gap: 8px',
+        },
+        {
+          selector: `${CALLOUT('warning')} .manager-callout-item:first-child .manager-callout-item-lead`,
+          styles: 'color: var(--fab-text)',
+        },
+        { selector: CALLOUT('actions'), styles: 'background-color: var(--fab-danger-soft)' },
+        {
+          selector: CALLOUT_ACTIONS,
+          styles: 'display: inline-flex; flex-shrink: 0; column-gap: 8px',
+        },
+        { selector: `${CALLOUT_ACTIONS} > span`, styles: SLOT_BOX },
+        { selector: `${CALLOUT_ACTIONS} > span > span`, styles: SLOT_BOX },
+      ],
+    },
+    position: CALLOUT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Callout.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-icon-buttons-specimen',
+    label:
+      'Specimen, mounted through the published seam — nine icon buttons in a 360px column on the window’s --fab-bg-1 ground, 8px apart, each a glyph alone beside a caption the companion draws, after two steps: a click on the last, the Batch notes disclosure, whose callback passed aria-expanded true in its own update and showed the companion’s notes line Quench each ingot before the next pour beneath it, the pointer still resting on that button’s raised tile; and Tab from the danger button, which put keyboard focus on the ghost-danger Remove Ember salt, so it carries the accent keyboard ring, 2px wide with 2px of ground between ring and face, on its danger fill and ink. Reading top to bottom: a neutral pen on its 34px bordered face; a primary check in the success ink and edge; a ghost ellipsis 28px tall with no edge or fill; a danger trash in the danger ink and edge; the focused ghost-danger xmark; an xmark at size 24 and one at size 26, each a square of that side; and a disabled arrow at 62% opacity. The lab’s stand-in for Foundry’s tooltip manager records the keyboard focus’s tooltip and draws none, so the frame shows no tooltip; the hover text each button writes and the tooltip’s opening and closing are the mounted suite’s',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each press.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-icon-buttons' },
+    steps: [{ selector: ICON_BUTTON('expand') }, { selector: ICON_BUTTON('danger'), press: 'Tab' }],
+    // The disclosure's expanded state and the notes it shows, which only the click produces, and
+    // the tooltip the keyboard focus opened through the facade on the ghost-danger button.
+    expectSelector: `${ICON_BUTTONS}:has(> [data-lab-icon-button="expand"] button[aria-expanded="true"]):has(> [data-lab-icon-notes]:not([hidden])) > [data-lab-icon-button="ghost-danger"] button[aria-describedby="tooltip"]:focus-visible`,
+    expectCenterHit: ICON_BUTTON('expand'),
+    expectContained: [
+      ...ICON_BUTTON_KEYS.map((key) => ({ container: ICON_BUTTONS, target: ICON_ROW(key) })),
+      { container: ICON_BUTTONS, target: ICON_NOTES },
+      { container: '.window-content', target: ICON_BUTTONS },
+    ],
+    expectLayout: {
+      controls: [
+        // Each role's face and each rung's square at rest, the disabled face, the focused
+        // ghost-danger's ring and face, and the pressed disclosure under the pointer.
+        {
+          selector: ICON_BUTTON('neutral'),
+          styles:
+            'width: 34px; height: 34px; border-top-color: var(--fab-border); background-color: var(--fab-surface-soft)',
+        },
+        {
+          selector: ICON_BUTTON('primary'),
+          styles: 'color: var(--fab-success-text); border-top-color: var(--fab-success-border)',
+        },
+        {
+          selector: ICON_BUTTON('ghost'),
+          styles:
+            'height: 28px; border-top-color: rgba(0, 0, 0, 0); background-color: rgba(0, 0, 0, 0)',
+        },
+        {
+          selector: ICON_BUTTON('danger'),
+          styles: 'color: var(--fab-danger-text); border-top-color: var(--fab-danger-border)',
+        },
+        // `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${ICON_BUTTON('ghost-danger')}:focus-visible`,
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-danger-text); background-color: var(--fab-danger-soft)',
+        },
+        { selector: ICON_BUTTON('size-24'), styles: 'width: 24px; height: 24px' },
+        { selector: ICON_BUTTON('size-26'), styles: 'width: 26px; height: 26px' },
+        { selector: ICON_BUTTON('disabled'), styles: 'opacity: 0.62' },
+        // Still under the pointer; the lab emulates reduced motion, so the read is not mid-fade.
+        {
+          selector: ICON_BUTTON('expand'),
+          styles: 'background-color: var(--fab-surface-raised)',
+        },
+      ],
+    },
+    position: ICON_BUTTONS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `IconButton.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

@@ -3,7 +3,8 @@
  * bridge (issue 2454): under a root that hands it a localizer each line of its own copy reads its
  * translations, and in a tree mounted with none, as a published mount is, they read the English
  * fallback and `game.i18n` is never called. The application mixin and the roll prompt host, the
- * two Fabricate roots, hand their trees the bridge's `localize` by default.
+ * two Fabricate roots, hand their trees the bridge's `localize` and tooltip facade by default
+ * (issue 2601).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -113,16 +114,19 @@ async function openedText(selector) {
 }
 
 let APP_LOCALIZER;
+let APP_TOOLTIPS;
 let mountWithLocalizer;
 let PICKER_COPY;
 let bridgeLocalize;
+let bridgeTooltips;
 
 before(async () => {
   await harness.setup();
   // The copy the compiled tree imports, so its context key is the one the picker reads.
-  ({ APP_LOCALIZER, mountWithLocalizer } = await harness.loadRawModule(LOCALIZER));
+  ({ APP_LOCALIZER, APP_TOOLTIPS, mountWithLocalizer } = await harness.loadRawModule(LOCALIZER));
   ({ PICKER_COPY } = await harness.loadRawModule(PICKER_MODEL));
-  ({ localize: bridgeLocalize } = await harness.loadRawModule(BRIDGE));
+  ({ localize: bridgeLocalize, foundryTooltips: bridgeTooltips } =
+    await harness.loadRawModule(BRIDGE));
 });
 after(() => harness.teardown());
 
@@ -174,12 +178,13 @@ describe('2454 the rest of the picker’s own copy', () => {
   }
 });
 
-describe('2454 the Fabricate roots hand their trees the bridge’s localize', () => {
-  /** A component stand-in that records the localizer its tree is handed and the props it gets. */
+describe('2454 the Fabricate roots hand their trees the bridge’s localize and tooltips', () => {
+  /** A component stand-in that records the localizer and tooltips its tree takes, and its props. */
   function probe() {
     const seen = [];
     const Probe = (_anchor, props) => {
-      seen.push({ localize: getContext(APP_LOCALIZER), props });
+      const [localize, tooltips] = [getContext(APP_LOCALIZER), getContext(APP_TOOLTIPS)];
+      seen.push({ localize, tooltips, props });
     };
     return { Probe, seen };
   }
@@ -199,6 +204,7 @@ describe('2454 the Fabricate roots hand their trees the bridge’s localize', ()
     app._replaceHTML(await app._renderHTML({}, {}), content, {});
     assert.equal(seen.length, 1, 'the window mounted its tree');
     assert.ok(seen[0].localize === bridgeLocalize, 'the tree reads the bridge’s localize');
+    assert.ok(seen[0].tooltips === bridgeTooltips, 'and the bridge’s tooltip facade');
     await app.close();
     content.remove();
   });
@@ -213,6 +219,7 @@ describe('2454 the Fabricate roots hand their trees the bridge’s localize', ()
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(seen.length, 1, 'the prompt mounted its tree');
     assert.ok(seen[0].localize === bridgeLocalize, 'the tree reads the bridge’s localize');
+    assert.ok(seen[0].tooltips === bridgeTooltips, 'and the bridge’s tooltip facade');
     seen[0].props.onDismiss();
     assert.equal(await pending, null);
   });
@@ -236,6 +243,18 @@ describe('2454 mountWithLocalizer', () => {
       'target and props pass through'
     );
     assert.ok(options.context.get(APP_LOCALIZER) === localize, 'the localizer is the context');
+    assert.ok(!options.context.has(APP_TOOLTIPS), 'and no tooltips were given, so none are added');
+  });
+
+  it('hands every tree the tooltips it is given beside the localizer', () => {
+    let handed;
+    const mount = (_component, options) => {
+      handed = options.context;
+    };
+    const tooltips = { show() {}, hide() {}, owns: () => false };
+    mountWithLocalizer(mount, () => '', tooltips)('Root', { target: {} });
+    assert.ok(handed.get(APP_TOOLTIPS) === tooltips, 'the tooltips are the context');
+    assert.equal(typeof handed.get(APP_LOCALIZER), 'function', 'beside the localizer');
   });
 
   it('keeps every entry of a context the caller passes, beside the localizer', () => {

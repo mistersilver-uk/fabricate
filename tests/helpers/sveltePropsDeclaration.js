@@ -18,15 +18,23 @@ export function declaredPropNames(source) {
   if (start === -1 || end <= start) {
     throw new Error('no `let { … } = $props()` destructure found');
   }
-  // A `...rest` entry has no `=` or `:`, so it comes through verbatim.
+  // A `...rest` entry has no `=` or `:`, so it comes through verbatim; a quoted key, unquoted.
   return splitTopLevel(source.slice(start + 'let {'.length, end))
-    .map((entry) => entry.split(/[=:]/)[0].trim())
+    .map((entry) =>
+      entry
+        .split(/[=:]/)[0]
+        .trim()
+        .replace(/^(['"])(.*)\1$/u, '$2')
+    )
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right));
 }
 
-/** A prop name as JavaScript spells one, plus the `...rest` form the reader reports verbatim. */
-export const PROP_NAME = /^(\.\.\.)?[A-Za-z_$][\w$]*$/;
+/**
+ * A prop name as JavaScript spells one, an attribute name a quoted key declares (`'data-tooltip'`),
+ * or the `...rest` form the reader reports verbatim.
+ */
+export const PROP_NAME = /^(?:(\.\.\.)?[A-Za-z_$][\w$]*|[a-z]+(?:-[a-z0-9]+)+)$/;
 
 /** Characters that open a nesting a top-level comma cannot appear inside. */
 const OPENERS = '([{';

@@ -1,7 +1,9 @@
 /**
  * Issue 2541 — `IconButton`'s name tooltip, role set, rungs and glyph. Foundry's `TooltipManager`
- * shows `data-tooltip-text` on pointer hover by itself; keyboard focus is the component's job, so
- * these tests stub `game.tooltip` with the lab's call-recording manager and `:focus-visible`.
+ * shows `data-tooltip-text` on pointer hover by itself; keyboard focus is the component's job,
+ * through the `APP_TOOLTIPS` facade its root hands it (issue 2601), so these tests mount it with
+ * the bridge's facade, stub `game.tooltip` with the lab's call-recording manager and answer
+ * `:focus-visible`.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -16,28 +18,42 @@ import { createMinimalLabWorld } from '../view-lab/foundry/minimalLabWorld.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const ICON_BUTTON = 'src/ui/svelte/components/IconButton.svelte';
+const LOCALIZER = 'src/ui/svelte/util/appLocalizer.js';
+const TOOLTIPS = 'src/ui/svelte/util/foundryTooltip.js';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-icon-button-tooltip-',
+  rawModules: [LOCALIZER, TOOLTIPS],
   compiledModules: [ICON_BUTTON],
   componentPath: ICON_BUTTON,
 });
 
-before(() => harness.setup());
+/** The context a Fabricate root mounts its tree with: the bridge's facade under `APP_TOOLTIPS`. */
+let rootContext;
+
+before(async () => {
+  await harness.setup();
+  // The copies the compiled tree imports, so the key is the one the button reads.
+  const { APP_TOOLTIPS } = await harness.loadRawModule(LOCALIZER);
+  const { foundryTooltips } = await harness.loadRawModule(TOOLTIPS);
+  rootContext = () => new Map([[APP_TOOLTIPS, foundryTooltips]]);
+});
 after(() => harness.teardown());
 afterEach(() => {
   harness.remount();
   delete globalThis.game.tooltip;
 });
 
-/** Mount one icon button and hand back its `<button>`, `:focus-visible` answered by `keyboard`. */
-async function mountButton(props = {}, { keyboard = true } = {}) {
-  const root = await harness.mount({
-    ariaLabel: 'Remove Iron ingot',
-    icon: 'fas fa-xmark',
-    ...props,
-  });
+/**
+ * Mount one icon button under a root's context, or none with `context: null`, and hand back its
+ * `<button>`, `:focus-visible` answered by `keyboard`.
+ */
+async function mountButton(props = {}, { keyboard = true, context = rootContext() } = {}) {
+  const root = await harness.mount(
+    { ariaLabel: 'Remove Iron ingot', icon: 'fas fa-xmark', ...props },
+    { context: context ?? undefined }
+  );
   const button = root.querySelector('button');
   assert.ok(Boolean(button), 'the icon button rendered no <button>');
   const matches = button.matches.bind(button);
@@ -201,6 +217,15 @@ describe('IconButton shows its name under keyboard focus', () => {
     assert.deepEqual(heard, [['Escape', false]]);
   });
 
+  it('reads `game.tooltip` when focus arrives, so a manager swapped in after mount is the one used', async () => {
+    const button = await mountButton();
+    const tooltip = withTooltip();
+    focus(button);
+    assert.deepEqual(transcript(tooltip, button), [
+      ['activate', 'button', { text: 'Remove Iron ingot' }],
+    ]);
+  });
+
   it('does nothing outside Foundry, where there is no tooltip manager', async () => {
     const button = await mountButton();
     focus(button);
@@ -227,6 +252,68 @@ describe('IconButton shows its name under keyboard focus', () => {
       Object.assign(globalThis, { game });
     }
     assert.deepEqual(pressed, ['click']);
+  });
+});
+
+describe('IconButton with no tooltip context, as a tree mounted without a Fabricate root', () => {
+  it('still writes its hover text, and opens and closes no tooltip on focus, blur or a press', async () => {
+    const tooltip = withTooltip();
+    const pressed = [];
+    const onclick = () => {
+      pressed.push('click');
+    };
+    const button = await mountButton({ onclick }, { context: null });
+    assert.equal(button.getAttribute('data-tooltip-text'), 'Remove Iron ingot');
+    focus(button);
+    press(button, 'Escape');
+    blur(button);
+    button.click();
+    assert.deepEqual(transcript(tooltip, button), [], 'no call reached `game.tooltip`');
+    assert.deepEqual(pressed, ['click']);
+  });
+});
+
+describe('IconButton closes its own open tooltip when it goes away or changes under it', () => {
+  it('closes it when unmounted', async () => {
+    const tooltip = withTooltip();
+    const button = await mountButton();
+    focus(button);
+    harness.remount();
+    assert.deepEqual(transcript(tooltip, button), [
+      ['activate', 'button', { text: 'Remove Iron ingot' }],
+      ['deactivate', 'button'],
+    ]);
+  });
+
+  it('closes it when an update changes the name it shows, or disables it', async () => {
+    for (const next of [{ ariaLabel: 'Remove Ember salt' }, { disabled: true }]) {
+      const tooltip = withTooltip();
+      const button = await mountButton();
+      focus(button);
+      await harness.setProps(next);
+      assert.ok(!tooltip.element, `${Object.keys(next)[0]}: its own tooltip must close`);
+      harness.remount();
+    }
+  });
+
+  it('keeps it open through an update that leaves its text and state alone', async () => {
+    const tooltip = withTooltip();
+    const button = await mountButton();
+    focus(button);
+    await harness.setProps({ 'aria-expanded': 'true' });
+    assert.ok(tooltip.element === button, 'the tooltip stays on the button');
+  });
+
+  it('leaves another element’s tooltip open when it unmounts', async () => {
+    const tooltip = withTooltip();
+    const button = await mountButton();
+    focus(button);
+    const other = document.createElement('span');
+    document.body.append(other);
+    tooltip.activate(other, { text: 'Another hint' });
+    harness.remount();
+    assert.ok(tooltip.element === other, 'only the button’s own tooltip may be dismissed');
+    other.remove();
   });
 });
 

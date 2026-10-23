@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field` and `Well`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well` and `Callout`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2055,6 +2055,8 @@ The published components, in publication order:
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
 | `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
+| `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
+| `IconButton` | 1 | `fabricate` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -2063,7 +2065,8 @@ An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
-On `Button` and `StatusToggle` the rest keys land on the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
+On `Button`, `StatusToggle` and `IconButton` the rest keys land on the control itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused there.
+`IconButton`'s button carries Foundry's tooltip, so it refuses `data-locked` as well.
 Each component's tone set is its own and the sets are not interchangeable: `InfoStrip`'s badge says `positive` where `FillBar` and `Medallion` say `success`.
 Colour is never the only carrier of a state: wherever you pass a `tone`, `tint`, `ink`, `fill` or `color`, say the same thing in text beside the component.
 A collection of the wrong type, such as `rows: null`, is a contained fault reported under the component's name; it is not a refusal.
@@ -2406,7 +2409,7 @@ const saved = fabUi.mount('Notice', {
 The button hugs its label on one line while it has the room.
 Where it is narrower than the label, the label wraps at its spaces inside the button, is never clipped or ellipsised, and the button does not grow taller, so a label that wraps onto more lines than the button holds spills past its top and bottom edges: pass a short verb phrase and give the button the room for one line.
 A label of white space alone draws a button with no name, so never pass one.
-The button draws no glyph: a leading glyph and a glyph-only button are not published at version 1.
+The button draws no glyph: a leading glyph is not published at version 1, and a glyph-only button is [`IconButton`](#iconbutton).
 `onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
 The key is spelt `onclick`, all lower case, unlike `Notice`'s `onAction`.
 `role` is `neutral`, `primary`, `ghost`, `dashed`, `danger` or `warning`, and defaults to `neutral`.
@@ -2939,6 +2942,139 @@ well.slot('children').append(content);
 // `card.destroy()` also destroys the well mounted in its content slot.
 ```
 
+### Callout
+
+`Callout` draws the design system's callout: a standing statement, a rule or fact that is always true and stays put, beside a leading glyph in a rounded strip.
+It is never a live region and announces nothing, on mount or on `update`: a note the reader must hear when it appears is a [`Notice`](#notice).
+`tone` is `neutral`, `info`, `accent`, `warning`, `success` or `danger`, and defaults to `neutral`; a tone outside that set draws `neutral`, so a tone added later is additive.
+`info` is a standing note about live state, `warning` a hazard the reader can still avoid, `danger` a standing consequence and `success` a standing confirmation; `accent` is colour alone and says nothing.
+It repaints the edge, the fill, the glyph and the title, and the body keeps its muted ink at every tone.
+Colour is never the only carrier and the glyph is hidden from assistive technology, so say the state in words in your title, text or items; the glyph each tone draws by default is private and two tones may share one, so the glyph never tells tones apart.
+`title` is optional final display text, a short line drawn above the text.
+It is not a heading.
+`text` is optional final display text, the note's sentence.
+`icon` is optional Font Awesome classes for the leading glyph, hidden from assistive technology; absent, the tone's own glyph is drawn.
+`items` is optional and is an array of `{ icon, lead, text }` points drawn under the body as a list: `lead` and `text` are final display text, the lead inked `--fab-text` before the text, and `icon` is Font Awesome classes for the point's glyph, hidden from assistive technology and inked as the leading glyph.
+Every member of an item is optional and draws nothing when absent or empty, an item that is not an object is skipped, and a value that is not an array draws no list.
+Pass no other member: one this line does not state is private, and a function in it throws `"items" must not hold a function`.
+The lead and the text are drawn one space apart, so punctuate the lead where the run would be ambiguous, as `Moonpetal:` before `one held, two needed`.
+An item with no `icon` releases the glyph column, so its text starts left of its glyph-led siblings', so give every item of a list an `icon`, or none.
+`actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
+Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room and a long label squeezes it: keep what you draw there short.
+Fill it with phrasing content, a `<span>` for a mount target, for example of a published [`Button`](#button) inside a Fabricate window; content there inherits the strip's muted ink and type.
+A published `Button`'s focus ring clears 3:1 against every tone's fill on the four grounds named below.
+Give that button the `neutral`, `primary`, `warning` or `danger` role, never `ghost` or `dashed`, whose transparent face draws the label in the muted ink, which falls short on a tinted fill as the body does.
+It draws a `<p>` with no role unless it draws a `title`, an item or the `actions` slot, and then a `<div>` with `role="note"`, because a paragraph cannot hold them.
+With none of `title`, `text` and `items` the strip is a bare glyph that says nothing, so never mount a callout without one of them; with `actions` alone it is a note holding just your control.
+An `update` that moves it between the two replaces its root element; the mount, its handle and its claim on `target` are unchanged, and while `actions` is requested the root stays the `<div>`, so no `update` moves the slot.
+Its ink and fill are its own, so its root is `any` and it needs no Fabricate ancestor: the body inks `--fab-text-muted` on the tone's translucent fill over `target`'s ground, and the title inks `--fab-text` at `neutral` and the tone's own text ink otherwise; it inherits `target`'s face.
+The title, an item's lead and the glyphs clear their floors, 4.5:1 for text and 3:1 for a glyph, at every tone in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and the title does not on `--fab-bg-3`, so draw a callout on those four grounds.
+On a light ground, such as Foundry's light application theme or a light-themed chat card, the translucent fills barely tint it and none of its text clears 4.5:1, so in a window of your own paint `--fab-bg-1` on `target`.
+The body, its text, each item's text and text you draw in `actions`, which inherits the same ink, is the muted ink over the tone's fill: it clears 4.5:1 in every palette at `neutral` on those four grounds, at `danger` on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`, and at `success` on `--fab-bg-0`.
+In the default palette alone it falls short on `--fab-bg-1`, a Fabricate window's own ground, and on `--fab-surface`, at `info` (4.20:1), `accent` (4.08:1), `warning` (4.14:1) and `success` (4.27:1), and on `--fab-bg-0` at `info` (4.49:1), `accent` (4.36:1) and `warning` (4.42:1).
+At every tone but `neutral` it falls short on `--fab-bg-2`, so inside an [`InspectorCard`](#inspectorcard), in up to six of the seven palettes, the default among them; so say in `title` whatever the reader must not miss.
+Rest `data-*` attributes land on the root.
+Name them for your module, as `data-<module-id>-…`; `data-callout-*` names are the note's own and private, so pass none: a value under one the note writes overwrites it.
+Do not pass `data-action`: the window dispatches a click on it (`close` closes the window), which makes a pointer-only control of an element that takes no focus.
+Fabricate draws nothing focusable in the note: an `update` that keeps `actions` keeps its slot, so focus stays on a control you drew there; one that omits `actions`, and `destroy`, remove that control, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its padding, corner, edge, gap and type figures, the glyph each tone draws by default, and how Fabricate lays a callout out in its own entries and cards are private.
+A `class` is refused because a rest key must be a `data-*` attribute.
+
+A worked note follows: the reagents a batch still lacks, with the control that answers it in the strip, mounted inside a Fabricate window, for example in an extension target, because a published `Button` needs one.
+
+```javascript
+// After `load(['Callout', 'Button'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('Callout') || !fabUi.components.includes('Button')) return;
+
+const note = fabUi.mount('Callout', {
+  target,
+  props: {
+    tone: 'warning',
+    title: 'Two reagents run short',
+    items: [
+      { icon: 'fas fa-leaf', lead: 'Moonpetal:', text: 'one held, two needed' },
+      { icon: 'fas fa-fire', lead: 'Ember salt:', text: 'none held' },
+    ],
+    actions: true,
+  },
+});
+// A `<span>` mount target in the actions slot, a flex box so it is exactly as tall as the button.
+const buttonTarget = document.createElement('span');
+buttonTarget.style.display = 'flex';
+note.slot('actions').append(buttonTarget);
+fabUi.mount('Button', {
+  target: buttonTarget,
+  props: { role: 'neutral', children: 'Open the shopping list', onclick: () => acmeShop.open() },
+});
+// `note.destroy()` also destroys the button mounted in its actions slot.
+```
+
+### IconButton
+
+`IconButton` draws the design system's icon button: a native `<button type="button">` whose face is a glyph alone, for a verb its glyph says where a label does not fit, as a row's remove control.
+A verb that needs its word to be understood is a published [`Button`](#button).
+`icon` is required and is the Font Awesome classes of the glyph, as `fas fa-trash`, drawn as an `<i>` hidden from assistive technology; it is the button's whole face.
+`ariaLabel` is required and is the button's name, final display text naming the verb and what it acts on, as "Remove Iron ingot".
+It is the button's whole accessible name and its tooltip, so a sighted user who cannot read the glyph is shown the words a screen reader speaks.
+A name of white space alone leaves the button with no name and an empty tooltip, so never pass one.
+`role` is `neutral`, `primary`, `ghost`, `danger` or `ghost-danger`, and defaults to `neutral`; a role outside that set draws `neutral`.
+It is the button's visual role and sets no ARIA role: the button is a native `<button>` whatever `role` says.
+Each value names a verb, never a colour: `neutral` is the secondary verb; `primary` the leading verb of its cluster; `ghost` the quiet verb, drawn with no edge or fill at rest, for a control repeated on every row of a list; `danger` the destructive verb; and `ghost-danger` the destructive verb repeated on every row, as a row's delete.
+A visual role is drawn and never announced, so a destructive role needs the verb in `ariaLabel`: "Delete Iron ingot", never "Iron ingot".
+Confirm a destructive press yourself, in a dialog of Foundry's, before anything is written.
+`size` is `''`, `'24'` or `'26'`, a string, and defaults to `''`: `''` draws the default rung, and `'24'` and `'26'` a square of that many pixels at every role; what it draws for any other value is private.
+`disabled` is `true` or `false`.
+`true` draws the button as unavailable, takes it out of the tab order and stops every press, so `onclick` is not called.
+Fabricate coerces no `disabled` to a boolean, so only `true` and `false` are in the contract.
+Never pass `true` while the button holds focus, as [Ownership and theme](#ownership-and-theme) states.
+`onclick` is a required callback, called with no argument each time the button is pressed, each repeat of a held Enter key included.
+`aria-expanded` is `true` or `false`, and is an `aria` prop: Fabricate writes it on the button.
+It is for a button whose press shows and hides a region you draw, as the [`Button`](#button) section states; the name is the same in both states, and you omit the prop on a button that does no such thing.
+Its glyph may follow the state: pass the other `icon` in the same `update`, as `fas fa-chevron-up` while the region is shown.
+The tooltip is `ariaLabel`, plain text that is never read as HTML.
+Fabricate writes it as `data-tooltip-text` on the button in every mount, and Foundry's own hover listener shows it after a delay while the pointer rests on the button.
+Under keyboard focus, and only under `:focus-visible`, Fabricate opens the same tooltip itself through `game.tooltip`, which it reads when the focus arrives, and closes it on blur, a press, Escape, `destroy` and an `update` that changes `ariaLabel` or passes `disabled: true`; it closes only its own tooltip, and Escape still reaches a `keydown` listener of yours above `target`.
+While either tooltip is open, the one hover shows or the one keyboard focus opens, Foundry sets `aria-describedby` to `tooltip` on the button and removes it when the tooltip closes, so a screen reader may read the name a second time as its description.
+You cannot suppress that second reading at version 1, so keep `ariaLabel` a short verb phrase.
+Rest `data-*` is for your own hooks.
+Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
+They land on the button itself, so `data-keyboard-focus`, `data-action`, `data-cursor`, every `data-tooltip` name, and the two names Fabricate's own stylesheet reads off its own buttons, `data-validation-focused` and `data-essence-sort-direction`, are refused with `"<key>" is reserved on IconButton`.
+That includes `data-tooltip-text`, so the tooltip says only what `ariaLabel` says.
+`data-locked` is refused the same way, because Foundry pins a copy of any tooltip it opens on an element carrying `data-locked`, and the closes this section states never reach that copy.
+It needs a Fabricate window ancestor, because its face and ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
+Your own window or dialog carries no Fabricate root, so the button is refused there with `IconButton needs a Fabricate window ancestor`.
+Give `target` `display: flex` and align your own content to the button by centring.
+The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
+An `update` keeps the same button, so focus stays on it; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond the button on every side; leave that much inside any edge of your own that clips.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the button on one of those four grounds.
+Its default rung's side, its corner and glyph size, each role's colours and edge beyond what this section states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors are private.
+A `class`, a `tooltip` of its own and content beside the glyph are refused, because a rest key must be a `data-*` attribute.
+
+A worked row control follows: the remove control at the end of a row you draw inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['IconButton'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates `IconButton` describes none: draw your own control there.
+if (!fabUi?.describe?.('IconButton')) return;
+
+const remove = fabUi.mount('IconButton', {
+  target, // Inside a Fabricate window, at the end of your row.
+  props: {
+    icon: 'fas fa-trash',
+    ariaLabel: `Delete ${reagent.name}`, // The verb and its object: the role is never announced.
+    role: 'ghost-danger',
+    size: '26',
+    onclick: () => acmeReagents.confirmDelete(reagent.id), // Confirm in a dialog of Foundry's.
+    'data-acme-reagent': reagent.id,
+  },
+});
+
+// `remove.destroy()` when the row goes away, moving focus first if the button holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3015,6 +3151,7 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   A `slot` prop holds `true` or `false`, and anything else there throws `"<key>" is a slot and takes true or false`.
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
   Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet reads off its buttons, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
+  Where it also says that control carries Foundry's tooltip, `data-locked` throws the same.
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
   A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
 - `onFault` is optional, and is described with faults below.
@@ -3113,7 +3250,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field` and `Well` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well` and `Callout` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -3299,7 +3436,7 @@ A published component draws a control only where its section says so, and each c
   Fabricate resolves and checks nothing: an id that is absent, or that two elements in that tree share, names or describes nothing, and keeping it unique is yours.
   In a Foundry 14 detached window Foundry moves the window's element whole to the other document, so a described element inside that element goes with it and anything you appended to `body` stays behind.
 - In Foundry 13 and 14 the tooltip sets `aria-describedby` to `tooltip` on the element it is shown for and removes the attribute when it closes.
-  A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it.
+  A tooltip on an ancestor leaves the control alone, so this reaches a published control only when you show one on it yourself, with `game.tooltip.activate` or a Tour step that selects it, or on `IconButton`, whose own tooltip opens on its button under the pointer and keyboard focus alike, as its section states.
   Restore the prop once the tooltip has closed, which you can see when `game.tooltip.element` is no longer your control or after calling `game.tooltip.deactivate()` yourself: call `update` without the prop, `await` anything once that `update` has returned (`await Promise.resolve()` is enough), and call `update` with it again.
   Without the `await` between them Fabricate may draw the two as the second alone, which writes nothing, and a restore you make while the tooltip is still open is removed with it.
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
@@ -3307,6 +3444,7 @@ A published component draws a control only where its section says so, and each c
 - A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
   Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
+  The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

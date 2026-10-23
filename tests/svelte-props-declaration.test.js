@@ -43,6 +43,26 @@ test('the $props() reader survives comments, template literals and commas in str
   ]);
 });
 
+test('the $props() reader unquotes an attribute name a quoted key declares', () => {
+  const source = [
+    '<script>',
+    '  let {',
+    '    title = undefined,',
+    "    'data-tooltip': dataTooltip = undefined,",
+    '    "data-tooltip-text": dataTooltipText,',
+    '    ...rest',
+    '  } = $props();',
+    '</script>',
+  ].join('\n');
+  const names = declaredPropNames(source);
+  assert.deepEqual(names, ['...rest', 'data-tooltip', 'data-tooltip-text', 'title']);
+  assert.ok(
+    names.every((name) => PROP_NAME.test(name)),
+    'each is a prop name'
+  );
+  assert.ok(!PROP_NAME.test("'data-tooltip'"), 'a name still quoted is a misread');
+});
+
 /** Wrap destructure lines in a component's `<script>`. */
 function destructure(...lines) {
   return [

@@ -19,6 +19,7 @@ const ROW_PATH = 'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-complication-row-variants-',
+  rawModules: ['src/ui/svelte/util/appLocalizer.js'],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',

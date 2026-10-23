@@ -31,7 +31,7 @@ const runActionHarness = createHarness(
     component('Kicker'),
     'src/ui/svelte/components/SegmentedControl.svelte',
   ],
-  [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES]
+  [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES, 'src/ui/svelte/util/appLocalizer.js']
 );
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
 const listRowHarness = createHarness('ListRow', [component('Medallion')]);
@@ -54,7 +54,11 @@ const progressHarness = createHarness(
   [component('FillBar'), component('Kicker'), component('StageBars')],
   [...FOUNDRY_BRIDGE_RAW_MODULES]
 );
-const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
+const stageNavHarness = createHarness(
+  'StageNav',
+  [component('IconButton'), component('Button')],
+  ['src/ui/svelte/util/appLocalizer.js']
+);
 const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
 const yieldHarness = createHarness('YieldScale', [...resultModules, component('Kicker')]);
@@ -66,6 +70,7 @@ const outcomeHarness = createHarness(
 const pagerHarness = createHarness('Pagination', PAGINATION_COMPILED_MODULES, [
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
+  'src/ui/svelte/util/appLocalizer.js',
 ]);
 const harnesses = [
   runActionHarness,

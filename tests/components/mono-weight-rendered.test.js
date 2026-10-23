@@ -82,6 +82,7 @@ const HARNESS = Object.freeze({
       ...FOUNDRY_BRIDGE_RAW_MODULES,
       'src/ui/svelte/actions/dragDrop.js',
       'src/ui/svelte/util/dropUtils.js',
+      'src/ui/svelte/util/appLocalizer.js',
     ],
   },
 });

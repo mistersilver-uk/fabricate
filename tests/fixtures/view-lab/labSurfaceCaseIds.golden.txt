@@ -52,6 +52,8 @@ manager-published-select-layer
 manager-published-stage-bars-specimen
 manager-published-field-specimen
 manager-published-well-specimen
+manager-published-callout-specimen
+manager-published-icon-buttons-specimen
 player-gathering-environments
 fabricate-app-shell
 player-inventory

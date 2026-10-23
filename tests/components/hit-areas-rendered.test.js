@@ -272,6 +272,7 @@ const MOUNT_DEPENDENCIES = Object.freeze({
       'src/ui/svelte/util/rangeBarText.js',
       ...FOUNDRY_BRIDGE_RAW_MODULES,
       ...LOCALIZE_OR_RAW_MODULES,
+      'src/ui/svelte/util/appLocalizer.js',
     ],
     compiledModules: [component('RangeBarMarker'), component('IconButton')],
   },

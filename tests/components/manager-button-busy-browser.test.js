@@ -41,7 +41,12 @@ const harnessFor = (componentPath, { raw = [], compiled = [], rootClass = 'fabri
   createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-button-busy-',
-    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES, ...raw],
+    rawModules: [
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
+      'src/ui/svelte/util/appLocalizer.js',
+      ...raw,
+    ],
     compiledModules: [...compiled, componentPath],
     componentPath,
     rootClass,
