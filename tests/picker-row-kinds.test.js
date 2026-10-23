@@ -17,7 +17,7 @@ import {
   offeredIngredientKinds,
   shownAmount,
   toValue,
-} from '../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+} from '../src/ui/svelte/components/pickerRowKinds.js';
 
 /** One persisted ingredient option per match type, each carrying a field the row never draws. */
 const INGREDIENTS = Object.freeze({

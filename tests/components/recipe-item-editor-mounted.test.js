@@ -6,6 +6,7 @@ import {
   CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
@@ -60,6 +61,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',
@@ -71,7 +73,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Avatar.svelte',
     // The identity row `InventoryDetailHeader` composes (issue 1518).
     'src/ui/svelte/apps/PlayerDetailHeader.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
@@ -658,9 +660,9 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     await flushAnnouncement();
     assert.equal(
       announcement(root),
-      'Overview',
-      'the region names the destination it reached; the zone carries no accessible name of its ' +
-        'own, so there is no control to name beside it'
+      'Overview — Drop a game-world Item here',
+      'the region names the destination it reached and then the zone, a group named by its title ' +
+        '(issue 2466)'
     );
   });
 

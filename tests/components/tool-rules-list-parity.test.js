@@ -28,6 +28,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
 
 /**
@@ -183,7 +184,7 @@ const listScreen = (rows = SIX_ROWS) => `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fab-inspector-panel manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -209,10 +210,10 @@ const listScreen = (rows = SIX_ROWS) => `
           </div>
         </section>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
-        <div class="manager-tool-inspector-foot" data-probe="foot">
-          <button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
+        <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">
+          <button type="button" class="fabricate-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
         </div>
       </section>
     </aside>
@@ -327,21 +328,21 @@ function inspectorColumn(sections, footState) {
   ).join('');
   const foot =
     footState === 'member'
-      ? `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
-      : `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
+      ? `<button type="button" class="fabricate-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
+      : `<button type="button" class="fabricate-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
   return `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body" style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; height: 600px">
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fab-inspector-panel manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
         </div>
-        <div class="manager-tool-inspector-foot" data-probe="foot">${foot}</div>
+        <div class="fab-inspector-panel-foot manager-tool-inspector-foot" data-probe="foot">${foot}</div>
       </section>
     </aside>
   </div>
@@ -480,25 +481,25 @@ test('the row enable switch is the shared control rather than a copy of it', asy
     const measured = await page.evaluate(READ_PROBES);
     const tokens = await page.evaluate(READ_TOKENS, [
       '--fab-accent',
-      '--fab-surface-raised',
-      '--fab-on-accent',
-      '--fab-text-subtle',
+      '--fab-surface-soft',
+      '--fab-bg-1',
+      '--fab-text-muted',
     ]);
 
-    // The family sizes the button to its content - a 34px track - rather than pinning it to
+    // The family sizes the button to its content - a 38px track - rather than pinning it to
     // the 36px box the retired copy declared.
-    assert.equal(measured['resting-switch'].width, 34, 'the switch is the family box');
+    assert.equal(measured['resting-switch'].width, 38, 'the switch is the family box');
     assert.equal(measured['resting-switch'].height, 24, 'and the family rung');
 
-    // `.fabricate-toggle .manager-status-toggle-track` is an `inline-flex`.
+    // `.fabricate-toggle .manager-status-toggle-track` is a `flex` box.
     for (const probe of ['resting-switch-track', 'selected-still-switch-track']) {
       assert.equal(measured[probe].display, 'flex', `${probe} is the primitive track box`);
-      assert.equal(measured[probe].width, 34, `${probe} is 34px wide`);
-      assert.equal(measured[probe].height, 20, `${probe} is 20px tall`);
+      assert.equal(measured[probe].width, 38, `${probe} is 38px wide`);
+      assert.equal(measured[probe].height, 22, `${probe} is 22px tall`);
     }
     for (const probe of ['resting-switch-knob', 'selected-still-switch-knob']) {
-      assert.equal(measured[probe].width, 14, `${probe} is the family 14px knob`);
-      assert.equal(measured[probe].height, 14, `${probe} is the family 14px knob`);
+      assert.equal(measured[probe].width, 18, `${probe} is the family 18px knob`);
+      assert.equal(measured[probe].height, 18, `${probe} is the family 18px knob`);
     }
 
     // BOTH POSITIONS COME FROM THE FAMILY'S `--fab-toggle-*` CUSTOM PROPERTIES.
@@ -509,18 +510,18 @@ test('the row enable switch is the shared control rather than a copy of it', asy
     );
     assert.equal(
       measured['selected-still-switch-knob'].background,
-      tokens['--fab-on-accent'],
-      'and the ON knob is the on-accent ink'
+      tokens['--fab-bg-1'],
+      'and the ON knob is the bg-1 ground'
     );
     assert.equal(
       measured['resting-switch-track'].background,
-      tokens['--fab-surface-raised'],
-      'the OFF track is the raised neutral, not a second copy of it'
+      tokens['--fab-surface-soft'],
+      'the OFF track is the soft neutral, not a second copy of it'
     );
     assert.equal(
       measured['resting-switch-knob'].background,
-      tokens['--fab-text-subtle'],
-      'and the OFF knob is the subtle ink'
+      tokens['--fab-text-muted'],
+      'and the OFF knob is the muted ink'
     );
   } finally {
     await close();

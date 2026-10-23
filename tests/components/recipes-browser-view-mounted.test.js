@@ -7,6 +7,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   CHECK_TARGET_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
@@ -29,6 +30,7 @@ import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -72,7 +74,7 @@ const RECIPE_RAW_MODULES = [
 ];
 
 const RECIPE_PRIMITIVES = [
-  'src/ui/svelte/components/Pagination.svelte',
+  ...PAGINATION_COMPILED_MODULES,
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
   // (`...RECIPE_PRIMITIVES, ...SELECT_COMPILED_MODULES`), not folded in here — it covers the
   // manager's ONE chip (issue 883) and shared no-state primitive (issue 785) too. Both
@@ -125,6 +127,7 @@ const inspector = createMountedComponentHarness({
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipes/RecipeProduceRow.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
@@ -249,7 +252,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
     assert.ok(Boolean(root.querySelector('.fabricate-pagination')), 'twelve rows render the pager');
-    chooseSelectOption(root, '[data-pagination-size]', '10');
+    choosePageSize(root, '', '10');
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
     assert.equal(countText(), '10 of 12 recipes', 'ten rows below it, twelve in the category');
@@ -277,7 +280,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     });
     const countText = () => root.querySelector('.fab-group-count').textContent.trim();
 
-    chooseSelectOption(root, '[data-pagination-size]', '10');
+    choosePageSize(root, '', '10');
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -329,7 +332,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
     });
 
     // Shrink the page to 10 so general (12) must span two pages.
-    chooseSelectOption(root, '[data-pagination-size]', '10');
+    choosePageSize(root, '', '10');
 
     // Page 1: the whole alchemy bucket, then the first slice of general.
     assert.equal(root.querySelectorAll('.manager-recipe-row').length, 10, 'page 1 holds ten');
@@ -684,7 +687,7 @@ describe('RecipesBrowserView result count', () => {
     assert.equal(count.textContent.trim(), '1–12 of 12');
     assert.equal(count.classList.contains('manager-chip'), false, 'the count is not a chip to press');
 
-    chooseSelectOption(root, '[data-pagination-size]', '10');
+    choosePageSize(root, '', '10');
     assert.equal(root.querySelector('[data-recipe-count]').textContent.trim(), '1–10 of 12');
 
     root.querySelector('[data-pagination-next]').click();
@@ -707,7 +710,14 @@ describe('RecipesBrowserView lock and enable controls', () => {
 
     for (const id of ['r1', 'r2']) {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
-      assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
+      const lock = row.querySelector('[data-recipe-lock]');
+      assert.ok(lock, 'the lock control is present');
+      // Its hint, not its name, is the tooltip (issue 2541): what a lock does, in both states.
+      assert.equal(
+        lock.getAttribute('data-tooltip-text'),
+        'Locked recipes stay visible to players, but only a GM can craft them.'
+      );
+      assert.ok(!lock.hasAttribute('title'), 'and no native title stacks a second');
       assert.ok(row.querySelector('.fabricate-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643).
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');

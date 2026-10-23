@@ -1,12 +1,22 @@
 {
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
+    "Notifications": {
+      "ScopedIdentity": {
+        "Conflicting": "Fabricate | Saved. {count} row(s) in {system} could not be linked to the world catalogue because a world entry with the same id or source already describes something else: {names}. They keep working in this system only; review them under World › Tools or World › Essences.",
+        "ConflictingMore": "and {more} more"
+      }
+    },
     "Common": {
       "General": "General",
       "Picker": {
         "NoMatches": "No matches",
         "Loading": "Loading…",
-        "Error": "The list could not load"
+        "Error": "The list could not load",
+        "KeyHints": {
+          "List": "↑↓ move · ↵ pick · esc close",
+          "Grid": "←↑↓→ move · ↵ pick · esc close"
+        }
       },
       "SetPicker": {
         "Add": "Add",
@@ -18,6 +28,33 @@
         "Apply": "Apply",
         "More": "+{count} more",
         "MoreName": "and {count} more"
+      },
+      "SetCard": {
+        "ReservedRole": "reserved role",
+        "Actions": "Actions for {name}",
+        "NameLabel": "{kicker} name",
+        "Kicker": {
+          "ResultSet": "Result set",
+          "IngredientSet": "Ingredient set"
+        }
+      },
+      "RouteSources": {
+        "ProducedBy": "Produced by",
+        "Unreachable": "Nothing — unreachable",
+        "Empty": "Add an ingredient set first.",
+        "Assign": "Assign",
+        "AssignTo": "Assign to {name}",
+        "Search": "Search…",
+        "RoutedTo": "now → {name}",
+        "NotRouting": "does not route",
+        "Separator": ", ",
+        "Remove": "Remove {name}",
+        "Summary": "{label} {sources}"
+      },
+      "RoutingOverview": {
+        "Produces": "produces",
+        "Default": "default",
+        "Shared": "shared · {count}"
       },
       "Stepper": {
         "Decrease": "Decrease {label}",
@@ -52,7 +89,17 @@
       "TintPicker": {
         "Presets": "Colour presets",
         "CustomHex": "Custom hex",
-        "None": "No colour"
+        "None": "No colour",
+        "Search": "Search colours",
+        "Count": "{matched} of {total}"
+      },
+      "RangeBar": {
+        "Label": "Outcome bands",
+        "LabelWithRecord": "{label} — {record}",
+        "Boundary": "{from} / {to}",
+        "ValueText": "{value} — {record}",
+        "RelativeValueText": "{value} — DC {offset}",
+        "RelativeValueTextAgainst": "{value} — DC {offset} against {record}"
       }
     },
     "Migration": {
@@ -143,9 +190,26 @@
         "RemapSkippedErrorsDetail": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldEssenceIdentityFlags().",
         "ItemOverrideScopeDetail": "Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but a merged-away id counts for nothing, so those items contribute less essence than they did, or none at all. Fabricate has no screen for these overrides, so whatever set them — a GM, a macro or another module — has to set them again.",
         "Overflow": "…and {count} more"
+      },
+      "ScopedIdentityReconcile": {
+        "Created": "Fabricate added {count} essence(s) and tool(s) to the world catalogue.",
+        "CreatedDetail": "Fabricate added {count} essence(s) and tool(s) to the world catalogue, each linked to the crafting system that holds it: {names}. Every crafting system keeps exactly the behaviour it had.",
+        "Adopted": "Fabricate linked {count} essence(s) and tool(s) to the world entry they already matched.",
+        "AdoptedDetail": "Fabricate linked {count} essence(s) and tool(s) to the world entry with the same id they already matched: {names}.",
+        "Conflicting": "{count} row(s) could not be linked to the world catalogue and keep working in their system only.",
+        "ConflictingDetail": "{count} row(s) could not be linked to the world catalogue because a world entry with the same id or source already describes something else, so they keep working in their system only: {names}. Review them under World › Tools or World › Essences.",
+        "Ambiguous": "{count} tool(s) match more than one world tool and were left unlinked.",
+        "AmbiguousDetail": "{count} tool(s) share a source item with more than one world tool, so Fabricate could not tell which one they are and left them working in their system only: {names}. Review them under World › Tools.",
+        "UnresolvedMemberships": "{count} world link(s) name a row their crafting system no longer holds.",
+        "UnresolvedMembershipsDetail": "{count} world link(s) name an essence or tool their crafting system no longer holds: {names}. Nothing was removed.",
+        "OrphanedSystemMemberships": "{count} world link(s) name a crafting system that no longer exists.",
+        "OrphanedSystemMembershipsDetail": "{count} world link(s) name a crafting system that no longer exists: {names}. Nothing was removed.",
+        "EquivalentEssenceCandidates": "{count} essence(s) look like the same essence in more than one system and were kept separate.",
+        "EquivalentEssenceCandidatesDetail": "{count} essence(s) look like the same essence in more than one system and were kept separate: {names}. Review them under World › Essences."
       }
     },
     "Update": {
+      "DeferredPartStale": "Part of Fabricate could not load because this browser is still running an earlier version of the module. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS.",
       "StaleEntryScript": "Fabricate {installedVersion} is installed, but this browser is still running Fabricate {buildVersion}. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS."
     },
     "Canvas": {
@@ -700,6 +764,8 @@
           "FooterNote": "One prompt sets the bonus, roll mode and advantage for the whole batch. Every item still rolls its own check.",
           "ReorderNote": "Your saved stage order is used for each item that has one.",
           "SalvageAction": "Salvage",
+          "SalvageBusy": "Salvaging…",
+          "DestroyBusy": "Destroying…",
           "ProgressSalvaging": "Salvaging {current} of {total}",
           "ProgressDestroying": "Destroying {current} of {total}",
           "RunPending": "Waiting",
@@ -782,6 +848,7 @@
           "MisconfiguredSimple": "This component has more than one salvage result set, but Simple mode uses a single set. Fix it in the component editor.",
           "Action": "Salvage",
           "ActionRoll": "Salvage roll",
+          "ActionBusy": "Salvaging…",
           "FooterNote": "Nothing to roll — breaking this down consumes one of the item and recovers the full set.",
           "FooterNoteRoll": "One roll, one shot — rolling breaks the item down immediately. No reroll.",
           "RequiredTools": "Required tools",
@@ -1520,6 +1587,7 @@
           "ClaimOne": "Claim {name}",
           "ClaimMany": "Claim {count} rewards",
           "ClaimNone": "Choose a reward to claim",
+          "Busy": "Claiming…",
           "Forfeit": "Close without a reward",
           "ForfeitDetail": "None of these rewards can be claimed by this character. Closing the choice awards nothing and moves the run to Finished.",
           "ReadOnly": "Only this character's owner or the GM can choose this reward.",
@@ -1567,6 +1635,7 @@
           "SourceActorNotFound": "The character supplying this run’s materials could not be found. Reopen Fabricate and choose the character again.",
           "AlchemySystemNotFound": "That alchemy system is no longer available. Reopen Fabricate and choose it again.",
           "AlchemySubmissionInvalid": "Those alchemy ingredients are not a submission this recipe accepts. Choose the ingredients again.",
+          "AlchemySubmissionUnfunded": "These ingredients cannot be combined as placed. Nothing was spent.",
           "IngredientSetNotFound": "That set of ingredients is no longer part of this recipe. Refresh the Journal and choose again.",
           "StaleRun": "This run changed somewhere else. Refresh the Journal and try again.",
           "StaleStage": "This run has already moved past that stage. Refresh the Journal and try again.",
@@ -1853,6 +1922,11 @@
           "DiscoveredOnFailure": "Learned {name} — the brew failed and yielded the failure result.",
           "Brewing": "The mixture is set to work. Finish it from your Journal once enough time has passed.",
           "DiscoveredBrewing": "Discovered {name}! The mixture is set to work — finish it from your Journal once enough time has passed.",
+          "Started": "Your ingredients are used and the brew is waiting in your Journal. Finish it there.",
+          "DiscoveredStarted": "Discovered {name}! Your ingredients are used and the brew is waiting in your Journal. Finish it there.",
+          "Interrupted": "Your ingredients are used, but the brew did not finish. Finish or cancel it from your Journal.",
+          "DiscoveredInterrupted": "Discovered {name}! Your ingredients are used, but the brew did not finish. Finish or cancel it from your Journal.",
+          "Unknown": "Something went wrong while brewing. Check your Journal before you brew again.",
           "CheckFailed": "The brew failed its check. The chat card has the full outcome.",
           "DiscoveredCheckFailed": "Learned {name} — the brew failed its check. The chat card has the full outcome.",
           "Fizzled": "The mixture fizzles — no reaction."
@@ -2546,7 +2620,6 @@
           "Content": "Delete crafting system <strong>{name}</strong>?",
           "Consequences": "Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed."
         },
-        "EditSystem": "Edit system",
         "ReturnToSystemLibrary": "Return to System Library",
         "EditNamed": "Edit {name}",
         "NoDescription": "No description",
@@ -2692,6 +2765,7 @@
           "IssueRequirementOverlap": "Two requirements in a set can be satisfied by the same component.",
           "IssueUnroutedResultGroup": "A result set is not assigned to any check outcome.",
           "IssueUnproducedOutcomeTier": "A check outcome produces no result set.",
+          "IssueUnreachableResultGroup": "A result set is not reached by any ingredient set.",
           "IssueMissingTaughtRecipe": "A result teaches a recipe that is no longer in this system.",
           "IssueChoiceGroupInProgressive": "A result set holds a choice of rewards, which a progressive system cannot award.",
           "IssueChoiceGroupTooFew": "A choice of rewards holds fewer than two alternatives.",
@@ -2833,7 +2907,6 @@
           "DropZoneHint": "Drag a world or compendium item here to make it a book or scroll that teaches recipes.",
           "DropZoneError": "That drop was not a game-world or compendium item. Drag an Item (book, scroll, or any item) here.",
           "DisableNamed": "Disable {name}",
-          "Edit": "Edit recipe item",
           "EditNamed": "Edit {name}",
           "EditRecipeItem": "Edit recipe item",
           "EmptyFilterHint": "Clear the filters to show every recipe item in this system.",
@@ -3195,6 +3268,7 @@
           "TagPanelCount": "{matched} of {total}",
           "TagComponentCount": "{count} components",
           "TagComponentCountOne": "1 component",
+          "TagCreate": "New tag “{name}”",
           "NoTagsDefined": "No tags defined",
           "NoTagsSet": "No tags set",
           "RemoveCost": "Remove cost",
@@ -3232,17 +3306,42 @@
           "ResultSetNamePlaceholder": "Result set name",
           "AlchemyOnSuccess": "On success",
           "AlchemyOnFailure": "On a failed check",
-          "RoutingIngredientSets": "Produced by",
-          "RoutingAddIngredientSet": "Add ingredient set",
-          "RoutingSearchIngredientSets": "Search ingredient sets...",
-          "RoutingNoIngredientSets": "Add a named ingredient set first.",
-          "RoutingOutcomeTiers": "Produced on outcome",
-          "RoutingAddOutcomeTier": "Add outcome",
-          "RoutingSearchOutcomeTiers": "Search outcomes...",
+          "FailureResultsTitle": "Award results on a failed check",
+          "FailureResultsSub": "Adds an “On a failed check” result set; turning it off removes the set and its results.",
+          "FailureResultsBlockedTooltip": "This system produces nothing on a failed check, so there is no failure set to add.",
+          "FailureResultsPolicyTitle": "Failed checks produce nothing on this system",
+          "FailureResultsPolicyText": "To award results on a failed check, set “Produce a result on a failed check” to Decided per recipe or Always on the crafting check’s On failure section.",
+          "FailureResultsOpenChecks": "Open the crafting check",
+          "FailureSetOptionalNote": "Optional. Leave it empty and a failed check produces nothing.",
+          "FailureSetPolicyNote": "This system produces nothing on a failed check, so this set awards nothing.",
           "RoutingNoOutcomeTiers": "Define outcome tiers in the routed crafting check first.",
           "RoutingNoSuccessOutcomeTiers": "No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.",
           "RoutingNoSuccessOutcomeTiersPolicy": "Every outcome tier on this check is a failure, and this system produces nothing on a failed check. Mark a tier as a Success, or let failed checks produce a result on the crafting check’s On failure section.",
-          "RoutingRemove": "Remove",
+          "RoutingDefault": "default",
+          "RoutingDeletedTier": "Deleted outcome tier",
+          "RoutingAssignNote": "Assigning a tier stops the other tiers reaching a result set by default.",
+          "RoutingSharedIngredientSets": "{count} ingredient sets route here, so editing these results changes what each of them awards.",
+          "RoutingSharedOutcomeTiers": "{count} outcome tiers route here, so editing these results changes what each of them awards.",
+          "RoutingImplicitSuccess": "a passed check — no assignment",
+          "RoutingImplicitFailure": "a failed check — no assignment",
+          "RoutingCard": {
+            "Title": "Routing",
+            "HintIngredients": "Each ingredient set produces the result set its row names; re-point a row to change it.",
+            "HintCheck": "The outcome tiers belong to this system’s crafting check; this recipe chooses the result set each one produces.",
+            "AddIngredientSet": "Ingredient set",
+            "AddResultSet": "Result set",
+            "EditTiers": "Edit outcome tiers",
+            "Gap": "Gap",
+            "GapSummary": "{values} — no tier claims this value",
+            "GapAction": "Edit outcome tiers to close the gap at {values}",
+            "NotRouted": "Not routed",
+            "AwardsNothing": "Awards nothing",
+            "BlockedPolicy": "routing not permitted by this system",
+            "BlockedMinimum": "below this recipe’s minimum success tier",
+            "ForcedFailure": "only on a forced failure",
+            "FallbackTitle": "Routed by default",
+            "BorrowedNote": "This step has no result sets of its own, so the recipe can’t be enabled. Until it has one, it falls back to the recipe’s."
+          },
           "AddResultItem": "Add item",
           "ResultAdder": "Result",
           "AddAResult": "Add a result",
@@ -3293,6 +3392,7 @@
           "ToolsEmptyStep": "No tools needed for this step.",
           "ToolsEmptyGlobal": "No global tools — add one that every step needs.",
           "ToolsEmptyIngredientSet": "No tools needed for this ingredient set.",
+          "ToolsSetNameRequired": "An ingredient set needs a name to carry Tools. An unnamed set’s Tool references are inert: they stay saved, and apply again once it is named.",
           "GlobalTools": "Global tools",
           "GlobalToolsHint": "required for every step",
           "AddGlobalTool": "Add global tool",
@@ -3340,6 +3440,7 @@
             "CheckNoRequirementOverlap": "No overlapping ingredient requirements",
             "CheckRoutedResultGroupsRouted": "Every check-mode result set is assigned a check outcome",
             "CheckRoutedOutcomeTiersProduced": "Every check success outcome produces a result set",
+            "CheckRoutedResultGroupsReachable": "Every result set is reached by an ingredient set",
             "CheckTaughtRecipesResolve": "Every recipe it teaches is in this system",
             "CheckChoiceGroupsValid": "Every choice of rewards is complete",
             "CheckAlchemyResultSelection": "Resolves to exactly one result set",
@@ -3353,6 +3454,7 @@
             "IssueRequirementOverlap": "Two requirements in a set can be satisfied by the same component (ambiguous).",
             "IssueUnroutedResultGroup": "A result set is not assigned to any check outcome and will never be produced.",
             "IssueUnproducedOutcomeTier": "A check outcome is not assigned to any result set, so it produces nothing.",
+            "IssueUnreachableResultGroup": "No ingredient set reaches a result set, so it will never be produced.",
             "IssueMissingTaughtRecipe": "A result teaches a recipe that is no longer in this system, so every craft is refused.",
             "IssueChoiceGroupInProgressive": "A progressive system awards every stage in order, so a result set cannot hold a choice of rewards.",
             "IssueChoiceGroupTooFew": "A choice of rewards holds fewer than two alternatives.",
@@ -3766,7 +3868,8 @@
               "Unlink": "Remove macro",
               "NotScript": "That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.",
               "Unresolved": "That macro could not be found. Drop a macro from this world or an installed compendium.",
-              "Missing": "This macro no longer resolves. Drop or browse another to replace it."
+              "Missing": "This macro no longer resolves. Drop or browse another to replace it.",
+              "Relink": "Relink"
             },
             "Summary": {
               "StageMissed": "the award is missed",
@@ -3812,7 +3915,6 @@
             "Hint": "What this component yields when it is broken down in {system}.",
             "ResultGroups": "Result sets",
             "SimpleSingleGroupHint": "Simple mode uses a single result set.",
-            "GroupName": "Result set name",
             "GroupNamePlaceholder": "Set {n}",
             "RemoveGroup": "Remove result set",
             "ResultComponent": "Result component",
@@ -4140,7 +4242,6 @@
           "OnlyGeneralComponent": "Only General so far",
           "OnlyGeneralComponentHint": "Every component falls under General until you add one. Group your component directory by adding a category above.",
           "NoComponentCategoryMatches": "No matches for \"{query}\".",
-          "RemoveComponentCategory": "Remove component category",
           "RemoveComponentCategoryNamed": "Remove component category {name}",
           "RemoveComponentCategoryConfirm": "Remove {name}? {count} components may keep this category value until you update them.",
           "ComponentCategoryAddFailedFeedback": "Component category could not be added.",
@@ -4172,9 +4273,7 @@
           "NoTags": "No component tags yet",
           "NoTagsHint": "Tags let a recipe require any component that carries them. Add a tag above, then apply it to components.",
           "NoTagMatches": "No matches for \"{query}\".",
-          "RemoveCategory": "Remove category",
           "RemoveCategoryNamed": "Remove category {name}",
-          "RemoveTag": "Remove tag",
           "RemoveTagNamed": "Remove tag {name}",
           "RemoveCategoryConfirm": "Remove {name}? {count} references may keep this category value until you update them.",
           "RemoveTagConfirm": "Remove {name}? {count} references may keep this tag value until you update them.",
@@ -4330,7 +4429,6 @@
           "InspectorHint": "The inspector shows source linkage and component usage for the selected essence.",
           "InspectorNoSourceHint": "The inspector shows identity and component usage for the selected essence.",
           "CreateInspectorTitle": "New essence draft",
-          "CreateInspectorHint": "The inspector will show the essence ID after the draft is saved.",
           "EmptySetup": {
             "Kicker": "Essence setup",
             "Title": "Set up essences",
@@ -4612,7 +4710,6 @@
             "UnresolvedDrop": "Unresolved drop",
             "Actions": "Gathering task actions",
             "ActionsFor": "Gathering task actions for {name}",
-            "Edit": "Edit gathering task",
             "Duplicate": "Duplicate gathering task",
             "Delete": "Delete gathering task",
             "ToggleNamed": "Toggle {name}",
@@ -4842,9 +4939,7 @@
             "EmptySearchTitle": "No events match these filters",
             "EmptySearchHint": "Clear search and filters to show all events in this system.",
             "Create": "Create gathering event",
-            "Actions": "Gathering event actions",
             "ActionsFor": "Gathering event actions for {name}",
-            "Edit": "Edit event",
             "Duplicate": "Duplicate event",
             "Delete": "Delete event",
             "ToggleNamed": "Toggle {name}",
@@ -5061,7 +5156,6 @@
             "Quickstart": "Quickstart"
           },
           "EditHint": "Edit scene linkage, environment details, tasks, results, tools, visibility, timing, and validation through the existing draft callbacks.",
-          "Edit": "Edit environment",
           "Duplicate": "Duplicate environment",
           "Delete": "Delete environment",
           "Enable": "Enable environment",
@@ -7093,6 +7187,7 @@
             "NoFormula": "Give this check a roll formula to preview an outcome.",
             "Roll": "Roll a test check",
             "RollAgain": "Roll again",
+            "Rolling": "Rolling…",
             "DynamicDc": "This check takes its DC from a macro at craft time. The preview never runs that macro, so it reads against the static fallback DC instead.",
             "DynamicTarget": "This check's target comes from a macro at craft time. The preview never runs that macro, so it reads against the adjusted character value instead.",
             "NeedsCharacter": "Choose a character who has every value this check reads, then roll.",
@@ -7509,7 +7604,7 @@
             "Progressive": "Progressive",
             "ProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down an ordered list of results until it runs out.",
             "AlchemySimple": "Simple check",
-            "AlchemySimpleBody": "A pass/fail check you can switch off. On a pass the success result set is produced; on a fail the reserved failure result set is.",
+            "AlchemySimpleBody": "A pass/fail check you can switch off. On a pass the success result set is produced; on a fail, the recipe’s failure result set is, if it has one.",
             "AlchemyTiered": "Tiered check",
             "AlchemyTieredBody": "A mandatory routed check. The roll is mapped onto a named tier, and each success tier routes to the result set bound to it.",
             "SalvageRoutedBody": "One roll is rolled once and mapped onto a band. Each band is a named tier, and a salvageable item binds its result sets to those tiers.",
@@ -7616,7 +7711,6 @@
               "SearchMiss": "No matches for \"{query}\".",
               "EmptyTitle": "No world recipe categories yet",
               "EmptyHint": "Add one above and every crafting system can use it. Each system keeps its own categories as well.",
-              "RemoveLabel": "Remove recipe category",
               "RemoveNamedLabel": "Remove recipe category {name}",
               "RemoveConfirm": "Remove {name}? {count} recipes across every crafting system use it. No recipe is rewritten - this removes the world entry only.",
               "ReservedFeedback": "General is already available as the base category.",
@@ -7636,7 +7730,6 @@
               "SearchMiss": "No matches for \"{query}\".",
               "EmptyTitle": "No world component categories yet",
               "EmptyHint": "Add one above and every crafting system can use it. Each system keeps its own categories as well.",
-              "RemoveLabel": "Remove component category",
               "RemoveNamedLabel": "Remove component category {name}",
               "RemoveConfirm": "Remove {name}? {count} components across every crafting system carry it. {cascade}",
               "CascadeSome": "Deleting clears it from {defaults} world components, which {inheriting} crafting systems inherit.",
@@ -7658,7 +7751,6 @@
               "SearchMiss": "No matches for \"{query}\".",
               "EmptyTitle": "No world component tags yet",
               "EmptyHint": "Add one above and every crafting system is granted it. Each system keeps its own tags as well.",
-              "RemoveLabel": "Remove component tag",
               "RemoveNamedLabel": "Remove component tag {name}",
               "RemoveConfirm": "Remove {name}? {count} references across every crafting system. {cascade}",
               "CascadeSome": "Deleting drops it from {components} world components; each system keeps its own tags.",
@@ -8453,7 +8545,9 @@
             "peach": "Peach",
             "butter": "Butter",
             "aqua": "Aqua",
-            "mauve": "Mauve"
+            "mauve": "Mauve",
+            "verdant": "Verdant",
+            "azure": "Azure"
           }
         }
       },
@@ -8481,6 +8575,8 @@
         "ResolutionModeChangeTitle": "Change Resolution Mode?",
         "ResolutionModeChangeContent": "{count} recipe(s) will be migrated to {mode}.",
         "ResolutionModeChangeContentDelete": "{count} recipe(s) will be migrated to {mode}; {deleteCount} cannot be migrated and will be deleted: {names}.",
+        "ResolutionModeChangeDroppedSets": "{count} recipe(s) will keep only their first ingredient set; these ingredient sets will be dropped: {sets}.",
+        "ResolutionModeChangeDroppedFailureSets": "{count} recipe(s) will lose their failure result set, which {mode} does not have: {names}.",
         "ResolutionModeChangeConfirm": "Change mode",
         "SalvageResolutionMode": "Salvage resolution mode",
         "SalvageResolutionModeHint": "Salvage has one ingredient, so ingredient-set routing does not apply. Components incompatible with the new salvage mode will have salvage disabled.",
@@ -8499,7 +8595,7 @@
           "CheckModeIntro": "Choose the shape of the check a matched brew rolls: a simple pass/fail check, or a tiered routed check. Use the Active switch to resolve brews without a check at all.",
           "CheckModeNone": "No check",
           "CheckModeSimple": "Simple check",
-          "CheckModeSimpleDesc": "A pass/fail check you can switch off. On a pass the success result set is produced; on a fail the reserved failure result set is.",
+          "CheckModeSimpleDesc": "A pass/fail check you can switch off. On a pass the success result set is produced; on a fail, the recipe’s failure result set is, if it has one.",
           "CheckModeTiered": "Tiered check",
           "CheckModeTieredDesc": "A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.",
           "BehaviourHeading": "Alchemy behaviour",

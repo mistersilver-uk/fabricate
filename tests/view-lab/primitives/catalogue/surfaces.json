@@ -109,12 +109,73 @@
     "content": ["Clear filters"]
   },
   {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "compact — a 32 tile and tighter padding, for a sidebar or a slot",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "compact": true,
+      "icon": "fa-regular fa-circle-dot",
+      "title": "No travel actor",
+      "hint": "Pick the actor that represents this party on the map."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "inline — one line, the tile released into a bare glyph",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "inline": true,
+      "icon": "fas fa-feather",
+      "hint": "Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "note — the popover line, with no panel",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "note": true,
+      "title": "No actor matches your search."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "field — inline at the width of a control, 34px high (issue 1649)",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "props": {
+      "inline": true,
+      "field": true,
+      "hint": "Any Weather"
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "fill — the whole box of a bounded host (issue 1648)",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
+    "slot": {
+      "width": 260,
+      "height": 120
+    },
+    "note": "A boxed slot, because `fill` takes its height from a bounded host: the drawing's 120px host, at the unit's 260px width.",
+    "props": {
+      "compact": true,
+      "fill": true,
+      "icon": "fas fa-clock-rotate-left",
+      "hint": "No completed runs yet."
+    }
+  },
+  {
     "spec": "<Card> <Well> <RowDisclosure>",
     "cap": "card — radius 11, padding 16, bg-2",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/InspectorCard.svelte",
-    "partial": "title only",
-    "note": "The card with its title, as the drawing writes it. Its icon tile and “per tick” badge stay drawn: they are library marks with no shipped markup a node array can carry.",
+    "partial": "title only, no tile or badge",
+    "note": "The shipped card in place of its drawing, holding the title as the drawing writes it. The icon tile and the “per tick” badge are library marks with no shipped markup a node array can carry.",
     "content": [
       {
         "tag": "h3",
@@ -130,29 +191,47 @@
     "cap": "collapsible card, body in a well",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/InspectorCard.svelte",
+    "fixture": "CardWellBody",
+    "partial": "no ordinal or chevron",
+    "note": "The flush card in place of its drawing: its head insets itself and its body is the shipped Well, so the Well's own row stands at the well unit rather than inside this replaced drawing.",
+    "props": {
+      "flush": true
+    },
+    "data": {
+      "wellLabel": "Ingredients",
+      "wellStyle": "margin:0 16px 16px"
+    },
     "content": [
       {
-        "tag": "h3",
+        "tag": "div",
         "attrs": {
-          "style": "margin:0;font-family:var(--fab-font-serif);font-size:15px;font-weight:600"
+          "style": "padding:12px 16px"
         },
-        "text": "Draw the billet"
-      },
-      {
-        "tag": "p",
-        "attrs": {
-          "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
-        },
-        "text": "2 ingredients"
+        "children": [
+          {
+            "tag": "h3",
+            "attrs": {
+              "style": "margin:0;font-family:var(--fab-font-serif);font-size:15px;font-weight:600"
+            },
+            "text": "Draw the billet"
+          },
+          {
+            "tag": "p",
+            "attrs": {
+              "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
+            },
+            "text": "2 ingredients"
+          }
+        ]
       }
     ]
   },
   {
     "spec": "<Card> <Well> <RowDisclosure>",
-    "cap": "collapsible card, body in a well",
+    "cap": "well — radius 9, padding 12, bg-1",
     "draws": ".k-well",
     "path": "src/ui/svelte/components/Well.svelte",
-    "note": "The card row above stands beside its drawing rather than replacing it, so the drawing, and this well inside it, stays on the page: the Card drawing beside the live Card contains this live Well.",
+    "note": "The well at its own unit: the flush card's row replaces the drawing that holds the collapsible card's well, and draws a live Well there itself.",
     "props": {
       "label": "Ingredients"
     }

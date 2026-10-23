@@ -333,7 +333,7 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
         options={breakageModeOptions}
-        selectedValue={breakageChoice}
+        value={breakageChoice}
         groupName="tool-breakage-mode"
         columns={2}
         data-radio-card-group="tool-breakage-mode"
@@ -455,7 +455,7 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
         options={breakabilityOptions}
-        selectedValue={tool?.checkBreakable === false ? 'immune' : 'breakable'}
+        value={tool?.checkBreakable === false ? 'immune' : 'breakable'}
         groupName="tool-check-breakable"
         columns={2}
         data-radio-card-group="tool-breakability"
@@ -478,8 +478,7 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <!-- STILL A `<fieldset disabled>`, the immune state's whole mechanism: one attribute rather
-         than `disabled` passed down three controls. -->
+    <!-- STILL A `<fieldset disabled>`: one attribute is the immune state's whole mechanism. -->
     <!-- THE CONTROL HALF of the validation row action. The `onBreak` and `repair` checks are both
          about what is authored INSIDE this fieldset, so the fieldset is the destination; it is not
          natively focusable, hence the tabindex and the keyboard-focus attribute. IT CAN BE
@@ -503,9 +502,10 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}
         options={onBreakOptions}
-        selectedValue={onBreak.mode}
+        value={onBreak.mode}
         groupName="tool-on-break"
         columns={3}
+        layout="stacked"
         disabled={immune}
         data-radio-card-group="tool-on-break"
         optionDataAttr="data-tool-on-break-choice"

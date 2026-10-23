@@ -12,7 +12,14 @@ import {
   waitForQueuedAnnouncement,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settle, settleBetweenTests, compareStrings } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settle,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+  compareStrings,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -38,6 +45,7 @@ export function registerBulkCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -45,6 +53,7 @@ export function registerBulkCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -646,7 +655,7 @@ export function registerBulkCases() {
     const remove = inspector.querySelector('[data-recipe-action="delete"]');
     assert.ok(Boolean(remove), 'the inspector renders its Delete');
     assert.ok(
-      remove.classList.contains('fab-manager-button'),
+      remove.classList.contains('fabricate-button'),
       'Delete renders through the Button primitive, not a hand-written class'
     );
     assert.ok(
@@ -663,7 +672,7 @@ export function registerBulkCases() {
       const sibling = inspector.querySelector(`[data-recipe-action="${action}"]`);
       assert.ok(Boolean(sibling), `the inspector renders its ${action} action`);
       assert.ok(
-        sibling.classList.contains('fab-manager-button'),
+        sibling.classList.contains('fabricate-button'),
         `${action} renders through the primitive too`
       );
       assert.ok(

@@ -32,20 +32,11 @@
   overflow: hidden;
 }
 
-/* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest. */
+/* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes the nearest; the selected tool's panel and its sections inherit the column's 16px rhythm. */
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
-  padding: var(--fab-space-4);
-}
+  --fab-manager-inspector-pad: var(--fab-space-4);
 
-.fabricate-manager .manager-tools-authority-card,
-.fabricate-manager .manager-tools-create-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-overlay-light-04);
+  gap: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-library-card {
@@ -63,8 +54,7 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-tools-authority-card h2,
-.fabricate-manager .manager-tools-create-card h3 {
+.fabricate-manager .manager-tools-authority-card h2 {
   margin: 0;
   font-family: var(--fab-font-serif);
   font-size: 0.84rem;
@@ -72,27 +62,22 @@
   line-height: 1.2;
 }
 
-.fabricate-manager .manager-tools-authority-card .manager-kicker,
-.fabricate-manager .manager-tools-create-card .manager-kicker {
+.fabricate-manager .manager-tools-authority-card .manager-kicker {
   margin-bottom: var(--fab-space-1);
   font-size: 0.64rem;
 }
 
-.fabricate-manager .manager-tools-authority-card .manager-muted,
-.fabricate-manager .manager-tools-create-card p:not(.manager-kicker) {
+.fabricate-manager .manager-tools-authority-card .manager-muted {
   margin: var(--fab-space-1) 0 0;
   font-size: 0.7rem;
   line-height: 1.3;
 }
 
-/* ── THE BREAKAGE-MODE CARD ── `proto:2499`: `padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 11px` (issue 1373). */
+/* ── THE BREAKAGE-MODE CARD ── Its box is the shared card's; this rule only stacks its content (issue 1373). */
 .fabricate-manager .manager-tools-authority-card {
   flex-flow: column nowrap;
   align-items: stretch;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tools-authority-heading {
@@ -222,7 +207,6 @@
 
 .fabricate-manager .manager-tools-browser-pagination .fabricate-pagination {
   width: 100%;
-  box-sizing: border-box;
 }
 
 /* `proto:4870`: `gap: 11px; border-radius: 9px`. The row gap takes the scale's 12px, which is the step nearest the design's 11 — it was 8, one step short, which is where a third of finding 13's 30-40% looseness reversed into tightness. */
@@ -321,11 +305,6 @@
 /* ── THE ROW'S ENABLE SWITCH IS THE SHARED ONE, AND ITS FIVE-RULE SKIN IS GONE ── The Tools list drew this switch by hand — a 36px box, a 34x20 track and a 14px knob that travelled 14px, in the accent on and the raised neutral off (issue 1515). */
 
 .fabricate-manager .manager-tool-browser-inspector {
-  gap: var(--fab-space-4);
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -445,7 +424,6 @@
 
 @container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-tools-authority-card,
-  .fabricate-manager .manager-tools-create-card,
   .fabricate-manager .manager-tools-library-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -824,11 +802,9 @@
   background: var(--fab-bg-0);
 }
 
-/* THE ROWS AND THE PAGER LOSE THEIR FILLS. The border is what makes a row a row here, which is the prototype's own construction; a fill on top of a pane one rung darker is what made five near-identical greys on one screen. */
+/* THE ROWS LOSE THEIR FILLS. The border is what makes a row a row here, which is the prototype's own construction; a fill on top of a pane one rung darker is what made five near-identical greys on one screen. */
 .fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination,
-.fabricate-manager[data-manager-view='essences'] .manager-essence-row,
-.fabricate-manager[data-manager-view='essences'] .fabricate-pagination {
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row {
   background: transparent;
 }
 
@@ -853,11 +829,7 @@
 
 /* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to be brought onto the same ladder here rather than in a component's scoped `<style>`. */
 .fabricate-manager[data-manager-view='essences'] .manager-inspector {
-  background: var(--fab-bg-0);
-}
-
-.fabricate-manager[data-manager-view='essences'] .manager-inspector .fabricate-card {
-  background: transparent;
+  --fab-manager-inspector-bg: var(--fab-bg-0);
 }
 
 /* THE PAGE HEADER BAND IS PART OF THE SAME FLAT SURFACE, and it was the one region the block above could not reach. */
@@ -865,13 +837,6 @@
 .fabricate-manager[data-manager-view='world-essence-entry'] .manager-header,
 .fabricate-manager[data-manager-view='essences'] .manager-header {
   background: var(--fab-bg-0);
-}
-
-/* THE BROWSER TOOLBAR STRIP IS FLUSH, NOT A RAISED BAND. Last of the surface inversions on these screens, and the same one just corrected on the secondary buttons — ours raised a region the prototype leaves level. */
-.fabricate-manager[data-manager-view='world-essences'] .fabricate-filter-bar,
-.fabricate-manager[data-manager-view='essences'] .fabricate-filter-bar {
-  border-bottom: 0;
-  background: transparent;
 }
 
 /* ── THE TOOL SCREENS JOIN THE SAME SURFACE LADDER ── The blocks above are route-scoped by design, and their route lists name the ESSENCE screens (issue 1373). */
@@ -899,45 +864,9 @@
   background: var(--fab-bg-1);
 }
 
-/* ── THE BREAKAGE CHOOSER'S TYPE AND COLOUR, ON BOTH TOOL SCOPES ── `RadioCardGroup`'s GEOMETRY stays on the shipped ladder — that hold is recorded at the component and nothing here moves a padding, a gap, a radius or the tile — but its own wording is that TYPE and COLOUR come from the reference, and three of those had not been taken (issue 1373). */
-.fabricate-manager[data-manager-view='tool-edit']
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option,
-.fabricate-manager[data-manager-view='world-tool-entry']
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option {
-  background: var(--fab-bg-0);
-}
-
-.fabricate-manager[data-manager-view='tool-edit'] .manager-resolution-option-name,
-.fabricate-manager[data-manager-view='world-tool-entry'] .manager-resolution-option-name {
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.fabricate-manager[data-manager-view='tool-edit'] .manager-resolution-option-desc,
-.fabricate-manager[data-manager-view='world-tool-entry'] .manager-resolution-option-desc {
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-/* AND THE CHOSEN CARD'S OWN TWO VALUES, WHICH ARE THE SAME STATEMENT AS THE RESTING ONE (issue 1373). */
-.fabricate-manager[data-manager-view='tool-edit']
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active,
-.fabricate-manager[data-manager-view='world-tool-entry']
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-surface-active);
-}
-
-/* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the reference’s own construction on both list screens. */
+/* THE ROWS LOSE THEIR FILLS, so the 1px border is what makes a row a row — the reference’s own construction on both list screens. */
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-tools'] .fabricate-pagination,
-.fabricate-manager[data-manager-view='tools'] .manager-tools-row,
-.fabricate-manager[data-manager-view='tools'] .fabricate-pagination {
+.fabricate-manager[data-manager-view='tools'] .manager-tools-row {
   background: transparent;
 }
 
@@ -959,17 +888,7 @@
 
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence rules list does, so its surfaces are brought onto the ladder here rather than in a scoped block (issue 1373). */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager[data-manager-view='tools'] .manager-inspector .fabricate-card {
-  background: transparent;
-}
-
-/* THE WORLD TOOLS CATALOGUE'S TOOLBAR STRIP IS FLUSH TOO (issue 1373). */
-.fabricate-manager[data-manager-view='world-tools'] .fabricate-filter-bar {
-  border-bottom: 0;
-  background: transparent;
+  --fab-manager-inspector-bg: var(--fab-bg-1);
 }
 
 /* ── THE TOOL RULES EDITOR'S VALIDATION SURFACE ── Scoped to this route, not applied to `EditorValidationSurface` at large: the recipe, check and essence editors each have reference frames of their own, and this is the one that was read against its own (issues 1373, 1509). */
@@ -1008,11 +927,6 @@
 }
 
 /* ── THE WORLD COMPONENT CATALOGUE'S ROW STATES ── A NEW BLOCK, APPENDED (issue 1371). */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-components'] .fabricate-pagination {
-  background: transparent;
-}
-
 .fabricate-manager[data-manager-view='world-components']
   .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
   background: var(--fab-surface-raised);
@@ -1137,10 +1051,6 @@
 /* ── THE CARD, AND THE HEAD EVERY CARD SHARES ── `proto:845`, `:882` and `:921` draw one head: a 12px glyph in the card's own ink, an `h3` at 14px serif, a 10px muted subtitle, and an optional trailing action. */
 .fabricate-manager .manager-component-entry-card {
   gap: var(--fab-space-3);
-  padding: var(--fab-space-4);
-  background: var(--fab-bg-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
 }
 
 .fabricate-manager .manager-component-entry-card-head {
@@ -1213,10 +1123,6 @@
 }
 
 /* ── A3. THE IDENTITY CARD ── `proto:833-843`: a 56px chip and a copy column (issue 1371). */
-.fabricate-manager .manager-component-entry-identity {
-  background: var(--fab-surface-soft);
-}
-
 .fabricate-manager .manager-component-entry-identity-body {
   display: flex;
   align-items: flex-start;
@@ -1329,7 +1235,7 @@
 }
 
 /* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-2);
@@ -1339,7 +1245,7 @@
 }
 
 /* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires: switching a control off must take its colours from `.fabricate-button:disabled` and keep the shape it had when enabled. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
@@ -1461,7 +1367,6 @@
 .fabricate-manager .manager-component-entry-systems-card {
   flex: 0 0 auto;
   gap: 0;
-  padding: 0;
   overflow: hidden;
 }
 
@@ -1473,7 +1378,7 @@
 }
 
 /* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
-.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fabricate-button {
   flex: 0 0 auto;
   height: 30px;
   min-height: 30px;
@@ -1486,7 +1391,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border-strong);
   color: var(--fab-text);
@@ -1606,7 +1511,7 @@
   gap: var(--fab-space-chip);
 }
 
-.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -1617,14 +1522,14 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fabricate-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
 }
 
 /* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3 drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
-.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fabricate-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -1635,7 +1540,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fabricate-button:not(:disabled) {
   background: transparent;
   border-color: var(--fab-border-strong);
   color: var(--fab-text-secondary);
@@ -1682,7 +1587,6 @@
 
 /* ── A7. DELETE FROM THE WORLD ── `proto:928-936`: the danger card at the foot, in place of the header `Delete`. */
 .fabricate-manager .manager-scoped-entry-danger {
-  padding: var(--fab-space-3) var(--fab-space-4);
   background: var(--fab-danger-soft);
   border-color: var(--fab-danger-border);
 }
@@ -1892,11 +1796,6 @@
 
 /* === ISSUE 1371 · PARTS C AND D — THE SYSTEM COMPONENT RULES LIST AND ITS EDITOR === */
 
-/* C3. THE TOOLBAR'S OWN BAND (`proto:1050`): `14px 20px 0` — inset from the pane's edge (issue 1371). */
-.fabricate-manager .manager-component-toolbar {
-  padding: var(--fab-space-3) var(--fab-space-5);
-}
-
 /* ── C3. THE TOOLBAR'S SECOND ROW ── `proto:1058` puts the selection register, the two VIEW controls and the count on ONE row. */
 .fabricate-manager .manager-component-filter-row.is-secondary {
   display: flex;
@@ -2051,14 +1950,7 @@
   font-size: 0.5rem;
 }
 
-/* ── C7. THE INSPECTOR ── `proto:1247`: a scrolling body at 17px padding (snapped to 16) with 13px gaps (snapped to 12), over a PINNED foot. */
-.fabricate-manager .manager-component-browser-inspector {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-height: 0;
-}
-
+/* ── C7. THE INSPECTOR ── `proto:1247`: a scrolling body with 13px gaps (snapped to 12), over the `InspectorPanel` foot. */
 .fabricate-manager .manager-component-inspector-body {
   display: flex;
   flex: 1 1 auto;
@@ -2215,27 +2107,12 @@
   font-size: 0.74rem;
 }
 
-/* `proto:1268`: the pinned foot — a top hairline over the inspector's own surface, holding ONE primary action. */
-.fabricate-manager .manager-component-inspector-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-4);
-  padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
-}
-
 /* === ISSUE 1371 · PART D — THE COMPONENT RULES EDITOR === `rebuild-spec.md` Part D, `proto:1282-1501`. */
 
 /* `proto:1316`: the callout's one exit — a 30px control on `--fab-bg-1` behind a `border-strong` hairline. */
 
-/* `.fab-manager-button` IS CHAINED, and it is load-bearing rather than tidiness. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-component-identity-exit {
+/* The root is TRIPLED, and it is load-bearing rather than tidiness. */
+.fabricate-button.fabricate-button.fabricate-button.manager-component-identity-exit {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);
   height: 30px;
@@ -2528,12 +2405,12 @@
   display: none;
 }
 
-/* A stage whose component authors no crafting complication renders nothing into the band, so its
-   body box is dropped rather than drawing 12px of dead height on every row of an always-open list
-   (issue 1512). Keyed on the callers' own family classes: a bare `:not(.has-band)` would hide the
+/* A stage whose component authors no complication for the list's activity renders nothing into
+   the band, so its body box is dropped rather than drawing 12px of dead height on every row of an
+   always-open list (issue 1512). Keyed on the two stage lists' own family classes, the manager's
+   `ProgressiveStageList` and the player's stage row: a bare `:not(.has-band)` would hide the
    editing body of every other caller, which is a body the caller always fills. */
-.fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
-.fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
+.fabricate-sortable-list-row.manager-progressive-stage-row:not(.has-band)
   .fabricate-sortable-list-body,
 .fabricate-sortable-list-row.progressive-stage-row:not(.has-band) .fabricate-sortable-list-body {
   display: none;
@@ -2553,16 +2430,6 @@
 }
 
 /* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */
-
-/* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
-.fabricate-manager .manager-salvage-group-card {
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  list-style: none;
-}
 
 /* `proto:1405`: the group's count in the mono face. Weight 500, because the face ships 400 and 500 only and the reference's 700 has nowhere to land. */
 .fabricate-manager .manager-salvage-group-count {
@@ -2637,7 +2504,7 @@
 /* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ── The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint can be written here, at any specificity (issue 1506). */
 
 /* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ── Copy and Unlink share one geometry and one surface, and the reference separates them by INK alone: Unlink carries the danger edge and the danger text while it is still linked, and falls back to the neutral pair once there is nothing left to unlink. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-source-unlink]:not(
     :disabled
   ) {
   border-color: var(--fab-danger-border);
@@ -2645,13 +2512,13 @@
 }
 
 /* `Add alias` STATES WHETHER IT WILL DO ANYTHING (`proto:5436-5438`). With an empty field the reference draws it transparent on a plain hairline in the disabled ink; with a uuid typed it lifts onto `surface-soft` behind a strong edge in the full text ink. */
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-alias-add]:disabled {
   background: transparent;
   border-color: var(--fab-border);
   color: var(--fab-text-disabled);
 }
 
-.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fabricate-button[data-scoped-entry-alias-add]:not(
     :disabled
   ) {
   background: var(--fab-surface-soft);
@@ -2684,9 +2551,9 @@
 
 /* === issue 1371 r8-prim — the shared primitives' opt-in sizes, and the two corners the M12a edit would otherwise have moved off the ladder. === */
 
-/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.fabricate-button.fab-manager-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters,
-.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
+/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.fabricate-button.fabricate-button.fabricate-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
+.fabricate-button.fabricate-button.fabricate-button.manager-clear-filters,
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fabricate-button {
   border-radius: 7px;
 }
 
@@ -2749,8 +2616,15 @@
 /* === issue 1371 r9-prim2 — the manager button's opt-in 38px rung. === */
 
 /* ── THE 38px BUTTON (issue 1371, gap-list rows 1 and 22) ── 38 IS A RUNG (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the world component catalogue's `+ Register item` (`proto:570`) and the system's `+ Add from catalogue` (`proto:1046`) at 38 against the 34 this control ships at. */
-.fabricate-button.fabricate-button.fab-manager-button.is-size-38 {
+.fabricate-button.fabricate-button.fabricate-button.is-size-38 {
   min-height: 38px;
+}
+
+/* The 28px rung (issue 2515): a choice group's `Alternative` adder, at the stepper's 28. It pins the height the `dashed` role pins, and takes the 26-32 band's corner. */
+.fabricate-button.fabricate-button.fabricate-button.is-size-28 {
+  height: 28px;
+  min-height: 28px;
+  border-radius: 7px;
 }
 
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
@@ -2762,7 +2636,7 @@
 
 /* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. */
 .fabricate-manager[data-manager-view="components"]
-  .fabricate-button.fab-manager-button.manager-component-sort-direction {
+  .fabricate-button.fabricate-button.manager-component-sort-direction {
   color: var(--fab-text-secondary);
   font-size: 11px;
 }
@@ -2770,13 +2644,6 @@
 /* `proto:1062`: the two micro-labels on the second row at 8.5px. The shared label rule draws 8.8px, and the 0.08em tracking it already carries resolves against the element's OWN size, so the `letterSpacing` line closes with the size and needs no declaration of its own. */
 .fabricate-manager[data-manager-view="components"] .manager-component-filter-label {
   font-size: 8.5px;
-}
-
-/* === issue 1371 r16-cat — the world Component catalogue's foot pager, second pass (maintainer ruling M21, superseding r13-cat's M19 rule that stood here). === */
-
-/* ── THE PAGER IS A FULL-WIDTH BAND BY CONSTRUCTION NOW (M21) ── M19 ("the pagination footer on the component browser is not full width") was closed in r13 by bleeding the pager through the list column's `--fab-space-4` inset with three negative margins. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .fabricate-pagination {
-  background: var(--fab-overlay-light-03);
 }
 
 /* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG, ON EVERY BULK PANEL (M24) ── `proto:5340` (the world panel) and `proto:5638` (the system panel) draw the dock's destructive action `height:34px; border-radius:8px; font:700 11px` on a `--danger-soft` fill inside a `--danger-border` hairline, as ONE 11px line. */

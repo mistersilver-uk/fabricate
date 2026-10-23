@@ -24,6 +24,7 @@ import {
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
@@ -76,7 +77,7 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // The ONE ingredient-kind table (issue 1373, round 8).
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -109,6 +110,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
@@ -118,14 +120,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
-    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/ChoiceGroup.svelte',
+    'src/ui/svelte/components/PickerRow.svelte',
+    'src/ui/svelte/components/PickerRowAmount.svelte',
+    'src/ui/svelte/components/PickerRowNameField.svelte',
+    'src/ui/svelte/components/PickerRowRewardBody.svelte',
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
     ...CHOICE_GROUP_COMPILED_MODULES,
+    // Issue 2512: every ingredient set is drawn in the set card.
+    'src/ui/svelte/components/SetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
@@ -135,7 +139,7 @@ const harness = createMountedComponentHarness({
     // issue 1373's parity round. This editor passes no `requiredForPageSize`, so it draws no
     // pager - but the import is STATIC, so it is in this tree's graph either way and the
     // harness's closure validator throws for a shared-harness suite that omits it.
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
@@ -1331,9 +1335,38 @@ describe('Tool Studio editor (mounted)', () => {
       [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')].map((node) =>
         node.textContent.replaceAll(/\s+/gu, ' ').trim()
       ),
-      ['metal 2 components', 'salvage 0 components'],
+      ['#metal 2 components', '#salvage 0 components'],
       'each tag counts the components carrying it exactly'
     );
+  });
+
+  it('offers no new-tag footer on a repair tag row (issue 2515)', async () => {
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          onBreak: { mode: 'flagBroken' },
+          repairRequirements: [
+            {
+              id: 'tags',
+              options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+            },
+          ],
+        }),
+        itemTags: ['metal'],
+      })
+    );
+    root.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    const field = document.querySelector(
+      '.fabricate-picker-popover .manager-travel-popover-search input'
+    );
+    field.value = 'brine';
+    field.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    await tick();
+    await settle();
+    assert.equal(field.value, 'brine', 'the absent tag is typed');
+    assert.ok(!document.querySelector('[data-recipe-tag-create]'), 'and no footer offers it');
   });
 
   it('reads a zero for a vocabulary tag named like an Object.prototype member (issue 2430)', async () => {
@@ -1359,7 +1392,7 @@ describe('Tool Studio editor (mounted)', () => {
       [...document.querySelectorAll('.fabricate-picker-popover [role="option"]')].map((node) =>
         node.textContent.replaceAll(/\s+/gu, ' ').trim()
       ),
-      ['constructor 0 components', 'metal 1 component']
+      ['#constructor 0 components', '#metal 1 component']
     );
   });
 
@@ -2092,7 +2125,7 @@ describe('Tool Studio editor (mounted)', () => {
     // `proto:2334` is one muted sentence that states the AND rule AND introduces the gate pair.
     const cardText = root.querySelector('[data-tool-rule-card="prerequisites"]').textContent;
     assert.equal(cardText.includes('Which prerequisites'), false, 'no list eyebrow');
-    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet.
+    // `RadioCardGroup` hides its legend through the sheet unless `legendVisible` is set.
     assert.ok(
       !root.querySelector('[data-tool-rule-card="prerequisites"] .is-legend-visible'),
       'and no visible gate-pair legend — the sentence above it is the introduction'

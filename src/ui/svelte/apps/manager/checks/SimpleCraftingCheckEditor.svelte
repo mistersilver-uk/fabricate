@@ -221,7 +221,7 @@
 
 <div class="manager-checks-editor" data-simple-check-editor>
   {#if shows('roll')}
-    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
+    <InspectorCard flush class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -276,7 +276,7 @@
          an editor, hence the shared icon fact row and no count badge, and it renders in every
          mode precisely because it IS the mode's outcome model. -->
   {#if shows('outcomes')}
-    <InspectorCard class="manager-checks-card" data-simple-outcomes="">
+    <InspectorCard flush class="manager-checks-card" data-simple-outcomes="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -393,7 +393,7 @@
     <!-- THE TIER LIST RENDERS UNDER BOTH MODES: the macro takes the tier's DC as its anchor and
              returns the final number, so hiding the tiers under dynamic would hide half of what
              the engine reads. -->
-    <InspectorCard class="manager-checks-card" data-static-dc="">
+    <InspectorCard flush class="manager-checks-card" data-static-dc="">
       <CheckRecipeTiers
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}

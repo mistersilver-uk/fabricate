@@ -28,11 +28,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // now the dense row's 22px mark; the alchemy known-recipe and discipline card tiles -2, now that
 // row's 38px mark. Issue 2321: the inventory inspector's cross-reference tiles -6, now
 // `XrefList`'s rows. Issue 2381: the player progressive stage row's art +2, one per branch (22 inline, 30 stacked), replacing the raw `<img>` tile
-// its retired list drew. The count is every `<Medallion` opening tag in `src/`; a branched pair is two.
-const MEDALLION_SITES = 70;
+// its retired list drew. Issue 2466: the link field's 38px chip +1. Issue 2467: the option card's
+// 30px chip +1. The count is every `<Medallion` opening tag in `src/`; a branched pair is two.
+const MEDALLION_SITES = 72;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 53;
+const ART_BEARING_SITES = 54;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

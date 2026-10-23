@@ -32,10 +32,10 @@
 
   const paused = $derived(run?.paused === true || Boolean(run?.pauseState));
   const busy = $derived(primary?.busy === true || run?.busy === true);
-  const primaryEnabled = $derived(primary?.enabled === true && !busy);
+  const primaryEnabled = $derived(primary?.enabled === true);
   const primaryLabel = $derived(busy ? primary?.busyLabel || primary?.label : primary?.label);
   const pauseEnabled = $derived(pause?.enabled !== false && !busy);
-  const beginEnabled = $derived(begin?.enabled === true && !busy);
+  const beginEnabled = $derived(begin?.enabled === true);
 
   function confirmCancel() {
     onCancel();
@@ -67,13 +67,13 @@
       aria-label={cancel.confirmLabel}
     >
       <Button
+        icon={cancel.icon || 'fas fa-ban'}
         role="danger"
         class="fab-run-action-control"
         data-run-action="cancel-confirm"
         onkeydown={disarmOnEscape}
         onclick={confirmCancel}
       >
-        <i class={cancel.icon || 'fas fa-ban'} aria-hidden="true"></i>
         {cancel.confirmLabel}
       </Button>
       <Button
@@ -95,16 +95,16 @@
     <IconButton
       class="fab-run-action-control fab-run-action-cancel"
       ariaLabel={cancel.ariaLabel || runLabel}
+      icon={cancel.icon || 'fas fa-ban'}
       disabled={busy || cancel.disabled === true}
       data-run-action="cancel-arm"
-      title={cancel.title || undefined}
+      tooltip={cancel.title || undefined}
       onclick={() => (armed = true)}
-    >
-      <i class={cancel.icon || 'fas fa-ban'} aria-hidden="true"></i>
-    </IconButton>
+    />
 
     {#if paused}
       <Button
+        icon={resume.icon || 'fas fa-play'}
         class="fab-run-action-control is-resume"
         data-run-action="resume"
         aria-label={resume.ariaLabel || undefined}
@@ -112,11 +112,11 @@
         disabled={busy || resume.disabled === true}
         onclick={onResume}
       >
-        <i class={resume.icon || 'fas fa-play'} aria-hidden="true"></i>
         {resume.label}
       </Button>
     {:else}
       <Button
+        icon={pause.icon || 'fas fa-pause'}
         class="fab-run-action-control"
         data-run-action="pause"
         aria-label={pause.ariaLabel || undefined}
@@ -124,7 +124,6 @@
         disabled={!pauseEnabled}
         onclick={onPause}
       >
-        <i class={pause.icon || 'fas fa-pause'} aria-hidden="true"></i>
         {pause.label}
       </Button>
 
@@ -145,15 +144,15 @@
       {#if begin}
         <div class="fab-run-begin-decision" data-run-begin>
           <Button
+            icon={begin.icon || 'fas fa-play'}
             role={beginEnabled ? 'primary' : 'neutral'}
             class="fab-run-action-control fab-run-action-primary"
             data-run-action="begin"
-            aria-busy={busy || undefined}
+            {busy}
             title={beginEnabled ? begin.prompt : begin.reason || undefined}
             disabled={!beginEnabled}
             onclick={onBegin}
           >
-            <i class={begin.icon || 'fas fa-play'} aria-hidden="true"></i>
             {busy ? begin.busyLabel || begin.label : begin.label}
           </Button>
         </div>
@@ -166,15 +165,15 @@
         {/if}
       {:else}
         <Button
+          icon={primary?.icon || ''}
           role={primaryEnabled ? 'primary' : 'neutral'}
           class="fab-run-action-control fab-run-action-primary"
           data-run-action="primary"
-          aria-busy={busy || undefined}
+          {busy}
           title={primaryEnabled ? primary?.title : primary?.reason || primary?.title || undefined}
           disabled={!primaryEnabled}
           onclick={onPrimary}
         >
-          {#if primary?.icon}<i class={primary.icon} aria-hidden="true"></i>{/if}
           {primaryLabel}
         </Button>
       {/if}

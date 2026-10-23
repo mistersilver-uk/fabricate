@@ -33,7 +33,7 @@ export function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-const CHAINED_MANAGER_BUTTON = String.raw`\.fabricate-button(?:\.fab-manager-button)?`;
+const CHAINED_MANAGER_BUTTON = String.raw`\.fabricate-button(?:\.fabricate-button)*`;
 const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
 
 function selectorPattern(selector) {
@@ -132,14 +132,14 @@ const managerButtonRoleClasses = (() => {
   );
 })();
 
-// The three unconditional classes, likewise read out of the component rather than restated.
+// The unconditional root, likewise read out of the component rather than restated.
 const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, 'Button declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
-    base.includes('fabricate-button') && base.includes('fab-manager-button'),
-    `Button must emit the family root and the primitive class, got ${base.join(' ')}`
+    base.includes('fabricate-button'),
+    `Button must emit the family root, got ${base.join(' ')}`
   );
   return base;
 })();
@@ -160,47 +160,64 @@ export const stepperScoped = scopedComponentCss(
   resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
 );
 
+// `SegmentedControl` owns its chrome in a scoped `<style>`: the pager's page-size control.
+export const segmentedScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/components/SegmentedControl.svelte')
+);
+
 /**
- * THE PAGER'S PER-PAGE CONTROL, exactly as `Pagination.svelte` renders it after issue 1504.
+ * A pager bar as `Pagination.svelte` renders it: the summary, an optional nav and, past one option,
+ * the caption and the segmented page-size control. `compact` takes the compact bar and the
+ * control's `inline` rung. The control's scoped block, `segmentedScoped.css`, goes beside the sheet.
  *
- * @param {string} value The rendered value on the trigger.
  * @returns {string} The fixture markup.
  */
-export function pagerBarFixture({ probe, value = '4', arrows = false }) {
+export function pagerBarFixture({
+  probe,
+  sizes = [4, 6, 12],
+  value = sizes[0],
+  arrows = false,
+  compact = false,
+  edge = false,
+  summary = 'Showing 1-4 of 8',
+}) {
+  const hash = segmentedScoped.hashClass;
   const arrow = (side, marked) => `<button
         type="button"
         class="fabricate-icon-button"
         data-keyboard-focus="true"
         ${marked ? `data-probe="arrow-${probe}"` : ''}
       ><i class="fas fa-chevron-${side}" aria-hidden="true"></i></button>`;
-  return `<div class="fabricate-pagination">
-    <span class="manager-pagination-summary">Showing 1-4 of 8</span>
+  const segment = (size) => `<label
+          class="manager-segment ${hash}${size === value ? ' is-active' : ''}"
+          data-pagination-size-option="${size}"
+        ><input type="radio" class="manager-segment-input ${hash}" name="size-${probe}"
+          value="${size}" ${size === value ? 'checked' : ''}
+        /><span class="manager-segment-label ${hash}">${size}</span></label>`;
+  const modifiers = [compact && 'is-compact', compact && edge && 'is-edge']
+    .filter(Boolean)
+    .join(' ');
+  return `<div class="fabricate-pagination ${modifiers}">
+    <span class="manager-pagination-summary">${summary}</span>
     ${
       arrows
         ? `<nav class="manager-pagination-nav">
       ${arrow('left', true)}
-      <span class="manager-pagination-page">Page 1 of 2</span>
+      <span class="manager-pagination-page${compact ? ' manager-pagination-hidden' : ''}">Page 1 of 2</span>
       ${arrow('right', false)}
     </nav>`
         : ''
     }
-    <span class="manager-pagination-size"
+    ${
+      sizes.length > 1
+        ? `<span class="manager-pagination-size"
       ><span id="caption-${probe}">Per page</span
-      ><div class="fabricate-picker manager-travel-picker fabricate-select"
-        ><button
-          type="button"
-          class="fabricate-select-trigger fabricate-select-trigger-inline"
-          data-pagination-size=""
-          data-select-size="inline"
-          data-probe="pager-${probe}"
-          role="combobox"
-          aria-haspopup="listbox"
-          aria-expanded="false"
-          aria-labelledby="caption-${probe}"
-        ><span class="manager-travel-picker-value fabricate-select-value">${value}</span><i
-          class="fas fa-chevron-down" aria-hidden="true"></i></button
-      ></div
-    ></span>
+      ><div class="manager-segmented ${hash}${compact ? ' is-inline' : ''}" role="radiogroup"
+        aria-labelledby="caption-${probe}" data-pagination-size="" data-probe="pager-${probe}"
+        >${sizes.map(segment).join('')}</div
+    ></span>`
+        : ''
+    }
   </div>`;
 }
 /**

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -36,7 +37,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/booksScrollsSelectOptions.js'
   ],
   compiledModules: [
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',

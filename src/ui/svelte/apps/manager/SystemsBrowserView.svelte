@@ -2,6 +2,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import ListState from '../../components/ListState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import Button from '../../components/Button.svelte';
@@ -175,11 +176,13 @@
         onChange={(next) => (ui.statusFilter = next)}
       />
     </span>
-    <Chip
-      >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
-        .replace('{shown}', filteredSystems.length)
-        .replace('{total}', systems.length)}</Chip
-    >
+    {#if !systemsLoading}
+      <Chip
+        >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
+          .replace('{shown}', filteredSystems.length)
+          .replace('{total}', systems.length)}</Chip
+      >
+    {/if}
     {#if filtersActive}
       <Button class="manager-clear-filters" data-clear-filters="systems" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
@@ -192,45 +195,40 @@
     class="manager-table-scroll"
     aria-label={text('FABRICATE.Admin.Manager.SystemsTable', 'Crafting systems table')}
   >
-    {#if systemsLoading}
-      <EmptyState
-        icon="fas fa-spinner"
-        title={text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
-        hint={text(
-          'FABRICATE.Admin.Manager.LoadingSystemsHint',
-          'Fabricate is finishing startup before the system library is shown.'
-        )}
-        data-systems-loading
-      />
-    {:else if (systems || []).length === 0}
-      <EmptyState
-        icon="fas fa-layer-group"
-        title={text('FABRICATE.Admin.Manager.EmptyTitle', 'No crafting systems yet')}
-        hint={text(
-          'FABRICATE.Admin.Manager.EmptyHint',
-          'Create a system to start organizing components and recipes.'
-        )}
-      >
-        <Button role="primary" onclick={onCreateSystem}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
-        </Button>
-      </EmptyState>
-    {:else if filteredSystems.length === 0}
-      <EmptyState
-        icon="fas fa-search"
-        title={text('FABRICATE.Admin.Manager.EmptySearchTitle', 'No systems match this search')}
-        hint={text(
-          'FABRICATE.Admin.Manager.EmptySearchHint',
-          'Clear the search to show all configured systems.'
-        )}
-      >
-        <Button onclick={() => (ui.searchTerm = '')}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</Button
+    <ListState
+      loading={systemsLoading}
+      loadingLabel={text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
+      loadingProps={{ 'data-systems-loading': true }}
+    >
+      {#if (systems || []).length === 0}
+        <EmptyState
+          icon="fas fa-layer-group"
+          title={text('FABRICATE.Admin.Manager.EmptyTitle', 'No crafting systems yet')}
+          hint={text(
+            'FABRICATE.Admin.Manager.EmptyHint',
+            'Create a system to start organizing components and recipes.'
+          )}
         >
-      </EmptyState>
-    {:else}
-      <!--
+          <Button role="primary" onclick={onCreateSystem}>
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
+          </Button>
+        </EmptyState>
+      {:else if filteredSystems.length === 0}
+        <EmptyState
+          icon="fas fa-search"
+          title={text('FABRICATE.Admin.Manager.EmptySearchTitle', 'No systems match this search')}
+          hint={text(
+            'FABRICATE.Admin.Manager.EmptySearchHint',
+            'Clear the search to show all configured systems.'
+          )}
+        >
+          <Button onclick={() => (ui.searchTerm = '')}
+            >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</Button
+          >
+        </EmptyState>
+      {:else}
+        <!--
         THE LIBRARY IS A LIST, NOT A TABLE (issue 1515). `role="table"` promises columns a screen
         reader can walk cell by cell, and this surface has never had them: the leading column is an
         identity block and the trailing one a control cluster, and at the stacked breakpoint the
@@ -240,19 +238,19 @@
         the strip is hidden. `RecipesBrowserView`'s `manager-recipe-table-head` is the same answer,
         already shipped.
       -->
-      <div
-        class="manager-systems-table"
-        role="list"
-        aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}
-      >
-        <div class="manager-table-head" aria-hidden="true">
-          <span>{text('FABRICATE.Admin.Manager.Column.System', 'System')}</span>
-          <span>{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
-          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
-        </div>
-        {#each paginatedSystems as system (system.id)}
-          <!-- SELECTION IS `aria-current`, AND THE SELECTING CONTROL IS A REAL `<button>`.
+        <div
+          class="manager-systems-table"
+          role="list"
+          aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}
+        >
+          <div class="manager-table-head" aria-hidden="true">
+            <span>{text('FABRICATE.Admin.Manager.Column.System', 'System')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
+            <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
+          </div>
+          {#each paginatedSystems as system (system.id)}
+            <!-- SELECTION IS `aria-current`, AND THE SELECTING CONTROL IS A REAL `<button>`.
                `aria-selected` is not valid on a `listitem` outside a listbox, and the row itself
                is no longer a focus target: it was a handler-bearing `<div>` carrying `role="row"`
                and `tabindex="0"`, which put a whole row in the tab order announcing a table row
@@ -261,98 +259,96 @@
                `data-keyboard-focus` because Foundry recognises a `<button>` only inside a
                `<form>` and this window renders none, so without it Space pauses the game and the
                arrows pan the canvas while the row has focus. -->
-          <div
-            class={`manager-system-row ${isSelectedSystem(system) ? 'is-selected' : ''}`}
-            role="listitem"
-            aria-current={isSelectedSystem(system) ? 'true' : undefined}
-            data-system-id={system.id}
-          >
-            <button
-              type="button"
-              class="manager-system-identity"
-              data-keyboard-focus="true"
-              onclick={() => selectRow(system.id)}
+            <div
+              class={`manager-system-row ${isSelectedSystem(system) ? 'is-selected' : ''}`}
+              role="listitem"
+              aria-current={isSelectedSystem(system) ? 'true' : undefined}
+              data-system-id={system.id}
             >
-              <span class="manager-system-icon" aria-hidden="true">
-                <i class="fas fa-layer-group"></i>
-              </span>
-              <span class="manager-system-copy">
-                <span class="manager-system-name" title={systemDisplayLabel(system, systemLabels)}
-                  >{systemDisplayLabel(system, systemLabels)}</span
-                >
-                {#if system.description}
-                  <span class="manager-system-description" title={system.description}
-                    >{system.description}</span
-                  >
-                {:else}
-                  <span class="manager-system-description"
-                    >{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span
-                  >
-                {/if}
-              </span>
-            </button>
-            <span
-              class="manager-labeled-cell"
-              data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}
-            >
-              <Chip>{resolutionModeLabel(system.resolutionMode)}</Chip>
-            </span>
-            <span
-              class="manager-labeled-cell manager-status-cell"
-              data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
-            >
-              <StatusToggle
-                on={system.enabled !== false}
-                label={system.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                ariaLabel={system.enabled === false
-                  ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace(
-                      '{name}',
-                      systemDisplayLabel(system, systemLabels)
-                    )
-                  : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace(
-                      '{name}',
-                      systemDisplayLabel(system, systemLabels)
-                    )}
-                onclick={(event) => toggleEnabled(system.id, system.enabled === false, event)}
-                onkeydown={(event) => event.stopPropagation()}
-              />
-            </span>
-            <span
-              class="manager-action-group manager-labeled-cell"
-              data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
-            >
-              <IconButton
-                ariaLabel={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace(
-                  '{name}',
-                  systemDisplayLabel(system, systemLabels)
-                )}
-                title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')}
-                onclick={(event) => {
-                  event.stopPropagation();
-                  onEditSystem(system.id);
-                }}
+              <button
+                type="button"
+                class="manager-system-identity"
+                data-keyboard-focus="true"
+                onclick={() => selectRow(system.id)}
               >
-                <i class="fas fa-edit" aria-hidden="true"></i>
-              </IconButton>
-              <ActionMenu
-                items={rowMenuItems()}
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.SystemActionsFor',
-                  'System actions for {name}'
-                ).replace('{name}', systemDisplayLabel(system, systemLabels))}
-                triggerTitle={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
-                onSelect={(action) => {
-                  if (action === 'export') onExportSystem(system.id);
-                  else if (action === 'delete') onDeleteSystem(system.id);
-                }}
-              />
-            </span>
-          </div>
-        {/each}
-      </div>
-    {/if}
+                <span class="manager-system-icon" aria-hidden="true">
+                  <i class="fas fa-layer-group"></i>
+                </span>
+                <span class="manager-system-copy">
+                  <span class="manager-system-name" title={systemDisplayLabel(system, systemLabels)}
+                    >{systemDisplayLabel(system, systemLabels)}</span
+                  >
+                  {#if system.description}
+                    <span class="manager-system-description" title={system.description}
+                      >{system.description}</span
+                    >
+                  {:else}
+                    <span class="manager-system-description"
+                      >{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span
+                    >
+                  {/if}
+                </span>
+              </button>
+              <span
+                class="manager-labeled-cell"
+                data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}
+              >
+                <Chip>{resolutionModeLabel(system.resolutionMode)}</Chip>
+              </span>
+              <span
+                class="manager-labeled-cell manager-status-cell"
+                data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
+              >
+                <StatusToggle
+                  on={system.enabled !== false}
+                  label={system.enabled === false
+                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                  ariaLabel={system.enabled === false
+                    ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace(
+                        '{name}',
+                        systemDisplayLabel(system, systemLabels)
+                      )
+                    : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace(
+                        '{name}',
+                        systemDisplayLabel(system, systemLabels)
+                      )}
+                  onclick={(event) => toggleEnabled(system.id, system.enabled === false, event)}
+                  onkeydown={(event) => event.stopPropagation()}
+                />
+              </span>
+              <span
+                class="manager-action-group manager-labeled-cell"
+                data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+              >
+                <IconButton
+                  ariaLabel={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace(
+                    '{name}',
+                    systemDisplayLabel(system, systemLabels)
+                  )}
+                  onclick={(event) => {
+                    event.stopPropagation();
+                    onEditSystem(system.id);
+                  }}
+                  icon="fas fa-edit"
+                />
+                <ActionMenu
+                  items={rowMenuItems()}
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.SystemActionsFor',
+                    'System actions for {name}'
+                  ).replace('{name}', systemDisplayLabel(system, systemLabels))}
+                  onSelect={(action) => {
+                    if (action === 'export') onExportSystem(system.id);
+                    else if (action === 'delete') onDeleteSystem(system.id);
+                  }}
+                />
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </ListState>
   </section>
 
   <Pagination

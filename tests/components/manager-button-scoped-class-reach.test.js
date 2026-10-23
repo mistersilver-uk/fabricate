@@ -57,7 +57,7 @@ function compiledCss(file, source) {
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     tag: 'Button',
-    contractClasses: ['fabricate-button', 'fab-manager-button'],
+    contractClasses: ['fabricate-button'],
     minimumTokens: 20,
   }),
   Object.freeze({

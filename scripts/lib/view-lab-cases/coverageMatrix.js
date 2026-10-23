@@ -29,6 +29,8 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // Each result set names the ingredient set routing into it (issue 2512).
+    expectSelector: '[data-recipe-result-set-id] [data-route-sources-chip]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -47,6 +49,8 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // Each result set names the outcome tier routing into it (issue 2512).
+    expectSelector: '[data-recipe-result-set-id] [data-route-sources-chip]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -71,10 +75,10 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     // No pattern for `components/ThresholdBandStrip.svelte`: it is a broad signal, so `sourceMatches` never sees it.
-    // The strip's pure geometry is a util, so it is named here as well (issue 2431).
+    // The strip's pure geometry and its words are utils, so they are named here as well (issues 2431, 2435).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
+      /^src\/ui\/svelte\/util\/rangeBar(?:Geometry|Text)\.js$/,
     ],
   }),
   managerCase({
@@ -361,7 +365,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/util\/rangeBarGeometry\.js$/,
+      /^src\/ui\/svelte\/util\/rangeBar(?:Geometry|Text)\.js$/,
     ],
   }),
   managerCase({

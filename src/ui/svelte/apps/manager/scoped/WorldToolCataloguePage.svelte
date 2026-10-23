@@ -543,17 +543,6 @@
   /* NO GRID OF ITS OWN ANY MORE: the band is the frame's `columnLead`, so `<main>` holds exactly
      one child and the host sheet's single `minmax(0, 1fr)` track is already right for it. */
 
-  /* `:global()` AND CHAINED (issue 1427's rule): this class sits on an `<InspectorCard>` tag, so
-     Svelte stamps no hash onto it and prunes the local selector, which `lint:svelte:warnings`
-     fails on. `.fabricate-card` is chained for the specificity the hash carried. */
-  :global(.fabricate-card.manager-world-tool-break-card) {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
-    padding: var(--fab-space-2) var(--fab-space-3);
-  }
-
   .manager-world-tool-break-head {
     display: flex;
     align-items: center;

@@ -15,14 +15,23 @@ const BIOME_COLOUR_OPEN = [
   { selector: '[data-gathering-vocabulary-panel="biomes"] .manager-color-picker-trigger' },
 ];
 const BIOME_COLOUR_SOURCES = [/^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/];
-const biomeSwatch = (token) =>
-  `[data-manager-color-picker-popover] [data-manager-color-token="${token}"]`;
-const biomeSwatchPressed = (token, value) => ({
+// The tint popover's panel; the inline strip carries the first class alone (issue 2459).
+const BIOME_COLOUR_PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
+const biomeSwatch = (token) => `${BIOME_COLOUR_PANEL} [data-manager-color-token="${token}"]`;
+const biomeSwatchSelected = (token, value) => ({
   selector: biomeSwatch(token),
-  name: 'aria-pressed',
+  name: 'aria-selected',
   value,
 });
-const BIOME_COLOUR_CURSOR = [...BIOME_COLOUR_OPEN, { selector: biomeSwatch('sage'), press: 'Tab' }];
+// The panel's query holds focus, so the arrow keys a GM presses in it move the picker's cursor:
+// ArrowDown lands it on the first tile, Sage, and ArrowRight moves it on to Mist.
+const BIOME_COLOUR_QUERY = `${BIOME_COLOUR_PANEL} input[role="combobox"]`;
+const BIOME_COLOUR_TO_MIST = ['ArrowDown', 'ArrowRight'].map((press) => ({
+  selector: BIOME_COLOUR_QUERY,
+  press,
+}));
+const BIOME_COLOUR_CURSOR = [...BIOME_COLOUR_OPEN, ...BIOME_COLOUR_TO_MIST];
+const BIOME_COLOUR_ON_MIST = `${biomeSwatch('mist')}[data-active-option="true"]`;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -347,7 +356,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/(?:GatheringConditionPanel|TimeOfDayBar)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
-      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|worldTimeLabel)\.js$/,
+      /^src\/ui\/svelte\/util\/(?:rangeBarGeometry|rangeBarText|worldTimeLabel)\.js$/,
     ],
   }),
   // A rail "+" activated: Dusk's midpoint seeds the add form's Starts at, and its name takes focus.
@@ -405,8 +414,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/timeOfDayBandModel\.js$/,
     ],
   }),
-  // The New-biome colour palette open (issue 2257): the shared palette as a popover, its default
-  // cell pressed.
+  // The New-biome colour palette open (issues 2257 and 2459): the picker's grid form, its default
+  // tile selected.
   managerCase({
     id: 'manager-gathering-biome-colour-popover',
     label: 'Manager — Gathering settings New-biome colour palette open',
@@ -415,12 +424,12 @@ export const CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: BIOME_COLOUR_OPEN,
     expectView: 'environments',
-    expectSelector: '.fabricate-manager [data-manager-color-picker-popover] [role="group"]',
-    expectAttributes: [biomeSwatchPressed('sage', 'true')],
+    expectSelector: `.fabricate-manager ${BIOME_COLOUR_PANEL} [role="listbox"]`,
+    expectAttributes: [biomeSwatchSelected('sage', 'true')],
     kinds: ['manager', 'environments'],
     sourceMatches: BIOME_COLOUR_SOURCES,
   }),
-  // The swatch's keyboard cursor (issue 2416): Tab from the pressed Sage lands it on Mist.
+  // The picker's cursor on a tile (issues 2416 and 2459): two arrow keys in the query land it on Mist.
   managerCase({
     id: 'manager-gathering-biome-colour-popover-cursor',
     label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on Mist',
@@ -430,23 +439,51 @@ export const CASES = Object.freeze([
     steps: BIOME_COLOUR_CURSOR,
     themeVariants: ['hearth-herb'],
     expectView: 'environments',
-    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
-    expectAttributes: [biomeSwatchPressed('sage', 'true'), biomeSwatchPressed('mist', 'false')],
+    expectSelector: BIOME_COLOUR_ON_MIST,
+    expectAttributes: [biomeSwatchSelected('sage', 'true'), biomeSwatchSelected('mist', 'false')],
     kinds: ['manager', 'environments'],
     sourceMatches: BIOME_COLOUR_SOURCES,
   }),
-  // The cursor and the selected ring on one cell: Space presses Mist under the cursor.
+  // The cursor and the selected ring on one tile: Enter picks Mist under the cursor and closes the
+  // panel, the swatch reopens it, and the same two keys bring the cursor back onto Mist.
   managerCase({
     id: 'manager-gathering-biome-colour-popover-cursor-selected',
-    label: 'Manager — Gathering settings New-biome colour palette, keyboard cursor on pressed Mist',
+    label:
+      'Manager — Gathering settings New-biome colour palette, keyboard cursor on selected Mist',
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    steps: [...BIOME_COLOUR_CURSOR, { selector: biomeSwatch('mist'), press: 'Space' }],
+    steps: [
+      ...BIOME_COLOUR_CURSOR,
+      { selector: BIOME_COLOUR_QUERY, press: 'Enter' },
+      BIOME_COLOUR_OPEN.at(-1),
+      ...BIOME_COLOUR_TO_MIST,
+    ],
     themeVariants: ['hearth-herb'],
     expectView: 'environments',
-    expectSelector: `${biomeSwatch('mist')}:focus-visible`,
-    expectAttributes: [biomeSwatchPressed('mist', 'true'), biomeSwatchPressed('sage', 'false')],
+    expectSelector: BIOME_COLOUR_ON_MIST,
+    expectAttributes: [biomeSwatchSelected('mist', 'true'), biomeSwatchSelected('sage', 'false')],
+    kinds: ['manager', 'environments'],
+    sourceMatches: BIOME_COLOUR_SOURCES,
+  }),
+  // A biome's edit palette (issue 2459), opened from its icon by the ContextMenu key, as the
+  // right-click opens it: the panel stands against the icon with its query focused and the hex.
+  managerCase({
+    id: 'manager-gathering-biome-colour-edit-popover',
+    label: 'Manager — Gathering settings biome edit colour palette open from its icon',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector: '[data-gathering-vocabulary-panel="biomes"] .manager-biome-combined-trigger',
+        press: 'ContextMenu',
+      },
+    ],
+    expectView: 'environments',
+    expectSelector: `.fabricate-manager ${BIOME_COLOUR_PANEL}:has([role="listbox"]) input[role="combobox"]:focus`,
     kinds: ['manager', 'environments'],
     sourceMatches: BIOME_COLOUR_SOURCES,
   }),

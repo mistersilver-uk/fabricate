@@ -7,7 +7,7 @@
 import { CRAFTING_SHARED, CRAFTING_SIMPLE } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
-const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+const SINGLE_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 const CRAFT_HORSESHOE = Object.freeze([
   { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
   { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },

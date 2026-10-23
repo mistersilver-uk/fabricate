@@ -18,12 +18,15 @@ import {
   setInputValue,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { choosePageSize, pageSizeValue } from '../helpers/page-size-control.js';
 import { railCounts } from '../helpers/validationSurfaceReadings.js';
 import {
   booksScrollsFixtures,
   assertDropComponentCellKeyboardPath,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
@@ -70,6 +73,7 @@ export function registerGatheringCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -77,6 +81,7 @@ export function registerGatheringCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -801,7 +806,7 @@ export function registerGatheringCases() {
   const BROWSER = '[data-gathering-task-component-browser]';
   const TOOLS = '[data-gathering-task-required-tools]';
   const pageOf = (card) => target.querySelector(`${card} [data-pagination-page]`).textContent.trim();
-  const pageSizeOf = (card) => selectTriggerText(target, `${card} [data-pagination-size]`);
+  const pageSizeOf = (card) => pageSizeValue(target, card);
   const pressIn = async (selector) => {
     target.querySelector(selector).click();
     await settleRouteExit();
@@ -810,7 +815,7 @@ export function registerGatheringCases() {
     {
       state: 'pageSize',
       tab: 'results',
-      set: () => chooseSelectOption(target, `${DROPS} [data-pagination-size]`, 10),
+      set: () => choosePageSize(target, DROPS, 10),
       read: () => pageSizeOf(DROPS),
       expected: '10',
     },
@@ -824,7 +829,7 @@ export function registerGatheringCases() {
     {
       state: 'componentPageSize',
       tab: 'results',
-      set: () => chooseSelectOption(target, `${BROWSER} [data-pagination-size]`, 9),
+      set: () => choosePageSize(target, BROWSER, 9),
       read: () => pageSizeOf(BROWSER),
       expected: '9',
     },
@@ -852,7 +857,7 @@ export function registerGatheringCases() {
     {
       state: 'toolPageSize',
       tab: 'requirements',
-      set: () => chooseSelectOption(target, `${TOOLS} [data-pagination-size]`, 9),
+      set: () => choosePageSize(target, TOOLS, 9),
       read: () => pageSizeOf(TOOLS),
       expected: '9',
     },
@@ -1771,7 +1776,7 @@ export function registerGatheringCases() {
     // Selecting 9 fits all eight components on a single page. The per-page selector must
     // survive so the user can still switch back — the prev/next nav is the only part that
     // should disappear once there is a single page.
-    chooseSelectOption(target, '[data-pagination-size]', 9);
+    choosePageSize(target, '', 9);
     await tick();
     flushSync();
     assert.equal(
@@ -1783,11 +1788,8 @@ export function registerGatheringCases() {
       sizeSelect(),
       'per-page selector must remain visible when the chosen size fits everything on one page'
     );
-    // THE CONTROL STATES ITS VALUE AS A LABEL NOW (issue 1504). A native `<select>` carried it in
-    // `.value`; the converted trigger renders the chosen option's label, so what a GM reads is
-    // `9` as text rather than `9` as an attribute.
     assert.equal(
-      selectTriggerText(target, '[data-pagination-size]'),
+      pageSizeValue(target),
       '9',
       'per-page selector should reflect the chosen page size'
     );
@@ -1798,7 +1800,7 @@ export function registerGatheringCases() {
     );
 
     // Recoverability: the surviving selector still works to reduce the page size again.
-    chooseSelectOption(target, '[data-pagination-size]', 6);
+    choosePageSize(target, '', 6);
     await tick();
     flushSync();
     assert.equal(

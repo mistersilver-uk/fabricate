@@ -121,9 +121,9 @@
     // ── THE BULK DOCK REACHES THE INSPECTOR'S EDGES (issue 1371 r16-cat, maintainer ruling M24)
     // "I also see a padding/whitespace around the bulk edit panel that prevents the button panel
     // from being full-width." The inspector column below pads `--fab-space-4` and the bulk panel
-    // renders inside a `-scroll` child that owns the `overflow-y` — so `BulkEditPanelShell`'s
-    // sticky dock, whose negative bleeds are sized for the shared rail's `--fab-space-3`, was
-    // CLIPPED at the scroller's edge and stopped 16px short of the column's on every side.
+    // renders inside a `-scroll` child that owns the `overflow-y`, so the pinned foot was CLIPPED
+    // at the scroller's edge and stopped 16px short of the column's on every side; the flush
+    // scroller now carries the column's inset as `--fab-manager-inspector-pad` (issue 2500).
     flushBulkDock = false,
     armedToken = $bindable(''),
     // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
@@ -437,7 +437,7 @@
   const membershipSegments = $derived(
     membershipOptions.map((option) => ({
       value: option,
-      fallback: membershipLabels[option],
+      label: membershipLabels[option],
       count: model.project({ entries, searchOf, membership: option, systemId }).rows.length,
     }))
   );
@@ -814,11 +814,9 @@
                         <IconButton
                           data-scoped-list-action={action.id}
                           ariaLabel={`${action.label} — ${name}`}
-                          title={action.label}
                           onclick={() => action.run(entry)}
-                        >
-                          <i class={action.icon} aria-hidden="true"></i>
-                        </IconButton>
+                          icon={action.icon}
+                        />
                       {/if}
                     {/each}
                   </span>
@@ -995,7 +993,7 @@
     column-gap: 0;
   }
 
-  /* No inset, so the toolbar, rows and pager reach the pane's edges (M21, issue 2373). */
+  /* No inset, so the rows and pager reach the pane's edges (M21, issue 2373); the sheet insets the filter bar (issue 2546). */
   .manager-scoped-list-column {
     display: flex;
     flex-direction: column;
@@ -1004,8 +1002,8 @@
     min-height: 0;
   }
 
-  /* Boxed children keep the gutter `FilterBar` and `Pagination` pad inside themselves: inline,
-     above the first, and below a pagerless scroller. */
+  /* Boxed children keep the --fab-space-3 inline gutter the filter bar's box and the pager's content start on:
+     inline, above the first, and below a pagerless scroller. */
   .manager-scoped-list-column-lead,
   .manager-scoped-list-unavailable,
   .manager-scoped-list-bulk,
@@ -1229,13 +1227,11 @@
     background: var(--fab-bg-1);
   }
 
-  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`). */
+  /* THE BULK PANEL'S SCROLLER TAKES THE COLUMN'S INSET (M24; see `flushBulkDock`): the manager
+     sheet pads it by its own `--fab-manager-inspector-pad`, the token `InspectorPanel`'s foot
+     bleeds by (issue 2500). */
   .manager-scoped-list-inspector:has(> .manager-scoped-list-inspector-scroll.is-flush-bulk) {
     padding: 0;
-  }
-
-  .manager-scoped-list-inspector-scroll.is-flush-bulk {
-    padding: var(--fab-space-4);
   }
 
   .manager-scoped-list-inspector-scroll {

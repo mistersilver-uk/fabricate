@@ -6,6 +6,7 @@
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { newDraftId as newId } from '../../util/draftId.js';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import ComponentCategoryTagsCards from './component/ComponentCategoryTagsCards.svelte';
   import ComponentEssencesCard from './component/ComponentEssencesCard.svelte';
@@ -15,8 +16,8 @@
   // The progressive-complications section (issue 1286). It owns its own visibility gate, so it is
   // placed unconditionally rather than behind a second predicate that could drift out of step.
   import ComponentComplicationsSection from './component/ComponentComplicationsSection.svelte';
-  import { fromValue } from './recipe/pickerRowKinds.js';
-  import { withAddedResult } from './recipe/resultRows.js';
+  import { fromValue } from '../../components/pickerRowKinds.js';
+  import { withAddedResult } from '../../components/resultRows.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -547,11 +548,6 @@
       enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
-  }
-
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
   // Deep clone the persisted salvage shape into an editable draft. Authoring touches only

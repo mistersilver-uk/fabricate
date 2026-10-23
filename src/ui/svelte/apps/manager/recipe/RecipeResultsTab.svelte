@@ -16,7 +16,7 @@
   import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
-  import { recipeResultKinds } from './resultRows.js';
+  import { recipeResultKinds } from '../../../components/resultRows.js';
 
   let {
     // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
@@ -38,10 +38,14 @@
     currencyEnabled = false,
     recipeOptions = [],
     knowledgeObservable = false,
-    // Result routing: the provider and the system's outcome tiers feed the per-result-set
-    // assignment controls.
+    // Result routing: the provider, the outcome tiers the policy offers, and every tier the system
+    // defines, feed each result set's routing line.
     routingProvider = null,
     outcomeTierOptions = [],
+    routedOutcomeTiers = [],
+    // `routedMinimum`'s `{ minSuccessOutcomeId, direction }`, so a set card strikes a success tier
+    // below the recipe's minimum.
+    routedMinimum = {},
     outcomeTiersDefined = false,
     // Issue 1098: threaded on to the section and the single-step group card alike.
     failureResultsAllowed = false,
@@ -49,6 +53,8 @@
     progressive = false,
     // Deep link from a progressive row's difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The two-slot editor's link to the Checks tab, forwarded to every section.
+    onOpenChecks = () => {},
     onAssignIngredientSet = () => {},
     onUpdateResultGroups = () => {},
     onDeleteStep = () => {},
@@ -207,8 +213,11 @@
             {progressive}
             isTerminalStep={index === steps.length - 1}
             {onOpenComponent}
+            {onOpenChecks}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
+            {routedOutcomeTiers}
+            {routedMinimum}
             {outcomeTiersDefined}
             {failureResultsAllowed}
             onAssignIngredientSet={(groupId, setId, assigned) =>
@@ -228,8 +237,11 @@
       {routingProvider}
       {progressive}
       {onOpenComponent}
+      {onOpenChecks}
       {ingredientSets}
       {outcomeTierOptions}
+      {routedOutcomeTiers}
+      {routedMinimum}
       {outcomeTiersDefined}
       {failureResultsAllowed}
       onAssignIngredientSet={(groupId, setId, assigned) =>

@@ -724,12 +724,13 @@
 
 .fabricate-link-field.manager-item-drop-zone.is-linked {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) max-content;
+  grid-template-columns: 38px minmax(0, 1fr) max-content;
   justify-content: normal;
   gap: var(--fab-space-3);
   border-style: solid;
   background: var(--fab-bg-1);
   text-align: start;
+  container: fabricate-link-field / inline-size;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing {
@@ -788,33 +789,13 @@
   font-size: 18px;
 }
 
-.fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 11px;
-  overflow: hidden;
-  background: var(--fab-surface-soft);
-  color: var(--fab-accent);
-  font-size: inherit;
-}
-
-.fabricate-link-field.manager-item-drop-zone.is-missing .manager-item-drop-zone-icon {
-  color: var(--fab-danger-text);
-}
-
-.fabricate-link-field .manager-item-drop-zone-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .fabricate-link-field .manager-item-drop-zone-copy {
   display: grid;
   gap: var(--fab-space-1);
   min-width: 0;
 }
 
-.fabricate-link-field.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy strong,
+.fabricate-link-field .manager-item-drop-zone-copy strong,
 .fabricate-link-field .manager-item-drop-zone-copy small {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -836,13 +817,11 @@
   line-height: 1.4;
 }
 
-/* A linked name is not capped: a uuid standing in for a name would be cut (issue 2466). */
 .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong {
   font-family: var(--fab-font-serif);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
-  overflow-wrap: anywhere;
 }
 
 .fabricate-link-field.manager-item-drop-zone.is-missing .manager-item-drop-zone-copy strong {
@@ -856,7 +835,21 @@
 .fabricate-link-field .manager-item-drop-zone-actions {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: var(--fab-space-1);
+}
+
+/* At 260px and narrower (a 234px content box inside the zone's padding and border) the actions take their own row below the copy, so a long Relink label cannot squeeze the copy column. The copy then spans to the right padding: a container query cannot style its own container, so the zone's track list stays and the copy takes the empty third track's 12px gap as well. */
+@container fabricate-link-field (max-width: 234px) {
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy {
+    grid-column: 2 / -1;
+  }
+
+  .fabricate-link-field.manager-item-drop-zone.is-linked .manager-item-drop-zone-actions {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+  }
 }
 
 /* The Tool Studio's checklist row is GONE with its component (issue 1373, round 5). */
@@ -1051,19 +1044,25 @@
 
 .fabricate-toggle.manager-tool-setting-toggle {
   position: relative;
-  flex: 0 0 34px;
-  width: 34px;
+  flex: 0 0 38px;
+  width: 38px;
 }
 
+/* The transparent input lies exactly over the 38x22 track, a pixel below the 24px host's top edge. */
 .fabricate-toggle .manager-tool-setting-toggle-input {
   position: absolute;
   z-index: 1;
-  inset: 2px 0 auto;
-  width: 34px;
-  height: 20px;
+  inset: 1px 0 auto;
+  box-sizing: border-box;
+  width: 38px;
+  height: 22px;
   margin: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.fabricate-toggle .manager-tool-setting-toggle-input:disabled {
+  cursor: not-allowed;
 }
 
 /* THE STRIP HALF OF THE CHECKBOX HOST'S PAIR, written on the element that can actually TAKE focus (issue 1508). */
@@ -1529,20 +1528,11 @@
   line-height: 1.35;
 }
 
-/* A single ingredient/result set renders CHROMELESS: complexity is emergent, so with only one set there is no "Set 1" box to contain — no set-name header or remove control, and its requirements sit directly on the tab background (issue 643). */
-.fabricate-manager .manager-recipe-ingredient-set.is-chromeless {
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-
 .fabricate-manager .manager-recipe-result-set-simple {
   margin-top: var(--fab-space-2);
 }
 
-/* Alchemy Simple's two fixed slots (success + reserved failure) are siblings in a plain wrapper, so without this they stack flush and the failure card reads as part of the success card. */
+/* The two-slot editor's success set, its failure set once opted into, the toggle and the policy callout are siblings in a plain wrapper, so without this they stack flush and each reads as part of the one above. */
 .fabricate-manager .manager-recipe-result-set-alchemy-simple {
   display: flex;
   flex-direction: column;

@@ -1311,15 +1311,7 @@ function createStore(calls = [], options = {}) {
         }
       );
     },
-    // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a four-parameter
-    // stub records a call that looks identical whether the argument is threaded or silently dropped
-    // — which is exactly how the value went missing once already.
-    addEssence: (name, description, icon, sourceComponentId, colorToken, extra) => {
-      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken, extra]);
-      if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
-      return options.addEssenceResult ?? true;
-    },
-    // The essence actions issue 1036 adds beside the two above.
+    // The essence actions issue 1036 adds.
     setEssenceEnabled: (id, enabled) => {
       calls.push(['setEssenceEnabled', id, enabled]);
       return { updated: true, invalidatedRecipes: 0 };

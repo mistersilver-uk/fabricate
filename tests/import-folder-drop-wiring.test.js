@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import {
   collectWorldFolderGroups,
   collectPackFolderGroups,
@@ -152,8 +153,6 @@ const RESOLVED = {
   ),
 };
 globalThis.fromUuid = async (uuid) => RESOLVED[uuid] || null;
-
-const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 function buildManager() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });

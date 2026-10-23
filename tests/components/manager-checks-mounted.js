@@ -12,6 +12,8 @@ import {
   labCaseSelector,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
@@ -58,6 +60,7 @@ export function registerChecksCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -65,6 +68,7 @@ export function registerChecksCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -3430,13 +3434,20 @@ export function registerChecksCases() {
     await mountChecks([], routedCraftingOptions('1d20'));
     await openChecksActivity('crafting');
 
-    // ONE card of rows, not one card per row. Direct children.
+    // ONE flush card of rows, not one card per row: its one list insets the rows.
     const digest = target.querySelector('[data-checks-digest]');
-    const rows = [...digest.children];
+    assert.ok(digest.classList.contains('is-flush'), 'the digest card is flush');
+    const lists = [...digest.children];
+    assert.deepEqual(
+      lists.map((list) => list.className),
+      ['manager-checks-rail-list'],
+      'the card holds one list'
+    );
+    const rows = [...lists[0].children];
     assert.ok(rows.length >= 2, 'the digest states more than one fact');
     assert.ok(
       rows.every((row) => row.classList.contains('manager-checks-rail-row')),
-      'every direct child of the digest card is a row, so the card is not a stack of cards'
+      'every direct child of the digest list is a row, so the card is not a stack of cards'
     );
 
     const triggers = target.querySelector('[data-checks-digest-row="triggers"]');

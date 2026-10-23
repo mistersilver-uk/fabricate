@@ -477,27 +477,27 @@
                 {#if actor.rolled}
                   <IconButton
                     class="manager-economy-actor-roll"
-                    title={text(
+                    tooltip={text(
                       'FABRICATE.Admin.Manager.Economy.ResetHint',
                       'Re-roll this character’s pool from the max/start expressions'
                     )}
                     ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
                     data-economy-actor-roll=""
-                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></IconButton
-                  >
+                    icon="fas fa-arrows-rotate"
+                  />
                 {:else}
                   <IconButton
                     class="manager-economy-actor-roll is-roll-needed"
-                    title={text(
+                    tooltip={text(
                       'FABRICATE.Admin.Manager.Economy.RollHint',
                       'Roll this character’s pool from the max/start expressions'
                     )}
                     ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
                     data-economy-actor-roll=""
-                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></IconButton
-                  >
+                    icon="fas fa-dice-d20"
+                  />
                 {/if}
               </li>
             {/each}
@@ -507,6 +507,7 @@
             pageSize={actorPageSize}
             pageIndex={actorPageIndex}
             pageSizeOptions={[6, 12, 24]}
+            density="compact"
             onPageChange={(index) => (actorPageIndex = index)}
             onPageSizeChange={(size) => {
               actorPageSize = size;
@@ -776,11 +777,11 @@
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
      Then chained, because at (0,2,0) this rule did not beat
-     `.fabricate-button.fabricate-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
+     `.fabricate-button.fabricate-button.fabricate-button` (0,3,0) at all. Naming the ancestor and
      the primitive's classes takes it to (0,5,0), which wins on specificity rather than on where the
      sheet happens to be injected. */
   :global(
-    .fabricate-manager .fabricate-button.fab-manager-button.is-primary.manager-economy-bulk-save
+    .fabricate-manager .fabricate-button.fabricate-button.is-primary.manager-economy-bulk-save
   ) {
     width: auto;
     justify-self: center;
@@ -812,24 +813,5 @@
     color: var(--fab-accent);
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
-  }
-
-  /* Keep the actor-list pagination compact and on a single line. */
-  .manager-economy-subsection :global(.fabricate-pagination) {
-    flex-wrap: nowrap;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 0;
-    background: transparent;
-  }
-
-  .manager-economy-subsection :global(.manager-pagination-page) {
-    min-width: auto;
-  }
-
-  .manager-economy-subsection :global(.manager-pagination-summary) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 </style>

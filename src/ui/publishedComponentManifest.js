@@ -1,16 +1,20 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
- * frozen `{ name, path, version, props, rest, root, restOn? }`, appended and never interleaved, and a
- * breaking change to one bumps its own `version` (issue 2426). A prop is
- * `{ kind: 'data' | 'text' | 'slot' | 'callback' | 'aria', required?, element?, args? }`: a `text`
- * key takes a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless
- * `element` says `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
+ * frozen `{ name, path, version, props, rest, root, restOn?, overlays?, lazy? }`, appended and
+ * never interleaved, and a breaking change to one bumps its own `version` (issue 2426). A prop is
+ * `{ kind, required?, requiredWhen?, element?, args? }`, its kind `'data' | 'text' | 'slot' |
+ * 'callback' | 'aria'`:
+ * `requiredWhen` names the `data` key while which it is required (issue 2452), a `text` key takes
+ * a string, and a `slot` key is filled through `handle.slot`, in a `<div>` unless `element` says
+ * `'span'`. `root` is the ancestor the target needs: `'any'`, `'fabricate'` or
  * `'manager'` (issue 2451). A `callback` key takes a function, called with its first `args`
  * arguments, none when unstated (issue 2452). An entry whose rest keys land on a control it draws
  * also states `restOn: 'control'`, which makes M13 refuse `RESERVED_ON_A_CONTROL` among its rest
  * keys; the `describe` result leaves `restOn` out. An `aria` key is an ARIA attribute of its own
  * name on such an entry: the component declares no prop for it, so it lands on that control with
- * the rest keys (issue 2452).
+ * the rest keys (issue 2452). `overlays: true` marks an entry that opens an overlay, which the seam
+ * hosts by its mount's `overlayHost` chain; absent, it opens none (issue 2454). `lazy: true` marks
+ * an entry whose code `load` fetches, which no entry before `Kicker` may state (issue 2455).
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({
@@ -162,6 +166,7 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     }),
     rest: true,
     root: 'any',
+    lazy: true,
   }),
   Object.freeze({
     name: 'InspectorCard',
@@ -198,6 +203,9 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       icon: Object.freeze({ kind: 'data' }),
       action: Object.freeze({ kind: 'data' }),
       onAction: Object.freeze({ kind: 'callback' }),
+      dismissable: Object.freeze({ kind: 'data' }),
+      dismissLabel: Object.freeze({ kind: 'data', requiredWhen: 'dismissable' }),
+      onDismiss: Object.freeze({ kind: 'callback', requiredWhen: 'dismissable' }),
     }),
     rest: true,
     root: 'any',
@@ -233,5 +241,63 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
     restOn: 'control',
+  }),
+  Object.freeze({
+    name: 'Stepper',
+    path: 'src/ui/svelte/components/Stepper.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'data', required: true }),
+      min: Object.freeze({ kind: 'data' }),
+      max: Object.freeze({ kind: 'data' }),
+      step: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      decrementLabel: Object.freeze({ kind: 'data', required: true }),
+      incrementLabel: Object.freeze({ kind: 'data', required: true }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+    }),
+    rest: false,
+    root: 'fabricate',
+  }),
+  Object.freeze({
+    name: 'SearchField',
+    path: 'src/ui/svelte/components/SearchField.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'value', initial: '' }),
+      placeholder: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
+  Object.freeze({
+    name: 'Select',
+    path: 'src/ui/svelte/components/Select.svelte',
+    version: 1,
+    props: Object.freeze({
+      options: Object.freeze({ kind: 'data', required: true }),
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      placeholder: Object.freeze({ kind: 'data' }),
+      size: Object.freeze({ kind: 'data' }),
+    }),
+    rest: false,
+    root: 'fabricate',
+    overlays: true,
+  }),
+  Object.freeze({
+    name: 'StageBars',
+    path: 'src/ui/svelte/components/StageBars.svelte',
+    version: 1,
+    props: Object.freeze({
+      stages: Object.freeze({ kind: 'data', required: true }),
+      currentIndex: Object.freeze({ kind: 'data' }),
+      numbered: Object.freeze({ kind: 'data' }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+    }),
+    rest: true,
+    root: 'any',
   }),
 ]);

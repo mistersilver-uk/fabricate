@@ -126,14 +126,12 @@
   const membershipOptions = $derived([
     {
       value: 'in',
-      labelKey: 'FABRICATE.Admin.Manager.Essence.MembershipIn',
-      fallback: 'In this system',
+      label: text('FABRICATE.Admin.Manager.Essence.MembershipIn', 'In this system'),
       count: membershipCounts.in,
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Essence.MembershipAll',
-      fallback: 'All world essences',
+      label: text('FABRICATE.Admin.Manager.Essence.MembershipAll', 'All world essences'),
       count: membershipCounts.all,
     },
   ]);

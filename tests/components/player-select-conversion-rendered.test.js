@@ -196,8 +196,7 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
 });
 
 /**
- * The two floored sites, and what each one is floored against. The book's page size left this
- * list when it became `Pagination`'s own control, floored by that primitive's hook rule.
+ * The two floored sites, and what each one is floored against.
  */
 const FLOORED_SITES = Object.freeze([
   {
@@ -353,7 +352,7 @@ describe('a converted trigger stops resizing with its value where a floor says s
 });
 
 /**
- * The four converted subjects this fixture can mount, and the row each one's panel is sized for.
+ * The three converted subjects this fixture can mount, and the row each one's panel is sized for.
  */
 const PANEL_SITES = Object.freeze([
   {
@@ -361,23 +360,19 @@ const PANEL_SITES = Object.freeze([
     name: 'the inventory sort',
     value: 'type',
     widest: 'Quantity',
-    banded: true,
   },
   {
     subject: 'journal',
     name: 'the journal sort',
     value: 'oldest',
     widest: 'Soonest Ready',
-    banded: true,
   },
   {
     subject: 'system',
     name: 'the participation selector',
     value: 'Alchemy',
     widest: 'Alchemists Supplies v1.6 — Salvageable, Tool',
-    banded: true,
   },
-  { subject: 'book', name: 'the book page size', value: '', widest: '12', banded: false },
 ]);
 
 /**
@@ -483,7 +478,7 @@ describe('an open option list draws every one of its labels in full (issue 1511)
     });
   }
 
-  for (const { subject, name, value, widest } of PANEL_SITES.filter((site) => site.banded)) {
+  for (const { subject, name, value, widest } of PANEL_SITES) {
     it(`ellipsises ${name} again once its stated panel band is taken away`, async () => {
       const page = await openFixture(subject, value);
       try {

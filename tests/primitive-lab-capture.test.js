@@ -8,6 +8,7 @@ import {
   TEXT_LIMIT,
   captureManifest,
   createDeadline,
+  describeRun,
   frameId,
   frameLabel,
   frameNote,
@@ -69,7 +70,13 @@ test('keys become capture requests; coverage is the first row of every non-empty
   });
   assert.deepEqual(requests, [
     { key: 'row:marks/2', kind: 'address', spec: '<Chip>', cap: 'removable' },
-    { key: addressKey('<Chip>', 'gone'), kind: 'address', spec: '<Chip>', cap: 'gone' },
+    {
+      key: addressKey('<Chip>', 'gone'),
+      kind: 'address',
+      spec: '<Chip>',
+      cap: 'gone',
+      deletedRow: true,
+    },
     {
       key: 'unit:0.0',
       kind: 'ordinal',
@@ -250,4 +257,28 @@ test('composites render at double density while lab:check keeps its own context'
     'a panel shows at its CSS size, one image pixel a device pixel'
   );
   assert.equal(panelWidth(header, 1), 500);
+});
+
+test('the run log counts the removed notes and prints one line free of control and format characters for each', () => {
+  const manifest = captureManifest({
+    frames: [{ id: 'a' }],
+    failures: [{ id: 'k', reason: 'r' }],
+    notes: [
+      {
+        key: 'k1',
+        kind: 'removed',
+        spec: '<Chip>',
+        cap: 'go\nne\u{202E}',
+        reason: '<Chip> has no\u{1B}\u{200B} unit',
+      },
+      { key: 'k2', kind: 'removed', spec: '<Gone>', cap: null, reason: 'no entry' },
+      { key: 'k3', kind: 'unlocated', file: 'a.json', count: 1 },
+    ],
+    timings: { bootMs: 5, totalMs: 9 },
+  });
+  assert.deepEqual(describeRun(manifest, '/out'), [
+    'captured 1 unit(s) to /out (1 failure(s), 2 removed with their drawing, 0 over the cap; boot 5 ms, total 9 ms)',
+    'removed with its drawing: <Chip> · gone (<Chip> has no unit)',
+    'removed with its drawing: <Gone> (no entry)',
+  ]);
 });

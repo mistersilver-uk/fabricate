@@ -26,11 +26,11 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "empty — where every row starts",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "PickerRowSearchOpen",
-    "slot": { "width": 620, "height": 163 },
+    "slot": { "width": 582, "height": 167 },
     "data": { "typed": "ingot" },
-    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window. Measured: at 620 by 163 the row holds one line, the search is 221px wide and the list opens 4px beneath it at its left edge, 221 by 104, unclamped and unflipped; 163 is the least height that holds the whole list (162 clips it to 103), and below 619 the search falls under the list's 220px floor, so the list outgrows the field.",
+    "note": "The act focuses the search and types the row's query, so the suggestions open beneath it. A boxed slot, because the list is portalled to the window. Measured: at 582 by 167 the row holds one line, the search stands at its 180px minimum and the list opens 4px beneath it at its left edge, 220 by 104, unclamped and unflipped, so the list's 220px floor outgrows the field; 167 is the least height that holds the whole list (166 clips it to 103), and below 582 the row wraps to a second line.",
     "props": {
       "value": {
         "kind": "component",
@@ -63,7 +63,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -87,11 +87,11 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
@@ -99,13 +99,13 @@
       "catalogue": {
         "tags": [
           {
-            "id": "#Hardwood",
-            "label": "#Hardwood",
+            "id": "hardwood",
+            "label": "hardwood",
             "icon": "fas fa-tag"
           },
           {
-            "id": "#Seasoned",
-            "label": "#Seasoned",
+            "id": "seasoned",
+            "label": "seasoned",
             "icon": "fas fa-tag"
           }
         ]
@@ -117,7 +117,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(3)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "essence",
@@ -141,7 +141,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "ingredient side — the kinds this context offers",
     "draws": ":scope > div > div:nth-child(4)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "currency",
@@ -168,7 +168,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result side — the same row, a different offered set",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "note": "A result row, offering the result kinds.",
     "props": {
       "value": {
@@ -193,7 +193,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result side — the same row, a different offered set",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "currency",
@@ -222,7 +222,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result quantity — fixed, or rolled",
     "draws": ":scope > div > div:nth-child(1)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -248,7 +248,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "result quantity — fixed, or rolled",
     "draws": ":scope > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -274,29 +274,29 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "adding a tag — the adder opens the catalogue",
     "draws": ":scope > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "TagAdderOpen",
-    "slot": { "width": 745, "height": 287 },
+    "slot": { "width": 765, "height": 337 },
     "data": { "typed": "wood" },
-    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, the held `#Hardwood` selected with a check and every tag with its count chip, `#Dirftwood`'s zero in the warning tone. A boxed slot, because the panel is portalled to the window. Measured: at 745 by 287 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 231, unclamped and unflipped; below 745 the stepper, `or…` and remove wrap to a second line, and 287 is the least height that holds the whole panel (286 clips it to 230). The tag panel opens at its 300px site minimum, so the held `#Hardwood` reads whole and only `#Seasoned-Heartwood-Planks` ellipsizes beside its count chip.",
+    "note": "The act clicks `+ Tag` and types the row's query, so the panel lists the five tags matching it, each stored lowercase without a `#` as the build stores it and drawn by the row as `#` and that spelling: the held `#hardwood` selected with a check and every tag with its count chip, `#dirftwood`'s zero in the warning tone, and the footer offers `New tag “wood”`, since no tag is stored as `wood`. A boxed slot, because the panel is portalled to the window. Measured: at 765 by 337 the row holds one line and the panel opens 6px beneath `+ Tag` at its left edge, 300 by 275 with its footer, unclamped and unflipped; below 765 the row wraps to a second line, and 337 is the least height that holds the whole panel (336 clips it to 274). The tag panel opens at its 300px site minimum, so the held `#hardwood` reads whole and only `#seasoned-heartwood-planks` ellipsizes beside its count chip.",
     "props": {
       "value": {
         "kind": "tags",
-        "tags": ["#Hardwood", "#Seasoned"],
+        "tags": ["hardwood", "seasoned"],
         "tagMatch": "any",
         "quantity": 1
       },
       "kinds": ["component", "tags", "essence", "currency"],
       "catalogue": {
         "tags": [
-          { "id": "#Hardwood", "label": "#Hardwood", "icon": "fas fa-tag", "count": 24 },
-          { "id": "#Seasoned", "label": "#Seasoned", "icon": "fas fa-tag", "count": 11 },
-          { "id": "#Softwood", "label": "#Softwood", "icon": "fas fa-tag", "count": 9 },
-          { "id": "#Driftwood", "label": "#Driftwood", "icon": "fas fa-tag", "count": 3 },
-          { "id": "#Dirftwood", "label": "#Dirftwood", "icon": "fas fa-tag", "count": 0 },
+          { "id": "hardwood", "label": "hardwood", "icon": "fas fa-tag", "count": 24 },
+          { "id": "seasoned", "label": "seasoned", "icon": "fas fa-tag", "count": 11 },
+          { "id": "softwood", "label": "softwood", "icon": "fas fa-tag", "count": 9 },
+          { "id": "driftwood", "label": "driftwood", "icon": "fas fa-tag", "count": 3 },
+          { "id": "dirftwood", "label": "dirftwood", "icon": "fas fa-tag", "count": 0 },
           {
-            "id": "#Seasoned-Heartwood-Planks",
-            "label": "#Seasoned-Heartwood-Planks",
+            "id": "seasoned-heartwood-planks",
+            "label": "seasoned-heartwood-planks",
             "icon": "fas fa-tag",
             "count": 1
           }
@@ -309,7 +309,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the only route in — a standalone result row’s inline convert control",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -336,7 +336,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a currency reward — the body is open because a value is picked",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "note": "A reward row, so a named currency opens its naming body beneath it.",
     "props": {
       "value": {
@@ -369,8 +369,8 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
-    "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn: `KindAdder` renders them for `RecipeResultGroupCard`, which no library entry names, so a row for them would stand outside its entry. The adder's menu is drawn in the kind menu's inks, which carry its #2368 debt.",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
+    "note": "The two reward rows. The Result adder and its kind menu beneath stay drawn here: `KindAdder` stands live in its own `<KindAdder>` entry, whose several-kinds unit copies this drawing. The adder's menu is drawn in the kind menu's inks, which carry its #2368 debt.",
     "props": {
       "value": {
         "kind": "component",
@@ -397,7 +397,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "a component reward, and one still searching — plus the set’s one adder over its offered kinds",
     "draws": ":scope > div:nth-of-type(1) > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "props": {
       "value": {
         "kind": "component",
@@ -423,7 +423,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "choice group — what “or…” produces",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "note": "An ingredient group of the three drawn alternatives, its pill's note in the drawing's words.",
     "props": {
       "group": {
@@ -448,7 +448,7 @@
             "quantity": 1,
             "match": {
               "type": "tags",
-              "tags": ["#Hardwood", "#Seasoned"],
+              "tags": ["hardwood", "seasoned"],
               "tagMatch": "any"
             }
           }
@@ -460,7 +460,7 @@
           "name": "Oak Haft"
         }
       ],
-      "itemTags": ["#Hardwood", "#Seasoned"],
+      "itemTags": ["hardwood", "seasoned"],
       "currencyUnits": [
         {
           "id": "sp",
@@ -475,7 +475,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "player chooses — the alternatives are an offer",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "note": "A result group, so its header and help line are the shipped group's own words.",
     "props": {
       "side": "result",
@@ -521,7 +521,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "rolled — the same alternatives, decided by an expression",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -576,7 +576,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "up to N, player chooses — a ceiling on a subset, N fixed",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -620,7 +620,7 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "up to N, by roll — the one cell where repeats are a setting",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "props": {
       "side": "result",
       "offer": {
@@ -675,9 +675,9 @@
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the kind menu — one menu, two triggers",
     "draws": ":scope > div > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/PickerRow.svelte",
+    "path": "src/ui/svelte/components/PickerRow.svelte",
     "fixture": "KindMenuOpen",
-    "slot": { "width": 515, "height": 197 },
+    "slot": { "width": 585, "height": 194 },
     "undrawn": {
       "Oak Haft": "the row’s named component; the drawing draws the trigger without its row"
     },
@@ -689,18 +689,18 @@
       },
       "allowAny": true
     },
-    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 515 by 197 holds the row on one line with its named pill whole, and the menu opens beneath its trigger, unclamped and unflipped; below 507 the pill is squeezed under the stepper. On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
+    "note": "The whole bare requirement row stands around its `or…`, because the trigger and its menu are `PickerRowKindMenu`, a part of `PickerRow` rather than a primitive a fixture may compose. The act opens the menu. A boxed slot, because the menu is portalled to the window: 585 by 194 holds the row on one line with its subject cell whole, and the menu opens 4px beneath its trigger at its end edge, unclamped and unflipped; below 585 the trailing controls wrap to a second line rather than squeeze the subject cell, and the whole menu fits with 3px to spare (191 is the least height that holds it and 190 clips it; the slot keeps 194 so CI's chrome has room). On the panel's bg-3 the shipped `--fab-text-muted` heading (2.65 to 4.48:1 in five themes) and `--fab-text-secondary` items (3.51 and 4.06:1 in hearth-herb and ironblood-forge) fall under 4.5:1, and the kind tints under 3:1 (1.81 to 2.85:1 in ironblood-forge, hearth-herb and foundry-native), so the drawing inks the heading and items in `--fab-text` and the glyphs in `--fab-text-secondary`: debt owned by #2368."
   },
   {
     "spec": "<PickerRow> <ChoiceGroup>",
     "cap": "the kind menu — one menu, two triggers",
     "draws": ":scope > div > div > div",
-    "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
+    "path": "src/ui/svelte/components/ChoiceGroup.svelte",
     "fixture": "KindMenuOpen",
-    "slot": { "width": 630, "height": 375 },
+    "slot": { "width": 661, "height": 347 },
     "undrawn": {
       "Oak Haft": "the first alternative’s component; the drawing draws the menu without its group",
-      "#Hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
+      "hardwood": "the second alternative’s tag, and the tag vocabulary’s one entry; the drawing draws the menu without its group",
       "Vitality": "the system’s essence, whose presence offers Essence; the drawing draws no essence catalogue",
       "Gold": "the currency unit’s name, whose presence offers Currency; the drawing draws no currency catalogue",
       "gp": "the currency unit’s abbreviation; the drawing draws no currency catalogue"
@@ -712,17 +712,84 @@
           { "quantity": 1, "match": { "type": "component", "componentId": "oak-haft" } },
           {
             "quantity": 1,
-            "match": { "type": "tags", "tags": ["#Hardwood"], "tagMatch": "any" }
+            "match": { "type": "tags", "tags": ["hardwood"], "tagMatch": "any" }
           }
         ]
       },
       "componentOptions": [{ "id": "oak-haft", "name": "Oak Haft" }],
-      "itemTags": ["#Hardwood"],
+      "itemTags": ["hardwood"],
       "essenceOptions": [{ "id": "vitality", "name": "Vitality" }],
       "currencyUnits": [{ "id": "gp", "label": "Gold", "abbreviation": "gp" }],
       "currencyEnabled": true
     },
-    "note": "The whole choice group stands around its `Alternative` adder, because the adder is `KindAdder`, a part of `ChoiceGroup` rather than a primitive a fixture may compose. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 630 by 375 holds both alternatives on one line, and the menu opens beneath the adder at its start edge, unclamped and unflipped; below 621 the tag row wraps, the adder drops, and the menu flips above it. Its drawn inks carry the bare row's #2368 debt."
+    "note": "The whole choice group stands around its `Alternative` adder, because this unit draws the adder inside its group; `KindAdder` stands alone in its own `<KindAdder>` entry. It renders only once the group holds two alternatives, and the menu offers Essence and Currency only while the system has an essence and an enabled currency, so the row passes both. The act opens the menu. A boxed slot, because the menu is portalled to the window: 661 by 347 holds both alternatives on one line, and the menu opens 4px beneath the adder at its start edge, unclamped and unflipped; below 661 a member row wraps to a second line, and 347 is the least height that holds the menu beneath the adder (at 346 it flips above it). Its drawn inks carry the bare row's #2368 debt."
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "fixed — the unit right of the stepper",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "A currency amount, so its unit stands right of the 102 by 28 stepper. The slot renders a fragment and owns no wrapper, so its parts stand in the page's own flow, the unit a word space from the stepper, where the drawing's wrapper draws the host row's 8px gap. In the page's own flow the unit sits on the stepper's baseline rather than centred; a host row's `align-items: center` levels it.",
+    "props": {
+      "value": { "kind": "currency", "quantity": 50 },
+      "amount": { "unit": "gp" },
+      "name": "Gold"
+    }
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "the Fixed | Rolled toggle — a result amount",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "The toggle's well is block-level, so in the page's own flow it stands above the stepper, where a host row lays the two in line at its 8px gap.",
+    "props": {
+      "value": { "kind": "component", "quantity": 2 },
+      "name": "Karrun Warblade",
+      "rollable": true
+    }
+  },
+  {
+    "spec": "<PickerRowAmount>",
+    "cap": "rolled — the expression in the stepper’s slot",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/PickerRowAmount.svelte",
+    "note": "Measured: the expression is 102 by 28 at radius 7, the stepper's own box, beneath the toggle's 30px well. The slot renders a fragment and owns no wrapper, so the gap between its parts is the host row's, 8px, which the drawing's wrapper draws.",
+    "props": {
+      "value": { "kind": "component", "quantityFormula": "1d4 + @abilities.dex.mod" },
+      "name": "Ironwort Draught",
+      "rollable": true
+    }
+  },
+  {
+    "spec": "<KindAdder>",
+    "cap": "one kind offered — appends directly",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/KindAdder.svelte",
+    "note": "With one kind on offer the button appends directly and opens no menu. Measured: 71 by 34 at radius 9, the manager button's 34px rung.",
+    "props": {
+      "kinds": ["component"],
+      "label": "Result",
+      "ariaLabel": "Add a result"
+    }
+  },
+  {
+    "spec": "<KindAdder>",
+    "cap": "several kinds — the kind menu from the button’s start edge",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/KindAdder.svelte",
+    "fixture": "KindAdderOpen",
+    "slot": { "width": 166, "height": 131 },
+    "undrawn": {
+      "manager-recipe-or-menu manager-recipe-result-menu": "the portaled panel's classes, which draw the kind menu's 150px; the drawing draws the panel they style"
+    },
+    "note": "The act opens the menu. A boxed slot, because the menu is portalled to the window: at 166 by 131 the menu opens 4px beneath the button, 150 by 93, unflipped. It stands 8px in from the button's start edge, the menu's margin inside its host, because the adder stands at the window's own edge here; 166 is the least width that keeps that margin on both sides (165 moves it to 7), and 131 the least height that holds the whole menu (130 clips it). Its drawn inks carry the bare row's #2368 debt.",
+    "props": {
+      "kinds": ["component", "currency"],
+      "label": "Result",
+      "ariaLabel": "Add a result",
+      "heading": "Add a result",
+      "menuClass": "manager-recipe-or-menu manager-recipe-result-menu"
+    }
   },
   {
     "spec": "<SetPicker>",
@@ -1031,15 +1098,15 @@
       "severities": [
         {
           "value": "Minor",
-          "fallback": "Minor"
+          "label": "Minor"
         },
         {
           "value": "Major",
-          "fallback": "Major"
+          "label": "Major"
         },
         {
           "value": "Severe",
-          "fallback": "Severe"
+          "label": "Severe"
         }
       ],
       "shownHint": "They see the complication when it fires.",
@@ -1140,39 +1207,60 @@
     "spec": "<SortableList>",
     "cap": "read-only — a GM stage’s complications, nested and fixed",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/StageComplicationList.svelte",
-    "fixture": "SortableListGmComplications",
-    "partial": "no DC or Edit link",
+    "path": "src/ui/svelte/apps/manager/ProgressiveStageList.svelte",
+    "fixture": "SortableListProgressiveStages",
     "props": {
-      "ownerName": "Ground Reagent",
-      "complications": [
+      "items": [{ "id": "reagent", "componentId": "ground-reagent" }],
+      "componentOptions": [
         {
-          "id": "dust-cloud",
-          "name": "Choking dust",
-          "severity": "severe",
-          "visibility": "visible",
-          "when": { "stageMissed": true },
-          "effectRoll": { "enabled": true, "expr": "1d4" }
-        },
-        {
-          "id": "dust-spoiled",
-          "name": "Spoiled batch",
-          "severity": "minor",
-          "visibility": "gmOnly",
-          "when": { "stagePartial": true }
+          "id": "ground-reagent",
+          "name": "Ground Reagent",
+          "difficulty": 2,
+          "complications": [
+            {
+              "id": "dust-cloud",
+              "name": "Choking dust",
+              "severity": "severe",
+              "visibility": "visible",
+              "activities": { "crafting": true },
+              "when": { "stageMissed": true },
+              "effectRoll": { "enabled": true, "expr": "1d4" }
+            },
+            {
+              "id": "dust-spoiled",
+              "name": "Spoiled batch",
+              "severity": "minor",
+              "visibility": "gmOnly",
+              "activities": { "crafting": true },
+              "when": { "stagePartial": true }
+            }
+          ]
         }
-      ]
+      ],
+      "catalogue": {
+        "component": [{ "id": "ground-reagent", "label": "Ground Reagent", "icon": "fas fa-cube" }]
+      },
+      "difficultyDataAttr": "data-recipe-result-difficulty",
+      "editDataAttr": "data-recipe-result-edit",
+      "dcLabel": "DC",
+      "dcUnsetLabel": "No difficulty",
+      "editLabel": "Edit",
+      "editTitle": "Edit difficulty and complications on the component"
     },
     "data": {
-      "stages": [{ "id": "reagent", "name": "Ground Reagent" }]
+      "editAriaKey": "FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult"
     },
     "undrawn": {
       "severe": "the first complication's severity value, drawn as its label",
       "minor": "the second complication's severity value, drawn as its label",
       "visible": "the first complication's visibility value, drawn as its Player chip",
-      "gmOnly": "the second complication's visibility value, drawn as the absence of a Player chip"
+      "gmOnly": "the second complication's visibility value, drawn as the absence of a Player chip",
+      "data-recipe-result-difficulty": "the attribute name the list writes the stage's DC under, a hook rather than a word",
+      "data-recipe-result-edit": "the attribute name the list writes the Edit link's component id under, a hook rather than a word",
+      "No difficulty": "the DC's unset copy, which a stage whose component carries a DC never shows",
+      "Edit difficulty and complications on the component": "the Edit link's tooltip, which a static drawing cannot hover"
     },
-    "note": "Wired as `ComponentSalvageStages` wires its stage list: one numbered, reorderable stage row naming its component, with the shipped `StageComplicationList` in the row's `body`. The stage's DC and Edit link are the caller's own scoped markup and stay drawn."
+    "note": "Mounts the shipped `ProgressiveStageList` with the recipe hooks and the salvage Edit name: one numbered, reorderable stage row naming its component, its read-only DC and Edit link in the row's trailing controls, and the component's crafting complications in the shipped `StageComplicationList` in the row's `body`."
   },
   {
     "spec": "<ExprInput> <RequirementChooser>",

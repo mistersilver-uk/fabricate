@@ -147,8 +147,17 @@ export function assertSelectHasResolvedName(root, triggerSelector) {
     // THE DOCUMENT, not `root`. The caption may sit outside the harness mount target when a
     // suite mounts a portaled surface, and an `aria-labelledby` is resolved against the whole
     // document either way — so scoping the lookup here would report a working name as broken.
-    const caption = trigger.ownerDocument.getElementById(labelledBy);
-    const name = caption?.textContent?.replaceAll(/\s+/gu, ' ').trim() ?? '';
+    // An IDREF list, as the routing overview's badge-and-connector name is (issue 2513).
+    const captions = labelledBy
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map((id) => trigger.ownerDocument.getElementById(id));
+    const caption = captions.every(Boolean) ? captions : null;
+    const name = (caption ?? [])
+      .map((element) => element.textContent)
+      .join(' ')
+      .replaceAll(/\s+/gu, ' ')
+      .trim();
     assert.ok(
       name.length > 0,
       `${triggerSelector} points \`aria-labelledby\` at "${labelledBy}", which names ` +

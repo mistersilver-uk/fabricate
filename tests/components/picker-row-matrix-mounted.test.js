@@ -13,8 +13,9 @@ import {
   INGREDIENT_KINDS,
   KIND_ORDER,
   fromValue,
+  kindMeta,
   toValue,
-} from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+} from '../../src/ui/svelte/components/pickerRowKinds.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
@@ -37,7 +38,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     'src/ui/svelte/util/announceAfterFocus.js',
     // Surplus: nothing this tree renders imports the copy module (issue 2465).
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -51,13 +52,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/components/PickerRowAmount.svelte',
+    'src/ui/svelte/components/PickerRowNameField.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/components/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/PickerRow.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  componentPath: 'src/ui/svelte/components/PickerRow.svelte',
 });
 
 /**
@@ -196,7 +197,7 @@ async function openTagAdder(target) {
   return target.ownerDocument.querySelector('.fabricate-picker-popover');
 }
 const tagOptions = (panel) => [...panel.querySelectorAll('[role="option"]')];
-const tagOption = (panel, tag) => tagOptions(panel).find((node) => node.title === tag);
+const tagOption = (panel, tag) => tagOptions(panel).find((node) => node.title === `#${tag}`);
 const optionText = (node) => node.textContent.replaceAll(/\s+/gu, ' ').trim();
 /** An option's announced selection, and whether it draws the held check. */
 const heldState = (node) => [
@@ -247,10 +248,9 @@ describe('PickerRow: unreachable cells are absent', () => {
           config.allowAny === true,
           `${kind}: convert`
         );
-        assert.equal(
-          Boolean(target.querySelector('.manager-recipe-option-divider')),
-          config.allowAny === true,
-          `${kind}: the divider belongs to the convert control`
+        assert.ok(
+          !target.querySelector('.manager-recipe-option-divider'),
+          `${kind}: no divider stands before the convert control`
         );
         assert.equal(
           Boolean(target.querySelector('[data-stepper-input]')),
@@ -299,7 +299,7 @@ describe('PickerRow: every reachable cell acts', () => {
       if (kind === 'tags') {
         await click(target.querySelector('[data-recipe-add-tag]'));
         const option = [...target.ownerDocument.querySelectorAll('[role="option"]')].find(
-          (node) => node.textContent.trim() === 'rare'
+          (node) => node.textContent.trim() === '#rare'
         );
         await click(option);
         assert.deepEqual(await applied('add tag'), { ...start, tags: ['rare'] });
@@ -330,18 +330,28 @@ describe('PickerRow: every reachable cell acts', () => {
         );
       });
 
-      it(`${surface} × ${kind}: Any of / All of forwards the policy and rewrites the word`, async () => {
+      it(`${surface} × ${kind}: Any of / All of forwards the policy; no word leads the arm`, async () => {
         const start = { ...unnamed(kind), tags: ['herb'] };
         const { target, applied } = await mountRow(config, start);
-        const policy = () => target.querySelector('[data-recipe-tag-policy]').textContent;
-        assert.equal(policy(), 'Any of');
+        const arm = () => target.querySelector('[data-recipe-option-tags]');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
         await click(tagMatchRadio(target, 'all'));
         assert.deepEqual(await applied('all'), { ...start, tagMatch: 'all' });
-        assert.equal(policy(), 'All of');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
         assert.ok(tagMatchRadio(target, 'all').checked);
         await click(tagMatchRadio(target, 'any'));
         assert.deepEqual(await applied('any'), start);
-        assert.equal(policy(), 'Any of');
+        assert.doesNotMatch(arm().textContent, /Any of|All of/);
+      });
+
+      it(`${surface} × ${kind}: a chip reads its stored tag after a \`#\`, lit at the tag-run scale`, async () => {
+        const { target } = await mountRow(config, { ...unnamed(kind), tags: ['herb'] });
+        const chip = target.querySelector(':scope [data-recipe-option-tags] .manager-chip');
+        assert.equal(chip.getAttribute('data-recipe-tag'), 'herb', 'the hook holds the stored tag');
+        assert.equal(chip.querySelector(':scope > span').textContent, '#herb');
+        for (const name of ['is-tag', 'is-lit', 'is-tag-run']) {
+          assert.ok(chip.classList.contains(name), `the chip carries ${name}`);
+        }
       });
     } else {
       it(`${surface} × ${kind}: clear forwards an empty subject and returns the search`, async () => {
@@ -623,10 +633,19 @@ describe('PickerRow: the remaining branches', () => {
     assert.notEqual(names[0], names[1], 'two rows sharing a name would be one radio group');
   });
 
+  it('words the tag-match segments in English when the active language has no translation', async () => {
+    const { target } = await mountRow(ingredient, unnamed('tags'));
+    const words = ['any', 'all'].map(
+      (mode) =>
+        target.querySelector(`[data-recipe-tag-match="${mode}"] .manager-segment-label`).textContent
+    );
+    assert.deepEqual(words, ['Any of', 'All of']);
+  });
+
   it('the tag picker lists every vocabulary tag and marks the held ones selected', async () => {
     const { target } = await mountRow(ingredient, { ...unnamed('tags'), tags: ['herb'] });
     const panel = await openTagAdder(target);
-    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare'], 'vocabulary order');
+    assert.deepEqual(tagOptions(panel).map(optionText), ['#herb', '#rare'], 'vocabulary order');
     assert.deepEqual(tagOptions(panel).map(heldState), [
       ['true', true],
       ['false', false],
@@ -887,13 +906,248 @@ describe('PickerRow: the remaining branches', () => {
         return node.classList[0];
       }
     );
-    assert.deepEqual(order, [
-      'fab-stepper',
-      'manager-recipe-option-divider',
-      'convert',
-      'trailing',
-      'remove',
-    ]);
+    assert.deepEqual(order, ['fab-stepper', 'convert', 'trailing', 'remove']);
+  });
+});
+
+describe('PickerRow: the lead plate is untinted until a value resolves (issue 2515)', () => {
+  const lead = (target) => target.querySelector('.manager-recipe-option-lead').className;
+  const LEAD_CELLS = [
+    ...INGREDIENT_KINDS.map((kind) => [SURFACES['recipe ingredient'], kind]),
+    [SURFACES['recipe result'], 'knowledge'],
+  ];
+
+  for (const [config, kind] of LEAD_CELLS) {
+    it(`${kind}: an empty row's lead plate is is-empty, and takes the kind tone once named`, async () => {
+      const { target, applied } = await mountRow(config, unnamed(kind));
+      assert.equal(lead(target), 'manager-recipe-option-lead is-empty', 'no kind tint');
+      if (kind === 'tags') {
+        await click(tagOption(await openTagAdder(target), 'herb'));
+        await applied('first tag');
+      } else {
+        const { id, query } = PICK[kind];
+        await type(target.querySelector('[data-recipe-option-search]'), query);
+        await click(target.ownerDocument.querySelector(`[data-recipe-option-suggestion="${id}"]`));
+        await applied('name');
+      }
+      assert.equal(lead(target), `manager-recipe-option-lead is-${kindMeta(kind).tone}`);
+      assert.ok(
+        target
+          .querySelector('[data-recipe-option]')
+          .classList.contains(`is-${kindMeta(kind).tone}`),
+        'the row keeps its own tone throughout'
+      );
+    });
+  }
+
+  it('a missing recipe, a read-only face and a misconfigured row are not is-empty', async () => {
+    const result = SURFACES['recipe result'];
+    const missing = await mountRow(result, { ...unnamed('knowledge'), id: 'r-gone' });
+    assert.ok(Boolean(missing.target.querySelector('[data-recipe-option-missing]')));
+    assert.equal(lead(missing.target), 'manager-recipe-option-lead is-knowledge');
+    harness.remount();
+    const face = await mountRow(result, unnamed('currency'), { readonlyKinds: ['currency'] });
+    assert.equal(lead(face.target), 'manager-recipe-option-lead is-currency');
+    harness.remount();
+    const unknown = await mountRow(result, unnamed('activity'));
+    assert.equal(lead(unknown.target), 'manager-recipe-option-lead is-unknown');
+  });
+
+  it('the subject cell holds the subject plate, carrying the image or the glyph', async () => {
+    for (const [id, inside] of [
+      ['c-iron', 'img'],
+      ['c-coal', 'i.manager-recipe-option-mark'],
+    ]) {
+      const { target } = await mountRow(SURFACES['recipe ingredient'], {
+        ...unnamed('component'),
+        id,
+      });
+      const plate = target.querySelector(
+        ':scope [data-recipe-option-chosen] > .manager-recipe-option-plate'
+      );
+      assert.ok(Boolean(plate), `${id}: the plate sits in the subject cell`);
+      assert.equal(plate.children.length, 1, `${id}: one mark`);
+      assert.ok(plate.firstElementChild.matches(inside), `${id}: ${inside}`);
+      harness.remount();
+    }
+  });
+});
+
+describe('PickerRow: a currency entry draws its unit right of the amount (issue 2515)', () => {
+  const units = (unit) => ({
+    ...CATALOGUE,
+    currency: [{ id: 'gp', label: 'Gold', icon: 'fa-solid fa-coins', ...(unit && { unit }) }],
+  });
+  const named = { ...unnamed('currency'), id: 'gp' };
+
+  for (const [surface, config] of [
+    ['recipe ingredient', SURFACES['recipe ingredient']],
+    ['recipe result', SURFACES['recipe result']],
+  ]) {
+    it(`${surface}: the entry's unit is the stepper's next sibling`, async () => {
+      const { target } = await mountRow(config, named, { catalogue: units('gp') });
+      const unit = target.querySelector('[data-recipe-option-unit]');
+      assert.equal(unit.textContent, 'gp');
+      assert.ok(unit.previousElementSibling.matches('.fab-stepper'), 'right of the stepper');
+    });
+  }
+
+  it('a unit with no abbreviation, and an unnamed row, draw none', async () => {
+    const bare = await mountRow(SURFACES['recipe ingredient'], named, { catalogue: units('') });
+    assert.ok(!bare.target.querySelector('[data-recipe-option-unit]'), 'no abbreviation');
+    harness.remount();
+    const empty = await mountRow(SURFACES['recipe ingredient'], unnamed('currency'), {
+      catalogue: units('gp'),
+    });
+    assert.ok(!empty.target.querySelector('[data-recipe-option-unit]'), 'nothing named yet');
+  });
+
+  it("the caller's amount.unit wins over the entry's", async () => {
+    const { target } = await mountRow(SURFACES['recipe ingredient'], named, {
+      catalogue: units('gp'),
+      amount: { unit: 'coins' },
+    });
+    assert.equal(target.querySelector('[data-recipe-option-unit]').textContent, 'coins');
+  });
+});
+
+describe('PickerRow: the tag catalogue offers a new tag from its footer (issue 2515)', () => {
+  const ingredient = SURFACES['recipe ingredient'];
+  const tagRow = (tags) => ({ ...unnamed('tags'), tags });
+  const FOOTER = '[data-recipe-tag-create]';
+  const footer = (target) => target.ownerDocument.querySelector(FOOTER);
+  const searchOf = (panel) => panel.querySelector(':scope .manager-travel-popover-search input');
+
+  /** Mount a tag row whose `onCreateTag` records and returns `result`, or calls it, then type `query`. */
+  async function typedRow(query, { tags = [], extra = {}, result } = {}) {
+    const calls = [];
+    const row = await mountRow(ingredient, tagRow(tags), {
+      onCreateTag: (tag) => {
+        calls.push(tag);
+        return typeof result === 'function' ? result() : result;
+      },
+      ...extra,
+    });
+    const panel = await openTagAdder(row.target);
+    await type(searchOf(panel), query);
+    return { ...row, calls, panel };
+  }
+
+  it('offers an absent name, against a vocabulary and against none at all', async () => {
+    const { target } = await typedRow('brine');
+    assert.equal(optionText(footer(target)), 'New tag “brine”');
+    harness.remount();
+    const zero = await typedRow('brine', { extra: { catalogue: EMPTY_CATALOGUE } });
+    assert.equal(optionText(footer(zero.target)), 'New tag “brine”', "a system's first tag");
+  });
+
+  it('offers nothing for an empty query, a listed tag in any case, a held tag, or no handler', async () => {
+    for (const [query, options, why] of [
+      [' '.repeat(3), {}, 'an empty query'],
+      ['HERB', {}, 'a vocabulary tag, cased otherwise'],
+      [
+        'herb',
+        { extra: { catalogue: { ...CATALOGUE, tags: [{ id: 'Herb', label: 'Herb' }] } } },
+        'a vocabulary tag stored cased',
+      ],
+      ['ghost', { tags: ['ghost'] }, 'a tag the row holds outside the vocabulary'],
+      ['brine', { extra: { onCreateTag: null } }, 'no onCreateTag'],
+    ]) {
+      const { target } = await typedRow(query, options);
+      assert.ok(!footer(target), `${why}: no footer`);
+      harness.remount();
+    }
+  });
+
+  it('a press adds the normalized tag once, keeps the panel and its query, and focuses the search', async () => {
+    const { target, calls, panel, changes, applied } = await typedRow('  Brine ');
+    const button = footer(target);
+    assert.equal(optionText(button), 'New tag “brine”', 'named as it will be stored');
+    assert.equal(button.getAttribute('title'), 'New tag “brine”');
+    button.focus();
+    await click(button);
+    await click(button);
+    assert.deepEqual(calls, ['brine'], 'a double activation writes once');
+    assert.equal(changes.length, 1, 'and adds to the row once');
+    assert.deepEqual((await applied('create')).tags, ['brine']);
+    assert.ok(!footer(target), 'the held tag takes the footer away');
+    assert.ok(target.ownerDocument.querySelector('.fabricate-picker-popover'), 'the panel stays');
+    assert.equal(searchOf(panel).value, '  Brine ', 'with its query');
+    await harness.setProps({
+      catalogue: { ...CATALOGUE, tags: [...CATALOGUE.tags, { id: 'brine', label: 'brine' }] },
+    });
+    await settle();
+    assert.ok(!footer(target), 'the refreshed vocabulary lists it');
+    assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
+  });
+
+  it('strips one typed `#`: `#rare` is listed, and `#brine` creates `brine`', async () => {
+    const listed = await typedRow('#rare');
+    assert.ok(!footer(listed.target), 'a listed tag typed as its row reads offers no footer');
+    harness.remount();
+    const { target, calls, applied } = await typedRow('#brine');
+    assert.equal(optionText(footer(target)), 'New tag “brine”', 'named as it will be stored');
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine']);
+    assert.deepEqual((await applied('create')).tags, ['brine']);
+    const chip = target.querySelector('[data-recipe-tag="brine"]');
+    assert.equal(chip.querySelector(':scope > span').textContent, '#brine');
+  });
+
+  it('a press from the focused footer leaves focus in the search once it unmounts', async () => {
+    const { target, calls, panel, applied } = await typedRow('salt');
+    const button = footer(target);
+    button.focus();
+    const { KeyboardEvent } = target.ownerDocument.defaultView;
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    assert.equal(button.dispatchEvent(enter), true, "nothing cancels Enter's native activation");
+    // A browser activates a focused button on Enter with a click; happy-dom raises none.
+    await click(button);
+    assert.deepEqual(calls, ['salt']);
+    assert.deepEqual((await applied('create')).tags, ['salt']);
+    assert.ok(!footer(target), 'the footer unmounted');
+    assert.ok(target.ownerDocument.activeElement === searchOf(panel), 'focus is in the search');
+  });
+
+  it('a refused write takes the tag back off the row and says so', async () => {
+    const notices = [];
+    const { ui } = globalThis;
+    Reflect.set(globalThis, 'ui', {
+      notifications: {
+        error: (message) => {
+          notices.push(message);
+        },
+      },
+    });
+    try {
+      const { target, changes } = await typedRow('brine', {
+        result: () => Promise.reject(new Error('refused')),
+      });
+      await click(footer(target));
+      await settle();
+      const staged = changes.map(([value]) => value.tags);
+      assert.deepEqual(staged, [['brine'], []], 'staged on the press, then taken back off');
+      assert.deepEqual(notices, ['Tag could not be added.']);
+      assert.equal(optionText(footer(target)), 'New tag “brine”', 'the footer offers it again');
+    } finally {
+      Reflect.set(globalThis, 'ui', ui);
+    }
+  });
+
+  it('does nothing on a press while the write is pending', async () => {
+    let finish;
+    const pending = new Promise((done) => (finish = done));
+    const { target, calls, panel, changes, applied } = await typedRow('brine', { result: pending });
+    await click(footer(target));
+    await applied('create');
+    await type(searchOf(panel), 'salt');
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine'], 'the second name waits on the first write');
+    assert.equal(changes.length, 0, 'and adds nothing to the row');
+    finish();
+    await settle();
+    await click(footer(target));
+    assert.deepEqual(calls, ['brine', 'salt'], 'the write settled, a press creates again');
   });
 });
 
@@ -959,7 +1213,7 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
   it('lists the vocabulary when the row holds only a tag outside it, and adds beside it', async () => {
     const { target, applied } = await mountRow(ingredient, tagRow(['ghost']));
     const panel = await openTagAdder(target);
-    assert.deepEqual(tagOptions(panel).map(optionText), ['herb', 'rare']);
+    assert.deepEqual(tagOptions(panel).map(optionText), ['#herb', '#rare']);
     assert.deepEqual(tagOptions(panel).map(heldState), [
       ['false', false],
       ['false', false],
@@ -1029,13 +1283,13 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
         .querySelector('.fabricate-picker-popover')
         ?.querySelector('[data-active-option="true"]');
     await press('ArrowDown');
-    assert.equal(active()?.title, 'herb', 'the cursor is on the held tag');
+    assert.equal(active()?.title, '#herb', 'the cursor is on the held tag');
     await press('Enter');
     assert.deepEqual((await applied('enter removes')).tags, []);
-    assert.equal(active()?.title, 'herb', 'the cursor survives the removal');
+    assert.equal(active()?.title, '#herb', 'the cursor survives the removal');
     await press('Enter');
     assert.deepEqual((await applied('enter re-adds')).tags, ['herb']);
-    assert.equal(active()?.title, 'herb', 'and the re-add');
+    assert.equal(active()?.title, '#herb', 'and the re-add');
     await press('Escape');
     assert.ok(!target.ownerDocument.querySelector('.fabricate-picker-popover'), 'Escape closes');
     assert.equal(
@@ -1058,10 +1312,10 @@ describe('PickerRow: the tag adder is the row’s multi-select catalogue (issue 
     const { target } = await mountRow(ingredient, tagRow(['herb']), { catalogue });
     const panel = await openTagAdder(target);
     assert.deepEqual(tagOptions(panel).map(optionText), [
-      'herb 24 components',
-      'rare 1 component',
-      'typo 0 components',
-      'bare',
+      '#herb 24 components',
+      '#rare 1 component',
+      '#typo 0 components',
+      '#bare',
     ]);
     const chipClasses = (tag) => [
       ...tagOption(panel, tag).querySelector('.manager-chip').classList,

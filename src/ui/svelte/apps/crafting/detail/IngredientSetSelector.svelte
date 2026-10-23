@@ -54,10 +54,9 @@
       legend={localize('FABRICATE.App.Crafting.Detail.IngredientSetsTitle')}
       legendVisible
       {options}
-      selectedValue={selectedSetId ?? ''}
+      value={selectedSetId ?? ''}
       groupName={`crafting-route-${uid}`}
       optionDataAttr="data-set-id"
-      configCards={true}
       onChange={(id) => onChoose?.(id)}
     >
       {#snippet optionBody(set)}

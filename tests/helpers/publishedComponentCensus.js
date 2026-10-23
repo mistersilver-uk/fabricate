@@ -2,8 +2,8 @@
  * The census of a published root class over every stylesheet (issues 2451, 2452): which selectors
  * name it, which of those a published mount can match, where they sit and what they draw, the bare
  * `button` rules beside them, the classes the published closures spell, and the DOM reads of an ARIA
- * attribute. `tests/published-component-manifest.test.js` and
- * `tests/published-toggle-census.test.js` read it.
+ * attribute. `tests/published-component-manifest.test.js`, `tests/published-toggle-census.test.js`
+ * and `tests/published-stepper-census.test.js` read it.
  */
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
@@ -13,6 +13,7 @@ import { walkNodes } from './moduleAst.js';
 import {
   SHIPPED,
   byName,
+  classNames,
   declarationsOf,
   everyStylesheet,
   importClosure,
@@ -141,7 +142,7 @@ const holdsGlobal = (node) =>
   );
 
 /** Whether `:global` reaches `complex`: in a part of its own, in a rule that nests it, or in a rule it nests. */
-function reachedByGlobal(css, complex) {
+export function reachedByGlobal(css, complex) {
   const within = (outer) => outer.start <= complex.start && complex.end <= outer.end;
   return [...walkNodes(css)].some(
     (rule) =>
@@ -282,13 +283,6 @@ export function dataHooksOf(census) {
       .map((part) => part.name)
   );
   return [...new Set(names)].sort(byName);
-}
-
-/** The static class names one template node writes, by attribute or directive. */
-export function classNames(node) {
-  if (node.type === 'ClassDirective') return [node.name];
-  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
-  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
 }
 
 /**

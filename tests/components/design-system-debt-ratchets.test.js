@@ -976,7 +976,7 @@ const oneLine = (selector) => selector.replaceAll(/\s+/gu, ' ').trim();
  * fails until it is listed here, and the review of that listing decides the classification.
  */
 const FLOATING_SURFACES = Object.freeze([
-  ['src/ui/svelte/components/Modal.svelte', '.manager-modal', 'a dialog over the window'],
+  ['src/ui/svelte/components/Modal.svelte', '.fabricate-modal', 'a dialog over the window'],
   [
     MODULE_SHEET,
     '.fabricate-typeahead-list.fabricate-typeahead-list',
@@ -985,7 +985,6 @@ const FLOATING_SURFACES = Object.freeze([
   [MODULE_SHEET, '.fabricate-manager .manager-recipe-duration-popover', 'a popover'],
   [MODULE_SHEET, '.fabricate-manager .manager-recipe-option-suggestions', 'opens over the form'],
   [MODULE_SHEET, '.fabricate-manager .manager-availability-menu', 'a menu'],
-  [MODULE_SHEET, '.fabricate-color-picker-popover.manager-color-picker-popover', 'a popover'],
   [MODULE_SHEET, '.fabricate-action-menu-panel.manager-action-menu-panel', 'a row menu'],
   [MODULE_SHEET, '.fabricate-interaction-prompt', 'a toast over the canvas'],
   [MODULE_SHEET, '.fabricate-picker-popover.manager-travel-popover', 'a popover'],
@@ -1196,7 +1195,7 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const STATE_TINTS = Object.freeze([
   [
     `${MANAGER}/BulkEditPanelShell.svelte`,
-    ':global( .fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover )',
+    ':global( .fabricate-manager .fabricate-button.fabricate-button.fab-bulk-edit-apply:not(:disabled):hover )',
     'var(--fab-accent-strong)',
     'an accent verb deepens in its own family',
   ],
@@ -1268,21 +1267,21 @@ const STATE_TINTS = Object.freeze([
   ]),
   [
     `${COMPONENTS}/ThresholdBandStrip.svelte`,
-    '.fab-band-strip-handle.is-dragging .fab-band-strip-grip, .fab-band-strip-handle:hover .fab-band-strip-grip',
-    'var(--fab-accent-soft)',
-    'a drag grip, a mark that lights while it is grabbed',
-  ],
-  [
-    MODULE_SHEET,
-    '.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active .manager-resolution-option-icon',
-    'var(--fab-accent-soft)',
-    'the chosen card’s icon well, a mark inside the surface',
+    '.fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle.is-dragging .fab-band-strip-grip, .fab-band-strip-track:not(.is-disabled) .fab-band-strip-handle:hover .fab-band-strip-grip',
+    'var(--fab-accent)',
+    'a drag grip, a 2px seam that lights in the accent while it is hovered or grabbed',
   ],
   [
     MODULE_SHEET,
     '.fabricate-manager .manager-selected-tag-pill button:hover, .fabricate-manager .manager-selected-tag-pill button:focus-visible',
     'var(--fab-success-soft)',
     'the remove inside a success pill hovers in the pill’s family',
+  ],
+  [
+    MODULE_SHEET,
+    ".fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true']",
+    'var(--fab-surface-soft)',
+    'a selected tint tile keeps the tile ground its ring is the mark on (spec, the swatch exception)',
   ],
   [
     MODULE_SHEET,
@@ -1298,21 +1297,21 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible',
+    '.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit:focus-visible, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-edit:focus-visible',
     'var(--fab-accent-strong)',
     'an accent verb deepens in its own family',
   ],
   [
     MODULE_SHEET,
-    '.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track',
-    'color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text))',
+    '.fabricate-toggle.fabricate-toggle.is-on:not(:disabled, .is-disabled, .is-locked, :has(> .manager-tool-setting-toggle-input:disabled)):hover .manager-status-toggle-track',
+    'color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-toggle-lift))',
     'a switch track lifts toward its ink: a control’s track, not a surface',
   ],
   [
     MODULE_SHEET,
-    '.fabricate-option-cards .manager-resolution-option.is-active',
-    'var(--fab-accent-soft)',
-    'a radio card’s answer: accent-soft under the 3px bar',
+    '.fabricate-option-cards .manager-resolution-option.is-active::before',
+    'var(--fab-surface-soft)',
+    'a radio card’s answer: surface-soft layered over the bg-2 rest ground, the specimen’s gradient drawn flat',
   ],
   [
     MODULE_SHEET,
@@ -1340,7 +1339,7 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-success-strong)',
     'the primary verb deepens in its own family',
   ],
@@ -1352,13 +1351,13 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-danger:not(:disabled):hover, .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover, .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover",
     'var(--fab-danger-soft)',
     'the danger verb fills in the family it inks in',
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
     'var(--fab-warning-soft)',
     'the warning verb keeps its own fill',
   ],
@@ -1388,7 +1387,7 @@ const STATE_TINTS = Object.freeze([
   ],
   [
     MODULE_SHEET,
-    '.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible',
+    '.fabricate-button.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete:focus-visible, .fabricate-button.fabricate-button.fabricate-button.manager-component-browser-inspector-delete:focus-visible',
     'var(--fab-danger-soft)',
     'a destructive verb’s focus face, the danger fill its hover takes',
   ],
@@ -1646,13 +1645,12 @@ test('no state rule in the sheet and every scoped block mixes two tint families'
 /** A hover that keeps a rung fill under a tinted edge, with the reason the edge is its own. */
 const HOVER_EDGE_TINTS = Object.freeze(
   [
-    '.fabricate-button.fabricate-button.is-dashed:not(:disabled):hover',
-    '.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover',
+    ".fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
   ].map((selector) => [
     MODULE_SHEET,
     selector,
     'var(--fab-accent-border)',
-    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (library.html:134)',
+    'the dashed adder’s hover edge, `.k-btn.dashed:hover` (library.html:141)',
   ])
 );
 

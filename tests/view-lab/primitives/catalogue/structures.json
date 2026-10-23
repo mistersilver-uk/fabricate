@@ -99,6 +99,42 @@
     "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis is staged as `EssenceBulkEditPanel` stages it: a `BulkEditSection` label over a filled `SegmentedControl`. Drawn differently: the label is `BulkEditSection`’s own micro-label, 0.58rem at .1em with a `space-2` top margin, about 16px below the hero, where the drawing has an 8.5px Kicker 8px below it, and the track is 34px where the drawing’s is 36."
   },
   {
+    "spec": "<InspectorPanel>",
+    "cap": "rail — content continuing under the foot",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/InspectorPanel.svelte",
+    "inset": 12,
+    "fixture": "InspectorPanelRecipeVerbs",
+    "partial": "verbs and foot",
+    "props": {
+      "style": "--fab-manager-inspector-pad: var(--fab-space-3); --fab-manager-inspector-bg: var(--fab-bg-2)"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Selected recipe"
+      },
+      {
+        "tag": "strong",
+        "text": "Healing Draught"
+      },
+      {
+        "tag": "span",
+        "text": "Mountain Herb"
+      },
+      {
+        "tag": "span",
+        "text": "Clear Water"
+      }
+    ],
+    "data": {
+      "duplicate": "Duplicate recipe",
+      "edit": "Edit recipe",
+      "remove": "Delete recipe"
+    },
+    "note": "The panel’s three recipe verbs in its foot, the content above it as plain text. The aside’s two tokens ride the root’s `style`, because the lab’s slot is not a `.manager-inspector`; the slot is not a scroller, so the foot stands under the content."
+  },
+  {
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
     "path": "src/ui/svelte/components/Modal.svelte",
@@ -167,7 +203,7 @@
           "tag": "button",
           "attrs": {
             "type": "button",
-            "class": "fabricate-button fab-manager-button is-ghost",
+            "class": "fabricate-button is-ghost",
             "data-keyboard-focus": "true"
           },
           "text": "Cancel"
@@ -176,7 +212,7 @@
           "tag": "button",
           "attrs": {
             "type": "button",
-            "class": "fabricate-button fab-manager-button is-primary",
+            "class": "fabricate-button is-primary",
             "data-keyboard-focus": "true"
           },
           "text": "Import 412 records"
@@ -195,7 +231,7 @@
       "pageIndex": 0,
       "pageSizeOptions": [10, 25, 50]
     },
-    "note": "The per-page choice ships as a `Select`, so the drawn segments are not a `SegmentedControl` and keep the kit's default paint."
+    "note": "The page-size choice ships as a `SegmentedControl` at its default rung, named by the Per page caption; the drawn segments are the kit's pager rung of it."
   },
   {
     "spec": "<Pagination> <FilterBar>",
@@ -204,7 +240,7 @@
     "path": "src/ui/svelte/components/FilterBar.svelte",
     "fixture": "FilterBarRecipes",
     "partial": "no toggles",
-    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so Enabled only and Craftable stay drawn. The sort button draws only the caller’s direction word, Asc: the shipped button draws its arrow glyph beside that word and the drawing draws the glyph alone, but no shared button takes a glyph as a prop and a fixture may not author an `<i>`, so neither glyph stands live.",
+    "note": "The fixture cannot author the caller’s three `manager-recipe-filter-row` divs, so the live bar is the section’s own single wrapping row where the shipped recipe bar sets its controls in three rows. The count is the row’s `content`, `span.manager-recipe-count`. The search, the scope switch, the Name select and the sort button are wired as `RecipesBrowserView` wires its own, without the caller’s “Sort by” label. No `FilterBar` caller draws a toggle chip, so the Enabled only and Craftable chips have no live counterpart. The drawing’s search is the 38px field and its Name select the 34px toolbar rung, as the shipped bar sets them. The sort button draws only the caller’s direction word, Asc: the shipped button draws its arrow glyph beside that word and the drawing draws the glyph alone, but no shared button takes a glyph as a prop and a fixture may not author an `<i>`, so neither glyph stands live.",
     "undrawn": {
       "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name",
       "all": "an option’s value, not its words",
@@ -221,9 +257,9 @@
     "data": {
       "searchLabel": "Search recipes",
       "scopes": [
-        { "value": "all", "fallback": "All" },
-        { "value": "mine", "fallback": "Mine" },
-        { "value": "shared", "fallback": "Shared" }
+        { "value": "all", "label": "All" },
+        { "value": "mine", "label": "Mine" },
+        { "value": "shared", "label": "Shared" }
       ],
       "scope": "all",
       "scopeLabel": "Recipe scope",
@@ -432,7 +468,7 @@
               "tag": "button",
               "attrs": {
                 "type": "button",
-                "class": "fabricate-button fab-manager-button is-ghost",
+                "class": "fabricate-button is-ghost",
                 "data-keyboard-focus": "true"
               },
               "children": [
@@ -450,7 +486,7 @@
               "tag": "button",
               "attrs": {
                 "type": "button",
-                "class": "fabricate-button fab-manager-button is-primary",
+                "class": "fabricate-button is-primary",
                 "data-keyboard-focus": "true"
               },
               "children": ["Save"]
@@ -461,16 +497,14 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowDefaultBrowse",
-    "partial": "status button stays drawn",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
-      "Delete system": "a menu item’s label; the drawing draws the menu closed",
-      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+      "Delete system": "a menu item’s label; the drawing draws the menu closed"
     },
     "props": {
       "name": "Riverbridge",
@@ -548,21 +582,21 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+      "on": true,
+      "statusKey": "FABRICATE.Admin.Manager.StatusOn",
+      "toggleKey": "FABRICATE.Admin.Manager.DisableSystemNamed"
     },
-    "note": "The badges are `Chip`s as `RunCard` renders its status, and the kebab is a closed `ActionMenu` as `SystemsBrowserView` wires its row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The status button stays drawn: it is a prose mark with no component, and the shipped browsers put a `StatusToggle` in that cell. Drawn differently: the chips sit at the head’s far end, because the name takes `flex: 1 1 auto`, where the drawing sets them beside the name; they carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and the kebab is `ActionMenu`’s `IconButton` trigger, 34px with a 1px border at radius 9 and the vertical `fa-ellipsis-vertical` every shipped menu uses, where the drawing’s is a 28px borderless square at radius 7 with horizontal dots."
+    "note": "The badges are `Chip`s at the list density as `RunCard` renders its status, and the trailing cell is a `StatusToggle` and then a closed `ActionMenu`, as `SystemsBrowserView` wires its status cell and row menu; no shipped `ListRow` caller has this trailing, so the composition is the drawing’s. The switch reads On or Off, `SystemsBrowserView`’s own reading, and is named Enable or Disable and the system’s name. The kebab is `ActionMenu`’s `IconButton` trigger, 34px at radius 9 with the vertical `fa-ellipsis-vertical` every shipped menu uses."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default — 38px chip, 12px sans name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowDefaultBrowse",
-    "partial": "status button stays drawn",
     "undrawn": {
       "Export system": "a menu item’s label; the drawing draws the menu closed",
-      "Delete system": "a menu item’s label; the drawing draws the menu closed",
-      "System actions": "the menu trigger’s title; the drawing draws an unlabelled kebab"
+      "Delete system": "a menu item’s label; the drawing draws the menu closed"
     },
     "props": {
       "name": "Oakhollow",
@@ -623,17 +657,18 @@
         }
       ],
       "menuForKey": "FABRICATE.Admin.Manager.SystemActionsFor",
-      "menuKey": "FABRICATE.Admin.Manager.SystemActions"
+      "on": false,
+      "statusKey": "FABRICATE.Admin.Manager.StatusOff",
+      "toggleKey": "FABRICATE.Admin.Manager.EnableSystemNamed"
     },
     "note": "A second browse row, wired as the first default row is, and drawn differently from the drawing in the ways that row’s note names."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "selectable dense — the Journal’s Active run",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowRunCard",
-    "partial": "no countdown",
     "undrawn": {
       "Progress": "the stage bars' accessible name, the Journal's own copy; the drawing names no group"
     },
@@ -654,6 +689,28 @@
         {
           "tag": "span",
           "text": "Stage 2 of 2"
+        }
+      ],
+      "aside": [
+        {
+          "tag": "span",
+          "attrs": {
+            "style": "display:inline-flex;align-items:center;gap:var(--fab-space-chip);font-family:var(--fab-font-mono);font-size:10px;font-weight:500;color:var(--fab-text);white-space:nowrap"
+          },
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-clock",
+                "aria-hidden": "true",
+                "style": "font-size:11px;color:var(--fab-text-muted)"
+              }
+            },
+            {
+              "tag": "span",
+              "text": "5h 0m 0s remaining"
+            }
+          ]
         }
       ]
     },
@@ -691,10 +748,10 @@
       "progress": 40,
       "progressKey": "FABRICATE.App.Journal.Progress.Label"
     },
-    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars as the aside beneath the one button. The bolt arrives as the row's `content`, its paint restated from `RunCard`'s scoped `.journal-run-card-bolt`. The countdown stays drawn: it shares the aside with the bars inside `RunCard`'s own timing block, which a row's one `content` cannot reach."
+    "note": "Wired as `RunCard` wires it: the bolt and the status chip as badges, the meta as spans, and the stage bars and the world-time countdown of `RunCard`’s `timing` snippet as the aside beneath the one button. The bolt arrives as the row’s `content` and the countdown as its `aside` snippet, each painted as `RunCard`’s scoped `.journal-run-card-bolt` and `.journal-run-card-countdown` paint it. Drawn differently: the countdown stands beneath the bars, because the flex line `RunCard` sets them on is its own scoped `.journal-run-card-timing`, where the drawing and the shipped row set it beside them."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "selectable dense — the Journal’s Active run",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -726,12 +783,11 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "default with an aside — a leading thumb, block content beneath",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
     "fixture": "ListRowGatheringTask",
-    "partial": "art mark, not the 56px thumb; no badges; the caption stands above its bar",
     "props": {
       "name": "Gather Ironvale ore",
       "icon": "fas fa-leaf",
@@ -739,6 +795,16 @@
       "density": "default",
       "markSize": 38
     },
+    "content": [
+      {
+        "tag": "img",
+        "attrs": {
+          "src": "icons/containers/bags/pouch-leather-brown-green.webp",
+          "alt": "",
+          "style": "display:block;box-sizing:border-box;width:56px;height:56px;padding:var(--fab-space-2);border-radius:9px;object-fit:contain;background:var(--fab-surface-raised)"
+        }
+      }
+    ],
     "snippets": {
       "meta": [
         {
@@ -752,15 +818,26 @@
       ]
     },
     "data": {
+      "chips": [
+        {
+          "label": "2 h",
+          "tone": "neutral"
+        },
+        {
+          "label": "Ready",
+          "tone": "success"
+        }
+      ],
       "chanceLabelKey": "FABRICATE.App.Gathering.Detail.SuccessChanceLabel",
       "chanceKey": "FABRICATE.App.Gathering.Detail.SuccessChance",
       "percent": 62,
-      "fill": "success"
+      "fill": "success",
+      "chanceStyle": "display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:var(--fab-space-2)"
     },
-    "note": "Wired as `GatheringTaskRow` wires it: the default density, and the success chance in the aside beneath the button, `ChanceBar`'s composition inlined because `ChanceBar` is app-scoped. Its 56px thumb, its callout badges and the wrapper that sets the caption beside the bar are that row's own scoped markup, so the mark stands where the thumb would."
+    "note": "Wired as `GatheringTaskRow` wires it: the default density, its 56px thumb as `leading`, painted as that row’s scoped `.gathering-task-thumb.is-fallback` paints its fallback image, which the drawing stands a glyph for, and the success chance in the aside beneath the button as a `BandedBar`, because `ChanceBar` is app-scoped, its caption set beside the track as that row’s scoped `.gathering-task-chance` grid sets it. The caption rides inside the meter, which its `aria-label` names, where `GatheringTaskRow` draws `ChanceBar showCaption={false}` with the caption as an `aria-hidden` `Kicker` beside it; it draws the same. The badges are `Chip`s at the list density; `GatheringTaskRow`’s own `.gathering-task-callout` pill, in the same tones, is adoption debt that becomes `Chip density=\"list\"` under issue 2559."
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "dense — the cross-reference and result form",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/XrefList.svelte",
@@ -785,7 +862,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/ViewToggle.svelte",
@@ -797,7 +874,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -824,7 +901,7 @@
     }
   },
   {
-    "spec": "<ListRow> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -847,6 +924,40 @@
           "text": "#Alchemy"
         }
       ]
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list loading — the list’s form, not the row’s",
+    "draws": ".k-list-loading-default",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The crafting system library's loading body at the default density; the header above it stays the drawing's, because the list owns it.",
+    "props": {
+      "loading": true,
+      "loadingLabel": "Loading crafting systems…"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list loading — the list’s form, not the row’s",
+    "draws": ".k-list-loading-dense",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The Knowledge roster's loading body at the dense density.",
+    "props": {
+      "loading": true,
+      "loadingLabel": "Loading player characters…",
+      "density": "dense"
+    }
+  },
+  {
+    "spec": "<ListRow> <ViewToggle> <XrefList> <ListState>",
+    "cap": "browse list error",
+    "draws": ".k-list-error",
+    "path": "src/ui/svelte/components/ListState.svelte",
+    "note": "The gathering environment browser's failed load, its detail the refused setting read's own message.",
+    "props": {
+      "error": "Could not load the gathering environments",
+      "errorDetail": "“fabricate.gatheringEnvironments” is not a registered game setting."
     }
   },
   {
@@ -1114,7 +1225,7 @@
       "searchKey": "FABRICATE.App.Journal.Filters.SearchLabel",
       "placeholder": "Search"
     },
-    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the per-page choice is a `Select` where the drawing draws segments; the drawing’s pager figures (1–3 of 128, page 1 of 43) mean three a page against its chosen 10, so the live pager reads 1–10 and page 1 of 13 over the drawing’s three rows; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; the Outcome chips carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and `Pagination` adds a ‘Per page’ label, a footer ground lighter than the drawn bg-1, and bordered arrows."
+    "note": "The populated table: rows keyed by `id`, the Outcome column a `Chip` as `IoTable` renders its availability, and the search at the compact density `GatheringTaskDropsCard` gives it. No shipped caller sorts, so the sort on When exercises the table’s own contract. Drawn differently: the drawing’s pager figures (1–3 of 128, page 1 of 43) mean three a page against its chosen 10, so the live pager reads 1–10 and page 1 of 13 over the drawing’s three rows; the sort glyph is `fa-caret-down` where the drawing draws a chevron; the selected row takes `--fab-surface-active` where the drawing takes success-soft; the compact search is 34px high and 260 wide where the drawing’s is 30 by 150; the Outcome chips carry a 1px border at 9px/600 where the drawn badge is borderless at 10px; and `Pagination` adds a ‘Per page’ caption and bordered arrows."
   },
   {
     "spec": "<DataTable>",
@@ -1276,18 +1387,11 @@
         }
       ]
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ],
     "data": {
       "dismissKey": "FABRICATE.App.Journal.History.Dismiss",
-      "class": "is-ghost"
+      "size": "24",
+      "role": "ghost",
+      "icon": "fas fa-xmark"
     },
     "note": "Wired as `HistoryList` wires the Journal’s Finished list: each entry’s dismiss is a 24px ghost `IconButton` named for its entry, and `onOpen` makes each entry an open button, so the first is `aria-pressed` through `selectedKey`. Drawn differently: the dismiss glyph takes the ghost `IconButton`’s text-subtle ink where the drawing’s is text-muted."
   },

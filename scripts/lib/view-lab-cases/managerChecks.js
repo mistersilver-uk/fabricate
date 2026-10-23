@@ -8,7 +8,7 @@ import {
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+import { choosePageSize, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -835,9 +835,12 @@ export const CASES = Object.freeze([
       'Crafting',
       { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
-      { selector: '[data-recipe-add="routing-option"]' },
+      { selector: '[data-route-sources-assign]' },
     ],
     expectView: 'recipe-edit',
+    // Only the open Assign panel satisfies it: the failed tier is offered beside the passing ones.
+    expectSelector:
+      '.fabricate-manager > .fabricate-route-sources-popover [role="option"][title="Ruined"]',
     kinds: ['manager', 'recipes', 'resolution-mode'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -1209,7 +1212,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
-      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
+      ...choosePageSize('10', '.manager-main'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'components',

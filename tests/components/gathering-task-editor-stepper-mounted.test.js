@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   RESULT_ROW_COMPILED_MODULES,
@@ -27,6 +28,8 @@ import {
   GATHERING_TASK_EDITOR_COMPILED_MODULES,
   GATHERING_TASK_EDITOR_RAW_MODULES,
 } from '../helpers/gatheringTaskEditorModules.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
 const { normalizeGatheringResultGroups } = await import(
@@ -69,6 +72,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
@@ -93,15 +97,23 @@ const harness = createMountedComponentHarness({
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
     ...RESULT_ROW_RAW_MODULES,
+    // Issue 2511: the recipe results section's set drafts, routing model and routing edits.
+    'src/ui/svelte/apps/manager/recipe/setDrafts.js',
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
+    'src/ui/svelte/apps/manager/recipe/resultSetSources.js',
+    'src/utils/routedOutcomeKeywords.js',
+    'src/utils/failureResultPolicy.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -109,9 +121,12 @@ const harness = createMountedComponentHarness({
     // complication band through it.
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+    'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     ...RESULT_ROW_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: the set card and the routing line every result set draws.
+    'src/ui/svelte/components/SetCard.svelte',
+    'src/ui/svelte/components/RouteSources.svelte',
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
@@ -119,6 +134,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
@@ -285,7 +301,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
     assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
     assert.ok(
-      addModifier.classList.contains('fab-manager-button'),
+      addModifier.classList.contains('fabricate-button'),
       `Add modifier renders through the Button primitive, got ${addModifier.className}`
     );
     assert.ok(
@@ -301,7 +317,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const addDrop = root.querySelector('[data-gathering-add-drop="toolbar"]');
     assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
     assert.ok(
-      addDrop.classList.contains('fab-manager-button'),
+      addDrop.classList.contains('fabricate-button'),
       `Add drop rule renders through the Button primitive, got ${addDrop.className}`
     );
     assert.ok(
@@ -1291,7 +1307,8 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
       view.task().resultGroups.map((group) => group.name),
       ['', 'Rich']
     );
-    view.root.querySelectorAll('[data-recipe-remove="result-set"]')[0].click();
+    const firstCard = view.root.querySelectorAll('[data-recipe-result-set-id]')[0];
+    await chooseSetCardAction(firstCard, '[data-recipe-remove="result-set"]');
     await view.sync();
     assert.deepEqual(
       view.task().resultGroups.map((group) => group.id),
@@ -1413,7 +1430,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
 
   it('ranks a drop by its place in the whole list, on a later page and through a search', async () => {
     const view = await twelveRanked();
-    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    choosePageSize(view.root, '.manager-task-drops-card', 10);
     await view.sync();
     assert.equal(ranks(view.root).length, 10, 'ten rows a page');
     await view.press('.manager-task-drops-card [data-pagination-next]');
@@ -1468,7 +1485,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
     const view = await twelveRanked();
     await view.press('.manager-task-drops-card [data-pagination-next]');
     assert.deepEqual(ranks(view.root), ['#6', '#7', '#8', '#9', '#10']);
-    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    choosePageSize(view.root, '.manager-task-drops-card', 10);
     await view.sync();
     assert.deepEqual(ranks(view.root).slice(0, 2), ['#1', '#2']);
     assert.equal(ranks(view.root).length, 10);

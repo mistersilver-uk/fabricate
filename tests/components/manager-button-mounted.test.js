@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -43,7 +44,7 @@ describe('Button emits the element and classes its call sites are styled against
     assert.equal(node.tagName, 'BUTTON');
     assert.equal(node.getAttribute('type'), 'button');
     // A manager button inside a `<form>`-adjacent card must never submit by accident.
-    assert.equal(node.className, 'fabricate-button fab-manager-button');
+    assert.equal(node.className, 'fabricate-button');
   });
 
   it('emits is-warning-action for the warning role, and never is-warning', async () => {
@@ -59,7 +60,7 @@ describe('Button emits the element and classes its call sites are styled against
       await harness.mount({ role });
       assert.equal(
         button().className,
-        `fabricate-button fab-manager-button is-${role}`,
+        `fabricate-button is-${role}`,
         `the ${role} role`
       );
       harness.remount();
@@ -69,7 +70,7 @@ describe('Button emits the element and classes its call sites are styled against
   it('renders neutral for an unrecognised role rather than an unstyled is-* class', async () => {
     await harness.mount({ role: 'nonsense' });
     // A typo must show up as the default button, never as a class the sheet does not declare.
-    assert.equal(button().className, 'fabricate-button fab-manager-button');
+    assert.equal(button().className, 'fabricate-button');
   });
 
   it('renders neutral for a role that names an inherited member of the mapping', async () => {
@@ -78,7 +79,7 @@ describe('Button emits the element and classes its call sites are styled against
       await harness.mount({ role });
       assert.equal(
         button().className,
-        'fabricate-button fab-manager-button',
+        'fabricate-button',
         `role="${role}"`
       );
       harness.remount();
@@ -89,7 +90,7 @@ describe('Button emits the element and classes its call sites are styled against
     await harness.mount({ role: 'dashed', fullWidth: true });
     assert.equal(
       button().className,
-      'fabricate-button fab-manager-button is-dashed is-full-width'
+      'fabricate-button is-dashed is-full-width'
     );
     harness.remount();
     await harness.mount({ role: 'dashed' });
@@ -100,7 +101,7 @@ describe('Button emits the element and classes its call sites are styled against
   // ── THE 38px RUNG (issue 1371) ────────────────────────────────────────────────────────
   it('emits NO size class by default, so every shipped button keeps its 34px control', async () => {
     await harness.mount({ role: 'primary' });
-    assert.equal(button().className, 'fabricate-button fab-manager-button is-primary');
+    assert.equal(button().className, 'fabricate-button is-primary');
   });
 
   it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
@@ -108,13 +109,18 @@ describe('Button emits the element and classes its call sites are styled against
     // The documented order, and the same one `SearchField` states for the same token:
     assert.equal(
       button().className,
-      'fabricate-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
+      'fabricate-button is-primary is-full-width is-size-38 manager-thing'
     );
+  });
+
+  it('emits is-size-28 for the 28px rung (issue 2515)', async () => {
+    await harness.mount({ role: 'dashed', size: '28' });
+    assert.equal(button().className, 'fabricate-button is-dashed is-size-28');
   });
 
   it('takes the rung as a number too, since a caller will write size={38}', async () => {
     await harness.mount({ size: 38 });
-    assert.equal(button().className, 'fabricate-button fab-manager-button is-size-38');
+    assert.equal(button().className, 'fabricate-button is-size-38');
   });
 
   it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
@@ -123,11 +129,89 @@ describe('Button emits the element and classes its call sites are styled against
       await harness.mount({ size });
       assert.equal(
         button().className,
-        'fabricate-button fab-manager-button',
+        'fabricate-button',
         `size="${String(size)}" is not a rung this button offers`
       );
       harness.remount();
     }
+  });
+
+  // ── THE LEADING ICON (issue 2540) ─────────────────────────────────────────────────────
+  it('draws one hidden <i> carrying the icon class as the first child', async () => {
+    const children = createRawSnippet(() => ({ render: () => '<span>Add</span>' }));
+    await harness.mount({ icon: 'fas fa-plus', children });
+    const node = button();
+    const glyphs = node.querySelectorAll('i');
+    assert.equal(glyphs.length, 1);
+    assert.equal(node.children.length, 2);
+    assert.equal(node.firstElementChild, glyphs[0]);
+    assert.equal(node.children[1].textContent, 'Add');
+    assert.equal(glyphs[0].className, 'fas fa-plus');
+    assert.equal(glyphs[0].getAttribute('aria-hidden'), 'true');
+  });
+
+  it('draws no <i> for an empty icon, and none by default', async () => {
+    await harness.mount({ icon: '' });
+    assert.equal(button().querySelector('i'), null);
+    harness.remount();
+    await harness.mount({});
+    assert.equal(button().querySelector('i'), null);
+  });
+
+  it('leaves the root class unchanged by an icon', async () => {
+    await harness.mount({ role: 'ghost', icon: 'fas fa-plus' });
+    assert.equal(button().className, 'fabricate-button is-ghost');
+  });
+
+  // ── THE BUSY STATE (issue 2540) ───────────────────────────────────────────────────────
+  it('writes aria-busy and aria-disabled for busy, and never disabled', async () => {
+    await harness.mount({ role: 'primary', busy: true });
+    const node = button();
+    assert.equal(node.getAttribute('aria-busy'), 'true');
+    assert.equal(node.getAttribute('aria-disabled'), 'true');
+    assert.equal(node.disabled, false, 'busy keeps the tab stop that `disabled` would drop');
+    assert.equal(node.className, 'fabricate-button is-primary');
+  });
+
+  it('writes neither busy attribute while idle', async () => {
+    await harness.mount({});
+    assert.ok(!button().hasAttribute('aria-busy'), 'no aria-busy while idle');
+    assert.ok(!button().hasAttribute('aria-disabled'), 'no aria-disabled while idle');
+  });
+
+  it('swallows a press while busy and forwards it once settled', async () => {
+    const presses = [];
+    const onclick = () => {
+      presses.push('press');
+    };
+    await harness.mount({ busy: true, onclick });
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    button().dispatchEvent(event);
+    assert.deepEqual(presses, [], 'a busy press reaches no callback');
+    assert.equal(event.defaultPrevented, true, 'and its default (a submit, a link) is prevented');
+    harness.remount();
+    await harness.mount({ onclick });
+    button().click();
+    assert.deepEqual(presses, ['press']);
+  });
+
+  it('swallows an anchor press while busy, so the link does not navigate', async () => {
+    const presses = [];
+    const onclick = () => {
+      presses.push('press');
+    };
+    await harness.mount({ tag: 'a', href: '/docs', busy: true, onclick });
+    assert.equal(button().tagName, 'A', 'the anchor form renders');
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    button().dispatchEvent(event);
+    assert.deepEqual(presses, [], 'a busy anchor press reaches no callback');
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(button().getAttribute('aria-disabled'), 'true');
+  });
+
+  it('renders disabled when disabled and busy are both set', async () => {
+    await harness.mount({ busy: true, disabled: true });
+    assert.equal(button().disabled, true);
   });
 
   it('appends the pass-through class after its own, never in place of them', async () => {
@@ -136,7 +220,7 @@ describe('Button emits the element and classes its call sites are styled against
     // silently unstyle the button while every `data-*` selector kept resolving.
     assert.equal(
       button().className,
-      'fabricate-button fab-manager-button is-ghost is-subtle manager-thing'
+      'fabricate-button is-ghost is-subtle manager-thing'
     );
   });
 

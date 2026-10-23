@@ -8,6 +8,7 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
@@ -123,13 +124,16 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    for (const paginationModule of PAGINATION_COMPILED_MODULES) {
+      writeCompiledSvelte(paginationModule);
+    }
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);
     }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/Medallion.svelte');
     // The manager's ONE labelled push-button (issue 1118).
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
@@ -390,6 +394,12 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     );
     assert.ok(unrolledRoll.classList.contains('is-roll-needed'));
     assert.ok(unrolledRoll.querySelector('.fa-dice-d20'));
+    // Its hint, not its name, is the tooltip (issue 2541): the name says the verb, the hint how.
+    assert.equal(
+      unrolledRoll.getAttribute('data-tooltip-text'),
+      'Roll this character’s pool from the max/start expressions'
+    );
+    assert.ok(!unrolledRoll.hasAttribute('title'), 'and no native title stacks a second');
 
     // Rolled: inputs enabled, the button is a reset (arrows-rotate), not emphasised.
     const rolledCurrent = target.querySelector(
@@ -401,6 +411,10 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     );
     assert.equal(rolledRoll.classList.contains('is-roll-needed'), false);
     assert.ok(rolledRoll.querySelector('.fa-arrows-rotate'));
+    assert.equal(
+      rolledRoll.getAttribute('data-tooltip-text'),
+      'Re-roll this character’s pool from the max/start expressions'
+    );
     unmount(mounted);
     mounted = null;
     target.remove();

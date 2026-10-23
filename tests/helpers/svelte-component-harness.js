@@ -182,6 +182,8 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   // The listbox cursor's arithmetic (issue 1503).
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  // The app root's localizer context, which localizes the picker's own copy (issue 2454).
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -220,6 +222,13 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
+// The pager's compiled closure: the arrow buttons and the segmented page-size control it composes.
+export const PAGINATION_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Pagination.svelte'
+]);
+
 // The requirement row's `or…` kind menu (issue 1516): `PickerRow` imports it whether or not a
 // caller passes `allowAny`, so every tree that compiles the row compiles these too.
 export const KIND_MENU_RAW_MODULES = Object.freeze(['src/ui/svelte/util/actionMenuLayout.js']);
@@ -227,7 +236,7 @@ export const KIND_MENU_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte'
+  'src/ui/svelte/components/PickerRowKindMenu.svelte'
 ]);
 
 // The result rows beyond `<Select>` (issue 1516): the requirement row, its amount slot, its kind
@@ -239,8 +248,8 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
   // Issue 1521: the card and the requirement row localize through `localizeOr`.
   ...LOCALIZE_OR_RAW_MODULES,
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
+  'src/ui/svelte/components/resultRows.js',
   'src/ui/svelte/util/recipeCurrency.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
@@ -251,32 +260,35 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/utils/rollFormulaRollability.js',
   // Issue 1773: a recipe result renders through the result-side `ChoiceGroup`, whose edits and
   // essence offer (read by its ingredient form) it imports.
-  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
-  'src/ui/model/essenceValidation.js'
+  'src/ui/svelte/components/resultGroupEdits.js',
+  'src/ui/model/essenceValidation.js',
+  // Issue 2511: the shared draft-id mint and pending focus the card and the group read.
+  'src/ui/svelte/util/draftId.js',
+  'src/ui/svelte/util/pendingFocus.js'
 ]);
 
 export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/PickerRowKindMenu.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
   // Issue 1773: a recipe result set's one adder, the shared kind adder since issue 2367.
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   // …and its choice group, with the award header, the range cell and the progressive statement.
   'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte'
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
+  'src/ui/svelte/components/ChoiceGroup.svelte'
 ]);
 
 // Issue 1773: what `ChoiceGroup`'s result-side form adds to every tree compiling the group — its
@@ -284,9 +296,9 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
 // literals, because the harness guard follows a nested spread one level only.
 export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/announceAfterFocus.js',
-  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/components/resultGroupEdits.js',
+  'src/ui/svelte/components/resultRows.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
   'src/ui/svelte/util/recipeCurrency.js',
   'src/utils/choiceGroupShape.js',
   'src/models/Result.js',
@@ -294,20 +306,22 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/utils/rollFormulaRollability.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
-  'src/utils/scalars.js'
+  'src/utils/scalars.js',
+  'src/ui/svelte/util/draftId.js',
+  'src/ui/svelte/util/pendingFocus.js'
 ]);
 
 export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte'
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS
@@ -554,12 +568,14 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // Every transitive `.svelte` module in the player Crafting tab tree (plus the shared Pagination
 // component RecipeBrowser reuses).
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/components/Pagination.svelte',
-  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s page-size
-  // control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
+  ...PAGINATION_COMPILED_MODULES,
+  // Restated as a literal: the allowlist guard follows one spread level, and this list is itself
+  // spread by its callers.
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: the crafting browser's
+  // category and system filters are `<Select>`s, so this PLAYER-app list reaches `Select`, `Field`,
   // `SearchablePopover`, the `Button` `SearchablePopover` renders its trigger through (issue
-  // 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
-  // `IconButton` below arrives by.
+  // 1371), and the `Chip`/`EmptyState` pair the popover's list renders.
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
@@ -692,14 +708,15 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       teardownDOM();
       if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
     },
-    async mount(props = {}) {
+    // `context` is the Svelte context map a Fabricate root mounts its tree with (issue 2454).
+    async mount(props = {}, { context } = {}) {
       // Cross a macrotask boundary BEFORE building the next tree.
       await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
       // THE MOUNT TARGET IS AN APPLICATION ROOT (issue 1466).
       target.className = rootClass;
       document.body.appendChild(target);
-      mounted = createClassComponent({ component: Component, target, props });
+      mounted = createClassComponent({ component: Component, target, props, context });
       flushSync();
       await tick();
       flushSync();

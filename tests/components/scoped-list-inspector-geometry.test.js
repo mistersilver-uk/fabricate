@@ -13,11 +13,12 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   STATUS_TONE_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -146,7 +147,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -278,8 +279,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       `a ${ROW_COUNT}-entity corpus rendered no page-size control in the list column, so this ` +
         'fixture cannot be driven onto one page and the overflow below is unreachable'
     );
-    // Issue 1504: the control is a shared `<Select>`, so this is two clicks on a portaled panel.
-    chooseSelectOption(target, '[data-pagination-size]', TALL_PAGE_SIZE);
+    choosePageSize(target, '', TALL_PAGE_SIZE);
     await harness.setProps({});
     assert.equal(
       target.querySelectorAll('[data-scoped-list-row]').length,
@@ -420,8 +420,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       `a ${PAGED_ROW_COUNT}-entity corpus rendered no page-size control in the list column, so ` +
         'this fixture never reached the multi-page state it exists to measure'
     );
-    // Issue 1504: the control is a shared `<Select>`, so this is two clicks on a portaled panel.
-    chooseSelectOption(pagedTarget, '[data-pagination-size]', PAGED_PAGE_SIZE);
+    choosePageSize(pagedTarget, '', PAGED_PAGE_SIZE);
     await harness.setProps({});
     shortPagedMarkup = pagedTarget.innerHTML;
 
@@ -881,8 +880,16 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         return [box.left - columnBox.left, columnBox.right - box.right];
       };
       const style = getComputedStyle(column);
+      const pager = column.querySelector(':scope > .fabricate-pagination');
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--fab-bg-1)';
+      document.body.append(probe);
+      const bg1 = getComputedStyle(probe).backgroundColor;
+      probe.remove();
       return {
         rendered: true,
+        bg1,
+        pagerFill: pager ? getComputedStyle(pager).backgroundColor : null,
         padding: ['Top', 'Right', 'Bottom', 'Left'].map((side) =>
           parseFloat(style[`padding${side}`])
         ),
@@ -917,17 +924,27 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       const box = await measureFlushColumn(markupOf(), view);
       assert.equal(box.rendered, true, 'the column, its toolbar, its rows or a row did not render');
       assert.deepEqual(box.padding, [0, 0, 0, 0], 'the list column carries no inset');
-      for (const band of ['toolbar', 'rows']) {
-        assert.ok(
-          box[band].every((edge) => Math.abs(edge) <= EPSILON_PX),
-          `the ${band} stops ${box[band].join('/')}px short of the column's left/right edges`
-        );
-      }
+      assert.ok(
+        box.rows.every((edge) => Math.abs(edge) <= EPSILON_PX),
+        `the rows stop ${box.rows.join('/')}px short of the column's left/right edges`
+      );
+      assert.ok(
+        box.toolbar.every((edge) => Math.abs(edge - GUTTER_PX) <= EPSILON_PX),
+        `the filter bar stops ${box.toolbar.join('/')}px short of the column's left/right edges, ` +
+          `not the ${GUTTER_PX}px inset`
+      );
+      assert.ok(
+        Math.abs(box.toolbar[0] - box.rowInset) <= EPSILON_PX,
+        `the filter bar's left edge (${box.toolbar[0]}px) is not the rows' gutter (${box.rowInset}px)`
+      );
       assert.ok(
         Math.abs(box.rowInset - GUTTER_PX) <= EPSILON_PX,
         `a row starts ${box.rowInset}px inside the column, not on the ${GUTTER_PX}px gutter`
       );
       assert.ok(box.footClass.includes(foot), `NON-VACUITY: the foot is \`${box.footClass}\``);
+      if (foot === 'fabricate-pagination') {
+        assert.equal(box.pagerFill, box.bg1, 'the pager fill is --fab-bg-1 on this route (M4)');
+      }
       assert.ok(
         Math.abs(box.footGap) <= EPSILON_PX,
         `the foot stops ${box.footGap}px above the column's bottom`
@@ -939,6 +956,24 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       );
     });
   }
+
+  it("lets no route repaint the pager: its fill is the primitive's --fab-bg-1 everywhere (M4)", () => {
+    const rules = [...fabricateCss.matchAll(/([^{}]*)\{([^{}]*)\}/gu)];
+    const bare = (selector) => selector.replaceAll(/\/\*[\s\S]*?\*\//gu, '').trim();
+    const repaints = rules
+      .filter(
+        ([, selector, body]) =>
+          bare(selector).includes('.fabricate-pagination') &&
+          /background/u.test(body) &&
+          !/^\.fabricate-pagination\.fabricate-pagination(?:\.is-compact)?$/u.test(bare(selector))
+      )
+      .map(([, selector]) => bare(selector));
+    assert.deepEqual(repaints, [], 'a route rule paints the pager over its own fill');
+    const owner = rules.find(([, selector]) =>
+      /^\s*\.fabricate-pagination\.fabricate-pagination\s*$/u.test(selector)
+    );
+    assert.ok(Boolean(owner) && owner[2].includes('background: var(--fab-bg-1)'));
+  });
 
   it('gives the ROWS REGION the slack on a short list rather than sizing it to its content', async () => {
     // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS.

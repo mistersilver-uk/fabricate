@@ -528,8 +528,8 @@ If `features.gathering === false`:
 The selected system's recipe visibility is authored on the Crafting group's **Settings** page (`crafting-settings`), in a **Recipe Visibility** section rendered below the resolution-mode card.
 It is no longer on the System Overview page, and it authors the flat `visibilityMode` enum rather than the legacy `listMode` + `knowledge.mode` pair.
 
-- A single radio-card selector (the shared `RadioCardGroup` primitive, rendered directly with `configCards` stated at the call site) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
-  The `ResolutionModeCard` wrapper this control used to reach that primitive through was removed at issue 1509; the control, its four options and its `is-config-cards` face are unchanged.
+- A single radio-card selector (the shared `RadioCardGroup` primitive, rendered directly) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
+  The `ResolutionModeCard` wrapper this control used to reach that primitive through was removed at issue 1509; the control, its four options and its `.fabricate-option-cards` face are unchanged.
   Each option carries a label and description; exactly one mode is active for the whole system.
 - **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from _gating_ to _reveal_ language (per `recipe-visibility`), because brewing is never gated by visibility.
   A non-alchemy system renders "Restricted" with gating language.
@@ -725,11 +725,12 @@ Only shown when essences are enabled.
 **IDENTITY IS NOT AUTHORED AT SYSTEM SCOPE.**
 An essence's name, glyph, colour and description belong to its WORLD record, which every crafting system holding the essence resolves the same one of, so the system-scope Essence Rules editor renders no control that writes them — see `ui-world-scope/spec.md` `## GM World Essence Screens` requirement 10.
 The identity capabilities below are the WORLD essence entry editor's, and the system-scope route reaches them only through that editor.
-The one surface at system scope that still authors identity is a CREATE draft, whose in-system record is the only record there is and which therefore has no shared definition to contradict.
+No system-scope create exists (issue 2554): the world Essence Catalogue's `+ New essence` is the only create, and every system-scope write of an essence row registers its world identity at the save chokepoint (`data-models/spec.md` -> Scoped Entity Definitions requirement 17).
+The one surface at system scope that still authors identity is the three-tab editor rendered where the world corpus cannot answer for the essence, whose in-system record is then the only record readable and which therefore has no shared definition to contradict.
 
 Capabilities:
 
-- Browse, create, duplicate when supported, and delete essence definitions; edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
+- Browse essence definitions, add a world essence to this system and delete one from it, with no system-scope create or duplicate (`ui-world-scope/spec.md` `## GM World Essence Screens` requirement 13); edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
@@ -776,7 +777,7 @@ Capabilities:
   Both were removed because the row already states its own enabled state as a pill and its own source breakage in the summary line, the search box reads the source name, and the sort key groups by enabled-ness; a second and a third way to narrow a six-row list is chrome the reference does not draw.
   The presentation toggle is NOT a filter and stays, because it is the only route to the grid above.
 - Manager hides source columns, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in a create draft — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
+  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in the three-tab editor rendered where the world corpus cannot answer — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
@@ -901,7 +902,7 @@ Re-entering the same Tool does not prompt.
 Stopping use of the Tool in this system is armed at its own control rather than confirmed by a separate DialogV2; successful removal returns to the library without a second dirty prompt.
 `Delete`, which destroys the Tool itself, belongs to the world Tool entry.
 
-Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, and no component on them restates that type in its own scoped block.
+Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, except a `Field` caption, which takes it from the primitive's own kicker rule; and no component on them restates that type in its own scoped block.
 The same holds for a card's surface fill, which comes from the route's surface ladder in the global sheet.
 Both are correctness rules rather than tidiness: the global sheet is imported at `layer(modules)` while a component's scoped block is injected unlayered, so a local declaration silently discards the shared rule for that property at any specificity, and the shared value can then be corrected without the screen moving.
 The two breakage configuration labels — `Uses per copy` and `Break chance per use` — are NOT eyebrows and carry no kicker: each names the control on its own row and is drawn as a sentence-case title in the body ink.
@@ -1146,7 +1147,7 @@ On success it clears the selection and returns the rail to the single-recipe ins
 The keyboard is returned to the studio's toolbar and that same sentence is then announced through the manager's live region, per Emptying a bulk selection above.
 The recipe-item figure it reports is the one the impact statement promised, not the number of definitions the write rewrote, so a legacy-basis delete does not report having done less than it stated.
 A write that deleted nothing reports no success, leaves the selection intact and returns the control to its idle face rather than leaving it in progress, and tells the GM that nothing was deleted — whether the write failed or simply reached nothing, which a concurrent client deleting the same recipes between the statement and the click produces without any failure at all.
-Focus is returned to the re-enabled control — because confirming disables the control and so moves focus to the document body — and that outcome is then announced through the card's own live region, in that order; disarming without confirming is announced through the same region, since it changes the control's accessible name while it holds focus.
+Focus stays on the control for the duration of the write, because its in-progress face is `aria-disabled` rather than natively disabled, and is returned to the control when anything else left it on the document body; that outcome is then announced through the card's own live region, in that order; disarming without confirming is announced through the same region, since it changes the control's accessible name while it holds focus.
 The single-recipe delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same recipe.
 
 ## Books & Scrolls Surface
@@ -1323,7 +1324,7 @@ The rejection still propagates to the caller.
 A hook-driven or post-action re-read of a surface that already holds a snapshot publishes neither state, so a populated surface does not blank while it refreshes, and a failed re-read keeps the last published rows.
 
 **Loading and error states.** While the projection is loading, the surface root carries `aria-busy="true"`.
-The roster pane renders a compact no-state panel stating that player characters are loading, in place of its empty and no-match panels, and the detail pane renders a no-state panel stating that character knowledge is loading, in place of its select-a-character prompt.
+The roster pane draws its list's loading form through `ListState` — a visible line stating that player characters are loading over static skeleton rows, under `aria-busy` — in place of its empty and no-match panels, and the detail pane renders a no-state panel stating that character knowledge is loading, in place of its select-a-character prompt.
 While the projection is in error, the detail pane renders a danger-toned notice with `role="status"` and a polite live region, stating that character knowledge could not be loaded, with a line telling the GM how to try again, and the roster pane renders its search field and nothing beneath it.
 In neither state does a pane say "No player characters", report that no character matches the search, or ask the GM to select a character, because each of those claims describes a finished read.
 Each pane nests the shared primitive inside its own tinted wrapper rather than adopting the player views' view-state composition, per the design system's rule for a pane inside a tinted container.

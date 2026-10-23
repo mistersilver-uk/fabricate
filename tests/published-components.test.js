@@ -8,6 +8,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
+import { withoutMember } from '../src/ui/publishedComponentProps.js';
 import { createPublishedComponents } from '../src/ui/publishedComponentSeam.js';
 
 import {
@@ -19,6 +21,7 @@ import {
   TABLE,
   ZETA,
   ZETA_COMPONENT,
+  deferredLoader,
   drained,
   exactly,
   fakeRuntime,
@@ -29,9 +32,16 @@ import {
 } from './helpers/publishedComponentFakes.js';
 
 describe('the published-components descriptor', () => {
-  it('is frozen, with exactly its five members and schema version 1', () => {
+  it('is frozen, with exactly its six members and schema version 1', () => {
     const { ui } = seamWith();
-    assert.deepEqual(Object.keys(ui), ['schemaVersion', 'components', 'describe', 'mount', 'load']);
+    assert.deepEqual(Object.keys(ui), [
+      'schemaVersion',
+      'components',
+      'describe',
+      'mount',
+      'load',
+      'mountMany',
+    ]);
     assert.equal(ui.schemaVersion, 1);
     assert.ok(Object.isFrozen(ui));
   });
@@ -42,15 +52,16 @@ describe('the published-components descriptor', () => {
     assert.ok(Object.isFrozen(ui.components));
   });
 
-  it('describes an entry as a frozen version, its props by kind, rest and root, with nothing else', () => {
+  it('describes an entry as a frozen version, its props by kind, rest, root and overlays, with nothing else', () => {
     const { ui } = seamWith();
     const described = ui.describe('Zeta');
-    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root']);
+    assert.deepEqual(Object.keys(described), ['version', 'props', 'rest', 'root', 'overlays']);
     assert.deepEqual(described, {
       version: 3,
       props: { label: { kind: 'data', required: true }, items: { kind: 'data', required: false } },
       rest: true,
       root: 'any',
+      overlays: false,
     });
     assert.ok(Object.isFrozen(described));
     assert.ok(Object.isFrozen(described.props));
@@ -60,6 +71,7 @@ describe('the published-components descriptor', () => {
       props: { value: { kind: 'data', required: false } },
       rest: false,
       root: 'any',
+      overlays: false,
     });
     assert.deepEqual(ui.describe('Titled').props, {
       title: { kind: 'text', required: true },
@@ -166,6 +178,48 @@ describe('mount refuses before it can draw', () => {
     seam.publicApi.mount('Zeta', { target: allowed, props: zetaProps() });
   });
 
+  it('M18: refuses an overlayHost that is no element or is one of another document, on an entry that opens no overlay', () => {
+    const { ui, mounts } = seamWith();
+    const target = new FakeTarget();
+    const text = { nodeType: 3, ownerDocument: target.ownerDocument };
+    for (const overlayHost of [null, 'body', {}, text, new FakeTarget()]) {
+      assert.throws(
+        () => ui.mount('Zeta', { target, props: zetaProps(), overlayHost }),
+        refusal("overlayHost must be an element in the target's document")
+      );
+    }
+    assert.equal(mounts.length, 0, 'nothing is rendered');
+    assert.equal(ui.describe('Zeta').overlays, false);
+    const own = new FakeTarget('section', target.ownerDocument);
+    const handle = ui.mount('Zeta', { target, props: zetaProps(), overlayHost: own });
+    assert.equal(
+      handle.update(zetaProps()),
+      true,
+      'one of the same document, unconnected, is accepted'
+    );
+    handle.destroy();
+    ui.mount('Zeta', { target, props: zetaProps(), overlayHost: undefined }).destroy();
+  });
+
+  it('M18: is checked directly after M16 and before M5 and M7', () => {
+    const rooted = [{ ...ZETA, root: 'fabricate' }];
+    const { ui } = seamWith({ table: rooted, hasAncestor: () => false });
+    const overlayHost = new FakeTarget();
+    assert.throws(
+      () => ui.mount('Zeta', { target: new FakeTarget(), props: zetaProps(), overlayHost }),
+      refusal('Zeta needs a Fabricate window ancestor')
+    );
+    const { ui: open } = seamWith();
+    const target = new FakeTarget();
+    open.mount('Zeta', { target, props: zetaProps() });
+    const stray = refusal("overlayHost must be an element in the target's document");
+    assert.throws(() => open.mount('Zeta', { target, props: zetaProps(), overlayHost }), stray);
+    assert.throws(
+      () => open.mount('Zeta', { target: new FakeTarget(), props: [], overlayHost }),
+      stray
+    );
+  });
+
   it('M5: refuses a target holding a live mount and leaves that mount live', () => {
     const { ui, unmounts } = seamWith();
     const target = new FakeTarget();
@@ -187,6 +241,31 @@ describe('mount refuses before it can draw', () => {
       refusal('target must be empty')
     );
     assert.equal(mounts.length, 0);
+  });
+
+  it('M5 and M6 are judged before the props, and a stale claim is ended before a props refusal', () => {
+    const { ui } = seamWith();
+    const held = new FakeTarget();
+    const live = ui.mount('Zeta', { target: held, props: zetaProps() });
+    assert.throws(
+      () => ui.mount('Zeta', { target: held, props: [] }),
+      refusal('target already holds a published component')
+    );
+    assert.equal(live.update(zetaProps()), true, 'a refused mount leaves the live one');
+    const full = new FakeTarget();
+    full.childNodes.push({ role: 'companion text' });
+    assert.throws(
+      () => ui.mount('Zeta', { target: full, props: [] }),
+      refusal('target must be empty')
+    );
+    const target = new FakeTarget();
+    const stale = ui.mount('Zeta', { target, props: zetaProps() });
+    target.replaceChildren();
+    assert.throws(
+      () => ui.mount('Zeta', { target, props: [] }),
+      refusal('props must be a plain object')
+    );
+    assert.equal(stale.update(zetaProps()), false, 'the stale claim was ended first');
   });
 
   it('M7: refuses props that are not a plain object, and accepts a foreign-realm plain one', () => {
@@ -332,7 +411,13 @@ describe('a rest key on an entry whose rest lands on a control', () => {
 
   it('describes the entry without restOn, which only its group states', () => {
     const { ui } = pressed();
-    assert.deepEqual(Object.keys(ui.describe('Pressed')), ['version', 'props', 'rest', 'root']);
+    assert.deepEqual(Object.keys(ui.describe('Pressed')), [
+      'version',
+      'props',
+      'rest',
+      'root',
+      'overlays',
+    ]);
     assert.deepEqual(ui.describe('Pressed'), { ...ui.describe('Rooted') });
   });
 
@@ -562,6 +647,211 @@ describe('an aria key', () => {
   });
 });
 
+// A required title, then a guard and the two keys required while it is truthy, as `Notice` publishes them.
+const DISMISSING = Object.freeze({
+  name: 'Dismissing',
+  path: 'src/ui/svelte/components/Dismissing.svelte',
+  version: 1,
+  props: {
+    title: { kind: 'data', required: true },
+    dismissable: { kind: 'data' },
+    dismissLabel: { kind: 'data', requiredWhen: 'dismissable' },
+    onDismiss: { kind: 'callback', requiredWhen: 'dismissable' },
+  },
+  rest: true,
+  root: 'any',
+  component: Object.freeze({ role: 'Dismissing' }),
+});
+const WHEN = (key) => `Dismissing requires a non-empty "${key}" when "dismissable" is truthy`;
+
+describe('a requiredWhen key', () => {
+  const dismissingProps = (overrides = {}) => ({
+    title: 'Saved',
+    dismissable: true,
+    dismissLabel: 'Dismiss the saved notice',
+    onDismiss() {},
+    ...overrides,
+  });
+  const mountOf = (ui, props) => ui.mount('Dismissing', { target: new FakeTarget(), props });
+  const without = (key, overrides = {}) => {
+    const props = dismissingProps(overrides);
+    delete props[key];
+    return props;
+  };
+
+  it('M9: refuses the key absent, undefined or empty while its guard is truthy, naming the guard', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    for (const dismissable of [true, 1, 'yes', {}, []]) {
+      for (const props of [
+        without('dismissLabel', { dismissable }),
+        dismissingProps({ dismissable, dismissLabel: undefined }),
+        dismissingProps({ dismissable, dismissLabel: '' }),
+      ]) {
+        assert.throws(() => mountOf(ui, props), refusal(WHEN('dismissLabel')));
+      }
+      for (const props of [
+        without('onDismiss', { dismissable }),
+        dismissingProps({ dismissable, onDismiss: undefined }),
+      ]) {
+        assert.throws(() => mountOf(ui, props), refusal(WHEN('onDismiss')));
+      }
+    }
+    assert.throws(
+      () => mountOf(ui, dismissingProps({ onDismiss: '' })),
+      refusal('"onDismiss" must be a function'),
+      'an empty callback is M17, as on a required one'
+    );
+    assert.equal(mounts.length, 0);
+  });
+
+  it('admits both keys absent while the guard is falsy or absent', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    for (const dismissable of [false, 0, '', null, undefined]) {
+      mountOf(ui, { title: 'Saved', dismissable });
+    }
+    mountOf(ui, { title: 'Saved' });
+    assert.equal(mounts.length, 6);
+  });
+
+  it('refuses the first failing key in manifest order, whatever order the companion passes', () => {
+    const { ui } = seamWith({ table: [DISMISSING] });
+    assert.throws(
+      () => mountOf(ui, { dismissable: true }),
+      refusal('Dismissing requires a non-empty "title"')
+    );
+    assert.throws(
+      () => mountOf(ui, { onDismiss() {}, dismissable: true, title: 'Saved' }),
+      refusal(WHEN('dismissLabel'))
+    );
+    assert.throws(
+      () => mountOf(ui, { dismissLabel: 'Dismiss', dismissable: true, title: 'Saved' }),
+      refusal(WHEN('onDismiss'))
+    );
+  });
+
+  it("names Notice's first failing requiredWhen key in manifest order when both fail together", () => {
+    const shipped = PUBLISHED_COMPONENT_MANIFEST.find((entry) => entry.name === 'Notice');
+    const notice = { ...shipped, component: Object.freeze({ role: 'Notice' }) };
+    const guarded = Object.keys(notice.props).filter(
+      (key) => notice.props[key].requiredWhen === 'dismissable'
+    );
+    assert.deepEqual(guarded, ['dismissLabel', 'onDismiss'], 'the label precedes the callback');
+    const named = (entry, key) =>
+      `${entry.name} requires a non-empty "${key}" when "dismissable" is truthy`;
+    const failingBoth = [
+      { title: 'Saved', dismissable: true },
+      { onDismiss: undefined, title: 'Saved', dismissable: true },
+      { onDismiss: undefined, dismissLabel: '', dismissable: true, title: 'Saved' },
+    ];
+    const { ui } = seamWith({ table: [notice] });
+    for (const props of failingBoth) {
+      assert.throws(
+        () => ui.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(notice, guarded[0]))
+      );
+    }
+    // The same keys listed the other way round name the callback, so the order is the manifest's
+    // and not a pass over one kind before another.
+    const { dismissLabel, onDismiss, ...rest } = notice.props;
+    const reversed = { ...notice, props: { ...rest, onDismiss, dismissLabel } };
+    const flipped = seamWith({ table: [reversed] }).ui;
+    for (const props of failingBoth) {
+      assert.throws(
+        () => flipped.mount('Notice', { target: new FakeTarget(), props }),
+        refusal(named(reversed, 'onDismiss'))
+      );
+    }
+  });
+
+  it('refuses an update atomically: the earlier props and the earlier callback stay', () => {
+    const { ui, mounts } = seamWith({ table: [DISMISSING] });
+    const calls = [];
+    const noting = (call) => () => {
+      calls.push(call);
+    };
+    const handle = mountOf(ui, dismissingProps({ onDismiss: noting('first') }));
+    const next = { onDismiss: noting('next') };
+    assert.throws(
+      () => handle.update(without('dismissLabel', next)),
+      refusal(WHEN('dismissLabel'))
+    );
+    assert.throws(() => handle.update(without('onDismiss')), refusal(WHEN('onDismiss')));
+    const [{ instance }] = mounts;
+    assert.deepEqual(instance.updates, [], 'nothing was rendered');
+    instance.callbacks.onDismiss.deliver([]);
+    assert.deepEqual(calls, ['first'], 'the earlier function still answers');
+    assert.equal(
+      handle.update({ title: 'Saved', dismissable: false }),
+      true,
+      'cleared, so neither'
+    );
+  });
+
+  it('describes requiredWhen last, only on the keys that state it, and never as required', () => {
+    const { ui } = seamWith({ table: [DISMISSING] });
+    const { props } = ui.describe('Dismissing');
+    assert.deepEqual(props.dismissLabel, {
+      kind: 'data',
+      required: false,
+      requiredWhen: 'dismissable',
+    });
+    assert.deepEqual(Object.keys(props.onDismiss), ['kind', 'required', 'requiredWhen']);
+    assert.equal(props.onDismiss.requiredWhen, 'dismissable');
+    for (const key of ['title', 'dismissable']) {
+      assert.deepEqual(Object.keys(props[key]), ['kind', 'required'], key);
+    }
+    assert.ok(Object.isFrozen(props.dismissLabel));
+  });
+
+  const guarded = (spec, extra = {}) => ({
+    ...DISMISSING,
+    props: { ...DISMISSING.props, ...extra, dismissLabel: spec },
+  });
+  for (const [claim, entry, other] of [
+    ['a key the entry does not publish', guarded({ kind: 'data', requiredWhen: 'nope' }), 'nope'],
+    ['an inherited name', guarded({ kind: 'data', requiredWhen: 'toString' }), 'toString'],
+    ['itself', guarded({ kind: 'data', requiredWhen: 'dismissLabel' }), 'dismissLabel'],
+    ['a value that is no string', guarded({ kind: 'data', requiredWhen: 1 }), '1'],
+    ['a callback guard', guarded({ kind: 'data', requiredWhen: 'onDismiss' }), 'onDismiss'],
+    [
+      'a text guard',
+      guarded({ kind: 'data', requiredWhen: 'note' }, { note: { kind: 'text' } }),
+      'note',
+    ],
+    ['a required guard', guarded({ kind: 'data', requiredWhen: 'title' }), 'title'],
+    [
+      'a guard that is itself requiredWhen',
+      guarded(
+        { kind: 'data', requiredWhen: 'shown' },
+        { shown: { kind: 'data', requiredWhen: 'dismissable' } }
+      ),
+      'shown',
+    ],
+    [
+      'a key beside required',
+      guarded({ kind: 'data', required: false, requiredWhen: 'dismissable' }),
+      'dismissable',
+    ],
+    ['a slot key', guarded({ kind: 'slot', requiredWhen: 'dismissable' }), 'dismissable'],
+    ['an aria key', guarded({ kind: 'aria', requiredWhen: 'dismissable' }), 'dismissable'],
+  ]) {
+    it(`refuses at registration a requiredWhen on ${claim}, naming the entry, key and guard`, () => {
+      const seam = createPublishedComponents({ table: [entry], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(
+            error.message,
+            exactly(`${PREFIX}Dismissing "dismissLabel" has an unknown requiredWhen "${other}"`)
+          );
+          return true;
+        }
+      );
+    });
+  }
+});
+
 describe('a live mount', () => {
   it('hands the runtime the host, the entry component and a copy of the props', () => {
     const { ui, mounts } = seamWith();
@@ -574,11 +864,14 @@ describe('a live mount', () => {
     assert.deepEqual(Object.keys(hostProps), [
       'component',
       'initial',
+      'values',
       'onfault',
       'kinds',
       'slots',
       'callbacks',
+      'flush',
     ]);
+    assert.deepEqual(hostProps.values, {}, 'a data-only entry has no value key');
     assert.deepEqual(hostProps.kinds, {}, 'a data-only entry has no other kind');
     assert.ok(Object.isFrozen(hostProps.kinds));
     assert.deepEqual(hostProps.initial, props);
@@ -586,7 +879,7 @@ describe('a live mount', () => {
     assert.notEqual(hostProps.initial.items, props.items, 'copied at every depth');
     props.items[0].id = 'mutated';
     assert.equal(hostProps.initial.items[0].id, 'a', 'copied at call time');
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot', 'value']);
     assert.ok(Object.isFrozen(handle));
   });
 
@@ -778,6 +1071,154 @@ describe('load', () => {
   });
 });
 
+// An entry stating `lazy: true` is bound to a loader and no component (issue 2455).
+const LAZY_COMPONENT = Object.freeze({ role: 'Lazy' });
+const LAZY = Object.freeze({
+  name: 'Lazy',
+  path: 'src/ui/svelte/components/Lazy.svelte',
+  version: 1,
+  props: { value: { kind: 'data' } },
+  rest: false,
+  root: 'any',
+  lazy: true,
+});
+const CHUNK_FAILURE = 'Failed to fetch dynamically imported module: https://x/chunks/Lazy-ab12.js';
+
+function lazySeam(loader, options = {}) {
+  return seamWith({ table: [ZETA, LAZY], loaders: { [LAZY.path]: loader }, ...options });
+}
+
+describe('a lazy entry', () => {
+  it('M19: refuses a mount until load has resolved for it, directly after M3, rendering nothing', async () => {
+    const pending = deferredLoader();
+    const { ui, mounts } = lazySeam(pending.load);
+    const target = new FakeTarget();
+    for (const options of [
+      { target, props: { value: 1 } },
+      { target: {}, props: { nope: 1 } },
+    ]) {
+      assert.throws(() => ui.mount('Lazy', options), refusal('"Lazy" is not loaded'));
+    }
+    const loading = ui.load(['Lazy']);
+    assert.throws(() => ui.mount('Lazy', { target }), refusal('"Lazy" is not loaded'));
+    assert.throws(() => ui.mount('Nope', { target }), refusal('"Nope" is not published'));
+    assert.equal(target.childNodes.length, 0);
+    assert.equal(mounts.length, 0);
+    pending.resolve(LAZY_COMPONENT);
+    assert.equal(await loading, undefined);
+    ui.mount('Lazy', { target, props: { value: 1 } });
+    assert.equal(mounts[0].props.component, LAZY_COMPONENT, 'the component its loader resolved');
+    assert.equal(target.childNodes.length, 1);
+  });
+
+  it('M2: refuses an unloaded mount before ready as mount before ready, ahead of M19', () => {
+    const { ui } = lazySeam(deferredLoader().load, { isReady: () => false });
+    assert.throws(
+      () => ui.mount('Lazy', { target: new FakeTarget() }),
+      refusal('mount before ready')
+    );
+  });
+
+  it('calls its loader once for concurrent and later loads', async () => {
+    const pending = deferredLoader();
+    const { ui } = lazySeam(pending.load);
+    const loads = [ui.load(['Lazy']), ui.load(['Zeta', 'Lazy']), ui.load('Lazy')];
+    pending.resolve(LAZY_COMPONENT);
+    assert.deepEqual(await Promise.all(loads), [undefined, undefined, undefined]);
+    assert.equal(pending.calls, 1, 'one call for three concurrent loads');
+    await ui.load(['Lazy']);
+    assert.equal(pending.calls, 1);
+  });
+
+  it('rejects with M3 for a name that is not published before any loader runs', async () => {
+    const pending = deferredLoader();
+    const { ui } = lazySeam(pending.load);
+    await assert.rejects(ui.load(['Lazy', 'Nope']), refusal('"Nope" is not published'));
+    assert.equal(pending.calls, 0);
+  });
+
+  it("rejects with the loader's error, keeps it and never calls the loader again, so M19 stays", async () => {
+    const failure = new Error('offline');
+    for (const loader of [
+      () => Promise.reject(failure),
+      () => {
+        throw failure;
+      },
+    ]) {
+      let calls = 0;
+      const { ui } = lazySeam(() => {
+        calls += 1;
+        return loader();
+      });
+      let loading;
+      assert.doesNotThrow(() => {
+        loading = ui.load(['Lazy']);
+      });
+      await assert.rejects(loading, (error) => error === failure);
+      await assert.rejects(ui.load(['Zeta', 'Lazy']), (error) => error === failure);
+      assert.equal(calls, 1, 'a failed fetch is not retried');
+      const target = new FakeTarget();
+      assert.throws(() => ui.mount('Lazy', { target }), refusal('"Lazy" is not loaded'));
+    }
+  });
+
+  it('hands a chunk-load failure to reportLoadFailure once, and no other failure', async () => {
+    for (const [failure, expected] of [
+      [new TypeError(CHUNK_FAILURE), 1],
+      [new Error('Lazy.svelte threw while it evaluated'), 0],
+    ]) {
+      const reported = [];
+      const { ui } = lazySeam(() => Promise.reject(failure), {
+        reportLoadFailure: (error) => {
+          reported.push(error);
+        },
+      });
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+      }
+      assert.deepEqual(
+        reported,
+        Array.from({ length: expected }, () => failure)
+      );
+    }
+  });
+
+  it("rejects with the loader's error when reportLoadFailure throws", async () => {
+    const failure = new TypeError(CHUNK_FAILURE);
+    let reports = 0;
+    const { ui } = lazySeam(() => Promise.reject(failure), {
+      reportLoadFailure: () => {
+        reports += 1;
+        throw new Error('the notice failed');
+      },
+    });
+    await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+    await assert.rejects(ui.load(['Lazy']), (error) => error === failure);
+    assert.equal(reports, 1);
+  });
+
+  it('rejects before registration as mount throws there, while an eager name resolves', async () => {
+    const seam = createPublishedComponents({ table: [ZETA, LAZY], isReady: () => true });
+    await assert.rejects(seam.publicApi.load(['Lazy']), (error) => {
+      assert.equal(error.constructor, Error);
+      assert.match(error.message, exactly(`${PREFIX}not registered`));
+      return true;
+    });
+    assert.equal(await seam.publicApi.load(['Zeta']), undefined);
+  });
+
+  it('is described as an eager entry is, with no lazy member', () => {
+    const { ui } = lazySeam(deferredLoader().load);
+    assert.deepEqual(ui.describe('Lazy'), {
+      version: 1,
+      props: { value: { kind: 'data', required: false } },
+      rest: false,
+      root: 'any',
+      overlays: false,
+    });
+  });
+});
+
 describe('a faulted mount', () => {
   it('reports once, unmounts once, releases the claim and goes inert', () => {
     const { seam, ui, mounts, unmounts, reports } = seamWith();
@@ -821,9 +1262,10 @@ describe('a faulted mount', () => {
     const target = new FakeTarget();
     const handle = ui.mount('Zeta', { target, props: zetaProps() });
     assert.deepEqual(reports, [[FAULT_REPORT, 'Zeta', error]]);
-    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot']);
+    assert.deepEqual(Object.keys(handle), ['update', 'destroy', 'slot', 'value']);
     assert.ok(Object.isFrozen(handle));
     assert.equal(handle.update(zetaProps()), false);
+    assert.equal(handle.value('label'), undefined, 'the inert handle reads no value');
     handle.destroy();
     assert.equal(unmounts.length, 0);
     assert.equal(target.childNodes.length, 0);
@@ -983,7 +1425,7 @@ describe('a mount made with onFault', () => {
 });
 
 describe('registration', () => {
-  for (const kind of ['snippet', 'value']) {
+  for (const kind of ['snippet', 'bindable']) {
     it(`refuses a manifest entry whose prop kind is ${kind}, naming the entry, key and kind`, () => {
       const unknown = { ...ALPHA, props: { body: { kind } } };
       const seam = createPublishedComponents({ table: [unknown], isReady: () => true });
@@ -1048,10 +1490,178 @@ describe('registration', () => {
     assert.equal(second.mounts.length, 0);
   });
 
+  for (const lazy of ['true', 1, null]) {
+    it(`refuses a manifest entry whose lazy is ${String(lazy)}, naming the entry and the value`, () => {
+      const seam = createPublishedComponents({ table: [{ ...ALPHA, lazy }], isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {}, loaders: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          assert.match(error.message, exactly(`${PREFIX}Alpha has an unknown lazy "${lazy}"`));
+          return true;
+        }
+      );
+    });
+  }
+
+  const LAZY_BINDING = `${PREFIX}Lazy is lazy, so its runtime binds a loader and no component`;
+  const EAGER_BINDING = `${PREFIX}Alpha is not lazy, so its runtime binds no loader`;
+  for (const [claim, table, components, loaders, message] of [
+    ['a lazy entry bound to no loader', [LAZY], {}, {}, LAZY_BINDING],
+    [
+      'a lazy entry bound to a loader that is no function',
+      [LAZY],
+      {},
+      { [LAZY.path]: 'x' },
+      LAZY_BINDING,
+    ],
+    [
+      'a lazy entry bound to a component beside its loader',
+      [LAZY],
+      { [LAZY.path]: LAZY_COMPONENT },
+      { [LAZY.path]: () => LAZY_COMPONENT },
+      LAZY_BINDING,
+    ],
+    ['an eager entry bound to a loader', [ALPHA], {}, { [ALPHA.path]: () => {} }, EAGER_BINDING],
+    [
+      'an eager entry stating lazy: false bound to a loader',
+      [{ ...ALPHA, lazy: false }],
+      {},
+      { [ALPHA.path]: () => {} },
+      EAGER_BINDING,
+    ],
+  ]) {
+    it(`refuses ${claim}, and stays unregistered`, () => {
+      const seam = createPublishedComponents({ table, isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components, loaders }),
+        (error) => error.constructor === Error && exactly(message).test(error.message)
+      );
+      assert.throws(
+        () => seam.publicApi.mount(table[0].name, { target: new FakeTarget() }),
+        (error) => exactly(`${PREFIX}not registered`).test(error.message)
+      );
+    });
+  }
+
   it('treats only a boolean true as required', () => {
     const loose = { ...ALPHA, props: { value: { kind: 'data', required: 'yes' } } };
     const { ui } = seamWith({ table: [loose] });
     assert.deepEqual(ui.describe('Alpha').props.value, { kind: 'data', required: false });
     ui.mount('Alpha', { target: new FakeTarget(), props: {} });
+  });
+});
+
+// `InfoStrip` spreads each fact's `props` as attributes, so the seam drops that member; `Meter`'s
+// `segments` and `Ticker`'s `facts` are not stripped, so an item there keeps every member it was given.
+const STRIP_TABLE = Object.freeze([
+  {
+    name: 'InfoStrip',
+    path: 'src/ui/svelte/components/InfoStrip.svelte',
+    version: 1,
+    props: { label: { kind: 'data' }, facts: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'InfoStrip' }),
+  },
+  {
+    name: 'Meter',
+    path: 'src/ui/svelte/components/Meter.svelte',
+    version: 1,
+    props: { segments: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'Meter' }),
+  },
+  {
+    name: 'Ticker',
+    path: 'src/ui/svelte/components/Ticker.svelte',
+    version: 1,
+    props: { facts: { kind: 'data' } },
+    rest: false,
+    root: 'any',
+    component: Object.freeze({ role: 'Ticker' }),
+  },
+]);
+const ATTRIBUTES = Object.freeze({ 'data-action': 'close', class: 'x', 'aria-label': 'Hidden' });
+const fact = (value) => ({ icon: 'fas fa-sun', value, props: { ...ATTRIBUTES } });
+
+describe('a per-item member the seam strips', () => {
+  const stripping = () => seamWith({ table: STRIP_TABLE });
+  const target = () => new FakeTarget();
+
+  it('is dropped from every fact on mount, and nothing else is', () => {
+    const { ui, mounts } = stripping();
+    ui.mount('InfoStrip', { target: target(), props: { facts: [fact('Clear'), fact('Storm')] } });
+    assert.deepEqual(mounts[0].props.initial.facts, [
+      { icon: 'fas fa-sun', value: 'Clear' },
+      { icon: 'fas fa-sun', value: 'Storm' },
+    ]);
+  });
+
+  it('is dropped on update too', () => {
+    const { ui, mounts } = stripping();
+    const handle = ui.mount('InfoStrip', { target: target(), props: { facts: [fact('Clear')] } });
+    assert.equal(handle.update({ facts: [fact('Storm')] }), true);
+    assert.deepEqual(mounts[0].instance.updates[0].facts, [{ icon: 'fas fa-sun', value: 'Storm' }]);
+  });
+
+  it('is dropped from a copy, and never from the caller’s object', () => {
+    const { ui, mounts } = stripping();
+    const facts = [fact('Clear')];
+    ui.mount('InfoStrip', { target: target(), props: { facts } });
+    assert.deepEqual(facts, [fact('Clear')], 'the caller keeps its props member');
+    assert.notEqual(mounts[0].props.initial.facts, facts);
+    assert.notEqual(mounts[0].props.initial.facts[0], facts[0]);
+  });
+
+  it('tolerates a facts value that is not an array, and an item that is null or a primitive', () => {
+    const { ui, mounts } = stripping();
+    for (const facts of ['Clear', 7, null, true, {}]) {
+      ui.mount('InfoStrip', { target: target(), props: { facts } });
+    }
+    assert.deepEqual(
+      mounts.map((mount) => mount.props.initial.facts),
+      ['Clear', 7, null, true, {}]
+    );
+    ui.mount('InfoStrip', { target: target(), props: { facts: [null, 'x', 3, fact('Clear')] } });
+    assert.deepEqual(mounts[5].props.initial.facts, [
+      null,
+      'x',
+      3,
+      { icon: 'fas fa-sun', value: 'Clear' },
+    ]);
+  });
+
+  it('is judged first: a function in the member is still M10, and a non-data item is M11', () => {
+    const { ui } = stripping();
+    const mount = (facts) => () => ui.mount('InfoStrip', { target: target(), props: { facts } });
+    assert.throws(
+      mount([{ value: 'x', props: { onclick: () => {} } }]),
+      refusal('"facts" must not hold a function')
+    );
+    assert.throws(mount([new Date()]), refusal('"facts" must be data'));
+  });
+
+  it('is private to its own key: a member of another entry passes through', () => {
+    const { ui, mounts } = stripping();
+    const segments = [{ tone: 'danger', props: { 'data-x': 1 } }];
+    ui.mount('Meter', { target: target(), props: { segments } });
+    assert.deepEqual(mounts[0].props.initial.segments, segments);
+  });
+
+  it('is private to its own entry: another entry’s key of the same name passes through', () => {
+    const { ui, mounts } = stripping();
+    const facts = [fact('Clear')];
+    ui.mount('Ticker', { target: target(), props: { facts } });
+    assert.deepEqual(mounts[0].props.initial.facts, facts);
+  });
+
+  it('drops a member at a nested path from the items below it', () => {
+    const tiers = [{ yields: [{ props: { a: 1 }, name: 'x' }, { name: 'y' }], props: { b: 2 } }];
+    assert.deepEqual(withoutMember(tiers, ['yields', 'props']), [
+      { yields: [{ name: 'x' }, { name: 'y' }], props: { b: 2 } },
+    ]);
+    assert.deepEqual(tiers[0].yields[0].props, { a: 1 }, 'the value it was given is unchanged');
   });
 });

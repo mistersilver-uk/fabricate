@@ -13,8 +13,6 @@
 
   Invariants:
   - Branch order is the shipped ladder's, pinned by `tests/manager-header-families.test.js`.
-  - Each button role is a literal, because `manager-button-cascade-inventory.test.js` counts
-    `role="primary"` and `role="ghost"` sites per file.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';

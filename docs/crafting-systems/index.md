@@ -99,9 +99,14 @@ You will be asked to confirm before anything changes.
 {: .note }
 > The confirmation runs a dry run first and reports accurate counts: how many recipes will be migrated to the new mode and, only when some cannot be migrated, how many will be deleted and their names.
 When no recipe needs deleting, the confirmation does not mention deletion at all.
+When a recipe that is kept loses part of its shape, the confirmation names what is lost.
+It lists each ingredient set dropped when a recipe is collapsed into Alchemy mode, with the recipe it came from.
+It also lists each recipe that loses its failure result set when you move into Progressive mode.
+It mentions neither when nothing is lost.
 
 A recipe is only deleted when its shape cannot fit the new mode.
 This happens in two cases: narrowing into Simple or Progressive mode (which each expect exactly one ingredient set and one result set) from a recipe that has more than one of either, and moving a multi-step recipe into Alchemy mode (which does not support multi-step recipes).
+A failure result set does not count toward that limit, so a recipe with one success set and one failure set is kept.
 Every other recipe is kept and adjusted to suit the new mode.
 
 A missing setup at the system level never deletes a recipe.

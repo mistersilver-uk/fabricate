@@ -527,11 +527,9 @@
                   'FABRICATE.Admin.Manager.BooksScrolls.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', item.resolvedName)}
-                title={text('FABRICATE.Admin.Manager.BooksScrolls.Edit', 'Edit recipe item')}
                 onclick={() => onOpenRecipeItem(item.id)}
-              >
-                <i class="fas fa-pen" aria-hidden="true"></i>
-              </IconButton>
+                icon="fas fa-pen"
+              />
             </div>
           </div>
         {/each}

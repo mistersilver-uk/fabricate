@@ -282,13 +282,17 @@ test('the subject modifier picker fallbacks match lang/en.json exactly', () => {
   assertMirrored(inline, inline.length, 'inline fallbacks');
 });
 
-// The Overview tab restates the pick-source labels for its own tri-state select, the pick-cap
-// sentences, and the inert cause from the recipe's point of view (issue 1055). Scoped to the
-// check-modifier keys this change owns: the tab carries other pairs whose drift predates it.
+// The Overview tab and its picker field restate the pick-source labels for the tri-state select,
+// the pick-cap sentences, and the inert cause from the recipe's point of view (issue 1055). Scoped
+// to the check-modifier keys this change owns: the tab carries other pairs whose drift predates it.
 test('the recipe Overview tab modifier fallbacks match lang/en.json exactly', () => {
-  const tab = componentAstOf('src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte');
-  const pairs = inlineCopy(tab).filter(({ key }) =>
-    ['CraftingModifier', 'ModifierPolicy', 'ModifierUnnamed'].some((part) => key.includes(part))
+  const pairs = [
+    'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeCraftingModifierField.svelte',
+  ].flatMap((path) =>
+    inlineCopy(componentAstOf(path)).filter(({ key }) =>
+      ['CraftingModifier', 'ModifierPolicy', 'ModifierUnnamed'].some((part) => key.includes(part))
+    )
   );
   assert.ok(pairs.length >= 10, `expected the tab's modifier fallbacks, got ${pairs.length}`);
   assertMirrored(pairs, pairs.length, 'modifier fallbacks');

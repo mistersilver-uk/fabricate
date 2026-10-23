@@ -1,26 +1,19 @@
 <!--
-  The Component Studio's COMPLICATIONS authoring section: what goes wrong when this component is
+  The Component Studio's complications authoring section: what goes wrong when this component is
   produced as a stage of a progressive result.
 
-  IT GATES ITSELF on the SYSTEM resolving at least one activity progressively — a complication has
-  no moment to fire otherwise, and a card offering a consequence that can never happen is worse than
-  no card. The gate lives here rather than in `ComponentEditView` so there is ONE predicate rather
-  than a prop the host could forget to compute.
+  It gates itself on the system resolving at least one activity progressively, since a
+  complication has no moment to fire otherwise; one predicate here, not a prop the host computes.
 
-  THE SUB-LINE IS NOT THE PROTOTYPE'S, which is wrong for the shipped model twice over: a
-  complication fires when this component is PRODUCED as a progressive stage, and not when the
-  component is itself salvaged or spent. That second case is deferred, so the copy discloses it
-  rather than letting a GM author for a moment this build never reaches. It says nothing about
-  player visibility either: `visibility: 'gmOnly'` is a DISCLOSURE guarantee, not a confidentiality
-  one, and the spec and the field documentation are where that limit belongs.
+  The sub-line names only the produced-as-a-progressive-stage moment and discloses that the
+  salvaged-or-spent case is deferred. `visibility: 'gmOnly'` is a disclosure guarantee, not a
+  confidentiality one; the spec and the field documentation own that limit.
 
-  IDS ARE MINTED THROUGH AN INJECTED `random`, falling back to `foundry.utils.randomID()`, because
-  the sibling sections' idiom would put a `Math.random()` literal in new code that SonarCloud flags
-  (S2245). The last-resort counter serves a context with neither, where determinism is a feature.
+  Ids mint through the injected `random`, then `foundry.utils.randomID()`, then a counter (pinned
+  by the "carries NO `Math.random()` literal" test).
 
-  The draft lives in `ComponentEditView`, which is what makes an edit here dirty the component and
-  survive Save. This is a controlled component: it never mutates the array it is given, it emits a
-  whole new one, and the only state it keeps is which row is open and what a rejected drop says.
+  A controlled component: the draft lives in `ComponentEditView`, this emits a whole new array,
+  and it keeps only which row is open and what a rejected drop says.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -74,6 +67,7 @@
   let openId = $state('');
   let macroWarning = $state('');
   let macroNames = $state({});
+  let macroBrowseOpen = $state({});
   let localIdCounter = 0;
 
   function text(key, fallback) {
@@ -253,20 +247,17 @@
   const severityOptions = $derived([
     {
       value: 'minor',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.minor',
-      fallback: 'Minor',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.minor', 'Minor'),
       variant: 'info',
     },
     {
       value: 'major',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.major',
-      fallback: 'Major',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.major', 'Major'),
       variant: 'warning',
     },
     {
       value: 'severe',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Severity.severe',
-      fallback: 'Severe',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Severity.severe', 'Severe'),
       variant: 'danger',
     },
   ]);
@@ -274,13 +265,11 @@
   const matchOptions = $derived([
     {
       value: 'any',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Match.any',
-      fallback: 'Any',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Match.any', 'Any'),
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Component.Complications.Match.all',
-      fallback: 'All',
+      label: text('FABRICATE.Admin.Manager.Component.Complications.Match.all', 'All'),
     },
   ]);
 
@@ -344,12 +333,10 @@
   });
 
   function macroDisplay(uuid) {
-    if (!uuid) return { name: '', missing: false };
+    if (!uuid) return { uuid: '', name: '', missing: false };
     const known = (macroOptions || []).find((macro) => macro?.uuid === uuid);
-    if (known) return { name: known.name || uuid, missing: false };
-    const resolved = macroNames[uuid];
-    if (resolved) return { name: resolved.name || uuid, missing: resolved.missing === true };
-    return { name: uuid, missing: false };
+    const resolved = known ?? macroNames[uuid] ?? {};
+    return { uuid, name: resolved.name || uuid, missing: resolved.missing === true };
   }
 
   function summaryFor(complication) {
@@ -981,24 +968,26 @@
                         'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                         'Browse macros'
                       )}
+                      {@const searchLabel = text(
+                        'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
+                        'Search macros...'
+                      )}
                       <SearchablePopover
+                        bind:open={
+                          () => macroBrowseOpen[complication.id] ?? false,
+                          (value) => (macroBrowseOpen[complication.id] = value)
+                        }
                         options={macroPickerOptions}
                         value={complication.macroUuid || ''}
                         disabled={saving}
-                        triggerClass="fabricate-button"
+                        triggerButton={{ role: 'neutral' }}
                         triggerIcon="fas fa-scroll"
                         triggerLabel={browseLabel}
                         triggerProps={{ 'data-complication-macro-browse': 'true' }}
                         ariaLabel={browseLabel}
                         panelLabel={browseLabel}
-                        searchPlaceholder={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
-                          'Search macros...'
-                        )}
-                        searchLabel={text(
-                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
-                          'Search macros...'
-                        )}
+                        searchPlaceholder={searchLabel}
+                        {searchLabel}
                         emptyHint={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.None',
                           'No script macros in this world'
@@ -1008,11 +997,11 @@
                     {/snippet}
                     {@const macro = macroDisplay(complication.macroUuid)}
                     <div class="fab-complication-macro-controls">
-                      <!-- `ItemDropZone` has no click handler, only `use:dragDrop`, and
-                           `SearchablePopover` owns its own trigger. The recorded deviation from the
-                           prototype is that browse is a separate button beside the drop target. -->
+                      <!-- Browse is the head's trigger, beside the zone (a recorded prototype
+                           deviation); Relink opens that same list. -->
                       <ItemDropZone
-                        item={complication.macroUuid ? { name: macro.name } : null}
+                        value={complication.macroUuid ? macro : null}
+                        showUuid
                         documentType="Macro"
                         kind="complication-macro"
                         emptyIcon="fas fa-scroll"
@@ -1021,11 +1010,12 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.DropTitle',
                           'Drop a macro here'
                         )}
-                        hint={complication.macroUuid ||
-                          text(
-                            'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
-                            'Or browse this world’s script macros.'
-                          )}
+                        hint={complication.macroUuid
+                          ? ''
+                          : text(
+                              'FABRICATE.Admin.Manager.Component.Complications.Macro.DropHint',
+                              'Or browse this world’s script macros.'
+                            )}
                         subline={macro.missing
                           ? text(
                               'FABRICATE.Admin.Manager.Component.Complications.Macro.Missing',
@@ -1038,6 +1028,11 @@
                           'Remove macro'
                         )}
                         onUnlink={() => setMacro(complication.id, '')}
+                        relinkLabel={text(
+                          'FABRICATE.Admin.Manager.Component.Complications.Macro.Relink',
+                          'Relink'
+                        )}
+                        onRelink={() => (macroBrowseOpen[complication.id] = true)}
                         onDrop={(data) => handleMacroDrop(complication.id, data)}
                       />
                     </div>
@@ -1289,7 +1284,7 @@
   }
 
   /* The browse trigger, in the macro card's HEAD. Its type is copied from the manager's existing
-     compact in-header control, `.manager-salvage-stage-edit`, rather than invented, so the two read
+     compact in-header control, `.manager-progressive-stage-edit`, rather than invented, so the two read
      as one treatment: `fabricate-button`'s default is sized for a footer action and wrapped "Browse
      macros" onto two lines. `white-space: nowrap` is what fixes the wrap; the rest keeps it from
      looking like a different button once it no longer does. */

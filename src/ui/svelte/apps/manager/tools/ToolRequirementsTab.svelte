@@ -355,7 +355,7 @@
         {/if}
         <!-- ONE SENTENCE, WHICH ALSO INTRODUCES THE PAIR BELOW IT, where a standing statement plus
              an uppercase eyebrow made two headings the reference does not draw. `RadioCardGroup`'s
-             `<legend>` is therefore screen-reader-only, its shipped `is-config-cards` contract. -->
+             `<legend>` is therefore screen-reader-only; `legendVisible` would show it. -->
         <p class="manager-tool-requirements-summary" data-tool-prerequisites-summary>
           {text(
             'FABRICATE.Admin.Manager.Tools.Editor.RequiredAll',
@@ -365,7 +365,7 @@
         <RadioCardGroup
           legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
           options={gateModeOptions}
-          selectedValue={prerequisites.gateMode}
+          value={prerequisites.gateMode}
           groupName="tool-gate-mode"
           columns={2}
           data-radio-card-group="tool-gate-mode"
@@ -622,11 +622,9 @@
 
   /* THE HAND-TYPED ROW'S SENTENCE, a SIBLING of that row rather than a third line inside it, as
      the Checks Studio states its own per-entry fault; the radio names it through
-     `aria-describedby`. Only the WEIGHT is stated here, resetting the 700 inherited from
-     `.fabricate-field`: this is the field's VALUE, not its caption. */
+     `aria-describedby`. */
   .manager-tool-bonus-hand-typed {
     margin: 0;
-    font-weight: 500;
   }
 
   /* The per-section trailing line: the last thing in the card and a claim rather than a control,

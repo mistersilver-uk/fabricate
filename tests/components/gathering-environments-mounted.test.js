@@ -8,7 +8,7 @@ import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
-import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import { choosePageSize, pageSizeValues } from '../helpers/page-size-control.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
@@ -17,6 +17,7 @@ import {
   GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -76,11 +77,11 @@ function makeServices(result, { reject = false } = {}) {
 async function mountView(services) {
   target = document.createElement('div');
   // THE MOUNT TARGET IS THE PLAYER APPLICATION ROOT (issue 1504, decision YY). `GatheringView`
-  // renders a `Pagination`, whose page-size control is a shared `<Select>`; a picker resolves
-  // its portal host by walking up to the nearest Fabricate application root, and the only root
-  // this view has in production is `fabricate-app`. Mounted into a bare `<div>` the panel lands
-  // on `<body>`, out of reach of every `target.querySelector` in this file — which is a fixture
-  // asserting against a portal that FAILED, not a product regression.
+  // renders a picker, which resolves its portal host by walking up to the nearest Fabricate
+  // application root, and the only root this view has in production is `fabricate-app`. Mounted
+  // into a bare `<div>` the panel lands on `<body>`, out of reach of every `target.querySelector`
+  // in this file — which is a fixture asserting against a portal that FAILED, not a product
+  // regression.
   target.className = 'fabricate-app';
   document.body.appendChild(target);
   mounted = mount(GatheringView, { target, props: { services } });
@@ -186,7 +187,9 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    for (const paginationModule of PAGINATION_COMPILED_MODULES) {
+      writeCompiledSvelte(paginationModule);
+    }
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
     // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
@@ -982,10 +985,10 @@ describe('GatheringView mounted behavior', () => {
 
     // 9 must be a real offered option from [6, 9, 12].
     assert.ok(
-      selectOptionValues(target, '[data-pagination-size]').includes('9'),
+      pageSizeValues(target).includes('9'),
       '9 is a selectable per-page option'
     );
-    chooseSelectOption(target, '[data-pagination-size]', 9);
+    choosePageSize(target, '', 9);
 
     assert.equal(
       target.querySelectorAll('[data-environment-id]').length,

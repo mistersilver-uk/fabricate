@@ -145,6 +145,23 @@ function drift(slot) {
   };
 }
 
+const TAG_LISTS = new Set(['tags', 'itemTags']);
+
+/** Every tag a row stores: each `tags` / `itemTags` string, and each `tags` entry's id and label. */
+function storedTags(value, key = '') {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (typeof item === 'string') return TAG_LISTS.has(key) ? [item] : [];
+      if (key !== 'tags' || !item || typeof item !== 'object') return storedTags(item, key);
+      return [item.id, item.label].filter((text) => typeof text === 'string');
+    });
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([name, item]) => storedTags(item, name));
+  }
+  return [];
+}
+
 test('the drawing-text gate reads every catalogue row against its drawing', () => {
   assert.deepEqual(PROBLEMS, []);
   assert.equal(SLOTS.length, ENTRIES.length, 'every row must resolve to one drawing');
@@ -167,6 +184,24 @@ test('every word a row passes appears in its drawing, or its `undrawn` says why 
     }
   }
   assert.deepEqual(problems, []);
+});
+
+// The row draws the `#`, and the word check is a substring one, so `##hardwood` would pass it.
+test('a PickerRow or ChoiceGroup row stores its tags without the drawn `#`', () => {
+  assert.deepEqual(
+    storedTags({ tags: ['a'], catalogue: { tags: [{ id: 'b', label: 'c', icon: 'x' }] } }),
+    ['a', 'b', 'c']
+  );
+  const rows = ENTRIES.filter((entry) => entry.row.spec === '<PickerRow> <ChoiceGroup>');
+  const stored = rows.flatMap((entry) =>
+    storedTags(entry.row.props).map((tag) => ({ at: WHERE.get(entry.row), tag }))
+  );
+  assert.ok(stored.length > 0, 'no PickerRow or ChoiceGroup row stores a tag');
+  const prefixed = stored.filter(({ tag }) => tag.startsWith('#'));
+  assert.deepEqual(
+    prefixed.map(({ at, tag }) => `${at}: ${tag}`),
+    []
+  );
 });
 
 test('every `…Key` a row’s `data` passes names a string `lang/en.json` ships', () => {

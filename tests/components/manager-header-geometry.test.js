@@ -86,13 +86,13 @@ function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
   </div>
   <div class="manager-header-actions" role="group" aria-label="Actions">
     <span class="manager-chip is-warning is-header" data-downtime-chrome-status>Unsaved</span>
-    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-ghost" data-action="back">
+    <button type="button" class="fabricate-button is-size-38 is-ghost" data-action="back">
       <i class="fas fa-arrow-left"></i><span>All factions</span>
     </button>
-    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-danger" data-action="delete">
+    <button type="button" class="fabricate-button is-size-38 is-danger" data-action="delete">
       <i class="fas fa-trash"></i><span>Delete faction</span>
     </button>
-    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-primary" data-action="save">
+    <button type="button" class="fabricate-button is-size-38 is-primary" data-action="save">
       <i class="fas fa-floppy-disk"></i><span>Save faction</span>
     </button>
   </div>
@@ -203,7 +203,7 @@ const CHIP_CLUSTERS = [
 <header class="fabricate-page-header manager-header">
   <div class="manager-header-actions" role="group" aria-label="Actions">
     <span class="${chipClass}" title="Unsaved">Unsaved</span>
-    <button type="button" class="fabricate-button fab-manager-button is-size-38 is-ghost">
+    <button type="button" class="fabricate-button is-size-38 is-ghost">
       <i class="fas fa-arrow-left"></i><span>Back</span>
     </button>
   </div>
@@ -220,7 +220,7 @@ const CHIP_CLUSTERS = [
     <h3 class="manager-card-title">Identity</h3>
     <div class="manager-action-group">
       <span class="${chipClass}" title="Unsaved">Unsaved</span>
-      <button type="submit" class="fabricate-button fab-manager-button is-primary">
+      <button type="submit" class="fabricate-button is-primary">
         <i class="fas fa-save"></i><span>Save details</span>
       </button>
     </div>
@@ -378,7 +378,7 @@ const advertHeader = () => `
   </div>
   <div class="manager-header-actions" role="group" aria-label="Component actions">
     ${premiumAdMarkup}
-    <button type="button" class="fabricate-button fab-manager-button is-primary is-size-38" data-component-add-from-catalogue>
+    <button type="button" class="fabricate-button is-primary is-size-38" data-component-add-from-catalogue>
       <i class="fas fa-plus"></i><span>Add from catalogue</span>
     </button>
   </div>
@@ -481,7 +481,7 @@ const pageHeaderHarness = createMountedComponentHarness({
 });
 
 /** The classes `Button size="38"` writes, which every header action file passes (D10). */
-const HEADER_BUTTON = 'fabricate-button fab-manager-button is-size-38';
+const HEADER_BUTTON = 'fabricate-button is-size-38';
 
 /** Each caller that renders `PageHeader`, with the route its own CSS is scoped under. */
 const SPECIMEN_CALLERS = Object.freeze([

@@ -92,6 +92,7 @@ A progressive recipe's stages can only be components, so its adder offers nothin
 
 Search for the currency unit in the row's name field, then set the amount with the **Fixed** and **Rolled** choice described above.
 A fixed currency amount must be a whole number, and a row with a fraction is marked until you fix it.
+The unit's abbreviation shows beside the amount, and a long one is cut off to fit.
 Once a unit is named, two optional fields open beneath the row.
 
 | Field | What it does |
@@ -136,6 +137,8 @@ When the player chooses, the craft pauses at that result until the player picks.
 They settle it in the Journal's run detail, where the [Journal]({% link player-app/journal.md %}) page describes the pick.
 The GM can always settle a pick for a player.
 A rolled group needs no pick, because the roll decides.
+
+{% include screenshot.html case="player-crafting-results-choice-group" caption="How a reward the player chooses looks in the Crafting tab before the craft." %}
 
 A reward the player chooses needs a run on the current lifecycle.
 A run on the older lifecycle refuses to award one.
@@ -232,11 +235,23 @@ An ingredient set adds a requirement through one dashed **Ingredient** adder, wh
 The menu leaves out essence and currency while the system has them turned off.
 On a requirement's bare row, **or…** opens the same kinds in a menu headed **Accept instead**; once a requirement holds alternatives, its box has one dashed **Alternative** adder that opens that same menu.
 
+{% include screenshot.html case="manager-recipe-edit-choice-group-menu" caption="An any-one-of requirement with the Accept instead menu open." %}
+
 - Match a specific component managed by the crafting system.
 - Match any item that carries a given set of tags.
+  The row shows each tag in a chip as a `#` followed by the tag as it is stored, such as `#solvent`, and the adder's list reads the same way.
+  The `#` is only for display and is not part of the tag.
   The tag adder lists the system's tags with how many components carry each, marks the row's tags as selected, and choosing one again removes it.
+  Type a tag the system does not have yet, and the adder offers **New tag “name”**, showing the name trimmed, in lowercase and without a leading `#`, as it will be saved.
+  Typing `#brine` therefore adds the tag `brine`.
+  Choosing it adds the tag to the system's tags right away and checks it on the row.
+  The new tag is saved with the system at once, not with the recipe's **Save**, so **Discard** leaves it in the system's tags with no components carrying it.
+  If the tag cannot be saved, it comes back off the row and the message "Tag could not be added." appears.
 - Match an essence amount, satisfied by any combination of items whose totalled essence reaches the amount.
 - Match a currency cost, paid from the crafter's coins rather than consumed items.
+  The unit's abbreviation shows beside the amount, as on a currency result.
+
+{% include screenshot.html case="player-crafting-chooser-open" caption="The player's side of a requirement with alternatives." %}
 
 An essence is a first-class option like any other, so it can sit inside a group as one of several **Accept instead** alternatives.
 For example, a group might accept either 2x Iron Ingot or 3 units of Fire essence, and either one satisfies the group.
@@ -278,6 +293,10 @@ See [Multi-Step Recipes]({% link crafting/recipes/multi-step.md %}) for details.
 Tools are reusable items required for crafting, such as a blacksmith's forge, an alchemist's cauldron, or a wizard's staff.
 A recipe can require Tools for the whole recipe or for a single step.
 In **Routed by ingredients**, each named ingredient set can also require its own Tools.
+Each set's Tools card carries the set's name, and you can rename the set there.
+An ingredient set needs a name to carry Tools, so clearing the name is refused and a note explains why.
+The Tool references on an unnamed set are inert.
+They stay saved and apply again once the set is named.
 
 See [Tools]({% link tools.md %}) for source linking, prerequisites, breakage, and usage tracking.
 
@@ -303,6 +322,8 @@ The Overview tab edits identity (name, description, image, and whether it is on 
 When the system is in player mode, the Overview tab can also restrict a recipe to specific players.
 When the system uses a fixed Routed by check crafting check, the Overview tab also offers a per-recipe minimum success tier.
 See [Minimum success tier for fixed routed checks]({% link crafting/recipes/routed.md %}#minimum-success-tier-for-fixed-routed-checks).
+In both routed modes the Overview tab ends with a **Routing** card that lists each ingredient set or outcome tier beside the result set it produces.
+See [The routing overview]({% link crafting/recipes/routed.md %}#the-routing-overview).
 When the system has a Modifiers library and its combination rule is **By recipe**, the Overview tab also lets the recipe pick which of those modifiers apply to it, up to the system's pick limit.
 The combination rule itself is always the system's, and no other rule offers a recipe a control.
 See [Check modifiers]({% link checks/index.md %}#check-modifiers).

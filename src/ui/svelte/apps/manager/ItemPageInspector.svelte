@@ -414,11 +414,9 @@
      button would have quietly stopped filling the rail and stopped sitting on its bottom
      edge. Chained because `justify-content` is stated by the base control at (0,2,0) and a
      bare `:global(.manager-books-scrolls-edit-action)` would be (0,1,0); naming the ancestor
-     and both primitive classes puts all three declarations at (0,4,0), which is decided by
+     and the root twice puts all three declarations at (0,4,0), which is decided by
      specificity rather than by which sheet the browser loaded last. */
-  :global(
-    .fabricate-manager .fabricate-button.fab-manager-button.manager-books-scrolls-edit-action
-  ) {
+  :global(.fabricate-manager .fabricate-button.fabricate-button.manager-books-scrolls-edit-action) {
     width: 100%;
     justify-content: center;
     margin-top: auto;

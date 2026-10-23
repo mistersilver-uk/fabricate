@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { createRawSnippet, flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
@@ -126,20 +126,6 @@ function stubGeometry() {
   return stubRect(trigger(), TRIGGER_RECT);
 }
 
-/**
- * Make `window.addEventListener` a function, so `anchoredPopover` installs its listener pair.
- *
- * @returns {() => void} Restores `globalThis`.
- */
-function installWindowEventGuardStub() {
-  globalThis.addEventListener = () => {};
-  globalThis.removeEventListener = () => {};
-  return () => {
-    delete globalThis.addEventListener;
-    delete globalThis.removeEventListener;
-  };
-}
-
 function pressKey(key) {
   const event = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
   document.activeElement.dispatchEvent(event);
@@ -169,16 +155,10 @@ const activeDescendant = (holder) => holder.getAttribute('aria-activedescendant'
 const holderOf = (open) => open.querySelector('.manager-travel-popover-search input');
 
 describe('1503 SearchablePopover — the capabilities its specimen names', () => {
-  let restoreWindowEvents = () => {};
-
-  before(async () => {
-    await harness.setup();
-    restoreWindowEvents = installWindowEventGuardStub();
-  });
-  after(() => {
-    restoreWindowEvents();
-    harness.teardown();
-  });
+  // `anchoredPopover` binds its listener pair to the panel's own `document.defaultView`, happy-dom's
+  // real Window, so the scroll clauses below need no stub on the flattened `globalThis` (issue 2454).
+  before(() => harness.setup());
+  after(() => harness.teardown());
 
   describe('the `trigger` snippet', () => {
     it('renders the caller’s button instead of its own, and keeps the primitive’s contract', async () => {
@@ -441,6 +421,117 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         !sideways.defaultPrevented,
         'so Left/Right stay with the query field’s own caret rather than being swallowed'
       );
+      harness.remount();
+    });
+  });
+
+  describe('`squareTiles` (issue 2459)', () => {
+    it('draws each option as a text-free tile named by its label', async () => {
+      await mountPicker({ as: 'grid', columns: 4, squareTiles: true });
+      const open = await openPanel();
+      assert.equal(listOf(open).getAttribute('data-picker-tiles'), 'square');
+      for (const [index, row] of optionRows(open).entries()) {
+        assert.equal(row.getAttribute('aria-label'), ICONS[index].label, 'the tile is named');
+        assert.equal(row.getAttribute('title'), ICONS[index].label, 'and titled the same');
+        assert.equal(row.textContent.trim(), '', 'and renders no text node');
+        assert.ok(
+          Boolean(row.querySelector(`i.${ICONS[index].icon.replace('fas ', '')}`)),
+          'only a glyph'
+        );
+      }
+      harness.remount();
+    });
+
+    it('names a tile the caller draws, and a gated tile with its reason and no chip', async () => {
+      await mountPicker({
+        as: 'grid',
+        columns: 4,
+        squareTiles: true,
+        useOptionSnippet: true,
+        options: [
+          ...ICONS,
+          { id: 'flint', label: 'Flint', disabled: true, disabledReason: 'Spent' },
+        ],
+      });
+      const rows = optionRows(await openPanel());
+      assert.equal(rows[0].getAttribute('aria-label'), 'Anvil', 'a caller snippet keeps the name');
+      assert.equal(rows[5].getAttribute('aria-label'), 'Flint — Spent');
+      assert.equal(rows[5].getAttribute('title'), 'Flint — Spent');
+      assert.ok(!rows[5].querySelector('[data-popover-option-reason]'), 'no reason chip renders');
+      harness.remount();
+    });
+
+    it('is opt-in: neither a plain grid nor a list form carries it', async () => {
+      for (const props of [{ as: 'grid', columns: 2 }, { squareTiles: true }]) {
+        await mountPicker(props);
+        const open = await openPanel();
+        assert.ok(!listOf(open).hasAttribute('data-picker-tiles'), JSON.stringify(props));
+        const row = optionRows(open)[0];
+        assert.ok(!row.hasAttribute('aria-label'), 'a row is named by its text, not a label');
+        assert.equal(row.querySelector('.manager-travel-option-name').textContent.trim(), 'Anvil');
+        harness.remount();
+      }
+    });
+  });
+
+  describe('`keyHints` and `footerAction` (issue 2459)', () => {
+    const GRID_HINT = '←↑↓→ move · ↵ pick · esc close';
+    const LIST_HINT = '↑↓ move · ↵ pick · esc close';
+    const hintRow = (open) => open.querySelector('[data-popover-key-hints]');
+
+    it('hints the key map the cursor really has, below the caller footer', async () => {
+      const footer = createRawSnippet(() => ({ render: () => '<div data-test-footer></div>' }));
+      for (const [props, hint] of [
+        [{ as: 'grid', columns: 4 }, GRID_HINT],
+        [{}, LIST_HINT],
+        [{ as: 'grid', columns: 1 }, LIST_HINT],
+      ]) {
+        await mountPicker({ ...props, keyHints: true, footer });
+        const open = await openPanel();
+        const row = hintRow(open);
+        assert.equal(row.textContent.trim(), hint, JSON.stringify(props));
+        assert.equal(row.querySelector('span').getAttribute('aria-hidden'), 'true');
+        assert.ok(
+          open.querySelector('[data-test-footer]').compareDocumentPosition(row) &
+            globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
+          'the row sits beneath the caller footer'
+        );
+        harness.remount();
+      }
+    });
+
+    it('draws no row by default', async () => {
+      await mountPicker({ as: 'grid', columns: 4 });
+      assert.ok(!hintRow(await openPanel()), 'every new prop defaults off');
+      harness.remount();
+    });
+
+    it('hands the footer action the panel`s close', async () => {
+      const calls = [];
+      chosen.length = 0;
+      await mountPicker({
+        keyHints: true,
+        footerAction: {
+          label: 'Open catalogue',
+          onActivate: (context) => {
+            calls.push(context);
+          },
+        },
+      });
+      const action = hintRow(await openPanel()).querySelector(
+        'button.fabricate-picker-footer-action'
+      );
+      assert.equal(action.textContent.trim(), 'Open catalogue');
+      assert.equal(action.getAttribute('data-keyboard-focus'), 'true');
+      action.click();
+      flushSync();
+      assert.equal(calls.length, 1);
+      assert.equal(typeof calls[0].close, 'function');
+      assert.ok(panel(), 'the action alone does not close the panel');
+      calls[0].close();
+      await settle();
+      assert.ok(!panel(), 'the close it was handed does');
+      assert.deepEqual(chosen, [], 'and no option was chosen');
       harness.remount();
     });
   });
@@ -1036,6 +1127,26 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         'and the caller’s handler ran after it, which is observable as the default ALREADY being ' +
           'prevented by the time it was called'
       );
+      harness.remount();
+    });
+  });
+
+  describe('the `footer` snippet (issue 2515)', () => {
+    it('receives the raw query and a call that focuses the query field', async () => {
+      let context = () => ({});
+      const footer = createRawSnippet((args) => {
+        context = args;
+        return { render: () => '<div data-test-footer></div>' };
+      });
+      await mountPicker({ footer });
+      const open = await openPanel();
+      assert.ok(open.querySelector('[data-test-footer]'), 'the footer renders in the panel');
+      search(open, '  Anv ');
+      assert.equal(context().query, '  Anv ', 'the query as typed');
+      assert.equal(typeof context().close, 'function');
+      trigger().focus();
+      context().focusSearch();
+      assert.ok(document.activeElement === holderOf(open), 'focusSearch focuses the query field');
       harness.remount();
     });
   });

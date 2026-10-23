@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { measureImporters } from '../scripts/lib/componentImporters.js';
+import { importGraph, measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -531,6 +531,31 @@ test('every ruled-out verdict is from the closed set, and a merged name points a
   }
 });
 
+/**
+ * What contradicts a `manager-only` scope on `file`, read transitively over `graph`: the walk passes
+ * through importers under the primitive directory, every other importer it reaches must lie under
+ * the manager, and at least one must, or no application reaches the row at all.
+ * @param {{ importersOf: (file: string) => string[] }} graph an `importGraph` result
+ * @param {string} file the row's path
+ * @returns {string[]} one line per contradiction, empty when the scope holds
+ */
+function managerOnlyContradictions(graph, file) {
+  const visited = new Set([file]);
+  const pending = [file];
+  const reached = [];
+  while (pending.length > 0) {
+    for (const importer of graph.importersOf(pending.pop())) {
+      if (visited.has(importer)) continue;
+      visited.add(importer);
+      if (importer.startsWith(PRIMITIVE_DIRECTORY)) pending.push(importer);
+      else reached.push(importer);
+    }
+  }
+  const outside = reached.filter((importer) => !importer.startsWith(MANAGER_DIRECTORY));
+  const unreached = reached.length === outside.length ? [`no file under ${MANAGER_DIRECTORY}`] : [];
+  return [...outside.sort(byCodePoint).map((importer) => `reached from ${importer}`), ...unreached];
+}
+
 test('a manager-only row states its reason, and no caller outside the manager contradicts it', () => {
   const scoped = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.scope === 'manager-only');
   assert.ok(scoped.length > 0, 'no row is manager-only, so both clauses below are vacuous');
@@ -548,20 +573,50 @@ test('a manager-only row states its reason, and no caller outside the manager co
       `${row.path} is scoped manager-only and its \`why\` never says so. The value is a decision, ` +
         'and a decision whose reason is unwritten is indistinguishable from a default.'
     );
-
-    const outside = graph
-      .importersOf(row.path)
-      .filter((importer) => !importer.startsWith(MANAGER_DIRECTORY));
     assert.deepEqual(
-      outside,
+      managerOnlyContradictions(graph, row.path),
       [],
-      `${row.path} is scoped manager-only and is imported from outside ${MANAGER_DIRECTORY}. ` +
-        'The scope is then a false claim about a component another application already renders, ' +
-        'which is worse than no claim: the register would be recording a decision the tree has ' +
-        'already overruled. Either the scope is `shared` and the path is the debt, or the ' +
+      `${row.path} is scoped manager-only, and read through the primitive directory it is ` +
+        `reached from outside ${MANAGER_DIRECTORY}, or from no application at all. The scope is ` +
+        'then a false claim about a component another application already renders, which is ' +
+        'worse than no claim. Either the scope is `shared` and the path is the debt, or the ' +
         'importer is the defect.'
     );
   }
+});
+
+test('the manager-only walk fails each way a scope can be contradicted', () => {
+  const app = (name) => `src/ui/svelte/apps/${name}`;
+  const leaf = `${PRIMITIVE_DIRECTORY}Leaf.svelte`;
+  const middle = `${PRIMITIVE_DIRECTORY}Middle.svelte`;
+  const importing = (target) => `<script>import X from '${target}';</script>\n`;
+  const contradictionsOver = (tree) =>
+    managerOnlyContradictions(
+      importGraph(Object.keys(tree), (file) => tree[file]),
+      leaf
+    );
+  const chain = { [leaf]: '<div></div>\n', [middle]: importing('./Leaf.svelte') };
+  const managed = {
+    ...chain,
+    [app('manager/Editor.svelte')]: importing('../../components/Middle.svelte'),
+  };
+
+  assert.deepEqual(contradictionsOver(managed), [], 'the control tree is itself contradicted');
+  assert.deepEqual(
+    contradictionsOver({
+      ...managed,
+      [app('crafting/Body.svelte')]: importing('../../components/Middle.svelte'),
+    }),
+    [`reached from ${app('crafting/Body.svelte')}`]
+  );
+  assert.deepEqual(
+    contradictionsOver({
+      ...managed,
+      'src/ui/svelte/util/reader.js': "import '../components/Leaf.svelte';\n",
+    }),
+    ['reached from src/ui/svelte/util/reader.js']
+  );
+  assert.deepEqual(contradictionsOver(chain), [`no file under ${MANAGER_DIRECTORY}`]);
 });
 
 test('every re-rooted family carries a shared scope and an entry in the gate that proves it', () => {
@@ -660,6 +715,11 @@ test('TierTrack, which issue 2424 built, reads shipped in the library', () => {
   assert.equal(PER_NAME_STATUS.get('TierTrack'), 'shipped');
 });
 
+test('IconButton, which issue 2541 published, reads shipped in the library', () => {
+  // A member row the status clause already reads; pinned so its block cannot slip back to target.
+  assert.equal(PER_NAME_STATUS.get('IconButton'), 'shipped');
+});
+
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
     assert.equal(
@@ -710,11 +770,30 @@ test('the library\'s "Ruled out" section draws one Merged well per merged name o
   );
 });
 
-test('the <ValidationSummary> specimen names every prop its shipped component declares', () => {
-  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<ValidationSummary>');
-  assert.ok(row, 'no manifest row names <ValidationSummary>, so there is no component to read');
+/** Shipped entries whose Svelte API is pinned to every prop their component declares. */
+const PROP_PINNED_ENTRIES = ['ValidationSummary', 'ArmedDangerButton'];
+
+for (const name of PROP_PINNED_ENTRIES) {
+  test(`the <${name}> specimen names every prop its shipped component declares`, () => {
+    const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === `<${name}>`);
+    assert.ok(row, `no manifest row names <${name}>, so there is no component to read`);
+    const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
+    const block = library.blocks.find((entry) => entry.names.includes(name));
+    const named = new Set(block?.apiNames);
+    assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
+    assert.deepEqual(
+      props.filter((prop) => !named.has(prop)),
+      [],
+      'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
+    );
+  });
+}
+
+test('the <OptionCards> specimen names every prop its shipped component declares', () => {
+  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<OptionCards>');
+  assert.ok(row, 'no manifest row names <OptionCards>, so there is no component to read');
   const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
-  const block = library.blocks.find((entry) => entry.names.includes('ValidationSummary'));
+  const block = library.blocks.find((entry) => entry.names.includes('OptionCards'));
   const named = new Set(block?.apiNames);
   assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
   assert.deepEqual(
@@ -770,6 +849,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+  // Issue 2511's single-caller stage body; `<SortableList>`'s read-only unit specifies its parent.
+  'src/ui/svelte/apps/manager/StageComplicationList.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
@@ -796,13 +877,18 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
-  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 2510: ChoiceGroupAwardHeader and the four PickerRow* parts below each have one caller.
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/PickerRowKindMenu.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowRangeCell.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
   // Issue 2431: the range bar's single-caller marker; `<RangeBar>` specifies its parent.
   'src/ui/svelte/components/RangeBarMarker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
@@ -843,31 +929,19 @@ test('every component in the primitive directory carries a manifest row', () => 
   );
 });
 
-/** Primitives the library CITES normatively without giving them an entry. */
-const CITED_WITHOUT_ENTRY = [
-  {
-    name: 'Locked',
-    why:
-      'Cited at `library.html:642` and `:852` as the route a disabled option takes, carrying a ' +
-      'required `reason`. Both citations are library prose describing a specimen; `spec.md` ' +
-      'commits to no clause naming it, so this is a loose citation with a missing entry.',
-  },
-  {
-    name: 'RoutingOverview',
-    why:
-      'Cited at `library.html:1756` and `:1768` as the element two specimens render. NOT a loose ' +
-      'citation: spec.md requirement "Sets and groups are the container layer above the row" ' +
-      'already MANDATES the surface — "The routing is authored in TWO surfaces" and "A ROUTING ' +
-      'OVERVIEW lists every source with the set it produces". This is a bound requirement whose ' +
-      'specimen has no entry of its own.',
-  },
-];
+/**
+ * Primitives the library CITES normatively without giving them an entry. Empty since issue 2467
+ * struck the last such citation: the option cards entry states a disabled option's reason as its
+ * own `disabledOptions`, so no name is cited without a heading. Appending here is the cheapest
+ * repair available to the next author, which is why the length pin below runs first.
+ */
+const CITED_WITHOUT_ENTRY = [];
 
 test('every primitive name in the library is an entry, a declined candidate, or a recorded debt', () => {
   // The length pin runs FIRST, deliberately.
   assert.equal(
     CITED_WITHOUT_ENTRY.length,
-    2,
+    0,
     'the cited-without-entry register is pinned for the same reason the heading census is: ' +
       'without it the cheapest repair available to the next author is a one-token append'
   );

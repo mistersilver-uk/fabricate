@@ -343,7 +343,7 @@
     box-sizing: border-box;
     align-items: center;
     padding: var(--fab-space-4) var(--fab-space-3);
-    border: 1.5px dashed var(--fab-accent-border);
+    border: 1px dashed var(--fab-accent-border);
   }
 
   /* `.is-drop-active` lives in `styles/fabricate.css`, not here: the `dragDrop` ACTION adds it,
@@ -360,8 +360,8 @@
     /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
     height: 32px;
     border-radius: 9px;
-    color: var(--fab-text-subtle);
-    background: var(--fab-surface-soft);
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-3);
     font-size: 14px;
     overflow: hidden;
   }
@@ -375,7 +375,7 @@
   .manager-party-actor-name {
     max-width: 100%;
     overflow: hidden;
-    color: var(--fab-text-secondary);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 12px;
     font-weight: 600;
@@ -390,10 +390,10 @@
   }
 
   .manager-party-actor-note {
-    max-width: 100%;
-    color: var(--fab-text-subtle);
+    max-width: min(100%, 34ch);
+    color: var(--fab-text-muted);
     font-family: var(--font-primary);
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 400;
     line-height: 1.5;
     text-align: center;

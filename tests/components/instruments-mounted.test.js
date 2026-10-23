@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -25,7 +24,7 @@ const banded = createHarness(
   [component('Kicker')],
   ['src/ui/svelte/util/dropRateTier.js']
 );
-const stages = createHarness('StageBars', [], [...FOUNDRY_BRIDGE_RAW_MODULES]);
+const stages = createHarness('StageBars', []);
 const harnesses = [meter, banded, stages];
 
 before(async () => {
@@ -96,6 +95,205 @@ describe('Meter (mounted)', () => {
     assert.ok(!node.hasAttribute('aria-labelledby'), 'no reference to an empty label');
     assert.ok(!node.querySelector('.fab-meter-hidden'), 'no empty hidden label');
     assert.equal(node.getAttribute('aria-label'), 'Stamina', 'a rest aria-label names it');
+  });
+});
+
+const sharesOf = (root) => [...root.querySelectorAll('.fab-fill-bar-share')];
+const toneOf = (node) => [...node.classList].find((name) => name.startsWith('is-'));
+const fillOf = (root) => root.querySelector('.fab-fill-bar-fill');
+
+/** The drawn segments' grow factors stand in `expected`'s ratio, within 1e-6. */
+function assertRatio(root, expected) {
+  const grows = sharesOf(root).map((share) => Number(share.style.flexGrow));
+  assert.equal(grows.length, expected.length, `${expected.length} segments drawn`);
+  const sum = (list) => list.reduce((total, each) => total + each, 0);
+  for (const [index, grow] of grows.entries()) {
+    const want = expected[index] / sum(expected);
+    assert.ok(Math.abs(grow / sum(grows) - want) < 1e-6, `segment ${index} is ${want} of the fill`);
+  }
+}
+
+/** The single fill: its tone class, inline style and the track's tone attribute, and no segment. */
+function assertSingleFill(root, tone, style) {
+  assert.equal(sharesOf(root).length, 0, 'no segment element');
+  assert.ok(!root.querySelector('.is-stacked'), 'no stacked fill');
+  assert.deepEqual(
+    [...fillOf(root).classList].filter((name) => !name.startsWith('svelte-')),
+    ['fab-fill-bar-fill', `is-${tone}`]
+  );
+  assert.equal(fillOf(root).getAttribute('style'), style);
+  assert.equal(root.querySelector('.fab-fill-bar').dataset.fillBarTone, tone);
+}
+
+describe('Meter segments (mounted)', () => {
+  it('draws each entry as a segment of the one fill, and still announces the whole', async () => {
+    const root = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'Pooled days',
+      segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assert.match(fillOf(root).getAttribute('style'), /width: 58%/u);
+    assert.ok(fillOf(root).classList.contains('is-stacked'));
+    assertRatio(root, [3, 4]);
+    assert.deepEqual(sharesOf(root).map(toneOf), ['is-accent', 'is-neutral']);
+    assert.equal(root.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '7');
+  });
+
+  it('stops each span where the fill ends, so an entry past the reading is not drawn', async () => {
+    const root = await meter.mount({
+      value: 8,
+      max: 10,
+      label: 'x',
+      segments: [{ value: 6 }, { value: 6 }, { tone: 'danger' }],
+    });
+    assertRatio(root, [6, 2]);
+    assert.deepEqual(sharesOf(root).map(toneOf), ['is-success', 'is-success']);
+  });
+
+  it('gives the last entry the rest of the reading, whatever its own value', async () => {
+    const root = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 3 }, { value: 1, tone: 'neutral' }],
+    });
+    assertRatio(root, [3, 4]);
+  });
+
+  it('draws no entry that spans nothing', async () => {
+    const zero = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 0, tone: 'danger' }, { value: 2, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertRatio(zero, [2, 5]);
+    assert.deepEqual(sharesOf(zero).map(toneOf), ['is-accent', 'is-neutral']);
+    meter.remount();
+
+    const trailing = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 7, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertSingleFill(trailing, 'accent', 'width: 58%;');
+    meter.remount();
+
+    const leading = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 0, tone: 'danger' }, { tone: 'accent' }],
+    });
+    assertSingleFill(leading, 'accent', 'width: 58%;');
+    meter.remount();
+
+    const whole = await meter.mount({
+      value: 7,
+      max: 12,
+      label: 'x',
+      segments: [{ value: 12, tone: 'danger' }, { tone: 'accent' }],
+    });
+    assertSingleFill(whole, 'danger', 'width: 58%;');
+  });
+
+  it('reads an entry value that is not a finite number of zero or more as 0', async () => {
+    for (const bad of ['3', Infinity, -2, NaN]) {
+      const root = await meter.mount({
+        value: 7,
+        max: 12,
+        label: 'x',
+        segments: [
+          { value: bad, tone: 'danger' },
+          { value: 2, tone: 'accent' },
+          { tone: 'neutral' },
+        ],
+      });
+      assertRatio(root, [2, 5]);
+      assert.deepEqual(sharesOf(root).map(toneOf), ['is-accent', 'is-neutral'], String(bad));
+      meter.remount();
+    }
+  });
+
+  it('reads a null entry as one with no value, tone or colour', async () => {
+    for (const [segments, tones] of [
+      [
+        [{ value: 3, tone: 'accent' }, null],
+        ['is-accent', 'is-success'],
+      ],
+      [
+        [{ value: 3, tone: 'accent' }, null, { tone: 'neutral' }],
+        ['is-accent', 'is-neutral'],
+      ],
+    ]) {
+      const root = await meter.mount({ value: 7, max: 12, label: 'x', segments });
+      assertRatio(root, [3, 4]);
+      assert.deepEqual(sharesOf(root).map(toneOf), tones);
+      meter.remount();
+    }
+  });
+
+  it('draws a span of float residue as nothing and a small real one as a segment', async () => {
+    const residue = await meter.mount({
+      value: 0.1 + 0.2,
+      max: 1,
+      label: 'x',
+      segments: [{ value: 0.1 }, { value: 0.2 }, { tone: 'danger' }],
+    });
+    assertRatio(residue, [1, 2]);
+    assert.deepEqual(sharesOf(residue).map(toneOf), ['is-success', 'is-success']);
+    meter.remount();
+
+    const small = await meter.mount({
+      value: 1e-6,
+      max: 1,
+      label: 'x',
+      segments: [{ value: 5e-7, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertRatio(small, [1, 1]);
+    assert.deepEqual(sharesOf(small).map(toneOf), ['is-accent', 'is-neutral']);
+  });
+
+  it('draws one entry, or none, as the single fill it drew before segments', async () => {
+    for (const [segments, tone] of [
+      [[{ tone: 'accent' }], 'accent'],
+      [[], 'success'],
+      [[{ value: 9, tone: 'accent' }], 'accent'],
+    ]) {
+      const root = await meter.mount({ value: 7, max: 12, label: 'x', segments });
+      assertSingleFill(root, tone, 'width: 58%;');
+      meter.remount();
+    }
+  });
+
+  it("paints the first entry's tone and colour when no entry spans anything", async () => {
+    const empty = await meter.mount({
+      value: 0,
+      max: 12,
+      label: 'x',
+      segments: [{ tone: 'accent', color: 'var(--fab-tag-aqua)' }],
+    });
+    assertSingleFill(empty, 'accent', 'width: 0%; background: var(--fab-tag-aqua);');
+    meter.remount();
+
+    const owed = await meter.mount({
+      value: 0,
+      max: 0,
+      label: 'x',
+      segments: [{ tone: 'accent' }],
+    });
+    assertSingleFill(owed, 'accent', 'width: 100%;');
+    meter.remount();
+
+    const full = await meter.mount({
+      value: 7,
+      max: 0,
+      label: 'x',
+      segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+    });
+    assertSingleFill(full, 'accent', 'width: 100%;');
   });
 });
 
@@ -197,12 +395,18 @@ describe('BandedBar (mounted)', () => {
 });
 
 describe('StageBars (mounted)', () => {
-  it('is a named group of stage-named progress bars, toned by position', async () => {
+  /** A second mount in the same test, after the first is destroyed. */
+  async function remountStages(props) {
+    stages.remount();
+    return stages.mount(props);
+  }
+
+  it('is a named group of progress bars, each named by its label, else its name, toned by position', async () => {
     const root = await stages.mount({
       stages: [
-        { id: 'draw', name: 'Draw', value: 100 },
-        { id: 'fold', name: 'Fold', value: 45 },
-        { id: 'grind', value: 0 },
+        { name: 'Draw', value: 100 },
+        { name: 'Fold', label: 'Fold the billet', value: 45 },
+        { value: 0 },
       ],
       currentIndex: 1,
       ariaLabel: 'Progress',
@@ -215,10 +419,12 @@ describe('StageBars (mounted)', () => {
       bars.map((bar) => [bar.getAttribute('aria-label'), bar.getAttribute('aria-valuenow')]),
       [
         ['Draw', '100'],
-        ['Fold', '45'],
-        ['FABRICATE.Common.StageBars.Unnamed:{"index":3,"count":3}', '0'],
-      ]
+        ['Fold the billet', '45'],
+        [null, '0'],
+      ],
+      'a stage of several with neither label nor name has no name of its own'
     );
+    assert.ok(!bars[2].hasAttribute('aria-labelledby'), 'and borrows none');
     assert.deepEqual(
       [...group.querySelectorAll('[data-stage-bars-state]')].map(
         (stage) => stage.dataset.stageBarsState
@@ -230,12 +436,19 @@ describe('StageBars (mounted)', () => {
       [null, 'step', null],
       'the current stage is not told by colour alone'
     );
-    assert.equal(
-      group.querySelectorAll('.fab-stage-bars-caption').length,
-      3,
-      'numbered by default'
+    assert.deepEqual(
+      [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) => caption.textContent),
+      ['1 Draw', '2 Fold', '3 '],
+      'numbered by default, each caption its position and its name, never its label'
     );
     assert.ok(!group.querySelector('button'), 'choosing a stage is not this instrument');
+  });
+
+  it('draws an empty named group for no stages', async () => {
+    const root = await stages.mount({ stages: [], ariaLabel: 'Progress' });
+    const group = root.querySelector('[role="group"]');
+    assert.equal(group.getAttribute('aria-label'), 'Progress');
+    assert.equal(group.children.length, 0);
   });
 
   it('names the group by the caller kicker and draws no captions when unnumbered', async () => {
@@ -259,5 +472,83 @@ describe('StageBars (mounted)', () => {
     const bar = root.querySelector('[role="progressbar"]');
     assert.equal(bar.getAttribute('aria-label'), 'Progress');
     assert.ok(!bar.hasAttribute('aria-labelledby'), 'exactly one naming route');
+  });
+
+  it("names a lone stage by its own label, else its own name, before the group's name", async () => {
+    const named = await stages.mount({
+      stages: [{ name: 'Copy', value: 70 }],
+      ariaLabel: 'Progress',
+    });
+    assert.equal(
+      named.querySelector('[role="progressbar"]').getAttribute('aria-label'),
+      'Copy',
+      "a lone stage's own name beats the group's"
+    );
+    const labelled = await remountStages({
+      stages: [{ name: 'Copy', label: 'Copy the scroll', value: 70 }],
+      ariaLabel: 'Progress',
+    });
+    assert.equal(
+      labelled.querySelector('[role="progressbar"]').getAttribute('aria-label'),
+      'Copy the scroll',
+      "and its label beats both the name and the group's"
+    );
+  });
+
+  it('clamps a value to 0–100, reads a non-numeric one as 0, and tones only a full bar by its value', async () => {
+    const root = await stages.mount({
+      stages: [
+        { name: 'A', value: 150 },
+        { name: 'B', value: -5 },
+        { name: 'C', value: 'x' },
+        { name: 'D', value: '45' },
+      ],
+      ariaLabel: 'Progress',
+    });
+    const bars = [...root.querySelectorAll('[role="progressbar"]')];
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-valuenow')),
+      ['100', '0', '0', '45']
+    );
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-stage-bars-state]')].map(
+        (stage) => stage.dataset.stageBarsState
+      ),
+      ['success', 'neutral', 'neutral', 'neutral'],
+      'a filled bar reads success, and no other bar but the current one is toned'
+    );
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-current')),
+      ['step', null, null, null],
+      'the current stage defaults to the first, and a filled current bar still carries it'
+    );
+  });
+
+  it('draws a bar for every stage whatever a stage carries, and marks no current one out of range', async () => {
+    const duplicated = await stages.mount({
+      stages: [
+        { id: 'a', name: 'X', value: 1 },
+        { id: 'a', name: 'Y', value: 2 },
+      ],
+      ariaLabel: 'Progress',
+    });
+    assert.deepEqual(
+      [...duplicated.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-label')
+      ),
+      ['X', 'Y'],
+      'a private id two stages share keys nothing'
+    );
+    const outOfRange = await remountStages({
+      stages: [{ name: 'A', value: 1 }, null],
+      currentIndex: 7,
+      ariaLabel: 'Progress',
+    });
+    const bars = [...outOfRange.querySelectorAll('[role="progressbar"]')];
+    assert.equal(bars.length, 2, 'a null entry still draws its bar');
+    assert.deepEqual(
+      bars.map((bar) => bar.getAttribute('aria-current')),
+      [null, null]
+    );
   });
 });

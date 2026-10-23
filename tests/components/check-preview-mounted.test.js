@@ -269,14 +269,14 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
     // Reported as "the roll button does not match the studio's button". The cause is not a
     // missing rule: `fabricate-button is-primary` matches no rule stating a type size, so the
     // label took Foundry's 14px app base while every converted button in the studio read at
-    // the primitive's 11.52px. `fab-manager-button` is what `Button` emits and is the
-    // only class the type-scale rule keys on, so its presence IS the conversion.
+    // the primitive's 11.52px. The tripled `fabricate-button` root the type-scale rule keys on is
+    // `Button`'s since issue 2540, so the root on this element IS the conversion.
     const root = await mountChecks();
     const roll = root.querySelector('[data-checks-simulator-roll]');
     assert.equal(roll.tagName, 'BUTTON', 'it is one button, not a button inside a button');
     assert.equal(roll.querySelectorAll('button').length, 0, 'and nests none');
     assert.ok(
-      roll.classList.contains('fab-manager-button'),
+      roll.classList.contains('fabricate-button'),
       'the roll action renders through Button'
     );
     assert.ok(roll.classList.contains('is-primary'), 'in the primary role it always had');
@@ -1324,7 +1324,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     assert.ok(!live.querySelector('[aria-live]'), 'no region nests inside it');
   });
 
-  it('keeps the Roll button focusable while rolling, marked aria-disabled (F11)', async () => {
+  it('keeps the Roll button focusable while rolling, marked busy (F11, issue 2540)', async () => {
     let release;
     const gate = new Promise((resolveGate) => {
       release = resolveGate;
@@ -1342,9 +1342,12 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await settle();
       assert.equal(button.disabled, false, 'a disabled button would drop focus mid-roll');
       assert.equal(button.getAttribute('aria-disabled'), 'true');
+      assert.equal(button.getAttribute('aria-busy'), 'true');
+      assert.equal(button.textContent.trim(), 'Rolling…', 'the roll in flight names itself');
       release();
       for (let attempt = 0; attempt < 12; attempt += 1) await settle();
       assert.ok(!button.hasAttribute('aria-disabled'), 'and it clears once the roll lands');
+      assert.ok(!button.hasAttribute('aria-busy'));
     } finally {
       globalThis.Roll.prototype.evaluate = evaluate;
     }

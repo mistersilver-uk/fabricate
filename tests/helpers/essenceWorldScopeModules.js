@@ -1,6 +1,7 @@
 /** The dependency manifest the mounted world ESSENCE suites compile against (issue 1372). */
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 import {
+  PAGINATION_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   STATUS_TONE_RAW_MODULES,
 } from './svelte-component-harness.js';
@@ -50,11 +51,11 @@ export const ESSENCE_WORLD_SHELL_MODULES = Object.freeze([
   // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
+  ...PAGINATION_COMPILED_MODULES,
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
-  // (`...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: `Pagination` and the
-  // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
-  // this shell rather than new controls on these screens.
+  // (`...ESSENCE_WORLD_SHELL_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here: the frame below
+  // imports `Select`, so it and `SearchablePopover` are transitive dependencies of this shell
+  // rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
@@ -84,6 +85,7 @@ export const ESSENCE_CATALOGUE_BULK_RAW_MODULES = Object.freeze([
 
 export const ESSENCE_CATALOGUE_BULK_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/components/IconPicker.svelte',

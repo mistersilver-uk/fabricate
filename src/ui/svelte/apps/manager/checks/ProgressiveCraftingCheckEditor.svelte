@@ -59,7 +59,7 @@
 
 <div class="manager-checks-editor" data-progressive-check-editor>
   {#if shows('roll')}
-    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
+    <InspectorCard flush class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -117,7 +117,7 @@
        beyond the formula, which is why the studio renders Outcomes in every mode: hiding it
        here would remove this control from the UI entirely. -->
   {#if shows('outcomes')}
-    <InspectorCard class="manager-checks-card" data-award-mode="">
+    <InspectorCard flush class="manager-checks-card" data-award-mode="">
       <div class="manager-checks-card-head">
         <h3 class="manager-checks-card-title">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}

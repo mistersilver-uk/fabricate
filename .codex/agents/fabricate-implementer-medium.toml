@@ -1,5 +1,5 @@
 name = "fabricate_implementer_medium"
-description = "Implement a scoped Fabricate change with tests and validation. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures."
+description = "Implement a scoped Fabricate change with tests and validation. Bound to the medium model tier, selected by the workflow driver, for a bounded, cohesive work packet spanning implementation, tests, localization and specs across several related files."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"

@@ -10,7 +10,7 @@ import {
 } from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
-const { recipeResultKinds } = await import('../../src/ui/svelte/apps/manager/recipe/resultRows.js');
+const { recipeResultKinds } = await import('../../src/ui/svelte/components/resultRows.js');
 
 function recipeItemById(vs, id) {
   return (vs.selectedSystem?.recipeItemDefinitions || []).find((d) => d.id === id);

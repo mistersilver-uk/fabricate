@@ -69,6 +69,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   // `ActionMenu`'s own placement helper (issue 1477).
   'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -145,6 +146,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   // The GM read-only stage complication list a salvage stage row's body renders (issue 2445).
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
@@ -177,6 +179,10 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/component/ComponentDifficultyCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+  // Issue 2512: a salvage result set's head is the set card.
+  'src/ui/svelte/components/SetCard.svelte',
+  // The salvage well's outcome routing (issue 2513).
+  'src/ui/svelte/components/RoutingOverview.svelte',
   'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
   'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',

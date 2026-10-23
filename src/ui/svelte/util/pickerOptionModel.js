@@ -78,6 +78,66 @@ export function filteredCountLabel(template, matched, total) {
   return String(template).replace('{matched}', String(matched)).replace('{total}', String(total));
 }
 
+/** A grid's cells per row: 2 to 6, the counts the sheet draws, and 1 for any other value or the list form. */
+export function gridColumnCount(as, columns) {
+  return as === 'grid' && Number.isInteger(columns) && columns >= 2 && columns <= 6 ? columns : 1;
+}
+
+/** Where `close()` returns focus: an anchored picker's anchor while connected, else the nearest `[tabindex]` container when one exists (none: focus is left to the browser); otherwise the trigger. */
+export function focusReturnTarget(origin, root) {
+  if ('anchor' in origin) {
+    return origin.anchor?.isConnected ? origin.anchor : (root?.closest?.('[tabindex]') ?? null);
+  }
+  const target = origin.trigger ?? root?.querySelector?.('button');
+  return target?.isConnected === false ? null : (target ?? null);
+}
+
+/**
+ * Calls `onLost` when a mutation under `root` leaves `resolve()` answering no connected anchor;
+ * returns the disconnect. `root` is the anchor's own document unless given, since a Foundry 14
+ * detached window's anchor is not in this one; that reads `resolve()` once, so an effect calls
+ * this untracked.
+ */
+export function watchAnchor(
+  resolve,
+  onLost,
+  root = resolve()?.ownerDocument ?? globalThis.document,
+  Observer = globalThis.MutationObserver
+) {
+  const observer = new Observer(() => {
+    if (!resolve()?.isConnected) onLost();
+  });
+  observer.observe(root, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+/** The picker's own copy, each entry as `[key, fallback]`. */
+export const PICKER_COPY = Object.freeze({
+  error: Object.freeze(['FABRICATE.Common.Picker.Error', 'The list could not load']),
+  loading: Object.freeze(['FABRICATE.Common.Picker.Loading', 'Loading…']),
+  noMatches: Object.freeze(['FABRICATE.Common.Picker.NoMatches', 'No matches']),
+  gridHints: Object.freeze([
+    'FABRICATE.Common.Picker.KeyHints.Grid',
+    '←↑↓→ move · ↵ pick · esc close',
+  ]),
+  listHints: Object.freeze([
+    'FABRICATE.Common.Picker.KeyHints.List',
+    '↑↓ move · ↵ pick · esc close',
+  ]),
+});
+
+/**
+ * `(name) => text`: the `PICKER_COPY` entry `name` translated by `localize`, the app root's
+ * localizer, else its fallback, which is what a tree mounted with none draws (issue 2454).
+ */
+export function pickerCopy(localize) {
+  return (name) => {
+    const [key, fallback] = PICKER_COPY[name];
+    const translated = typeof localize === 'function' ? localize(key) : '';
+    return translated && translated !== key ? translated : fallback;
+  };
+}
+
 /** A list holding nothing takes the caller's hint and detail; a list the query emptied takes the no-matches line and no detail. */
 export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, emptyDetail }) {
   const filteredToNothing = total > 0 && matched === 0;

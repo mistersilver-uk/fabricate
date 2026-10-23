@@ -77,13 +77,11 @@
   const PRODUCT_OPTIONS = [
     {
       value: 'sum',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Count.ProductSum',
-      fallback: 'Add the dice',
+      label: text('FABRICATE.Admin.Manager.Checks.Count.ProductSum', 'Add the dice'),
     },
     {
       value: 'count',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Count.ProductCount',
-      fallback: 'Count successes',
+      label: text('FABRICATE.Admin.Manager.Checks.Count.ProductCount', 'Count successes'),
       validationTarget: 'checks-product',
     },
   ];
@@ -99,13 +97,11 @@
   const DIRECTION_OPTIONS = [
     {
       value: 'over',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionOver',
-      fallback: 'Higher is better',
+      label: text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionOver', 'Higher is better'),
     },
     {
       value: 'under',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionUnder',
-      fallback: 'Lower is better',
+      label: text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionUnder', 'Lower is better'),
     },
   ];
 

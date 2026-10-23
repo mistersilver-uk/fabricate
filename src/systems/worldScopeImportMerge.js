@@ -15,6 +15,7 @@
 
 import { isPlainObject } from '../utils/scalars.js';
 
+import { WORLD_SCOPE_SLICE_KEYS } from './importReferenceResolver.js';
 import { membershipKey } from './scopedDefinitions.js';
 import { subKeyEntries } from './scopedDefinitionStore.js';
 import {
@@ -190,4 +191,25 @@ export function recheckWorldDefault({
 /** The component membership union as `(componentId, systemId)` keys. */
 export function membershipKeySet(membershipUnion) {
   return new Set(membershipUnion.map((entry) => membershipKey(entry.entityId, entry.systemId)));
+}
+
+/**
+ * The incoming essence and tool membership records as `createSystem`/`updateSystem` registration
+ * seeds, `{ essences, tools }` each keyed by entity id, first record per entity (issue 2554); the
+ * manager rewrites each `systemId`, so the later membership merge finds them already written.
+ */
+export function scopeMembershipSeeds(packData) {
+  const seeds = {};
+  for (const entityType of ['essences', 'tools']) {
+    const byId = {};
+    for (const record of sliceRecords(
+      packData?.[WORLD_SCOPE_SLICE_KEYS[entityType]],
+      'membership'
+    )) {
+      const entityId = trimmedId(record.entityId);
+      if (entityId && !byId[entityId]) byId[entityId] = structuredClone(record);
+    }
+    seeds[entityType] = byId;
+  }
+  return seeds;
 }

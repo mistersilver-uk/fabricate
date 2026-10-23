@@ -6,8 +6,9 @@ import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBr
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The ramp `BandedBar` reads its fills from (issue 1782).
   'src/ui/svelte/util/dropRateTier.js',
-  // The range bar's pure geometry (issue 2431).
+  // The range bar's pure geometry (issue 2431) and its own localized words (issue 2435).
   'src/ui/svelte/util/rangeBarGeometry.js',
+  'src/ui/svelte/util/rangeBarText.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -17,6 +18,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/components/stepperLabels.js',
@@ -27,6 +29,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The fixed-range gap spans the readiness gap check reads (issue 2511).
+  'src/ui/svelte/apps/manager/checks/checkRangeGaps.js',
   // The count rules and the free-text Convert the evaluator delegates to (issue 2006).
   'src/ui/svelte/apps/manager/checks/countReadiness.js',
   'src/ui/svelte/apps/manager/checks/countFormulaConversion.js',

@@ -7,6 +7,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { gridColumnCount } from '../../src/ui/svelte/util/pickerOptionModel.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   activeDescendant,
@@ -41,6 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -62,24 +64,30 @@ const harness = createMountedComponentHarness({
 
 const chosen = [];
 
-/** The column count the SHEET draws this panel at, read rather than restated. */
-function sheetGridColumns() {
-  const sheet = readStylesheet();
-  const rungs = [
-    ...sheet.matchAll(
-      /\.fabricate-picker-popover \.manager-travel-popover-options\[data-picker-columns='(\d+)'\] \{([^}]*)\}/g
-    ),
-  ];
-  assert.ok(rungs.length > 0, 'the sheet still carries a column rung for the shared grid form');
-  const rung = rungs.find((match) => /grid-template-columns:\s*repeat\(\d+,/.test(match[2]));
-  assert.ok(rung, 'and one of its rungs declares a repeated column template');
+/** Every column rung the sheet carries, as the count it is keyed on -> the count it paints. */
+function sheetColumnRungs() {
+  const rungs = new Map();
+  for (const match of readStylesheet().matchAll(
+    /\.fabricate-picker-popover \.manager-travel-popover-options\[data-picker-columns='(\d+)'\] \{([^}]*)\}/g
+  )) {
+    const template = match[2].match(/grid-template-columns:\s*repeat\((\d+),/);
+    rungs.set(Number(match[1]), template ? Number(template[1]) : null);
+  }
+  assert.ok(rungs.size > 0, 'the sheet still carries a column rung for the shared grid form');
+  return rungs;
+}
+
+/** The column count the SHEET draws for the count the list EMITS, read rather than restated. */
+function sheetGridColumns(emitted) {
+  const painted = sheetColumnRungs().get(Number(emitted));
+  assert.ok(painted, `the sheet carries a rung keyed on the emitted count ${emitted}`);
   assert.equal(
-    Number(rung[1]),
-    Number(rung[2].match(/grid-template-columns:\s*repeat\((\d+),/)[1]),
+    painted,
+    Number(emitted),
     'a rung must paint the count it is keyed on, or the list renders a different grid from the ' +
       'one the key map steps by'
   );
-  return Number(rung[1]);
+  return painted;
 }
 
 /** The two trigger labels, by key rather than by sentence. */
@@ -158,11 +166,26 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
     assertRestingList(panel, holderOf(panel));
   });
 
+  it('carries a sheet rung for exactly the column counts the primitive admits (issue 2459)', () => {
+    const admitted = Array.from({ length: 12 }, (_, count) => count).filter(
+      (count) => count > 1 && gridColumnCount('grid', count) === count
+    );
+    const rungs = sheetColumnRungs();
+    assert.deepEqual(
+      [...rungs.keys()].sort((left, right) => left - right),
+      admitted,
+      'a count the primitive emits with no rung draws one column while the cursor steps by more'
+    );
+    for (const [keyed, painted] of rungs) assert.equal(painted, keyed, `rung ${keyed}`);
+  });
+
   it('steps the vertical arrows by as many cells as the sheet draws columns', async () => {
-    const columns = sheetGridColumns();
+    const { panel } = await openPanel({});
+    const columns = sheetGridColumns(
+      panel.querySelector('[role="listbox"]').getAttribute('data-picker-columns')
+    );
     assert.equal(columns, 2, 'the sheet still draws this panel in two columns');
 
-    const { panel } = await openPanel({});
     const holder = holderOf(panel);
     const rows = optionRows(panel);
 
@@ -434,9 +457,9 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
 
   // ── CRITERION 3(a): WHAT A MOUNTED DOM CAN SEE OF THE GRID ──────────────────────────────
   it('emits the grid form on the list rather than styling it inline', async () => {
-    const columns = sheetGridColumns();
     const { panel } = await openPanel({});
     const list = panel.querySelector('[role="listbox"]');
+    const columns = sheetGridColumns(list.getAttribute('data-picker-columns'));
 
     assert.equal(
       list.getAttribute('data-picker-as'),

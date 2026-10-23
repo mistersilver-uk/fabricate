@@ -189,7 +189,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       KEEP_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
       ':has(.formula-content .formula:text-is("1d20 + 3"))' +
@@ -223,7 +223,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
       ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−(1d8 + 1) to the total"))' +
       ' .manager-modal-footer button[data-action="advantage"] .action-note:text-is("+(1d8 + 1) to the total")',
@@ -251,7 +251,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       KEEP_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
       ':has(.formula-content .formula:text-is("1d20"))' +
@@ -282,7 +282,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("5d10 · each ≥ 7"))' +
@@ -315,7 +315,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
       ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
       ' input[data-roll-prompt-additional-dice]:not(:disabled)',
@@ -341,7 +341,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      '.fabricate-app [data-manager-modal][data-roll-prompt="single"]' +
       ':not(:has(.formula-content .manager-chip[data-roll-prompt-required]))' +
       ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
       ':not(:has([data-roll-prompt-additional-dice-message]))' +

@@ -2,9 +2,10 @@
  * Telling a client it is running a STALE ENTRY SCRIPT (issue 1565). Foundry serves the module's
  * entry at a stable URL, so a cache in front of it can hand back an earlier build whose hashed
  * chunks are gone. Two signals, because they fail at different moments:
- * {@link buildDeferredChunkFailureNotice} on the rejection, {@link buildStaleEntryNotice} at
- * startup. Neither is GM-gated, and neither claims reopening recovers — only a reload does, and
- * the copy escalates to a cache-bypassing one. Pure, because nothing in `src/main.js` is testable.
+ * {@link buildDeferredChunkFailureNotice} (a window) or {@link buildDeferredPartFailureNotice} (a
+ * lazy published part) on the rejection, {@link buildStaleEntryNotice} at startup. None is
+ * GM-gated, and none claims reopening recovers — only a reload does, and the copy escalates to a
+ * cache-bypassing one. Pure, because nothing in `src/main.js` is testable.
  */
 
 import { localizeWith } from './localizeWithFallback.js';
@@ -27,7 +28,7 @@ export const STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE =
   'Fabricate | this browser is running a cached entry script from an earlier version of Fabricate; reload to complete the update.';
 
 /** Is this rejection the host refusing to fetch a code-split chunk? */
-function isChunkLoadFailure(error) {
+export function isChunkLoadFailure(error) {
   const message = error?.message;
   if (typeof message !== 'string' || !message) return false;
   const text = message.toLowerCase();
@@ -51,6 +52,19 @@ export function buildDeferredChunkFailureNotice(error, localize) {
     'FABRICATE.Admin.Manager.LoadFailed',
     undefined,
     'Fabricate could not open the crafting system manager. The browser console has the error.'
+  );
+}
+
+/**
+ * The notice for a lazy published part: its caller reports a chunk-load failure alone, so the copy
+ * names a stale cache.
+ */
+export function buildDeferredPartFailureNotice(_error, localize) {
+  return localizeWith(
+    localize,
+    'FABRICATE.Update.DeferredPartStale',
+    undefined,
+    'Part of Fabricate could not load because this browser is still running an earlier version of the module. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS.'
   );
 }
 
@@ -83,13 +97,49 @@ function isNoticeLive(hasNotice, retained) {
   }
 }
 
-/** The reporter for a failed deferred load: one console line per failure, one notice at a time. */
-export function createDeferredChunkFailureReporter({ notify, log, localize, hasNotice }) {
+/**
+ * The reporter for a failed deferred load: it logs one console line per failure and raises one
+ * notice at a time, built by the `buildNotice` its call names (the window notice by default).
+ * A call with `once` raises its builder's notice at most once per reporter, and a notice a live
+ * one suppresses is not used up. While `canNotify()` is false only the latest notice waits, and
+ * `whenReady` is handed the flush that raises it.
+ */
+export function createDeferredChunkFailureReporter({
+  notify,
+  log,
+  localize,
+  hasNotice,
+  canNotify = () => true,
+  whenReady,
+}) {
   let retained = null;
-  return (error) => {
-    log(error);
+  let pending = null;
+  const spent = new Set();
+
+  function raise({ error, buildNotice, once }) {
+    if (once && spent.has(buildNotice)) return;
     if (isNoticeLive(hasNotice, retained)) return;
-    retained = notify(buildDeferredChunkFailureNotice(error, localize), { console: false }) ?? null;
+    if (once) spent.add(buildNotice);
+    retained = notify(buildNotice(error, localize), { console: false }) ?? null;
+  }
+
+  function flush() {
+    const queued = pending;
+    pending = null;
+    if (queued) raise(queued);
+  }
+
+  return (error, { buildNotice = buildDeferredChunkFailureNotice, once = false } = {}) => {
+    log(error);
+    const notice = { error, buildNotice, once };
+    if (canNotify()) {
+      pending = null;
+      raise(notice);
+      return;
+    }
+    const waiting = pending !== null;
+    pending = notice;
+    if (!waiting) whenReady?.(flush);
   };
 }
 

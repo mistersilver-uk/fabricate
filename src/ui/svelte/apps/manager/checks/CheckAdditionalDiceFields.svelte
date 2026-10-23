@@ -61,13 +61,17 @@
   const SOURCE_OPTIONS = [
     {
       value: 'path',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourcePath',
-      fallback: 'Value on the crafting character',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourcePath',
+        'Value on the crafting character'
+      ),
     },
     {
       value: 'macro',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourceMacro',
-      fallback: 'Read and spend macros',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.AdditionalDice.SourceMacro',
+        'Read and spend macros'
+      ),
     },
   ];
 
@@ -203,11 +207,11 @@
       kind={slot.kind}
       hookAttrs={{ root: { [slot.hook]: '' } }}
       documentType="Macro"
-      item={rule[slot.key] ? { name: macroName(slot.key) } : null}
+      value={rule[slot.key] ? { uuid: rule[slot.key], name: macroName(slot.key) } : null}
       state={macroStates[slot.key]?.missing ? 'missing' : 'linked'}
+      showUuid
       title={text('FABRICATE.Admin.Manager.Checks.AdditionalDice.MacroEmpty', 'Drop a macro here')}
       hint={rule[slot.key] ? '' : slot.hint}
-      uuid={rule[slot.key]}
       emptyIcon={rule[slot.key] ? 'fas fa-file-code' : 'fas fa-link'}
       copyLabel={slot.copy}
       unlinkLabel={slot.unlink}

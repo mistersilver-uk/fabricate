@@ -170,61 +170,48 @@ describe('ViewToggle (issue 2412)', () => {
   });
 
   it('renders the essence browser’s base call exactly, apart from the radio name', async () => {
-    const translations = {
-      'FABRICATE.Admin.Manager.Essence.ViewList': 'Liste',
-      'FABRICATE.Admin.Manager.Essence.ViewGrid': 'Raster',
-    };
-    const i18n = globalThis.game.i18n;
-    const localize = i18n.localize;
-    i18n.localize = (key) => translations[key] ?? key;
-    try {
-      for (const view of ['list', 'grid']) {
-        const shared = {
-          ariaLabel: 'Essence presentation',
-          'data-essence-view-mode': true,
-          optionDataAttr: 'data-essence-view-option',
-        };
-        const adopted = await harness.mount({
-          ...shared,
-          view,
-          listLabel: 'Liste',
-          gridLabel: 'Raster',
-        });
-        const base = await mountBeside(SEGMENTED, {
-          ...shared,
-          value: view,
-          iconOnly: true,
-          groupName: 'manager-essence-view-mode',
-          options: [
-            {
-              value: 'list',
-              labelKey: 'FABRICATE.Admin.Manager.Essence.ViewList',
-              fallback: 'List',
-              icon: 'fas fa-list',
-            },
-            {
-              value: 'grid',
-              labelKey: 'FABRICATE.Admin.Manager.Essence.ViewGrid',
-              fallback: 'Grid',
-              icon: 'fas fa-table-cells-large',
-            },
-          ],
-        });
-        const groupOf = (root) => root.querySelector('[role="radiogroup"]');
-        const checked = (root) =>
-          [...root.querySelectorAll('input[type="radio"]')].map((r) => r.checked);
-        assert.deepEqual(checked(adopted), checked(base), `the checked radio at ${view}`);
-        const unnamed = (root) => {
-          const clone = groupOf(root).cloneNode(true);
-          for (const input of clone.querySelectorAll('input[type="radio"]')) input.name = 'group';
-          return clone.outerHTML;
-        };
-        assert.equal(unnamed(adopted), unnamed(base), `the markup at ${view}`);
-        destroyBeside();
-        harness.remount();
-      }
-    } finally {
-      i18n.localize = localize;
+    for (const view of ['list', 'grid']) {
+      const shared = {
+        ariaLabel: 'Essence presentation',
+        'data-essence-view-mode': true,
+        optionDataAttr: 'data-essence-view-option',
+      };
+      const adopted = await harness.mount({
+        ...shared,
+        view,
+        listLabel: 'Liste',
+        gridLabel: 'Raster',
+      });
+      const base = await mountBeside(SEGMENTED, {
+        ...shared,
+        value: view,
+        iconOnly: true,
+        groupName: 'manager-essence-view-mode',
+        options: [
+          {
+            value: 'list',
+            label: 'Liste',
+            icon: 'fas fa-list',
+          },
+          {
+            value: 'grid',
+            label: 'Raster',
+            icon: 'fas fa-table-cells-large',
+          },
+        ],
+      });
+      const groupOf = (root) => root.querySelector('[role="radiogroup"]');
+      const checked = (root) =>
+        [...root.querySelectorAll('input[type="radio"]')].map((r) => r.checked);
+      assert.deepEqual(checked(adopted), checked(base), `the checked radio at ${view}`);
+      const unnamed = (root) => {
+        const clone = groupOf(root).cloneNode(true);
+        for (const input of clone.querySelectorAll('input[type="radio"]')) input.name = 'group';
+        return clone.outerHTML;
+      };
+      assert.equal(unnamed(adopted), unnamed(base), `the markup at ${view}`);
+      destroyBeside();
+      harness.remount();
     }
   });
 });

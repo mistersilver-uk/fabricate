@@ -11,6 +11,7 @@ import {
 } from '../migration/migrationNoticeDetail.js';
 import { buildMigrationRecoveryPrompt } from '../migration/migrationRecoveryPrompt.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../migration/MigrationRunner.js';
+import { buildScopedIdentityReconcileNotice } from '../systems/scopedIdentityReconcileNotice.js';
 import {
   buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
@@ -150,7 +151,16 @@ function reportEarlyVersionNotices(summary, localize) {
   }
 }
 
-/** The 1.21.0 to 1.34.0 GM notices, in release order. */
+/** A severity-carrying notice: detail to the console, then an `info` or a permanent `warn` toast;
+ * an empty message is silent. */
+function dispatchSeverityNotice(label, notice) {
+  if (!notice.message) return;
+  logMigrationNoticeDetail(label, notice.detail);
+  if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+  else ui.notifications?.info?.(notice.message);
+}
+
+/** The 1.21.0 to 1.28.0 GM notices, in release order. */
 function reportLaterVersionNotices(summary, localize) {
   // 1.21.0 retired the check-modifier placeholder; the notice composes in the pure module.
   const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
@@ -197,17 +207,18 @@ function reportLaterVersionNotices(summary, localize) {
     logMigrationNoticeDetail('1.28.0 character library collisions', notice.detail);
     ui.notifications?.warn?.(notice.message, { permanent: true });
   }
+}
 
+/** The 1.30.0 to 1.36.0 world-scope GM notices, in release order. */
+function reportWorldScopeNotices(summary, localize) {
   // 1.30.0 (issue 1363). The report is `null` unless the migration ran, so an omission is silent;
   // tests assert its presence.
   const worldScopeEntityReport = summary?.worldScopeEntityReport ?? null;
   if (worldScopeEntityReport && game.user?.isGM) {
-    const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, localize);
-    if (notice.message) {
-      logMigrationNoticeDetail('1.30.0 world-scope entities', notice.detail);
-      if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
-      else ui.notifications?.info?.(notice.message);
-    }
+    dispatchSeverityNotice(
+      '1.30.0 world-scope entities',
+      buildWorldScopeEntityNotice(worldScopeEntityReport, localize)
+    );
   }
 
   // 1.34.0 (issue 1654): always a permanent warning, as every message needs GM action (issue 1737).
@@ -218,6 +229,15 @@ function reportLaterVersionNotices(summary, localize) {
       logMigrationNoticeDetail('1.34.0 equivalent essence merge', essenceNotice.detail);
       ui.notifications?.warn?.(essenceNotice.message, { permanent: true });
     }
+  }
+
+  // 1.36.0 (issue 2554): silent when every list is empty.
+  const scopedIdentityReconcileReport = summary?.scopedIdentityReconcileReport ?? null;
+  if (scopedIdentityReconcileReport && game.user?.isGM) {
+    dispatchSeverityNotice(
+      '1.36.0 scoped identity reconciliation',
+      buildScopedIdentityReconcileNotice(scopedIdentityReconcileReport, localize)
+    );
   }
 }
 
@@ -238,6 +258,7 @@ export async function runMigrations(fabricate) {
   if (reportDeferralOrAbort(summary, localize)) return;
   reportEarlyVersionNotices(summary, localize);
   reportLaterVersionNotices(summary, localize);
+  reportWorldScopeNotices(summary, localize);
 }
 
 /** GM-only and never throwing: the console guidance and abort notice have already fired. */

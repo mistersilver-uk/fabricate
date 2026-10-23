@@ -42,14 +42,10 @@
   margin-bottom: var(--fab-space-2);
 }
 
-/* ══ Checks Studio visual parity with the standalone prototype ══ Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json` records the prototype's computed styles per named region (issue 1096). */
+/* ══ Checks Studio visual parity with the standalone prototype ══ The rules below take their values from the prototype's computed styles per named region (issue 1096). A studio card is a `flush` card: its head and body inset themselves, and its box is the shared card's. */
 .fabricate-card.fabricate-card.manager-checks-card {
   gap: 0;
-  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-checks-card > .manager-checks-card-head {
@@ -115,7 +111,7 @@
 }
 
 /* The head's action, LINK-STYLED. `Button` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -140,15 +136,15 @@
 }
 
 /* The INK is split out and qualified, and the split states which of the declarations above are a RESET and which is paint (issue 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link:not(:disabled) {
   color: var(--fab-accent);
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link > i {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link > i {
   font-size: 9px;
 }
 
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-card-head-link:not(:disabled):hover {
   color: var(--fab-text);
   background: none;
   text-decoration: underline;
@@ -333,62 +329,6 @@
   line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own face is restated, at (0,4,0). Gap, padding, radius, radio and legend are the primitive's: the studio's 11px gap snapped to the primitive's own 12 (issue 1523). */
-.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
-  border: 1px solid var(--fab-border);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-surface-active);
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option-icon {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: var(--fab-text-subtle);
-  background: var(--fab-surface-active);
-  font-size: 11px;
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option.is-active
-  .manager-resolution-option-icon {
-  color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-.fabricate-manager .manager-checks-card .manager-resolution-option-name {
-  color: var(--fab-text);
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-option.is-active
-  .manager-resolution-option-name {
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-checks-card .manager-resolution-option-desc {
-  color: var(--fab-text-muted);
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
 /* ── The bands card's own "Preview against" control ── The rail's `Preview as` is a DIFFERENT control with a different subject (issue 1097). */
 .fabricate-manager .manager-checks-preview-against {
   display: flex;
@@ -506,8 +446,8 @@
   min-width: 0;
 }
 
-/* (0,4,0), which is what it takes to beat `.fabricate-button.fab-manager-button.is-dashed`'s 34px height (issue 1118). */
-.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fab-manager-button.is-dashed {
+/* (0,4,0), which is what it takes to beat `.fabricate-button.fabricate-button.fabricate-button.is-dashed`'s 34px height (issue 1118). */
+.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fabricate-button.is-dashed {
   flex: 0 1 auto;
   height: 30px;
   min-height: 0;
@@ -518,7 +458,7 @@
 /* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). */
 .fabricate-manager
   .manager-checks-trigger-presets
-  .fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
+  .fabricate-button.fabricate-button.is-dashed:not(:disabled) {
   background: var(--fab-bg-0);
 }
 
@@ -656,14 +596,6 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager .manager-checks-rail .fabricate-card {
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-bg-1);
-}
-
 .fabricate-manager .manager-checks-rail .manager-kicker {
   margin: 0;
   min-width: 0;
@@ -730,11 +662,6 @@
 }
 
 /* ── The activation card ── The prototype gives this section NO heading: the card is the statement, so it carries the state in its own surface. */
-.fabricate-manager .manager-checks-rail .manager-checks-active-card {
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3) var(--fab-space-4);
-}
-
 .fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
@@ -779,9 +706,12 @@
   line-height: 1.35;
 }
 
-/* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
-.fabricate-manager .manager-checks-rail .fabricate-card.is-rail-list {
+/* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE `flush` card of compact rows each, not a stack of bordered cards. The list insets its rows, so each row's text sits 20px in and its hover corners stay inside the card. */
+.fabricate-manager .manager-checks-rail-list {
+  display: flex;
+  flex-direction: column;
   gap: var(--fab-space-1);
+  min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 
@@ -889,7 +819,7 @@
   font-size: 8px;
 }
 
-/* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.fabricate-field` control takes that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
+/* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.fabricate-field` control takes that wrapper's 12.5px/500 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
 .fabricate-manager .manager-checks-rail .fabricate-field input {
   font-size: 11.5px;
   font-weight: 500;
@@ -908,7 +838,7 @@
 }
 
 /* The simulator's roll action. It renders through `Button`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-checks-simulator-roll {
+.fabricate-button.fabricate-button.fabricate-button.manager-checks-simulator-roll {
   justify-content: center;
   width: 100%;
   height: auto;
@@ -1175,7 +1105,7 @@
   padding: var(--fab-space-3) var(--fab-space-4);
 }
 
-/* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive, so they carry the `manager-resolution-mode-card is-config-cards` contract rather than a bespoke grid of their own (issue 855). */
+/* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive and draw its face, rooted at `.fabricate-option-cards`; no rule here repaints it (issues 855, 2467). */
 
 /* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050. */
 
@@ -1663,14 +1593,17 @@
   padding: var(--fab-space-4);
 }
 
-/* ONE right-hand-panel surface for the whole manager (issues 881, 643). */
+/* ONE right-hand-panel surface for the whole manager (issues 881, 643). Its inset and fill are tokens a route overrides, so `InspectorPanel`'s foot bleeds by and paints exactly what the aside does (issue 2498). */
 .fabricate-manager .manager-inspector {
+  --fab-manager-inspector-pad: var(--fab-space-3);
+  --fab-manager-inspector-bg: var(--fab-bg-2);
+
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
-  padding: var(--fab-space-3);
+  padding: var(--fab-manager-inspector-pad);
   border-left: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-manager-inspector-bg);
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;
@@ -2419,7 +2352,7 @@
 }
 
 .fabricate-manager .manager-character-modifier-override-row .fabricate-toggle {
-  max-width: 100px;
+  max-width: 104px;
 }
 
 .fabricate-manager .manager-character-modifier-override-hint {

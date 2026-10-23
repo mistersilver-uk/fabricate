@@ -154,15 +154,13 @@
       />
       {#if onDelete}
         <IconButton
-          class="is-ghost is-danger"
+          role="ghost-danger"
           data-complication-remove=""
-          title={deleteLabel || undefined}
           ariaLabel={deleteLabel || undefined}
           {disabled}
           onclick={() => onDelete()}
-        >
-          <i class="fas fa-trash" aria-hidden="true"></i>
-        </IconButton>
+          icon="fas fa-trash"
+        />
       {/if}
     {/if}
   </div>

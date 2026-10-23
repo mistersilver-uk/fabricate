@@ -1,17 +1,15 @@
 /** A SHARED PICKER MUST PAINT WHEREVER IT IS MOUNTED (issues 1464 and 1470). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import test from 'node:test';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
-import {
-  FIXTURE_ALLOWLIST,
-  FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
-} from '../helpers/managerButtonFixtureAllowlist.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
 import { collectWorkingTreeSources, repoRoot, stripComments } from '../helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../helpers/styleBlockScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
+import { svelteFiles } from '../helpers/svelteTemplateScan.js';
 
 const STYLESHEET = 'styles/fabricate.css';
 
@@ -151,9 +149,10 @@ const PRIMITIVES = Object.freeze([
       'manager-color-picker-trigger',
       'manager-color-preset',
     ]),
-    // Measured today: 12 written, 16 family selectors, 15 owned, 1 caller override.
+    // Measured at issue 2459, the box rule gone and the tile ring rooted on the picker panel: 12
+    // written, 17 family selectors, 15 owned, 2 caller overrides.
     writtenFloor: 10,
-    familyFloor: 13,
+    familyFloor: 14,
     ownedFloor: 12,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-color-picker', root: 'fabricate-color-picker' }),
@@ -167,20 +166,18 @@ const PRIMITIVES = Object.freeze([
     name: 'Button',
     components: Object.freeze(['src/ui/svelte/components/Button.svelte']),
     roots: Object.freeze(['fabricate-button']),
-    // Two exact class names, not a shared prefix.
-    family: 'fabricate-button|fab-manager-button',
-    anchors: Object.freeze(['fabricate-button', 'fab-manager-button']),
+    // One exact class name, not a shared prefix: issue 2540 retired its second token.
+    family: 'fabricate-button',
+    anchors: Object.freeze(['fabricate-button']),
     // COMPOSES its family in `const classes = $derived([…])` (`Button.svelte`) rather
     // than in markup — `classesWrittenBy` and the root-emission clause's `attributes` local both
     // read `composedClassRegion` for this entry as well as the (here, empty) markup region.
     composesClasses: true,
-    // Measured today: 2 written (the array holds no other unconditional family literal).
-    writtenFloor: 2,
+    // Measured today: 1 written (the array holds no other unconditional family literal).
+    writtenFloor: 1,
     familyFloor: 75,
     ownedFloor: 26,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'fab-manager-button', root: 'fabricate-button' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     name: 'IconButton',
@@ -207,10 +204,11 @@ const PRIMITIVES = Object.freeze([
       'manager-pagination-page',
       'manager-pagination-size',
     ]),
-    // Written inline on the root `<section>` (`Pagination.svelte:215`).
-    writtenFloor: 4,
-    familyFloor: 15,
-    ownedFloor: 5,
+    // Written inline on the root `<section>`. Measured after issue 2546: 6 written, 21 family
+    // selectors, 13 owned.
+    writtenFloor: 6,
+    familyFloor: 21,
+    ownedFloor: 13,
     mirrored: Object.freeze([]),
   }),
   Object.freeze({
@@ -321,16 +319,16 @@ const PRIMITIVES = Object.freeze([
     name: 'FilterBar',
     components: Object.freeze(['src/ui/svelte/components/FilterBar.svelte']),
     roots: Object.freeze(['fabricate-filter-bar']),
-    // One exact class name. `manager-toolbar-pills` (`fabricate.css:4194`) and
-    // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
-    // `\.fabricate-filter-bar(?![\w-])`, so neither enters this family.
+    // One exact class name. `manager-toolbar-pills` is a CALLER class: `pickerSelectors` anchors on
+    // `\.fabricate-filter-bar(?![\w-])`, so it does not enter this family.
     family: 'fabricate-filter-bar',
     anchors: Object.freeze(['fabricate-filter-bar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
-    // Measured at this commit: 1 written, 7 family selectors, 1 owned.
+    // Measured at this commit: 1 written, 4 family selectors (the box, the host inset, its top-inset case
+    // and the components route's button size), 1 owned.
     writtenFloor: 1,
-    familyFloor: 7,
+    familyFloor: 4,
     ownedFloor: 1,
     mirrored: Object.freeze([]),
   }),
@@ -343,10 +341,11 @@ const PRIMITIVES = Object.freeze([
     family: 'fabricate-card',
     anchors: Object.freeze(['fabricate-card']),
     composesClasses: true,
-    // Measured at this commit: 1 written, 7 family selectors, 2 owned.
+    // One written root, four family selectors and three of them owned: the flex stack, the box and
+    // `flush` (issue 2315); the fourth is the Checks Studio's caller-class compound.
     writtenFloor: 1,
-    familyFloor: 6,
-    ownedFloor: 1,
+    familyFloor: 4,
+    ownedFloor: 3,
     mirrored: Object.freeze([]),
   }),
   Object.freeze({
@@ -483,13 +482,13 @@ const PRIMITIVES = Object.freeze([
     // ── RADIOCARDGROUP (issue 1509). The manager's radio-card group, rooted at the class it emits.
     // IT DECLARES NO `classProps`, AND THAT IS A DECISION WITH A MEASURED REASON. `classPropValues`
     // builds ``new RegExp(`\b${name}=(?:"([^"]*)"|\{`([^`]*)`\})`)``, so a
-    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured, TWELVE
-    // of them, at `RadioCardGroup.svelte:90, 95, 97, 98, 102, 105, 120, 124, 125, 127, 131, 137` —
-    // and the class-prop floor above requires exactly `classProps.length * components.length`, so
-    // it would red at 12 against 1. What that field would have bought — a guard on `Field` renaming
-    // or dropping its `class` prop — is bought instead by the mounted root-emission assertion in
-    // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
-    // fieldset, and by that suite's own mutation control.
+    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured,
+    // FOURTEEN of them — and the class-prop floor above requires exactly
+    // `classProps.length * components.length`, so it would red at 14 against 1. What that field
+    // would have bought — a guard on `Field` renaming or dropping its `class` prop — is bought
+    // instead by the mounted root-emission assertion in `tests/components/field-mounted.test.js`,
+    // which reads the RENDERED `className` off the fieldset, and by that suite's own mutation
+    // control.
     name: 'RadioCardGroup',
     components: Object.freeze(['src/ui/svelte/components/RadioCardGroup.svelte']),
     roots: Object.freeze(['fabricate-option-cards']),
@@ -503,17 +502,22 @@ const PRIMITIVES = Object.freeze([
       'manager-resolution-mode-note',
       'manager-resolution-mode-options',
       'manager-resolution-option',
+      'manager-resolution-option-head',
       'manager-resolution-option-icon',
+      'manager-resolution-option-text',
       'manager-resolution-option-body',
       'manager-resolution-option-name',
       'manager-resolution-option-desc',
-      'manager-resolution-option-badge',
+      'manager-resolution-option-reason',
       'manager-radio-card-group',
     ]),
-    // Measured at this commit: 12 written, 47 family selectors, 31 owned.
-    writtenFloor: 10,
-    familyFloor: 42,
-    ownedFloor: 27,
+    // Measured at this commit: 13 written; 36 family selectors (48, less the 15 route-scoped caller
+    // rules deleted and the 12 owned rules merged or deleted, plus 15 new, then the badge rule out
+    // and the reason selector in); 35 owned. Each floor keeps the base entry's headroom: written 2
+    // (12 against 10), family 5 (47 against 42), owned 4 (31 against 27), so 11, 31 and 31.
+    writtenFloor: 11,
+    familyFloor: 31,
+    ownedFloor: 31,
     // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
     // (9 attributes over 3 files against this one's 4 over 2) and is REFUSED all the same: it is
     // the option ROW, a descendant of the root, so a fixture carrying it satisfies the attribute
@@ -1047,7 +1051,7 @@ function pickerSelectors(written, primitive) {
  * A COMPOUND that names a caller's own container by an application root QUALIFIED BY AN
  * ATTRIBUTE — `.fabricate-manager[data-manager-view='essences']` — rather than by a caller CLASS.
  * Narrow on purpose: an attribute that qualifies the FAMILY's own compound —
- * `.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]` — is not an
+ * `.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]` — is not an
  * application root at all, and this must not fire on it; that selector stays gate-owned and
  * re-rooted like its unattributed siblings.
  *
@@ -1360,9 +1364,8 @@ test('the composed-class region is read from the actual array literal, not the m
   const managerButton = PRIMITIVES.find((entry) => entry.name === 'Button');
   const managerButtonRegion = composedClassRegion(managerButton.components[0]);
   assert.ok(
-    managerButtonRegion.includes("'fabricate-button'") &&
-      managerButtonRegion.includes("'fab-manager-button'"),
-    `${managerButton.components[0]}'s composed-class array no longer contains the literals ` +
+    managerButtonRegion.includes("'fabricate-button'"),
+    `${managerButton.components[0]}'s composed-class array no longer contains the literal ` +
       '`classesWrittenBy` reads for Button, so a reader that stops finding the array ' +
       'would examine an empty family instead of reporting the regression'
   );
@@ -1533,7 +1536,7 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
  * The entries whose ROOT ELEMENT is another entry's, so TWO namespace roots land on ONE element.
  */
 const CO_ROOTED_PAIRS = Object.freeze([
-  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 40 }),
+  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 28 }),
   Object.freeze({ host: 'Field', guest: 'ModifierPillSelect', hostFloor: 20, guestFloor: 11 }),
 ]);
 
@@ -1665,11 +1668,11 @@ test('the application-root-attribute clause names a caller’s own container', (
   const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
 
   // FIRES: an application root qualified by a per-view attribute is a caller's own container,
-  // exactly like the four shipped `[data-manager-view=…] .fabricate-pagination` overrides.
+  // exactly like the `[data-manager-view=…]` caller rules the sheet still holds.
   assert.ok(
     namesCallersOwnContainer(".fabricate-manager[data-manager-view='world-essences']", pagination),
     'the clause no longer fires on an application root qualified by a per-view attribute, so the ' +
-      'four shipped Pagination overrides would stay gate-owned and red the ownership assertion below'
+      'shipped per-view caller rules would stay gate-owned and red the ownership assertion below'
   );
 
   // DOES NOT FIRE: an attribute that qualifies the FAMILY's own compound is not an application
@@ -1677,7 +1680,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   // family compound, which must stay gate-owned and re-rooted like its unattributed siblings.
   assert.ok(
     !namesCallersOwnContainer(
-      '.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
+      '.fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]',
       managerButton
     ),
     'the clause fires on an attribute that qualifies the family’s own compound rather than an ' +
@@ -1691,20 +1694,34 @@ test('the application-root-attribute clause names a caller’s own container', (
       'plain .fabricate-manager compound from ownership'
   );
 
-  // NON-VACUITY: the clause actually reaches Pagination's shipped per-view overrides in
-  // `styles/fabricate.css` — six of them today — not just the synthetic control above.
-  const written = classesWrittenBy(pagination);
-  const family = pickerSelectors(written, pagination);
-  const callerContainerSelectors = family.filter((selector) =>
-    compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, pagination))
+  // NON-VACUITY: the clause reaches every entry's shipped caller-container rules, not just the
+  // synthetic control above.
+  const callerContainerSelectors = PRIMITIVES.flatMap((primitive) =>
+    pickerSelectors(classesWrittenBy(primitive), primitive).filter((selector) =>
+      compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, primitive))
+    )
   );
   assert.ok(
-    callerContainerSelectors.length >= 4,
-    `only ${callerContainerSelectors.length} Pagination selectors were recognised by the ` +
-      'application-root-attribute clause, against a floor of 4 — the `[data-manager-view=…] ' +
-      '.fabricate-pagination` overrides, of which the sheet holds six today. A lower number means ' +
-      'the clause has stopped recognising ' +
-      'them and they would wrongly enter the owned set below.'
+    callerContainerSelectors.length >= 11,
+    `only ${callerContainerSelectors.length} selectors were recognised by the ` +
+      'application-root-attribute clause across every entry, against a floor of 11. A lower number means the clause ' +
+      'has stopped recognising a caller’s own container and those rules would wrongly enter the ' +
+      'owned set below.'
+  );
+});
+
+test('the option cards’ one caller rule is the Difficulty fields’ margin', () => {
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const written = classesWrittenBy(primitive);
+  assert.deepEqual(
+    pickerSelectors(written, primitive).filter(
+      (selector) => !isPrimitiveOwned(selector, written, primitive)
+    ),
+    [
+      '.fabricate-manager .manager-checks-card .manager-resolution-mode-card + .manager-checks-difficulty-fields',
+    ],
+    'a caller rule names the option-card family again. The face is the primitive’s alone, so a ' +
+      'route that repaints it draws a second face; state the difference in the primitive instead.'
   );
 });
 
@@ -1719,7 +1736,7 @@ test('another entry’s root is a caller container only when no application root
       'demand the pager drop its root from its own rule'
   );
   for (const [name, selector] of [
-    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fab-manager-button'],
+    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fabricate-button'],
     ['StatusToggle', '.fabricate-manager .fabricate-sortable-list .fabricate-toggle'],
   ]) {
     assert.ok(
@@ -1814,26 +1831,6 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'passes over a tree that could have any number.',
   }),
 ]);
-
-/**
- * The subset of `FIXTURE_ALLOWLIST` that is ROOT-LESS.
- * `FIXTURE_ALLOWLIST` is the ledger of fixtures that model a deliberately UNCONVERTED control, and
- * since issue 1502 most of those fixtures DO carry their family root: a population-B trigger
- * without `fabricate-button` matches no rule in the sheet, so the fixtures that measure geometry
- * gained it. Those entries are irrelevant here — they are never offenders — and only the entries
- * still writing a family class with no root of any primitive can register a hit. Derived once at
- * module level because both clauses need the same subset, and two copies of one filter is the
- * duplication `tests/helpers/primitiveSourceContract.js` exists to have stopped repeating.
- *
- * @type {ReadonlyArray<import('../helpers/managerButtonFixtureAllowlist.js').ButtonFixtureExemption>}
- */
-const ROOT_LESS_FIXTURE_EXEMPTIONS = Object.freeze(
-  FIXTURE_ALLOWLIST.filter((entry) =>
-    PRIMITIVES.every((primitive) =>
-      primitive.roots.every((root) => !entry.classes.split(/\s+/).includes(root))
-    )
-  )
-);
 
 // A literal imperative class write: `.className =` a quoted or `${`-free backtick string, or
 // `classList.add(…)` with literal arguments only. A dynamic write is not read.
@@ -2045,7 +2042,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   );
   const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
   const exemptHits = new Map();
-  const allowlistHits = new Map();
   const offenders = [];
   let attributes = 0;
 
@@ -2055,13 +2051,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
         for (const { root, offends } of attributeOffence(primitive, value)) {
           attributes += 1;
           if (!offends) continue;
-          const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
-            (entry) => entry.file === file && entry.classes === value
-          );
-          if (allowlisted) {
-            allowlistHits.set(allowlisted, (allowlistHits.get(allowlisted) ?? 0) + 1);
-            continue;
-          }
           const key = `${file}|${primitive.name}`;
           if (exempt.has(key)) {
             exemptHits.set(key, (exemptHits.get(key) ?? 0) + 1);
@@ -2132,27 +2121,6 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
         `against ${entry.primitive} and has ${hits}. Reason on record: ${entry.why}`
     );
   }
-
-  // The Button unconverted-probe exemptions are a SEPARATE, larger ledger.
-  const expectedAllowlistAttributeCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
-  const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
-  assert.equal(
-    totalAllowlistHits,
-    expectedAllowlistAttributeCount,
-    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistAttributeCount} ` +
-      '`FIXTURE_ALLOWLIST` attributes recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
-      'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
-      'without updating the ledger.'
-  );
-  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
-    const hits = allowlistHits.get(entry) ?? 0;
-    assert.equal(
-      hits,
-      entry.count,
-      `${entry.file} is allowlisted for ${entry.count} occurrence(s) of ` +
-        `class="${entry.classes}" and this gate found ${hits}. Reason on record: ${entry.why}`
-    );
-  }
 });
 
 test('every fixture element in a picker’s family sits under one of its namespace roots', () => {
@@ -2166,7 +2134,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
     DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
   );
   const exemptHits = new Map();
-  const allowlistHits = new Map();
   const offenders = [];
   let elements = 0;
 
@@ -2177,13 +2144,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
         if (copied.length === 0) continue;
         elements += 1;
         if (rooted) continue;
-        const allowlisted = ROOT_LESS_FIXTURE_EXEMPTIONS.find(
-          (entry) => entry.file === file && entry.classes === element.classes.join(' ')
-        );
-        if (allowlisted) {
-          allowlistHits.set(allowlisted, (allowlistHits.get(allowlisted) ?? 0) + 1);
-          continue;
-        }
         const key = `${file}|${primitive.name}`;
         if (exempt.has(key)) {
           exemptHits.set(key, (exemptHits.get(key) ?? 0) + 1);
@@ -2261,37 +2221,6 @@ test('every fixture element in a picker’s family sits under one of its namespa
     );
   }
 
-  const expectedAllowlistElementCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
-  // The SPLIT ITSELF, guarded rather than narrated.
-  assert.ok(
-    ROOT_LESS_FIXTURE_EXEMPTIONS.length < FIXTURE_ALLOWLIST.length &&
-      expectedAllowlistElementCount < FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT,
-    `the root-less subset is ${ROOT_LESS_FIXTURE_EXEMPTIONS.length} of ` +
-      `${FIXTURE_ALLOWLIST.length} entries and ${expectedAllowlistElementCount} of ` +
-      `${FIXTURE_ALLOWLIST_ATTRIBUTE_COUNT} attributes, which is not a strict subset: the ` +
-      'root-carrying population-B entries issue 1502 introduced have stopped being filtered ' +
-      'out, so this clause is holding over the whole allowlist rather than the part of it that ' +
-      'can register a hit'
-  );
-  const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
-  assert.equal(
-    totalAllowlistHits,
-    expectedAllowlistElementCount,
-    `this gate matched ${totalAllowlistHits} of the ${expectedAllowlistElementCount} ` +
-      '`FIXTURE_ALLOWLIST` elements recorded in `managerButtonFixtureAllowlist.js`. Either an ' +
-      'entry has drifted from its fixture’s exact `class` string or a fixture was removed ' +
-      'without updating the ledger.'
-  );
-  for (const entry of ROOT_LESS_FIXTURE_EXEMPTIONS) {
-    const hits = allowlistHits.get(entry) ?? 0;
-    assert.equal(
-      hits,
-      entry.count,
-      `${entry.file} is allowlisted for ${entry.count} occurrence(s) of ` +
-        `class="${entry.classes}" and this gate found ${hits}. Reason on record: ${entry.why}`
-    );
-  }
-
   // A PRE/POST element total for one SUITE.
   const layoutFile = 'tests/components/manager-layout*.js';
   const layoutSources = Object.keys(sources).filter((file) =>
@@ -2356,24 +2285,90 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 7,
+    blocks >= 6,
     `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
+      'opened after `</script>`. Six do today: `SearchablePopover` and the ' +
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
       '`TintPicker` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the scoped ' +
       'danger pair, naming both button vocabularies, that tints a failing validation ' +
-      'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
-      'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
+      'tab, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +
       'and the mono address line under the name, and `ModifierPillSelect`, whose block is the ' +
       'disabled-trigger tint and the visually-hidden status span its multi-select cap announces. ' +
-      'All seven blocks STAY ' +
+      'All six blocks STAY ' +
       'where they are: a scoped block is injected unlayered and this sheet is ' +
       'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
       'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, ' +
       'usually to say they deliberately have none, and the `</script>` guard above is what ' +
       'keeps that prose out of this clause. A lower number means the reader has stopped ' +
       'finding the real blocks and this clause examined nothing.'
+  );
+});
+
+/** The data hooks the option cards' face is addressed by; a caller never selects on them. */
+const OPTION_FACE_HOOKS = /^data-(?:radio-card-(?:option|reason)|tool-choice-[\w-]+)$/;
+
+/** The classes and attributes each rule of a parsed component's scoped block names, `:global()` arguments included. */
+function scopedRuleNames(ast) {
+  const namesIn = (node, out = []) => {
+    if (Array.isArray(node)) for (const child of node) namesIn(child, out);
+    else if (node && typeof node === 'object') {
+      if (node.type === 'ClassSelector' || node.type === 'AttributeSelector') out.push(node.name);
+      for (const [key, value] of Object.entries(node)) if (key !== 'parent') namesIn(value, out);
+    }
+    return out;
+  };
+  const rules = [];
+  const walk = (nodes) => {
+    for (const node of nodes ?? []) {
+      if (node.type === 'Rule') rules.push(namesIn(node.prelude));
+      walk(node.block?.children);
+    }
+  };
+  walk(ast.css?.children);
+  return rules;
+}
+
+test('no caller’s scoped block restates the option cards’ face (issue 2467)', () => {
+  // Two callers place the group's own legend in their heading; neither paints a card.
+  const LEGEND_PLACEMENT = new Set([
+    'src/ui/svelte/apps/manager/CraftingSettingsView.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+  ]);
+  const primitive = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  const family = new RegExp(`^(?:${primitive.family})$`);
+  const offences = [];
+  let blocks = 0;
+  for (const absolute of svelteFiles(join(repoRoot, 'src'))) {
+    const file = relative(repoRoot, absolute).split(sep).join('/');
+    const ast = componentAstOf(file);
+    if (primitive.components.includes(file) || !ast.css) continue;
+    blocks += 1;
+    for (const names of scopedRuleNames(ast)) {
+      const hooks = names.filter((name) => OPTION_FACE_HOOKS.test(name));
+      const named = names.filter((name) => family.test(name));
+      const legendOnly = named.every((name) => name === 'manager-resolution-mode-legend');
+      if (hooks.length > 0 || (named.length > 0 && !(LEGEND_PLACEMENT.has(file) && legendOnly))) {
+        offences.push(`${file}: ${names.join(' ')}`);
+      }
+    }
+  }
+  assert.ok(
+    blocks > 100,
+    `only ${blocks} scoped blocks were read, so the absence below is vacuous`
+  );
+  assert.deepEqual(
+    offences,
+    [],
+    'a caller’s scoped block names the option-card family or its data hooks, and an unlayered ' +
+      'block beats the sheet, so it repaints the primitive on one route'
+  );
+  assert.deepEqual(
+    allSelectors().filter((selector) =>
+      /\[data-(?:radio-card-(?:option|reason)|tool-choice-)/.test(selector)
+    ),
+    [],
+    'the sheet selects on the option cards’ data hooks; the face is addressed by the primitive’s classes'
   );
 });

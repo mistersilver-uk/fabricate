@@ -88,7 +88,8 @@
     open = next;
     if (next) return;
     staging = null;
-    if (openedFromMore && document.activeElement?.closest?.('.fabricate-set-picker-popover')) {
+    const active = (moreButton?.ownerDocument ?? document).activeElement;
+    if (openedFromMore && active?.closest?.('.fabricate-set-picker-popover')) {
       setTimeout(() => moreButton?.focus());
     }
     openedFromMore = false;

@@ -13,7 +13,10 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -22,6 +25,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-mapping-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -30,6 +34,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878).
     'src/ui/svelte/util/essenceIcons.js',
@@ -52,7 +57,10 @@ const harness = createMountedComponentHarness({
     // The manager's ONE selection control (issue 772). The match-by-name toggle renders
     // through it now rather than as a raw checkbox wearing Foundry's control chrome.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    // Issue 2512: each row's tags are the set picker's token run.
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/Avatar.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     // The shared modal chrome (issue 877): portal, centring, title/subtitle.
@@ -248,5 +256,81 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
     assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.equal(root.getAttribute('role'), 'dialog');
+  });
+});
+
+describe('ImportFolderMappingModal: tags through the set picker (issue 2512)', () => {
+  const settle = async () => {
+    flushSync();
+    await new Promise((done) => setTimeout(done, 0));
+    flushSync();
+  };
+  const tokens = (index) =>
+    [...rows()[index].querySelectorAll('[data-set-picker-token]')].map((token) =>
+      token.getAttribute('data-set-picker-token')
+    );
+  const panel = () => document.querySelector('.fabricate-set-picker-popover');
+
+  async function openTags(index) {
+    rows()[index].querySelector('[data-import-mapping-add-tag]').click();
+    await settle();
+    assert.ok(Boolean(panel()), 'Add tag opens the picker');
+  }
+
+  async function choose(label) {
+    panel().querySelector(`[role="option"][title="${label}"]`).click();
+    await settle();
+  }
+
+  async function apply() {
+    panel().querySelector('[data-set-picker-apply]').click();
+    await settle();
+  }
+
+  async function mountCommitting() {
+    const result = { decisions: null };
+    await harness.mount({
+      open: true,
+      folders: [FOLDERS[1]],
+      ...VOCAB,
+      onCommit: (decisions) => {
+        result.decisions = decisions;
+      },
+    });
+    return result;
+  }
+
+  it('adds two tags on Apply, and Commit carries them as addTags', async () => {
+    const result = await mountCommitting();
+    await openTags(0);
+    await choose('#herb');
+    await choose('#rare');
+    await apply();
+    assert.deepEqual(tokens(0), ['herb', 'rare'], 'each applied tag draws its token');
+    commitButton().click();
+    assert.deepEqual(result.decisions[0].addTags, ['herb', 'rare']);
+  });
+
+  it('removes a tag by choosing its token’s option again and applying', async () => {
+    const result = await mountCommitting();
+    await openTags(0);
+    await choose('#herb');
+    await choose('#rare');
+    await apply();
+    await openTags(0);
+    await choose('#herb');
+    await apply();
+    assert.deepEqual(tokens(0), ['rare'], 'the removed tag’s token is gone');
+    commitButton().click();
+    assert.deepEqual(result.decisions[0].addTags, ['rare']);
+  });
+
+  it('discards a choice that was never applied', async () => {
+    const result = await mountCommitting();
+    await openTags(0);
+    await choose('#herb');
+    commitButton().click();
+    assert.deepEqual(tokens(0), [], 'nothing was applied');
+    assert.deepEqual(result.decisions[0].addTags, []);
   });
 });

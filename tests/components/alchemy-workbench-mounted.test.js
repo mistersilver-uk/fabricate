@@ -95,12 +95,12 @@ describe('Workbench (mounted)', () => {
       brewEnabled: true,
     });
     const brew = brewButton(target);
-    for (const name of ['fab-manager-button', 'is-primary', 'is-full-width']) {
+    for (const name of ['fabricate-button', 'is-primary', 'is-full-width']) {
       assert.ok(brew.classList.contains(name), `Brew carries ${name}`);
     }
     assert.equal(target.querySelectorAll('.fabricate-button.is-primary').length, 1, 'one primary');
     const clear = target.querySelector('[data-alchemy-clear]');
-    assert.ok(clear.classList.contains('fab-manager-button') && clear.classList.contains('is-ghost'));
+    assert.ok(clear.classList.contains('fabricate-button') && clear.classList.contains('is-ghost'));
     assert.equal(clear.disabled, false);
     assert.ok(!/brewpulse|@keyframes/.test(injectedCss()), 'no ready pulse is declared');
   });
@@ -295,6 +295,8 @@ describe('Workbench (mounted)', () => {
       { status: 'produced-on-failure', tone: 'warning', glyph: 'fa-triangle-exclamation' },
       { status: 'check-failed', tone: 'warning', glyph: 'fa-triangle-exclamation' },
       { status: 'brewing', tone: 'info', glyph: 'fa-hourglass-half' },
+      { status: 'started', tone: 'info', glyph: 'fa-book-open' },
+      { status: 'interrupted', tone: 'warning', glyph: 'fa-triangle-exclamation' },
       { status: 'no-match-fizzle', tone: 'danger', glyph: 'fa-circle-xmark' }
     ];
 
@@ -327,6 +329,40 @@ describe('Workbench (mounted)', () => {
         );
       });
     }
+
+    // Issue 2574: a run the call left live reads from its own copy, never the time-gated one.
+    for (const [status, key] of [
+      ['started', 'FABRICATE.App.Alchemy.Banner.Started'],
+      ['interrupted', 'FABRICATE.App.Alchemy.Banner.Interrupted'],
+      ['brewing', 'FABRICATE.App.Alchemy.Banner.Brewing'],
+    ]) {
+      it(`words the ${status} banner from its own copy`, async () => {
+        const target = await harness.mount({
+          mode: 'ready',
+          targetName: 'Elixir',
+          benchEmpty: false,
+          benchChips: BENCH,
+          brewEnabled: true,
+          lastBrew: { status, discovered: null, message: '' },
+        });
+        assert.match(target.querySelector('[data-alchemy-banner]').textContent, new RegExp(key));
+      });
+    }
+
+    it('never words a refusal without a message as a fizzle', async () => {
+      const target = await harness.mount({
+        mode: 'ready',
+        targetName: 'Elixir',
+        benchEmpty: false,
+        benchChips: BENCH,
+        brewEnabled: true,
+        lastBrew: { status: 'refused', discovered: null, message: '' },
+      });
+      assert.doesNotMatch(
+        target.querySelector('[data-alchemy-banner]').textContent,
+        /Banner\.Fizzled/
+      );
+    });
 
     it('states the brew message, and keeps the notice out of the DOM before any brew', async () => {
       const withBrew = await harness.mount({

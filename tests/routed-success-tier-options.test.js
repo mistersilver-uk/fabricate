@@ -6,11 +6,12 @@ import assert from 'node:assert/strict';
 const {
   routedSuccessTierOptions,
   routedOutcomeTierOptions,
+  routedOutcomeTierRows,
   routedHasOutcomeTiers,
   routedOutcomeTierNames
 } = await import('../src/utils/routedOutcomeKeywords.js');
 
-test('routedOutcomeTierOptions returns ALL id-bearing tiers (success AND failure) as {id,name}', () => {
+test('routedOutcomeTierOptions returns ALL id-bearing tiers (success AND failure) as {id,name,success}', () => {
   assert.deepEqual(routedOutcomeTierOptions(null), []);
   const routed = {
     type: 'relative',
@@ -22,9 +23,9 @@ test('routedOutcomeTierOptions returns ALL id-bearing tiers (success AND failure
     ]
   };
   assert.deepEqual(routedOutcomeTierOptions(routed), [
-    { id: 't1', name: 'Standard' },
-    { id: 't2', name: 'Botch' },
-    { id: 't3', name: 't3' }
+    { id: 't1', name: 'Standard', success: true },
+    { id: 't2', name: 'Botch', success: false },
+    { id: 't3', name: 't3', success: true }
   ]);
 });
 
@@ -34,7 +35,9 @@ test('routedOutcomeTierOptions reads fixedOutcomes when type is fixed', () => {
     fixedOutcomes: [{ id: 'f1', name: 'Masterwork', success: true }],
     relativeOutcomes: [{ id: 'r1', name: 'Ignored', success: true }]
   };
-  assert.deepEqual(routedOutcomeTierOptions(routed), [{ id: 'f1', name: 'Masterwork' }]);
+  assert.deepEqual(routedOutcomeTierOptions(routed), [
+    { id: 'f1', name: 'Masterwork', success: true }
+  ]);
 });
 
 test('null/undefined routed config yields no options', () => {
@@ -55,8 +58,8 @@ test('relative type: only success tiers with an id are offered', () => {
     fixedOutcomes: [{ id: 'f1', name: 'Ignored', success: true }],
   };
   assert.deepEqual(routedSuccessTierOptions(routed), [
-    { id: 't1', name: 'Fine' },
-    { id: 't3', name: 'Mythic' },
+    { id: 't1', name: 'Fine', success: true },
+    { id: 't3', name: 'Mythic', success: true },
   ]);
 });
 
@@ -69,12 +72,12 @@ test('fixed type reads the fixed outcome list', () => {
       { id: 'f2', name: 'High', success: false },
     ],
   };
-  assert.deepEqual(routedSuccessTierOptions(routed), [{ id: 'f1', name: 'Low' }]);
+  assert.deepEqual(routedSuccessTierOptions(routed), [{ id: 'f1', name: 'Low', success: true }]);
 });
 
 test('a tier without a name falls back to its id', () => {
   const routed = { type: 'relative', relativeOutcomes: [{ id: 't1', success: true }] };
-  assert.deepEqual(routedSuccessTierOptions(routed), [{ id: 't1', name: 't1' }]);
+  assert.deepEqual(routedSuccessTierOptions(routed), [{ id: 't1', name: 't1', success: true }]);
 });
 
 test('a non-array outcome list yields no options', () => {
@@ -155,4 +158,64 @@ test('tier names — fixed type reads the fixed outcome list', () => {
 
 test('tier names — a non-array outcome list yields no names', () => {
   assert.deepEqual(routedOutcomeTierNames({ type: 'relative', relativeOutcomes: null }), []);
+});
+
+test('a tier whose success is anything but true reads as a failure option', () => {
+  const routed = {
+    type: 'relative',
+    relativeOutcomes: [
+      { id: 't1', name: 'Unmarked' },
+      { id: 't2', name: 'Truthy', success: 'yes' },
+    ],
+  };
+  assert.deepEqual(routedOutcomeTierOptions(routed), [
+    { id: 't1', name: 'Unmarked', success: false },
+    { id: 't2', name: 'Truthy', success: false },
+  ]);
+  assert.deepEqual(routedSuccessTierOptions(routed), []);
+});
+
+// routedOutcomeTierRows — every id-bearing tier with its fixed bounds, for the routing overview.
+
+test('tier rows — a fixed check carries finite raw bounds and nulls the rest', () => {
+  const routed = {
+    type: 'fixed',
+    fixedOutcomes: [
+      { id: 'f1', name: 'Fine', success: true, start: 16, end: 20 },
+      { id: 'f2', name: 'Rough', success: true, start: '8', end: null },
+      { id: 'f3', success: false, start: undefined, end: NaN },
+      { name: 'NoId', success: true, start: 1, end: 7 },
+    ],
+  };
+  assert.deepEqual(routedOutcomeTierRows(routed), [
+    { id: 'f1', name: 'Fine', success: true, start: 16, end: 20 },
+    { id: 'f2', name: 'Rough', success: true, start: null, end: null },
+    { id: 'f3', name: 'f3', success: false, start: null, end: null },
+  ]);
+});
+
+test('tier rows — a relative check has no bounds', () => {
+  const routed = {
+    type: 'relative',
+    relativeOutcomes: [{ id: 'r1', name: 'Fine', success: true, start: 3, end: 9 }],
+  };
+  assert.deepEqual(routedOutcomeTierRows(routed), [
+    { id: 'r1', name: 'Fine', success: true, start: null, end: null },
+  ]);
+  assert.deepEqual(routedOutcomeTierRows(null), []);
+});
+
+test('tier rows — their id, name and success are exactly the outcome-tier options', () => {
+  for (const routed of [
+    {
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'f1', success: true, start: 1, end: 5 }, null, { id: 'f2', name: 'B' }],
+    },
+    { type: 'relative', relativeOutcomes: [{ id: 'r1', name: 'A', success: 'yes' }, { id: '' }] },
+  ]) {
+    assert.deepEqual(
+      routedOutcomeTierRows(routed).map(({ id, name, success }) => ({ id, name, success })),
+      routedOutcomeTierOptions(routed)
+    );
+  }
 });

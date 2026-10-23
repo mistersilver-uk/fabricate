@@ -84,7 +84,7 @@
   });
 </script>
 
-<InspectorCard class="manager-checks-card" data-dynamic-dc="">
+<InspectorCard flush class="manager-checks-card" data-dynamic-dc="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">
@@ -108,7 +108,7 @@
         unlink: { 'data-unlink-macro': true },
       }}
       documentType="Macro"
-      item={macroUuid ? { name: macroCardLabel } : null}
+      value={macroUuid ? { uuid: macroUuid, name: macroCardLabel } : null}
       state={resolvedMacroMissing ? 'missing' : 'linked'}
       title={macroCardLabel}
       emptyIcon="fas fa-scroll"

@@ -13,6 +13,7 @@
   import Notice from '../../../components/Notice.svelte';
   import RecipeResultGroupCard from '../recipe/RecipeResultGroupCard.svelte';
   import RecipeResultsSection from '../recipe/RecipeResultsSection.svelte';
+  import { newDraftId } from '../../../util/draftId.js';
   import GatheringTaskCard from './GatheringTaskCard.svelte';
   import GatheringTaskComponentBrowserCard from './GatheringTaskComponentBrowserCard.svelte';
   import GatheringTaskDropsCard from './GatheringTaskDropsCard.svelte';
@@ -67,13 +68,6 @@
       };
     })
   );
-  function newResultGroupId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function'
-      ? random()
-      : `gathering-group-${Math.random().toString(36).slice(2, 12)}`;
-  }
-
   function updateResultGroups(nextGroups) {
     onUpdateTask({ resultGroups: nextGroups });
   }
@@ -85,7 +79,7 @@
   }
 
   function addRoutedResultGroup() {
-    updateResultGroups([...resultGroups, { id: newResultGroupId(), name: '', results: [] }]);
+    updateResultGroups([...resultGroups, { id: newDraftId(), name: '', results: [] }]);
   }
 
   function removeRoutedResultGroup(index) {
@@ -135,6 +129,7 @@
       'Name each result set after a gathering-check tier. Matching ignores surrounding spaces and letter case.'
     )}
     data-gathering-task-results="routed"
+    data-set-card-scope
   >
     {#if routedTierMatches.length > 0}
       <ul class="manager-gathering-routed-tier-list" data-gathering-routed-tier-list>
@@ -180,6 +175,7 @@
           role="dashed"
           fullWidth
           data-gathering-add-result-set="empty"
+          data-set-card-remove-fallback
           onclick={addRoutedResultGroup}
         >
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -208,6 +204,7 @@
         role="dashed"
         fullWidth
         data-gathering-add-result-set="footer"
+        data-set-card-remove-fallback
         onclick={addRoutedResultGroup}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>

@@ -1117,6 +1117,61 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
   });
 
+  describe('the grid form`s column count (issue 2459)', () => {
+    const TEN = Array.from({ length: 10 }, (_, index) => ({
+      id: `tile-${index + 1}`,
+      label: `Tile ${index + 1}`,
+      icon: 'fas fa-tag',
+    }));
+
+    it('steps four columns by rows and wraps a ragged last row by the flat ring', async () => {
+      await mountPicker({ as: 'grid', columns: 4, options: TEN });
+      const panel = await openPanel();
+      const holder = panel.querySelector(':scope .manager-travel-popover-search input');
+      const rows = optionRows(panel);
+      assert.equal(
+        panel.querySelector('[role="listbox"]').getAttribute('data-picker-columns'),
+        '4'
+      );
+
+      pressKey('ArrowDown');
+      pressKey('ArrowDown');
+      pressKey('ArrowRight');
+      assert.equal(activeDescendant(holder), rows[5].id, 'the cursor is on tile 6');
+      pressKey('ArrowDown');
+      assert.equal(activeDescendant(holder), rows[9].id, 'ArrowDown from tile 6 lands on tile 10');
+      pressKey('ArrowLeft');
+      pressKey('ArrowDown');
+      assert.equal(
+        activeDescendant(holder),
+        rows[2].id,
+        'ArrowDown from tile 9 has no tile under it and wraps by the flat ring to tile 3'
+      );
+      harness.remount();
+    });
+
+    for (const columns of [7, 0, 1.5, '4']) {
+      it(`draws and maps one column for \`columns\` ${JSON.stringify(columns)}`, async () => {
+        await mountPicker({ as: 'grid', columns });
+        const panel = await openPanel();
+        const holder = panel.querySelector(':scope .manager-travel-popover-search input');
+        const rows = optionRows(panel);
+        assert.equal(
+          panel.querySelector('[role="listbox"]').getAttribute('data-picker-columns'),
+          '1',
+          'a count the sheet has no rung for is emitted as one column'
+        );
+
+        pressKey('ArrowDown');
+        pressKey('ArrowDown');
+        assert.equal(activeDescendant(holder), rows[1].id, 'ArrowDown from 0 lands on 1');
+        assert.ok(!pressKey('ArrowRight').defaultPrevented, 'ArrowRight is left to the caret');
+        assert.equal(activeDescendant(holder), rows[1].id, 'and the cursor does not move');
+        harness.remount();
+      });
+    }
+  });
+
   describe('the panel`s own chrome, which must not become the focus holder', () => {
     it('suppresses a mousedown on the panel inset so DOM focus stays on the holder', async () => {
       await mountPicker({});

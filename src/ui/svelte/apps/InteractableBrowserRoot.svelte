@@ -303,26 +303,19 @@
                 <div class="fab-ib-row-actions">
                   <IconButton
                     ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('tool', tool.id)}
                     data-interactable-browser-place=""
-                  >
-                    <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-cubes"
+                  />
                   <IconButton
                     ariaLabel={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}
-                    title={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
                     onclick={() => place('tool', tool.id, 'none')}
                     data-interactable-browser-place-region=""
-                  >
-                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-draw-polygon"
+                  />
                 </div>
               </li>
             {/each}
@@ -371,26 +364,19 @@
                 <div class="fab-ib-row-actions">
                   <IconButton
                     ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     onclick={() => place('gatheringTask', task.id)}
                     data-interactable-browser-place=""
-                  >
-                    <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-cubes"
+                  />
                   <IconButton
                     ariaLabel={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}
-                    title={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
                     onclick={() => place('gatheringTask', task.id, 'none')}
                     data-interactable-browser-place-region=""
-                  >
-                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fas fa-draw-polygon"
+                  />
                 </div>
               </li>
             {/each}
@@ -420,14 +406,6 @@
     padding: var(--fab-space-3);
     height: 100%;
     overflow-y: auto;
-  }
-
-  /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.fabricate-filter-bar`
-     draws its own padding, a soft fill and a bottom rule — a divider that reads as a mistake when
-     it stops 12px (`--fab-space-3`) short of both edges. The pull is exactly this column's own inline padding,
-     so the bar meets the window and the rows beneath it keep their inset. */
-  .fabricate-interactable-browser :global(.fab-ib-controls) {
-    margin-inline: calc(-1 * var(--fab-space-3));
   }
 
   /* THE PICKER STATES ITS OWN WIDTH, for the reason `Select.svelte` records: the shared select

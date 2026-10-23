@@ -268,7 +268,7 @@
 }
 
 /* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
-.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
+.fabricate-button.fabricate-button.fabricate-button.manager-downtime-unlock {
   padding: 0 var(--fab-space-4);
   border-radius: 9px;
   font-size: 11.5px;
@@ -276,7 +276,7 @@
 }
 
 /* Split from the geometry above for the invariant at `.fabricate-button:disabled`. */
-.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+.fabricate-button.fabricate-button.fabricate-button.manager-downtime-unlock:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
@@ -480,11 +480,16 @@
   background: var(--fab-warning);
 }
 
+/* The card's box is the `<Card>` specimen's, and a caller rule places a card without restating it; `flush` is the one variant. Pinned by `card-drawing-parity.test.js`. */
 .fabricate-card.fabricate-card {
-  padding: var(--fab-space-3);
+  padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-2);
+}
+
+.fabricate-card.fabricate-card.is-flush {
+  padding: 0;
 }
 
 .fabricate-manager .manager-fact-grid {
@@ -563,13 +568,13 @@
   align-items: center;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-text);
   line-height: 1.25;
 }
 
 .fabricate-manager .manager-condition-shortcut-label i {
   width: 16px;
   color: var(--fab-text-muted);
+  font-size: 12px;
   text-align: center;
 }
 
@@ -675,13 +680,13 @@
   background: var(--fab-warning-soft);
 }
 
-.fabricate-button.fabricate-button:not(:disabled):hover,
+.fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover,
 .fabricate-icon-button.fabricate-icon-button:not(:disabled):hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-surface-raised);
 }
 
-.fabricate-button.fabricate-button.is-primary:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
@@ -693,17 +698,23 @@
   background: var(--fab-success-soft);
 }
 
-.fabricate-button.fabricate-button.is-danger:not(:disabled):hover,
+.fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover,
 .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
+}
+
+/* THE BUSY FACE (issue 2540): an action in flight keeps its tab stop, so it is `aria-disabled` and never `:disabled`, and every role hover above refuses it. Every busy carrier draws it, `ArmedDangerButton` included; only native `disabled` draws the disabled face. */
+.fabricate-button.fabricate-button[aria-busy='true']:not(:disabled) {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 .fabricate-icon-button.fabricate-icon-button {
@@ -751,16 +762,6 @@
 .fabricate-icon-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
-}
-
-/* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502). */
-.fabricate-pagination.fabricate-pagination .fabricate-icon-button {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-
-  /* THE PAGER'S CORNER, AND ONLY THE PAGER'S. The family's shared base block corners every icon button at 6px; the specimen's published icon rung is `.k-btn.icon` at radius 7, which is also the corner the `inline` select rung this bar now holds takes (issue 1504). */
-  border-radius: 7px;
 }
 
 .fabricate-icon-button.fabricate-icon-button i,
@@ -1362,7 +1363,7 @@
 }
 
 .fabricate-manager .manager-task-core-status .fabricate-toggle {
-  max-width: 64px;
+  max-width: 68px;
 }
 
 .fabricate-manager .manager-task-availability-row {
@@ -1545,7 +1546,7 @@
   align-items: center;
 }
 
-/* The drops summary card has no rule of its own. It used to restate the whole `.fabricate-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px `--fab-border` edge and an 8px radius were all the same values the shell already declares — and then diverged on the only two it changed: `--fab-bg-3` instead of the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px (issue 883). */
+/* The drops summary card is the shared card with no rule of its own (issue 883). */
 
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;
@@ -1830,17 +1831,11 @@
   flex-wrap: wrap;
   gap: var(--fab-space-2);
   min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-border);
-  background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
 }
 
 /* The pager is the footer's only content and renders nothing at or below the smallest page. */
@@ -1989,9 +1984,6 @@
 .fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 0;
-  border-top: 0;
-  background: transparent;
 }
 
 .fabricate-manager .manager-drop-rank-cell {
@@ -2434,7 +2426,7 @@
 }
 
 /* The inspector's controls run at 28px, a notch under the standard 34px control, because they sit in a 300px column beside a rate slider (issue 1118). */
-.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fabricate-button {
   min-height: 28px;
   border-radius: 7px;
   padding: 0 var(--fab-space-2);
@@ -2827,28 +2819,12 @@
   outline-offset: -2px;
 }
 
-.fabricate-color-picker-popover.manager-color-picker-popover {
-  position: absolute;
-  box-sizing: border-box;
-  z-index: 120;
-  display: grid;
-  gap: var(--fab-space-2);
-  width: 220px;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 6px;
-  background: var(--fab-bg-3);
-  box-shadow: var(--fab-shadow-lg);
-}
-
 .fabricate-color-picker-popover .manager-color-preset-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: var(--fab-space-chip);
 }
 
 .fabricate-color-picker-popover .manager-color-preset {
-  aspect-ratio: 1;
   border: 1px solid var(--fab-border);
 }
 
@@ -2859,6 +2835,15 @@
 
 .fabricate-color-picker-popover .manager-color-preset-none.is-selected .manager-color-swatch {
   box-shadow: inset 0 0 0 2px var(--fab-text);
+}
+
+/* In the popover the swatch is a square tile's content (issue 2459): the selected tile keeps the soft ground, outranking the primitive's active ground, so the inset ring is the mark. */
+.fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-option[aria-selected='true'] .manager-color-swatch {
+  box-shadow: inset 0 0 0 2px var(--fab-biome-icon-foreground);
+}
+
+.fabricate-color-picker-popover.fabricate-picker-popover .manager-travel-popover-options[data-picker-tiles='square'] .manager-travel-option[aria-selected='true'] {
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-color-picker-popover .manager-color-custom {
@@ -2946,11 +2931,6 @@
   color: var(--fab-danger);
 }
 
-.fabricate-manager .manager-gathering-rules-card {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-overlay-light-08);
-}
-
 .fabricate-manager .manager-rule-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -3012,11 +2992,6 @@
   padding-left: 42px;
   min-width: 0;
   max-width: 160px;
-}
-
-.fabricate-toggle.fabricate-toggle.is-disabled,
-.fabricate-toggle.fabricate-toggle:disabled {
-  cursor: not-allowed;
 }
 
 /* The no-state panel's own appearance now lives in its component's scoped block (`src/ui/svelte/components/EmptyState.svelte`), not here: co-located CSS keeps `VIEW_RECIPES` screenshot detection scoped to the views that render the panel instead of matching the broad `theme-or-global-ui` recipe. */

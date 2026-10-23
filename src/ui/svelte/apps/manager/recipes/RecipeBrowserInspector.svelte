@@ -19,6 +19,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Button from '../../../components/Button.svelte';
+  import InspectorPanel from '../InspectorPanel.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -380,311 +381,308 @@
 </script>
 
 {#if selectedRecipe}
-  <!-- ONE column on the panel background, not a stack of boxes: sections are uppercase
-       micro-labels sitting directly on it, and only the things that ARE objects keep a box. -->
-  <section class="manager-recipe-browser-inspector" data-recipe-inspector>
-    <p class="manager-recipe-browser-inspector-label">
-      {text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}
-    </p>
+  <InspectorPanel class="manager-recipe-browser-inspector" data-recipe-inspector="">
+    <div class="manager-recipe-browser-inspector-body">
+      <p class="manager-recipe-browser-inspector-label">
+        {text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}
+      </p>
 
-    <div class="manager-recipe-browser-inspector-hero">
-      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={38} />
-      <div class="fab-stack" data-gap="1">
-        <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
-        <!-- TWO chips on one line: what it is, and whether it is on. No "Unlocked" pill for a
+      <div class="manager-recipe-browser-inspector-hero">
+        <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={38} />
+        <div class="fab-stack" data-gap="1">
+          <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
+          <!-- TWO chips on one line: what it is, and whether it is on. No "Unlocked" pill for a
              NON-state, and the status chip uses the same word as the row's own switch. Locked
              keeps its pill; Incomplete and Can't enable appear only when true. -->
-        <div class="manager-chip-row">
-          {#if showRecipeCategories}
-            <!-- Through the SAME label helper the rows use: a recipe with no category
+          <div class="manager-chip-row">
+            {#if showRecipeCategories}
+              <!-- Through the SAME label helper the rows use: a recipe with no category
                  (or the reserved `general`) is localized, not rendered raw. -->
-            <Chip data-recipe-category>
-              {getRecipeCategoryLabel(selectedRecipe.category, localize)}
-            </Chip>
-          {/if}
-          <Chip
-            tone={statusChipTone(selectedRecipe.enabled === false ? 'subtle' : 'success')}
-            icon="fas fa-circle"
-            >{selectedRecipe.enabled === false
-              ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</Chip
-          >
-          {#if selectedRecipe.locked}
-            <Chip tone="accent" icon="fas fa-lock"
-              >{text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}</Chip
+              <Chip data-recipe-category>
+                {getRecipeCategoryLabel(selectedRecipe.category, localize)}
+              </Chip>
+            {/if}
+            <Chip
+              tone={statusChipTone(selectedRecipe.enabled === false ? 'subtle' : 'success')}
+              icon="fas fa-circle"
+              >{selectedRecipe.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</Chip
             >
-          {/if}
-          <!-- ONE predicate, three surfaces: this reads `enableBlocked`, the SAME activation check
+            {#if selectedRecipe.locked}
+              <Chip tone="accent" icon="fas fa-lock"
+                >{text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}</Chip
+              >
+            {/if}
+            <!-- ONE predicate, three surfaces: this reads `enableBlocked`, the SAME activation check
                the row pills and the bulk panel's pre-flight count read, and not the narrower
                `incomplete` — a STRUCTURALLY BROKEN recipe reads `incomplete: false` and wore no
                pill while still being un-enableable. The strict `enabled === false` split is
                meaningful, because the activation gate fires only on a transition into enabled. -->
-          {#if selectedRecipe.enableBlocked}
-            {@const blockedLabel =
-              selectedRecipe.enabled === false
-                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
-                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
-            <Chip
-              tone={statusChipTone(selectedRecipe.enabled === false ? 'danger' : 'warning')}
-              icon={selectedRecipe.enabled === false
-                ? 'fas fa-circle-exclamation'
-                : 'fas fa-pen-ruler'}
-              truncate
-              title={blockedLabel}>{blockedLabel}</Chip
-            >
-          {/if}
+            {#if selectedRecipe.enableBlocked}
+              {@const blockedLabel =
+                selectedRecipe.enabled === false
+                  ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
+                  : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
+              <Chip
+                tone={statusChipTone(selectedRecipe.enabled === false ? 'danger' : 'warning')}
+                icon={selectedRecipe.enabled === false
+                  ? 'fas fa-circle-exclamation'
+                  : 'fas fa-pen-ruler'}
+                truncate
+                title={blockedLabel}>{blockedLabel}</Chip
+              >
+            {/if}
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- The flavour text, whole. It used to be cut at 160 characters, in the one panel
+      <!-- The flavour text, whole. It used to be cut at 160 characters, in the one panel
          with the room to show it. -->
-    <p class="manager-recipe-browser-inspector-flavour">
-      {selectedRecipe.description ||
-        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-    </p>
+      <p class="manager-recipe-browser-inspector-flavour">
+        {selectedRecipe.description ||
+          text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+      </p>
 
-    <!-- The four questions a GM has about the recipe they just clicked: what does it
+      <!-- The four questions a GM has about the recipe they just clicked: what does it
          take, what does it make, how many steps, what do they roll. No heading — a 2x2
          grid of labelled numbers does not need one. -->
-    <div class="manager-recipe-stat-grid">
-      {#each stats as stat (stat.id)}
-        <div class="manager-recipe-stat" data-recipe-fact={stat.id}>
-          <strong class={`manager-recipe-stat-value ${stat.tone ? `is-${stat.tone}` : ''}`}
-            >{stat.value}</strong
-          >
-          <span class="manager-recipe-stat-label">{stat.label}</span>
-        </div>
-      {/each}
-    </div>
-
-    {#if showVisibilitySummary}
-      <p class="manager-muted">
-        <strong
-          >{text('FABRICATE.Admin.Manager.Recipe.PlayerVisibility', 'Player visibility')}:</strong
-        >
-        {selectedRecipe.visibilitySummary}
-      </p>
-    {/if}
-
-    {#if isMultiStep}
-      <!-- Multi-step: paginate one step at a time — the step's own Requires / Produces —
-           with prev/next, the step name, and an (x / y) position hint (issue 643). -->
-      <div class="manager-recipe-step-pager" data-recipe-step-pager>
-        <IconButton
-          class="manager-recipe-step-nav"
-          data-recipe-step-prev=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
-          title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
-          disabled={currentStepIndex === 0}
-          onclick={() => goToStep(-1)}
-          ><i class="fas fa-chevron-left" aria-hidden="true"></i></IconButton
-        >
-        <div class="manager-recipe-step-pager-copy">
-          <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span
-          >
-          <span class="manager-recipe-step-pager-count" data-recipe-step-count
-            >{currentStepIndex + 1} / {stepModel.length}</span
-          >
-        </div>
-        <IconButton
-          class="manager-recipe-step-nav"
-          data-recipe-step-next=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
-          title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
-          disabled={currentStepIndex === stepModel.length - 1}
-          onclick={() => goToStep(1)}
-          ><i class="fas fa-chevron-right" aria-hidden="true"></i></IconButton
-        >
+      <div class="manager-recipe-stat-grid">
+        {#each stats as stat (stat.id)}
+          <div class="manager-recipe-stat" data-recipe-fact={stat.id}>
+            <strong class={`manager-recipe-stat-value ${stat.tone ? `is-${stat.tone}` : ''}`}
+              >{stat.value}</strong
+            >
+            <span class="manager-recipe-stat-label">{stat.label}</span>
+          </div>
+        {/each}
       </div>
-    {/if}
 
-    <p class="manager-recipe-browser-inspector-label">
-      {text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}
-    </p>
-    {#if routedPairing}
-      <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
-           set's requirements to show — and drives the paired result-set dropdown below. -->
-      <!-- `maxWidth` is the manager's 1120px one-column breakpoint: below it the inspector spans
-           the window, so the trigger outgrows the `inline` band's 240px ceiling, and the panel is
-           then held by the overlay host's inset rather than by this cap. -->
-      <Select
-        class="manager-recipe-route-select"
-        size="inline"
-        value={selectedRoutingSetId}
-        options={routingSetOptions}
-        maxWidth={1120}
-        ariaLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
-          'Select ingredient set'
-        )}
-        triggerProps={{ 'data-recipe-route': 'ingredient-set' }}
-        onChange={selectRoutingSet}
-      />
-    {/if}
-    {#snippet requirementRow(row)}
-      <div class="manager-recipe-flow-row" data-recipe-requirement={row.kind}>
-        <span class="manager-recipe-flow-icon" aria-hidden="true">
-          {#if row.img}
-            <img src={row.img} alt="" />
-          {:else}
-            <i class={row.icon}></i>
-          {/if}
-        </span>
-        <span class="manager-recipe-flow-name">{requirementName(row)}</span>
-        <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
-      </div>
-    {/snippet}
-    <!-- The ONE empty-outcome note this panel draws, in both tones: danger, because an outcome that
-       awards nothing is a gap, and neutral for a step that only advances the craft (issue 1907). -->
-    {#snippet emptyNote(hook, label, neutral = false)}
-      {#if neutral}
-        <p class="manager-muted" {...hook}>{label}</p>
-      {:else}
-        <p class="manager-recipe-flow-empty" {...hook}>
-          <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-          <span>{label}</span>
+      {#if showVisibilitySummary}
+        <p class="manager-muted">
+          <strong
+            >{text('FABRICATE.Admin.Manager.Recipe.PlayerVisibility', 'Player visibility')}:</strong
+          >
+          {selectedRecipe.visibilitySummary}
         </p>
       {/if}
-    {/snippet}
-    {#if activeRequirementRows.length === 0}
-      <p class="manager-muted" data-recipe-requires-empty>
-        {text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}
+
+      {#if isMultiStep}
+        <!-- Multi-step: paginate one step at a time — the step's own Requires / Produces —
+           with prev/next, the step name, and an (x / y) position hint (issue 643). -->
+        <div class="manager-recipe-step-pager" data-recipe-step-pager>
+          <IconButton
+            class="manager-recipe-step-nav"
+            data-recipe-step-prev=""
+            ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
+            disabled={currentStepIndex === 0}
+            onclick={() => goToStep(-1)}
+            icon="fas fa-chevron-left"
+          />
+          <div class="manager-recipe-step-pager-copy">
+            <span class="manager-recipe-step-pager-name" data-recipe-step-name
+              >{currentStepName}</span
+            >
+            <span class="manager-recipe-step-pager-count" data-recipe-step-count
+              >{currentStepIndex + 1} / {stepModel.length}</span
+            >
+          </div>
+          <IconButton
+            class="manager-recipe-step-nav"
+            data-recipe-step-next=""
+            ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
+            disabled={currentStepIndex === stepModel.length - 1}
+            onclick={() => goToStep(1)}
+            icon="fas fa-chevron-right"
+          />
+        </div>
+      {/if}
+
+      <p class="manager-recipe-browser-inspector-label">
+        {text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}
       </p>
-    {:else}
-      <div class="manager-recipe-flow-list">
-        {#each activeRequirementRows as req (req.id)}
-          {#if req.type === 'anyOf'}
-            <!-- A multi-option requirement is satisfied by ANY ONE of its members, so
+      {#if routedPairing}
+        <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
+           set's requirements to show — and drives the paired result-set dropdown below. -->
+        <!-- `maxWidth` is the manager's 1120px one-column breakpoint: below it the inspector spans
+           the window, so the trigger outgrows the `inline` band's 240px ceiling, and the panel is
+           then held by the overlay host's inset rather than by this cap. -->
+        <Select
+          class="manager-recipe-route-select"
+          size="inline"
+          value={selectedRoutingSetId}
+          options={routingSetOptions}
+          maxWidth={1120}
+          ariaLabel={text(
+            'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
+            'Select ingredient set'
+          )}
+          triggerProps={{ 'data-recipe-route': 'ingredient-set' }}
+          onChange={selectRoutingSet}
+        />
+      {/if}
+      {#snippet requirementRow(row)}
+        <div class="manager-recipe-flow-row" data-recipe-requirement={row.kind}>
+          <span class="manager-recipe-flow-icon" aria-hidden="true">
+            {#if row.img}
+              <img src={row.img} alt="" />
+            {:else}
+              <i class={row.icon}></i>
+            {/if}
+          </span>
+          <span class="manager-recipe-flow-name">{requirementName(row)}</span>
+          <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
+        </div>
+      {/snippet}
+      <!-- The ONE empty-outcome note this panel draws, in both tones: danger, because an outcome that
+       awards nothing is a gap, and neutral for a step that only advances the craft (issue 1907). -->
+      {#snippet emptyNote(hook, label, neutral = false)}
+        {#if neutral}
+          <p class="manager-muted" {...hook}>{label}</p>
+        {:else}
+          <p class="manager-recipe-flow-empty" {...hook}>
+            <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+            <span>{label}</span>
+          </p>
+        {/if}
+      {/snippet}
+      {#if activeRequirementRows.length === 0}
+        <p class="manager-muted" data-recipe-requires-empty>
+          {text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}
+        </p>
+      {:else}
+        <div class="manager-recipe-flow-list">
+          {#each activeRequirementRows as req (req.id)}
+            {#if req.type === 'anyOf'}
+              <!-- A multi-option requirement is satisfied by ANY ONE of its members, so
                  they are drawn as EQUAL peers inside one bordered group — none promoted
                  above the others. -->
-            <div class="manager-recipe-flow-anyof" data-recipe-requirement="anyOf">
-              <span class="manager-recipe-flow-anyof-label">
-                <i class="fas fa-code-branch" aria-hidden="true"></i>
-                {text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}
-              </span>
-              {#each req.members as member (member.id)}
-                {@render requirementRow(member)}
-              {/each}
-            </div>
-          {:else}
-            {@render requirementRow(req)}
-          {/if}
-        {/each}
-      </div>
-    {/if}
-
-    <p class="manager-recipe-browser-inspector-label">
-      {text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}
-    </p>
-    <!-- One produced row, TONED BY ROLE. `showGroupPill` is false wherever the group is already
-         identified, so the pill is never doubled up. -->
-    {#snippet produceRow(row, showGroupPill)}
-      <RecipeProduceRow
-        {row}
-        unknownName={text(UNNAMED_COMPONENT, 'Unknown component')}
-        dcLabel={isProgressive ? progressiveDcLabel(row) : null}
-        groupPill={showGroupPill && !routedPairing ? row.groupName : ''}
-      />
-    {/snippet}
-    <div class="manager-recipe-flow-list">
-      {#if isTwoOutcome && !isMultiStep}
-        <!-- Alchemy / simple-with-check: two outcome sections, Success and Failure. The
-             failure section reads "No results" when the reserved group is empty rather
-             than disappearing. -->
-        {#each twoOutcomeSections as section (section.key)}
-          <div class="manager-recipe-produces-outcome" data-recipe-produces-outcome={section.key}>
-            <span
-              class={`manager-recipe-flow-group manager-recipe-produces-outcome-head ${section.tone}`}
-              >{section.label}</span
-            >
-            {#if section.rows.length === 0}
-              {@render emptyNote({ 'data-recipe-outcome-empty': section.key }, outcomeNoResults)}
-            {:else}
-              {#each section.rows as row (row.id)}
-                {@render produceRow(row, false)}
-              {/each}
-            {/if}
-          </div>
-        {/each}
-      {:else if isRoutedByCheck && !isMultiStep}
-        <!-- Routed by check: a FULL-WIDTH collapsible section per result group, headed by the tier
-             NAME rather than an anonymous "Result Group N". They start collapsed. -->
-        {#each producedGroups as group, index (group.groupId)}
-          {@const expanded = expandedTiers.has(group.groupId)}
-          <div
-            class={`manager-recipe-produces-tier ${group.failure ? 'is-failure' : ''}`}
-            data-recipe-produces-group={group.groupId}
-          >
-            <button
-              type="button"
-              class="manager-recipe-produces-tier-head"
-              data-recipe-tier-toggle={group.groupId}
-              aria-expanded={expanded}
-              onclick={() => toggleTier(group.groupId)}
-            >
-              <i
-                class={`fas ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}
-                aria-hidden="true"
-              ></i>
-              <span class="manager-recipe-produces-tier-name"
-                >{produceGroupLabel(group, index)}</span
-              >
-              <span class="manager-recipe-produces-tier-count">{group.rows.length}</span>
-            </button>
-            {#if expanded}
-              <div class="manager-recipe-produces-tier-body">
-                {#each group.rows as row (row.id)}
-                  {@render produceRow(row, false)}
+              <div class="manager-recipe-flow-anyof" data-recipe-requirement="anyOf">
+                <span class="manager-recipe-flow-anyof-label">
+                  <i class="fas fa-code-branch" aria-hidden="true"></i>
+                  {text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}
+                </span>
+                {#each req.members as member (member.id)}
+                  {@render requirementRow(member)}
                 {/each}
               </div>
+            {:else}
+              {@render requirementRow(req)}
             {/if}
-          </div>
-        {/each}
-      {:else}
-        {#each activeProduceRows as row (row.id)}
-          {@render produceRow(row, true)}
-        {/each}
+          {/each}
+        </div>
       {/if}
-      <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that makes
+
+      <p class="manager-recipe-browser-inspector-label">
+        {text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}
+      </p>
+      <!-- One produced row, TONED BY ROLE. `showGroupPill` is false wherever the group is already
+         identified, so the pill is never doubled up. -->
+      {#snippet produceRow(row, showGroupPill)}
+        <RecipeProduceRow
+          {row}
+          unknownName={text(UNNAMED_COMPONENT, 'Unknown component')}
+          dcLabel={isProgressive ? progressiveDcLabel(row) : null}
+          groupPill={showGroupPill && !routedPairing ? row.groupName : ''}
+        />
+      {/snippet}
+      <div class="manager-recipe-flow-list">
+        {#if isTwoOutcome && !isMultiStep}
+          <!-- Alchemy / simple-with-check: two outcome sections, Success and Failure. The
+             failure section reads "No results" when the reserved group is empty rather
+             than disappearing. -->
+          {#each twoOutcomeSections as section (section.key)}
+            <div class="manager-recipe-produces-outcome" data-recipe-produces-outcome={section.key}>
+              <span
+                class={`manager-recipe-flow-group manager-recipe-produces-outcome-head ${section.tone}`}
+                >{section.label}</span
+              >
+              {#if section.rows.length === 0}
+                {@render emptyNote({ 'data-recipe-outcome-empty': section.key }, outcomeNoResults)}
+              {:else}
+                {#each section.rows as row (row.id)}
+                  {@render produceRow(row, false)}
+                {/each}
+              {/if}
+            </div>
+          {/each}
+        {:else if isRoutedByCheck && !isMultiStep}
+          <!-- Routed by check: a FULL-WIDTH collapsible section per result group, headed by the tier
+             NAME rather than an anonymous "Result Group N". They start collapsed. -->
+          {#each producedGroups as group, index (group.groupId)}
+            {@const expanded = expandedTiers.has(group.groupId)}
+            <div
+              class={`manager-recipe-produces-tier ${group.failure ? 'is-failure' : ''}`}
+              data-recipe-produces-group={group.groupId}
+            >
+              <button
+                type="button"
+                class="manager-recipe-produces-tier-head"
+                data-recipe-tier-toggle={group.groupId}
+                aria-expanded={expanded}
+                onclick={() => toggleTier(group.groupId)}
+              >
+                <i
+                  class={`fas ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}
+                  aria-hidden="true"
+                ></i>
+                <span class="manager-recipe-produces-tier-name"
+                  >{produceGroupLabel(group, index)}</span
+                >
+                <span class="manager-recipe-produces-tier-count">{group.rows.length}</span>
+              </button>
+              {#if expanded}
+                <div class="manager-recipe-produces-tier-body">
+                  {#each group.rows as row (row.id)}
+                    {@render produceRow(row, false)}
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        {:else}
+          {#each activeProduceRows as row (row.id)}
+            {@render produceRow(row, true)}
+          {/each}
+        {/if}
+        <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that makes
            nothing — true even when a failure group is listed above. (Two-outcome modes show a
            per-section "No results" instead, so skip the global note.) -->
-      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
-        {@render emptyNote(PRODUCES_EMPTY, producesEmptyLabel, stepAwardsNothingDeliberately)}
-      {/if}
+        {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
+          {@render emptyNote(PRODUCES_EMPTY, producesEmptyLabel, stepAwardsNothingDeliberately)}
+        {/if}
+      </div>
     </div>
-
-    <!-- Three full-width buttons: `Edit recipe` as the loudest thing on the panel, Duplicate as a
-         dark secondary above it, and Delete below in danger ink — NOT a text link, so a GM never
-         fires it by reflex, but still a real action rather than a demoted afterthought. -->
-    <div class="manager-recipe-browser-inspector-actions">
-      <Button
-        class="manager-recipe-browser-inspector-duplicate"
-        data-recipe-action="duplicate"
-        onclick={() => onDuplicate()}
-      >
-        <i class="fas fa-copy" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
-      </Button>
-      <Button
-        class="manager-recipe-browser-inspector-edit"
-        data-recipe-action="edit"
-        onclick={() => onEdit()}
-      >
-        <i class="fas fa-pen" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-      </Button>
-      <Button
-        role="danger"
-        class="manager-recipe-browser-inspector-delete"
-        data-recipe-action="delete"
-        onclick={() => onDelete()}
-      >
-        <i class="fas fa-trash" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-      </Button>
-    </div>
-  </section>
+    {#snippet foot()}
+      <div class="manager-recipe-browser-inspector-actions">
+        <Button
+          class="manager-recipe-browser-inspector-duplicate"
+          data-recipe-action="duplicate"
+          onclick={() => onDuplicate()}
+        >
+          <i class="fas fa-copy" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
+        </Button>
+        <Button
+          class="manager-recipe-browser-inspector-edit"
+          data-recipe-action="edit"
+          onclick={() => onEdit()}
+        >
+          <i class="fas fa-pen" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
+        </Button>
+        <Button
+          role="danger"
+          class="manager-recipe-browser-inspector-delete"
+          data-recipe-action="delete"
+          onclick={() => onDelete()}
+        >
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
+        </Button>
+      </div>
+    {/snippet}
+  </InspectorPanel>
 {:else if recipeCount === 0}
   <section
     class="manager-setup-card"

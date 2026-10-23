@@ -94,11 +94,11 @@
           options: [
             {
               value: 'manual',
-              fallback: localize('FABRICATE.App.Journal.Actions.Completion.Manual'),
+              label: localize('FABRICATE.App.Journal.Actions.Completion.Manual'),
             },
             {
               value: 'worldTime',
-              fallback: localize('FABRICATE.App.Journal.Actions.Completion.WorldTime'),
+              label: localize('FABRICATE.App.Journal.Actions.Completion.WorldTime'),
             },
           ],
           onChange: (value) => journal?.setCompletionMode?.(run, value),

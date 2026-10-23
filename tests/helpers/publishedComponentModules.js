@@ -6,6 +6,8 @@
  */
 import assert from 'node:assert/strict';
 
+import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+
 export const PUBLISHED_SEAM = 'src/ui/publishedComponentSeam.js';
 export const PUBLISHED_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
@@ -15,10 +17,26 @@ export const CALLBACK_REPORT = 'Fabricate | Published component callback failed:
 
 export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentSeam.js',
+  'src/ui/publishedComponentLoading.js',
+  'src/ui/deferredChunkFailureReport.js',
+  'src/utils/deferredEntryNotice.js',
+  'src/utils/localizeWithFallback.js',
   'src/ui/publishedComponentProps.js',
   'src/ui/publishedComponentCallbacks.js',
+  'src/ui/publishedComponentValues.js',
   'src/ui/publishedComponentManifest.js',
+  'src/ui/publishedComponentOverlays.js',
+  'src/ui/svelte/util/overlayHost.js',
+  'src/ui/theme.js',
   'src/ui/svelte/util/dropRateTier.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  'src/ui/svelte/util/overlayBounds.js',
+  'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
 ]);
 
 export const PUBLISHED_RUNE_MODULES = Object.freeze(['src/ui/publishedComponents.svelte.js']);
@@ -41,6 +59,13 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */
@@ -97,11 +122,38 @@ export function recordEscapes(record) {
   };
 }
 
-/** A fresh seam over the shipped manifest, registered with the adapter's own `components` table. */
-export function shippedSeam({ createPublishedComponents, runtime, components, report }) {
+const LAZY_ENTRIES = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true);
+
+/** A loader for each lazy path that rejects, for a suite that never loads one. */
+const UNLOADED = Object.freeze(
+  Object.fromEntries(
+    LAZY_ENTRIES.map(({ path }) => [
+      path,
+      () => Promise.reject(new Error(`this suite injects no loader for ${path}`)),
+    ])
+  )
+);
+
+/**
+ * A fresh seam over the shipped manifest, registered with the adapter's own `components` table and
+ * the suite's `loaders`, since no suite resolves the adapter's own `import()` (issue 2455).
+ */
+export function shippedSeam({
+  createPublishedComponents,
+  runtime,
+  components,
+  loaders = UNLOADED,
+  report,
+}) {
   const instance = createPublishedComponents({ isReady: () => true, report });
-  instance.register({ ...runtime, components });
+  instance.register({ ...runtime, components, loaders });
   return instance.publicApi;
+}
+
+/** Each lazy manifest path's loader, resolving the component the harness compiled for it. */
+export function harnessLoaders(harness) {
+  const loadDefault = async (path) => (await harness.loadRuneModule(path)).default;
+  return Object.fromEntries(LAZY_ENTRIES.map(({ path }) => [path, () => loadDefault(path)]));
 }
 
 export function assertClipped(element, what) {

@@ -340,6 +340,20 @@ test('8. HIGH_RISK_PATHS matching is root-anchored, never a basename match', () 
   assert.equal(matchesHighRiskPath('AGENTS.md'), true);
   assert.equal(matchesHighRiskPath('scripts/validate-agent-bindings.mjs'), true);
   assert.equal(matchesHighRiskPath('scripts/lib/agentModelTiers.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/agentBindingRender.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/agentBindingRoles.json'), true);
+  assert.equal(matchesHighRiskPath('scripts/release.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/ui-pr-screenshot-evidence.mjs'), true);
+  assert.equal(matchesHighRiskPath('scripts/forward-port-provenance.mjs'), true);
+  assert.equal(matchesHighRiskPath('scripts/foundry-smoke/scenarios/d0-recipes.mjs'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/releaseZipChunks.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/publishGuard.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/releaseTags.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/forwardPortProvenance.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/screenshotEvidenceMatching.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/foundrySmokeSignal.js'), true);
+  assert.equal(matchesHighRiskPath('scripts/lib/designSystemPrimitives.json'), false);
+  assert.equal(matchesHighRiskPath('scripts/lib/view-lab-cases/managerRecipeEditor.js'), false);
   assert.equal(matchesHighRiskPath('.claude/agents/fabricate-implementer-small.md'), true);
   assert.equal(matchesHighRiskPath('src/migration/v3/step.js'), true);
 
@@ -418,7 +432,7 @@ test('9. each worked example resolves to its stated model tier via its stated ru
       tier: 'small',
     },
     {
-      name: 'a Svelte component fix that adds an exported helper — rule 2',
+      name: 'a Svelte component fix that adds an exported helper — rule 4',
       family: 'fabricate_implementer',
       spawn: {
         stage: 'implementation',
@@ -426,8 +440,8 @@ test('9. each worked example resolves to its stated model tier via its stated ru
         sizeMetric: 1,
         ruleTwoSource: 'new-export',
       },
-      rule: 2,
-      tier: 'large',
+      rule: 4,
+      tier: 'medium',
     },
     {
       name: 'post-implementation review of a 2-file, 180-line src/systems diff — rule 6',
@@ -450,21 +464,68 @@ test('9. each worked example resolves to its stated model tier via its stated ru
     assert.equal(resolved.tier, example.tier, example.name);
   }
 
-  // Rule 3 and rule 4 are reachable, and rule 6 is total even with nothing keyed.
+  // Three ordinary paths no longer imply a frontier model.
   const threePaths = selectModelTier({
     stage: 'implementation',
-    paths: ['a.js', 'b.js', 'c.js'],
-    sizeMetric: 1,
+    paths: ['a.js', 'b.js', 'tests/a.test.js'],
+    sizeMetric: 2,
     ruleTwoSource: 'none',
   });
-  assert.deepEqual([threePaths.rule, threePaths.tier], [3, 'large']);
+  assert.deepEqual([threePaths.rule, threePaths.tier], [6, 'medium']);
   const oversize = selectModelTier({
     stage: 'plan-review',
     paths: ['a.js'],
     sizeMetric: STAGE_THRESHOLDS['plan-review'].mediumMax + 1,
     ruleTwoSource: 'none',
   });
-  assert.deepEqual([oversize.rule, oversize.tier], [4, 'large']);
+  assert.deepEqual([oversize.rule, oversize.tier], [3, 'large']);
+  const module = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/ui/newInternalHelper.js'],
+    sizeMetric: 1,
+    ruleTwoSource: 'new-module',
+  });
+  assert.deepEqual([module.rule, module.tier], [4, 'medium']);
+  const persisted = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/systems/recipeModel.js'],
+    sizeMetric: 1,
+    ruleTwoSource: 'persisted-shape',
+  });
+  assert.deepEqual([persisted.rule, persisted.tier], [2, 'large']);
+  const publicApi = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/ui/publicFacade.js'],
+    sizeMetric: 1,
+    ruleTwoSource: 'public-api',
+  });
+  assert.deepEqual([publicApi.rule, publicApi.tier], [2, 'large']);
+  const publicApiReview = selectModelTier({
+    stage: 'post-implementation',
+    paths: ['src/integrations/thirdPartyBridge.js', 'tests/third-party-bridge.test.js'],
+    sizeMetric: 150,
+    ruleTwoSource: 'public-api',
+  });
+  assert.deepEqual([publicApiReview.rule, publicApiReview.tier], [2, 'large']);
+  const exportReview = selectModelTier({
+    stage: 'post-implementation',
+    paths: ['src/ui/recipePicker.js', 'tests/components/recipe-picker.test.js'],
+    sizeMetric: 100,
+    ruleTwoSource: 'new-export',
+  });
+  assert.deepEqual([exportReview.rule, exportReview.tier], [4, 'medium']);
+  const routineRegistry = selectModelTier({
+    stage: 'post-implementation',
+    paths: ['scripts/lib/designSystemPrimitives.json', 'src/ui/svelte/components/Button.svelte', 'tests/components/button-mounted.test.js'],
+    sizeMetric: 240,
+    ruleTwoSource: 'none',
+  });
+  assert.deepEqual([routineRegistry.rule, routineRegistry.tier], [6, 'medium']);
+  // The review-stage MEDIUM_MAX is 800 lines: at it stays medium, one line over is rule 3.
+  const reviewAt = (sizeMetric) =>
+    selectModelTier({ stage: 'post-implementation', paths: ['src/a.js', 'tests/a.test.js'], sizeMetric, ruleTwoSource: 'none' });
+  assert.deepEqual([reviewAt(800).rule, reviewAt(800).tier], [6, 'medium']);
+  assert.deepEqual([reviewAt(801).rule, reviewAt(801).tier], [3, 'large']);
   const unavailable = selectModelTier({ stage: 'implementation', paths: ['a.js'] });
   assert.deepEqual([unavailable.rule, unavailable.tier], [6, 'medium']);
 });
@@ -516,19 +577,29 @@ test('11. model-tier floors only raise, clamp at large, and remember the execute
   assert.equal(floored.rule, 5);
   assert.equal(floored.tier, 'medium');
 
-  // An unresolved finding floors one model tier above the executed model tier...
-  const escalated = selectModelTier({
+  // A bounded review fix does not spend the next tier by default.
+  const ordinaryFix = selectModelTier({
     ...smallSpawn,
     previousExecutedTier: 'small',
     unresolvedFinding: true,
   });
+  assert.equal(ordinaryFix.tier, 'small');
+
+  // Only documented redesign needs move the floor above the executed model tier.
+  const escalated = selectModelTier({
+    ...smallSpawn,
+    previousExecutedTier: 'small',
+    unresolvedFinding: true,
+    redesignRequired: true,
+  });
   assert.equal(escalated.tier, 'medium');
 
-  // ...and every floor clamps at large.
+  // Every floor still clamps at large.
   const clamped = selectModelTier({
     ...smallSpawn,
     previousExecutedTier: 'large',
     unresolvedFinding: true,
+    redesignRequired: true,
   });
   assert.equal(clamped.tier, 'large');
 
@@ -882,11 +953,11 @@ test('14. main() reports each seeded defect, so no gate call site can be deleted
   }
 });
 
-// --- 15. Rule 5 needs EXACTLY one path --------------------------------------
+// --- 15. Rule 5 requires a single path and no new contract surface -----
 
 test('15. a 2-path spawn at or below SMALL_MAX resolves to medium via rule 6, not small', () => {
-  // The Design's own case: a module plus its co-located test is one concern, and it
-  // is deliberately medium rather than small.
+  // A module plus its co-located test is one concern, and it is deliberately medium.
+  // Adding more ordinary owned paths must not change that model tier.
   const pair = selectModelTier({
     stage: 'implementation',
     paths: ['src/systems/dnd5e.js', 'tests/systems/dnd5e.test.js'],
@@ -894,6 +965,13 @@ test('15. a 2-path spawn at or below SMALL_MAX resolves to medium via rule 6, no
     ruleTwoSource: 'none',
   });
   assert.deepEqual([pair.rule, pair.tier], [6, 'medium']);
+  const fivePaths = selectModelTier({
+    stage: 'implementation',
+    paths: ['src/ui/component.js', 'src/ui/component.css', 'tests/component.test.js', 'lang/en.json', 'openspec/specs/ui/spec.md'],
+    sizeMetric: 5,
+    ruleTwoSource: 'none',
+  });
+  assert.deepEqual([fivePaths.rule, fivePaths.tier], [6, 'medium']);
 
   // The same facts with exactly one path DO reach rule 5, so the guard is what differs.
   const single = selectModelTier({

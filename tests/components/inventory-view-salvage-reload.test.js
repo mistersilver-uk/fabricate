@@ -10,6 +10,7 @@ import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
@@ -66,7 +67,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
@@ -118,10 +119,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
-  // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
-  // portal host by walking up to the nearest Fabricate application root. `rootClass` IS that
-  // host: on the `fabricate-manager` default the panel would portal to a root no production
-  // mount of this component can reach, and every `target.querySelector` for a row would miss.
+  // picker, which resolves its portal host by walking up to the nearest Fabricate application
+  // root. `rootClass` IS that host: on the `fabricate-manager` default the panel would portal to
+  // a root no production mount of this component can reach, and every `target.querySelector` for
+  // a row would miss.
   rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/inventory/InventoryView.svelte',
 });

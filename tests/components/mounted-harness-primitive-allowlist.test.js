@@ -29,6 +29,9 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // The inspector's filling root and pinned foot (issues 2498, 2500): four system inspectors and,
+  // through `BulkEditPanelShell`, every bulk panel render it.
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   // The app's one select (issue 1504), which pulls `SearchablePopover` in behind it. The guard
   // names it for a suite whose roster it reads: inline, by name or shorthand, and one spread deep.
   'src/ui/svelte/components/Select.svelte',
@@ -52,6 +55,10 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/RuleSentence.svelte',
   // The set picker (issue 1782): the recipe-item editor's contents tab and the crafting bar.
   'src/ui/svelte/components/SetPicker.svelte',
+  // The set card (issue 2512): every recipe set, the Tools tab's per-set cards and salvage groups.
+  'src/ui/svelte/components/SetCard.svelte',
+  // The routing overview (issue 2513): the recipe Overview's routing card and the salvage well.
+  'src/ui/svelte/components/RoutingOverview.svelte',
   // The inspector rail section (issue 1782): the essence, tool and recipe-item inspectors.
   'src/ui/svelte/components/Rail.svelte',
   // The log list (issue 1782): every tree holding the journal's Finished list renders it.
@@ -175,6 +182,9 @@ const SHARED_PRIMITIVES = [
   // The cross-reference list over it (issue 2321): the inventory inspector draws it in the player
   // window, and the recipe-item preview carries that inspector into the manager tree.
   'src/ui/svelte/components/XrefList.svelte',
+  // A browse list's loading and error forms (issue 2548): the systems library, the environment
+  // browser and the Knowledge roster draw it, in every manager tree that mounts one of them.
+  'src/ui/svelte/components/ListState.svelte',
   // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
   'src/ui/svelte/components/YieldScale.svelte',
   // The app navigation and its labelled rows (issue 1777): the manager root and the player shell
@@ -410,7 +420,7 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
   );
 });
 
-const [SELECT, PAGINATION] = ['Select', 'Pagination'].map((name) =>
+const [SELECT, SELECT_HOST] = ['Select', 'BulkEditSelect'].map((name) =>
   SHARED_PRIMITIVES.find((path) => path.endsWith(`/${name}.svelte`))
 );
 const SYNTHETIC_SUITE = 'tests/components/synthetic-roster.test.js';
@@ -421,11 +431,11 @@ test('a roster passed by name or shorthand is read as a spread, and a call on it
   const gapsOf = (...lines) => gapsIn(SYNTHETIC_SUITE, syntheticSuite(...lines));
   const selectGap = `${SYNTHETIC_SUITE} mounts a tree that renders ${SELECT} but never compiles it`;
 
-  const byName = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE });');
+  const byName = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE });');
   assert.ok(byName.gaps.includes(selectGap), 'a roster passed by name is read');
-  const shorthand = gapsOf(`const @KEY = ['${PAGINATION}'];`, 'h({ @KEY });');
+  const shorthand = gapsOf(`const @KEY = ['${SELECT_HOST}'];`, 'h({ @KEY });');
   assert.ok(shorthand.gaps.includes(selectGap), 'a roster passed by shorthand is read');
-  const call = gapsOf(`const TREE = ['${PAGINATION}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
+  const call = gapsOf(`const TREE = ['${SELECT_HOST}'];`, 'h({ @KEY: TREE.filter(Boolean) });');
   assert.deepEqual(call.named, [], 'a call on a roster stays unread, as the harness test needs');
 });
 

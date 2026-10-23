@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { argv, exit } from 'node:process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const MANAGER_MARKER = 'fabricate-crafting-system-manager';
+export const MANAGER_MARKER = 'fabricate-crafting-system-manager';
 
 /** Recursively collect every emitted `.js` path under a dist directory. */
 function collectJsFiles(dir) {

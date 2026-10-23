@@ -5,15 +5,18 @@
  * needs: mount, update on one root and destroy; the seam's refusal of an unpublished or missing
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
- * button with its `onAction` callback (issue 2452). The published `Button` and `StatusToggle` mount
- * here as leaves; what each draws and refuses is `published-button-mounted.test.js`'s and
- * `published-toggle-mounted.test.js`'s.
+ * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
+ * `Stepper`, `SearchField` and `StageBars` mount here as leaves; what each draws and refuses is
+ * `published-button-mounted.test.js`'s, `published-toggle-mounted.test.js`'s,
+ * `published-stepper-mounted.test.js`'s, `published-search-mounted.test.js`'s and
+ * `published-stage-bars-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+import { deferredLoader } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
   FAULT_REPORT,
@@ -25,6 +28,7 @@ import {
   assertClipped,
   companionTarget,
   fabricateTarget,
+  harnessLoaders,
   recordEscapes,
   settle,
   shippedSeam,
@@ -47,17 +51,21 @@ let seamParts;
 let reports;
 let escaped;
 let targets;
+let testSeam;
 const recordEscape = (error) => {
   escaped.push(error);
 };
 
-const ui = () =>
+const freshSeam = () =>
   shippedSeam({
     ...seamParts,
     report: (...args) => {
       reports.push(args);
     },
   });
+
+/** The test's own seam, on which `load(['Rail'])` has resolved, since `Rail` is lazy. */
+const ui = () => testSeam;
 
 /** An empty target for `name`: bare, or inside the shell its entry in `LEAVES` names. */
 function targetFor(name) {
@@ -75,15 +83,17 @@ before(async () => {
   const { publishedComponentRuntime: runtime, COMPONENTS: components } =
     await harness.loadRuneModule(PUBLISHED_ADAPTER);
   const { createPublishedComponents } = await harness.loadRawModule(PUBLISHED_SEAM);
-  seamParts = { createPublishedComponents, runtime, components };
+  seamParts = { createPublishedComponents, runtime, components, loaders: harnessLoaders(harness) };
 });
 
 after(() => harness.teardown());
 
-beforeEach(() => {
+beforeEach(async () => {
   reports = [];
   escaped = [];
   targets = [];
+  testSeam = freshSeam();
+  await testSeam.load(['Rail']);
 });
 
 afterEach(() => {
@@ -215,6 +225,69 @@ const LEAVES = Object.freeze([
     read: (root) => root.getAttribute('aria-pressed'),
     drawn: ['false', 'true'],
   },
+  {
+    name: 'Stepper',
+    under: 'fabricate',
+    root: '.fab-stepper',
+    props: {
+      value: 2,
+      ariaLabel: 'Days to credit',
+      decrementLabel: 'Decrease days to credit',
+      incrementLabel: 'Increase days to credit',
+      onChange() {},
+    },
+    next: {
+      value: 3,
+      ariaLabel: 'Days to credit',
+      decrementLabel: 'Decrease days to credit',
+      incrementLabel: 'Increase days to credit',
+      onChange() {},
+    },
+    read: (root) => root.querySelector('input').value,
+    drawn: ['2', '3'],
+  },
+  {
+    name: 'SearchField',
+    under: 'fabricate',
+    root: '.fabricate-search',
+    props: { ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+    next: { value: 'iron', ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+    read: (root) => root.querySelector('input').value,
+    drawn: ['', 'iron'],
+  },
+  {
+    name: 'Select',
+    under: 'fabricate',
+    root: '.fabricate-picker',
+    props: {
+      options: [
+        { value: 10, label: 'Ten rows' },
+        { value: 25, label: 'Twenty-five rows' },
+      ],
+      value: 10,
+      ariaLabel: 'Rows per page',
+      onChange() {},
+    },
+    next: {
+      options: [
+        { value: 10, label: 'Ten rows' },
+        { value: 25, label: 'Twenty-five rows' },
+      ],
+      value: 25,
+      ariaLabel: 'Rows per page',
+      onChange() {},
+    },
+    read: (root) => root.querySelector('button').textContent.trim(),
+    drawn: ['Ten rows', 'Twenty-five rows'],
+  },
+  {
+    name: 'StageBars',
+    root: '.fab-stage-bars',
+    props: { stages: [{ name: 'Gather', value: 40 }], ariaLabel: 'Forging progress' },
+    next: { stages: [{ name: 'Gather', value: 80 }], ariaLabel: 'Forging progress' },
+    read: (root) => root.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),
+    drawn: ['40', '80'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -263,11 +336,40 @@ describe('each published leaf through the seam', () => {
   }
 });
 
+describe("InfoStrip's per-item props", () => {
+  it('renders no member of a fact’s props, on mount and on update, and leaves the caller’s object', async () => {
+    const attributes = {
+      'data-action': 'close',
+      class: 'x',
+      title: 'Hidden',
+      'aria-label': 'Hidden',
+    };
+    const facts = [{ icon: 'fas fa-sun', value: 'Clear', props: { ...attributes } }];
+    const { target, handle } = mountLeaf('InfoStrip', { label: 'Conditions', facts });
+    const drawn = () => target.querySelector('.fabricate-info-strip-fact');
+    const named = () =>
+      Object.keys(attributes)
+        .filter((name) => name !== 'class')
+        .filter((name) => drawn().hasAttribute(name));
+    assert.deepEqual(named(), []);
+    assert.equal(drawn().textContent.trim(), 'Clear');
+    const strip = target.querySelector('.fabricate-info-strip');
+    assert.ok(strip.hasAttribute('aria-labelledby'), 'the strip keeps its accessible name');
+    handle.update({ label: 'Conditions', facts: [{ value: 'Storm', props: { ...attributes } }] });
+    await settle();
+    assert.equal(drawn().textContent.trim(), 'Storm');
+    assert.deepEqual(named(), []);
+    assert.deepEqual(facts[0].props, attributes);
+    assert.deepEqual(reports, []);
+  });
+});
+
 describe('a key a leaf does not publish', () => {
   const UNPUBLISHED = [
     ['Avatar', 'class', 'is not a prop of Avatar'],
     ['Medallion', 'src', 'is not a prop of Medallion'],
     ['FillBar', 'class', 'is not a data attribute'],
+    ['FillBar', 'shares', 'is not a data attribute'],
     ['StatBox', 'valueDataAttr', 'is not a data attribute'],
     ['Meter', 'aria-label', 'is not a data attribute'],
     ['Meter', 'labelId', 'is not a data attribute'],
@@ -285,8 +387,6 @@ describe('a key a leaf does not publish', () => {
     ['EmptyState', 'field', 'is not a data attribute'],
     ['EmptyState', 'fill', 'is not a data attribute'],
     ['EmptyState', 'note', 'is not a data attribute'],
-    ['Notice', 'dismissable', 'is not a data attribute'],
-    ['Notice', 'dismissLabel', 'is not a data attribute'],
     ['Notice', 'blocking', 'is not a data attribute'],
     ['Notice', 'evidence', 'is not a data attribute'],
     ['Button', 'size', 'is not a data attribute'],
@@ -295,6 +395,19 @@ describe('a key a leaf does not publish', () => {
     ['Button', 'class', 'is not a data attribute'],
     ['StatusToggle', 'as', 'is not a data attribute'],
     ['StatusToggle', 'label', 'is not a data attribute'],
+    ['Stepper', 'disabled', 'is not a prop of Stepper'],
+    ['SearchField', 'label', 'is not a data attribute'],
+    ['SearchField', 'ariaLabelledBy', 'is not a data attribute'],
+    ['SearchField', 'density', 'is not a data attribute'],
+    ['SearchField', 'icon', 'is not a data attribute'],
+    ['SearchField', 'onChange', 'is not a data attribute'],
+    ['SearchField', 'inputProps', 'is not a data attribute'],
+    ['SearchField', 'class', 'is not a data attribute'],
+    ['Select', 'label', 'is not a prop of Select'],
+    ['Select', 'disabled', 'is not a prop of Select'],
+    ['Select', 'triggerProps', 'is not a prop of Select'],
+    ['StageBars', 'ariaLabelledBy', 'is not a data attribute'],
+    ['StageBars', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
@@ -552,6 +665,52 @@ describe('Rail under a bare ancestor', () => {
   });
 });
 
+describe('Rail, which is lazy', () => {
+  const RAIL = 'src/ui/svelte/components/Rail.svelte';
+
+  it('refuses a mount (M19) and renders nothing until its one load resolves, then draws', async () => {
+    const pending = deferredLoader();
+    const seam = shippedSeam({ ...seamParts, loaders: { [RAIL]: pending.load } });
+    const target = companionTarget(targets);
+    const mountRail = () => seam.mount('Rail', { target, props: { label: 'Standing' } });
+    const unloaded = { name: 'TypeError', message: `${REFUSAL}"Rail" is not loaded` };
+    assert.throws(mountRail, unloaded);
+    const loads = [seam.load(['Rail']), seam.load(['Kicker', 'Rail'])];
+    assert.throws(mountRail, unloaded);
+    assert.equal(target.childNodes.length, 0, 'nothing is rendered');
+    pending.resolve((await harness.loadRuneModule(RAIL)).default);
+    await Promise.all(loads);
+    assert.equal(pending.calls, 1, 'one import for two concurrent loads');
+    const handle = mountRail();
+    assert.equal(target.querySelector('.fab-rail-label').textContent, 'Standing');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
+  });
+
+  it('refuses mountMany (M19), ahead of M21, until its load resolves, then draws every item', async () => {
+    const pending = deferredLoader();
+    const seam = shippedSeam({ ...seamParts, loaders: { [RAIL]: pending.load } });
+    const items = ['Standing', 'Renown', 'Favour'].map((label) => ({
+      target: companionTarget(targets),
+      props: { label },
+    }));
+    const unloaded = { name: 'TypeError', message: `${REFUSAL}"Rail" is not loaded` };
+    assert.throws(() => seam.mountMany('Rail', items), unloaded);
+    assert.throws(() => seam.mountMany('Rail', items[0]), unloaded);
+    const loading = seam.load(['Rail']);
+    assert.throws(() => seam.mountMany('Rail', items), unloaded);
+    for (const { target } of items) assert.equal(target.childNodes.length, 0, 'nothing rendered');
+    pending.resolve((await harness.loadRuneModule(RAIL)).default);
+    await loading;
+    const handles = seam.mountMany('Rail', items);
+    assert.deepEqual(
+      items.map(({ target }) => target.querySelector('.fab-rail-label').textContent),
+      ['Standing', 'Renown', 'Favour']
+    );
+    for (const handle of handles) handle.destroy();
+  });
+});
+
 describe('EmptyState under a bare ancestor', () => {
   /** The panel's one element child, the column that spaces its content. */
   const columnOf = (target) => target.querySelector('.manager-empty').firstElementChild;
@@ -641,7 +800,7 @@ describe('EmptyState under a bare ancestor', () => {
   });
 
   it('lays its column out and inks its title from its own stylesheet', async () => {
-    const theme = ':root[data-fabricate-theme] { --fab-text-secondary: rgb(1, 2, 3); }';
+    const theme = ':root[data-fabricate-theme] { --fab-text: rgb(1, 2, 3); }';
     await underSheet(theme, async () => {
       const { target, handle } = mountLeaf('EmptyState', { title: 'No factions yet' });
       await settle();
@@ -915,7 +1074,7 @@ describe('Notice with an action under a bare ancestor', () => {
     handle.destroy();
   });
 
-  it('draws no dismissal whatever its published props, and still refuses dismissable (M13)', async () => {
+  it('draws no dismissal unless dismissable, and refuses dismissable with no dismissLabel (M9)', async () => {
     const { target, handle } = mountNotice({
       tone: 'success',
       detail: 'Remove a project to continue.',
@@ -926,9 +1085,9 @@ describe('Notice with an action under a bare ancestor', () => {
     });
     await settle();
     assert.ok(!target.querySelector('[data-notice-dismiss]'), 'no dismiss control');
-    assert.throws(() => handle.update({ title: TITLE, dismissable: true }), {
+    assert.throws(() => handle.update({ title: TITLE, dismissable: true, onDismiss() {} }), {
       name: 'TypeError',
-      message: `${REFUSAL}"dismissable" is not a data attribute`,
+      message: `${REFUSAL}Notice requires a non-empty "dismissLabel" when "dismissable" is truthy`,
     });
     handle.destroy();
   });
@@ -1075,6 +1234,84 @@ describe('Meter under a bare ancestor', () => {
     assert.equal(getComputedStyle(target.querySelector('.fab-meter')).position, 'relative');
     handle.destroy();
   });
+});
+
+describe('Meter in segments through the seam', () => {
+  const POOLED = Object.freeze({
+    label: 'Pooled days',
+    value: 7,
+    max: 12,
+    valueText: '7 of 12 days: yours 3, others 4',
+    segments: [{ value: 3, tone: 'accent' }, { tone: 'neutral' }],
+  });
+  const segmentsOf = (target) => [...target.querySelectorAll('.fab-fill-bar-share')];
+  const tonesOf = (target) =>
+    segmentsOf(target).map((share) => [...share.classList].find((name) => name.startsWith('is-')));
+  /** Each drawn segment's share of the fill, from its grow factor. */
+  const sharesOf = (target) => {
+    const grows = segmentsOf(target).map((share) => Number(share.style.flexGrow));
+    const total = grows.reduce((sum, grow) => sum + grow, 0);
+    return grows.map((grow) => grow / total);
+  };
+  const assertShares = (target, expected) => {
+    const actual = sharesOf(target);
+    assert.equal(actual.length, expected.length, `${expected.length} segments drawn`);
+    for (const [index, share] of actual.entries()) {
+      assert.ok(Math.abs(share - expected[index]) < 1e-6, `segment ${index} is ${expected[index]}`);
+    }
+  };
+  let stopRecording;
+  before(() => {
+    stopRecording = recordEscapes(recordEscape);
+  });
+  after(() => stopRecording());
+
+  it('draws the scenario as two abutting segments of a 58% fill, announcing the one reading', async () => {
+    const { target, handle } = mountLeaf('Meter', POOLED);
+    await settle();
+    const meter = target.querySelector('[role="meter"]');
+    assert.equal(meter.getAttribute('aria-valuenow'), '7');
+    assert.equal(meter.getAttribute('aria-valuetext'), POOLED.valueText);
+    const fill = target.querySelector('.fab-fill-bar-fill');
+    assert.equal(fill.style.width, '58%');
+    assert.ok(fill.classList.contains('is-stacked'));
+    assertShares(target, [3 / 7, 4 / 7]);
+    assert.deepEqual(tonesOf(target), ['is-accent', 'is-neutral']);
+
+    assert.equal(handle.update({ ...POOLED, segments: [{ tone: 'accent' }] }), true);
+    await settle();
+    assert.equal(segmentsOf(target).length, 0, 'one entry draws no segment element');
+    assert.ok(target.querySelector('.fab-fill-bar-fill').classList.contains('is-accent'));
+    assert.equal(target.querySelector('.fab-fill-bar').dataset.fillBarTone, 'accent');
+    handle.destroy();
+    assert.deepEqual(reports, []);
+  });
+
+  it('stops a three-entry list where the fill ends', async () => {
+    const { target, handle } = mountLeaf('Meter', {
+      label: 'Stamina',
+      value: 8,
+      max: 10,
+      segments: [{ value: 6 }, { value: 6 }, { tone: 'danger' }],
+    });
+    await settle();
+    assertShares(target, [6 / 8, 2 / 8]);
+    assert.deepEqual(tonesOf(target), ['is-success', 'is-success']);
+    handle.destroy();
+  });
+
+  for (const segments of [null, {}]) {
+    it(`contains segments: ${JSON.stringify(segments)} as a fault: reported once, target emptied, handle inert`, async () => {
+      const { target, handle } = mountLeaf('Meter', { ...POOLED, segments });
+      await settle();
+      assert.deepEqual(escaped, [], 'nothing escapes the boundary');
+      assert.equal(reports.length, 1);
+      assert.deepEqual(reports[0].slice(0, 2), [FAULT_REPORT, 'Meter']);
+      assert.ok(reports[0][2] instanceof TypeError, 'the read of a collection that is no list');
+      assert.equal(target.childNodes.length, 0);
+      assert.equal(handle.update(POOLED), false);
+    });
+  }
 });
 
 describe('FillBar under a bare ancestor', () => {

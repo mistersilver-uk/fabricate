@@ -29,7 +29,7 @@ export const LAB_SYSTEM_IDS = Object.freeze({
 });
 
 /** One component definition plus the world item it originates from. */
-function component(id, name, icon, { categories = [], ...extra } = {}) {
+export function component(id, name, icon, { categories = [], ...extra } = {}) {
   return {
     id,
     name,
@@ -53,7 +53,7 @@ function component(id, name, icon, { categories = [], ...extra } = {}) {
  * @param {object[]} components Component definitions built by {@link component}.
  * @returns {string[]} The de-duplicated category vocabulary.
  */
-function componentCategoryVocabulary(components) {
+export function componentCategoryVocabulary(components) {
   return [...new Set(components.map((entry) => entry.category).filter(Boolean))];
 }
 
@@ -817,7 +817,7 @@ const GLASSWORK_COMPONENTS = [
   }),
 ];
 
-function recipe(id, name, systemId, icon, { categories = [], ...config } = {}) {
+export function recipe(id, name, systemId, icon, { categories = [], ...config } = {}) {
   return {
     id,
     name,
@@ -841,7 +841,7 @@ function recipe(id, name, systemId, icon, { categories = [], ...config } = {}) {
  * @param {Record<string, number>} ingredients componentId -> quantity.
  * @returns {object} A persisted-shape ingredient set.
  */
-const simpleSet = (setId, ingredients) => ({
+export const simpleSet = (setId, ingredients) => ({
   id: setId,
   ingredientGroups: Object.entries(ingredients).map(([componentId, quantity], index) => ({
     id: `${setId}-g${index + 1}`,
@@ -2958,9 +2958,9 @@ export function buildLabContent({ journalCaseState = null } = {}) {
       // Restricted on purpose: this is what makes the Access rail entry exist.
       resolutionMode: 'alchemy',
       craftingCheck: SIMPLE_CHECK,
-      // `checkMode: 'simple'` is what draws the alchemy Results tab's FIXED TWO-SLOT editor — a
-      // labelled "On success" set plus a reserved, undeletable "On a failed check" set
-      // (`recipeAlchemySimple = alchemyCheckMode === 'simple'`).
+      // `checkMode: 'simple'` is what draws the alchemy Results tab's TWO-SLOT editor — a reserved
+      // "On success" set plus, on a recipe carrying a `role: 'failure'` group, a reserved "On a
+      // failed check" set (`recipeAlchemySimple = alchemyCheckMode === 'simple'`).
       alchemy: { checkMode: 'simple' },
       features: {
         essences: true,

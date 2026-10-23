@@ -19,7 +19,6 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
-  chooseSelectOption,
   selectOptionLabels,
   selectOptionValues,
 } from '../helpers/select-control.js';
@@ -27,11 +26,14 @@ import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { parseUuidDouble } from '../helpers/manager/parseUuidDouble.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   labCaseSelector,
   managerComponents,
   settle,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
 } from './manager-mounted-shared.js';
 
@@ -68,6 +70,7 @@ export function registerWorldScopeCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -75,6 +78,7 @@ export function registerWorldScopeCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
   // The card moved to World > Rules & Resources > Character prerequisites in issue 1311.
@@ -289,7 +293,7 @@ export function registerWorldScopeCases() {
     assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
 
     // Rooted on `target` rather than on `pagination`.
-    chooseSelectOption(target, '[data-pagination-size]', 6);
+    choosePageSize(target, '', 6);
     await tick();
     flushSync();
 
@@ -686,7 +690,7 @@ export function registerWorldScopeCases() {
     assert.equal(
       target.querySelector('.manager-travel-inspector').getAttribute('data-travel-inspector'),
       'map',
-      'the one card follows the tab rather than being two cards'
+      'the one inspector follows the tab rather than being two'
     );
     assert.ok(
       target.querySelector('.manager-travel-inspector').classList.contains('is-empty'),
@@ -3361,11 +3365,11 @@ export function registerWorldScopeCases() {
           [...(panel()?.querySelectorAll('[role="option"]') ?? [])].map((node) =>
             node.textContent.replaceAll(/\s+/gu, ' ').trim()
           );
-        assert.deepEqual(options(), ['resin 1 component', 'wood 2 components']);
+        assert.deepEqual(options(), ['#resin 1 component', '#wood 2 components']);
 
         // Two picks inside one republish: the second must build on the first, not on the stale
         // projection the page still holds while the first write is in flight.
-        const choose = (tag) => panel().querySelector(`[role="option"][title="${tag}"]`).click();
+        const choose = (tag) => panel().querySelector(`[role="option"][title="#${tag}"]`).click();
         choose('wood');
         flushSync();
         choose('resin');
@@ -3378,7 +3382,7 @@ export function registerWorldScopeCases() {
         assert.ok(Boolean(panel()), 'the panel stays open across the save round-trip');
         assert.deepEqual(
           ['resin', 'wood'].map((tag) =>
-            panel().querySelector(`[title="${tag}"]`).getAttribute('aria-selected')
+            panel().querySelector(`[title="#${tag}"]`).getAttribute('aria-selected')
           ),
           ['true', 'true'],
           'and both saved tags now read as held'

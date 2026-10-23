@@ -27,7 +27,7 @@ import { chooseSelectOption } from './selectControl.mjs';
  */
 export async function answerRollPrompt(ctx, label, { timeout = 60_000 } = {}) {
   const { page, screenshot } = ctx;
-  const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
+  const dialog = page.locator('[data-manager-modal][data-roll-prompt]').first();
   await dialog.waitFor({ state: 'visible', timeout });
   await screenshot(page, label);
   // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
@@ -342,8 +342,7 @@ export async function captureGroupedContinuationFrame(ctx, options) {
   try {
     handle = await seed();
     await openBrowser();
-    const size = page.locator('.fabricate-manager [data-pagination-size]').first();
-    await chooseSelectOption(page, size, { value: '10' });
+    await page.locator('.fabricate-manager [data-pagination-size-option="10"]').first().click();
     await settle();
     await page.locator('.fabricate-manager [data-pagination-next]').first().click();
     await settle();
@@ -354,11 +353,10 @@ export async function captureGroupedContinuationFrame(ctx, options) {
     results.steps.push({ step: stepName, passed: false, error: error.message });
     process.stderr.write(`${failMessage}: ${error.message}\n`);
   } finally {
-    const sizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
+    const sizeReset = page.locator('.fabricate-manager [data-pagination-size-option="25"]').first();
     if ((await sizeReset.count()) > 0) {
-      // Narrowed, not removed (issue 1504).
       try {
-        await chooseSelectOption(page, sizeReset, { value: '25' });
+        await sizeReset.click();
       } catch (error) {
         process.stderr.write(
           `${failMessage}: the page size was not reset to 25: ${error.message}\n`

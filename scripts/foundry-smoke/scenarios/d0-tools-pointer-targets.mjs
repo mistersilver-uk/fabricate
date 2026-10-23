@@ -217,9 +217,7 @@ async function assertToolLibraryPagination(
     const pagination = element.querySelector('[data-tool-browser-pagination]');
     const summary = pagination?.querySelector('[data-pagination-summary]');
     const nav = pagination?.querySelector('.manager-pagination-nav');
-    // Still resolves after issue 1504 converted this control, and deliberately unchanged: the
-    // page-size hook rides across onto the `<Select>` trigger through `triggerData`, so this reads
-    // a `<button role="combobox">` where it used to read a `<select>`.
+    // The page-size hook is the segmented control's radiogroup root.
     const size = pagination?.querySelector('[data-pagination-size]');
     const rect = (node) => {
       const value = node?.getBoundingClientRect();

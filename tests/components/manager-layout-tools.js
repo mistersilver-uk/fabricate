@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { BAND_TONES } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 import { openLayoutContext, renderWithCascade } from '../helpers/layout-harness.js';
+import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 import {
   blockFor,
@@ -28,6 +29,7 @@ import {
   CHECKS_REDIRECT_VIEW,
   CHECKS_VIEWS,
   MODIFIER_BOUNDS_ROW_WIDTHS,
+  OPTION_CARD_COPIES,
   bandStripFixture,
   checkEditorSource,
   checksRollEdges,
@@ -41,6 +43,16 @@ import {
 } from './manager-layout-tools-fixtures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+test('the static option-card copies carry only classes RadioCardGroup writes', () => {
+  for (const [name, copy] of Object.entries(OPTION_CARD_COPIES)) {
+    assert.deepEqual(
+      classesNotWritten(copy),
+      [],
+      `the ${name} copy has drifted from the component`
+    );
+  }
+});
 
 test('Tool library renders 210px and 340px fixed columns through the 832px product root', async () => {
   for (const width of [1212, 832]) {
@@ -488,7 +500,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   try {
     const page = await context.newPage();
 
-    const edges = await checksRollEdges(page, 'fabricate-card manager-checks-card');
+    const edges = await checksRollEdges(page, 'fabricate-card is-flush manager-checks-card');
     assert.equal(
       edges.rowLeft,
       edges.radioLeft,
@@ -571,10 +583,10 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
   // TWO fixed arms and TWO controls.
   assert.deepEqual(
     [...new Set(wrapperArguments)].sort(compareStrings),
-    [root, `${root} manager-checks-card`],
+    [root, `${root} is-flush manager-checks-card`],
     'every interpolated card fixture must carry the family root; the control arms remove the ' +
-      'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +
-      'from the one those tests are proofs of'
+      'caller’s `flush` and class and nothing else, because "the primitive unrooted" is a ' +
+      'different mutation from the one those tests are proofs of'
   );
 });
 
@@ -587,13 +599,13 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
   // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>`.
   assert.match(
     withoutComments(craftingCheckEditor),
-    /<InspectorCard class="manager-checks-card" data-routed-tiers="">/,
-    'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
-      '.fabricate-card shell and its own 12px padding re-insets the tier row'
+    /<InspectorCard flush class="manager-checks-card" data-routed-tiers="">/,
+    'the routed tier section must be a flush manager-checks-card, or it falls back to the bare ' +
+      '.fabricate-card shell and its own padding re-insets the tier row'
   );
 });
 
-test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
+test('the combination-rule cards draw the one option-card face in the studio card and the bare shell', async () => {
   const context = await openLayoutContext({
     viewport: { width: 960, height: 700 },
     deviceScaleFactor: 1,
@@ -601,26 +613,26 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
   try {
     const page = await context.newPage();
 
-    const fixed = await modifiersCombinationRuleMetrics(page, 'fabricate-card manager-checks-card');
+    const fixed = await modifiersCombinationRuleMetrics(
+      page,
+      'fabricate-card is-flush manager-checks-card'
+    );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
-    // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
-    assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
-    assert.equal(fixed.optionPaddingTop, 12, "the combination-rule card's padding is 12px");
-    assert.equal(fixed.optionRadius, 11, "the combination-rule card's radius is 11px");
+    // The library's `<OptionCards>`: padding 12, radius 11, cards 8px apart, a 12.5px title.
+    assert.deepEqual(
+      [fixed.option.paddingLeft, fixed.option.paddingTop, fixed.option.radius],
+      [12, 12, 11]
+    );
+    assert.equal(fixed.option.gap, '8px', 'the cards sit on the 8px rung, not a per-card gutter');
+    assert.equal(fixed.option.nameSize, '12.5px');
+    assert.notEqual(fixed.option.chosenBorder, fixed.option.restBorder, 'the chosen card is edged');
 
-    // MUTATION PROOF, same page: reintroducing the defect.
-    const broken = await modifiersCombinationRuleMetrics(page, 'fabricate-card');
-    // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, and the studio's
-    // 11px option gap snapped to the primitive's own 12 (issue 1523), so the shell no longer
-    // differs there; the combination-rule card's own face below carries the proof.
-    assert.equal(broken.cardRadius, 11, 'the shared card is on the 11px card rung too');
-    assert.equal(broken.cardBackground, fixed.cardBackground, 'and on the same fill');
-    assert.equal(broken.optionGap, fixed.optionGap, 'and the option gap is the primitive’s 12px');
-    assert.notEqual(
-      broken.optionBackground,
-      fixed.optionBackground,
-      `expected the bare shell to drop the combination-rule cards off the studio's --fab-bg-1 ` +
-        `rest face (bare: ${broken.optionBackground})`
+    // HOST INDEPENDENCE, same page: the bare shell is the control, and the face must not move.
+    const bare = await modifiersCombinationRuleMetrics(page, 'fabricate-card');
+    assert.deepEqual(
+      bare.option,
+      fixed.option,
+      'the option cards take no face from the studio card'
     );
   } finally {
     await context.close();
@@ -639,9 +651,9 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
   // RETARGETED at the primitive (issue 1427), same reasoning as the routed-tier join above.
   assert.match(
     withoutComments(modifierCatalogueSource),
-    /<InspectorCard\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
-    'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
-      '.fabricate-card shell and the combination-rule cards fall back to the generic scale'
+    /<InspectorCard\s+flush\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    'the modifiers card must be a flush manager-checks-card, or it falls back to the bare ' +
+      '.fabricate-card shell and loses the studio card contract'
   );
 });
 
@@ -1100,7 +1112,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
-        '<section class="fabricate-card manager-checks-card" data-outcome-bands>' +
+        '<section class="fabricate-card is-flush manager-checks-card" data-outcome-bands>' +
         '<div class="manager-checks-card-body">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +
@@ -1427,11 +1439,11 @@ test('a Modifiers card button renders like the tool studio button of the same ro
       (role) =>
         `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="card-${role}"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>`
     ).join('');
-    // The NEGATIVE CONTROL: the class string this card shipped before the conversion. If it
-    // measured the same as the converted one, the primitive would be changing nothing and
-    // every assertion below would pass vacuously.
+    // The NEGATIVE CONTROL: the same button without the family root. Its pre-conversion class
+    // string is the converted one since issue 2540 retired the primitive token, so the root is
+    // what is withheld. If it measured the same, every assertion below would pass vacuously.
     const unconverted =
-      '<button type="button" class="fabricate-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+      '<button type="button" class="is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
 
     await page.setContent(`
       <!doctype html>
@@ -1600,11 +1612,11 @@ test('the Checks rail states its own control type scale instead of inheriting on
                       <section class="fabricate-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
-                            class="fabricate-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            class="fabricate-button is-primary manager-checks-simulator-roll">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                           <button type="button" data-probe="roll-unconverted"
-                            class="fabricate-button is-primary">
+                            class="is-primary">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                         </div>
@@ -1672,7 +1684,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
     // The NEGATIVE CONTROL for the rail rule, on the leg it still has.
     assert.equal(
       measured['field-input-elsewhere'].fontSize,
-      '13.12px',
+      '12.5px',
       'a field control outside the rail is unchanged — this gate must not be measuring a ' +
         'global re-type of every control in the manager'
     );
@@ -1721,7 +1733,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
     assert.equal(
       measured['roll-unconverted'].fontSize,
       '14px',
-      'the unconverted class string still bleeds Foundry’s 14px app base'
+      'a button without the family root still bleeds Foundry’s 14px app base'
     );
     assert.notEqual(
       measured.roll.fontSize,

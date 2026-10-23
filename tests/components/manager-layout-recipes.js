@@ -8,8 +8,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { recipeResultKinds } from '../../src/ui/svelte/components/resultRows.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
+import {
+  createMountedComponentHarness,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 import {
   blockFor,
@@ -239,8 +248,8 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
       return { property: declaration.slice(0, colon).trim(), value: declaration.slice(colon + 1).trim() };
     });
   assert.ok(
-    declarations.length >= 4,
-    'the rule still states the position and size the primitive has no opinion about'
+    declarations.length >= 3,
+    'the rule still states the position and height the primitive has no opinion about'
   );
 
   const context = await openLayoutContext({
@@ -273,10 +282,9 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
         <body>
           <main class="fabricate-manager">
             <span class="manager-recipe-option-tags" data-recipe-option-tags>
-              <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
               ${withChipHash(
-                '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>' +
-                  '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
+                '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="reagent"><span>#reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>' +
+                  '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="rare"><span>#rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
               )}
             </span>
           </main>
@@ -374,14 +382,13 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <input type="number" class="fab-stepper-input manager-recipe-option-quantity" value="2">
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
-        <span class="manager-recipe-option-divider"></span>
-        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
+        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
   const tagChips = `
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
+        <span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>#abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="hide"><span>#hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
 
   // The row exactly as `PickerRow` renders a tag requirement: the plate.
   const tagRow = (caseName, chips) =>
@@ -389,8 +396,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
       <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
       ${kindPickerFixture('Tag')}
-      <span class="manager-recipe-option-tags" data-recipe-option-tags>
-        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
+      <span class="manager-recipe-option-tags" data-recipe-option-tags>${chips}
         <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
           <button type="button" class="manager-recipe-tag-trigger" data-recipe-add-tag><i class="fa-solid fa-plus"></i><span class="manager-travel-picker-value">Tag</span></button>
         </div>
@@ -407,7 +413,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       <span class="manager-recipe-option-lead is-component"><i class="fas fa-cube"></i></span>
       ${kindPickerFixture('Component')}
       <span class="manager-recipe-option-name-field">
-        <span class="manager-recipe-option-chosen" data-recipe-option-chosen><i class="fas fa-cube manager-recipe-option-mark is-component"></i><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
+        <span class="manager-recipe-option-chosen" data-recipe-option-chosen><span class="manager-recipe-option-plate"><i class="fas fa-cube manager-recipe-option-mark is-component"></i></span><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
       </span>${controls}
     </div>`);
 
@@ -484,9 +490,8 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         const tallest = Math.max(...measured.armMembers.map((member) => member.height));
         assert.ok(
           measured.arm.height <= tallest + 1,
-          `${surface.label} (${surface.width}px): ${caseName} tag arm is ONE line - the policy ` +
-            `word, the chips and + Tag stay together (arm ${measured.arm.height}px vs tallest ` +
-            `member ${tallest}px)`
+          `${surface.label} (${surface.width}px): ${caseName} tag arm is ONE line - the chips ` +
+            `and + Tag stay together (arm ${measured.arm.height}px vs tallest member ${tallest}px)`
         );
         for (const [index, member] of measured.armMembers.entries()) {
           assert.ok(
@@ -502,19 +507,96 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         );
       }
 
-      // AN EMPTY TAG ROW IS A ROW LIKE ANY OTHER.
+      // AN EMPTY TAG ROW IS LEVEL WITH A COMPONENT ROW: every row stands on one 34px line (ruled 2026-10-18).
       if (!surface.rowParity) continue;
-      assert.equal(
-        Math.round(report.empty.row.height),
-        Math.round(report.component.row.height),
-        `${surface.label} (${surface.width}px): an EMPTY tag requirement row is no taller than ` +
+      assert.ok(
+        Math.abs(report.empty.row.height - report.component.row.height) <= 1,
+        `${surface.label} (${surface.width}px): an EMPTY tag requirement row is level with ` +
           `the component row beside it (${Math.round(report.empty.row.height)}px vs ` +
-          `${Math.round(report.component.row.height)}px) - a taller one has either stacked its ` +
-          `policy word above + Tag or moved a whole control onto a second line`
+          `${Math.round(report.component.row.height)}px) - a taller one has moved a whole ` +
+          `control onto a second line, and a shorter one has lost the row's 34px line`
       );
     } finally {
       await context.close();
     }
+  }
+});
+
+// In foundry-native, the one palette where the tag ink and the tag hue part (issue 2534).
+test("a tag chip is the choice-group drawing's 28px `#` pill in the tag ink", async () => {
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en" data-fabricate-theme="foundry-native">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer modules { ${css} }
+            ${chipCss}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            .fas::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <span class="manager-recipe-option-tags" data-recipe-option-tags>
+              ${withChipHash(
+                '<span class="manager-chip is-tag is-lit is-tag-run manager-recipe-tag-chip" data-recipe-tag="solvent"><span>#solvent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
+              )}
+            </span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const chip = document.querySelector('[data-recipe-tag="solvent"]');
+      const resolved = (property, value) => {
+        const probe = document.createElement('span');
+        probe.style.setProperty(property, value);
+        chip.append(probe);
+        const used = getComputedStyle(probe).getPropertyValue(property);
+        probe.remove();
+        return used;
+      };
+      const style = getComputedStyle(chip);
+      return {
+        height: chip.getBoundingClientRect().height,
+        radius: style.borderTopLeftRadius,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        textTransform: style.textTransform,
+        color: style.color,
+        // ratchet-exempt(lint): innerText applies text-transform, so it reads the chip as drawn.
+        text: chip.innerText.trim(),
+        tagInk: resolved('color', 'var(--fab-purple-text)'),
+        hue: resolved('color', 'var(--fab-purple)'),
+        removeSize: getComputedStyle(chip.querySelector('.manager-recipe-tag-remove')).fontSize,
+        minWidth: style.minWidth,
+        armGap: getComputedStyle(chip.parentElement).columnGap,
+        oldChipSize: resolved('font-size', '0.62rem'),
+      };
+    });
+
+    assert.equal(report.height, 28, 'the drawing: 28px');
+    assert.equal(report.radius, '999px', 'the drawing: a pill');
+    assert.equal(report.fontSize, '11px', 'the drawing: 11px');
+    assert.equal(report.fontWeight, '600', 'the drawing: 600');
+    assert.equal(report.textTransform, 'none', 'a tag is drawn as stored, never capitalised');
+    assert.equal(report.text, '#solvent', 'the chip reads `#` and the stored spelling');
+    assert.notEqual(report.tagInk, report.hue, 'foundry-native parts the tag ink from its hue');
+    assert.equal(report.color, report.tagInk, 'the lit chip inks with `--fab-purple-text`');
+    assert.equal(report.removeSize, report.oldChipSize, 'the `×` keeps its 0.62rem (ruling 4)');
+    assert.equal(report.minWidth, 'auto', 'the chip hugs its tag: no minimum width');
+    assert.equal(report.armGap, '8px', "the drawing's 8px between chips");
+  } finally {
+    await context.close();
   }
 });
 
@@ -557,7 +639,7 @@ test('a suggestion reads from the left edge the typed query does, under the host
           <main class="fabricate-manager">
             <div class="harness">
               <span class="manager-recipe-option-name-field">
-                <span class="manager-recipe-option-search is-typing">
+                <span class="manager-recipe-option-search">
                   <i class="fa-solid fa-magnifying-glass"></i>
                   <input type="text" data-recipe-option-search value="ingot" role="combobox" placeholder="Search components...">
                 </span>
@@ -797,6 +879,78 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
   }
 });
 
+test("the tag catalogue's new-tag footer keeps a long name inside the 300px panel (issue 2515)", async () => {
+  const popoverScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
+  );
+  const name = 'a-very-long-tag-name-that-runs-past-forty-characters';
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 400 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; }
+            }
+            @layer modules { ${css} }
+            ${popoverScoped.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${withScopeHash(
+              `<div class="fabricate-picker-popover manager-travel-popover" data-probe="panel" style="width: 300px; min-width: 300px; max-width: 300px">
+                <div class="manager-recipe-tag-create" data-probe="footer">
+                  <button type="button" class="fabricate-button is-ghost is-full-width" data-recipe-tag-create title="New tag “${name}”">
+                    <i class="fa-solid fa-plus"></i><span data-probe="label">New tag “${name}”</span>
+                  </button>
+                </div>
+              </div>`,
+              'manager-travel-popover',
+              popoverScoped.hashClass
+            )}
+          </main>
+        </body>
+      </html>
+    `);
+    const report = await page.evaluate(() => {
+      const at = (probe) => document.querySelector(`[data-probe="${probe}"]`);
+      const panel = at('panel');
+      const button = document.querySelector('[data-recipe-tag-create]');
+      const label = at('label');
+      const panelStyle = getComputedStyle(panel);
+      return {
+        panelInner: panel.getBoundingClientRect().right - Number.parseFloat(panelStyle.paddingRight),
+        buttonRight: button.getBoundingClientRect().right,
+        labelRight: label.getBoundingClientRect().right,
+        clipped: label.scrollWidth > label.clientWidth,
+        textOverflow: getComputedStyle(label).textOverflow,
+        rule: getComputedStyle(at('footer')).borderTopWidth,
+      };
+    });
+    assert.ok(
+      report.buttonRight <= report.panelInner + 0.5,
+      `the footer button stays inside the panel (${report.buttonRight} vs ${report.panelInner})`
+    );
+    assert.ok(report.labelRight <= report.buttonRight, 'and its label inside the button');
+    assert.ok(report.clipped, 'the long name is cut rather than widening the panel');
+    assert.equal(report.textOverflow, 'ellipsis', 'with an ellipsis');
+    assert.equal(report.rule, '1px', 'the footer sits under its hairline');
+  } finally {
+    await context.close();
+  }
+});
+
 test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm one', async () => {
   // `proto:4628` is `segStyle`: the chosen segment takes the design's own translucent tag value
   // and `var(--text)`, the unchosen one is transparent over `var(--subtle)`, and `proto:2268`
@@ -933,7 +1087,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
         ${kindPickerFixture(kind)}
         <span class="manager-recipe-option-name-field">
           <span class="manager-recipe-option-chosen" data-recipe-option-chosen>
-            <i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i>
+            <span class="manager-recipe-option-plate"><i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i></span>
             <span class="manager-recipe-option-chosen-name">Named</span>
           </span>
         </span>
@@ -992,6 +1146,406 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
       4,
       `the four kinds resolve to four distinct tints (${report.map((k) => `${k.kind}=${k.plate}`).join(', ')})`
     );
+  } finally {
+    await context.close();
+  }
+});
+
+test("the requirement row draws the library specimen's figures (issue 2515)", async () => {
+  const context = await openLayoutContext({
+    viewport: { width: 900, height: 320 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: 2rem; }
+            }
+            @layer modules { ${css} }
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager" style="width: 820px">
+            <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
+              <span class="manager-recipe-option-lead is-component" data-probe="lead"><i class="fas fa-cube"></i></span>
+              ${kindPickerFixture('Component')}
+              <span class="manager-recipe-option-name-field">
+                <span class="manager-recipe-option-chosen" data-probe="cell">
+                  <span class="manager-recipe-option-plate" data-probe="plate"><i class="fas fa-cube manager-recipe-option-mark is-component"></i></span>
+                  <span class="manager-recipe-option-chosen-name">Ore</span>
+                  <button type="button" class="manager-recipe-option-clear" data-probe="clear"><i class="fa-solid fa-xmark"></i></button>
+                </span>
+              </span>
+              <div class="manager-recipe-option-controls">
+                <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger" data-probe="or"><span>or…</span></button></div>
+                <button type="button" class="manager-recipe-option-remove" data-probe="remove"><i class="fas fa-xmark"></i></button>
+              </div>
+            </div>
+            <div class="manager-progressive-stage-row">
+              <div class="manager-recipe-ingredient-option-row is-component is-result" data-probe="stage">
+                <span class="manager-recipe-option-name-field">
+                  <span class="manager-recipe-option-chosen"><span class="manager-recipe-option-plate"><i class="fas fa-cube"></i></span><span class="manager-recipe-option-chosen-name">Herb</span></span>
+                </span>
+              </div>
+            </div>
+            <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option>
+              <span class="manager-recipe-option-lead is-empty"><i class="fas fa-cube"></i></span>
+              <span class="manager-recipe-option-name-field">
+                <span class="manager-recipe-option-search" data-probe="search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" placeholder="Search components...">
+                </span>
+              </span>
+            </div>
+            <span data-token="strong" style="color: var(--fab-border-strong)"></span>
+            <span data-token="accent-border" style="color: var(--fab-accent-border)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const at = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const read = (name) => {
+        const rect = at(name).getBoundingClientRect();
+        const style = getComputedStyle(at(name));
+        return {
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          radius: style.borderTopLeftRadius,
+          border: style.borderTopColor,
+        };
+      };
+      const token = (name) =>
+        getComputedStyle(document.querySelector(`[data-token="${name}"]`)).color;
+      return {
+        lead: read('lead'),
+        plate: read('plate'),
+        cell: read('cell'),
+        clear: read('clear'),
+        search: read('search'),
+        or: read('or'),
+        remove: read('remove'),
+        stage: {
+          ...read('stage'),
+          minHeight: getComputedStyle(at('stage')).minHeight,
+          tallest: Math.max(
+            ...[...at('stage').children].map((child) => child.getBoundingClientRect().height)
+          ),
+        },
+        strong: token('strong'),
+        accentBorder: token('accent-border'),
+      };
+    });
+
+    for (const name of ['lead', 'plate']) {
+      const box = report[name];
+      assert.deepEqual([box.width, box.height, box.radius], [26, 26, '6px'], `the ${name} plate`);
+    }
+    assert.equal(report.cell.height, 34, 'the subject cell stands at 34');
+    assert.ok(
+      report.cell.width >= 180,
+      `the subject cell is never under 180 (${report.cell.width})`
+    );
+    assert.equal(report.cell.radius, '7px', 'the subject cell corners at 7');
+    assert.equal(report.cell.border, report.strong, 'the subject cell is edged neutral-strong');
+    assert.equal(
+      report.cell.right - report.clear.right,
+      5,
+      "a short name's clear stands 4px plus the border inside the cell's end edge"
+    );
+    assert.equal(report.search.height, 34, 'the search stands at the cell height');
+    assert.equal(report.search.radius, '7px', 'the search corners at 7');
+    assert.equal(
+      report.search.border,
+      report.accentBorder,
+      'the search rests on the partial accent'
+    );
+    assert.equal(report.or.height, 28, '`or…` stands at 28');
+    assert.deepEqual(
+      [report.remove.width, report.remove.height, report.remove.radius],
+      [24, 24, '7px'],
+      'the remove is 24 by 24 at radius 7 (ruled 2026-10-18)'
+    );
+    // A progressive stage row drops the row's box, so it drops the 52px floor with it.
+    assert.equal(report.stage.minHeight, '0px', 'the stage row lifts the row floor');
+    assert.equal(report.stage.height, report.stage.tallest, 'and stands as tall as its subject');
+  } finally {
+    await context.close();
+  }
+});
+
+const REPO_ROOT = resolve(__dirname, '../..');
+const RESULT_TREE = [...new Set([...SELECT_COMPILED_MODULES, ...RESULT_ROW_COMPILED_MODULES])];
+
+/** `ChoiceGroup` mounted once per props object, as its callers draw it. */
+async function choiceGroupMarkup(mounts) {
+  const harness = createMountedComponentHarness({
+    repoRoot: REPO_ROOT,
+    tmpPrefix: 'fabricate-result-wrap-',
+    rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, ...RESULT_ROW_RAW_MODULES],
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: RESULT_TREE,
+    componentPath: 'src/ui/svelte/components/ChoiceGroup.svelte',
+  });
+  await harness.setup();
+  try {
+    const markup = [];
+    for (const props of mounts) {
+      markup.push((await harness.mount(props)).innerHTML);
+      harness.remount();
+    }
+    return markup;
+  } finally {
+    harness.teardown();
+  }
+}
+
+/** `ChoiceGroup`'s result side mounted once per entry, as a recipe's reward set draws it. */
+function resultGroupMarkup(entries) {
+  const offer = recipeResultKinds({
+    componentOptions: [{ id: 'cmp-ingot', name: 'Iron Ingot' }],
+    currencyUnits: [
+      { id: 'gold', label: 'Gold', abbreviation: 'gp' },
+      { id: 'mark', label: 'Guild mark', abbreviation: 'gold' },
+    ],
+    currencyEnabled: true,
+  });
+  return choiceGroupMarkup(
+    entries.map((group) => ({ side: 'result', group, offer, reward: true }))
+  );
+}
+
+/** A page drawing `body` under the core floor, the module sheet and the tree's scoped blocks. */
+function mountedGroupPage(body) {
+  const scoped = RESULT_TREE.filter((path) =>
+    readFileSync(resolve(REPO_ROOT, path), 'utf8').includes('\n<style>')
+  ).map((path) => scopedComponentCss(resolve(REPO_ROOT, path)).css);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+      <style>${readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
+      <style>@layer modules { ${css} }</style>
+      <style>${scoped.join('\n')}</style>
+      <style>:root { --font-primary: Arial, sans-serif; } body { margin: 0; }
+        .fas::before, .fa-solid::before { content: "x"; }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }</style>
+      </head><body>${body}</body></html>`;
+}
+
+// Arial, not Signika: its natural wrap (flat about 706-710, members about 799-800) sits 7-11px under
+// the rules, so this test pins the rule values and not the real-font fit, which View Lab measures.
+test('the widest result rows hold one line just over each wrap rule, and wrap by rule at it (issue 2515)', async () => {
+  const ranged = (entry, from, to) => ({ ...entry, selectionRange: { from, to } });
+  const markup = await resultGroupMarkup([
+    { id: 'r1', kind: 'currency', unit: 'gold', quantity: 5 },
+    { id: 'r2', kind: 'currency', unit: 'mark', quantity: 5 },
+    {
+      id: 'g1',
+      chooser: 'rolled',
+      selectionFormula: '1d20',
+      alternatives: [
+        ranged({ id: 'a', kind: 'currency', unit: 'gold', quantity: 5 }, 1, 10),
+        ranged({ id: 'b', componentId: 'cmp-ingot', quantity: 1 }, 11, 20),
+      ],
+    },
+  ]);
+  const context = await openLayoutContext({ viewport: { width: 1200, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      mountedGroupPage(`<main class="fabricate-manager" style="width: 1100px">
+        <div class="manager-recipe-ingredient-set-groups">${markup[0]}${markup[1]}</div>
+        ${markup[2]}
+      </main>`)
+    );
+    const layoutAt = (list, width) =>
+      page.evaluate(
+        ([selector, inline]) => {
+          const container = document.querySelector(selector);
+          container.style.cssText = `width: ${inline}px; max-width: none; min-width: 0; flex: none`;
+          const rows = [...container.querySelectorAll(':scope > .is-result')];
+          return rows.map((row) => {
+            const controls = row.querySelector(':scope > .manager-recipe-option-controls');
+            const parts = [
+              ...row.querySelectorAll(':scope > :not(.manager-recipe-option-controls)'),
+              ...controls.children,
+            ].filter(
+              (part) =>
+                !part.matches('.manager-recipe-reward-body, .manager-recipe-option-invalid') &&
+                part.getBoundingClientRect().width > 0
+            );
+            const centre = (part) => {
+              const box = part.getBoundingClientRect();
+              return box.top + box.height / 2;
+            };
+            const tops = [...new Set(parts.map((part) => Math.round(centre(part))))].sort(
+              (a, b) => a - b
+            );
+            const lineStarts = tops.filter(
+              (top, index) => index === 0 || top - tops[index - 1] > 8
+            );
+            const lineOf = (part) =>
+              lineStarts.filter((start) => Math.round(centre(part)) >= start).length;
+            const remove = row.querySelector('.manager-recipe-option-remove');
+            const amount = row.querySelector('[data-recipe-option-amount-mode]');
+            const lastOnRemoveLine = parts
+              .filter((part) => lineOf(part) === lineOf(remove))
+              .every(
+                (part) => part.getBoundingClientRect().right <= remove.getBoundingClientRect().right
+              );
+            return {
+              byRule: getComputedStyle(controls).display === 'contents',
+              lines: lineStarts.length,
+              removeLine: lineOf(remove),
+              amountLine: lineOf(amount),
+              lastOnRemoveLine,
+            };
+          });
+        },
+        [list, width]
+      );
+
+    const FLAT = '.manager-recipe-ingredient-set-groups';
+    const MEMBERS = '.manager-recipe-result-group-members';
+    for (const [list, rule, removeLine] of [
+      [FLAT, 719, 2],
+      [MEMBERS, 809, 1],
+    ]) {
+      const over = await layoutAt(list, rule + 1);
+      assert.equal(over.length, 2, `${list}: two rows measured`);
+      for (const row of over) {
+        assert.deepEqual([row.byRule, row.lines], [false, 1], `${list} at ${rule + 1}: one line`);
+      }
+      for (const row of await layoutAt(list, rule)) {
+        assert.deepEqual(
+          [row.byRule, row.lines, row.amountLine, row.removeLine, row.lastOnRemoveLine],
+          [true, 2, 2, removeLine, true],
+          `${list} at ${rule}: two lines by rule, the remove ending line ${removeLine}`
+        );
+      }
+    }
+
+    const unit = await page.evaluate(() => {
+      const long = document.querySelectorAll('[data-recipe-option-unit]')[1];
+      return {
+        text: long.textContent,
+        title: long.title,
+        width: long.getBoundingClientRect().width,
+        clipped: long.scrollWidth > long.clientWidth,
+        overflow: getComputedStyle(long).textOverflow,
+      };
+    });
+    assert.deepEqual([unit.text, unit.title], ['gold', 'gold'], 'the long unit, titled in full');
+    assert.ok(unit.width <= 16 && unit.clipped, `it is cut at 16px (${unit.width})`);
+    assert.equal(unit.overflow, 'ellipsis', 'with an ellipsis');
+  } finally {
+    await context.close();
+  }
+});
+
+// Ruled 2026-10-18 (issue 2515): no separator, header to first row 8, rows 8 apart, adder 8 below.
+test('a choice group stands its header, rows and 28px adder 8px apart, with no separator, on both sides', async () => {
+  const offer = recipeResultKinds({
+    componentOptions: [{ id: 'cmp-ingot', name: 'Iron Ingot' }],
+    currencyUnits: [{ id: 'gold', label: 'Gold', abbreviation: 'gp' }],
+    currencyEnabled: true,
+  });
+  const markup = await choiceGroupMarkup([
+    {
+      group: {
+        id: 'g-ing',
+        options: [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-ingot' } },
+          { quantity: 2, match: { type: 'component', componentId: 'cmp-hide' } },
+          { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } },
+        ],
+      },
+      componentOptions: [
+        { id: 'cmp-ingot', name: 'Iron Ingot' },
+        { id: 'cmp-hide', name: 'Tanned Hide' },
+      ],
+      itemTags: ['abrasive'],
+    },
+    {
+      // "Up to N", where the bundle is not exclusive and a separator would misread it.
+      side: 'result',
+      reward: true,
+      offer,
+      group: {
+        id: 'g-res',
+        awardStrategy: 'upTo',
+        awardCount: 2,
+        alternatives: [
+          { id: 'a', componentId: 'cmp-ingot', quantity: 1 },
+          { id: 'b', kind: 'currency', unit: 'gold', quantity: 5 },
+          { id: 'c', componentId: 'cmp-ingot', quantity: 2 },
+        ],
+      },
+    },
+  ]);
+  const context = await openLayoutContext({ viewport: { width: 1200, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      mountedGroupPage(`<main class="fabricate-manager" style="width: 1006px">
+        <div data-side="ingredient">${markup[0]}</div><div data-side="result">${markup[1]}</div>
+      </main>`)
+    );
+    const report = await page.evaluate(() => {
+      const box = (node) => node.getBoundingClientRect();
+      const tokens = (name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.querySelector('main').append(probe);
+        return getComputedStyle(probe).color;
+      };
+      const read = (side) => {
+        const group = document.querySelector(`[data-side="${side}"] .has-alternatives`);
+        const [head, options, adds] = group.children;
+        const rows = [...options.children];
+        const adder = adds.querySelector('button');
+        const style = getComputedStyle(group);
+        return {
+          rowsOnly: rows.every((row) => row.matches('[data-recipe-option]')),
+          headToRow: box(rows[0]).top - box(head).bottom,
+          between: rows.slice(1).map((row, index) => box(row).top - box(rows[index]).bottom),
+          rowToAdder: box(adder).top - box(rows.at(-1)).bottom,
+          rowHeights: rows.map((row) => box(row).height),
+          rowGround: getComputedStyle(rows[0]).backgroundColor,
+          adder: [box(adder).height, getComputedStyle(adder).borderTopLeftRadius],
+          ground: style.backgroundColor,
+          radius: style.borderTopLeftRadius,
+        };
+      };
+      return {
+        ingredient: read('ingredient'),
+        result: read('result'),
+        accentSoft: tokens('--fab-accent-soft'),
+        bg1: tokens('--fab-bg-1'),
+      };
+    });
+    for (const side of ['ingredient', 'result']) {
+      const group = report[side];
+      const at = `the ${side} group`;
+      assert.ok(group.rowsOnly, `${at}: the rows stand with nothing between them`);
+      assert.equal(group.headToRow, 8, `${at}: header to first row`);
+      assert.deepEqual(group.between, [8, 8], `${at}: rows 8 apart`);
+      assert.equal(group.rowToAdder, 8, `${at}: the adder 8 below the last row`);
+      assert.deepEqual(group.adder, [28, '7px'], `${at}: the adder at 28, radius 7`);
+      assert.deepEqual([group.ground, group.radius], [report.accentSoft, '9px'], `${at}: the box`);
+      assert.equal(group.rowGround, report.bg1, `${at}: member rows on bg-1`);
+    }
+    // Every row stands on one 34px line: the tag row is level with the named rows.
+    assert.deepEqual(report.ingredient.rowHeights, [52, 52, 52], 'tag and component rows level');
   } finally {
     await context.close();
   }
@@ -1323,6 +1877,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
 
 test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
   // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).
+  // In foundry-native, the one palette where the tag ink parts from the tag hue (issue 2534).
   const chipScopedForTriggers = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte')
   );
@@ -1341,7 +1896,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   try {
     await page.setContent(`
       <!doctype html>
-      <html lang="en">
+      <html lang="en" data-fabricate-theme="foundry-native">
         <head>
           <meta charset="utf-8">
           <style>
@@ -1359,7 +1914,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
           <main class="fabricate-manager">
             <div class="fabricate-action-menu">
               <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
-                <i class="fa-solid fa-code-branch"></i><span>or…</span>
+                <span>or…</span>
               </button>
             </div>
             <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -1386,11 +1941,21 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
           justifyContent: style.justifyContent,
+          paddingInline: [style.paddingLeft, style.paddingRight],
         };
       };
+      const ink = (value) => {
+        const probe = document.createElement('span');
+        probe.style.color = value;
+        document.querySelector('main').append(probe);
+        return getComputedStyle(probe).color;
+      };
       return {
+        muted: ink('var(--fab-text-muted)'),
+        tagInk: ink('var(--fab-purple-text)'),
         or: read('[data-or-trigger]'),
         tag: read('[data-tag-trigger]'),
+        tagPlus: getComputedStyle(document.querySelector('[data-tag-trigger] > i')).fontSize,
         chip: read('[data-plain-chip]'),
       };
     });
@@ -1402,13 +1967,15 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'the plain chip is the filled solid-edged badge both affordances were shipping as'
     );
 
-    // `proto:2290`: 26px — a rung on the control-height ladder, and the height of the stepper it
-    // stands beside — with a 7px corner, 9.5px/600 text and a dashed `--border-strong` edge.
+    // The library `<PickerRow>` specimen's dashed button: 28px, level with the stepper it stands
+    // beside, a 7px corner, and 11px/600 muted text at 12px padding (ruled 2026-10-18).
     assert.equal(report.or.borderStyle, 'dashed', 'the "or…" trigger is an affordance, not a fill');
-    assert.equal(report.or.height, 26, '`proto:2290`: 26px');
-    assert.equal(report.or.borderRadius, '7px', '`proto:2290`: a 7px corner');
-    assert.equal(report.or.fontSize, '9.5px', '`proto:2290`: 9.5px');
-    assert.equal(report.or.fontWeight, '600', '`proto:2290`: 600');
+    assert.equal(report.or.height, 28, 'the specimen: 28px');
+    assert.equal(report.or.borderRadius, '7px', 'the specimen: a 7px corner');
+    assert.equal(report.or.fontSize, '11px', 'the specimen: 11px');
+    assert.equal(report.or.fontWeight, '600', 'the specimen: 600');
+    assert.equal(report.or.color, report.muted, 'the specimen: muted ink');
+    assert.deepEqual(report.or.paddingInline, ['12px', '12px'], 'the specimen: 12px padding');
     assert.equal(
       report.or.background,
       'rgba(0, 0, 0, 0)',
@@ -1420,19 +1987,20 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'and it displaces the host `button { justify-content: center }` rather than inheriting it'
     );
 
-    // `proto:2256`: a ~20px stadium in the TAG tint at 10px/600.
+    // The library choice-group unit's dashed `button.k-chip`: a 28px pill in the tag ink at
+    // 11px/600, level with the 28px chips it stands among (issue 2534).
     assert.equal(report.tag.borderStyle, 'dashed', 'the `+ Tag` pill is an affordance too');
-    assert.equal(report.tag.borderRadius, '999px', '`proto:2256`: a stadium');
-    assert.equal(report.tag.fontSize, '10px', '`proto:2256`: 10px');
-    assert.equal(report.tag.fontWeight, '600', '`proto:2256`: 600');
+    assert.equal(report.tag.height, 28, 'the drawing: 28px, the chips\' height');
+    assert.equal(report.tag.borderRadius, '999px', 'the drawing: a pill');
+    assert.equal(report.tag.fontSize, '11px', 'the drawing: 11px');
+    assert.equal(report.tag.fontWeight, '600', 'the drawing: 600');
+    assert.deepEqual(report.tag.paddingInline, ['12px', '12px'], 'the drawing: 12px padding');
+    assert.equal(report.tagPlus, '9px', 'the drawing: a 9px plus');
+    assert.equal(report.tag.color, report.tagInk, 'the drawing: the tag ink, `--fab-purple-text`');
     assert.equal(
       report.tag.background,
       'rgba(0, 0, 0, 0)',
-      '`proto:2256` gives it no fill either — the chips beside it are the filled things'
-    );
-    assert.ok(
-      report.tag.height <= 22,
-      `\`proto:2256\` draws a pill no taller than the chips it stands among (got ${report.tag.height}px)`
+      'the drawing gives it no fill either — the chips beside it are the filled things'
     );
     // The two carry DIFFERENT inks, and neither is the chip's. `+ Tag` is in the tag family
     // because a tag is what it adds; `or…` is quiet because it offers four kinds and favours none.
@@ -1452,7 +2020,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   );
   assert.doesNotMatch(
     readFileSync(
-      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte'),
+      resolve(__dirname, '../../src/ui/svelte/components/PickerRow.svelte'),
       'utf8'
     ),
     /\n\s+triggerChip\b/,
@@ -1464,5 +2032,74 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       new RegExp(`\\.manager-chip\\.${retired}`),
       `the discarded chip-bound rules for \`${retired}\` are retired rather than left reading as live`
     );
+  }
+});
+
+test('Repeats is the "up to N, by roll" drawing\'s quiet 26px status button (issue 2534)', async () => {
+  const button = (hook, disabled = '') =>
+    `<button type="button" class="fabricate-button manager-recipe-award-repeats" ${hook} ${disabled}><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Unique</span></button>`;
+  const context = await openLayoutContext({
+    viewport: { width: 640, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: 2rem; }
+            }
+            @layer modules { ${css} }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${button('data-repeats')}
+            ${button('data-repeats-off', 'disabled')}
+            <button type="button" class="fabricate-button" data-family-off disabled>Off</button>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const repeats = document.querySelector('[data-repeats]');
+      const style = getComputedStyle(repeats);
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--fab-text-secondary)';
+      document.querySelector('main').append(probe);
+      const edge = (selector) => getComputedStyle(document.querySelector(selector)).borderTopColor;
+      return {
+        height: repeats.getBoundingClientRect().height,
+        radius: style.borderTopLeftRadius,
+        border: style.borderTopColor,
+        color: style.color,
+        secondary: getComputedStyle(probe).color,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        markSize: getComputedStyle(repeats.querySelector('i.fa-ellipsis')).fontSize,
+        offEdge: edge('[data-repeats-off]'),
+        familyOffEdge: edge('[data-family-off]'),
+      };
+    });
+
+    assert.equal(report.height, 26, 'the drawing: 26px, under the family\'s 34px');
+    assert.equal(report.radius, '7px', 'the drawing: a 7px corner (A3)');
+    assert.equal(report.border, 'rgba(0, 0, 0, 0)', 'the drawing: no edge');
+    assert.equal(report.color, report.secondary, 'the drawing: secondary ink');
+    assert.equal(report.fontSize, '10.5px', 'the drawing: 10.5px');
+    assert.equal(report.fontWeight, '500', 'the drawing: 500');
+    assert.equal(report.markSize, '11px', 'the `···` mark is 11px');
+    assert.equal(report.offEdge, report.familyOffEdge, 'a disabled Repeats keeps the family edge');
+  } finally {
+    await context.close();
   }
 });

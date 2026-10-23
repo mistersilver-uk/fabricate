@@ -8,15 +8,12 @@
    - title: the short statement of what is absent (omit for a one-sentence panel).
    - hint: the optional explanatory sentence beneath it.
    - compact: smaller tile and tighter padding for sidebars, popovers and inline panels.
-   - inline: the ONE-LINE form (issue 1286) — the stack becomes a ROW and the 46px icon
+   - inline: the ONE-LINE form (issue 1286) — the stack becomes a ROW and the 38px icon
      tile is released into a bare inline glyph, so the panel reads as a single sentence
      with a leading mark rather than as a centred hero block. It is NOT a smaller
      `compact`: `compact` keeps the tile (at 32px) and keeps the column, and a "nothing
      goes wrong with this component yet" line sitting directly above an Add button cannot
      afford either. The Component Studio's complications section is its first consumer.
-     (This clause used to go on to refuse the PLAYER app's own empties as "a different area
-     shell". That refusal is retired with the one at the foot of this block, and for the same
-     reason — see there.)
    - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
      corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
      the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
@@ -24,8 +21,8 @@
      draw (`proto:2262` is `padding:7px; font:500 10px var(--sans); color:var(--subtle)` and
      nothing else). `SearchablePopover` is its consumer, which is every picker in the manager
      and the player window's actor bar.
-   - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
-     "your filters match nothing", which is not an absence of content and deliberately
+   - filtered: the filtered-to-nothing treatment — the specimen's plain panel in the muted ink
+     for "your filters match nothing", which is not an absence of content and deliberately
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
    - field: default false; sizes a short placeholder to full control width and 34px height.
      Pair with inline for availability fields; the dashed edge and typography stay intact.
@@ -104,7 +101,7 @@
     display: grid;
     place-items: center;
     padding: var(--fab-space-4);
-    border: 1.5px dashed var(--fab-border);
+    border: 1px dashed var(--fab-border-strong);
     border-radius: 11px;
     color: var(--fab-text-subtle);
     text-align: center;
@@ -122,28 +119,31 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 46px;
-    height: 46px;
-    border-radius: 11px;
-    color: var(--fab-text-subtle);
-    background: var(--fab-surface-soft);
-    font-size: 18px;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-3);
+    font-size: 15px;
   }
 
   .manager-empty h3 {
     margin: 0;
-    color: var(--fab-text-secondary);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     line-height: 1.25;
+    overflow-wrap: break-word;
   }
 
+  /* Small text on every variant, so the muted tone: the subtle one is under 4.5:1 in six of seven
+     palettes (issue 2178). */
   .manager-empty p {
-    max-width: 280px;
+    max-width: 34ch;
     margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 11px;
+    color: var(--fab-text-muted);
+    font-size: 10.5px;
     line-height: 1.5;
     overflow-wrap: break-word;
   }
@@ -223,10 +223,7 @@
 
      Written AFTER `.is-inline` so a caller that set both still gets the released panel, and
      the tile is released the way `is-inline` releases it rather than resized — a third tile
-     size is exactly what that variant's own comment refuses.
-
-     26px had no step on the spacing scale and took 24; 7px has none either and takes
-     `--fab-space-chip`. */
+     size is exactly what that variant's own comment refuses. */
   .manager-empty.is-note {
     place-items: start;
     padding: var(--fab-space-chip);
@@ -245,6 +242,7 @@
     width: auto;
     height: auto;
     border-radius: 0;
+    color: var(--fab-text-muted);
     background: none;
     font-size: 10px;
   }
@@ -269,26 +267,13 @@
     line-height: 1.4;
   }
 
-  /* Filtered to nothing is not an error and does not want the full empty-panel apparatus. The
-     figures are the reference's, corrected on the VARIANT rather than route-scoped; the one NOT
-     taken is the ink, which composites to 2.66:1 at this size — `is-note` above carries the same
-     correction on the same measurement. */
+  /* The specimen's plain panel on the hero's edge and padding, in the muted ink (issue 2550). */
   .manager-empty.is-filtered {
     align-content: center;
-    padding: var(--fab-space-6);
-    border-width: 1px;
-    border-color: var(--fab-border);
-    border-radius: 9px;
     color: var(--fab-text-muted);
-  }
-
-  .manager-empty.is-filtered > div {
-    gap: var(--fab-space-3);
   }
 
   .manager-empty.is-filtered p {
     color: var(--fab-text-muted);
-    font-size: 11.5px;
-    font-weight: 400;
   }
 </style>

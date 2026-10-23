@@ -77,6 +77,8 @@ The panel tells you which of the two states you are in, so you are never left gu
 
 {% include screenshot.html case="manager-component-edit-salvage" caption="The salvage section of the component editor." %}
 
+Each result set under **Result sets** is a card headed by a **Result set** label and a name field, with a menu at the end of its heading that offers **Remove result set**.
+An unnamed set shows its position, such as "Set 2", in the field.
 Removing a component's last result set turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
@@ -84,6 +86,10 @@ A component that can be salvaged but yields nothing is not a setup Fabricate wil
 When the system's salvage resolution mode is Simple, a component uses a single result set.
 In Simple mode the panel shows the hint **Simple mode uses a single result set**, so it is clear why only one is allowed; once you have added the one set, the **Add result set** control is hidden.
 Routed and Progressive modes keep the full list, where each result set maps to an outcome or a stage.
+
+In Routed mode the panel also shows an **Outcome routing** list with one row per outcome of the salvage check.
+Each row has a dropdown naming the result set that outcome produces, and **Unrouted** means the outcome awards nothing, which the component's validation flags for a success outcome (a failure outcome may stay Unrouted).
+When two or more outcomes route to the same result set, their rows are marked **shared · N**, where N is how many outcomes share it.
 
 {: .note }
 > **Existing components show this toggle turned off, and that is correct.**
@@ -110,7 +116,7 @@ A progressive stage can swap its component in place.
 Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
 While salvage is enabled, saving the component with such a row is refused until you fix it.
 A component with salvage disabled still saves.
-The editor wraps a row onto two lines where the column is narrow.
+The editor wraps a row onto two lines where the column is narrow, with the component and its kind on the first line and the remove button at the end of the second.
 
 ### The Salvage Override
 

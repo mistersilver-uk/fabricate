@@ -415,7 +415,7 @@
     announcement = next;
   }
 
-  // ONLY WHEN FOCUS IS ACTUALLY NOWHERE: the confirm's own `disabled` left it on `<body>`.
+  // ONLY WHEN FOCUS IS ACTUALLY NOWHERE: a caller's native `disabled`, or another focus loss, left it on `<body>`.
   function restoreFocusToControl() {
     if (typeof document === 'undefined') return false;
     const active = document.activeElement;
@@ -958,8 +958,8 @@
   }
 
   /* THE REMOVE LEG RENDERS INSIDE THE SHELL'S DOCK and this rule still reaches it, because a
-     snippet carries the scope hash of the component that DEFINES it. No spacing above: the dock's
-     own `has-foot` column rhythm owns that gap. */
+     snippet carries the scope hash of the component that DEFINES it. No spacing above: the
+     `InspectorPanel` foot's own column gap owns that gap. */
   .fab-component-bulk-remove {
     display: flex;
     flex-direction: column;

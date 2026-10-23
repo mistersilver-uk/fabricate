@@ -1,7 +1,8 @@
-// The manager's own clipping boundaries for a portaled overlay panel (issue 1500). The SELECTORS
-// are values rather than component details, so a shared component under `components/` and the
-// `anchoredPopover` action carry no app-specific selector; each overlay takes a `bounds` prop, and
-// these defaults reproduce the shipped boundary for every caller that passes none.
+// The manager's own clipping boundaries for a portaled overlay panel (issue 1500). Each selector is
+// a default, a value rather than a component detail, so a shared component under `components/` and
+// the `anchoredPopover` action carry no app-specific selector; each overlay takes a `bounds` prop
+// that replaces it, and these defaults reproduce the shipped boundary for every caller that passes
+// none.
 
 export const MANAGER_SCROLLER_SELECTOR = '.admin-main, .manager-main, .manager-table-scroll';
 
@@ -19,14 +20,15 @@ const INSET = 16;
 
 // Walks up to the first USABLE matching ancestor, SKIPPING one that is zero-sized or
 // `display: contents` — not a box a panel can be clipped against — and falling back to the host's
-// own inset edges rather than to nothing.
+// own inset edges rather than to nothing. The display is read from the candidate's own window.
 export function ancestorScrollerBounds(selector) {
   return (hostRect, anchor) => {
     let candidate = anchor?.parentElement ?? null;
     while (candidate) {
       if (candidate.matches?.(selector)) {
         const rect = candidate.getBoundingClientRect?.();
-        const display = globalThis.getComputedStyle?.(candidate)?.display;
+        const display =
+          candidate.ownerDocument?.defaultView?.getComputedStyle?.(candidate)?.display;
         if (rect && rect.width > 0 && rect.height > 0 && display !== 'contents') {
           return {
             minLeft: rect.left - hostRect.left + INSET,

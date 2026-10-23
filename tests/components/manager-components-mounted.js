@@ -18,6 +18,8 @@ import {
   managerComponents,
   settle,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
   settleRouteExit,
 } from './manager-mounted-shared.js';
 import {
@@ -54,6 +56,7 @@ export function registerComponentsCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -61,6 +64,7 @@ export function registerComponentsCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -550,7 +554,7 @@ export function registerComponentsCases() {
     // `ComponentEditorHeader`'s conversion.
     assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
     assert.ok(
-      saveButton.classList.contains('fab-manager-button'),
+      saveButton.classList.contains('fabricate-button'),
       `the header Save renders through the Button primitive, got ${saveButton.className}`
     );
     assert.ok(
@@ -868,10 +872,11 @@ export function registerComponentsCases() {
       'routed mode should render the DC-override field'
     );
 
-    // The routing row's caption names its own outcome (issue 1510), not the generic control label.
+    // The routing row's badge and connector name its select (issues 1510, 2513), never the
+    // generic control label.
     assert.equal(
       assertSelectHasResolvedName(target, '[data-salvage-route="Success"]'),
-      'Success',
+      'Success produces',
       'the Success row resolves its own outcome name'
     );
     // `''` (Unrouted) is stamped `__unchanged__` in the DOM — a `data-popover-option` cannot be

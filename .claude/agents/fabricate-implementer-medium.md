@@ -1,6 +1,6 @@
 ---
 name: fabricate-implementer-medium
-description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with brief-approved focused checks. Use when the issue's OpenSpec delta defines the task and code, canonical spec, or test files need to change under `src/`, `openspec/specs/`, `tests/`, or related runtime files. Use for a medium, single-file change spanning multiple functions, objects, or structures in that file. The workflow driver selects the model tier; do not self-select.
+description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with brief-approved focused checks. Use when the issue's OpenSpec delta defines the task and code, canonical spec, or test files need to change under `src/`, `openspec/specs/`, `tests/`, or related runtime files. Use for a medium, bounded work packet spanning related implementation, tests, localization, and specs across multiple files. The workflow driver selects the model tier; do not self-select.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: claude-sonnet-5-5
 ---

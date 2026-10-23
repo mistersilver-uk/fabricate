@@ -22,15 +22,17 @@
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
-  import { activeOptionId } from '../util/listboxNavigation.js';
+  import { activeOptionId, squareTileName } from '../util/listboxNavigation.js';
+  import { pickerCopy } from '../util/pickerOptionModel.js';
+  import Button from './Button.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
 
   let {
     popoverClass = '',
     compactOptionRows = false,
-    dialogNameAttribute = undefined,
-    dialogNamedBy = undefined,
+    panelLabel = '',
+    panelLabelledBy = '',
     anchor = null,
     popoverLayout,
     horizontalAlign = 'left',
@@ -59,6 +61,7 @@
     as = 'list',
     isGrid = false,
     gridColumns = 1,
+    squareTiles = false,
     optionClass = '',
     option: optionContent = undefined,
     instanceId = '',
@@ -67,6 +70,9 @@
     emptyBody = '',
     header = undefined,
     footer = undefined,
+    keyHints = false,
+    copy = pickerCopy(),
+    footerAction = null,
     chooseOption,
     optionIsSelected,
     close,
@@ -86,6 +92,14 @@
   function keepFocusOnHolder(event) {
     if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
   }
+
+  const focusSearch = () => search?.focus();
+  const squareTileList = $derived(isGrid && squareTiles);
+  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
+  const dialogNamedBy = $derived(panelLabelledBy || undefined);
+
+  // The hints follow the cursor's real key map, so a one-column grid is hinted as a list.
+  const keyHintText = $derived(copy(gridColumns > 1 ? 'gridHints' : 'listHints'));
 </script>
 
 <div
@@ -138,7 +152,8 @@
       data-active-option={index === activeIndex ? 'true' : undefined}
       data-recipe-add={option.addMarker || undefined}
       data-popover-option={option.dataId || undefined}
-      title={option.label}
+      title={squareTileList ? squareTileName(option) : option.label}
+      aria-label={squareTileList ? squareTileName(option) : undefined}
       onclick={() => chooseOption(option)}
       onmousedown={(event) => event.preventDefault()}
     >
@@ -152,27 +167,29 @@
         {:else if option.icon}
           <i class={option.icon} aria-hidden="true"></i>
         {/if}
-        {#if option.meta}
-          <span class="manager-travel-option-lines">
+        {#if !squareTileList}
+          {#if option.meta}
+            <span class="manager-travel-option-lines">
+              <span class="manager-travel-option-name">{option.label}</span>
+              <span class="manager-travel-option-meta">{option.meta}</span>
+            </span>
+          {:else}
             <span class="manager-travel-option-name">{option.label}</span>
-            <span class="manager-travel-option-meta">{option.meta}</span>
-          </span>
-        {:else}
-          <span class="manager-travel-option-name">{option.label}</span>
+          {/if}
+          {#if option.trailing}<Chip
+              class="manager-travel-option-trailing"
+              tone={option.trailingChip?.tone ?? 'disabled'}
+              mono={option.trailingChip?.mono === true}>{option.trailing}</Chip
+            >{/if}
+          {#if option.trailingIcon}<i
+              class={`manager-travel-option-marker ${option.trailingIcon}`}
+              aria-hidden="true"
+            ></i>{/if}
+          {#if option.disabled && option.disabledReason}<Chip
+              tone="disabled"
+              data-popover-option-reason="">{option.disabledReason}</Chip
+            >{/if}
         {/if}
-        {#if option.trailing}<Chip
-            class="manager-travel-option-trailing"
-            tone={option.trailingChip?.tone ?? 'disabled'}
-            mono={option.trailingChip?.mono === true}>{option.trailing}</Chip
-          >{/if}
-        {#if option.trailingIcon}<i
-            class={`manager-travel-option-marker ${option.trailingIcon}`}
-            aria-hidden="true"
-          ></i>{/if}
-        {#if option.disabled && option.disabledReason}<Chip
-            tone="disabled"
-            data-popover-option-reason="">{option.disabledReason}</Chip
-          >{/if}
       {/if}
     </button>
   {/snippet}
@@ -225,6 +242,7 @@
       aria-busy={status?.kind === 'refining' ? 'true' : undefined}
       data-picker-as={as}
       data-picker-columns={isGrid ? String(gridColumns) : undefined}
+      data-picker-tiles={squareTileList ? 'square' : undefined}
     >
       {#if isGrouped}
         {#each groupedOptions as bucket (bucket.id)}
@@ -256,7 +274,21 @@
     </div>
   {/if}
 
-  {#if footer}{@render footer({ close, failed: status?.kind === 'error' })}{/if}
+  {#if footer}{@render footer({ close, failed: status?.kind === 'error', query, focusSearch })}{/if}
+
+  {#if keyHints || footerAction}
+    <div class="fabricate-picker-key-hints" data-popover-key-hints>
+      {#if keyHints}<span class="fabricate-picker-key-hints-text" aria-hidden="true"
+          >{keyHintText}</span
+        >{/if}
+      {#if footerAction}<Button
+          role="ghost"
+          size="28"
+          class="fabricate-picker-footer-action"
+          onclick={() => footerAction.onActivate?.({ close })}>{footerAction.label}</Button
+        >{/if}
+    </div>
+  {/if}
 
   <span class="visually-hidden" aria-live="polite" data-popover-live
     >{status?.kind === 'loading' ? status.text : ''}</span
@@ -287,6 +319,7 @@
 
   .manager-travel-popover-count {
     flex: 0 0 auto;
+    margin-left: auto;
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 9px;

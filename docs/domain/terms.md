@@ -606,10 +606,37 @@ Spec reference: openspec/specs/resolution-modes/spec.md
 Exactly one result group is produced per attempt.
 The routing basis is a property of the **mode**, not a per-recipe provider (no `resultSelection`).
 The crafting check is **required**: a `routedByCheck` system with no authored `craftingCheck.routed.rollFormula` is an **unconditional** system-level blocker (`routedCheckNoFormula`), independent of any recipe — even with zero recipes — because every recipe routes by the check.
-**Single-result-group rule:** a recipe/step with exactly one result group needs no outcome/tier mapping — the single group is produced on any non-failure (success) outcome and nothing on a failure outcome (it uses only the success/failure aspect of the roll, mirroring routed-by-ingredients' single-group exemption); only multiple result groups require each success outcome to map (by tier assignment or name), and resolution does not abort for an unmatched success outcome when there is exactly one group.
+**Single-result-group rule:** a recipe/step with exactly one result group that lists no tier id needs no outcome/tier mapping — the single group is produced on any non-failure (success) outcome and nothing on a failure outcome (it uses only the success/failure aspect of the roll, mirroring routed-by-ingredients' single-group exemption); each success outcome must map (by tier assignment or name) once the step has multiple result groups OR any group lists a tier id (the engine's `recipeUsesTierRouting`), and resolution does not abort for an unmatched success outcome only while the exemption holds — once a group lists a tier id, an unlisted tier is `unrouted-tier`.
 A reserved failure keyword as a `ResultGroup.name` is rejected and group names must be unique under trim/case normalization — enforced at the service level via `ResolutionModeService._validateRoutedGroupNames` (reference integrity, always applied).
 
 Canonical mapping: `resolutionMode: "routedByCheck"`
+
+Spec reference: openspec/specs/resolution-modes/spec.md
+
+## Routing Overview
+
+A routing overview lists every source of a routed scope in one row each, naming the result set it effectively produces, and lets the GM re-point routing without opening a set.
+It ships as `RoutingOverview` (`src/ui/svelte/components/RoutingOverview.svelte`), drawn once per step scope by `RecipeRoutingCard` on the recipe Overview tab and by the component Salvage card for its outcome routing.
+The sources are the ingredient sets under `routedByIngredients` and the system's outcome tiers under `routedByCheck`, so the card states that the tiers belong to the system and the recipe chooses each one's result set.
+A row reads the scope's routing model, so its target is the EFFECTIVE one: marked "default" when inherited (`resultMapping`, a lone group, the scope's first group, or a tier's name matching a result set) and "shared · N" when N sources reach the same set.
+Choosing a row's explicit target writes nothing, choosing a default target writes it, and the only writes are `IngredientSet.resultGroupId` and `ResultGroup.checkOutcomeIds`, through the fields the set card writes.
+Under `routedByCheck` a tier the system does not offer is a `policy`-blocked row, a success tier below `minSuccessOutcomeId` is a `below-minimum` row, a gap between fixed tiers is a row whose action opens the Checks Studio, and a failure tier the policy permits is marked "only on a forced failure" while a minimum is set (a forced failure skips the minimum and lands on the lowest-ranked failure tier; a roll below it otherwise fails outright).
+`routingScopes` defines the scopes: a collapsed chain is its final step, and a step with no result sets of its own is a read-only `borrowed` scope showing the recipe's.
+Salvage rows stay neutral and keep "Unrouted", because an unrouted salvage outcome awards nothing where an unrouted recipe tier aborts as `unrouted-tier`.
+
+Canonical mapping: `RoutingOverview`, `RecipeRoutingCard`, `routingOverviewRows.js` (`routingScopes`, `overviewRows`), `buildRoutingModel`, `routedCheckFacts`
+
+Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/design-system/spec.md
+
+## Unreachable Result Set
+
+A result set (`ResultGroup`) is unreachable under `routedByIngredients` when no ingredient set reaches it by effective routing.
+The routing is the set's `resultGroupId`, else its `resultMapping`, else the scope's first group.
+The recipe-readiness warning `unreachableResultGroup` is raised once per step for the first such group, with a `results` target and a focus tag on the group, and never blocks enabling.
+It carries the check `routedResultGroupsReachable` and is built from `buildRoutingModel`'s `inbound`, with no role filter, so a `role: 'failure'` group is held to the same rule because this mode never awards one on a failed check (the set card's own "Nothing — unreachable" reading still skips it, issue 2520).
+`systemValidation`'s `collectRecipeIssues` derives `routingProvider = 'ingredientSet'` under `routedByIngredients`, so the System Overview lists the warning with a headless message too, and a gap between fixed tiers raises nothing there.
+
+Canonical mapping: `collectUnreachableGroupIssues` in `recipeReadiness.js`; `CHECK_TO_ISSUES.routedResultGroupsReachable`; `READINESS_ISSUE_MESSAGES.unreachableResultGroup` in `src/systems/systemValidation.js`
 
 Spec reference: openspec/specs/resolution-modes/spec.md
 
@@ -664,10 +691,12 @@ Spec reference: openspec/specs/destructive-changes-and-migrations/spec.md, opens
 
 ## Resolution Mode Change (migration-first)
 
-A GM confirms; the confirm dialog runs a pure **dry-run** (`classifyModeChange`, no mutation) and reports accurate migrate/delete counts — when nothing will be deleted the copy must not mention deletion (two distinct lang keys: `ResolutionModeChangeContent` vs `ResolutionModeChangeContentDelete`).
+A GM confirms; the confirm dialog runs a pure **dry-run** (`summarizeModeChange` over `classifyModeChange`, no mutation) and reports accurate migrate/delete counts — when nothing will be deleted the copy must not mention deletion (two distinct lang keys: `ResolutionModeChangeContent` vs `ResolutionModeChangeContentDelete`).
+It also names what a SURVIVING recipe loses, each in its own paragraph that is omitted when empty: the ingredient sets an alchemy collapse drops (each recipe with its sets, an unnamed set read "Set N") and the recipes that lose their failure set on a move into `progressive`.
 The merged system (new mode) is **persisted FIRST**, so recipe migration/validation read the new mode through the in-memory `systems` map, then each recipe is run through `migrateRecipeForModeChange(recipeJSON, fromMode, toMode, system)` per the normative **5×5 migratability matrix** (rows = source, columns = target `simple` / `routedByIngredients` (RI) / `routedByCheck` (RC) / `progressive` / `alchemy`): no target seeds a per-recipe `resultSelection.provider` (retired for the system-level `alchemy.checkMode`, issue 554) — migrating _into_ `alchemy` `clear`s any stale `resultSelection` and collapses a multi-**ingredient-set** recipe to its first set (best-effort, single `console.warn`), while the system-level `alchemy.checkMode` is seeded separately by the startup migration (default `none`); `clear` sets `resultSelection` to `null` for every other target too (a no-op for the routed modes, which never carry one); `carry` verbatim into a structurally-identical target (`RI↔RC`, or alchemy↔routed survival); `reconcile` (a `reconcile: true` flag on `ModeChangeResult`) when a carried/cleared recipe's routing data is stale for the new basis — entering `routedByCheck` from any source, or `RC → RI` — so the recipe survives but is surfaced as a re-authoring validation issue, never silently mis-routed.
 **`RI↔RC` never deletes** (`carry`, with `reconcile` for the stale direction).
-A recipe is **deleted ONLY** for a per-recipe **structural** constraint of the target mode: narrowing into `simple`/`progressive` (which require **1×1** — exactly one ingredient set and one result group) from a non-1×1 recipe, or moving a multi-step recipe into `alchemy` (no multi-step support).
+Migrating into `progressive` drops every reserved `role: 'failure'` group, because that mode has none, so a `[success, failure]` recipe survives the narrowing and persists without the failure group; every other target keeps it.
+A recipe is **deleted ONLY** for a per-recipe **structural** constraint of the target mode: narrowing into `simple`/`progressive` (which require **1×1** — exactly one ingredient set and one SUCCESS result group; a reserved `role: 'failure'` group is not counted) from a non-1×1 recipe, or moving a multi-step recipe into `alchemy` (no multi-step support).
 **System-level gaps never delete or disable** here — they are surfaced by the System Validation aggregator as `blocks:'system'` issues that gate visibility, not deletion.
 Migrated recipes persist on structural validity alone (`updateRecipe(..., { allowIncomplete: true })`).
 Standard clean-up (runs, learned entries, progressive ordering prefs) applies only to deleted recipes; in alchemy the signature reconciliation (disable colliding recipes) re-runs **only** on mode-into-alchemy.
@@ -675,7 +704,7 @@ An edit to an already-`alchemy` system that would introduce a collision is **har
 Notifications are aggregated (one migrated summary, one deleted-recipes warning when any were deleted) with a single `recipesChanged` emission.
 The migration helper is pure and reuses the `_clone` idiom from `migrateLegacyResolutionModes.js` (it no longer seeds an alchemy provider; `_seedProvider` survives only for the recipe editor's per-recipe seeding path, retained but off the mode-change pass).
 
-Canonical mapping: `migrateRecipeForModeChange`/`classifyModeChange` in `src/systems/migrateRecipeForModeChange.js`; `CraftingSystemManager.updateSystem`/`_migrateRecipesForModeChange`/`_assertNoAlchemySignatureCollisions`; `adminStore.setResolutionMode` dry-run
+Canonical mapping: `migrateRecipeForModeChange`/`classifyModeChange` in `src/systems/migrateRecipeForModeChange.js`; `CraftingSystemManager.updateSystem`/`_migrateRecipesForModeChange`/`_assertNoAlchemySignatureCollisions`; `summarizeModeChange` in the same file; `modeChangeConfirmContent` in `src/ui/svelte/stores/modeChangeConfirm.js`, which `adminStore.setResolutionMode` passes to the confirm dialog
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/destructive-changes-and-migrations/spec.md, openspec/specs/recipe-visibility/spec.md
 
@@ -762,7 +791,7 @@ The same engine-evaluated check-routing machinery is shared by `routedByCheck` *
 As of #431 this check routing is **engine-evaluated at craft time** (no longer authoring-only): when the system's routed config carries a `rollFormula`, `CraftingEngine._runRoutedCheck` rolls it (via `runFormulaRouted`) and the final (post-step) tier NAME drives routing through `ResultGroup.checkOutcomeIds` (else name fallback); a usable routed check requires `routed.rollFormula`, and with no routed `rollFormula` there is no routed check path (the deprecated macro/builtIn routed resolution has been removed).
 The **unrouted-tier diagnostic** (`ResolutionModeService._routeByTierAssignment`): when the routed outcome resolves to an authored success tier **and the recipe opts into tier routing** (at least one group declares `checkOutcomeIds`) but no group lists THAT tier's id, resolution surfaces a distinct `disposition:'unrouted-tier'` (empty groups) rather than silently falling through to name matching — disambiguating it from generic `misconfiguration`.
 A purely name-routed recipe (no group declares any `checkOutcomeIds`), or an outcome that resolves no success tier, still falls back to outcome-name matching.
-**Check-mode authoring safety (#431):** two non-blocking recipe-readiness _warnings_ (`recipeReadiness.collectRoutedCheckIssues`, fired only when `routingProvider === 'check'` — now **derived from the system mode**: `routedByCheck → 'check'`, `routedByIngredients → 'ingredientSet'`, with alchemy deriving `'check'` only in its `tiered` check-mode) flag a check-mode result group assigned no valid outcome tier (`unroutedResultGroup`) and an authored success tier no group produces (`unproducedOutcomeTier`, the backstop for the craft-time `unrouted-tier`), **but only for steps with MULTIPLE result groups** — a single-result-group step routes on the routed-by-check success/failure exemption and raises neither warning; each surviving warning carries a paired checklist entry and `target:'results'` deep link; and deleting a routed outcome tier strips its now-dangling id from every recipe's `ResultGroup.checkOutcomeIds` on save (`adminStore.saveCraftingCheckRouted` → `_stripDeletedRoutedTierIds`) with a GM notification of the count of result groups changed.
+**Check-mode authoring safety (#431):** two non-blocking recipe-readiness _warnings_ (`recipeReadiness.collectRoutedCheckIssues`, fired only when `routingProvider === 'check'` — now **derived from the system mode**: `routedByCheck → 'check'`, `routedByIngredients → 'ingredientSet'`, with alchemy deriving `'check'` only in its `tiered` check-mode) flag a check-mode result group assigned no valid outcome tier (`unroutedResultGroup`) and an authored success tier no group produces (`unproducedOutcomeTier`, the backstop for the craft-time `unrouted-tier`), **but only for steps that use tier routing, meaning MULTIPLE result groups or any group listing a tier id** — a single-result-group step in which no group lists a tier id routes on the routed-by-check success/failure exemption and raises neither warning (a single group listing one of two tiers is therefore no longer exempt: it raises `unproducedOutcomeTier`, because the engine aborts the unlisted tier as `unrouted-tier`); each surviving warning carries a paired checklist entry and `target:'results'` deep link; and deleting a routed outcome tier strips its now-dangling id from every recipe's `ResultGroup.checkOutcomeIds` on save (`adminStore.saveCraftingCheckRouted` → `_stripDeletedRoutedTierIds`) with a GM notification of the count of result groups changed.
 Gathering routed tasks carry **no** per-task result-selection provider: routed gathering is **system-check-formula only**, resolving via `gatheringCraftingCheck.routed.rollFormula` → outcome tier → result-group name match.
 
 Canonical mapping: `resultSelection.provider`
@@ -798,6 +827,8 @@ A newly-created system defaults to `perRecord`; an absent or unrecognized value 
 It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as GM-facing declarations of intent rather than as a second branch.
 It is orthogonal to the failure CONSUMPTION axis (`recipes-and-steps` §Failure Consumption and Failure-Result Policy), which answers whether a failed attempt consumes; gathering carries the produce axis and no consume axis, and **Failure Outcome** continues to own its text/macro feedback through `_applyFailureFeedback`.
 Its reach is bounded by what each mode's model can express: real on crafting `simple` and `alchemy simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index — the retain-one clamp guarantees index 0 is the SUCCESS group); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI and route with a `disposition: 'failure'`; inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering the whole path ships DORMANT pending issue 683.
+On a single-step crafting `simple` or `alchemy simple` recipe the opt-in is the PRESENCE of its `role: 'failure'` group: the editor adds it empty and removes it, with its results, through the "Award results on a failed check" toggle, and never synthesizes it, so an edit to the success set cannot create it (a step of a multi-step recipe has no toggle, issue 2523).
+Under `never` that toggle is disabled while the group is absent and still removes a group already present, which stays drawn with a note that it awards nothing; an empty failure group draws an "Optional" note rather than a "Nothing produced" warning.
 **The policy therefore gates AUTHORING as well as resolution** — the tier picker, the readiness validator and the routing all read the same policy-conditional set.
 Distinct from the **Reserved Failure Keyword**, a tier-NAME convention, and from an outcome TIER whose `success` is false: the policy is what makes the latter assignable.
 
@@ -1603,7 +1634,7 @@ Displayed as compact entries with quantity badges.
 Components move between the component inventory and the workbench.
 Derived state, not persisted.
 Owned by the new `alchemyStore` (NOT `craftingStore`).
-Submitting brews via the engine (`submitAlchemyAttempt` -> `craftAlchemy`), which is authoritative.
+Submitting brews via the engine (`submitAlchemyAttempt` -> `executePublicBrew` -> `craftAlchemy` start, then execute when ready), which is authoritative; a matched version-1 brew spends every submitted unit at start, from the submission only.
 
 Canonical mapping: `alchemyStore.workbench` (`src/ui/svelte/stores/alchemyStore.svelte.js`); `src/ui/svelte/apps/alchemy/Workbench.svelte`
 

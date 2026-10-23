@@ -105,7 +105,7 @@
 
 <style>
   /* A plain column: the list rows are the boxes, so this draws no border, fill or padding. Its
-     weight is stated because the Component Studio mounts it inside a `.fabricate-field`, whose 700
+     weight is stated because the Component Studio mounts it inside a `.fabricate-field`, whose 500
      the trigger sentence would otherwise inherit. */
   .manager-stage-complications {
     display: flex;

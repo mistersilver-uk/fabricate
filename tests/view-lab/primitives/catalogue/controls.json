@@ -146,105 +146,88 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "primary"
+      "role": "primary",
+      "size": "38"
     },
     "content": ["Save recipe"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "primary"
+      "role": "primary",
+      "size": "38"
     },
     "content": ["New template"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-chevron-left",
-          "aria-hidden": "true"
-        }
-      },
-      "Back"
-    ]
+    "content": ["Back"],
+    "props": {
+      "icon": "fas fa-chevron-left",
+      "size": "38"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "ghost"
+      "role": "ghost",
+      "size": "38"
     },
     "content": ["Cancel"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "page 38 · the header pair only",
+    "cap": "38 · the header pair only",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "danger"
+      "role": "danger",
+      "icon": "fas fa-trash",
+      "size": "38"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-trash",
-          "aria-hidden": "true"
-        }
-      },
-      "Delete"
-    ]
+    "content": ["Delete"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Open editor"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Apply to all"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "warning"
+      "role": "warning",
+      "icon": "fas fa-triangle-exclamation"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-triangle-exclamation",
-          "aria-hidden": "true"
-        }
-      },
-      "Review"
-    ]
+    "content": ["Review"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
@@ -254,7 +237,7 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "row 30 · everything in the body",
+    "cap": "34 · everything in the body",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
@@ -264,86 +247,68 @@
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 28",
+    "cap": "busy · an action in flight",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/Button.svelte",
+    "props": {
+      "role": "primary",
+      "busy": true,
+      "icon": "fas fa-clock"
+    },
+    "content": ["Salvaging…"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "icon 34",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "undrawn": {
       "Link a world item": "the icon button’s accessible name; the drawing draws its glyph"
     },
     "props": {
-      "ariaLabel": "Link a world item"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-link",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "ariaLabel": "Link a world item",
+      "icon": "fas fa-link"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 28",
+    "cap": "icon 34",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "undrawn": {
       "More actions": "the icon button’s accessible name; the drawing draws its glyph"
     },
     "props": {
-      "ariaLabel": "More actions"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-ellipsis",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "ariaLabel": "More actions",
+      "icon": "fas fa-ellipsis"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 28",
+    "cap": "icon 34",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "undrawn": {
-      "Remove this row": "the icon button’s accessible name; the drawing draws its glyph"
+      "Remove this row": "the icon button’s accessible name; the drawing draws its glyph",
+      "24": "the rung the bare × is drawn at, 24px around its glyph; the caption names the unit’s 34"
     },
     "props": {
-      "ariaLabel": "Remove this row"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ]
+      "size": "24",
+      "role": "ghost",
+      "ariaLabel": "Remove this row",
+      "icon": "fas fa-xmark"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "icon 24 · numeric size, issue 1648",
+    "cap": "icon 24 · a dense row’s control, issue 1648",
     "draws": "button",
     "path": "src/ui/svelte/components/IconButton.svelte",
     "props": {
-      "size": 24,
-      "ariaLabel": "Dismiss finished run"
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-xmark",
-          "aria-hidden": "true"
-        }
-      }
-    ],
-    "note": "The shipped `HistoryList` caller also adds `is-ghost`."
+      "size": "24",
+      "ariaLabel": "Dismiss finished run",
+      "icon": "fas fa-xmark"
+    }
   },
   {
     "spec": "<Button> <IconButton>",
@@ -351,18 +316,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Ingredient"
-    ]
+    "content": ["Ingredient"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -370,18 +327,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Result"
-    ]
+    "content": ["Result"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -389,18 +338,10 @@
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "dashed"
+      "role": "dashed",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Add ingredient set"
-    ]
+    "content": ["Add ingredient set"]
   },
   {
     "spec": "<Button> <IconButton>",
@@ -409,77 +350,54 @@
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed",
-      "fullWidth": true
+      "fullWidth": true,
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-plus",
-          "aria-hidden": "true"
-        }
-      },
-      "Add another tier"
-    ]
+    "content": ["Add another tier"]
   },
   {
     "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "cap": "28 · a choice group’s Alternative adder",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/Button.svelte",
     "props": {
-      "role": "danger"
+      "role": "dashed",
+      "size": "28",
+      "icon": "fas fa-plus"
     },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-trash",
-          "aria-hidden": "true"
-        }
-      },
-      "Delete essence"
-    ]
+    "content": ["Alternative"]
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "danger"
-    },
-    "content": ["Confirm delete"]
+      "idleLabel": "Delete essence",
+      "idleAriaLabel": "Delete essence"
+    }
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "ghost"
-    },
-    "content": ["Cancel"]
+      "armed": true,
+      "armedLabel": "Confirm delete",
+      "armedAriaLabel": "Confirm delete"
+    }
   },
   {
-    "spec": "<Button> <IconButton>",
-    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "spec": "<ArmedDangerButton>",
+    "cap": "arm, then confirm — three faces",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/Button.svelte",
+    "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
     "props": {
-      "role": "danger",
-      "disabled": true
-    },
-    "content": [
-      {
-        "tag": "i",
-        "attrs": {
-          "class": "fas fa-clock",
-          "aria-hidden": "true"
-        }
-      },
-      "Deleting…"
-    ]
+      "busy": true,
+      "busyLabel": "Deleting…",
+      "busyIcon": "fas fa-clock"
+    }
   },
   {
     "spec": "<Toggle>",
@@ -504,19 +422,6 @@
     },
     "props": {
       "on": false,
-      "ariaLabel": "Enabled"
-    }
-  },
-  {
-    "spec": "<Toggle>",
-    "cap": "on · success",
-    "draws": ".k-tog",
-    "path": "src/ui/svelte/components/StatusToggle.svelte",
-    "undrawn": {
-      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
-    },
-    "props": {
-      "on": true,
       "ariaLabel": "Enabled"
     }
   },
@@ -585,15 +490,15 @@
       "options": [
         {
           "value": "flat",
-          "fallback": "Flat"
+          "label": "Flat"
         },
         {
           "value": "market",
-          "fallback": "Full market"
+          "label": "Full market"
         },
         {
           "value": "sim",
-          "fallback": "Deep sim"
+          "label": "Deep sim"
         }
       ],
       "value": "market",
@@ -615,11 +520,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -642,11 +547,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -670,11 +575,11 @@
       "options": [
         {
           "value": "any",
-          "fallback": "Any of"
+          "label": "Any of"
         },
         {
           "value": "all",
-          "fallback": "All of"
+          "label": "All of"
         }
       ],
       "value": "any",
@@ -697,11 +602,11 @@
       "options": [
         {
           "value": "list",
-          "fallback": "List"
+          "label": "List"
         },
         {
           "value": "grid",
-          "fallback": "Card grid"
+          "label": "Card grid"
         }
       ],
       "value": "list",
@@ -724,8 +629,9 @@
     "props": {
       "legend": "When the tool breaks",
       "groupName": "pl-tool-breakage",
-      "selectedValue": "breakable",
+      "value": "breakable",
       "columns": 3,
+      "layout": "stacked",
       "options": [
         {
           "value": "breakable",
@@ -743,9 +649,45 @@
           "value": "degrading",
           "fallback": "Degrading",
           "icon": "fas fa-star",
-          "disabled": true,
-          "badgeFallback": "Coming soon",
           "descFallback": "Quality drops with each failed check."
+        }
+      ],
+      "disabledOptions": [
+        {
+          "value": "degrading",
+          "reason": "Coming soon"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<OptionCards>",
+    "cap": "row — one or two tracks",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/RadioCardGroup.svelte",
+    "undrawn": {
+      "Breakage": "the group’s legend, which the shipped group requires; the drawing draws none",
+      "breakable": "an option’s value, not its words",
+      "immune": "an option’s value, not its words"
+    },
+    "props": {
+      "legend": "Breakage",
+      "groupName": "pl-tool-breakability",
+      "value": "breakable",
+      "columns": 2,
+      "layout": "row",
+      "options": [
+        {
+          "value": "breakable",
+          "fallback": "Breakable",
+          "icon": "fas fa-hammer",
+          "descFallback": "The active check may break this Tool."
+        },
+        {
+          "value": "immune",
+          "fallback": "Immune",
+          "icon": "fas fa-lock",
+          "descFallback": "This Tool ignores check-driven breakage."
         }
       ]
     }
@@ -1088,12 +1030,12 @@
         "options": [
           {
             "value": "manual",
-            "fallback": "By hand",
+            "label": "By hand",
             "icon": "fas fa-hand"
           },
           {
             "value": "worldTime",
-            "fallback": "As time passes",
+            "label": "As time passes",
             "icon": "fas fa-bolt"
           }
         ]

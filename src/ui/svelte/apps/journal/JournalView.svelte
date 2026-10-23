@@ -53,22 +53,22 @@
   const statusOptions = $derived([
     {
       value: 'all',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.All'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.All'),
       badge: counts.all ?? 0,
     },
     {
       value: 'ready',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.Ready'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.Ready'),
       badge: counts.ready ?? 0,
     },
     {
       value: 'inProgress',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.InProgress'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.InProgress'),
       badge: counts.inProgress ?? 0,
     },
     {
       value: 'paused',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.Paused'),
+      label: localize('FABRICATE.App.Journal.Filters.Status.Paused'),
       badge: counts.paused ?? 0,
     },
   ]);
@@ -247,8 +247,9 @@
   }
   .journal-browse-lists {
     display: grid;
-    /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. */
-    grid-template-rows: minmax(0, 1fr) 280px;
+    /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. The
+       pager is 47px: a rule, the 30px page-size track, and the section inset above and below. */
+    grid-template-rows: minmax(0, 1fr) 284px;
     min-height: 0;
     flex: 1 1 auto;
     gap: 0;

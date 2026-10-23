@@ -19,6 +19,8 @@ import {
   assertDropComponentCellKeyboardPath,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
 import {
   assertSelectHasResolvedName,
@@ -54,6 +56,9 @@ const {
 /** A gathering task or event toolbar filter, addressed by the caption id that names it. */
 const gatheringFilter = (browser, axis) =>
   `[data-gathering-${browser}-browser] .fabricate-select-trigger[aria-labelledby$="-${axis}-filter"]`;
+
+/** The tint popover's panel; the inline strip carries the first class alone (issue 2459). */
+const COLOR_PANEL = '.fabricate-color-picker-popover.fabricate-picker-popover';
 
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
@@ -137,6 +142,7 @@ export function registerEnvironmentsCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -144,6 +150,7 @@ export function registerEnvironmentsCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
   /** Mount on the Gathering route, with a switch for the selected system's gathering feature. */
@@ -1831,7 +1838,7 @@ export function registerEnvironmentsCases() {
       const add = target.querySelector(hook);
       assert.ok(Boolean(add), `the gathering settings tab should render an add control at ${hook}`);
       assert.ok(
-        add.classList.contains('fab-manager-button'),
+        add.classList.contains('fabricate-button'),
         `${hook} should render through the Button primitive, not a hand-written class`
       );
       assert.ok(
@@ -1988,7 +1995,7 @@ export function registerEnvironmentsCases() {
     flushSync();
     await tick();
     flushSync();
-    const colorPopover = target.querySelector('[data-manager-color-picker-popover]');
+    const colorPopover = target.querySelector(COLOR_PANEL);
     assert.ok(colorPopover);
     assert.equal(
       colorPopover.closest('.fabricate-manager'),
@@ -2012,8 +2019,8 @@ export function registerEnvironmentsCases() {
     );
     assert.match(
       colorPopover.getAttribute('style'),
-      /width:\s*220px;/,
-      'biome color popover should keep its fixed compact width'
+      /width:\s*240px;/,
+      'biome color popover should take the picker panel band floor'
     );
     target.querySelector('[data-manager-color-token="mist"]').click();
     await tick();
@@ -2025,11 +2032,17 @@ export function registerEnvironmentsCases() {
       { colorToken: 'mist', customColor: '' },
       'alchemy',
     ]);
-    assert.ok(target.querySelector('[data-manager-color-picker-popover]'));
+    assert.ok(!target.querySelector(COLOR_PANEL), 'a pick closes the panel');
+    biomeColorTrigger.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    );
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector(COLOR_PANEL), 'the edit palette reopens');
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
+    assert.ok(!target.querySelector(COLOR_PANEL), 'an outside mousedown closes it');
     biomeColorTrigger.getBoundingClientRect = () => ({
       left: 760,
       top: 330,
@@ -2043,17 +2056,17 @@ export function registerEnvironmentsCases() {
     );
     await tick();
     flushSync();
-    const constrainedColorPopover = target.querySelector('[data-manager-color-picker-popover]');
+    const constrainedColorPopover = target.querySelector(COLOR_PANEL);
     assert.ok(constrainedColorPopover);
     assert.match(
       constrainedColorPopover.getAttribute('style'),
-      /left:\s*424px;/,
+      /left:\s*404px;/,
       'biome color popover should clamp to the Manager main panel right edge'
     );
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
+    assert.ok(!target.querySelector(COLOR_PANEL), 'Escape closes the panel');
     managerShell.getBoundingClientRect = originalShellRect;
     managerMain.getBoundingClientRect = originalMainRect;
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
@@ -2175,12 +2188,12 @@ export function registerEnvironmentsCases() {
       ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern'],
       'each row menu trigger is named for the record it acts on'
     );
-    // The hover tooltip stays generic: it appears beside the row the pointer is already on.
+    // Its tooltip is that name (issue 2541), shown under keyboard focus as well as the pointer.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
-        row.querySelector('[aria-haspopup="menu"]').getAttribute('title')
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('data-tooltip-text')
       ),
-      ['Environment actions', 'Environment actions']
+      ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern']
     );
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
@@ -2403,6 +2416,22 @@ export function registerEnvironmentsCases() {
     target.querySelector('[data-overview-scene-unlink]').click();
     await tick();
     flushSync();
+
+    // The card's null guard: no scene address means the empty face, not a linked one.
+    const sceneZone = target.querySelector(
+      ':scope [data-overview-section="scene"] [data-manager-item-drop-zone]'
+    );
+    assert.ok(Boolean(sceneZone), 'the scene card keeps its drop zone after unlink');
+    assert.ok(!sceneZone.classList.contains('is-linked'), 'an unlinked scene zone is not linked');
+    assert.ok(
+      !sceneZone.querySelector('[data-overview-scene-unlink]'),
+      'an unlinked scene zone offers no unlink'
+    );
+    assert.equal(
+      target.querySelector(`#${sceneZone.getAttribute('aria-labelledby')}`).textContent.trim(),
+      'Drag a scene here to link it.',
+      'the unlinked scene zone names itself with the empty-face title'
+    );
 
     picker = target.querySelector('[data-overview-section="identity"] .fab-art-picker-tile');
     assert.equal(
@@ -2766,7 +2795,7 @@ export function registerEnvironmentsCases() {
     );
     assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
     assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear Moon Herb');
-    assert.equal(taskClearButton.getAttribute('title'), 'Clear Moon Herb');
+    assert.equal(taskClearButton.getAttribute('data-tooltip-text'), 'Clear Moon Herb');
     assert.equal(
       taskClearButton.textContent.trim(),
       '',
@@ -3112,7 +3141,7 @@ export function registerEnvironmentsCases() {
       const action = target.querySelector(`[data-environment-issue-action="${kind}"]`);
       assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
       assert.ok(
-        action.classList.contains('fab-manager-button'),
+        action.classList.contains('fabricate-button'),
         `the View ${kind} link renders through the Button primitive, got ${action.className}`
       );
       assert.ok(

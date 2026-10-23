@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
+  INSPECTOR_PANEL_PATTERN,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
@@ -88,7 +89,8 @@ export const CASES = Object.freeze([
     // Beyond the smoke: no smoke step scrolls an essence inspector to its verbs.
     reaches: 'beyond',
     smokeLabels: [],
-    // The rail's four verbs, which sit below its fold on every other essence frame (issue 1521).
+    // The rail's four verbs: Edit and Delete pinned in its foot (issue 2498), and Copy and Unlink
+    // beside Source, which sits below the fold on every other essence frame (issue 1521).
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -115,6 +117,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -194,6 +197,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -220,6 +224,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
       BULK_DELETE_CARD_PATTERN,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -231,7 +236,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -256,7 +261,7 @@ export const CASES = Object.freeze([
     query: { saveFails: '1' },
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-recipe-field="essence-enabled"]' },
       { selector: '[data-essence-edit-save]' },
     ],
@@ -276,7 +281,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
@@ -302,7 +307,7 @@ export const CASES = Object.freeze([
     query: { noEssenceScope: '1' },
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-essence-tab="oncraft"]' },
     ],
     expectView: 'essence-edit',
@@ -335,7 +340,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] [data-essence-edit]' },
       { selector: '[data-essence-tab="validation"]' },
     ],
     expectView: 'essence-edit',

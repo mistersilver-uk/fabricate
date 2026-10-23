@@ -11,6 +11,7 @@ import {
   componentCardHarness,
 } from '../helpers/componentEditViewModules.js';
 import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const harness = componentCardHarness('ComponentSalvageCard');
 
@@ -72,7 +73,10 @@ describe('ComponentSalvageCard', () => {
     );
     name.value = 'Dust';
     name.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    target.querySelector(':scope [data-salvage-group="grp-2"] [data-remove-salvage-group]').click();
+    await chooseSetCardAction(
+      target.querySelector(':scope [data-salvage-group="grp-2"]'),
+      '[data-remove-salvage-group]'
+    );
     target
       .querySelector(':scope [data-salvage-group="grp-1"] [data-remove-salvage-result]')
       .click();
@@ -104,13 +108,53 @@ describe('ComponentSalvageCard', () => {
     harness.remount();
   });
 
+  // Issue 2513: the well is a routing overview, one neutral row per outcome.
+  it('marks outcomes routed to one set "shared · 2", and gives unrouted ones no shared marker', async () => {
+    const markers = (target, name) =>
+      [
+        ...target.querySelectorAll(
+          `:scope [data-salvage-routing] [data-routing-overview-row="${name}"] .fabricate-routing-overview-marker`
+        ),
+      ].map((marker) => marker.textContent);
+    const outcomes = ['Fine', 'Masterwork', 'Ruined', 'Botched'];
+    const { target } = await mountWith({
+      salvageOutcomeNames: outcomes,
+      salvageDraft: {
+        enabled: true,
+        outcomeRouting: { Fine: 'grp-1', Masterwork: 'grp-1' },
+        resultGroups: GROUPS,
+      },
+    });
+    assert.deepEqual(markers(target, 'Fine'), ['shared · 2']);
+    assert.deepEqual(markers(target, 'Masterwork'), ['shared · 2']);
+    assert.deepEqual(markers(target, 'Ruined'), [], 'two unrouted outcomes share nothing');
+    assert.deepEqual(markers(target, 'Botched'), []);
+    assert.equal(selectTriggerText(target, '[data-salvage-route="Ruined"]'), 'Unrouted');
+    assert.equal(
+      target.querySelector('[data-validation-target="component-salvage-routing"]').dataset
+        .salvageRoute,
+      'Ruined',
+      'the validation hook lands on the first unrouted outcome'
+    );
+    assert.ok(
+      !target.querySelector(
+        ':scope [data-salvage-routing] .fabricate-routing-overview-summary:not(:empty)'
+      ),
+      'no row carries a summary'
+    );
+    harness.remount();
+  });
+
   it('holds the result-set controls while saving', async () => {
     const { target } = await mountWith({ saving: true });
     const name = target.querySelector(
       ':scope [data-salvage-group="grp-1"] [data-salvage-group-name]'
     );
     assert.ok(name.disabled, 'the set name is read-only');
-    assert.ok(target.querySelector('[data-remove-salvage-group]').disabled);
+    assert.ok(
+      target.querySelector(':scope [data-salvage-group="grp-1"] [data-set-card-actions]').disabled,
+      'the set’s kebab is inert'
+    );
     assert.ok(target.querySelector('button[data-add-salvage-group]').disabled);
     assert.ok(target.querySelector('[data-salvage-route="Success"]').disabled);
     harness.remount();

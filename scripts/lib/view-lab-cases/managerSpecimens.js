@@ -4,16 +4,20 @@
  * depicts a state no GM can reach today, so each label says so; it is not a smoke counterpart.
  */
 
+import { INSPECTOR_PANEL_PATTERN } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 /**
- * The seam, its prop kinds, its callbacks, its manifest, its adapter and its host: each redraws
- * what it mounts.
+ * The seam, its lazy loading, its prop kinds, its callbacks, its values, its overlay chain, its
+ * manifest, its adapter and its host: each redraws what it mounts.
  */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
+  /^src\/ui\/publishedComponentLoading\.js$/,
   /^src\/ui\/publishedComponentProps\.js$/,
   /^src\/ui\/publishedComponentCallbacks\.js$/,
+  /^src\/ui\/publishedComponentValues\.js$/,
+  /^src\/ui\/publishedComponentOverlays\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,
@@ -168,7 +172,28 @@ const PRESSED_TOGGLES = [
   `:has(> ${TOGGLE_SECTION('press')} button[data-lab-presses="1"][aria-pressed="true"])`,
 ].join('');
 
-/** Each notice, each button and each switch inside the ground, and the ground inside the window. */
+/**
+ * The same fixture's band of dismissable notices, one of its sections by the notice's tone, and
+ * the published button beneath each that stands for the companion's next control.
+ */
+const DISMISSALS_GROUND = '[data-lab-dismissals]';
+const DISMISSAL_SECTION = (tone) => `[data-lab-dismissal="${tone}"]`;
+const DISMISSAL = (tone) =>
+  `${CONTROLS_GROUND} > ${DISMISSALS_GROUND} > ${DISMISSAL_SECTION(tone)}`;
+const NEXT_BUTTON = (tone) => `${DISMISSAL(tone)} > [data-lab-next] button`;
+
+/** Each dismissable notice that fixture mounts, by its section's tone. */
+const DISMISSAL_TONES = Object.freeze(['danger', 'accent']);
+
+/** The 2px accent keyboard ring with 2px of ground between ring and control. */
+const ACCENT_RING =
+  'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)';
+
+/**
+ * Each notice, each button, each switch and each dismissal's section and next control inside the
+ * ground, and the ground inside the window. A dismissal's section, not its notice, because one
+ * case's press removes the notice.
+ */
 const CONTROLS_CONTAINMENT = Object.freeze([
   ...CONTROL_KEYS.map((key) => ({
     container: CONTROLS_GROUND,
@@ -176,11 +201,105 @@ const CONTROLS_CONTAINMENT = Object.freeze([
   })),
   ...BUTTON_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_BUTTON(key) })),
   ...TOGGLE_KEYS.map((key) => ({ container: CONTROLS_GROUND, target: LAB_TOGGLE(key) })),
+  ...DISMISSAL_TONES.flatMap((tone) => [
+    { container: CONTROLS_GROUND, target: DISMISSAL(tone) },
+    { container: CONTROLS_GROUND, target: NEXT_BUTTON(tone) },
+  ]),
   { container: '.window-content', target: CONTROLS_GROUND },
 ]);
 
-/** Sized to the fixture's 592px ground and the height of its notices, buttons and switches. */
-const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 830 });
+/** Sized to the fixture's 592px ground and the height of its notices, buttons, switches and dismissals. */
+const CONTROLS_WINDOW = Object.freeze({ width: 680, height: 940 });
+
+/** The values fixture's ground, one of its sections by key, and a part of that section's stepper. */
+const VALUES_GROUND = '[data-lab-values]';
+const STEPPER_SECTION = (key) => `[data-lab-stepper="${key}"]`;
+const LAB_STEPPER = (key, part) => `${VALUES_GROUND} ${STEPPER_SECTION(key)} ${part}`;
+const INCREMENT = 'button[data-stepper-increment]';
+
+/** Each stepper `tests/view-lab/fixtures/PublishedValues.svelte` mounts, by its section's key. */
+const STEPPER_KEYS = Object.freeze(['credit', 'count', 'even', 'limit', 'card']);
+
+/**
+ * The ground once the steppers case's first five steps have acted: `credit` and `count` stepped up,
+ * `even` holding 2 and showing it after refusing a typed 3, and `card` stepped down by its key.
+ */
+const STEPPED_VALUES = [
+  VALUES_GROUND,
+  `:has(> ${STEPPER_SECTION('credit')}[data-lab-value="4"])`,
+  `:has(> ${STEPPER_SECTION('count')}[data-lab-value="3"])`,
+  `:has(> ${STEPPER_SECTION('even')}[data-lab-value="2"][data-lab-shown="2"]:not([data-lab-refused="0"]))`,
+  `:has(${STEPPER_SECTION('card')}[data-lab-value="3"])`,
+].join('');
+
+/** Each stepper inside the ground, and the ground inside the window. */
+const VALUES_CONTAINMENT = Object.freeze([
+  ...STEPPER_KEYS.map((key) => ({ container: VALUES_GROUND, target: LAB_STEPPER(key, 'input') })),
+  { container: '.window-content', target: VALUES_GROUND },
+]);
+
+/** The 2px accent ring at the focused part's own edge, by its shape alone. */
+const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
+
+/** Sized to the fixture's 320px ground and the height of its five rows. */
+const VALUES_WINDOW = Object.freeze({ width: 480, height: 520 });
+
+/** The search fixture's ground, one of its sections by key, and a part of that section's field. */
+const SEARCH_GROUND = '[data-lab-search-ground]';
+const SEARCH_SECTION = (key) => `[data-lab-search="${key}"]`;
+const LAB_SEARCH = (key, part) => `${SEARCH_GROUND} ${SEARCH_SECTION(key)} ${part}`;
+
+/** Each field `tests/view-lab/fixtures/PublishedSearch.svelte` mounts, by its section's key. */
+const SEARCH_KEYS = Object.freeze(['empty', 'filled', 'transform']);
+
+/** Each field inside the ground, and the ground inside the window. */
+const SEARCH_CONTAINMENT = Object.freeze([
+  ...SEARCH_KEYS.map((key) => ({
+    container: SEARCH_GROUND,
+    target: LAB_SEARCH(key, '.fabricate-search'),
+  })),
+  { container: '.window-content', target: SEARCH_GROUND },
+]);
+
+/** Sized to the fixture's 320px ground and the height of its three fields. */
+const SEARCH_WINDOW = Object.freeze({ width: 480, height: 360 });
+
+/** The select fixture's ground, one of its sections by key, and a part of that section's select. */
+const SELECT_GROUND = '[data-lab-select-ground]';
+const SELECT_SECTION = (key) => `[data-lab-select="${key}"]`;
+const LAB_SELECT = (key, part) => `${SELECT_GROUND} ${SELECT_SECTION(key)} ${part}`;
+const SELECT_TRIGGER = '.fabricate-select-trigger';
+
+/** The list the ground hosts as `hosted`'s `overlayHost`, in the container the seam mounts there. */
+const HOSTED_LIST = `${SELECT_GROUND} > div > .fabricate-select-popover`;
+/** The list the seam's standalone layer hosts for `layer`, whose frame carries no app root. */
+const LAYER_LIST =
+  'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover';
+/** One option of a list, by the value the fixture passes. */
+const SELECT_OPTION = (list, value) => `${list} [data-popover-option="${value}"]`;
+
+/** Each trigger inside the ground, and the ground inside the window. */
+const SELECT_CONTAINMENT = Object.freeze([
+  ...['hosted', 'layer'].map((key) => ({
+    container: SELECT_GROUND,
+    target: LAB_SELECT(key, SELECT_TRIGGER),
+  })),
+  { container: '.window-content', target: SELECT_GROUND },
+]);
+
+/** Sized to the fixture's 320px ground, the room it reserves for the hosted list, and the layer's list beneath the second select. */
+const SELECT_WINDOW = Object.freeze({ width: 480, height: 440 });
+
+/** The stage bars fixture's ground, and one of its sections by key: relative to the ground, for inside its `:has()`, and from the document. */
+const STAGE_BARS_GROUND = '[data-lab-stage-bars-ground]';
+const STAGE_BARS_SECTION_IN_GROUND = (key) => `> [data-lab-stage-bars="${key}"]`;
+const STAGE_BARS_SECTION = (key) => `${STAGE_BARS_GROUND} ${STAGE_BARS_SECTION_IN_GROUND(key)}`;
+
+/** Each group `tests/view-lab/fixtures/PublishedStageBars.svelte` mounts, by its section's key. */
+const STAGE_BARS_KEYS = Object.freeze(['forge', 'brew', 'copy']);
+
+/** Sized to the fixture's 360px ground and the height of its three groups. */
+const STAGE_BARS_WINDOW = Object.freeze({ width: 480, height: 320 });
 
 export const CASES = Object.freeze([
   managerCase({
@@ -195,7 +314,10 @@ export const CASES = Object.freeze([
     // The hardest of the three states: a warning report listing its skipped rows inside the notice.
     expectSelector: '[data-bulk-report][data-notice-tone="warning"] [data-bulk-blocked-row]',
     kinds: ['manager', 'specimen'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-published-tier-track-specimen',
@@ -264,7 +386,7 @@ export const CASES = Object.freeze([
         {
           selector: '.fabricate-card',
           styles:
-            'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+            'display: flex; row-gap: 8px; padding-top: 16px; border-radius: 11px; background-color: var(--fab-bg-2)',
         },
         { selector: '.fab-rail > div', styles: SLOT_BOX },
         { selector: '.fab-rail > div > div', styles: SLOT_BOX },
@@ -272,18 +394,35 @@ export const CASES = Object.freeze([
         { selector: '.fabricate-card > div > div', styles: SLOT_BOX },
         {
           selector: HERO_PANEL,
-          styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+          styles:
+            'border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); background-color: rgba(0, 0, 0, 0)',
         },
         { selector: `${HERO_PANEL} > div`, styles: 'display: flex; row-gap: 8px' },
-        { selector: `${HERO_PANEL} > div > i`, styles: 'width: 46px; height: 46px' },
+        {
+          selector: `${HERO_PANEL} > div > i`,
+          styles:
+            'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
+        },
         { selector: `${HERO_PANEL} > div > div`, styles: SLOT_BOX },
         { selector: `${HERO_PANEL} > div > div > div`, styles: SLOT_BOX },
         {
           selector: '.manager-empty h3',
-          styles: 'color: var(--fab-text-secondary); font-size: 13px',
+          styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
         },
-        { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 12px' },
-        { selector: `${FILTERED_PANEL} p`, styles: 'color: var(--fab-text-muted)' },
+        {
+          selector: `${HERO_PANEL} > div > p`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+        },
+        {
+          selector: FILTERED_PANEL,
+          styles:
+            'padding: 16px; border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); border-radius: 11px',
+        },
+        { selector: `${FILTERED_PANEL} > div`, styles: 'row-gap: 8px' },
+        {
+          selector: `${FILTERED_PANEL} p`,
+          styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+        },
         {
           selector: `${HERO_PANEL} .fabricate-button`,
           styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
@@ -312,7 +451,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-controls-specimen',
     label:
-      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. Beneath those, eight published switches at rest beside their labels: Group by category off and Hidden tasks on; Sort by name and Essences in the list off, the second over its hint; a long label wrapping beside a switch that is on; Group by tag off; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+      'Specimen, mounted through the published seam — five notices that each carry an action, on the lighter ground, after three steps that press what the fixture mounts: a click on the first action, whose callback redrew that notice in the success tone with no button; Enter on the second, whose callback kept its button and counted the press in its title; and Tab from the second, which put keyboard focus on the third. Reading left to right, top to bottom: the success notice with no button; an info notice whose title reads Attempts allowed: 1; a danger notice across both cells whose detail wraps under its title, its button on the title’s row carrying the accent ring; a warning notice in one cell whose button has dropped beneath the text; and a success notice with its button on the title’s row. Beneath them, thirteen published buttons at rest: a neutral and a primary; a ghost and a danger; a warning and a dashed adder that hugs its label; a dashed adder across both cells; a neutral across one cell beside a disabled neutral; a disabled primary beside a neutral in a 120px target whose long label takes four lines, its first and last spilling unclipped past the top and bottom edges of its 34px box; and, on a darker strip, a ghost and a dashed adder. Beneath those, eight published switches at rest beside their labels: Group by category off and Hidden tasks on; Sort by name and Essences in the list off, the second over its hint; a long label wrapping beside a switch that is on; Group by tag off; and, on a darker strip, Crafter notifications on and Shared results off. Beneath those, two dismissable notices at rest, a danger and an accent one, each with its action and a dismiss control after it, and each above a Next step button. The frame draws inside the manager window, so it shows the ring’s declarations and not the bare host: the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -332,8 +471,9 @@ export const CASES = Object.freeze([
       controls: [
         // One button per tone once the first notice has lost its own: a control selector names
         // one element.
+        // Scoped to the five notices' sections, beside the dismissals' band.
         ...['info', 'danger', 'warning', 'success'].map((tone) => ({
-          selector: `.fab-notice.is-${tone} [data-notice-action]`,
+          selector: `${CONTROLS_GROUND} > section .fab-notice.is-${tone} [data-notice-action]`,
           styles: ACTION_BUTTON,
         })),
         // The third action under keyboard focus: `:focus-visible` alone says focus, not a ring.
@@ -346,7 +486,7 @@ export const CASES = Object.freeze([
           styles: 'color: var(--fab-success-text)',
         },
         {
-          selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+          selector: `${CONTROLS_GROUND} > section .fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title`,
           styles: 'color: var(--fab-danger-text)',
         },
         ...RESTING_BUTTONS,
@@ -363,7 +503,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-buttons-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn, the five notices above are unpressed and the eight switches beneath are at rest. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its buttons: a click on the neutral Clear filters, whose callback redrew it as Filters cleared, and Space on the primary New project, whose callback redrew it as Projects: 1. The first button stands on the raised tile under the pointer, and the second carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, kept across its own update. No other ring is drawn, the five notices above are unpressed and the eight switches and two dismissable notices beneath are at rest. The frame draws inside the manager window; the census of the sheet, the mounted player-shell clause and the measured equality are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -398,7 +538,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-toggles-specimen',
     label:
-      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off. The frame draws inside the manager window under Foundry 14’s own core sheet, so the button stands 28px tall here at the window’s 14px type size, and taller in a form or dialog row; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+      'Specimen, mounted through the published seam — the same fixture after two steps that press its switches: a click on Sort by name, whose callback turned it on and counted the press, and Space on Essences in the list, whose callback turned it on in place, so the accent keyboard ring, 2px wide with 2px of ground between ring and track, stays on it. Beneath the unpressed notices and the buttons at rest, reading left to right, top to bottom: Group by category off and Hidden tasks on, each beside its own label; Sort by name on, under the pointer; Essences in the list on and ringed, over its hint; a long label wrapping beside a switch that keeps its width, on; Group by tag off, whose aria-labelledby names no element, which the frame cannot show; and, on a darker strip, Crafter notifications on and Shared results off; beneath them, the two dismissable notices are at rest. The frame draws inside the manager window under Foundry 14’s own core sheet, so the button stands 28px tall here at the window’s 14px type size, and taller in a form or dialog row; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
     // Beyond the smoke: a companion mounts each through `api.ui` and is told of each press.
     reaches: 'beyond',
     smokeLabels: [],
@@ -416,11 +556,11 @@ export const CASES = Object.freeze([
         // figure would pin the fixture rather than the contract.
         {
           selector: TOGGLE_TRACK('group'),
-          styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+          styles: 'width: 38px; height: 22px; background-color: var(--fab-surface-soft)',
         },
         { selector: TOGGLE_TRACK('hide'), styles: 'background-color: var(--fab-accent)' },
         // A label that wraps beside the switch leaves it its own width.
-        { selector: LAB_TOGGLE('long'), styles: 'width: 34px' },
+        { selector: LAB_TOGGLE('long'), styles: 'width: 38px' },
         // `:focus-visible` alone says focus, not a ring; its colour fades in under Foundry's
         // own transition, so only its shape is read.
         {
@@ -433,6 +573,244 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'specimen'],
     // `StatusToggle.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES`
     // entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-notice-dismiss-focus',
+    label:
+      'Specimen, mounted through the published seam — the controls fixture after one step: Tab from the action of the accent notice beneath the switches, which put keyboard focus on its dismiss control, the xmark glyph alone. That control carries the accent keyboard ring, 2px wide with 2px of the notice’s own fill between ring and tile, at the tone whose fill shares the ring’s hue. No other ring is drawn: the danger notice beside it is at rest with its dismiss control after its action, each notice stands above its Next step button, and the notices, buttons and switches above are at rest. The accent tone is the notice’s own and not a companion’s to pass; it is drawn here because its fill shares the ring’s hue. The frame draws inside the manager window; the control gate’s focus-mark clause is the evidence for no Fabricate ancestor',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of the dismissal.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: `${DISMISSAL('accent')} [data-notice-action]`, press: 'Tab' }],
+    // Keyboard focus on the dismiss control the action precedes, which exists only once Tab has
+    // moved it there.
+    expectSelector: `${DISMISSAL('accent')} [data-notice-action] ~ [data-notice-dismiss]:focus-visible`,
+    expectCenterHit: `${DISMISSAL('accent')} [data-notice-dismiss]`,
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // `:focus-visible` alone says focus, not a ring.
+        {
+          selector: `${DISMISSAL('accent')} [data-notice-dismiss]:focus-visible`,
+          styles: ACCENT_RING,
+        },
+        // The glyph-only control's square tile, at each tone.
+        ...DISMISSAL_TONES.map((tone) => ({
+          selector: `${DISMISSAL(tone)} [data-notice-dismiss]`,
+          styles: 'width: 28px; height: 28px',
+        })),
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-notice-dismissed',
+    label:
+      'Specimen, mounted through the published seam — the controls fixture after one step: Enter on the dismiss control of the danger notice beneath the switches, whose callback moved focus to the Next step button beneath it and then destroyed the notice. The danger notice is gone and that button, risen into its place, carries the accent keyboard ring, 2px wide with 2px of ground between ring and fill, so focus never fell to the page body. The accent notice beside it is at rest above its own Next step button, and the notices, buttons and switches above are at rest. The frame draws inside the manager window; the mounted dismissal clauses are the evidence for the pointer and Space presses',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of the dismissal.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-controls' },
+    steps: [{ selector: `${DISMISSAL('danger')} [data-notice-dismiss]`, press: 'Enter' }],
+    // The danger notice gone and focus on the next control, neither of which holds before the press.
+    expectSelector: `${DISMISSAL('danger')}:not(:has(.fab-notice)) > [data-lab-next] button:focus`,
+    expectCenterHit: NEXT_BUTTON('danger'),
+    expectContained: CONTROLS_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // Focus arrived by a keyboard press, so the next control draws its ring.
+        { selector: `${NEXT_BUTTON('danger')}:focus-visible`, styles: ACCENT_RING },
+        {
+          selector: `${DISMISSAL('accent')} .fab-notice [data-notice-dismiss]`,
+          styles: 'width: 28px',
+        },
+      ],
+    },
+    position: CONTROLS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Notice.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-steppers-specimen',
+    label:
+      'Specimen, mounted through the published seam — five steppers, each beside its label, after six steps that edit what the fixture mounts: a click on the plus of Days to credit, whose callback passed 4 back; Space on the plus of Crafters at the bench, which passed 3 back; 3 typed into Pairs of gloves, whose callback refused the odd number and said why beneath it; Tab from that field, which reported the 3 again, refused it again, and snapped the field back to 2; the Down arrow on Rations carried, on the darker strip, which stepped it to 3; and the Up arrow on Attempts allowed, which stepped it from 9 to its bound of 10. Reading top to bottom: Days to credit 4; Crafters at the bench 3; Pairs of gloves 2 over its reason; Attempts allowed 10 with its plus dimmed and its field carrying the accent keyboard ring at its own edge; and Rations carried 3. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each edit.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-values' },
+    steps: [
+      { selector: LAB_STEPPER('credit', INCREMENT) },
+      { selector: LAB_STEPPER('count', INCREMENT), press: 'Space' },
+      { selector: LAB_STEPPER('even', 'input'), fill: '3' },
+      { selector: LAB_STEPPER('even', 'input'), press: 'Tab' },
+      { selector: LAB_STEPPER('card', 'input'), press: 'ArrowDown' },
+      { selector: LAB_STEPPER('limit', 'input'), press: 'ArrowUp' },
+    ],
+    // Every edited state, none of which exists before its step, the refused field snapped back,
+    // and keyboard focus on the field the Up arrow took to its bound, whose plus is disabled.
+    expectSelector: `${STEPPED_VALUES} > ${STEPPER_SECTION('limit')}[data-lab-value="10"]:has(${INCREMENT}:disabled) input:focus-visible`,
+    expectCenterHit: LAB_STEPPER('limit', 'input'),
+    expectContained: VALUES_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The sheet's declared group corner and value type; no host height: the stepper's box is
+        // its own, so a lab figure would pin the fixture rather than the contract.
+        { selector: LAB_STEPPER('credit', '.fab-stepper'), styles: 'border-radius: 7px' },
+        { selector: LAB_STEPPER('credit', 'input'), styles: 'font-size: 11.5px' },
+        { selector: `${LAB_STEPPER('limit', 'input')}:focus-visible`, styles: STEPPER_RING },
+      ],
+    },
+    position: VALUES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Stepper.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-steppers-button-focus',
+    label:
+      'Specimen, mounted through the published seam — the same five steppers at rest after one step: Tab from the field of Rations carried, on the darker strip, which put keyboard focus on its plus. That button carries the accent keyboard ring, 2px wide at its own edge and inside the stepper’s outer edge; no other ring is drawn and every number is the one the fixture started at. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-values' },
+    steps: [{ selector: LAB_STEPPER('card', 'input'), press: 'Tab' }],
+    expectSelector: `${LAB_STEPPER('card', INCREMENT)}:focus-visible`,
+    expectCenterHit: LAB_STEPPER('card', INCREMENT),
+    expectContained: VALUES_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        { selector: `${LAB_STEPPER('card', INCREMENT)}:focus-visible`, styles: STEPPER_RING },
+      ],
+    },
+    position: VALUES_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Stepper.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-search-specimen',
+    label:
+      'Specimen, mounted through the published seam — three search fields, each beneath the text that names it, after two steps that type into what the fixture mounts: Iron typed into Search components, which reported it; and “  SALT” typed into Search tags, whose callback passed salt back, trimmed and in lower case, from inside the call. Reading top to bottom: Search recipes empty, showing its placeholder; Search components holding Iron; and Search tags holding salt and keyboard focus, its field’s border taking the accent while its input draws no ring of its own. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each query.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-search' },
+    steps: [
+      { selector: LAB_SEARCH('filled', 'input'), fill: 'Iron' },
+      { selector: LAB_SEARCH('transform', 'input'), fill: '  SALT' },
+    ],
+    // Both reported values, neither of which exists before its step, the transformed one passed
+    // back from inside the call, and focus on the field that transformed.
+    expectSelector: `${SEARCH_GROUND}:has(> ${SEARCH_SECTION('filled')}[data-lab-value="Iron"]) > ${SEARCH_SECTION('transform')}[data-lab-value="salt"] .fabricate-search:focus-within`,
+    expectCenterHit: LAB_SEARCH('transform', 'input'),
+    expectContained: SEARCH_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The default shell's declared corner, and the focused input's want of a ring of its own.
+        { selector: LAB_SEARCH('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
+        { selector: `${LAB_SEARCH('transform', 'input')}:focus`, styles: 'outline-style: none' },
+        // The focused field's shell takes the accent, the keyboard mark a field whose wrapper draws the box.
+        {
+          selector: `${LAB_SEARCH('transform', '.fabricate-search')}:focus-within`,
+          styles: 'border-color: var(--fab-accent)',
+        },
+      ],
+    },
+    position: SEARCH_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SearchField.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-specimen',
+    label:
+      'Specimen, mounted through the published seam — two selects, each beneath the text that names it, after one step: a press on Rows per page, which opened its list inside the ground the companion passed as its overlay host. The list reads 10, ticked and filled as the chosen row, then 25 and All, drawn over the ground below the trigger, clipped by nothing and ending above Sort recipes by, which stays closed, uncovered and showing its placeholder. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select' },
+    steps: [{ selector: LAB_SELECT('hosted', SELECT_TRIGGER) }],
+    // The list the press opened, in the overlay host, with the chosen row marked, and the second
+    // select's trigger left uncovered beneath it.
+    expectSelector: `${SELECT_GROUND}:has(${SELECT_SECTION('hosted')} ${SELECT_TRIGGER}[aria-expanded="true"]) > div > .fabricate-select-popover [data-popover-option="10"][aria-selected="true"]`,
+    expectCenterHit: [SELECT_OPTION(HOSTED_LIST, '25'), LAB_SELECT('layer', SELECT_TRIGGER)],
+    expectContained: [...SELECT_CONTAINMENT, { container: SELECT_GROUND, target: HOSTED_LIST }],
+    expectLayout: {
+      controls: [
+        // The inline rung's declared corner, and the panel's own.
+        { selector: LAB_SELECT('hosted', SELECT_TRIGGER), styles: 'border-radius: 7px' },
+        { selector: HOSTED_LIST, styles: 'border-radius: 11px' },
+      ],
+    },
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-select-layer',
+    label:
+      'Specimen, mounted through the published seam — the same two selects after three steps: All chosen from the list of Rows per page, whose callback passed all back so the trigger reads All; then a press on Sort recipes by, which passed no overlay host and whose window carries no app root, so its list opened on the standalone layer over the window. The list reads Name, Tier and Most recently crafted, none ticked, below the trigger still showing Choose an order. The frame draws inside the manager window; the census of the sheet and the mounted player-shell clause are the evidence for the player window',
+    // Beyond the smoke: a companion mounts each through `api.ui` and is told of each choice.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-select' },
+    steps: [
+      { selector: LAB_SELECT('hosted', SELECT_TRIGGER) },
+      { selector: SELECT_OPTION(HOSTED_LIST, 'all') },
+      { selector: LAB_SELECT('layer', SELECT_TRIGGER) },
+    ],
+    // The choice the companion passed back, and the list the last press opened on the layer.
+    expectSelector: `body:has(${SELECT_SECTION('hosted')}[data-lab-value="all"]) > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover [data-popover-option="tier"]`,
+    expectCenterHit: SELECT_OPTION(LAYER_LIST, 'tier'),
+    expectContained: SELECT_CONTAINMENT,
+    expectLayout: {
+      controls: [
+        // The form rung's declared corner, and the panel's own on the layer.
+        { selector: LAB_SELECT('layer', SELECT_TRIGGER), styles: 'border-radius: 9px' },
+        { selector: LAYER_LIST, styles: 'border-radius: 11px' },
+      ],
+    },
+    position: SELECT_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Select.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-stage-bars-specimen',
+    label:
+      'Specimen, mounted through the published seam — three stage groups, each beneath the text that names it, reading top to bottom: Forging progress, four bars side by side captioned 1 Gather, 2 Smelt, 3 Forge and 4 Temper, the first two full in the success tone, Forge, the current stage, a little under half full in the accent, and Temper an empty track; Brewing progress, three bars with no captions, the first, the current stage, under a third full in the accent and the other two empty tracks; and Copying a scroll, one bar across the whole width captioned 1 Copy, about two thirds full in the accent. Each caption sits on one line, whole, in the muted ink. The frame draws inside the manager window, so ancestor independence is proved by the mounted suite’s bare-target clauses, not by this frame',
+    // Beyond the smoke: a companion mounts each through `api.ui`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-stage-bars' },
+    steps: [],
+    // The current stage of the numbered group, the labelled bar of the unnumbered one, and the
+    // lone bar named by its stage.
+    expectSelector: `${STAGE_BARS_GROUND}:has(${STAGE_BARS_SECTION_IN_GROUND('forge')} [data-stage-bars-stage="2"][data-stage-bars-state="accent"]):has(${STAGE_BARS_SECTION_IN_GROUND('brew')} [role="progressbar"][aria-label="Stage 3 of 3"]) ${STAGE_BARS_SECTION_IN_GROUND('copy')} [role="progressbar"][aria-label="Copy"]`,
+    expectContained: [
+      ...STAGE_BARS_KEYS.map((key) => ({
+        container: STAGE_BARS_GROUND,
+        target: `${STAGE_BARS_SECTION(key)} [role="group"]`,
+      })),
+      { container: '.window-content', target: STAGE_BARS_GROUND },
+    ],
+    // Each group's bars side by side on one line, and every caption whole, so no name is cut
+    // off with an ellipsis.
+    expectLayout: {
+      containerSelector: STAGE_BARS_GROUND,
+      oneLineRows: `${STAGE_BARS_GROUND} .fab-stage-bars`,
+      unclipped: `${STAGE_BARS_GROUND} .fab-stage-bars-caption`,
+    },
+    position: STAGE_BARS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `StageBars.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

@@ -268,39 +268,43 @@
 <!--
   THE ROW'S EDIT CONTROL, LABELLED IN THE LIST AND ICON-ONLY IN THE GRID CARD: the words say which
   layer it opens, where an unlabelled pencil beside a world-shared name reads as "edit the essence".
-  IT IS STILL `.fabricate-icon-button`, AND THAT IS LOAD-BEARING: three surfaces address it by that
-  class alone, and the smoke's locator sits behind a `count() > 0` guard, so losing it would stop a
-  published frame rather than fail. `IconButton.svelte` prepends the class itself, so this is the
-  caller's EXTRA, and `is-labelled` is computed in because a `class:` directive is element-only.
+  The labelled form is a `Button` (maintainer ruling, 2026-10-20), its arrow a child because `icon`
+  draws first; both carry the `data-essence-edit` hook the smoke, View Lab and tests reach it by.
 -->
 {#snippet editButton(labelled = false)}
-  <IconButton
-    class={labelled ? 'manager-essence-edit is-labelled' : 'manager-essence-edit'}
-    data-essence-edit={essence.id}
-    ariaLabel={labelled
-      ? format('FABRICATE.Admin.Manager.Essence.EditRulesNamed', 'Edit rules for {name}', {
-          name: essence.name,
-        })
-      : format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
-          name: essence.name,
-        })}
-    title={labelled
-      ? text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')
-      : text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
-    onclick={(event) => {
-      event.stopPropagation();
-      onEdit(essence.id);
-    }}
-  >
-    {#if labelled}
+  {#if labelled}
+    <Button
+      class="manager-essence-edit is-labelled"
+      data-essence-edit={essence.id}
+      aria-label={format(
+        'FABRICATE.Admin.Manager.Essence.EditRulesNamed',
+        'Edit rules for {name}',
+        { name: essence.name }
+      )}
+      onclick={(event) => {
+        event.stopPropagation();
+        onEdit(essence.id);
+      }}
+    >
       <span class="manager-essence-edit-label"
         >{text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    {:else}
-      <i class="fas fa-pen" aria-hidden="true"></i>
-    {/if}
-  </IconButton>
+    </Button>
+  {:else}
+    <IconButton
+      class="manager-essence-edit"
+      data-essence-edit={essence.id}
+      ariaLabel={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
+        name: essence.name,
+      })}
+      onclick={(event) => {
+        event.stopPropagation();
+        onEdit(essence.id);
+      }}
+      icon="fas fa-pen"
+    />
+  {/if}
 {/snippet}
 
 {#if isCard}
@@ -450,19 +454,14 @@
     gap: var(--fab-space-2);
   }
 
-  /* THE LABELLED VARIANT OF `.fabricate-icon-button`, every value COPIED from the labelled-button
-     authority rather than chosen; it cannot BE a `Button`, whose auto width would fight the
-     square 34px box. Compounded through `.manager-essence-row` on purpose, because a bare selector
-     ties at (0,2,0) and is decided by injection order. THE CHILD HALF IS `:global` BECAUSE
-     `IconButton.svelte` WRITES THE BUTTON: a forwarded `class` carries no `svelte-<hash>`, so a
-     fully scoped selector stopped matching the moment the control converted. */
+  /* THE LABELLED EDIT'S TYPE: `Button` paints its 34px box, padding and chrome, and this row keeps
+     the smaller, lighter label it drew as an icon button. Compounded through
+     `.manager-essence-row` on purpose, because a bare selector ties at (0,2,0) and is decided by
+     injection order. THE CHILD HALF IS `:global` BECAUSE `Button.svelte` WRITES THE BUTTON: a
+     forwarded `class` carries no `svelte-<hash>`. */
   .manager-essence-row :global(.manager-essence-edit.is-labelled) {
-    width: auto;
-    height: auto;
-    min-height: 34px;
     flex: 0 0 auto;
     gap: var(--fab-space-2);
-    padding: 0 var(--fab-space-3);
     font-size: 0.72rem;
     font-weight: 600;
     white-space: nowrap;

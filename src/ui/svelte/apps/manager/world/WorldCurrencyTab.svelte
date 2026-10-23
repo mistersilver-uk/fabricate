@@ -506,13 +506,7 @@
                in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
                the sibling clause in `manager-select-conversion-rendered.test.js` compares the
                two computed treatments. Changing the element is what lets the class win, and it
-               leaves the shared sheet alone.
-
-               The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
-               12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
-               (3.71:1). The library's `k-hint` is the authority for that treatment and the token
-               question belongs to issue 2315, not here —
-               consistency inside the card is what this change owes. -->
+               leaves the shared sheet alone. -->
           <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
             >{currencySpendStrategyHint()}</span
           >
@@ -616,20 +610,17 @@
                       >
                     {/if}
                     <IconButton
-                      class="is-danger"
+                      role="danger"
                       ariaLabel={text(
-                        'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
-                        'Unlink macro'
-                      )}
-                      title={text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
                         'Unlink macro'
                       )}
                       onclick={(event) => {
                         event.stopPropagation();
                         onClearCurrencyMacro(field.key);
-                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
-                    >
+                      }}
+                      icon="fas fa-link-slash"
+                    />
                   </div>
                 {:else}
                   <div
@@ -908,9 +899,8 @@
                             )}
                             onclick={() => handleAddCurrencySubUnit(unit.id)}
                             data-chip-remove-fallback=""
-                          >
-                            <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          </IconButton>
+                            icon="fa-solid fa-plus"
+                          />
                         </div>
                       {:else}
                         <Field as="div">
@@ -1045,7 +1035,6 @@
                   >
                   <IconButton
                     ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
-                    data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-move-currency-up={unit.id}
                     disabled={index === 0}
                     onclick={() =>
@@ -1056,15 +1045,10 @@
                         unit.label || unit.id,
                         currencyUnits.length
                       )}
-                  >
-                    <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fa-solid fa-chevron-up"
+                  />
                   <IconButton
                     ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
-                    data-tooltip={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                      'Move down'
-                    )}
                     data-move-currency-down={unit.id}
                     disabled={index === currencyUnits.length - 1}
                     onclick={() =>
@@ -1075,9 +1059,8 @@
                         unit.label || unit.id,
                         currencyUnits.length
                       )}
-                  >
-                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fa-solid fa-chevron-down"
+                  />
                   <IconButton
                     ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Edit',
@@ -1085,19 +1068,17 @@
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
                     data-world-currency-unit-expand={unit.id}
-                  >
-                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fa-solid fa-pen"
+                  />
                   <IconButton
-                    class="is-danger"
+                    role="danger"
                     ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                       'Delete currency unit'
                     )}
                     onclick={() => handleDeleteCurrencyUnit(unit.id)}
-                  >
-                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                  </IconButton>
+                    icon="fa-solid fa-trash"
+                  />
                 </div>
               {/if}
             </li>

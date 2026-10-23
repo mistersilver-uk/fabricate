@@ -1,8 +1,9 @@
 /**
  * The link field's faces as Chromium draws them (issue 2466): the 104px floor, the three grounds
- * and borders, the empty stack, the two-line caps, the action column and the compact face. The
- * sheet sits in `@layer modules` and the component's scoped block is unlayered, as Foundry loads
- * them, so each clause measures the cascade a selector reading cannot.
+ * and borders, the empty stack, the two-line caps, the action column, the compact face, the 38px
+ * chip, the uuid line and the named group. The sheet sits in `@layer modules`, Foundry's `code`
+ * rule in `@layer elements` and the scoped blocks unlayered, as Foundry loads them, so each
+ * clause measures the cascade a selector reading cannot.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,14 +20,21 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 const ZONE = 'src/ui/svelte/components/ItemDropZone.svelte';
+const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 
 const noop = () => {};
 const ACTIONS = { copyLabel: 'Copy uuid', unlinkLabel: 'Unlink', onCopy: noop, onUnlink: noop };
+const RELINK = { relinkLabel: 'Relink', onRelink: noop };
+const MISSING = { value: { uuid: 'Item.9pQr2sT4uV6wX8yZ', name: 'Untitled' }, state: 'missing' };
 const PROMPT = { title: 'Drop a game-world item here', emptyIcon: 'fas fa-link' };
 const LONG_TITLE = 'Drop a game-world item here to link it to this record. '.repeat(3).trim();
-/** A compendium address standing in for a name: 44 characters with no break opportunity. */
-const UUID_NAME = 'Compendium.dnd5e.items.Item.8RXjiddJ6VGyE7vB';
+/** A compendium address with no break opportunity, drawn where a value has no name. */
+const LONG_UUID = 'Compendium.world.lab-macros.Macro.kR3nQ8sT1vW2xY4z';
+/** A linked name of 80 characters with no break opportunity. */
+const LONG_NAME = 'Blacksmith'.repeat(8);
+const ANVIL = { uuid: 'Item.kR3n', name: 'Anvil' };
 const LONG_NOTE = `From the Items directory or a compendium, ${'x'.repeat(40)} and from any pack this world has unlocked for editing.`;
+const ART = 'icons/svg/item-bag.svg';
 
 /** Each case: the host's width and the props the zone mounts with. */
 const CASES = Object.freeze({
@@ -34,20 +42,15 @@ const CASES = Object.freeze({
   linked: {
     width: 280,
     props: {
-      item: { name: 'Blacksmith’s Compendium' },
-      uuid: 'Item.kR3nQ8sT1vW2xY4z',
+      value: { uuid: 'Item.kR3nQ8sT1vW2xY4z', name: 'Blacksmith’s Compendium' },
+      showUuid: true,
       hint: 'Drop another Item here to replace the linked source.',
       ...ACTIONS,
     },
   },
   missing: {
     width: 280,
-    props: {
-      item: { name: 'Untitled' },
-      uuid: 'Item.9pQr2sT4uV6wX8yZ',
-      state: 'missing',
-      hint: 'This document no longer resolves.',
-    },
+    props: { ...MISSING, hint: 'This document no longer resolves.' },
   },
   compact: {
     width: 280,
@@ -62,15 +65,88 @@ const CASES = Object.freeze({
   'long-empty': { width: 220, props: { ...PROMPT, title: LONG_TITLE, hint: LONG_NOTE } },
   'long-linked': {
     width: 220,
-    props: { item: { name: LONG_TITLE }, hint: LONG_NOTE, subline: LONG_NOTE, ...ACTIONS },
+    props: {
+      value: { uuid: 'Item.kR3n', name: LONG_TITLE },
+      hint: LONG_NOTE,
+      subline: LONG_NOTE,
+      ...ACTIONS,
+    },
   },
-  'uuid-name': { width: 220, props: { item: { name: UUID_NAME }, uuid: UUID_NAME, ...ACTIONS } },
+  'long-name': { width: 220, props: { value: { uuid: 'Item.kR3n', name: LONG_NAME }, ...ACTIONS } },
+  'no-name': { width: 220, props: { value: { uuid: LONG_UUID, name: '' }, ...ACTIONS } },
+  'no-name-shown': {
+    width: 280,
+    props: { value: { uuid: 'Item.kR3n', name: '' }, showUuid: true },
+  },
+  'uuid-as-name': {
+    width: 280,
+    props: { value: { uuid: 'Item.kR3n', name: 'Item.kR3n' }, showUuid: true },
+  },
+  'linked-unshown': { width: 280, props: { value: ANVIL } },
+  'null-linked': { width: 280, props: { ...PROMPT, value: null, state: 'linked' } },
+  'empty-state': { width: 280, props: { ...PROMPT, value: ANVIL, state: 'empty' } },
+  'blank-value': { width: 280, props: { ...PROMPT, value: { uuid: '', name: '' } } },
+  'linked-art': {
+    width: 280,
+    props: {
+      value: { uuid: 'Item.kR3n', name: 'Blacksmith’s Compendium', img: ART },
+      showUuid: true,
+      hint: 'Drop another.',
+      ...ACTIONS,
+    },
+  },
+  'missing-art': {
+    width: 280,
+    props: { value: { name: 'Untitled', img: ART }, state: 'missing', emptyIcon: 'fas fa-link' },
+  },
+  'compact-missing': {
+    width: 280,
+    props: {
+      ...MISSING,
+      value: { ...MISSING.value, img: ART },
+      compact: true,
+      ...PROMPT,
+      ...RELINK,
+    },
+  },
+  'missing-relink': {
+    width: 280,
+    props: { ...MISSING, hint: 'This document no longer resolves.', ...RELINK, onUnlink: noop },
+  },
+  'narrow-relink': {
+    width: 220,
+    props: {
+      ...MISSING,
+      hint: 'This document no longer resolves.',
+      relinkLabel: 'Relink this item',
+      onRelink: noop,
+      unlinkLabel: 'Unlink',
+      onUnlink: noop,
+    },
+  },
+  'disabled-linked': {
+    width: 280,
+    props: { value: { name: 'Blacksmith’s Compendium' }, ...ACTIONS, ...RELINK, disabled: true },
+  },
+  'disabled-missing': {
+    width: 280,
+    props: { ...MISSING, ...RELINK, unlinkLabel: 'Unlink', onUnlink: noop, disabled: true },
+  },
+  'missing-subline': {
+    width: 280,
+    props: { ...MISSING, hint: 'This document no longer resolves.', subline: 'Drop another.' },
+  },
+  'missing-hooked-hint': {
+    width: 280,
+    props: { ...MISSING, hint: 'Gone.', hookAttrs: { hint: { id: 'caller-hint' } } },
+  },
 });
 
 /** The tokens the clauses compare against, each read from an element that declares it. */
 const TOKENS = Object.freeze([
   'surface-soft',
   'bg-1',
+  'bg-3',
   'danger-soft',
   'accent-soft',
   'border-strong',
@@ -85,10 +161,15 @@ const TOKENS = Object.freeze([
 /** The page loads no Font Awesome, so the glyph is given a box; without one the stack has two rows. */
 const GLYPH_BOX = String.raw`.fas{display:inline-block;line-height:1}.fas::before{content:"\25A0"}`;
 
+/** Foundry 14.365's inline `code` rule, verbatim from `foundry2.css`, in the layer it ships in. */
+const FOUNDRY_CODE = `@layer elements { code { display: inline-block; padding: 1px 0.25rem; margin: -1px 0; word-break: keep-all; white-space: nowrap } }`;
+
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}</style>
+<style>${FOUNDRY_CODE}</style>
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, ZONE)).css}</style>
+<style>${scopedComponentCss(resolve(repoRoot, MEDALLION)).css}</style>
 <style>${GLYPH_BOX}</style>
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
 ${TOKENS.map((token) => `<span data-token="${token}" style="color:var(--fab-${token})"></span>`).join('')}
@@ -106,9 +187,13 @@ const readFaces = () => {
     'background-color',
     'border-top-color',
     'border-top-style',
+    'border-top-width',
     'border-top-left-radius',
     'min-height',
     'padding-top',
+    'padding-left',
+    'margin-top',
+    'margin-bottom',
     'opacity',
     'color',
     'font-size',
@@ -121,10 +206,15 @@ const readFaces = () => {
     root: '.manager-item-drop-zone',
     icon: '.manager-item-drop-zone-icon',
     glyph: '.manager-item-drop-zone-icon > i',
+    copy: '.manager-item-drop-zone-copy',
     name: '.manager-item-drop-zone-copy > strong',
     uuid: '.manager-item-drop-zone-uuid',
     hint: '.manager-item-drop-zone-copy > small:not([data-item-drop-zone-subline])',
     subline: '[data-item-drop-zone-subline]',
+    chip: '.fab-medallion',
+    chipGlyph: '.fab-medallion > i',
+    chipArt: '.fab-medallion > img',
+    actions: '.manager-item-drop-zone-actions',
   };
   const part = (node) => {
     if (!node) return null;
@@ -149,6 +239,44 @@ const readFaces = () => {
     face.buttons = [...host.querySelectorAll(':scope .manager-item-drop-zone-actions button')].map(
       (button) => part(button).box
     );
+    face.actionButtons = [
+      ...host.querySelectorAll(':scope .manager-item-drop-zone-actions button'),
+    ].map((button) => ({
+      box: part(button).box,
+      disabled: button.disabled,
+      relink: button.hasAttribute('data-item-drop-zone-relink'),
+      text: button.textContent.trim(),
+      classes: [...button.classList],
+    }));
+    const zone = host.querySelector(PARTS.root);
+    const byId = (id) => host.querySelector(`[id="${id}"]`);
+    const labelledBy = zone.getAttribute('aria-labelledby');
+    const describedBy = zone.getAttribute('aria-describedby');
+    const labelNode = labelledBy ? byId(labelledBy) : null;
+    face.root = {
+      ...face.root,
+      classes: [...zone.classList],
+      state: zone.getAttribute('data-item-drop-state'),
+    };
+    face.uuidCount = host.querySelectorAll(PARTS.uuid).length;
+    face.group = {
+      role: zone.getAttribute('role'),
+      labelledBy: [
+        [labelNode && labelNode === host.querySelector(PARTS.name), 'name'],
+        [labelNode && labelNode === host.querySelector(PARTS.uuid), 'uuid'],
+      ].find(([hit]) => hit)?.[1],
+      label: labelledBy ? (byId(labelledBy)?.textContent.trim() ?? '') : '',
+      described:
+        describedBy === null
+          ? null
+          : describedBy.split(' ').map((id) => byId(id)?.textContent.trim() ?? `#${id} unresolved`),
+    };
+    face.glyphClass = host.querySelector(':scope .fab-medallion > i')?.className ?? '';
+    const uuidLine = doc.createRange();
+    const uuidNode = host.querySelector(PARTS.uuid);
+    if (uuidNode) uuidLine.selectNodeContents(uuidNode);
+    face.uuidLine = uuidNode ? uuidLine.getClientRects()[0]?.height : 0;
+    face.uuidLines = uuidNode ? uuidLine.getClientRects().length : 0;
     faces[host.dataset.case] = face;
   }
   const tokens = {};
@@ -164,6 +292,8 @@ let browser;
 let tab;
 let faces;
 let tokens;
+let renamed;
+let copied;
 
 before(async () => {
   const harness = createMountedComponentHarness({
@@ -174,7 +304,12 @@ before(async () => {
       'src/ui/svelte/actions/dragDrop.js',
       'src/ui/svelte/util/dropUtils.js',
     ],
-    compiledModules: ['src/ui/svelte/components/IconButton.svelte', ZONE],
+    compiledModules: [
+      'src/ui/svelte/components/Button.svelte',
+      'src/ui/svelte/components/IconButton.svelte',
+      MEDALLION,
+      ZONE,
+    ],
     componentPath: ZONE,
   });
   const markup = {};
@@ -184,6 +319,15 @@ before(async () => {
       markup[key] = (await harness.mount(props)).innerHTML;
       harness.remount();
     }
+    const retitled = await harness.mount({ ...PROMPT, compact: true });
+    await harness.setProps({ title: 'Drop a macro here' });
+    const zone = retitled.querySelector('.manager-item-drop-zone');
+    renamed = retitled.querySelector(`[id="${zone.getAttribute('aria-labelledby')}"]`)?.textContent;
+    harness.remount();
+    const value = { uuid: 'Item.kR3n', name: 'Anvil', img: ART };
+    const copyable = await harness.mount({ value, ...ACTIONS, onCopy: (got) => (copied = got) });
+    copyable.querySelector(':scope .manager-item-drop-zone-actions button').click();
+    harness.remount();
   } finally {
     harness.teardown();
   }
@@ -246,14 +390,13 @@ it('draws the empty prompt as a centred stack on a dashed 104px box', () => {
 });
 
 it('draws a linked zone as a solid bg-1 row on the same floor, with its actions in a column', () => {
-  const { root, icon, name, uuid, hint, buttons } = faces.linked;
+  const { root, name, uuid, hint, buttons } = faces.linked;
   assert.equal(root.style['min-height'], '104px');
   assert.ok(root.box.height >= 104, `the linked box is ${root.box.height}px, under its floor`);
   assert.equal(root.style['border-top-style'], 'solid');
   assert.equal(root.style['border-top-color'], tokens['border-strong']);
   assert.equal(root.style['background-color'], tokens['bg-1']);
 
-  assert.deepEqual([icon.box.width, icon.box.height], [44, 44]);
   assert.equal(name.style['font-size'], '14px');
   assert.equal(name.style['font-weight'], '600');
   assert.equal(name.style['font-family'], tokens.serif);
@@ -272,14 +415,201 @@ it('draws a linked zone as a solid bg-1 row on the same floor, with its actions 
 });
 
 it('draws a missing zone on the danger ground', () => {
-  const { root, icon, name, uuid, hint } = faces.missing;
+  const { root, chipGlyph, name, uuid, hint } = faces.missing;
   assert.equal(root.style['border-top-style'], 'solid');
   assert.equal(root.style['border-top-color'], tokens['danger-border']);
   assert.equal(root.style['background-color'], tokens['danger-soft']);
   assert.equal(name.style.color, tokens['danger-text']);
-  assert.equal(icon.style.color, tokens['danger-text']);
+  assert.equal(chipGlyph.style.color, tokens['danger-text']);
   assert.equal(uuid.style.color, tokens['text-secondary']);
   assert.equal(hint.style.color, tokens['text-secondary']);
+});
+
+it('draws a linked zone`s chip as an unbordered 38px bg-3 tile, centred, 12px from the name', () => {
+  const { root, chip, name } = faces.linked;
+  assert.deepEqual([chip.box.width, chip.box.height], [38, 38]);
+  assert.equal(chip.style['border-top-left-radius'], '9px');
+  assert.equal(chip.style['border-top-style'], 'none', 'the chip is unbordered');
+  assert.equal(chip.style['border-top-width'], '0px');
+  assert.equal(chip.style['background-color'], tokens['bg-3']);
+  const gap = name.box.left - chip.box.right;
+  assert.ok(Math.abs(gap - 12) <= 0.5, `the name starts ${gap}px right of the chip, not 12px`);
+  const offset = middle(chip.box) - middle(root.box);
+  assert.ok(Math.abs(offset) <= 1, `the chip sits ${offset}px off the box's vertical centre`);
+  assert.ok(!faces.linked.chipArt, 'an item with no image draws the glyph');
+  assert.ok(Boolean(faces['linked-art'].chipArt), 'and an item with one draws it in the chip');
+});
+
+it('draws a missing chip as the alert glyph in danger ink, never the document`s art', () => {
+  for (const key of ['missing', 'missing-art']) {
+    const { chip, chipGlyph, chipArt, glyphClass } = faces[key];
+    assert.deepEqual([chip.box.width, chip.box.height], [38, 38], `${key}: the chip is 38px`);
+    assert.ok(
+      !chipArt,
+      `${key}: a broken link draws no image, so it cannot look like a working one`
+    );
+    assert.match(glyphClass, /\bfa-triangle-exclamation\b/u, `${key}: the alert glyph`);
+    assert.doesNotMatch(glyphClass, /\bfa-link\b/u, `${key}: not the caller's glyph`);
+    assert.equal(chipGlyph.style.color, tokens['danger-text'], `${key}: in danger ink`);
+  }
+});
+
+it('keeps the empty, the compact and a compact missing face`s glyph bare, with no chip', () => {
+  for (const key of ['empty', 'compact', 'compact-missing']) {
+    assert.ok(Boolean(faces[key].icon), `${key}: the bare glyph span renders`);
+    assert.ok(!faces[key].chip, `${key}: and no chip`);
+    assert.ok(!faces[key].chipArt, `${key}: and no art`);
+  }
+});
+
+it('sets the uuid at 10px, flush with the name, with Foundry`s `code` box cleared', () => {
+  for (const key of ['linked', 'missing', 'linked-art']) {
+    const { name, uuid, hint } = faces[key];
+    assert.equal(uuid.style['font-size'], '10px', `${key}: the uuid is 10px`);
+    assert.equal(uuid.style['padding-left'], '0px', `${key}: Foundry's inline padding is cleared`);
+    assert.equal(uuid.style['padding-top'], '0px', `${key}: and its block padding`);
+    assert.deepEqual(
+      [uuid.style['margin-top'], uuid.style['margin-bottom']],
+      ['0px', '0px'],
+      `${key}: and its -1px block margins, so the box keeps its line's height`
+    );
+    const offset = uuid.box.left - name.box.left;
+    assert.ok(Math.abs(offset) <= 0.5, `${key}: the uuid starts ${offset}px right of the name`);
+    const { uuidLine } = faces[key];
+    assert.ok(uuidLine > 0, `${key}: the uuid's text has a line box to compare with`);
+    assert.ok(
+      Math.abs(uuid.box.height - uuidLine) <= 0.5,
+      `${key}: the uuid's box is ${uuid.box.height}px around a ${uuidLine}px line`
+    );
+    for (const [label, gap] of [
+      ['above', uuid.box.top - name.box.bottom],
+      ['below', hint.box.top - uuid.box.bottom],
+    ]) {
+      assert.ok(Math.abs(gap - 4) <= 0.5, `${key}: the uuid sits ${gap}px from its ${label} line`);
+    }
+  }
+});
+
+it('draws Relink over unlink in a missing zone, on one right edge, inside the box', () => {
+  const { root, actionButtons } = faces['missing-relink'];
+  const [relink, unlink] = actionButtons;
+  assert.equal(actionButtons.length, 2);
+  assert.ok(relink.relink, 'Relink leads the column');
+  assert.ok(relink.classes.includes('fabricate-button'), 'and is the shipped `<Button>`');
+  assert.equal(relink.text, 'Relink');
+  assert.ok(unlink.classes.includes('is-danger'), 'unlink sits under it');
+  const edges = relink.box.right - unlink.box.right;
+  assert.ok(Math.abs(edges) <= 0.5, `Relink's right edge is ${edges}px off unlink's`);
+  for (const [label, { box }] of [
+    ['Relink', relink],
+    ['unlink', unlink],
+  ]) {
+    assert.ok(
+      box.left >= root.box.left &&
+        box.right <= root.box.right &&
+        box.top >= root.box.top &&
+        box.bottom <= root.box.bottom,
+      `${label} is not wholly inside the zone`
+    );
+  }
+});
+
+it('drops the actions to their own row below the copy in a 220px zone, Relink before unlink', () => {
+  const { root, name, uuid, hint, actions, actionButtons } = faces['narrow-relink'];
+  const [relink, unlink] = actionButtons;
+  assert.equal(
+    relink.text,
+    'Relink this item',
+    'the label is long enough to have squeezed the copy'
+  );
+  assert.ok(name.box.width >= 100, `the copy column is ${name.box.width}px wide, under 100`);
+  assert.ok(
+    Math.abs(name.box.right - actions.box.right) <= 1,
+    `the copy ends at ${name.box.right}px, short of the actions row's right edge at ${actions.box.right}px`
+  );
+  assert.ok(
+    name.box.height <= px(name.style['line-height']) + 0.5,
+    `"Untitled" breaks over ${name.box.height}px, more than one line`
+  );
+  const copyBottom = Math.max(name.box.bottom, uuid.box.bottom, hint.box.bottom);
+  for (const [label, { box }] of [
+    ['Relink', relink],
+    ['unlink', unlink],
+  ]) {
+    assert.ok(box.top >= copyBottom, `${label} is not on a row below the copy`);
+    assert.ok(
+      box.left >= root.box.left && box.right <= root.box.right && box.bottom <= root.box.bottom,
+      `${label} is not wholly inside the zone`
+    );
+  }
+  assert.ok(Math.abs(relink.box.top - unlink.box.top) <= 0.5, 'the two share one row');
+  assert.ok(relink.box.right <= unlink.box.left, 'Relink sits before unlink');
+});
+
+it('draws Relink only in a missing zone with a handler, and no column when no action renders', () => {
+  assert.ok(!faces.missing.actions, 'a missing zone with no handler draws no action column');
+  for (const key of ['disabled-linked', 'compact-missing']) {
+    assert.ok(
+      faces[key].actionButtons.every((button) => !button.relink),
+      `${key}: a handler alone does not draw Relink`
+    );
+  }
+  assert.ok(!faces['compact-missing'].actions, 'a compact zone draws no actions at all');
+});
+
+it('disables every action of a disabled zone, and dims the zone to 0.55', () => {
+  for (const [key, count] of [
+    ['disabled-linked', 2],
+    ['disabled-missing', 2],
+  ]) {
+    const { root, actionButtons } = faces[key];
+    assert.equal(actionButtons.length, count, `${key}: the actions render`);
+    assert.deepEqual(
+      actionButtons.map((button) => button.disabled),
+      Array.from({ length: count }, () => true),
+      `${key}: every action is disabled`
+    );
+    assert.equal(root.style.opacity, '0.55', `${key}: the zone dims`);
+  }
+  assert.ok(faces['disabled-missing'].actionButtons[0].relink, 'Relink is among them');
+});
+
+it('names every face a group by its title, its document`s name, or its uuid line', () => {
+  const NAMES = {
+    empty: PROMPT.title,
+    linked: 'Blacksmith’s Compendium',
+    missing: 'Untitled',
+    compact: CASES.compact.props.title,
+    'missing-relink': 'Untitled',
+    'missing-art': 'Untitled',
+    'compact-missing': PROMPT.title,
+    'null-linked': PROMPT.title,
+    'empty-state': PROMPT.title,
+    'blank-value': PROMPT.title,
+    'no-name': LONG_UUID,
+    'uuid-as-name': 'Item.kR3n',
+  };
+  const BY_UUID = new Set(['no-name', 'no-name-shown', 'uuid-as-name']);
+  for (const [key, face] of Object.entries(faces)) {
+    assert.equal(face.group.role, 'group', `${key}: the root is a group`);
+    const line = BY_UUID.has(key) ? 'uuid' : 'name';
+    assert.equal(face.group.labelledBy, line, `${key}: aria-labelledby resolves to its ${line}`);
+    if (NAMES[key]) assert.equal(face.group.label, NAMES[key], `${key}: named by its own line`);
+  }
+  assert.equal(renamed, 'Drop a macro here', 'the name follows a changed title');
+});
+
+it('describes a missing group by its hint and subline, and a linked one by nothing', () => {
+  assert.deepEqual(faces.missing.group.described, ['This document no longer resolves.']);
+  assert.deepEqual(faces['missing-subline'].group.described, [
+    'This document no longer resolves.',
+    'Drop another.',
+  ]);
+  assert.deepEqual(faces['missing-hooked-hint'].group.described, ['Gone.'], 'a caller`s hint id');
+  assert.equal(faces['missing-art'].group.described, null, 'a missing zone with no lines has none');
+  for (const key of ['linked', 'linked-art', 'empty', 'compact']) {
+    assert.equal(faces[key].group.described, null, `${key}: no description`);
+  }
 });
 
 it('lets a drag take the border, ground and ring of a linked, a missing and a compact zone', async () => {
@@ -327,18 +657,14 @@ it('dims a disabled zone to 0.55', () => {
   assert.equal(faces.disabled.root.style.opacity, '0.55');
 });
 
-it('caps a title, a hint and a subline at two lines, lets a linked name wrap, and grows the box', () => {
+it('caps a title, a linked name, a hint and a subline at two lines, and grows the box', () => {
   const empty = faces['long-empty'];
   assertCapped(empty.name, 'the empty title');
   assertCapped(empty.hint, 'the empty hint');
   assert.ok(empty.root.box.height > 104, 'two capped lines of each stand taller than the floor');
 
   const linked = faces['long-linked'];
-  assert.ok(linked.name.scroll.height <= linked.name.scroll.clientHeight, 'the linked name is cut');
-  assert.ok(
-    linked.name.box.height > 2 * px(linked.name.style['line-height']),
-    'the linked name stops at two lines, so it is still capped'
-  );
+  assertCapped(linked.name, 'the linked name');
   assertCapped(linked.hint, 'the linked hint');
   assertCapped(linked.subline, 'the subline');
 
@@ -351,10 +677,61 @@ it('caps a title, a hint and a subline at two lines, lets a linked name wrap, an
   }
 });
 
-it('wraps a uuid standing in for a linked name, never cutting it or overflowing sideways', () => {
-  const { root, name } = faces['uuid-name'];
+it('cuts an 80-character unbroken linked name at two lines, never overflowing sideways', () => {
+  const { root, name } = faces['long-name'];
+  assertCapped(name, 'the unbroken linked name');
   assert.ok(name.scroll.width <= name.scroll.clientWidth, 'the name runs out of its column');
-  assert.ok(name.scroll.height <= name.scroll.clientHeight, 'the name is clipped');
   assert.ok(root.scroll.width <= root.scroll.clientWidth, 'the zone scrolls sideways');
-  assert.ok(root.scroll.height <= root.scroll.clientHeight, 'the zone scrolls down');
+});
+
+it('draws a value with no name as its uuid line alone, wrapped and never clipped', () => {
+  const { root, copy, name, uuid, uuidLines } = faces['no-name'];
+  assert.ok(!name, 'a value with no name draws no <strong>');
+  assert.ok(uuidLines > 1, `the long uuid holds ${uuidLines} line, so it does not wrap`);
+  assert.ok(uuid.scroll.height <= uuid.scroll.clientHeight, 'the uuid line is clipped');
+  assert.ok(copy.scroll.width <= copy.scroll.clientWidth, 'the copy column runs sideways');
+  assert.ok(root.scroll.width <= root.scroll.clientWidth, 'the zone scrolls sideways');
+});
+
+it('draws the uuid line once: in missing, and in linked with showUuid or no name', () => {
+  const COUNTS = {
+    linked: 1,
+    'linked-art': 1,
+    missing: 1,
+    'missing-relink': 1,
+    'linked-unshown': 0,
+    'long-linked': 0,
+    'no-name': 1,
+    'no-name-shown': 1,
+    'uuid-as-name': 1,
+    'compact-missing': 0,
+    'null-linked': 0,
+    'empty-state': 0,
+  };
+  for (const [key, count] of Object.entries(COUNTS)) {
+    assert.equal(faces[key].uuidCount, count, `${key}: draws ${count} uuid line`);
+  }
+  assert.ok(!faces['uuid-as-name'].name, 'a name that is only the uuid draws no <strong>');
+});
+
+it('draws empty for a null value, an empty value or the empty state, whatever else is passed', () => {
+  for (const key of ['null-linked', 'empty-state', 'blank-value']) {
+    const { root, chip, actions } = faces[key];
+    assert.ok(!root.classes.includes('is-linked'), `${key}: not linked`);
+    assert.equal(root.style['border-top-style'], 'dashed', `${key}: the empty prompt's border`);
+    assert.ok(!chip && !actions, `${key}: no chip and no actions`);
+  }
+  assert.ok(faces['linked-unshown'].root.classes.includes('is-linked'), 'state unset draws linked');
+  assert.ok(!faces['linked-unshown'].root.classes.includes('is-missing'), 'and not missing');
+});
+
+it('never draws a compact zone missing, whatever its value and state hold', () => {
+  const { root, group } = faces['compact-missing'];
+  assert.ok(!root.classes.includes('is-missing'), 'a compact zone takes no is-missing');
+  assert.ok(!root.state, 'nor a data-item-drop-state');
+  assert.ok(!group.described, 'nor an aria-describedby');
+});
+
+it('hands the current value to the copy handler', () => {
+  assert.deepEqual(copied, { uuid: 'Item.kR3n', name: 'Anvil', img: ART });
 });

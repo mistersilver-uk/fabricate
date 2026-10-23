@@ -10,9 +10,9 @@ import { selectableEssenceOptions, visibleEssenceOptions } from '../src/ui/model
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const uiRoot = join(repoRoot, 'src/ui');
-const PICKER_ROW = 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
+const PICKER_ROW = 'src/ui/svelte/components/PickerRow.svelte';
 /** The row's own name field, which draws the essence search for the row's caller (issue 1773). */
-const PICKER_ROW_NAME_FIELD = 'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte';
+const PICKER_ROW_NAME_FIELD = 'src/ui/svelte/components/PickerRowNameField.svelte';
 
 /** The enumerated consumers, each with the projection it applies. */
 const CONSUMERS = Object.freeze([
@@ -21,7 +21,7 @@ const CONSUMERS = Object.freeze([
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
     'visibleEssenceOptions',
   ],
-  ['src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte', 'visibleEssenceOptions'],
+  ['src/ui/svelte/components/ChoiceGroup.svelte', 'visibleEssenceOptions'],
   // The world Component entry's `Essence contribution` card (issue 1371 r18-entry, maintainer
   // ruling M31): the same quantity grid over the WORLD essence catalogue, whose `enabled` is the
   // world master switch — an offer and the editing surface for the world map at once.
@@ -30,12 +30,10 @@ const CONSUMERS = Object.freeze([
 
 /** Importers of `PickerRow.svelte` that hand it no essence catalogue: path to the reason. */
 const ROW_CALLERS_WITHOUT_ESSENCES = Object.freeze({
-  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte':
-    'A result names a component, a currency or a taught recipe, so its catalogue has no essence kind.',
   'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte':
     'A salvage result names a component and nothing else, so its catalogue has no essence kind.',
-  'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte':
-    'A salvage stage names a component and nothing else, so its catalogue has no essence kind.',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte':
+    'A progressive stage names a component and nothing else, so its catalogue has no essence kind.',
 });
 
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is

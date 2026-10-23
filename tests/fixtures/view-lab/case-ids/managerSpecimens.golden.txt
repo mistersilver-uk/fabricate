@@ -4,3 +4,11 @@ manager-published-leaves-specimen
 manager-published-controls-specimen
 manager-published-buttons-specimen
 manager-published-toggles-specimen
+manager-published-notice-dismiss-focus
+manager-published-notice-dismissed
+manager-published-steppers-specimen
+manager-published-steppers-button-focus
+manager-published-search-specimen
+manager-published-select-specimen
+manager-published-select-layer
+manager-published-stage-bars-specimen

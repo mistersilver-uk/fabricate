@@ -49,8 +49,8 @@ const ICONS = 'src/ui/svelte/util/recipeImageIcons.js';
 const MODE_CALLOUT = `${MANAGER}/recipe/RecipeModeCallout.svelte`;
 const COMPONENT_EDIT = `${MANAGER}/ComponentEditView.svelte`;
 const ESSENCE_EDIT = `${MANAGER}/EssenceEditView.svelte`;
-const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
 const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
+const PROGRESSIVE_STAGE_LIST = `${MANAGER}/ProgressiveStageList.svelte`;
 
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const css = readStylesheet();
@@ -218,7 +218,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
   defineStructureContract('carries the linked-list a11y contract and the missing state', BOOKS_TAB, {
     writes: ['data-recipe-item-links', 'aria-label'],
     renders: ['IconButton'],
-    passesValues: [['IconButton', 'class', 'is-danger']],
+    passesValues: [['IconButton', 'role', 'danger']],
     names: ['onOpenItem'],
     spells: ['FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'],
   });
@@ -427,15 +427,25 @@ describe('the progressive reorder announcement', () => {
   // Both halves moved into the shared ordered list at issue 1512, and both are asserted where they
   // live now: `tests/sortable-list-source-contract.test.js` holds the read-the-name-first ordering
   // against `SortableList.svelte`, and `tests/components/sortable-list-mounted.test.js` reads the
-  // sentence out of the rendered live region. What this card still owns is the array move.
+  // sentence out of the rendered live region. What this card still owns is the array move, which
+  // reaches the shared list through the progressive stage list (issue 2511).
   defineStructureContract(
-    'hands the shared list the move and keeps no announcement of its own',
+    'hands the stage list the move and keeps no announcement of its own',
     RESULT_GROUP_CARD,
+    {
+      renders: ['ProgressiveStageList'],
+      passesProps: [['ProgressiveStageList', 'onReorder']],
+      namesNo: ['moveItem'],
+      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
+    }
+  );
+
+  defineStructureContract(
+    'and the stage list hands the move to the shared list',
+    PROGRESSIVE_STAGE_LIST,
     {
       renders: ['SortableList'],
       passesProps: [['SortableList', 'onReorder']],
-      namesNo: ['moveItem'],
-      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
     }
   );
 
@@ -691,10 +701,16 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
   it('puts the context rail on the ONE shared right-hand-panel surface', () => {
     // Issue 643 put the Recipe Studio rail on the SAME surface as its main editor panel
     // (--fab-bg-2) while every other screen kept the lighter --fab-bg-3.
+    // The fill is the aside's token, which `InspectorPanel`'s foot paints too (issue 2498).
     assert.match(
       css,
-      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*--fab-manager-inspector-bg:\s*var\(--fab-bg-2\);/,
       'the shared inspector sits on --fab-bg-2 on every screen'
+    );
+    assert.match(
+      css,
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-manager-inspector-bg\);/,
+      'the shared inspector paints its own fill token'
     );
     assert.doesNotMatch(
       css,
@@ -1002,36 +1018,18 @@ describe('RecipeEditView keeps the recipe image always editable', () => {
   });
 });
 
-describe('routed result-set head anchors the add-trigger to the right (issue 643 CHANGE 4)', () => {
-  it('pushes the routing add-trigger to the far right of the chip row via an auto margin', () => {
-    assert.ok(
-      /\.manager-recipe-routing-assignment-chips \.manager-recipe-routing-picker\s*\{[^}]*margin-left:\s*auto/.test(
-        css
-      ),
-      'the routing add-trigger (picker) is anchored right with margin-left: auto so it sits by the delete button'
-    );
-  });
-
+describe('a result set states its name and what routes into it (issue 2512)', () => {
   defineStructureContract(
-    'keeps the reusable routing hooks intact on both routed heads',
-    ROUTING_ASSIGNMENT,
-    {
-      passesValues: [['SearchablePopover', 'triggerAddMarker', 'routing-option']],
-      writes: ['data-routing-chip'],
-      spells: ['manager-recipe-routing-picker'],
-      // The trigger is the last flow child, so the auto margin pushes only it right.
-      rendersBefore: [['EachBlock', 'SearchablePopover']],
-    }
-  );
-
-  defineStructureContract(
-    'places the delete button immediately after the routing head in the result-set head',
+    'draws the set in SetCard, its routing line as RouteSources, and Remove behind the kebab',
     RESULT_GROUP_CARD,
     {
-      writes: ['data-recipe-remove'],
-      rendersBefore: [
-        ['RecipeRoutingAssignment', { attribute: ['data-recipe-remove', 'result-set'] }],
+      names: ['SetCard', 'RouteSources'],
+      namesNo: ['RecipeRoutingAssignment', 'IconButton'],
+      passesProps: [
+        ['SetCard', 'sources'],
+        ['SetCard', 'actions'],
       ],
+      property: [['data-recipe-remove', 'result-set']],
     }
   );
 });

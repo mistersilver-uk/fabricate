@@ -1160,10 +1160,10 @@ EssenceDefinition = {
 2. `associatedSystemItemId` is a compatibility alias for `sourceComponentId`.
 3. Legacy `sourceItemUuid` values that match a managed component id are treated as source component ids during normalization and display.
 4. If an essence source component cannot be resolved, stored source evidence is retained so GM UI can show a stale-but-readable source state.
-5. `colorToken` is the GM-authored per-essence colour: a nullable key from the shared `--fab-tag-*` token palette (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`), stored as the bare token.
+5. `colorToken` is the GM-authored per-essence colour: a nullable key from the shared `--fab-tag-*` token palette (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `verdant`, `azure`), stored as the bare token.
    It has **no** `customColor` sibling — the palette is the whole vocabulary, because a free hex cannot be guaranteed legible against all seven themes.
    Normalization emits it in **both** branches of essence-definition normalization (the object branch and the legacy id-string branch), so a definition never reaches a surface with the field absent.
-   A `null` or unrecognized token renders as the theme accent, which is what every essence renders as today, so no migration is required.
+   A `null` token, or one naming no declared `--fab-tag-*` token, renders as the theme accent; a declared token outside the offered ten is retained and renders in its own tint though no colour editor offers it, so no migration is required.
 6. `enabled` defaults to **true** and is emitted in **both** branches of essence-definition normalization, as `colorToken` is.
    The object branch reads `entry.enabled !== false`; the legacy id-string branch emits `true`.
    No migration is required and adding one would be wrong: essence-definition normalization is a whitelist rebuild that has never emitted the key, so no stored definition carries one and an absent key already reads as enabled.
@@ -2097,7 +2097,8 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
 3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
 4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and summed over the configured stack-quantity path in standard craft, mirroring the existing documented divergence between the two matchers.
    The two paths **agree** that essence requirements share units with each other: alchemy pools the whole submission across every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block (clause 5).
-   They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it, standard craft does not, because clause 2's `remaining`/`ingredientLedger.commitItemPlan` ledger has already spent that unit.
+   They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy signature matching credits it, standard craft does not, because clause 2's `remaining`/`ingredientLedger.commitItemPlan` ledger has already spent that unit.
+   A version-1 brew credits essences at start as standard craft does: its plan resolves through that ledger over the submitted units, each Item offering its submission occurrences, with the authority's allocation over the submitted carriers, each entry clamped per clause 6 to the units the component/tag groups left, so a claimed carrier funds no essence requirement.
 5. Every `match.type === "essence"` option in one ingredient set forms a single **essence block**, resolved as one backtrackable node placed last — after every component/tag group has claimed from `remaining`.
    Within the block a consumed unit credits every essence it carries to every essence requirement in the block, so one dual-essence carrier can fund two essence requirements at once.
    The block's scope is exactly one ingredient set: it does not span ingredient sets, it does not span steps, and it does not reach across the component/tag boundary.
@@ -2504,6 +2505,29 @@ SystemMembershipRecord = {
     Object IDENTITY is load-bearing beyond content, because the definition index and the recipe manager's signature guard are both keyed on the array itself: a copy is a permanent cache miss, and a rebuild counts a memo build on the overwhelming majority of worlds, which have written no world corpus at all.
     This is the basis rule applied to the READ: `null` means UNKNOWN, and UNKNOWN prunes nothing.
 
+17. **Every distinct Essence and Tool id a crafting system holds has exactly one world entity and one `(entityId, systemId)` membership** (issue 2554), except an id registration reports `conflicting` — which the `1.36.0` migration names `ambiguous` for a Tool whose sources match two or more world entities — and that id stays UNREGISTERED, is reported, and is the only unregistered state allowed.
+    The world entity owns identity; the membership owns enablement and overrides.
+    Per row the planner (`src/systems/manager/worldScopeIdentityRegistration.js`) decides `registered` (entity and membership both present), `create` (a new entity under the row's own id), `adopt` (a membership joining the existing same-id entity) or `conflicting` with a `reason` of `sourceCollision`, `idCollision`, `retiredId` or `emptyOverride`; a membership that already exists without its entity yields the entity alone and keeps that membership verbatim.
+    `CraftingSystemManager.save` plans registration for every system the repository write serialises — the whole corpus for the settings backend, including on `delete` — and writes `fabricate.essenceScope`, then `fabricate.toolScope`, then the systems, each only after the previous succeeded, so the GM UI, the manager and public APIs, `createSystem`/`updateSystem`, Item, pack and folder imports, plugin calls and CraftingSystem JSON import all obey it.
+    Each scope store is read, planned and saved with no `await` between.
+    It writes nothing when the plan is empty, when the store seam is absent, or when the persisted `migrationVersion` is below `1.36.0`, where the `1.36.0` migration owns reconciliation and the conflict warning stays silent.
+    An unseeded scope is seeded by its first registration write, which only widens the Valid Id Basis of requirement 16.
+    A rejected scope write reloads that store, removes what that call already registered in an earlier scope write, and throws a recoverable `WorldScopeRegistrationError` (`code: "worldWrite"`, the original error as `cause`) before any system write; a failed system write removes only what that call registered and rethrows.
+    Removal re-reads each store at that moment and never restores a pre-call snapshot, withdraws a created entity only when no membership still names it, and throws `AggregateError` when it itself fails.
+    `save` resolves to a registration receipt whose `compensate()` withdraws the same registrations later, which `toolSources.upsertTool`'s source-flag rollback calls so a Tool transaction it unwinds leaves no world entity or membership behind.
+    `createSystem` and `updateSystem` restore the in-memory record they replaced when their first save throws, announcing the restore when that save had written a scope, and keep the persisted record after it resolved.
+    A `conflicting` row never blocks the save: once the system write has succeeded the GM is warned, one toast per system, once per client session per `(systemId, entityType, rowId)`, naming at most five rows, with the full list and each row's reason in the console.
+    The in-system arrays remain the read projection and are not pruned.
+
+    17a.
+    **Membership shape** (precedent `### Component scope` requirement 6a).
+    A created entity carries the row's identity, a Tool's completed from its component as `### Tool scope` requirement 7 states.
+    A created entity's membership inherits every section and carries the row's own `enabled`, plus for a Tool a copy of the row's `repairRequirements`.
+    An adopted entity's membership is the `1.30.0` fully overriding shape, flipped back to inherit for each section whose world default is absent or whose world default, written through the read union's inherited-section writer, leaves the row's shipped fields unchanged; `effectSource` compares as its whole three-field block, `macro` against `propertyMacroUuid`, and `prerequisites` and `bonus` after their override normalization.
+    This departs from the `1.30.0` shape and `### Essence scope` requirement 5 on purpose: those bind the migration, not registration.
+    `createSystem(data, options)` and `updateSystem(id, updates, options)` accept `{ scopeMembershipSeeds }`, keyed by entity id for the system that call writes; a seed replaces only the membership shape of a `create` or `adopt` decision, with its `systemId` rewritten, and never registers a row decided `conflicting` by id, source or retired id.
+    A seed stands in for the adopted-shape derivation, so a seeded Tool row is not refused for an `emptyOverride`: the incoming membership is what the payload authored.
+
 ### Component scope
 
 **What the `1.30.0` migration writes here, and what it deliberately leaves UNAUTHORED.**
@@ -2692,6 +2716,9 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
 
    **The constraint binds an IMPORT-TIME write of a carried world default too, and is RE-DECIDED at the destination** (issue 1364).
    The migration is no longer the only writer of a world `effectSource`: an import carries one elected in ANOTHER world, whose component roster the destination does not share, so world-addressability is re-evaluated against the DESTINATION's MERGED roster rather than the corpus the value was elected in, and a section that fails is DECLINED and reported (`import-export/spec.md` -> World-default constraint re-check on import).
+6. **Registration** (issue 2554, `## Scoped Entity Definitions` requirement 17): an essence row adopts the same-id world essence, and otherwise creates one under its own id.
+   A row whose id is retired in `fabricate.worldEssenceMergeMap` is never created and is reported `conflicting`.
+   Registration never matches an essence by name and never re-keys one.
 
 ### Tool scope
 
@@ -2804,6 +2831,17 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-system-studio/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
    `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
    `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
+7. **Registration** (issue 2554, `## Scoped Entity Definitions` requirement 17).
+   A Tool row's source keys are its own source references, else those of the component its `componentId` names in the same system, compared without a pack Item's document-type segment and without embedded Item uuids; a Tool whose only references are embedded counts as source-less.
+   The embedded test fails closed: a reference `foundry.utils.parseUuid` cannot read, or any reference when no parser is available, counts as embedded.
+   Registration, the `1.36.0` migration, copy-mode import and `toolSources.upsertTool` read that one accessor (`toolRowReferences`), and a world Tool matches by its own references minus embedded Item uuids, so no two of them decide one row differently.
+   A Tool row adopts the same-id world Tool when the two share a source or both are source-less.
+   That departs from `destructive-changes-and-migrations/spec.md` -> World-Scope Entity Migration requirement 2 on purpose: Tool ids are minted with `randomID()`, so two source-less Tools share an id only by copying, and creating one is impossible while the id is taken.
+   `toolSources.upsertTool` gives a new Tool the id of the single world Tool sharing its source, aliases included, before minting one, unless the system already holds a row under that id.
+   Any other same-id world Tool — disjoint sources, or exactly one of the two source-less — leaves the row unregistered and reported `conflicting` (`idCollision`), and with no same-id world Tool, a different-id world Tool sharing a source does the same (`sourceCollision`, naming every match).
+   A source-less Tool with no same-id world Tool gets its own world identity.
+   A world Tool created for a row whose sources come only from its component carries those references, and the component's `name` and `img` where the row has none.
+   A row leaving `breakage` or `onBreak` unauthored where the world default authors it stays unregistered, because no membership can express that empty override.
 
 ## World Vocabulary
 
@@ -3108,10 +3146,13 @@ ResultGroup = {
   id: string,
   name: string,
   // Reserved role discriminator (issue 554). `'failure'` marks the reserved failure
-  // result group, valid on plain `simple` recipes and on alchemy `simple` checkMode;
-  // absent/other = a success group. Still forbidden on None/Tiered groups. The
-  // reserved failure group is undeletable in the editor and defaults to empty.
-  // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
+  // result group; absent/other = a success group. Only plain `simple` recipes and
+  // alchemy `simple` checkMode select it, by role, on a failed check the failure-result
+  // policy permits; an empty one awards nothing. Its presence is the recipe's opt-in:
+  // the editor adds it empty and removes it through "Award results on a failed check",
+  // and never synthesizes it. No other mode or checkMode selects it by role, and a
+  // mode change into `progressive` drops it. Preserved verbatim by normalization so a
+  // settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
   // alchemy tiered). Empty for non-tiered groups, and OMITTED from the serialized
@@ -5130,7 +5171,7 @@ The following aliases are **no longer emitted** by `toJSON()` / normalization ou
 | ---------------------------- | ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `results` (flat array, Recipe) | #1087 | `Recipe._normalizeResultGroups`, which wraps each flat result into a single-result group when `resultGroups` is absent or empty | It duplicated `resultGroups[].results` wholesale and was ~10% of a representative recipe payload, paid on every write and every socket replication. Worlds, exported system files and third-party content authored before the retirement carry it as their only result data and cannot all be reached by a migration, so accepting it is not a window that closes. Import reference remapping and `migrateComponentId` keep traversing it for the same reason. |
 | `ingredients` (flat array, IngredientSet) | #1135 | `IngredientSet._legacyIngredientsToGroups`, which wraps each flat ingredient into a single-option group when `ingredientGroups` is absent or empty; plus the FOUR projections that perform the same `{options: [ingredient]}` synthesis on raw json — `RecipeManager._displayGroups` and `RecipeManager._validateTagPlaceholders`, `adminRecipeRowProjection._ingredientCountForSet`, and `inventorySnapshot.groupsOf` | It was a DERIVED first-option-per-group projection of `ingredientGroups` — never authored, and strictly lossy, since a two-option group surfaced only its first option — and it was 19.89% of a simple serialized corpus and 21.13% of a rich one. The read fallback is permanent because it is reachable only for a pre-groups payload where the flat array is the set's ONLY ingredient data: a world, an exported system file or third-party content authored before ingredient groups existed. Stripping it on import would therefore delete a recipe's entire input requirement, which is why it must never be listed under § Retired Aliases (Fully Removed). The in-memory `IngredientSet#ingredients` property is unchanged and is what every runtime reader of the alias sees. |
-| `systemItemId` (Ingredient) | #1135 | Every fallback in `models/match/matchTypes.js` — `normalizeMatch`'s bare-field read, `getComponentId`, and the ingredient-reference id extraction — each of which reads `componentId` first and falls back to `systemItemId`. That file is the largest cluster but NOT the whole set: seven more ingredient-scoped `componentId \|\| systemItemId` reads live outside it, in `Recipe.isSimpleRecipe`, `CraftingEngine`'s prepared-step consumed summary, `InventoryListingBuilder._optionConsumedComponentIds`, `importReferenceResolver`'s `remapIngredientRef` and `reportIngredientRef`, `recipeGraphBuilder.extractComponentIds` (which reads it on grouped options AND on the flat alias), and `recipeComponentReferences`'s `isDeletedLegacy`. Re-derive the list mechanically before any cleanup — grep `systemItemId` under `src/` and keep the reads whose subject is an ingredient option or a flat `set.ingredients` row, discarding the Result, Tool and gathering-drop reads of the same-named alias | On an `Ingredient` it was a byte-for-byte duplicate of `componentId` on the SAME object, so it never distinguished anything on the wire. The read fallback is permanent for the same reason as `results`: a payload written before `componentId` existed carries the alias as its only component reference, and the 1.13.0 `migrateComponentId` pass cannot reach content outside the world. `Tool.toJSON` and `Result.toJSON` still emit it and stay in § Transitional Write Aliases; only `Ingredient` retires. `src/ui/recipeIngredientGroups.js` also writes it, and is DEAD — an orphaned draft serializer with no importer anywhere in the repository — so it is not a missed retirement site. |
+| `systemItemId` (Ingredient) | #1135 | Every fallback in `models/match/matchTypes.js` — `normalizeMatch`'s bare-field read, `getComponentId`, and the ingredient-reference id extraction — each of which reads `componentId` first and falls back to `systemItemId`. That file is the largest cluster but NOT the whole set: seven more ingredient-scoped `componentId \|\| systemItemId` reads live outside it, in `Recipe.isSimpleRecipe`, `CraftingEngine`'s prepared-step consumed summary, `InventoryListingBuilder._optionConsumedComponentIds`, `importReferenceResolver`'s `remapIngredientRef` and `reportIngredientRef`, `recipeGraphBuilder.extractComponentIds` (which reads it on grouped options AND on the flat alias), and `recipeComponentReferences`'s `isDeletedLegacy`. Re-derive the list mechanically before any cleanup — grep `systemItemId` under `src/` and keep the reads whose subject is an ingredient option or a flat `set.ingredients` row, discarding the Result, Tool and gathering-drop reads of the same-named alias | On an `Ingredient` it was a byte-for-byte duplicate of `componentId` on the SAME object, so it never distinguished anything on the wire. The read fallback is permanent for the same reason as `results`: a payload written before `componentId` existed carries the alias as its only component reference, and the 1.13.0 `migrateComponentId` pass cannot reach content outside the world. `Tool.toJSON` and `Result.toJSON` still emit it and stay in § Transitional Write Aliases; only `Ingredient` retires. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

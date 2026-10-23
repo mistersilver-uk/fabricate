@@ -2,8 +2,9 @@
  * The published component manifest (issue 2426) against each component's parsed declaration: its
  * props, rest, root and each key's kind, then its import closure of `.svelte` and `.js` files: a
  * stylesheet and template that need no ancestor above the entry's root, no read of a Foundry
- * global, no class the module sheet names under an `any` root, and focusable elements marked as
- * admission rule 9 asks; then the selectors that name the published `Chip`'s root class in the
+ * global, no class the module sheet names under an `any` root, focusable elements marked as
+ * admission rule 9 asks, and `overlays` stated exactly where an overlay action is reached, as rule
+ * 10 asks (issue 2454); then the selectors that name the published `Chip`'s root class in the
  * module sheet, and the published `InspectorCard`'s, `EmptyState`'s and `Notice`'s in the sheet
  * and every component `<style>` (issue 2451); then the published `Button`'s, with every selector
  * that names a bare `button`, every selector that reads a shipped `aria` key off any element, and
@@ -60,12 +61,20 @@ import { describe, it } from 'node:test';
 
 import { stylesheetSources } from '../scripts/lib/stylesheetSource.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
-import { RESERVED_ON_A_CONTROL } from '../src/ui/publishedComponentProps.js';
+import { RESERVED_ON_A_CONTROL, STRIPPED_ITEM_MEMBERS } from '../src/ui/publishedComponentProps.js';
+import { valueEntryFault } from '../src/ui/publishedComponentValues.js';
 
-import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
+import { PROBE_ENTRY, PROBE_OVERLAY_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { readDeclaration, templateOf } from './helpers/apiConvention.js';
-import { parseModule, walkNodes } from './helpers/moduleAst.js';
-import { componentAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
+import {
+  calledName,
+  importedModules,
+  lazilyImportedModules,
+  parseModule,
+  walkNodes,
+} from './helpers/moduleAst.js';
+import { componentAstOf, moduleAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
+import { drawnClosure, drawsNode } from './helpers/publishedClosureDrawn.js';
 import {
   BARE_BUTTON_ANCESTORS,
   BARE_BUTTON_RULES,
@@ -73,7 +82,6 @@ import {
   attributeReads,
   bareButtonSelectors,
   cannotMatchPublished,
-  classNames,
   classesOf,
   compoundsOf,
   dataHooksOf,
@@ -93,11 +101,13 @@ import {
   BRANCH_TWIN,
   DYNAMIC_ELEMENTS,
   SHIPPED,
+  ancestorDependencies,
   ariaFaults,
   attributeSelectors,
   attributesReadInClauses,
   branchTwinFaults,
   byName,
+  closureDependencies,
   controlRestFaults,
   declarationsOf,
   dynamicElementFaults,
@@ -119,27 +129,7 @@ import {
   tagKeys,
   unheldClauses,
 } from './helpers/publishedComponentGate.js';
-import { readsGlobal } from './helpers/svelteStructureContract.js';
-
-const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
-const APP_TOKENS = ['var(--fab-manager-'];
-/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
-const MANAGER_ROOTS = new Set(['fabricate-manager']);
-const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
-// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
-const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
-const FOUNDRY_GLOBALS = [
-  'game',
-  'foundry',
-  'Hooks',
-  'CONFIG',
-  'CONST',
-  'ui',
-  'canvas',
-  'fromUuid',
-  'fromUuidSync',
-  'getDocumentClass',
-];
+import { OVERLAY_ACTIONS, hostResolverImports } from './helpers/publishedComponentPublishable.js';
 
 /**
  * Every render tag beneath an `{#each}`, a `{#key}`, a `{#snippet}` or a child component's content,
@@ -206,7 +196,9 @@ function renderedLocals(ast) {
   return called;
 }
 
-const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria']);
+const SHIPPED_KINDS = new Set(['data', 'text', 'slot', 'callback', 'aria', 'value']);
+const VALUE_KEY = /^[a-z][A-Za-z0-9]*$/;
+const VALUE_TYPES = new Set(['string', 'number', 'boolean']);
 const SLOT_ELEMENTS = new Set(['div', 'span']);
 
 /** Whether a render call draws nothing for an absent local: `?.()`, or under the local's own guard. */
@@ -262,6 +254,49 @@ function argsFaults(key, spec) {
   return counts ? [] : [`${key} states args that is not a non-negative integer`];
 }
 
+/**
+ * What a key's `requiredWhen` breaks: the name of another `data` key of the entry that is neither
+ * `required` nor `requiredWhen` itself, on a key that is no `slot`, `aria` or `value` key and states no
+ * `required` (issue 2452).
+ */
+function requiredWhenFaults(key, spec, entry) {
+  const name = spec.requiredWhen;
+  if (name === undefined) return [];
+  const guard = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
+  const named = `${key} is requiredWhen ${String(name)}`;
+  const faults = [];
+  if (!guard || name === key) faults.push(`${named}, which is no other key of the entry`);
+  else if (guard.kind !== 'data') faults.push(`${named}, which is no data key`);
+  else if (guard.required === true || guard.requiredWhen !== undefined) {
+    faults.push(`${named}, which is itself required or requiredWhen`);
+  }
+  if (['slot', 'aria', 'value'].includes(spec.kind)) {
+    faults.push(`${key} states requiredWhen, which no ${spec.kind} key takes`);
+  }
+  if (spec.required !== undefined) faults.push(`${key} states both required and requiredWhen`);
+  return faults;
+}
+
+/**
+ * What a `value` key's spec breaks: a name that is not camel case from a lower-case letter, an
+ * `initial` that is not a string, number, boolean or `null`, a stated `required`, and a
+ * synthesised `on<Key>Change` the entry lists or the component declares.
+ */
+function valueFaults(key, spec, entry, declared) {
+  if (spec.kind !== 'value') return [];
+  const change = `on${key[0].toUpperCase()}${key.slice(1)}Change`;
+  const primitive = spec.initial === null || VALUE_TYPES.has(typeof spec.initial);
+  return [
+    ...(VALUE_KEY.test(key) ? [] : [`${key} is a value key whose name is not camel case`]),
+    ...(primitive ? [] : [`${key} has an initial that is not a string, number, boolean or null`]),
+    ...(spec.required === undefined ? [] : [`${key} is a value key that states required`]),
+    ...(Object.hasOwn(entry.props, change)
+      ? [`${key} synthesises ${change}, which the entry lists`]
+      : []),
+    ...(declared.has(change) ? [`${key} synthesises ${change}, which the component declares`] : []),
+  ];
+}
+
 /** What a key's `element` breaks: stated on a `slot` key only. */
 const elementFaults = (key, spec) =>
   spec.kind !== 'slot' && spec.element !== undefined
@@ -270,7 +305,8 @@ const elementFaults = (key, spec) =>
 
 /**
  * Each rule an entry's published keys break against the component's parsed declaration, as
- * `<key> <rule>`. An unpublished prop is not judged: it may be `$bindable` or rendered either way.
+ * `<key> <rule>`. A `value` key is `$bindable`, and no other published key is. An unpublished prop
+ * is not judged: it may be `$bindable` or rendered either way.
  * An `aria` key is judged by `ariaFaults`, since the component declares no prop for it.
  * Where a `callback` key is called from is `published-component-controls.test.js`'s.
  */
@@ -284,7 +320,13 @@ function declarationFaults(entry, ast) {
       : [`${key} has the unshipped kind ${spec.kind}`];
     if (spec.kind === 'aria') {
       const own = ariaFaults(key, spec, entry, Boolean(prop));
-      return [...unshipped, ...own, ...elementFaults(key, spec), ...argsFaults(key, spec)];
+      return [
+        ...unshipped,
+        ...own,
+        ...elementFaults(key, spec),
+        ...argsFaults(key, spec),
+        ...requiredWhenFaults(key, spec, entry),
+      ];
     }
     const faults = key.startsWith('aria-')
       ? [`${key} is spelled as an ARIA attribute and is not an aria key`]
@@ -294,18 +336,22 @@ function declarationFaults(entry, ast) {
     if (spec.required !== undefined && typeof spec.required !== 'boolean') {
       faults.push(`${key} is required by something other than a boolean`);
     }
-    if (prop.bindable) faults.push(`${key} is $bindable`);
+    if (prop.bindable && spec.kind !== 'value') faults.push(`${key} is $bindable`);
+    if (!prop.bindable && spec.kind === 'value') {
+      faults.push(`${key} is a value key that is not $bindable`);
+    }
+    faults.push(...valueFaults(key, spec, entry, declared));
     const calls = rendered.get(prop.local) ?? [];
     if (spec.kind === 'text') faults.push(...textRenderFaults(key, spec, calls));
     if (spec.kind === 'slot') faults.push(...slotFaults(key, spec, calls));
     faults.push(...elementFaults(key, spec));
-    if (spec.kind === 'data' && calls.length > 0) {
-      faults.push(`${key} is a data key rendered as a snippet`);
+    if ((spec.kind === 'data' || spec.kind === 'value') && calls.length > 0) {
+      faults.push(`${key} is a ${spec.kind} key rendered as a snippet`);
     }
     if (spec.kind === 'callback' && calls.length > 0) {
       faults.push(`${key} is a callback key a render tag calls`);
     }
-    return [...faults, ...argsFaults(key, spec)];
+    return [...faults, ...argsFaults(key, spec), ...requiredWhenFaults(key, spec, entry)];
   });
 }
 
@@ -413,7 +459,6 @@ const NOTICE = Object.freeze({
 const BUTTON = Object.freeze({
   root: 'fabricate-button',
   writable: new Set([
-    'fab-manager-button',
     'is-primary',
     'is-ghost',
     'is-danger',
@@ -431,7 +476,6 @@ const BUTTON = Object.freeze({
     'fab-bulk-edit-dock',
     'manager-tool-edit-actions',
     'manager-environment-drop-adjustment-row',
-    'manager-header-actions',
     'manager-checks-tier-add',
     'manager-salvage-stage-add',
     'fabricate-filter-bar',
@@ -456,7 +500,7 @@ const BUTTON = Object.freeze({
 });
 
 /** The classes `Button.svelte` spells that no published key writes. */
-const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-38']);
+const UNPUBLISHED_BUTTON_CLASSES = Object.freeze(['is-size-28', 'is-size-38']);
 
 /** Every selector in one sheet that names the chip root, as `{ selector, safe }`. */
 function chipSelectors(file, css) {
@@ -472,21 +516,16 @@ const unsafeChipSelectors = (file, css) =>
     .filter(({ safe }) => !safe)
     .map(({ selector }) => selector);
 
-/** The 26 sheet rules that draw a published button, each one compound with nothing above it. */
+/** The 21 sheet rules that draw a published button, each one compound with nothing above it. */
 const BUTTON_FAMILY_RULES = Object.freeze([
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-primary',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled)',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled)',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover',
-  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fab-manager-button.is-full-width',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled)',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-ghost:not(:disabled):hover',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled)',
-  'styles/fabricate-manager-recipe-editor.css: .fabricate-button.fabricate-button.is-dashed:not(:disabled):hover',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-primary',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled)',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-ghost:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed',
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled)',
+  "styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-dashed:not(:disabled, [aria-disabled='true']):hover",
+  'styles/fabricate-manager-shell.css: .fabricate-button.fabricate-button.fabricate-button.is-full-width',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:disabled',
@@ -496,19 +535,23 @@ const BUTTON_FAMILY_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled)',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled):hover',
-  'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-primary:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-danger:not(:disabled, [aria-disabled='true']):hover",
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button.is-warning-action:not(:disabled, [aria-disabled='true']):hover",
 ]);
-/** The two rules no published button can match, an anchor's and a glyph child's, which fail closed. */
+/**
+ * The three rules no published button can match, which fail closed: an anchor's, a glyph child's,
+ * and the busy face, whose `aria-busy` the seam refuses (issue 2540).
+ */
 const BUTTON_UNMATCHED_RULES = Object.freeze([
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button:is(a)',
   'styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button i',
+  "styles/fabricate-manager-rail-gathering.css: .fabricate-button.fabricate-button[aria-busy='true']:not(:disabled)",
 ]);
 /** The sheet rule a button matches only through a `data-*` hook Fabricate writes. */
 const BUTTON_DATA_HOOK_RULES = Object.freeze([
-  'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
+  'styles/fabricate-manager-library.css: .fabricate-button.fabricate-button.fabricate-button[data-essence-sort-direction]',
 ]);
 
 /**
@@ -577,46 +620,6 @@ const NOTICE_HAS_RULES = Object.freeze([
   'styles/fabricate-manager-library.css: .fabricate-manager .manager-recipe-notice:has(.fab-notice)',
 ]);
 
-/**
- * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
- * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
- */
-function ancestorDependencies(ast, root = 'any') {
-  if (root === 'manager') return [];
-  const windowed = root === 'fabricate';
-  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
-  const found = new Set();
-  for (const node of walkNodes(ast.css)) {
-    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
-    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
-    if (node.type !== 'Declaration') continue;
-    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
-    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
-      found.add('unguarded var(--font-primary)');
-    }
-  }
-  for (const node of walkNodes(ast.fragment)) {
-    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
-  }
-  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
-}
-
-/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
-function foundryReads(file, reader) {
-  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
-  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
-}
-
-/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
-function closureDependencies(path, reader = SHIPPED, root = 'any') {
-  return [...importClosure(path, reader)].flatMap((file) =>
-    [
-      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
-      ...foundryReads(file, reader),
-    ].map((rule) => `${file}: ${rule}`)
-  );
-}
-
 const SHEET_PREFIXES = ['fab-', 'fabricate-', 'manager-'];
 
 /** Every class name a module sheet selector names. */
@@ -680,6 +683,13 @@ const UNFOLLOWED_REST = 'rest is read where the gate cannot follow';
  * then, the tags of those it keeps undrawn, and in `heldBy` the mounted clause that holds both.
  */
 const REST_LANDINGS = Object.freeze({
+  'src/ui/svelte/components/SearchField.svelte': {
+    drawn: 'label',
+    undrawn: ['Field'],
+    defaults: ['label'],
+    heldBy:
+      'tests/components/published-search-mounted.test.js: the default draws the label root alone',
+  },
   'src/ui/svelte/components/StatusToggle.svelte': {
     drawn: 'button',
     undrawn: ['input', 'span'],
@@ -730,7 +740,8 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
 /**
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
- * is, and a rest the gate sees on no element, or reads anywhere but in those spreads, fails closed.
+ * is, and a rest the gate sees on no element, reads anywhere but in those spreads, or hands to a
+ * child component its pin does not name undrawn, fails closed.
  * An entry `landings` pins is judged by its drawn landing alone, and every entry by the twin rule.
  * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
  * the entry's `aria` keys among it.
@@ -738,11 +749,14 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
 function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
   const every = restElements(ast);
-  if (every.length === 0) return [NO_REST_ELEMENT];
+  if (every.every(({ node }) => node.type === 'Component')) return [NO_REST_ELEMENT];
   const pin = landings[entry.path];
   const pinned = pin ? landingPinFaults(entry, ast, every, pin) : [];
   const landed = pin ? every.filter(({ node }) => node.name === pin.drawn) : every;
   const shape = [...pinned, ...branchTwinFaults(ast)];
+  const handed = every.filter(
+    ({ node }) => node.type === 'Component' && !pin?.undrawn.includes(node.name)
+  );
   const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
   const controls = landed.filter(({ node }) => judged.includes(node));
   if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
@@ -750,7 +764,7 @@ function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS)
   const stated = entry.restOn === 'control';
   return [
     ...shape,
-    ...(restReads(ast) > every.length ? [UNFOLLOWED_REST] : []),
+    ...(restReads(ast) > every.length || handed.length > 0 ? [UNFOLLOWED_REST] : []),
     ...(lands && !stated ? [UNSTATED_REST] : []),
     ...(!lands && entry.restOn !== undefined ? [OVERSTATED_REST] : []),
     ...controls.flatMap((control) =>
@@ -782,6 +796,12 @@ describe('the manifest', () => {
     );
   });
 
+  it('holds a primitive initial and no colliding change key on every value key, the probe’s among them', () => {
+    for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
+      assert.equal(valueEntryFault(entry), null, entry.name);
+    }
+  });
+
   it('is a frozen list of frozen entries with unique names', () => {
     assert.ok(Object.isFrozen(PUBLISHED_COMPONENT_MANIFEST));
     const names = PUBLISHED_COMPONENT_MANIFEST.map((entry) => entry.name);
@@ -792,20 +812,262 @@ describe('the manifest', () => {
   });
 });
 
+describe('the per-item members the seam strips (issue 2455)', () => {
+  it('are InfoStrip facts props alone, each a member of a published data key', () => {
+    assert.ok(Object.isFrozen(STRIPPED_ITEM_MEMBERS));
+    assert.deepEqual([...STRIPPED_ITEM_MEMBERS], ['InfoStrip.facts.props']);
+    for (const spec of STRIPPED_ITEM_MEMBERS) {
+      const [name, key] = spec.split('.');
+      const entry = PUBLISHED_COMPONENT_MANIFEST.find((published) => published.name === name);
+      assert.equal(entry?.props[key]?.kind, 'data', spec);
+    }
+  });
+});
+
+/**
+ * Rule 10 (issue 2454): `overlays: true` exactly when the closure reaches an overlay action, and
+ * an `overlays: true` closure reaches no `resolveOverlayHost` except through `anchoredPopover.js`.
+ */
+function overlayFaults(entry, reader = SHIPPED) {
+  const reached = [...importClosure(entry.path, reader)]
+    .filter((file) => OVERLAY_ACTIONS.includes(file))
+    .sort(byName);
+  if (reached.length === 0) {
+    return entry.overlays === true ? ['is overlays: true and reaches no overlay action'] : [];
+  }
+  if (entry.overlays !== true)
+    return reached.map((file) => `reaches ${file} and is not overlays: true`);
+  return hostResolverImports(entry.path, reader).map(
+    (file) => `is overlays: true and ${file} imports resolveOverlayHost, which ignores the chain`
+  );
+}
+
+describe('admission rule 10: an entry that opens an overlay states overlays', () => {
+  it('names only overlay actions the plumbing ships', () => {
+    for (const file of OVERLAY_ACTIONS) assert.ok(SHIPPED.module(file).ast, file);
+  });
+
+  it('holds every shipped entry and both probes', () => {
+    for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
+      assert.deepEqual(overlayFaults(entry), [], entry.name);
+    }
+  });
+
+  it('refuses the overlay probe without overlays, by each action its closure reaches', () => {
+    const { overlays, ...unstated } = PROBE_OVERLAY_ENTRY;
+    assert.equal(overlays, true, 'the probe states it');
+    assert.deepEqual(overlayFaults(unstated), [
+      'reaches src/ui/svelte/actions/anchoredPopover.js and is not overlays: true',
+      'reaches src/ui/svelte/actions/portal.js and is not overlays: true',
+    ]);
+  });
+
+  it('refuses a closure that imports only a pure export of anchoredPopover.js', () => {
+    const reader = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';" +
+        'const layout = hostRelativePopoverLayout(() => null);</script>',
+      'src/ui/svelte/actions/anchoredPopover.js':
+        'export function hostRelativePopoverLayout(compute) { return compute; }',
+    });
+    const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte' };
+    assert.deepEqual(overlayFaults(entry, reader), [
+      'reaches src/ui/svelte/actions/anchoredPopover.js and is not overlays: true',
+    ]);
+    assert.deepEqual(overlayFaults({ ...entry, overlays: true }, reader), []);
+  });
+
+  it('refuses an overlays: true closure that imports resolveOverlayHost beside an overlay action', () => {
+    const reader = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { portal } from '../actions/portal.js';" +
+        "import { resolveOverlayHost } from '../util/overlayHost.js';" +
+        'const host = (node) => resolveOverlayHost(node);</script>',
+      'src/ui/svelte/actions/portal.js': 'export function portal() {}',
+      'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
+    });
+    const entry = { name: 'E', path: 'src/ui/svelte/components/E.svelte', overlays: true };
+    assert.deepEqual(overlayFaults(entry, reader), [
+      'is overlays: true and src/ui/svelte/components/E.svelte imports resolveOverlayHost, which ignores the chain',
+    ]);
+    const through = syntheticReader({
+      'src/ui/svelte/components/E.svelte':
+        "<script>import { anchoredPopover } from '../actions/anchoredPopover.js';</script>",
+      'src/ui/svelte/actions/anchoredPopover.js':
+        "import { resolveOverlayHost } from '../util/overlayHost.js';" +
+        'export const anchoredPopover = (node) => resolveOverlayHost(node);',
+      'src/ui/svelte/util/overlayHost.js': 'export function resolveOverlayHost() {}',
+    });
+    assert.deepEqual(overlayFaults(entry, through), [], 'through anchoredPopover.js is allowed');
+  });
+
+  it('names Modal as unpublishable until it acquires through the chain', () => {
+    const modal = { name: 'Modal', path: 'src/ui/svelte/components/Modal.svelte', overlays: true };
+    assert.ok(
+      hostResolverImports(modal.path, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
+      'Modal still portals through resolveOverlayHost'
+    );
+  });
+
+  it('refuses overlays on an entry whose closure reaches no overlay action', () => {
+    assert.deepEqual(overlayFaults({ ...PROBE_ENTRY, overlays: true }), [
+      'is overlays: true and reaches no overlay action',
+    ]);
+  });
+});
+
+/**
+ * The entries whose component declares a rest prop the entry does not publish, by path: the tag its
+ * rest is spread on, which no published key draws, and the mounted clause that holds a `data-*`
+ * key refused (M8) and nothing of the rest drawn.
+ */
+const UNPUBLISHED_REST = Object.freeze({
+  'src/ui/svelte/components/Select.svelte': {
+    landsOn: 'Field',
+    heldBy: 'tests/components/published-select-mounted.test.js: the published Select refuses',
+  },
+});
+
+/** Whether a drawn closure of one of `entries` draws `node` of `file` (issue 2454). */
+function drawnByAny(entries, reader = SHIPPED) {
+  const closures = entries.map((entry) => drawnClosure(entry, reader));
+  return (file, node) => closures.some((closure) => drawsNode(closure, file, node));
+}
+
+/** The adapter, and its specifier for a manifest path, which is relative to `src/ui/`. */
+const ADAPTER = 'src/ui/publishedComponents.svelte.js';
+const adapterSpecifierOf = (path) => `./${path.slice('src/ui/'.length)}`;
+
+/** The initialiser of the adapter's exported `const name`. */
+function adapterConstant(name) {
+  const { ast } = moduleAstOf(ADAPTER);
+  const exported = ast.body.flatMap((node) =>
+    node.type === 'ExportNamedDeclaration' && node.declaration?.kind === 'const'
+      ? node.declaration.declarations
+      : []
+  );
+  const declarator = exported.find((candidate) => candidate.id.name === name);
+  assert.ok(declarator, `the adapter exports const ${name}`);
+  return declarator.init;
+}
+
+/** Is `loader` `() => import(…).then((module) => module.default)`? */
+function resolvesDefault(loader) {
+  const call = loader.type === 'ArrowFunctionExpression' ? loader.body : null;
+  const then = call?.type === 'CallExpression' ? call.callee : null;
+  const pick = call?.arguments?.[0];
+  const parameter = pick?.params?.[0]?.name;
+  return (
+    then?.type === 'MemberExpression' &&
+    then.object.type === 'ImportExpression' &&
+    then.property.name === 'then' &&
+    call.arguments.length === 1 &&
+    pick.type === 'ArrowFunctionExpression' &&
+    pick.body.type === 'MemberExpression' &&
+    parameter !== undefined &&
+    pick.body.object.name === parameter &&
+    pick.body.property.name === 'default'
+  );
+}
+
+describe('a lazy entry, whose code load fetches (issue 2455)', () => {
+  it('is stated by no entry before Kicker, the first published with load', () => {
+    const first = PUBLISHED_COMPONENT_MANIFEST.findIndex((entry) => entry.name === 'Kicker');
+    assert.ok(first > 0, 'Kicker is published after TierTrack');
+    const early = PUBLISHED_COMPONENT_MANIFEST.slice(0, first);
+    assert.deepEqual(
+      early.filter((entry) => Object.hasOwn(entry, 'lazy')),
+      []
+    );
+  });
+
+  it('is Rail alone, pinned by name', () => {
+    const lazy = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true);
+    assert.deepEqual(
+      lazy.map((entry) => entry.name),
+      ['Rail']
+    );
+  });
+
+  it('is imported by the adapter through import() alone, and an eager entry statically alone', () => {
+    const { ast } = moduleAstOf(ADAPTER);
+    const statically = importedModules(ast);
+    const lazily = lazilyImportedModules(ast);
+    for (const entry of PUBLISHED_COMPONENT_MANIFEST) {
+      const specifier = adapterSpecifierOf(entry.path);
+      const lazy = entry.lazy === true;
+      assert.equal(statically.includes(specifier), !lazy, `${entry.name}: a static import`);
+      assert.equal(lazily.includes(specifier), lazy, `${entry.name}: an import()`);
+    }
+  });
+
+  it('binds each lazy path a loader that imports that path alone and resolves its default', () => {
+    const loaders = adapterConstant('LOADERS');
+    assert.equal(calledName(loaders), 'freeze');
+    const properties = loaders.arguments[0].properties;
+    const lazyPaths = PUBLISHED_COMPONENT_MANIFEST.filter((entry) => entry.lazy === true).map(
+      (entry) => entry.path
+    );
+    assert.deepEqual(
+      properties.map((property) => property.key.value),
+      lazyPaths
+    );
+    for (const { key, value } of properties) {
+      assert.deepEqual(lazilyImportedModules(value), [adapterSpecifierOf(key.value)], key.value);
+      assert.ok(resolvesDefault(value), `${key.value}'s loader resolves the module's default`);
+    }
+  });
+
+  it('is registered by the adapter as the exported REGISTRATION', () => {
+    const { ast } = moduleAstOf(ADAPTER);
+    const registers = [...walkNodes(ast)].filter((node) => calledName(node) === 'register');
+    assert.equal(registers.length, 1);
+    assert.deepEqual(
+      registers[0].arguments.map((argument) => argument.name),
+      ['REGISTRATION']
+    );
+    assert.equal(adapterConstant('REGISTRATION').type, 'CallExpression');
+  });
+});
+
 describe('each entry matches its component declaration', () => {
-  for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]) {
+  it('keeps a declared rest unpublished only where it lands on a tag no published key draws', () => {
+    assert.deepEqual(Object.keys(UNPUBLISHED_REST), ['src/ui/svelte/components/Select.svelte']);
+    for (const [path, { landsOn, heldBy }] of Object.entries(UNPUBLISHED_REST)) {
+      const entry = PUBLISHED_COMPONENT_MANIFEST.find((candidate) => candidate.path === path);
+      assert.equal(entry.rest, false, `${entry.name} publishes no rest`);
+      const landings = restElements(componentAstOf(path));
+      assert.ok(landings.length > 0, 'the rest is spread on a tag the gate can see');
+      const drawn = drawnClosure(entry, SHIPPED);
+      for (const { node } of landings) {
+        assert.equal(node.name, landsOn);
+        assert.ok(!drawsNode(drawn, path, node), `no published key draws <${landsOn}>`);
+      }
+      assert.deepEqual(unheldClauses([heldBy]), [], 'its heldBy names a describe block');
+    }
+  });
+
+  for (const entry of [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY, PROBE_OVERLAY_ENTRY]) {
     it(`${entry.name} publishes only declared props at a shipped kind, rest exactly when declared, and a root`, () => {
       const declaration = readDeclaration({ file: entry.path, ast: componentAstOf(entry.path) });
-      const keys = Object.keys(entry).filter((key) => key !== 'restOn');
+      const optional = new Set(['restOn', 'overlays', 'lazy']);
+      const keys = Object.keys(entry).filter((key) => !optional.has(key));
       assert.deepEqual(keys.sort(byName), ['name', 'path', 'props', 'rest', 'root', 'version']);
       assert.ok(
         !Object.hasOwn(entry, 'restOn') || entry.restOn === 'control',
         "restOn is 'control' or absent"
       );
+      assert.ok(
+        !Object.hasOwn(entry, 'overlays') || entry.overlays === true,
+        'overlays is true or absent'
+      );
+      assert.ok(!Object.hasOwn(entry, 'lazy') || entry.lazy === true, 'lazy is true or absent');
       assert.ok(['any', 'fabricate', 'manager'].includes(entry.root), 'a shipped root');
       assert.ok(Number.isInteger(entry.version) && entry.version > 0, 'a positive version');
       assert.equal(entry.name, declaration.component);
-      assert.equal(entry.rest, declaration.rest !== null, 'rest matches the rest declaration');
+      const restPublished =
+        declaration.rest !== null && !Object.hasOwn(UNPUBLISHED_REST, entry.path);
+      assert.equal(entry.rest, restPublished, 'rest matches the rest declaration, or its pin');
       assert.deepEqual(declarationFaults(entry, declaration.ast), []);
     });
 
@@ -822,7 +1084,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges seven focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the StatusToggle button and checkbox, and the probe button', () => {
+  it('judges twenty focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -836,16 +1098,30 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/SearchablePopover.svelte: button',
+      'src/ui/svelte/components/SearchablePopover.svelte: button',
+      'src/ui/svelte/components/SearchablePopover.svelte: input',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte: button',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte: div',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte: input',
+      'src/ui/svelte/components/SearchField.svelte: input',
       'src/ui/svelte/components/StatusToggle.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: input',
+      'src/ui/svelte/components/Stepper.svelte: button',
+      'src/ui/svelte/components/Stepper.svelte: button',
+      'src/ui/svelte/components/Stepper.svelte: input',
+      'src/ui/svelte/components/Stepper.svelte: input',
       'tests/fixtures/published-components/PublishedProbe.svelte: button',
+      'tests/fixtures/published-components/PublishedProbe.svelte: input',
+      'tests/fixtures/published-components/PublishedProbe.svelte: input',
     ]);
   });
 
   it('pins every svelte:element the shipped closures and the probe draw, by the tags and the published keys its file states', () => {
     const files = closureComponents([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
     assert.ok(files.length >= 15, 'every shipped closure and the probe were read');
-    assert.deepEqual(dynamicElementFaults(files), []);
+    const entries = [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY];
+    assert.deepEqual(dynamicElementFaults(files, DYNAMIC_ELEMENTS, drawnByAny(entries)), []);
     const held = Object.values(DYNAMIC_ELEMENTS).flatMap(({ heldBy }) => (heldBy ? [heldBy] : []));
     assert.ok(held.length > 0, 'a pin names a mounted clause');
     assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
@@ -855,8 +1131,11 @@ describe('each entry matches its component declaration', () => {
     const held = Object.values(REST_LANDINGS).map(({ heldBy }) => heldBy);
     assert.deepEqual(
       Object.keys(REST_LANDINGS),
-      ['src/ui/svelte/components/StatusToggle.svelte'],
-      'the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
+      [
+        'src/ui/svelte/components/SearchField.svelte',
+        'src/ui/svelte/components/StatusToggle.svelte',
+      ],
+      'the search field, whose unpublished label keeps its Field root undrawn, and the switch, whose unpublished as keeps its checkbox and indicator hosts undrawn'
     );
     assert.deepEqual(unheldClauses(held), [], 'each names a describe block of its file');
   });
@@ -869,7 +1148,14 @@ describe('each entry matches its component declaration', () => {
     );
     assert.deepEqual(
       shipped,
-      ['Notice.onAction: 0', 'Button.onclick: 0', 'StatusToggle.onclick: 0'],
+      [
+        'Notice.onAction: 0',
+        'Notice.onDismiss: 0',
+        'Button.onclick: 0',
+        'StatusToggle.onclick: 0',
+        'Stepper.onChange: 1',
+        'Select.onChange: 1',
+      ],
       'a forwarded argument needs a mounted clause on its type'
     );
   });
@@ -936,8 +1222,8 @@ describe('each entry matches its component declaration', () => {
       '<script>\n  let { body, value = $bindable(), ...rest } = $props();\n</script>\n{@render body?.()}'
     );
     assert.deepEqual(propLocals(ast), [
-      { key: 'body', local: 'body', bindable: false },
-      { key: 'value', local: 'value', bindable: true },
+      { key: 'body', local: 'body', bindable: false, fallback: undefined },
+      { key: 'value', local: 'value', bindable: true, fallback: undefined },
     ]);
     assert.deepEqual(
       [...renderedLocals(ast)],
@@ -949,7 +1235,7 @@ describe('each entry matches its component declaration', () => {
     'Synthetic.svelte',
     [
       '<script>',
-      '  let { label, body, note, value = $bindable(), row, ...rest } = $props();',
+      '  let { label, body, note, value = $bindable(), row, flag, ...rest } = $props();',
       '</script>',
       '<p {...rest}>{label}{@render body()}{@render body?.()}{@render note?.()}</p>',
       '{@render row?.(label)}{@render row()}',
@@ -961,10 +1247,40 @@ describe('each entry matches its component declaration', () => {
   it('passes a synthetic entry whose keys each match their declaration and render tags', () => {
     const body = { kind: 'text', required: true };
     assert.deepEqual(faultsOf({ label: data, body, note: { kind: 'text' } }), []);
+    const when = { kind: 'text', requiredWhen: 'label' };
+    assert.deepEqual(faultsOf({ label: data, note: when }), [], 'a key required while label is');
+    const optional = { kind: 'data', required: false };
+    assert.deepEqual(
+      faultsOf({ label: optional, note: when }),
+      [],
+      'a guard that states required: false is not itself required'
+    );
   });
 
   it('admits an unpublished prop that is $bindable, or rendered with and without an argument', () => {
     assert.deepEqual(faultsOf({ label: data }), []);
+  });
+
+  it('passes a $bindable value key whose initial is each primitive, null among them', () => {
+    for (const initial of ['', 0, false, null]) {
+      assert.deepEqual(faultsOf({ value: { kind: 'value', initial } }), []);
+    }
+  });
+
+  it('names a value key whose change callback the component declares, or whose name is not camel case', () => {
+    const { ast } = templateOf(
+      'Valued.svelte',
+      [
+        '<script>',
+        "  let { value = $bindable(''), onValueChange, Big = $bindable('') } = $props();",
+        '</script>',
+      ].join('\n')
+    );
+    const value = { kind: 'value', initial: '' };
+    assert.deepEqual(declarationFaults({ props: { value, Big: value } }, ast), [
+      'value synthesises onValueChange, which the component declares',
+      'Big is a value key whose name is not camel case',
+    ]);
   });
 
   for (const [claim, props, faults] of [
@@ -987,7 +1303,39 @@ describe('each entry matches its component declaration', () => {
       ['body is an optional text key rendered without ?. or an {#if} guard'],
     ],
     ['a data key with a render tag', { note: data }, ['note is a data key rendered as a snippet']],
-    ['a value kind', { note: { kind: 'value' } }, ['note has the unshipped kind value']],
+    [
+      'a value key that is not $bindable, with a render tag',
+      { note: { kind: 'value', initial: '' } },
+      ['note is a value key that is not $bindable', 'note is a value key rendered as a snippet'],
+    ],
+    [
+      'a value key with no initial',
+      { value: { kind: 'value' } },
+      ['value has an initial that is not a string, number, boolean or null'],
+    ],
+    [
+      'a value key whose initial is an object',
+      { value: { kind: 'value', initial: {} } },
+      ['value has an initial that is not a string, number, boolean or null'],
+    ],
+    [
+      'a value key that states required',
+      { value: { kind: 'value', initial: '', required: false } },
+      ['value is a value key that states required'],
+    ],
+    [
+      'a value key that states requiredWhen',
+      { open: { kind: 'data' }, value: { kind: 'value', initial: '', requiredWhen: 'open' } },
+      ['open is not a declared prop', 'value states requiredWhen, which no value key takes'],
+    ],
+    [
+      'a value key whose change callback the entry lists',
+      { value: { kind: 'value', initial: null }, onValueChange: { kind: 'callback' } },
+      [
+        'value synthesises onValueChange, which the entry lists',
+        'onValueChange is not a declared prop',
+      ],
+    ],
     [
       'a callback key a render tag calls',
       { note: { kind: 'callback' } },
@@ -1024,6 +1372,45 @@ describe('each entry matches its component declaration', () => {
       'a required that is not a boolean',
       { label: { kind: 'data', required: 'yes' } },
       ['label is required by something other than a boolean'],
+    ],
+    [
+      'a requiredWhen naming no key of the entry',
+      { label: { kind: 'data', requiredWhen: 'toString' } },
+      ['label is requiredWhen toString, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen naming its own key',
+      { label: { kind: 'data', requiredWhen: 'label' } },
+      ['label is requiredWhen label, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen that is no string',
+      { label: { kind: 'data', requiredWhen: 1 } },
+      ['label is requiredWhen 1, which is no other key of the entry'],
+    ],
+    [
+      'a requiredWhen naming a key that is no data key',
+      { note: { kind: 'text' }, label: { kind: 'data', requiredWhen: 'note' } },
+      ['label is requiredWhen note, which is no data key'],
+    ],
+    [
+      'a requiredWhen naming a required key',
+      { label: { kind: 'data', required: true }, note: { kind: 'text', requiredWhen: 'label' } },
+      ['note is requiredWhen label, which is itself required or requiredWhen'],
+    ],
+    [
+      'a requiredWhen naming a requiredWhen key',
+      {
+        label: data,
+        flag: { kind: 'data', requiredWhen: 'label' },
+        note: { kind: 'text', requiredWhen: 'flag' },
+      },
+      ['note is requiredWhen flag, which is itself required or requiredWhen'],
+    ],
+    [
+      'a requiredWhen beside required',
+      { label: data, note: { kind: 'text', required: false, requiredWhen: 'label' } },
+      ['note states both required and requiredWhen'],
     ],
   ]) {
     it(`names ${claim} as a fault`, () => {
@@ -1096,6 +1483,11 @@ describe('each entry matches its component declaration', () => {
       'that states required',
       { clean: { kind: 'slot', required: false } },
       ['clean is a slot key that states required'],
+    ],
+    [
+      'that states requiredWhen',
+      { unused: { kind: 'data' }, clean: { kind: 'slot', requiredWhen: 'unused' } },
+      ['clean states requiredWhen, which no slot key takes'],
     ],
     [
       'whose element is a <p>',
@@ -1323,6 +1715,37 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
+  /** Rule 9's element ids and faults over one synthetic file's `markup`. */
+  const idsOf = (markup) => {
+    const { ast } = templateOf('src/E.svelte', markup);
+    const { elements, faults } = focusableElements('src/E.svelte', ast);
+    return { ids: elements.map(({ id }) => id), faults };
+  };
+
+  it('tells two inputs that share a hook apart by their static type, and moves no unshared id', () => {
+    const markup =
+      '{#if a}<input type="text" data-in />{:else}<input type="number" data-in />{/if}';
+    assert.deepEqual(idsOf(`${markup}<input data-other />`), {
+      ids: [
+        'src/E.svelte: input[data-in][type="text"]',
+        'src/E.svelte: input[data-in][type="number"]',
+        'src/E.svelte: input[data-other]',
+      ],
+      faults: [],
+    });
+  });
+
+  for (const [claim, markup] of [
+    ['a pair with no static type', '<input data-in /><input type={kind} data-in />'],
+    ['a pair of one type', '<input type="number" data-in /><input type="number" data-in />'],
+  ]) {
+    it(`names ${claim} that shares a hook as a fault`, () => {
+      assert.deepEqual(idsOf(markup).faults, [
+        'src/E.svelte: input[data-in] names more than one element',
+      ]);
+    });
+  }
+
   const DYNAMIC = 'src/E.svelte: svelte:element';
   const MARKED = ' data-keyboard-focus="true"';
   const UNMARKED = `${DYNAMIC} does not state data-keyboard-focus="true"`;
@@ -1512,12 +1935,12 @@ describe('each entry matches its component declaration', () => {
   const CHILD = 'src/E.svelte';
   const UNKEYED = { [DYNAMIC]: { tags: ['span'], keys: [] } };
   /** The pin faults of a child whose tag reads its prop `tagProp`, beside a parent that draws it as `drawn`. */
-  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag') => {
+  const passedFaultsOf = (drawn, pins = UNKEYED, tagProp = 'tag', parentKeys = new Map()) => {
     const sources = {
       [CHILD]: `<script>let { ${tagProp} = 'span', ...rest } = $props();</script><svelte:element this={${tagProp}}></svelte:element>`,
-      'src/Parent.svelte': `<script>import Child from './E.svelte';</script>${drawn}`,
+      'src/Parent.svelte': `<script>import Child from './E.svelte'; let { label, ...rest } = $props();</script>${drawn}`,
     };
-    const published = { [CHILD]: new Map([['as', 'as']]) };
+    const published = { [CHILD]: new Map([['as', 'as']]), 'src/Parent.svelte': parentKeys };
     const files = Object.entries(sources).map(([file, source]) => ({
       file,
       ast: templateOf(file, source).ast,
@@ -1534,8 +1957,15 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(passedFaultsOf('<Child as="p" {...more} />', keyed, 'as'), []);
   });
 
+  it('passes a parent that names a pinned tag by a literal, and an entry that spreads its own rest', () => {
+    assert.deepEqual(passedFaultsOf('<Child tag="span" />'), []);
+    const entry = new Map([['label', 'label']]);
+    assert.deepEqual(passedFaultsOf('<Child {...rest} />', UNKEYED, 'tag', entry), []);
+  });
+
   for (const [claim, drawn, faults] of [
     ['the prop by name', '<Child tag="button" />', [PASSED('tag')]],
+    ['its rest, from a file that is no entry', '<Child {...rest} />', [PASSED('a spread')]],
     ['the prop from an expression', '<Child tag={kind} />', [PASSED('tag')]],
     ['the prop by a binding', '<Child bind:tag={kind} />', [PASSED('tag')]],
     ['a spread', '<Child {...more} />', [PASSED('a spread')]],
@@ -1544,6 +1974,29 @@ describe('each entry matches its component declaration', () => {
       assert.deepEqual(passedFaultsOf(drawn), faults);
     });
   }
+
+  it('judges no tag the drawn closures leave under an unpublished prop at a falsy default', () => {
+    const sources = {
+      [CHILD]:
+        "<script>let { tag = 'span', ...rest } = $props();</script>" +
+        '<svelte:element this={tag}></svelte:element>',
+      'src/Parent.svelte':
+        "<script>import Child from './E.svelte'; let { label, chip = false } = $props();</script>" +
+        '{#if chip}<Child {...more} />{/if}',
+    };
+    const reader = syntheticReader(sources);
+    const files = Object.keys(sources).map((file) => ({
+      file,
+      ast: reader.component(file),
+      published: new Map(),
+    }));
+    const entry = { name: 'Parent', path: 'src/Parent.svelte', props: { label: { kind: 'data' } } };
+    assert.deepEqual(dynamicElementFaults(files, UNKEYED, drawnByAny([entry], reader)), []);
+    const chip = { ...entry, props: { ...entry.props, chip: { kind: 'data' } } };
+    assert.deepEqual(dynamicElementFaults(files, UNKEYED, drawnByAny([chip], reader)), [
+      PASSED('a spread'),
+    ]);
+  });
 
   const REST = '<script>let { label, ...rest } = $props();</script>';
   /** One marked button that states `attributes` after its mark. */
@@ -2010,6 +2463,12 @@ describe('each entry matches its component declaration', () => {
       [ARIA('aria-expanded', 'that states required')],
     ],
     [
+      'an aria key that states requiredWhen',
+      { label: data, 'aria-expanded': { kind: 'aria', requiredWhen: 'label' } },
+      LANDING,
+      ['aria-expanded states requiredWhen, which no aria key takes'],
+    ],
+    [
       'an aria key on an entry with no restOn',
       { 'aria-expanded': aria },
       { rest: true },
@@ -2178,7 +2637,7 @@ const unsafeOf = (census) => census.filter(({ safe }) => !safe).map(({ selector 
 const publishedShapeOf = (name) => [Object.keys(entryNamed(name).props), entryNamed(name).root];
 
 describe('the module sheet against the published Chip', () => {
-  it('names the chip root in 16 selectors, none of which a published chip can match', () => {
+  it('names the chip root in 15 selectors, none of which a published chip can match', () => {
     const selectors = stylesheetSources().parts.flatMap(({ file, text }) =>
       chipSelectors(file, text)
     );
@@ -2186,7 +2645,8 @@ describe('the module sheet against the published Chip', () => {
       selectors.filter(({ safe }) => !safe).map(({ selector }) => selector),
       []
     );
-    assert.equal(selectors.length, 16, 'the census the static Chip was published on');
+    // 16 at publication; issue 2512 deleted the routing chip's rule with its component.
+    assert.equal(selectors.length, 15, 'the census the static Chip was published on');
     assert.deepEqual(
       Object.keys(PUBLISHED_COMPONENT_MANIFEST.find(({ name }) => name === 'Chip').props),
       ['tone', 'density', 'children'],
@@ -2225,14 +2685,17 @@ describe('the module sheet against the published Chip', () => {
 });
 
 describe('the module sheet and every component style against the published InspectorCard', () => {
-  it('names the card root in 23 selectors: its two family rules, two data-hook rules, and nineteen no published card can match', () => {
+  // Issue 2315 retired seven caller rules that restated or wrapped the card and added its `flush`
+  // rule, so the census InspectorCard was published on, 23, became 17; issue 2467 deleted the
+  // modifier card's two option-gap selectors, so it is 15.
+  it('names the card root in 15 selectors: its two family rules, two data-hook rules, and eleven no published card can match', () => {
     assert.ok(publishedManagerClasses().has('manager-chip'), 'the published closures were read');
     const selectors = shippedCensus(CARD, 'InspectorCard');
     assert.deepEqual(unsafeOf(selectors), [...CARD_FAMILY_RULES, ...CARD_DATA_HOOK_RULES]);
-    assert.equal(selectors.length, 23, 'the census InspectorCard was published on');
+    assert.equal(selectors.length, 15, 'the census at issue 2467');
     assert.deepEqual(
       PUBLISHED_COMPONENT_MANIFEST.filter(({ root }) => root !== 'any').map(({ name }) => name),
-      ['InspectorCard', 'Button', 'StatusToggle'],
+      ['InspectorCard', 'Button', 'StatusToggle', 'Stepper', 'SearchField', 'Select'],
       'an entry with a required root needs a census of its own'
     );
     assert.deepEqual(
@@ -2276,6 +2739,19 @@ describe('the module sheet and every component style against the published Inspe
       assert.deepEqual(unsafeCardSelectors(`${selector} { gap: 0 }`), [`sheet.css: ${flat}`]);
     });
   }
+
+  it('refuses the flush rule once a published key could write is-flush', () => {
+    const css = '.fabricate-card.fabricate-card.is-flush { padding: 0 }';
+    assert.deepEqual(
+      unsafeCardSelectors(css),
+      [],
+      'flush is unpublished, so is-flush is unwritable'
+    );
+    const flushPublished = { ...CARD, writable: new Set(['is-flush']) };
+    assert.deepEqual(unsafeOf(syntheticCensus(flushPublished, css, { spelled: SPELLED })), [
+      'sheet.css: .fabricate-card.fabricate-card.is-flush',
+    ]);
+  });
 
   it('admits a class a published closure spells once the shape calls it undrawn', () => {
     const css = '.fabricate-card .manager-chip { gap: 0 }';
@@ -2381,7 +2857,20 @@ describe('the module sheet and every component style against the published Notic
     );
     assert.deepEqual(
       publishedShapeOf('Notice'),
-      [['tone', 'title', 'detail', 'icon', 'action', 'onAction'], 'any'],
+      [
+        [
+          'tone',
+          'title',
+          'detail',
+          'icon',
+          'action',
+          'onAction',
+          'dismissable',
+          'dismissLabel',
+          'onDismiss',
+        ],
+        'any',
+      ],
       'a published key that writes a class reopens cannotMatchPublished'
     );
   });
@@ -2439,7 +2928,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Button', () => {
-  it('reaches a published button through 29 selectors: 26 that draw it, two it cannot match and one data-hook rule', () => {
+  it('reaches a published button through 25 selectors: 21 that draw it, three it cannot match and one data-hook rule', () => {
     const census = shippedCensus(BUTTON, 'Button');
     assert.deepEqual(
       writtenOf(reachingOf(census)),
@@ -2645,8 +3134,8 @@ describe('the module sheet and every component style against the published Butto
   for (const [claim, selector] of [
     ['a class no published key writes', '.fabricate-button.is-size-38'],
     ['the armed state, which no published key writes', '.fabricate-button.is-danger.is-armed'],
-    ['a per-site class', '.fabricate-button.fab-manager-button.manager-recipe-sort-direction'],
-    ['a pinned ancestor', '.fabricate-manager .manager-header-actions .fabricate-button'],
+    ['a per-site class', '.fabricate-button.fabricate-button.manager-recipe-sort-direction'],
+    ['a pinned ancestor', '.fabricate-manager .manager-knowledge-reset-actions .fabricate-button'],
     ['a classed child', '.fabricate-button .fa-plus'],
   ]) {
     it(`admits a selector that needs ${claim}`, () => {
@@ -2683,9 +3172,13 @@ describe('the module sheet and every component style against the published Butto
   });
 
   it('names a pinned ancestor that keeps no selector off the button as stale', () => {
-    const census = buttonCensus('.manager-header-actions .fabricate-button { gap: 0 }');
+    const census = buttonCensus('.manager-knowledge-reset-actions .fabricate-button { gap: 0 }');
     const stale = staleAncestors(BUTTON, census, SPELLED);
-    assert.equal(stale.includes('manager-header-actions'), false, 'the one the selector names');
+    assert.equal(
+      stale.includes('manager-knowledge-reset-actions'),
+      false,
+      'the one the selector names'
+    );
     assert.equal(stale.length, BUTTON.ancestors.size - 1, 'every other is stale');
   });
 

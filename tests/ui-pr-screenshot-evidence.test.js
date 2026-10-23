@@ -14,6 +14,9 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 
+import { REMOVED_NOTE_KIND, captureManifest } from '../scripts/lib/primitiveLabCapture.js';
+import { addressKey } from '../scripts/lib/primitiveLabUnits.js';
+
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -493,7 +496,7 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the three shared bulk primitives,
+    // The browser view, any file in the browser's own directory, the shared bulk primitives and `InspectorPanel`,
     // the staging inset, the shared selection primitive and both pure models all republish the
     // frame (issue 1010).
     for (const file of [
@@ -502,6 +505,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/InspectorPanel.svelte',
       'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
       'src/ui/model/componentBulkEditModel.js',
@@ -593,7 +597,7 @@ describe('UI PR screenshot evidence', () => {
       );
     }
 
-    // The recipe browser view, anything in the browser's own directory, the four shared primitives
+    // The recipe browser view, anything in the browser's own directory, the shared bulk primitives and `InspectorPanel`
     // and the shared selection control all republish the frames.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',
@@ -601,6 +605,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/InspectorPanel.svelte',
       'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
     ]) {
@@ -1264,6 +1269,20 @@ describe('UI PR screenshot evidence', () => {
     const pillIds = idsFor('src/ui/svelte/components/ModifierPillSelect.svelte');
     assert.ok(pillIds.includes('manager-checks-crafting-modifiers'));
     assert.ok(pillIds.includes('manager-recipe-edit-normal'));
+  });
+
+  it('maps the issue-2510 requirement-row family, and only that family, to the recipe-edit frames', () => {
+    const idsFor = (file) => mapChangedFilesToViews([file]).map(view => view.id);
+    for (const base of [
+      'PickerRow', 'PickerRowNameField', 'PickerRowAmount', 'PickerRowKindMenu', 'PickerRowRewardBody',
+      'PickerRowRangeCell', 'ChoiceGroup', 'ChoiceGroupAwardHeader', 'KindAdder',
+    ]) {
+      const file = `src/ui/svelte/components/${base}.svelte`;
+      assert.ok(idsFor(file).includes('manager-recipe-edit-normal'), `${file} selects no recipe-edit frame`);
+    }
+    // The family's pattern stops at its own names: a neighbouring Choice* primitive selects none.
+    const tabStripIds = idsFor('src/ui/svelte/components/ChoiceOptionList.svelte');
+    assert.deepEqual(tabStripIds.filter(id => id.startsWith('manager-recipe-edit')), []);
   });
 
   it('collects the thirteen recipe-edit frames into thirteen separate files', () => {
@@ -2942,6 +2961,46 @@ describe('publishing design-library frames (issue 2413)', () => {
     }
     assert.ok(!section.includes('- row:controls/4'), 'a captured unit is not listed');
     assert.ok(!section.includes('- entry:4:'), 'a unit whose frame was recorded is accounted for');
+  });
+
+  const GONE = addressKey('<Stepper>', 'signed');
+  const noteOf = (key, kind) => captureManifest({
+    notes: [{ key, kind, spec: '<Stepper>', cap: 'signed', reason: '<Stepper> has no unit captioned "signed"' }],
+  }).notes[0];
+  const removedNote = key => noteOf(key, REMOVED_NOTE_KIND);
+  const sectionFor = async (targets, overrides = {}) => librarySection((await publishLibrary({
+    library: { files: ['3-0-stepper.png'], manifest: manifestOf(overrides) },
+    targets,
+  })).written);
+
+  it('accounts for an address noted removed with no body line, and names it when no note says so', async () => {
+    const targets = `row:controls/4,${GONE}`;
+    const noted = await sectionFor(targets, { notes: [removedNote(GONE)] });
+    assert.ok(!noted.includes(GONE), noted);
+    assert.ok(!noted.includes('no record in the library manifest'), noted);
+    assert.ok(!noted.includes('has no unit captioned'), noted);
+    const bare = await sectionFor(targets);
+    assert.ok(bare.includes(`- ${GONE}: no record in the library manifest`), bare);
+  });
+
+  it('accounts for nothing from an address note of another kind', async () => {
+    const section = await sectionFor(`row:controls/4,${GONE}`, { notes: [noteOf(GONE, 'unlocated')] });
+    assert.ok(section.includes(`- ${GONE}: no record in the library manifest`), section);
+  });
+
+  it('changes nothing for a removed note off the selection, a removed non-address key, or an unlocated note', async () => {
+    const file = 'openspec/specs/design-system/library.html';
+    const targets = `row:controls/4,row:controls/9,unlocated:${file}:2`;
+    const bare = await sectionFor(targets);
+    assert.ok(bare.includes('- row:controls/9: no record in the library manifest'), bare);
+    assert.ok(bare.includes(`- could not locate 2 hunk(s) in ${file}; touched units may be missing`), bare);
+    for (const notes of [
+      [removedNote(GONE)],
+      [removedNote('row:controls/9')],
+      [{ key: `unlocated:${file}:2`, kind: 'unlocated', file, count: 2 }],
+    ]) {
+      assert.equal(await sectionFor(targets, { notes }), bare, JSON.stringify(notes));
+    }
   });
 
   it('escapes and cuts every manifest-sourced string', async () => {

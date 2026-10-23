@@ -8,6 +8,7 @@ import {
   BULK_EDIT_CHROME_PATTERN,
   COMPONENT_EDITOR_MATCHES,
   PREMIUM_ICONS_AD_PATTERN,
+  PROGRESSIVE_STAGE_LIST_MATCH,
   REQUIREMENT_SUGGESTION,
   STAGE_COMPLICATION_LIST_MATCH,
   TYPEAHEAD_COMBOBOX_SOURCE,
@@ -22,8 +23,8 @@ const SALVAGE_ROW = (n) => `${SALVAGE_ROWS}:nth-child(${n})`;
 
 /**
  * A flat salvage list's row geometry at 1024, where the list is too narrow for one line: the plate,
- * kind, name and remove on the first, the toggle and amount on the second, every remove and toggle
- * in a column.
+ * kind and name on the first line, the toggle, amount and remove on the second, every remove and
+ * toggle in a column.
  */
 const SALVAGE_GEOMETRY = Object.freeze({
   containerSelector: SALVAGE_LIST,
@@ -34,9 +35,12 @@ const SALVAGE_GEOMETRY = Object.freeze({
         '.manager-recipe-option-lead',
         '.manager-recipe-option-kind',
         '[data-salvage-result-component]',
+      ],
+      [
+        '[role="radiogroup"]',
+        '[data-salvage-result-quantity], [data-recipe-option-formula]',
         '[data-remove-salvage-result]',
       ],
-      ['[role="radiogroup"]', '[data-salvage-result-quantity], [data-recipe-option-formula]'],
     ],
   },
   alignedRight: `${SALVAGE_ROWS} .manager-recipe-option-remove`,
@@ -45,7 +49,7 @@ const SALVAGE_GEOMETRY = Object.freeze({
 
 /**
  * A progressive salvage's stage rows at 1024: the plate and kind, the name below them at its stated
- * minimum, then the DC and Edit.
+ * minimum of 180, then the DC and Edit.
  */
 const SALVAGE_STAGES = '.fabricate-sortable-list-row[data-salvage-result]';
 const SALVAGE_STAGE_GEOMETRY = Object.freeze({
@@ -61,16 +65,9 @@ const SALVAGE_STAGE_GEOMETRY = Object.freeze({
   alignedRight: `${SALVAGE_STAGES} [data-remove-salvage-result]`,
   minInlineSize: {
     selector: `${SALVAGE_STAGES} [data-salvage-result-component]`,
-    pixels: 140,
+    pixels: 180,
   },
 });
-
-/** The salvage rows' sources: the editor and the requirement row it draws them with. */
-const SALVAGE_ROW_SOURCES = Object.freeze([
-  ...COMPONENT_EDITOR_MATCHES,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(PickerRow|PickerRowAmount)\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
-]);
 
 /** Component Rules' header group, led by the Premium advert until it is dismissed. */
 const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
@@ -749,6 +746,8 @@ export const CASES = Object.freeze([
       { selector: '[data-salvage-routing]', scroll: true },
     ],
     expectView: 'component-edit',
+    // The routing well's rows are the routing overview's (issue 2513).
+    expectSelector: '[data-salvage-routing] .fabricate-routing-overview [data-salvage-route]',
     // The flat row in view after the scroll; its amount toggle is the requirement row's (issue 1516).
     expectCenterHit:
       '[data-salvage-group="rw-salv-partial"] [data-salvage-result] [data-recipe-option-amount-mode="rolled"]',
@@ -760,7 +759,35 @@ export const CASES = Object.freeze([
     },
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The routing well at the declared floor (issue 2513): Masterwork re-pointed to the set Standard
+  // already routes to, so both rows say the set is shared and the rows fit the narrow card.
+  managerCase({
+    id: 'manager-component-edit-salvage-routed-narrow',
+    label:
+      'Manager — Component edit salvage, two outcomes routed to one set, at the declared floor',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-route="Masterwork"]' },
+      { selector: '.fabricate-select-popover [data-popover-option="rw-salv-partial"]' },
+      { selector: '[data-salvage-routing]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '[data-salvage-routing]:has([data-routing-overview-row="Standard"] .fabricate-routing-overview-marker:has-text("shared · 2")) ' +
+      '[data-routing-overview-row="Masterwork"] .fabricate-routing-overview-marker:has-text("shared · 2")',
+    expectNoHorizontalOverflow: '[data-salvage-routing]',
+    expectCenterHit: '[data-salvage-routing] [data-salvage-route="Masterwork"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-narrow',
@@ -786,7 +813,11 @@ export const CASES = Object.freeze([
     expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, STAGE_COMPLICATION_LIST_MATCH],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
+    ],
   }),
   // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
   managerCase({
@@ -807,7 +838,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-salvage-result-groups] [data-component-edit-section="difficulty"]',
     kinds: ['manager', 'components'],
-    sourceMatches: COMPONENT_EDITOR_MATCHES,
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, PROGRESSIVE_STAGE_LIST_MATCH],
   }),
   // A stage's read-only complication list at the declared floor (issues 1522, 2445).
   managerCase({
@@ -829,7 +860,11 @@ export const CASES = Object.freeze([
       '.fabricate-manager .fabricate-sortable-list-row.has-band [data-stage-complications]',
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [...COMPONENT_EDITOR_MATCHES, STAGE_COMPLICATION_LIST_MATCH],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
+    ],
     // Rows on a stage card share `--fab-bg-1`, parted by the border alone: judged on a second palette.
     themeVariants: ['hearth-herb'],
   }),
@@ -918,7 +953,7 @@ export const CASES = Object.freeze([
     expectNoHorizontalOverflow: SALVAGE_LIST,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // A cleared stage searches again in place (issue 1516): its suggestion list opens beneath it,
   // inside the editor's form, and its last suggestion must own its pointer target.
@@ -940,7 +975,11 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
     kinds: ['manager', 'components'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, TYPEAHEAD_COMBOBOX_SOURCE, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   // A salvage row's kind select, open (issue 1516): one option, Component, ticked.
   managerCase({
@@ -961,7 +1000,7 @@ export const CASES = Object.freeze([
     expectCenterHit:
       '.fabricate-manager > .fabricate-select-popover [data-popover-option="component"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [...SALVAGE_ROW_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
 
   // Five frames, all on `lab-herbalism`: the section gates on progressive resolution, which only herbalism has.
@@ -1077,6 +1116,39 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-component-complications-macro-missing',
+    label: 'Manager — Component complications macro missing',
+    // The macro zone's missing face and its Relink; `missingComplicationMacro` retires the macro.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', missingComplicationMacro: '1' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
+      },
+      { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
+      { selector: '[data-item-drop-zone="complication-macro"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The missing face lands a tick after mount, once `fromUuid` settles, so this is the wait.
+    expectSelector:
+      '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
+      '[data-item-drop-zone="complication-macro"].is-missing [data-item-drop-zone-relink]',
+    expectContained: [
+      {
+        container: '[data-item-drop-zone="complication-macro"]',
+        target: '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]',
+      },
+    ],
+    expectCenterHit: '[data-item-drop-zone="complication-macro"] [data-item-drop-zone-relink]',
+    kinds: ['manager', 'components', 'complications'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-component-complications-check-trigger',
     label: 'Manager — Component complications check trigger',
     // Beyond the smoke: the check-trigger Select appears only once a check-trigger condition is chosen on an open complication.
@@ -1138,6 +1210,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
       STAGE_COMPLICATION_LIST_MATCH,
       ...COMPONENT_EDITOR_MATCHES,
+      PROGRESSIVE_STAGE_LIST_MATCH,
     ],
   }),
   managerCase({
@@ -1161,6 +1234,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
       STAGE_COMPLICATION_LIST_MATCH,
+      PROGRESSIVE_STAGE_LIST_MATCH,
     ],
   }),
   overrideCase({

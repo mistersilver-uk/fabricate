@@ -40,6 +40,8 @@ const RECIPE_EDIT_MATCHES = [
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770); a change to it republishes the recipe-editor frames it appears in.
   /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
+  // The requirement row family, moved out of `recipe/` at issue 2510.
+  /^src\/ui\/svelte\/components\/(?:PickerRow\w*|ChoiceGroup\w*|KindAdder)\.svelte$/,
 ];
 
 // Every recipe-editor frame maps one same-named smoke label to the shared RECIPE_EDIT_MATCHES glob.
@@ -75,7 +77,7 @@ const TOOL_STUDIO_MATCHES = [
 
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
 const BULK_STUDIO_SURFACE_PATTERN =
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard)\.svelte$/;
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard|InspectorPanel)\.svelte$/;
 const RECIPE_BULK_SELECT_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkEditSelect\.svelte$/;
 
 // The Component Studio BROWSER's own files (issue 676): the view and every component in
@@ -175,6 +177,19 @@ const worldNavigationFrame = (id, label) => ({
 });
 
 export const VIEW_RECIPES = Object.freeze([
+  {
+    // The system inspectors' filling root and pinned foot (issue 2498): the four browsers whose
+    // record verbs render through it, each at its default selection.
+    id: 'manager-inspector-panel',
+    label: 'Manager system inspectors — record verbs pinned to the rail foot',
+    smokeLabels: [
+      'manager-recipes-normal',
+      'manager-essences-normal',
+      'manager-components-normal',
+      'manager-tool-parity-01-library-1280x720',
+    ],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/InspectorPanel\.svelte$/],
+  },
   {
     id: 'manager-systems',
     label: 'Manager systems browser',
@@ -1559,6 +1574,8 @@ const LIBRARY_FRAME_FILE = /^[a-z0-9-]+\.png$/;
 const LIBRARY_FRAME_ID = /^[a-z0-9-]+$/;
 const LIBRARY_MANIFEST = 'manifest.json';
 const LIBRARY_UNLOCATED_PREFIX = 'unlocated:';
+const LIBRARY_ADDRESS_PREFIX = 'addr:';
+const LIBRARY_REMOVED_KIND = 'removed';
 const LIBRARY_TEXT_MAX = 200;
 const LIBRARY_NOT_CAPTURED_MAX = 20;
 const LIBRARY_SECTION_MAX = 20_000;
@@ -1637,9 +1654,15 @@ function manifestFrames(manifest, pngs) {
   return { frames, accounted, notCaptured };
 }
 
+/** The `addr:` keys of `removed` notes: deleted rows whose drawing the head library dropped. */
+const removedAddresses = manifest => listOf(manifest.notes)
+  .filter(note => note?.kind === LIBRARY_REMOVED_KIND && typeof note.key === 'string' && note.key.startsWith(LIBRARY_ADDRESS_PREFIX))
+  .map(note => note.key);
+
 /**
  * Reconciles the selected keys against the library artifact: the frames to publish, and a line
- * for every failure, overflow, unrecorded key, lab problem and unlocated hunk.
+ * for every failure, overflow, unrecorded key, lab problem and unlocated hunk, but none for a
+ * removed address.
  */
 function reconcileLibrary(targets, artifact) {
   const units = targets.filter(key => !key.startsWith(LIBRARY_UNLOCATED_PREFIX));
@@ -1662,6 +1685,7 @@ function reconcileLibrary(targets, artifact) {
     found.accounted.add(entryId(entry));
     notCaptured.push(`${entryId(entry)}: over the library unit cap`);
   }
+  for (const key of removedAddresses(manifest)) found.accounted.add(key);
   notCaptured.push(
     ...units.filter(unit => !found.accounted.has(unit)).map(key => `${key}: no record in the library manifest`),
     ...listOf(manifest.labProblems).map(problem => `Primitive Lab reported: ${problemText(problem)}`),

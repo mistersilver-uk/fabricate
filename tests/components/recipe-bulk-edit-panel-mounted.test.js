@@ -52,6 +52,7 @@ const panel = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
@@ -1105,15 +1106,15 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
   });
 
   it('renders the busy face from the caller\'s own flag, not from the arm', async () => {
-    // `deleting` is the owner's in-flight flag. Passing `armed: false` alongside it is the
-    // state a real browser reaches within a frame of the write starting — disabling a focused
-    // button blurs it, and `ArmedDangerButton` disarms on blur — so a busy face read off the
-    // arm would show "Delete 3 recipes" for the whole write. See
-    // `bulk-delete-busy-focus.test.js` for that blur, measured in Chromium.
+    // `deleting` is the owner's in-flight flag, and an owner that clears its arm on confirm
+    // passes `deleteArmed: false` beside it, so a busy face read off the arm would show
+    // "Delete 3 recipes" for the whole write. The face is `aria-disabled` rather than
+    // `disabled`, so focus survives it; see `bulk-delete-busy-focus.test.js`, measured in Chromium.
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
     await panel.setProps({ deleting: true, deleteArmed: false });
 
     assert.match(deleteButton(root).textContent, /Deleting…/);
-    assert.equal(deleteButton(root).disabled, true);
+    assert.equal(deleteButton(root).disabled, false);
+    assert.equal(deleteButton(root).getAttribute('aria-disabled'), 'true');
   });
 });

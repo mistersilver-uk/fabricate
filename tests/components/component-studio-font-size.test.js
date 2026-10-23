@@ -40,14 +40,15 @@ const FIXTURE = `
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label">Sort by</span>
               <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
-              <!-- Carries fab-manager-button because the shipped control does (issue 1118):
+              <!-- Carries the class list the shipped control does (issue 1118; the root alone since
+                   issue 2540):
                    ComponentsBrowserView renders this toggle through Button, and the
                    .fabricate-button.manager-component-sort-direction rule was chained onto the
-                   primitive class so its 9px radius and compact scale stop depending on source
+                   primitive rung so its 9px radius and compact scale stop depending on source
                    order. Note this fixture still measured 11.52px WITHOUT the marker, because
                    the components view has a toolbar rule of its own that supplies it — so it
                    would have gone on passing while measuring a rule it does not name. -->
-              <button class="fabricate-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+              <button class="fabricate-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
             </div>
           </div>
           <div class="manager-component-filter-row is-chips">
@@ -203,14 +204,14 @@ const FIXTURE = `
                shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
                child of the panel would go on measuring a box the product no longer renders. -->
           <div class="fab-bulk-edit-dock">
-            <!-- Carrying fab-manager-button since issue 1118 converted BulkEditPanelShell.
+            <!-- Carrying the primitive's class list since issue 1118 converted BulkEditPanelShell.
                  The marking and the re-chain landed in ONE commit, and had to: while
                  .fab-bulk-edit-apply was a SCOPED rule at (0,2,0), the primitive's (0,3,0)
                  control would have taken its 38px/0.78rem down to 34px/0.72rem and broken the
                  bottom-slot equality below against a shipped control that has not moved.
-                 That rule now names .fabricate-button.fab-manager-button and compiles to
+                 That rule now names .fabricate-button.fabricate-button and compiles to
                  (0,4,0), so the box this fixture measures is the same box it always was. -->
-            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <button type="button" class="fabricate-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
@@ -228,12 +229,12 @@ const FIXTURE = `
             cannot see a cascade change that moves one RENDERED value while both sources sit
             unchanged, which is the drift that desynchronises the slot.
           -->
-          <!-- Carries fab-manager-button because the shipped control does (issue 1118). The
-               inspector's stacked action column was chained onto the primitive class: at
+          <!-- Carries the shipped control's class list (issue 1118; the root alone since issue 2540). The
+               inspector's stacked action column was chained onto the primitive rung: at
                (0,3,0) it only TIED the primitive's own control and held its 38px and 0.78rem
                by source order alone. Unmarked, this fixture matched no rule at all and fell to
                Foundry's 14px app base — which is how it failed, loudly, rather than drifting. -->
-          <button type="button" class="fabricate-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
+          <button type="button" class="fabricate-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 
@@ -287,7 +288,7 @@ const FIXTURE = `
             <div class="fabricate-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="fabricate-sortable-list">
-                <li class="fabricate-sortable-list-row manager-salvage-stage-row">
+                <li class="fabricate-sortable-list-row manager-progressive-stage-row">
                  <div class="fabricate-sortable-list-line">
                   <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
                   <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
@@ -296,13 +297,13 @@ const FIXTURE = `
                   <div class="manager-recipe-ingredient-option-row is-component is-result">
                     <span class="manager-recipe-option-name-field">
                       <span class="manager-recipe-option-chosen">
-                        <img class="manager-recipe-option-chosen-img" alt="">
+                        <span class="manager-recipe-option-plate"><img alt=""></span>
                         <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Brass Casing</span>
                       </span>
                     </span>
                     <div class="manager-recipe-option-controls">
-                      <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
-                      <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                      <span class="manager-progressive-stage-dc" data-m="stage-dc">DC 8</span>
+                      <button class="manager-progressive-stage-edit" data-m="stage-edit"><span>Edit</span></button>
                     </div>
                   </div>
                   <span class="fabricate-sortable-list-rocker">
@@ -334,6 +335,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/InspectorPanel.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   // `BulkEditSelect.svelte` is NOT here any more (issue 1504).
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
@@ -418,7 +420,7 @@ const EXPECTED = {
   // ── The editor column.
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
-  'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
+  'readonly-label': 8.5, // the Field caption is the kicker (issue 2532)
   // 12.5px, the shared `<Select>`'s `form` rung, and a REAL change (issue 1510). It was 12 — the
   // literal `.manager-component-category-select` stated for the native control it painted, which
   // has no carrier now that the card's one control is the shared picker. The role still follows

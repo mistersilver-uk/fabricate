@@ -19,10 +19,10 @@
   | `showSearch` | boolean | `true` | Render the query field. With it off, `search` stays `''`, the filter degrades to the full list, and the TRIGGER becomes the focus holder. |
   | `inlineSearchTrigger` / `inlineCloseLabel` | boolean / string | `false` / `''` | The trigger REPLACES ITSELF with the query field while open and the panel's search row is suppressed, so there is exactly one query in exactly one field; it wins over every trigger form while open. |
   | `popoverTitle` / `showFilteredCount` / `filteredCountTemplate` / `compactOptionRows` | string / boolean / template / boolean | `''` / `false` / `'{matched} of {total}'` / `false` | The shared panel header — the caller supplies the template so its words stay localized, while this primitive owns the live numbers because it owns the query — and the dense full-width presentation as a WHOLE: the 5px frame, bordered rows with a 24px leading tile, an accent fill on the current value, and the 30px bordered search field. |
-  | `as` / `columns` | `'list'` \| `'grid'` / integer | `'list'` / `1` | The list's FORM and a grid's cells per row, EMITTED as `data-picker-as`/`data-picker-columns` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor. |
+  | `as` / `columns` / `squareTiles` | `'list'` \| `'grid'` / integer / boolean | `'list'` / `1` / `false` | The list's form, a grid's cells per row and its opt-in square tiles, emitted as `data-picker-as`/`data-picker-columns`/`data-picker-tiles` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor, and a count outside 2–6 draws and maps one column. A square tile is text-free, its label both its `title` and its `aria-label`. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces this component's trigger button; the caller spreads `attributes` onto its own element last, names and titles the button itself, passes neither `ariaLabel` nor `triggerTitle`, and gets `triggerClass` as a declared no-op. See the spread invariant. |
   | `option` | snippet `(option)` | `undefined` | Draws the row's CONTENT while this component keeps the row ELEMENT. When supplied it is the row's SOLE content — no `Chip`, no trailing marker, no label span — because a picker's suite reads its row label with `span:last-child`. |
-  | `header` / `footer` | snippets | `undefined` | Caller-owned content above and below the list. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks; `footer` with `{ close, failed }`, the dismissal a commit action ends on and whether the panel is showing an error. |
+  | `header` / `footer` / `keyHints` / `footerAction` | snippets / boolean / `{ label, onActivate }` or `null` | `undefined` / `false` / `null` | Caller-owned content above and below the list, and the primitive's own footer row beneath it. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks; `footer` with `{ close, failed, query, focusSearch }`, the dismissal a commit action ends on, whether the panel is showing an error, the raw query, and a call that focuses the query field. `keyHints` adds that row: the localized hints for the cursor's real key map, and at its end the one `footerAction`, a button whose `onActivate` is handed `{ close }`. |
   | `maxHeight` / `minWidth` / `maxWidth` | px | `0` / `240` / `340` | The panel's size band; `0` takes the layout's own value. |
   | `triggerAddMarker` / `triggerProps` / `triggerTitle` / `triggerHasPopup` | string / attribute object / string / `'dialog'` \| `'listbox'` | `''` / `{}` / `''` / `'dialog'` | Stable hooks and a native tooltip stamped on the trigger button itself rather than on a wrapper, plus what activating it opens. `triggerProps` is spread first, so it can never override this component's `type`, `onclick` or ARIA contract; and `'listbox'` is passed only with `showSearch={false}` and whenever `showSearch={false}`, both directions being refused at the source by `tests/components/searchable-popover-source-contract.test.js`, which also holds the two `trigger`-snippet refusals above. |
   | `triggerAriaDisabled` | boolean | `false` | Render `aria-disabled="true"` and refuse to open while leaving the trigger ENABLED and focusable. Not a synonym for `disabled`: several screen readers drop a `disabled` button from the tab order and `focus()` on one silently no-ops. The trade is that `aria-disabled` does not suppress the click, so `toggle()` must. |
@@ -31,8 +31,8 @@
   | `horizontalAlign` / `bounds` / `ignoreScrollWithin` | `'left'` \| `'right'` / selector, element or resolver / boolean | `'left'` / `pickerScrollerBounds` / `false` | Which of the panel's edges meets the trigger's, the clipping boundary it is clamped inside, and whether to drop viewport events that started INSIDE the panel, which is anchored to the trigger and moves with neither. A shared component must not name an area's own scroller, so the `bounds` default comes from `util/overlayBounds.js`. |
   | `emptyHint` / `emptyDetail` / `noMatchesHint` | localized strings | `''` / `''` / `FABRICATE.Common.Picker.NoMatches` | THE TWO EMPTINESSES ARE DIFFERENT FACTS. `emptyHint` is for a list that holds NOTHING and feeds `EmptyState`'s `title` slot, so it stays SHORT; `emptyDetail` feeds the `hint` slot and is suppressed with `emptyHint`. A filtered emptiness gets `noMatchesHint`. This is the OPPOSITE slot mapping from `VocabularyPanel`. |
   | `filterOptions(options, query)` | function | label-substring | Replaces this component's own filter, called with the raw options and the normalized query. IT IS CALLED ON EVERY PASS, INCLUDING AN EMPTY QUERY, and the DEFAULT short-circuits rather than the seam, so a pinned resolved row is not silently dropped. It is the only place a caller can see the query, and so the only home for alias matching and ranking; it may return NEW row objects, and its result is coerced to an array. |
-  | `measureListMetrics({ popover, list, search })` / `triggerOnKeydown` | functions | `undefined` | The first returns `{ rowPitch, rowGap, chromeHeight, listExtra }` on EVERY layout pass, measured from the rendered box rather than restated from stylesheet tokens, where `listExtra` is height rendered inside the list that no pitch can see, so it is subtracted from the budget and added back to the list's height. The second is a caller keydown handler COMPOSED AFTER this component's own — a prop rather than a spread key, because in the search-suppressed shape the trigger holds the key map and an overridden `onkeydown` would delete the focus model. |
-  | `open` | bindable boolean | `false` | Bind it to open the picker from something other than the trigger, or to force it shut from outside. |
+  | `measureListMetrics({ popover, list, search })` / `triggerOnKeydown` | functions | `undefined` | The first returns `{ rowPitch, rowGap, chromeHeight, listExtra, minUsableHeight }` on EVERY layout pass, measured from the rendered box: `listExtra` is height inside the list no pitch can see, subtracted from the budget and added back to the list, and `minUsableHeight` the room below which the panel flips. The second is a caller keydown handler COMPOSED AFTER this component's own — a prop rather than a spread key, because in the search-suppressed shape the trigger holds the key map and an overridden `onkeydown` would delete the focus model. |
+  | `open` / `anchor` | bindable boolean / element or resolver | `false` / `undefined` | Bind `open` to open the picker from something other than the trigger, or to force it shut from outside. With an `anchor` the caller owns, for a control whose opening gesture belongs to another, no trigger renders and every trigger prop is a no-op: the caller binds `open` and writes the anchor's own ARIA, the panel positions against the anchor, outside-click dismissal counts it inside, and `close()` returns focus to it while it is connected. Anchor mode is the prop's presence, not its truthiness: an element-form caller initialises its binding to `null`, which renders no trigger before the element mounts. An anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists; prefer the resolver form where the anchor can unmount. |
   | `onSelect(id)` | callback | no-op | The chosen option's id. Committing on select is the caller's business: the primitive holds no selection of its own and emits one call per click, in every mode. |
 
   Invariants:
@@ -42,9 +42,8 @@
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
     arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
     this component applying the intent the latter hands back, and
-    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin it.
-  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
-    its own chrome refusing focus above all — are stated there rather than restated here.
+    `searchable-popover-keyboard-mounted.test.js` and `-capabilities-mounted` pin it.
+  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, which states the invariants inside it.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
     position is STAMPED with a generation derived from the list, where an `$effect` reset would land
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
@@ -55,8 +54,7 @@
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
     while open. ESCAPE IS HANDLED IN ONE PLACE in every mode: `dismissOnOutsideClick` on the picker
     root registers a DOCUMENT-level capture-phase keydown, so it does not depend on the key reaching
-    the portaled panel, which the inline field — a sibling of the trigger in another subtree — never
-    would.
+    the portaled panel, which a key in the inline field, outside the panel, never does.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -65,16 +63,18 @@
     handing this component the caller's trigger ELEMENT, because `bind:this` cannot cross a snippet
     boundary; it and its function are created ONCE at component scope, attachments being guarded by
     identity.
+  - THE PICKER'S OWN COPY is localized by the `APP_LOCALIZER` context `mountWithLocalizer` sets at a
+    Fabricate root; a tree mounted without it draws `PICKER_COPY`'s English fallbacks.
 -->
 <script>
-  import { tick, untrack } from 'svelte';
+  import { getContext, tick, untrack } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
   import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { localize } from '../util/foundryBridge.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
@@ -82,24 +82,24 @@
     PENDING_SOURCE,
     activeCursorIndex,
     filteredCountLabel,
+    focusReturnTarget,
+    gridColumnCount,
     groupedOptionBuckets,
     labelSubstringFilter,
     latestSourceRequest,
     listedOptions,
     optionListGeneration as listGenerationOf,
+    pickerCopy,
     pickerEmptiness,
     refiningSource,
     renderedOptionOrder,
     selectedOptionIds,
     spreadableTriggerAttributes,
+    watchAnchor,
   } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
-
-  function localizedText(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
+  const copy = pickerCopy(getContext(APP_LOCALIZER));
 
   let {
     options = [],
@@ -129,10 +129,13 @@
     compactOptionRows = false,
     as = 'list',
     columns = 1,
+    squareTiles = false,
     trigger = undefined,
     option: optionContent = undefined,
     header = undefined,
     footer = undefined,
+    keyHints = false,
+    footerAction = null,
     maxHeight = 0,
     popoverClass = '',
     triggerAddMarker = '',
@@ -162,6 +165,7 @@
     minWidth = 240,
     maxWidth = 340,
     bounds = pickerScrollerBounds,
+    anchor = undefined,
     open = $bindable(false),
     onSelect = () => {},
   } = $props();
@@ -176,6 +180,8 @@
   let popoverRoot = $state(null);
   let triggerElement = $state(null);
   let searchInput = $state(null);
+  const anchored = $derived(anchor !== undefined);
+  const anchorNode = () => (typeof anchor === 'function' ? anchor() : anchor) ?? null;
 
   const normalizedSearch = $derived(search.trim().toLowerCase());
   let remote = $state(PENDING_SOURCE);
@@ -198,13 +204,13 @@
       query: normalizedSearch,
       loading,
       error,
-      errorText: localizedText('FABRICATE.Common.Picker.Error', 'The list could not load'),
-      loadingText: localizedText('FABRICATE.Common.Picker.Loading', 'Loading…'),
+      errorText: copy('error'),
+      loadingText: copy('loading'),
     })
   );
 
   const isGrid = $derived(as === 'grid');
-  const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
+  const gridColumns = $derived(gridColumnCount(as, columns));
 
   const groupedOptions = $derived(groupedOptionBuckets(filteredOptions, optionGroups));
   const isGrouped = $derived(groupedOptions.length > 0);
@@ -227,14 +233,11 @@
     filteredCountLabel(filteredCountTemplate, filteredOptions.length, totalCount)
   );
 
-  const noMatchesText = $derived(
-    noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
-  );
   const emptiness = $derived(
     pickerEmptiness({
       total: totalCount,
       matched: filteredOptions.length,
-      noMatchesText,
+      noMatchesText: noMatchesHint || copy('noMatches'),
       emptyHint,
       emptyDetail,
     })
@@ -305,8 +308,8 @@
 
   function restoreTriggerFocus() {
     tick().then(() => {
-      const target = triggerElement ?? pickerRoot?.querySelector?.('button');
-      if (target?.isConnected !== false) target?.focus?.();
+      const origin = anchored ? { anchor: anchorNode() } : { trigger: triggerElement };
+      focusReturnTarget(origin, pickerRoot)?.focus?.();
     });
   }
 
@@ -316,6 +319,10 @@
     typeAheadBuffer = null;
     if (restoreFocus) restoreTriggerFocus();
   }
+
+  $effect(() => {
+    if (open && untrack(() => anchored)) return untrack(() => watchAnchor(anchorNode, close));
+  });
 
   $effect(() => {
     if (open) return;
@@ -346,9 +353,6 @@
     event.stopPropagation();
     triggerOnKeydown?.(event);
   }
-
-  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
-  const dialogNamedBy = $derived(panelLabelledBy || undefined);
 
   const triggerAttributes = $derived({
     ...triggerProps,
@@ -408,10 +412,11 @@
 <div
   class={`fabricate-picker manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
+  style:display={anchored ? 'contents' : undefined}
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: () => close(),
-    additionalNodes: () => [popoverRoot],
+    additionalNodes: () => [popoverRoot, anchorNode()],
   }}
 >
   {#snippet triggerBody()}
@@ -432,13 +437,15 @@
       ></i>{/if}
   {/snippet}
 
-  {#if inlineSearchTrigger && open}
+  {#if anchored}{:else if inlineSearchTrigger && open}
     <div class="manager-travel-picker-inline">
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
       <input bind:this={searchInput} bind:value={search} {...searchProps} />
       <button
         type="button"
         class="manager-travel-picker-inline-close"
+        data-picker-inline-close=""
+        data-keyboard-focus="true"
         aria-label={inlineCloseLabel || undefined}
         title={inlineCloseLabel || undefined}
         onclick={() => close()}
@@ -462,7 +469,13 @@
       class={triggerClass}>{@render triggerBody()}</Button
     >
   {:else}
-    <button bind:this={triggerElement} class={triggerClass} {...triggerAttributes}>
+    <button
+      bind:this={triggerElement}
+      class={triggerClass}
+      {...triggerAttributes}
+      type="button"
+      data-keyboard-focus="true"
+    >
       {@render triggerBody()}
     </button>
   {/if}
@@ -472,12 +485,12 @@
       bind:popover={popoverRoot}
       bind:search={searchInput}
       bind:query={search}
-      anchor={triggerElement ?? pickerRoot}
+      anchor={anchorNode() ?? triggerElement ?? pickerRoot}
       {popoverLayout}
       {popoverClass}
       {compactOptionRows}
-      {dialogNameAttribute}
-      {dialogNamedBy}
+      {panelLabel}
+      {panelLabelledBy}
       {horizontalAlign}
       {minWidth}
       {maxWidth}
@@ -504,6 +517,7 @@
       {as}
       {isGrid}
       {gridColumns}
+      {squareTiles}
       {optionClass}
       option={optionContent}
       {instanceId}
@@ -512,32 +526,12 @@
       emptyBody={emptiness.body}
       {header}
       {footer}
+      {keyHints}
+      {copy}
+      {footerAction}
       {chooseOption}
       {optionIsSelected}
       {close}
     />
   {/if}
 </div>
-
-<style>
-  .manager-travel-picker-copy {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .manager-travel-picker-meta {
-    min-width: 0;
-    margin-top: var(--fab-space-2xs);
-    overflow: hidden;
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 0.6rem;
-    font-weight: 400;
-    line-height: 1.3;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-</style>

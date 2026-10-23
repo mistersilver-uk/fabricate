@@ -90,7 +90,9 @@ const codexEscalation = (tier, escalation) =>
 
 function codexDescription(role, tier) {
   if (!tier) return role.aboutCodex;
-  const blurb = `Bound to the ${tier} model tier, selected by the workflow driver, for a ${CODEX_TIER_BLURBS[tier]}.`;
+  const scope = role.codexTierBlurbs?.[tier] ?? CODEX_TIER_BLURBS[tier];
+  const article = /^[aeiou]/i.test(scope) ? 'an' : 'a';
+  const blurb = `Bound to the ${tier} model tier, selected by the workflow driver, for ${article} ${scope}.`;
   return `${role.aboutCodex} ${blurb}${confirmationClause(role, tier)}`;
 }
 

@@ -46,6 +46,9 @@ const IMPORTABLE = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/util/statusChipTone.js',
+  // The layout pair `SearchablePopover` imports, which its standing-alone panel is handed (issue 2459).
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/iconPickerPopover.js',
 ]);
 
 /** The calls a `<script module>` literal may be an argument to: a query, an attribute read, a wait's description. */
@@ -559,6 +562,20 @@ test('every notice row that passes an action names the fixture that gives it a h
     rows.map((row) => row.fixture),
     ['NoticeAction', 'NoticeAction', 'NoticeAction'],
     'a row that passes a label alone draws no button, so its frame loses the control unseen'
+  );
+});
+
+test('the popover-shipped TintPicker row opts in to the free-hex field its library specimen draws', () => {
+  const popover = CATALOGUE.map((entry) => entry.row).filter(
+    (row) =>
+      row.path === 'src/ui/svelte/components/TintPicker.svelte' &&
+      String(row.cap ?? '').startsWith('popover')
+  );
+  assert.equal(popover.length, 1, 'one popover-shipped row');
+  assert.equal(
+    popover[0].props?.allowCustom,
+    true,
+    'the Lab must draw the hex field the library popover draws (issue 2352)'
   );
 });
 

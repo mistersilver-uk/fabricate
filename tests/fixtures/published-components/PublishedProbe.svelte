@@ -14,6 +14,14 @@
     around the button. An effect also calls it once per distinct `pickAt`, which no shipped
     component may do: `tests/published-component-controls.test.js` pins both keys as its
     exceptions.
+
+  Values (issue 2453):
+  - `query` and `count` — bound values, each written by its own input's `oninput` through
+    `value = next`, never `bind:value`; `count` reads its input as a number, so `-0` is written.
+  - `mirror` — a bound value an effect writes once per distinct `mirrorAt`, `null` writing
+    `undefined`, which no shipped component may do: `tests/published-component-controls.test.js`
+    pins it as the exception. A `Delete` key down in the `query` input writes `undefined` to it
+    from an event handler, the same pin's second exception.
 -->
 <script module>
   export const PROBE_FAULTS = Object.freeze({
@@ -40,6 +48,10 @@
     pickAt = undefined,
     onPing = countPing,
     onPick = undefined,
+    query = $bindable(''),
+    count = $bindable(0),
+    mirror = $bindable(''),
+    mirrorAt = undefined,
     ...rest
   } = $props();
 
@@ -56,6 +68,7 @@
   const ping = $derived(onPing);
   const pick = $derived(onPick);
   const pickedAt = $derived(pickAt);
+  const mirroredAt = $derived(mirrorAt);
 
   $effect(() => {
     if (ping) untrack(() => (bindings += 1));
@@ -63,6 +76,10 @@
 
   $effect(() => {
     if (pickedAt !== undefined) pick?.(picked, 'effect');
+  });
+
+  $effect(() => {
+    if (mirroredAt !== undefined) mirror = mirroredAt ?? undefined;
   });
 
   if (untrack(() => throwAt) === 'init') throw PROBE_FAULTS.init;
@@ -108,6 +125,26 @@
       }}>{label}</button
     >
   </span>
+  <input
+    class="probe-value"
+    data-keyboard-focus="true"
+    data-probe-query
+    data-probe-mirror={mirror}
+    aria-label={label}
+    value={query}
+    oninput={(event) => (query = event.currentTarget.value)}
+    onkeydown={(event) => {
+      if (event.key === 'Delete') mirror = undefined;
+    }}
+  />
+  <input
+    class="probe-value"
+    data-keyboard-focus="true"
+    data-probe-count
+    aria-label={label}
+    value={count}
+    oninput={(event) => (count = Number(event.currentTarget.value))}
+  />
 </p>
 <svelte:element this={bodyAs} class="probe-body">{@render body?.()}</svelte:element>
 
@@ -132,6 +169,16 @@
   }
 
   .probe-press:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .probe-value:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .probe-value:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }

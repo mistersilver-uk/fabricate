@@ -109,13 +109,14 @@
   const KIND_OPTIONS = [
     {
       value: 'add',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.KindAdd',
-      fallback: 'Add a number',
+      label: text('FABRICATE.Admin.Manager.Checks.Evaluation.KindAdd', 'Add a number'),
     },
     {
       value: 'multiply',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.KindMultiply',
-      fallback: 'Multiply, rounded down',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.KindMultiply',
+        'Multiply, rounded down'
+      ),
     },
   ];
 
@@ -241,25 +242,24 @@
   const COMPARISON_OVER = [
     {
       value: 'meet',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdMeet',
-      fallback: 'Meet or exceed',
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdMeet', 'Meet or exceed'),
     },
     {
       value: 'exceed',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdExceed',
-      fallback: 'Strictly exceed',
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdExceed', 'Strictly exceed'),
     },
   ];
   const COMPARISON_UNDER = [
     {
       value: 'meet',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.ComparisonUnderMeet',
-      fallback: 'At or under',
+      label: text('FABRICATE.Admin.Manager.Checks.Evaluation.ComparisonUnderMeet', 'At or under'),
     },
     {
       value: 'exceed',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.ComparisonUnderExceed',
-      fallback: 'Strictly under',
+      label: text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ComparisonUnderExceed',
+        'Strictly under'
+      ),
     },
   ];
   const COMPARISON_OPTIONS = $derived(under ? COMPARISON_UNDER : COMPARISON_OVER);
@@ -270,7 +270,7 @@
   const parseAdjustment = (value) => parseCheckAdjustment(adjustmentKind, value);
 </script>
 
-<InspectorCard class="manager-checks-card" data-check-difficulty-card="">
+<InspectorCard flush class="manager-checks-card" data-check-difficulty-card="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">
@@ -288,7 +288,7 @@
         legend="What the roll is measured against"
         legendVisible
         options={SOURCE_OPTIONS}
-        selectedValue={normalized.target.source}
+        value={normalized.target.source}
         groupName="check-target-source"
         columns={2}
         optionDataAttr="data-check-target-source-option"
@@ -306,7 +306,7 @@
         legend={dcSourceLegend[1]}
         legendVisible
         options={DC_MODE_OPTIONS}
-        selectedValue={resolvedDcMode}
+        value={resolvedDcMode}
         groupName="check-dc-mode"
         columns={2}
         optionDataAttr="data-dc-mode-option"

@@ -50,6 +50,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
@@ -99,7 +100,7 @@ const ROSTER = [
  *
  * @returns {object}
  */
-function essenceScope() {
+function essenceScope(defaults = [{ id: 'ash', effectSource: 'Item.ember' }]) {
   return projectWorldScopeEntity({
     entityType: 'essence',
     corpus: {
@@ -119,7 +120,7 @@ function essenceScope() {
           description: 'Salt',
         },
       ],
-      defaults: [{ id: 'ash', effectSource: 'Item.ember' }],
+      defaults,
       membership: [
         { entityId: 'ash', systemId: 'sys-a', enabled: true, inherit: {} },
         { entityId: 'ash', systemId: 'sys-b', enabled: false, inherit: {} },
@@ -417,11 +418,11 @@ describe('the world essence entry editor buffers its edit until Save', () => {
   }
 
   /** Mount the entry editor on `ash`, which carries a world `effectSource` in `essenceScope()`. */
-  async function mountEntry() {
+  async function mountEntry(scope = essenceScope()) {
     const actions = recordingActions();
     const reported = { handle: null, dirty: [] };
     const root = await entryHarness.mount({
-      scope: essenceScope(),
+      scope,
       actions,
       entityId: 'ash',
       onBackToCatalogue: () => {},
@@ -442,6 +443,39 @@ describe('the world essence entry editor buffers its edit until Save', () => {
       ?.getAttribute('data-scoped-world-default-state');
 
   afterEach(() => entryHarness.remount());
+
+  it('names a bare-uuid default by its uuid line, and a named one by its name over it', async () => {
+    const { root } = await mountEntry(
+      essenceScope([
+        {
+          id: 'ash',
+          effectSource: 'Item.ember',
+          macro: { id: 'Macro.ember-burst', name: 'Ember Burst' },
+        },
+      ])
+    );
+    const zone = (section) =>
+      root.querySelector(
+        `[data-scoped-world-default-value="${section}"] [data-manager-item-drop-zone]`
+      );
+    const bare = zone('effectSource');
+    const bareUuid = [...bare.querySelectorAll('[data-item-drop-zone-uuid]')];
+    assert.ok(!bare.querySelector('strong'), 'a bare uuid draws no name');
+    assert.deepEqual(
+      bareUuid.map((line) => line.textContent.trim()),
+      ['Item.ember'],
+      'and one uuid line'
+    );
+    assert.equal(bareUuid[0].id, bare.getAttribute('aria-labelledby'), 'which names the group');
+
+    const named = zone('macro');
+    assert.equal(named.querySelector('strong')?.textContent.trim(), 'Ember Burst', 'the name');
+    assert.equal(
+      named.querySelector('[data-item-drop-zone-uuid]')?.textContent.trim(),
+      'Macro.ember-burst',
+      'over its uuid line'
+    );
+  });
 
   it('CLEARING a world default writes nothing, and the card still reports the change', async () => {
     const { root, actions, reported } = await mountEntry();

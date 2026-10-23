@@ -29,7 +29,7 @@ this programme has already measured what happens to those.
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
 | `data`    | no       | A plain object of the fixture's own props, beside `fixture` only. Plain JSON, like `props`. See below.                                                                                                                                                                                                                                                                       |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
-| `snippets` | no      | Named snippets (`actions`, `body`, `footer`, `meta`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                     |
+| `snippets` | no      | Named snippets (`actions`, `aside`, `body`, `footer`, `meta`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                            |
 | `note`    | no       | Why the row is shaped the way it is, in a sentence: the intent of a `slot` box, say. Read by people only; the page ignores it.                                                                                                                                                                                                                                              |
 | `inset`   | no       | The padding, in CSS px, of the region the primitive is placed in, for a primitive whose edges bleed into it. Refused beside a boxed `slot`. See below.                                                                                                                                                                                                                                                       |
 | `window`  | no       | `"player"` stands the specimen in the player window's `.fabricate-app` area, as `SvelteFabricateApp` frames it, rather than the GM manager's. For a primitive that ships only there: the area's rules differ, e.g. it removes Foundry core's `button.active` ring.                                                                                                       |
@@ -59,7 +59,7 @@ name's own status.
 
 Rows sharing a `(spec, cap, draws)` address are paired **positionally** against
 the elements that selector matches, in document order.
-Three `.k-btn` rows under `"icon 28"` therefore replace the first, second and
+Three `.k-btn` rows under `"icon 34"` therefore replace the first, second and
 third button in that unit, in the order the rows appear in the file — so row
 order is load-bearing, not cosmetic.
 
@@ -76,7 +76,10 @@ A drawing a row replaces may not contain a drawing another row claims, because
 the page resolves every address before it places anything, and a replaced
 drawing takes the inner one out of the document with it.
 A drawing whose specimen stands beside it stays, so a row may claim a drawing
-inside it: the `<Card>` drawing keeps its well, and `<Well>`'s row replaces it, so the Card drawing beside the live Card contains the live Well.
+inside it.
+A replaced drawing draws what it contained through its own specimen instead: the
+flush `<Card>` row's fixture draws the live Well its drawing held, and `<Well>`'s
+own row stands at a well unit of its own.
 
 ## `slot` — when a specimen needs a real box
 
@@ -208,7 +211,7 @@ shape:
 Only the names `specimenSnippets.js` lists are rendered, because a Svelte snippet
 cannot be built from a name at runtime; any other name is refused rather than
 dropped, and the coverage gate checks each name is a prop the component declares.
-They are `actions`, `body`, `footer` and `meta`, and each takes no argument.
+They are `actions`, `aside`, `body`, `footer` and `meta`, and each takes no argument.
 A snippet a component hands an item, such as `<LogList>`'s `action(entry)`, draws once per item, which one node array cannot, so a row supplies it through a `fixture`.
 
 ## `fixture` — a row that needs a function

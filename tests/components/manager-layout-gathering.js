@@ -17,10 +17,10 @@ import {
   css,
   pagerBarFixture,
   readWorkspaceGrid,
+  segmentedScoped,
 } from './manager-layout-shared.js';
 import {
   CHANCE_SLIDER_FIXTURE,
-  colorPickerSource,
   partiesTabScoped,
   partiesTabSource,
   partyExpandedBodyScoped,
@@ -197,13 +197,8 @@ test('manager gathering settings condition panels use a two-column responsive gr
     '.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i'
   );
   // Issue 1470 re-rooted the colour family off `.fabricate-manager` and onto the namespace
-  // classes `TintPickerButton` and `TintPicker` write, so the two shared components
-  // paint in whatever application they are mounted in. Same declarations, same specificity, same
-  // place in the file — only the root moved, and these lookups follow it.
-  const colorPickerPopoverBlock = blockFor(
-    '.fabricate-color-picker-popover.manager-color-picker-popover'
-  );
-  const colorPresetGridBlock = blockFor('.fabricate-color-picker-popover .manager-color-preset-grid');
+  // classes `TintPickerButton` and `TintPicker` write; the popover box is the picker panel's own
+  // since issue 2459, so only the hex field's chrome is read here.
   const colorCustomInputBlock = blockFor('.fabricate-color-picker-popover .manager-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager .manager-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
@@ -302,39 +297,6 @@ test('manager gathering settings condition panels use a two-column responsive gr
   assert.ok(
     css.includes('--fab-biome-icon-foreground: #202124;'),
     'biome icon foreground token should stay fixed charcoal in theme declarations'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('box-sizing: border-box;'),
-    'biome color picker popover should contain its padding and border in its width'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('z-index: 120;'),
-    'biome color picker popover should layer with Manager portaled pickers'
-  );
-  assert.equal(
-    colorPickerPopoverBlock.includes('top: calc(100% + 6px);'),
-    false,
-    'biome color picker popover position should come from computed inline placement'
-  );
-  assert.ok(
-    colorPickerPopoverBlock.includes('width: 220px;'),
-    'biome color picker popover should be wide enough for presets and custom hex input'
-  );
-  assert.ok(
-    colorPickerSource.includes('computeIconPickerPopoverLayout'),
-    'biome color picker should use shared popover positioning'
-  );
-  assert.ok(
-    colorPickerSource.includes('minWidth: 220') && colorPickerSource.includes('maxWidth: 220'),
-    'biome color picker layout should keep a fixed compact width'
-  );
-  assert.ok(
-    colorPickerSource.includes("horizontalAlign: 'left'"),
-    'biome color picker layout should left-align with the trigger'
-  );
-  assert.ok(
-    colorPresetGridBlock.includes('grid-template-columns: repeat(4, 1fr);'),
-    'biome color picker presets should render as a compact grid'
   );
   assert.ok(
     colorCustomInputBlock.includes('width: 100%;'),
@@ -749,11 +711,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'component grip should avoid viewport-scaled or negative tracking'
   );
   assert.ok(
-    componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-border);'),
-    'component browser should own a pagination footer'
+    !componentBrowserFooterBlock.includes('border-top') &&
+      !componentBrowserFooterBlock.includes('background'),
+    'component browser footer is layout only: its compact pager paints its own rule'
   );
   assert.ok(
-    componentBrowserFooterPaginationBlock.includes('background: transparent;'),
+    !componentBrowserFooterPaginationBlock.includes('background'),
     'component browser footer should not nest pagination chrome'
   );
   assert.ok(
@@ -1683,7 +1646,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       <div class="manager-travel-parties-list ${hash}">${cards}</div>
     </div>
     <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
-      ${pagerBarFixture({ probe: 'parties' })}
+      ${pagerBarFixture({ probe: 'parties', sizes: [3, 6, 9] })}
     </div>
   </div>`;
 
@@ -1696,6 +1659,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
     // The component's OWN scoped CSS, after the global sheet.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
       <style>${css}</style>
+      <style>${segmentedScoped.css}</style>
       <style>${partiesTabScoped.css}</style>
       <style>
         html, body { margin: 0; width: 100%; height: 100%; }
@@ -1879,7 +1843,7 @@ const TRAVEL_REALMS_PANE = `<div class="manager-gathering-panel manager-travel-r
   <div class="manager-table-scroll">
     <div class="manager-travel-realms-list" role="list">${TRAVEL_REALM_ROWS}</div>
   </div>
-  ${pagerBarFixture({ probe: 'realms', arrows: true })}
+  ${pagerBarFixture({ probe: 'realms', sizes: [], arrows: true })}
 </div>`;
 
 const mapLinksPane = (content) =>
@@ -1962,7 +1926,7 @@ const TRAVEL_SIZES = [
   { width: 1000, height: 720 },
 ];
 
-test('World Travel Realms puts a full-bleed filter bar over the 12px browse body at both sides of the 1120px rung', async () => {
+test('World Travel Realms insets the filter bar box 12px over the 12px browse body at both sides of the 1120px rung', async () => {
   // The fixture's structure is the one `gathering-realms-tab.test.js` pins on the mounted component.
   for (const size of TRAVEL_SIZES) {
     const at = `${size.width}x${size.height}`;
@@ -1981,12 +1945,16 @@ test('World Travel Realms puts a full-bleed filter bar over the 12px browse body
     assert.ok(report.scrollerClearsItsContent, `${at}: the list must not overflow its scroller`);
     assert.deepEqual(report.paneBorders, [0, 0, 0, 0], `${at}: the pane draws no card border`);
     assert.ok(
-      near(toolbar.left, main.left) && near(toolbar.right, main.right),
-      `${at}: the filter bar is full-bleed (${toolbar.left}-${toolbar.right} vs ${main.left}-${main.right})`
+      near(toolbar.left - main.left, 12) && near(main.right - toolbar.right, 12),
+      `${at}: the filter bar box is inset 12px from .manager-main (${toolbar.left - main.left}, ${main.right - toolbar.right})`
     );
     assert.ok(
-      near(search.left, row.left) && near(search.right, row.right),
-      `${at}: the search shares the realm row's edges (${search.left}-${search.right} vs ${row.left}-${row.right})`
+      near(toolbar.left, row.left) && near(toolbar.right, row.right),
+      `${at}: the box shares the realm row's edges (${toolbar.left}-${toolbar.right} vs ${row.left}-${row.right})`
+    );
+    assert.ok(
+      near(search.left - toolbar.left, 13) && near(toolbar.right - search.right, 13),
+      `${at}: the search sits inside the box's border and padding (${search.left - toolbar.left}, ${toolbar.right - search.right})`
     );
     assert.ok(
       near(row.left - main.left, 12) && near(main.right - row.right, 12),
@@ -2000,9 +1968,9 @@ test('World Travel Realms puts a full-bleed filter bar over the 12px browse body
     if (size.width > 1120) {
       assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
       // The pane's `auto minmax(0, 1fr) auto` rows: without them the implicit auto tracks share
-      // the free height and the filter bar band stretches around its search.
+      // the free height and the filter bar box stretches around its search.
       assert.ok(
-        near(search.top - toolbar.top, 12),
+        near(search.top - toolbar.top, 13),
         `${at}: the filter bar keeps its content height (${search.top - toolbar.top})`
       );
     }

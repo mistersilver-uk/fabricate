@@ -7,7 +7,12 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -36,6 +41,7 @@ export function registerEssencesCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -43,6 +49,7 @@ export function registerEssencesCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -214,11 +221,12 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.fabricate-icon-button` in the row must remain the Edit pencil.
+    // The row's edit control, a `Button` since it is labelled (issue 2541), carries the hook the
+    // capture and the smoke navigate by.
     assert.equal(
-      earthRow.querySelector('.fabricate-icon-button').getAttribute('data-essence-edit'),
+      earthRow.querySelector('[data-essence-edit]').getAttribute('data-essence-edit'),
       'earth',
-      'the first icon button in a row is still the Edit pencil'
+      'the row carries its edit control under its own hook'
     );
 
     // The row toggle routes through the ONE manager write, not through updateEssence.
@@ -278,6 +286,13 @@ export function registerEssencesCases() {
     assert.ok(
       Boolean(target.querySelector('[data-essence-action="edit"]')),
       'NON-VACUITY: the actions cluster is rendered, so the absence above is a measurement'
+    );
+    // The record verbs sit in the inspector's pinned foot (issue 2498).
+    const essenceFoot = target.querySelector(':scope .manager-inspector .fab-inspector-panel-foot');
+    assert.ok(
+      Boolean(essenceFoot?.querySelector(':scope [data-essence-action="edit"]')) &&
+        Boolean(essenceFoot.querySelector(':scope [data-essence-action="delete"]')),
+      'Edit and Delete render inside the foot'
     );
     // The `SYSTEM RULES n / m` panel (issue 1372, B1) renders only when the world corpus can
     // answer it, and this harness registers no essence scope store, so it is correctly absent
@@ -509,7 +524,7 @@ export function registerEssencesCases() {
     // picker's row.
     const iconResetButton = target.querySelector('[data-essence-icon-reset]');
     assert.equal(iconResetButton.getAttribute('aria-label'), 'Clear icon');
-    assert.equal(iconResetButton.title, 'Clear icon');
+    assert.equal(iconResetButton.getAttribute('data-tooltip-text'), 'Clear icon');
     assert.ok(
       iconResetButton.closest('.manager-essence-icon-tile'),
       'the reset overlays the icon tile rather than sitting in the picker row'
@@ -605,13 +620,17 @@ export function registerEssencesCases() {
       false,
       'a carried essence is still deletable — the delete is warned, not blocked'
     );
+    const impact = target.querySelector('[data-essence-delete-impact]');
+    assert.ok(impact, 'and an impact note states how far the cascade reaches');
     assert.ok(
-      target.querySelector('[data-essence-delete-impact]'),
-      'and an impact note states how far the cascade reaches'
+      !impact.closest('.fab-inspector-panel-foot') &&
+        target.querySelector('[data-essence-action="delete"]').getAttribute('aria-describedby') ===
+          impact.id,
+      'the note sits above the foot, and Delete is described by it (issue 2498)'
     );
 
     // ── NO CREATE ON THIS ROUTE (issue 1372, maintainer parity round 8) ─────────────────────
-    // The header's `+ Create essence` opened a system-scope draft that `store.addEssence` wrote
+    // The header's `+ Create essence` opened a system-scope draft that the store wrote
     // straight into `system.essenceDefinitions` — a system-owned essence with its own name, icon
     // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
     // reference's Essence Rules header carries nothing on the right at all.
@@ -983,5 +1002,40 @@ export function registerEssencesCases() {
     // `+ Create essence`; an essence's identity is a world record and the create that authors one
     // is the Essence Catalogue's. The two cases above still cover what this file is about — a
     // failed and a rejected save both KEEP the draft — over the update path that survives.
+  });
+
+  it('returns to the essence browser when the edited essence leaves the system (issue 2554)', async () => {
+    const calls = [];
+    const store = createStore(calls);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essence Rules').click();
+    await tick();
+    flushSync();
+    target.querySelector(':scope [data-essence-id="water"] [data-essence-edit="water"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.ok(Boolean(target.querySelector('#manager-essence-edit-name')), 'the editor is open');
+
+    store.viewState.update((state) => ({
+      ...state,
+      essenceCards: state.essenceCards.filter((card) => card.id !== 'water'),
+    }));
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+    assert.ok(
+      !target.querySelector('#manager-essence-edit-name'),
+      'no system-side create form stands in for the vanished essence'
+    );
+    assert.ok(!target.querySelector('[data-essence-id="water"]'), 'the browser lists what remains');
   });
 }

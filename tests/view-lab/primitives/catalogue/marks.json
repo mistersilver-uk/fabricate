@@ -601,6 +601,30 @@
   },
   {
     "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "meter — one reading in segments",
+    "draws": ".k-track",
+    "path": "src/ui/svelte/components/Meter.svelte",
+    "undrawn": {
+      "7 of 12 days: yours 3, others 4": "the announced reading; the drawing states the segments as text beside the track"
+    },
+    "props": {
+      "value": 7,
+      "max": 12,
+      "label": "Pooled days",
+      "valueText": "7 of 12 days: yours 3, others 4",
+      "segments": [
+        {
+          "value": 3,
+          "tone": "accent"
+        },
+        {
+          "tone": "neutral"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
     "cap": "banded — colour carries the reading",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/BandedBar.svelte",
@@ -674,22 +698,18 @@
       "numbered": false,
       "stages": [
         {
-          "id": "draw",
           "name": "Draw",
           "value": 100
         },
         {
-          "id": "fold",
           "name": "Fold",
           "value": 100
         },
         {
-          "id": "grind",
           "name": "Grind",
           "value": 45
         },
         {
-          "id": "finish",
           "name": "Finish",
           "value": 0
         }

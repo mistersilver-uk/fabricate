@@ -8,6 +8,7 @@ import {
   defineSoleWriterClauses,
 } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { openingTagsNamed } from './helpers/svelteTagScan.js';
 
 /**
  * The class only the primitive may write, and the root `styles/fabricate.css` paints the control
@@ -42,6 +43,33 @@ const CLASS_EXCEPTIONS = Object.freeze([
  * issue 1782 converted one and issue 1777 the last two, so the primitive is the only writer.
  */
 
+/** A role an icon button takes through `role` (issue 2541), never as a class. */
+const ROLE_CLASS = /\bis-(?:primary|ghost|danger)\b/;
+
+/** A `class` value, or an `ActionMenu`'s `triggerClass` value, quoted or braced. */
+const CLASS_VALUE = /(?:^|\s)class=("[^"]*"|\{[^}]*\})/;
+const TRIGGER_CLASS = /\btriggerClass=("[^"]*"|\{[^}]*\})/;
+
+/** A tooltip Foundry would show beside the one the primitive writes from `ariaLabel` or `tooltip`. */
+const HAND_WRITTEN_TOOLTIP = /(?:^|\s)(?:title|data-tooltip(?:-html|-text)?)=/;
+
+// Each would still WORK from a call site — the rest spread lands last and `class` appends —
+// which is why each needs a gate: the site renders identically and the contract is a convention
+// again. A hand-written tooltip also stacks a native `title` or mutes the focus tooltip.
+const RESTATEMENTS = Object.freeze([
+  Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
+  Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
+  Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
+  Object.freeze({
+    name: 'a role class',
+    present: (tag) => ROLE_CLASS.test(CLASS_VALUE.exec(tag)?.[1] ?? ''),
+  }),
+  Object.freeze({
+    name: 'a hand-written tooltip',
+    present: (tag) => HAND_WRITTEN_TOOLTIP.test(tag),
+  }),
+]);
+
 const contract = definePrimitiveSourceContract({
   label: 'icon-button',
   tag: 'IconButton',
@@ -60,26 +88,19 @@ const contract = definePrimitiveSourceContract({
       'policing a token that reaches nothing',
   },
 
-  // Three probes. `type` and `aria-label` would still WORK from a call site — both ride the rest
-  // spread, which lands last and therefore wins — which is exactly why they need a gate: a site
-  // that kept the old spelling would bypass the required-prop contract below while rendering
-  // identically.
-  restatements: Object.freeze([
-    Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
-    Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
-    Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
-  ]),
+  restatements: RESTATEMENTS,
 
   classOnlyRemedy:
     'a manager icon button is an `<IconButton>`, never a hand-written ' +
-    '`class="fabricate-icon-button"`. A per-site modifier travels as a pass-through on the ' +
-    '`class` prop, the accessible name is the required `ariaLabel` prop, and a per-site ' +
+    '`class="fabricate-icon-button"`. A role travels as `role` and a per-site state as a ' +
+    'pass-through on `class`, the accessible name is the required `ariaLabel` prop, and a per-site ' +
     '`data-*` hook rides the rest spread — see `IconButton.svelte`',
 
   restatementRemedy:
-    'the primitive emits `type="button"` and `fabricate-icon-button` itself, and takes the ' +
-    'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
-    'convention this component exists to close',
+    'the primitive emits `type="button"` and `fabricate-icon-button` itself, takes the ' +
+    'accessible name as `ariaLabel` and shows it as its tooltip, and maps `role` to the ' +
+    '`is-primary`/`is-ghost`/`is-danger` classes; an information-bearing hint passes `tooltip`. ' +
+    'Restating any of them from a call site re-opens the convention this component exists to close',
 
   bareDataRemedy:
     'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on ' +
@@ -146,4 +167,52 @@ test('a tag NAMED in a `//` comment is not read as a call site', () => {
       'over `callSiteTags` is now accusing files of what their documentation says:\n  ' +
       readAsMarkup.join('\n  ')
   );
+});
+
+test('no ActionMenu trigger takes a role class on `triggerClass`', () => {
+  const triggers = Object.entries(contract.components).flatMap(([file, source]) =>
+    openingTagsNamed(source, 'ActionMenu').map((tag) => [file, tag])
+  );
+  assert.ok(triggers.length > 10, `found only ${triggers.length} ActionMenu tags`);
+  const offenders = triggers
+    .filter(([, tag]) => ROLE_CLASS.test(TRIGGER_CLASS.exec(tag)?.[1] ?? ''))
+    .map(([file]) => file);
+  assert.deepEqual(offenders, [], 'the trigger is an `IconButton`, whose role is its `role`');
+});
+
+/** The View Lab fixtures that wire a primitive as a shipped caller does, copying its call sites. */
+const LAB_FIXTURES = 'tests/view-lab/primitives/fixtures';
+
+test('the View Lab fixtures copy the swept call sites, not the old ones', () => {
+  const fixtures = collectSources(path.join(repoRoot, LAB_FIXTURES), { extensions: ['.svelte'] });
+  const tags = (name) =>
+    Object.entries(fixtures).flatMap(([file, source]) =>
+      openingTagsNamed(source, name).map((tag) => [file, tag])
+    );
+  const iconButtons = tags('IconButton');
+  const triggers = tags('ActionMenu');
+  // NON-VACUITY: `LogListHistory` wires HistoryList's dismiss, `ListRowDefaultBrowse` a row menu.
+  assert.ok(iconButtons.length > 0, `no fixture under ${LAB_FIXTURES} renders an IconButton`);
+  assert.ok(triggers.length > 0, `no fixture under ${LAB_FIXTURES} renders an ActionMenu`);
+  const offenders = [
+    ...iconButtons.flatMap(([file, tag]) =>
+      RESTATEMENTS.filter(({ present }) => present(tag)).map(({ name }) => `${file}: ${name}`)
+    ),
+    ...triggers
+      .filter(([, tag]) => ROLE_CLASS.test(TRIGGER_CLASS.exec(tag)?.[1] ?? ''))
+      .map(([file]) => `${file}: a role class on \`triggerClass\``),
+  ];
+  assert.deepEqual(
+    offenders,
+    [],
+    'a fixture draws what its caller ships, so it passes `role`, `icon` and the name tooltip too'
+  );
+});
+
+test('the role vocabulary is a named mapping in the primitive, with no neutral class', () => {
+  const source = contract.primitiveMarkup();
+  const mapping = /const ROLE_CLASSES = \{([\s\S]*?)\};/.exec(source);
+  assert.ok(mapping, 'IconButton declares no `ROLE_CLASSES` mapping');
+  const roles = [...mapping[1].matchAll(/^\s*'?([\w-]+)'?:/gm)].map(([, role]) => role);
+  assert.deepEqual(roles, ['primary', 'ghost', 'danger', 'ghost-danger']);
 });

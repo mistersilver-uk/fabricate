@@ -13,6 +13,8 @@ import {
   CALLER_SPREAD,
   COMPONENTS_DIR,
   REST,
+  ROLE_OUTSIDE_REGISTER,
+  VERB_ROLE_PRIMITIVES,
   applyRegister,
   bannedKeys,
   callerReport,
@@ -120,8 +122,7 @@ const EXCEPTIONS = Object.freeze([
     name: 'compact',
     fault: REGISTER_ONLY,
     reason:
-      'a density-shaped flag whose values and geometry are the library’s planned-migrations ' +
-      'row "Empty variant geometry"',
+      'a variant flag beside inline, note, field and fill, each a drawn unit of the <Empty> entry, not a density value',
   },
   {
     component: 'ItemDropZone',
@@ -166,10 +167,16 @@ const EXCEPTIONS = Object.freeze([
     reason: 'a function returning one row’s attributes, where `<part>Props` names a fixed object',
   },
   {
-    component: 'SearchablePopoverPanel',
-    name: 'dialogNameAttribute',
-    fault: suffixed('Attribute'),
-    reason: 'an internal part with one caller, handed the name its parent already derived',
+    component: 'PickerRowNameField',
+    name: 'describedBy',
+    fault: 'is a retired spelling',
+    reason: 'an internal part with one caller, handed the id its parent already derived',
+  },
+  {
+    component: 'PickerRowNameField',
+    name: 'onChoose',
+    fault: REGISTER_ONLY,
+    reason: 'a typeahead commits one suggestion per choice, the callback its holder contract names',
   },
   {
     component: 'EditorTabs',
@@ -212,13 +219,6 @@ const EXCEPTIONS = Object.freeze([
     name: REST,
     fault: 'spreads its rest on <input>, which is not the root',
     reason: 'rest lands on the host’s interactive element, which on the checkbox host is the input',
-  },
-  {
-    component: 'Select',
-    name: REST,
-    fault: 'declares a rest spread it writes on no element',
-    reason:
-      'rest reaches the `<Field>` root in the labelled form only; the bare root is the picker’s',
   },
 ]);
 
@@ -301,6 +301,14 @@ describe('the shared primitives and their callers follow the API convention', ()
     assert.deepEqual(unreasoned, [], 'an EXCEPTIONS entry states no reason');
   });
 
+  it('every primitive in the verb-role register declares the `role` it is admitted for', () => {
+    const declared = declarations();
+    const missing = VERB_ROLE_PRIMITIVES.filter(
+      (name) => !declared.get(name)?.names.includes('role')
+    );
+    assert.deepEqual(missing, [], 'a register entry admits a `role` prop nobody declares; drop it');
+  });
+
   it('no caller passes a primitive a name it does not take', () => {
     const declared = declarations();
     const violations = [];
@@ -381,6 +389,14 @@ describe('the convention gate fails on each thing it rules out', () => {
     assert.deepEqual(faultsOf(primitive('compact = false', '<div></div>')), [
       'compact is allowed only through the register',
     ]);
+  });
+
+  it('a verb `role` prop outside the closed register, which admits Button and IconButton', () => {
+    const declares = primitive(`role = 'neutral', ${WITH_REST}`);
+    assert.deepEqual(faultsOf(declares), [`role ${ROLE_OUTSIDE_REGISTER}`]);
+    for (const name of VERB_ROLE_PRIMITIVES) {
+      assert.deepEqual(faultsOf(declares, `${COMPONENTS_DIR}/${name}.svelte`), [], name);
+    }
   });
 
   for (const suffix of ['Attr', 'Attrs', 'Attribute', 'Attributes', 'Data', 'AriaLabel']) {

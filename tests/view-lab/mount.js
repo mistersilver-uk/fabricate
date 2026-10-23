@@ -134,6 +134,11 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Hold the manager's readiness gate shut through the first settle, for the crafting system
+    // library's startup form; and make the environment store's read throw, for the gathering
+    // browser's load-failure form (issue 2548).
+    systemsLoading: params.get('systemsLoading') === '1',
+    environmentsError: params.get('environmentsError') === '1',
     // Refuse every editor save the save-failed frames photograph (issue 1522).
     saveFails: params.get('saveFails') === '1',
     // Strip Herbalism's progressive formula, for the System Overview's blocker (issue 1522).
@@ -142,6 +147,8 @@ function readParams() {
     depletedImage: params.get('depletedImage') === '1',
     // List the lab's script macro in `game.macros`, for a macro picker's option (issue 2466).
     scriptMacros: params.get('scriptMacros') === '1',
+    // Point Choking dust's macro at a uuid nothing answers, for the macro zone's missing face (issue 2466).
+    missingComplicationMacro: params.get('missingComplicationMacro') === '1',
     // Bend Horseshoe asks for any ingot, for the held-stack picker's frame (issue 1644).
     tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
@@ -229,7 +236,24 @@ function readParams() {
     // Dock a chat log in the window, so a case can photograph the result card it posts: `1` on
     // the right, `left` over the recipe list when the right column is what the case names.
     chatLog: ['1', 'left'].includes(params.get('chatLog')) ? params.get('chatLog') : null,
+    // The hero-demo world in place of the lab's (issue 2571); the lab's world flags do not apply.
+    demoWorld: params.get('world') === 'demo',
+    // The demo world's roll seed, for re-tuning its scripted journey.
+    demoSeed: readDemoSeed(params),
   };
+}
+
+/** The demo world's `demoSeed`, an integer when given (0 included), else the world's own seed. */
+function readDemoSeed(params) {
+  const raw = params.get('demoSeed')?.trim() ?? '';
+  const seed = raw === '' ? null : Number(raw);
+  return Number.isInteger(seed) ? seed : undefined;
+}
+
+/** Build the hero-demo world, loaded only when a page asks for it. */
+async function buildDemoWorld(params) {
+  const { buildDemoWorld: build } = await import('./demo/demoWorld.js');
+  return build({ managedSystemId: params.system, seed: params.demoSeed });
 }
 
 /**
@@ -362,12 +386,16 @@ async function mountPlayerApp(content, params) {
     // same injectable edge the registry's own hooks travel on.
     playerExtensions,
   };
-  const instance = mount(FabricateAppRoot, { target: content, props });
+  // The demo world's journey moves between tabs, which every lab case holds still.
+  const mounted = params.demoWorld
+    ? (await import('./demo/demoTabs.svelte.js')).switchableTabs(props)
+    : props;
+  const instance = mount(FabricateAppRoot, { target: content, props: mounted });
   if (params.companionRoll) {
     const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
     installLabCompanionRoll(content.ownerDocument, params.companionRoll);
   }
-  return { instance, services, props };
+  return { instance, services, props: mounted };
 }
 
 function installJournalCaseServiceSeam(services, state) {
@@ -688,6 +716,13 @@ async function mountManagerApp(content, params) {
       : {}),
   });
   if (params.noEssenceScope) game.fabricate.getEssenceScopeStore = () => null;
+  if (params.environmentsError) {
+    // The shared instance, so the manager's services and its store reach the same throw; the
+    // message is the one `game.settings.get` raises for an unregistered setting.
+    game.fabricate.getGatheringEnvironmentStore().listBySystem = () => {
+      throw new Error('"fabricate.gatheringEnvironments" is not a registered game setting');
+    };
+  }
   const props = app._prepareSvelteProps();
   const services = props.services;
   if (params.downtimeProvider) {
@@ -708,6 +743,12 @@ async function mountManagerApp(content, params) {
 }
 
 // view-lab-region:lab-specimens
+/** A specimen's module once the `loaded` Promise it exports, if any, has settled (issue 2455). */
+async function afterLoaded(module) {
+  await module.loaded;
+  return module;
+}
+
 /**
  * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
  * shipped component, directly or through the published seam a companion calls (issue 2424), in a
@@ -719,9 +760,18 @@ const LAB_SPECIMENS = Object.freeze({
   // Issue 2424: the published tier track, mounted through the seam a companion calls.
   'published-tier-track': () => import('./fixtures/PublishedTierTrack.svelte'),
   // Issue 2448's seven data-only leaves, then issue 2451's `Kicker` and `Chip`, by the same seam.
-  'published-leaves': () => import('./fixtures/PublishedLeaves.svelte'),
+  // `Rail` is lazy (issue 2455), so the frame is measured only once its chunk has loaded.
+  'published-leaves': () => import('./fixtures/PublishedLeaves.svelte').then(afterLoaded),
   // Issue 2452: notices whose action reports each press through a callback, by the same seam.
   'published-controls': () => import('./fixtures/PublishedControls.svelte'),
+  // Issue 2452: steppers whose edits report each number through a callback, by the same seam.
+  'published-values': () => import('./fixtures/PublishedValues.svelte'),
+  // Issue 2453: search fields whose bound value reports each query, by the same seam.
+  'published-search': () => import('./fixtures/PublishedSearch.svelte'),
+  // Issue 2454: selects whose lists open in an overlay host and on the standalone layer, by the same seam.
+  'published-select': () => import('./fixtures/PublishedSelect.svelte'),
+  // Issue 2455: stage groups named by their stages' labels and names, by the same seam.
+  'published-stage-bars': () => import('./fixtures/PublishedStageBars.svelte'),
 });
 // view-lab-region:end
 
@@ -971,9 +1021,10 @@ async function boot() {
 
   const determinismStyle = installDeterminismStyles();
 
+  const buildWorld = params.demoWorld ? () => buildDemoWorld(params) : buildLabWorld;
   const world = params.chromeOnly
     ? null
-    : await buildLabWorld({
+    : await buildWorld({
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
         clearSystem: params.clearSystem,
@@ -994,6 +1045,7 @@ async function boot() {
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,
         scriptMacros: params.scriptMacros,
+        missingComplicationMacro: params.missingComplicationMacro,
         tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
@@ -1033,8 +1085,14 @@ async function boot() {
         side: params.chatLog === '1' ? 'right' : 'left',
       });
     }
+    // The admin store reads `game.fabricate.ready` as it is built, so the gate is shut before the
+    // mount and reopened once the first settle has photographed nothing but the startup form. The
+    // `fabricate.ready` hook the store then waits on never fires in the lab.
+    const fabricateReady = params.systemsLoading ? game.fabricate.ready : null;
+    if (params.systemsLoading) game.fabricate.ready = false;
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
+    if (params.systemsLoading) game.fabricate.ready = fabricateReady;
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.
     assertNoLabInducedClipping(built.frame, determinismStyle);

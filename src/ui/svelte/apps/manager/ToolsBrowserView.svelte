@@ -190,25 +190,22 @@
     })
   );
 
-  // The cohort segments, in the shape the shared segmented control reads. It localizes each label
-  // itself and the tally rides its `count` slot, so the two filter keys interpolate no `{count}`.
+  // The cohort segments, in the shape the shared segmented control reads. The tally rides its
+  // `count` slot, so the two filter keys interpolate no `{count}`.
   const membershipFilters = $derived([
     {
       value: 'in',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterInSystem',
-      fallback: 'In this system',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterInSystem', 'In this system'),
       count: memberRows.length,
     },
     {
       value: 'all',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
-      fallback: 'All world tools',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterAllWorld', 'All world tools'),
       count: memberRows.length + ghostRows.length,
     },
     {
       value: 'over',
-      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterOverriding',
-      fallback: 'Overriding',
+      label: text('FABRICATE.Admin.Manager.Tools.FilterOverriding', 'Overriding'),
     },
   ]);
 
@@ -368,7 +365,7 @@
       recipe in `openspec/specs/design-system/spec.md` puts a search and a filter in the bar, while
       the three segments above are a SETTING. It NESTS because `styles/fabricate.css`'s Tools-browser
       search overrides are descendants of `.manager-tools-library-card`, and the landmark has its own
-      name so band and control do not announce alike.
+      name so the filter bar and the setting do not announce alike.
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
       <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>

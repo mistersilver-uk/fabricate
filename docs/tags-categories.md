@@ -17,6 +17,8 @@ Hover it to see every spelling it stands for, and deleting it removes all of the
 Sorting a panel by name or by reference count, and reversing the direction, affects that panel alone.
 The left rail's **Tags & Categories** count adds up what the three panels show, so it includes the reserved **General** row each category panel carries.
 
+{% include screenshot.html case="manager-tags-categories-normal" caption="The three vocabularies on one screen." %}
+
 ## Recipe categories
 
 Custom recipe categories organize recipe browsing and authoring.
@@ -61,6 +63,10 @@ Tags are many-valued, so a component can carry as many as you like.
 Tags are always stored in lowercase, so the add form previews the exact text it will save.
 Unlike a category, no tag name is reserved, so a tag called **general** is just an ordinary tag.
 Tags are assigned to components in the component editor only.
+A recipe's ingredient tag adder can also add a tag to the system's component tags, as described under [Recipes]({% link crafting/recipes/index.md %}#ingredient-matching).
+
+{% include screenshot.html case="manager-tags-categories-tags-tab" caption="The component tags panel." %}
+
 They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
 
 A tag's reference count on this screen includes both the components that carry it and the recipe ingredients that filter on it.

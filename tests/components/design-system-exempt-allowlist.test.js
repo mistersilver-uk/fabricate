@@ -66,6 +66,11 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/components/SlotTile.svelte': 1 },
   ],
   [
+    'library §12 "Routed by ingredients" draws Assign as a dashed 22px button, a rung Button does ' +
+      'not publish',
+    { 'src/ui/svelte/components/RouteSources.svelte': 1 },
+  ],
+  [
     "the compact search's 32, the one exception to the retired 32 the geometry requirement names",
     { 'styles/fabricate.css': 1 },
   ],
@@ -76,6 +81,19 @@ const ALLOWLIST = Object.freeze([
   ],
   [
     "a nav row keeps its 30px rung's corner when a long label wraps it taller",
+    { 'styles/fabricate.css': 1 },
+  ],
+  ['knob travel derived from the track and knob sizes, not spacing', { 'styles/fabricate.css': 1 }],
+  [
+    "the library's PickerRow specimen draws the 26px plate at radius 6 (ruled 2026-10-17)",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the library's PickerRow specimen draws the 34px subject cell and search at radius 7",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the library's PickerRow specimen draws the 24px remove at radius 7 (ruled 2026-10-18)",
     { 'styles/fabricate.css': 1 },
   ],
   [
@@ -104,9 +122,12 @@ const ALLOWLIST = Object.freeze([
     { 'styles/fabricate.css': 1 },
   ],
   [
-    "the swatch's keyboard cursor became the picker's inset outline at issue 2416, so this row " +
-      "stays target only until the panel is recomposed onto the search popover's grid form, " +
-      'owned by issue 2459 (library.html, the target popover specimen)',
+    "the hover ring's reach (2px outline at a 1px offset), not spacing",
+    { 'styles/fabricate.css': 2 },
+  ],
+  [
+    "the popover is the search popover's grid form and the offering rule settled at issue 2352, " +
+      'so this row stays target only until issue 2459 flips it (library.html, the TintPicker warn)',
     { 'src/ui/svelte/components/TintPicker.svelte': 1 },
   ],
   [
@@ -145,19 +166,6 @@ const ALLOWLIST = Object.freeze([
     { 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte': 1 },
   ],
   [
-    'the composition licence of "The primitive set is a closed, versioned vocabulary" — this ' +
-      "is `PickerRow`'s amount slot, wholly the members `SegmentedControl`, `Stepper` and " +
-      "`RollDataExpressionInput`, so its second caller, the result choice group header's N " +
-      '(issue 1773), owes it no manifest row',
-    { 'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte': 1 },
-  ],
-  [
-    'the composition licence of "The primitive set is a closed, versioned vocabulary" — this ' +
-      "is the kind menu's adder, wholly the members `ActionMenu` and `Button`, so its callers " +
-      'owe it no manifest row',
-    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
-  ],
-  [
     STEPPER_LABELS,
     {
       'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte': 3,
@@ -185,7 +193,7 @@ const ALLOWLIST = Object.freeze([
   [
     "the spread is the menu's own trigger contract (ARIA state, handlers, element attachment), " +
       "never a caller's name",
-    { 'src/ui/svelte/apps/manager/recipe/KindAdder.svelte': 1 },
+    { 'src/ui/svelte/components/KindAdder.svelte': 1 },
   ],
   [
     "the spread is the popover's own trigger contract (type, ARIA state, handlers, element " +
@@ -199,6 +207,10 @@ const ALLOWLIST = Object.freeze([
   [
     "the spread is `hook()`'s one `data-*` name from `HOOK_NAMES`",
     { 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte': 3 },
+  ],
+  [
+    'errorProps is hook-only data-* attributes forwarded to the notice',
+    { 'src/ui/svelte/components/ListState.svelte': 1 },
   ],
   [
     'the spread is `hooks.expression`, the one `data-*` name its caller spells, or nothing',

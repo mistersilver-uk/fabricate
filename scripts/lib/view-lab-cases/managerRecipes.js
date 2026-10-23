@@ -6,10 +6,11 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
   CHECKS_ROUTE_MODEL_PATTERN,
+  INSPECTOR_PANEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, choosePageSize, managerCase } from './caseFactories.js';
 
 // The selection the inspector draws, and the draft whose refused save the notice reports.
 const RECIPE_ITEM_MODEL_PATTERN =
@@ -253,8 +254,12 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipes',
     expectSelector: '.fabricate-manager [data-recipe-fact="check"]:has-text("Check off")',
+    // Delete, the last record verb, is pinned in the rail's foot rather than clipped by it (issue 2498).
+    expectContained: [
+      { container: 'aside.manager-inspector', target: '[data-recipe-action="delete"]' },
+    ],
     kinds: ['manager', 'recipes'],
-    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/, INSPECTOR_PANEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',
@@ -265,7 +270,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      ...chooseSelectOption('.manager-main [data-pagination-size]', '10'),
+      ...choosePageSize('10', '.manager-main'),
       { selector: '.manager-main [data-pagination-next]' },
     ],
     expectView: 'recipes',
@@ -959,7 +964,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
-    // The shared pager's page-size trigger, inside the preview's recipe pager.
+    // The shared pager's page-size control, inside the preview's recipe pager.
     expectSelector:
       '[data-recipe-item-preview] [data-inventory-recipe-pager] [data-pagination-size]',
     // In the photograph, not merely in the document.

@@ -9,6 +9,7 @@ import {
 } from '../helpers/foundryBridgeModules.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
@@ -52,10 +53,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
@@ -69,6 +71,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte',
   ],
 });

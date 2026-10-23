@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): a density's geometry must live in this scoped block, and D10 added the header rung; extraction is issue 2317 -->
+<!-- ratchet-exempt(file-size): a density's geometry and a tone's lit ink must live in this scoped block, which the layered sheet cannot override, and D10 added the header rung; extraction is issue 2317 -->
 <!--
   The app's one chip: a short, fully-rounded badge carrying a count, a state, a category or a tag. `SearchablePopover` and `Select` render it too, so it ships under `components/`, and its CSS lives in this scoped `<style>` so `VIEW_RECIPES` maps a change here to the views that render it.
 
@@ -22,6 +22,7 @@
   Invariants:
   - The root keeps the literal `manager-chip` class — pinned by `manager-layout.test.js`, the mounted suites and `scripts/foundry-test-run.mjs`.
   - Four of the thirteen tones are one recessive ladder a caller routes by meaning, per "Every interactive primitive declares its full state set" in `openspec/specs/design-system/spec.md`; the names do not track the tokens (`muted` inks `--fab-text-disabled`, `neutral` inks `--fab-text-muted`).
+  - `density="row"` composes with a tone: its ground and ink sit above the tone rules, so a tone paints a row chip as it paints every other density.
   - `emphasis="bare"` is the one emphasis that does not compose with `struck`, because its `border` shorthand resets the dashed `border-style` that prop states.
   - `iconOnly` emits `role="img"` on a non-interactive host only, before the rest spread so a caller's own `role` wins, because `aria-label` on a bare `span` is dropped; seven square sides are published, one per density, and `is-list` has no `min-height` to read.
   - `removable` throws rather than drops on `tag="button"`/`"a"`, a missing `removeLabel` and a missing `onRemove`; `removeLabel` names the member it takes out and defaults to `undefined`, never `''` — pinned by `tests/design-system-required-names.test.js`.
@@ -240,6 +241,12 @@
     list-style: none;
   }
 
+  /* The row density's ground and ink sit above the tones, so a tone composes with it. */
+  .manager-chip.is-row {
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-2);
+  }
+
   .manager-chip.is-active,
   .manager-chip.is-positive {
     border-color: var(--fab-success-border);
@@ -310,8 +317,6 @@
     min-height: 22px;
     padding: 0 var(--fab-space-2);
     border-radius: 999px;
-    color: var(--fab-text-secondary);
-    background: var(--fab-bg-2);
     font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
@@ -490,6 +495,10 @@
   .manager-chip.has-tint.is-lit {
     color: var(--fab-chip-color);
     background: color-mix(in srgb, var(--fab-chip-color) 16%, transparent);
+  }
+
+  .manager-chip.is-tag.is-lit:not(.has-tint) {
+    color: var(--fab-purple-text);
   }
 
   .manager-chip.is-bare {

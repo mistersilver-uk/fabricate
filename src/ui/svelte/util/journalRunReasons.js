@@ -58,6 +58,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'source-actor-not-found': 'FABRICATE.App.Journal.Reason.SourceActorNotFound',
   'alchemy-system-not-found': 'FABRICATE.App.Journal.Reason.AlchemySystemNotFound',
   'alchemy-submission-invalid': 'FABRICATE.App.Journal.Reason.AlchemySubmissionInvalid',
+  'alchemy-submission-unfunded': 'FABRICATE.App.Journal.Reason.AlchemySubmissionUnfunded',
   'ingredient-set-not-found': 'FABRICATE.App.Journal.Reason.IngredientSetNotFound',
   // ── Run state ─────────────────────────────────────────────────────────────
   'active-run': 'FABRICATE.App.Journal.Reason.ActiveRun',

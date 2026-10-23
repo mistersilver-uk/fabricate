@@ -53,6 +53,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     // The detail pane's load-failure notice (issue 1969).
     'src/ui/svelte/components/Notice.svelte',
+    // The roster's loading form (issue 2548), over the notice.
+    'src/ui/svelte/components/ListState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/components/Callout.svelte',
     // The shared chip (issue 883). The tab bar's count badge and both row types render it.
@@ -839,9 +841,24 @@ describe('KnowledgeView mounted behaviour', () => {
     const view = target.querySelector('[data-knowledge-view]');
     assert.equal(view.getAttribute('aria-busy'), 'true');
     assert.ok(target.querySelector('[data-knowledge-loading]'), 'the detail pane is loading');
-    assert.ok(target.querySelector('[data-knowledge-roster-loading]'), 'the roster is loading');
+    // The roster's list loading form (issue 2548): a busy region under the kept hook, its status
+    // line over dense skeleton rows, the roster's rows being the compact kind.
+    const roster = target.querySelector(
+      ':scope .manager-knowledge-roster [data-knowledge-roster-loading]'
+    );
+    assert.ok(roster, 'the roster is loading');
+    assert.equal(roster.getAttribute('aria-busy'), 'true');
+    assert.equal(
+      roster.querySelector('[role="status"]')?.textContent,
+      'Loading player characters...'
+    );
+    const skeleton = roster.querySelectorAll('.fabricate-list-state-row');
+    assert.ok(skeleton.length > 0, 'the roster draws skeleton rows');
+    assert.ok(
+      [...skeleton].every((row) => row.classList.contains('is-dense')),
+      'every roster skeleton row is dense'
+    );
     assert.match(target.textContent, /Loading character knowledge\.\.\./);
-    assert.match(target.textContent, /Loading player characters\.\.\./);
     assert.doesNotMatch(target.textContent, /No player characters/);
     assert.equal(target.querySelector('[data-knowledge-no-selection]'), null);
     assert.equal(target.querySelector('[data-knowledge-error]'), null);

@@ -313,8 +313,6 @@
     border-bottom: 1px solid var(--fab-border);
   }
 
-  .fabricate-manager .manager-toolbar-primary,
-  .fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)),
   .fabricate-manager .manager-header-actions,
   .fabricate-manager .manager-action-group {
     justify-content: flex-start;

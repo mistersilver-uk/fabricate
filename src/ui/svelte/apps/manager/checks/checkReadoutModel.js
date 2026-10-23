@@ -25,6 +25,7 @@ const COPY = Object.freeze({
     'Roll a test {activity} check',
   ],
   rollAgain: ['FABRICATE.Admin.Manager.Checks.Simulator.RollAgain', 'Roll again'],
+  rolling: ['FABRICATE.Admin.Manager.Checks.Simulator.Rolling', 'Rolling…'],
   waiting: [
     'FABRICATE.Admin.Manager.Checks.Simulator.WaitingHint',
     'Roll a test check to see exactly which outcome a {record} lands on and what it costs the character.',
@@ -743,7 +744,7 @@ export function buildReadoutModel(
       ? { reason: abstention.reason, hint: abstentionHint(abstention, text) }
       : null,
     result,
-    rollLabel: rollLabel(result, activityLabel, text),
+    rollLabel: rolling ? say(text, COPY.rolling) : rollLabel(result, activityLabel, text),
     waitingHint: say(text, COPY.waiting, { record: noun }),
     additionalDice: previewAdditionalDice(plan, character, text),
     ...rolledReadout({ ...input, consumption, sandbox }, text),

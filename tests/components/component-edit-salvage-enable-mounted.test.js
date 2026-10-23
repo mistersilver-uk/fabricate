@@ -20,6 +20,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 
 const PRESET_TRIGGER = '[data-salvage-dc-preset]';
 
@@ -88,7 +89,9 @@ function props(overrides = {}) {
 const enableCard = (target) => target.querySelector('[data-recipe-section="salvage-enabled"]');
 const enableToggle = (target) => target.querySelector('[data-recipe-field="salvageEnabled"]');
 const addGroup = (target) => target.querySelector('[data-add-salvage-group]');
-const removeGroup = (target) => target.querySelector('[data-remove-salvage-group]');
+/** Remove the first result set through its card's kebab. */
+const removeGroup = (target) =>
+  chooseSetCardAction(target.querySelector('[data-salvage-group]'), '[data-remove-salvage-group]');
 
 function track(overrides = {}) {
   const dirtyEvents = [];
@@ -275,8 +278,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    removeGroup(target).click();
-    await flushRender();
+    await removeGroup(target);
 
     const { salvage } = drafts.at(-1).updates;
     assert.deepEqual(salvage.resultGroups, [], 'the last group is gone');
@@ -292,8 +294,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    removeGroup(target).click();
-    await flushRender();
+    await removeGroup(target);
 
     const { salvage } = drafts.at(-1).updates;
     assert.equal(salvage.resultGroups.length, 1);
@@ -359,12 +360,15 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    // An edit somewhere else entirely: rename the result group.
+    // An edit somewhere else entirely: rename the result group, which writes on input.
     const groupName = target.querySelector('[data-salvage-group-name]');
+    const before = drafts.length;
     groupName.value = 'Renamed';
     groupName.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
     await flushRender();
 
+    assert.ok(drafts.length > before, 'the rename is a draft edit');
+    assert.equal(drafts.at(-1).updates.salvage.resultGroups.at(-1).name, 'Renamed');
     assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the off-tier DC rode through untouched');
     harness.remount();
   });

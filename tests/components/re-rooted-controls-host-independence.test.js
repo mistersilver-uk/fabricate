@@ -17,6 +17,7 @@ import { chromium } from 'playwright';
 
 import { specificityOf } from '../../scripts/lib/stylesheetSelectorCensus.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sheet = readStylesheet();
@@ -133,7 +134,7 @@ const OPTION_CARDS_OWN_CLASSES = (() => {
   return match[1].trim();
 })();
 
-const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-config-cards`;
+const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES}`;
 
 /** The class list `ToggleCard` writes on its own root `<div>`, read out of its template. */
 const TOGGLE_CARD_CLASSES = (() => {
@@ -186,7 +187,7 @@ test('the class reader excludes conditional literals from default-control fixtur
 });
 
 test('the fifteen class strings under measurement are the ones the primitives emit', () => {
-  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button fab-manager-button');
+  assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination');
   assert.equal(FIELD_CLASSES, 'fabricate-field');
@@ -205,7 +206,7 @@ test('the fifteen class strings under measurement are the ones the primitives em
   assert.equal(
     OPTION_CARDS_CLASSES,
     'fabricate-field fabricate-option-cards is-wide ' +
-      'manager-resolution-mode-card manager-radio-card-group is-config-cards',
+      'manager-resolution-mode-card manager-radio-card-group',
     'the fieldset carries `Field`s pair, then this family`s root, then this family`s own classes'
   );
   assert.equal(
@@ -293,7 +294,7 @@ const CONTROLS = Object.freeze([
     id: 'button',
     classes: MANAGER_BUTTON_CLASSES,
     markup: (host) =>
-      `<button type="button" class="fabricate-button fab-manager-button" data-probe="${host}-button"><span>Save</span></button>`,
+      `<button type="button" class="fabricate-button" data-probe="${host}-button"><span>Save</span></button>`,
   }),
   Object.freeze({
     id: 'icon-button',
@@ -390,7 +391,7 @@ const CONTROLS = Object.freeze([
     // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header.
     comparesBox: false,
     markup: (host) =>
-      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
+      `<fieldset class="fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><span class="manager-resolution-option-head" data-probe="${host}-option-cards-head"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-tone-accent" style="width:30px;height:30px"><i class="fas fa-wand-magic-sparkles"></i></span></span><span class="manager-resolution-option-text" data-probe="${host}-option-cards-text"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><span class="manager-resolution-option-head"><span class="manager-resolution-option-icon"><span class="fab-medallion is-glyph-chip is-corner-7 is-ink-neutral" style="width:30px;height:30px"><i class="fas fa-layer-group"></i></span></span><span class="manager-resolution-option-text"><span class="manager-resolution-option-name">Routed by ingredients</span></span><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"></span></label></div></fieldset>`,
   }),
   // AND THE PROBE IS NOT THE ROOT FOR THE STATUS CARD EITHER (issue 1509 phase 4). This family
   // owns NO CONTROL: the switch inside it is `StatusToggle`'s, composed rather than written, and
@@ -424,7 +425,7 @@ const CONTROLS = Object.freeze([
     id: 'link-field',
     classes: `${LINK_FIELD_CLASSES} is-linked`,
     markup: (host) =>
-      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-icon"><img src="icons/svg/item-bag.svg" alt="" data-probe="${host}-link-field-art"></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
+      `<div class="fabricate-link-field manager-item-drop-zone is-linked" data-manager-item-drop-zone="" data-probe="${host}-link-field"><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-copy"><strong data-probe="${host}-link-field-name">Dragon Scale</strong><code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid data-probe="${host}-link-field-uuid">Item.7Yq0cS1n</code><small data-probe="${host}-link-field-hint">Drop another Item here to replace the linked source.</small></span><span class="manager-item-drop-zone-actions" data-probe="${host}-link-field-actions"><button type="button" class="fabricate-icon-button" aria-label="Copy UUID"><i class="fas fa-copy" aria-hidden="true"></i></button><button type="button" class="fabricate-icon-button is-danger" aria-label="Unlink"><i class="fas fa-link-slash" aria-hidden="true"></i></button></span></div>`,
   }),
   Object.freeze({
     id: 'link-field-compact',
@@ -487,8 +488,9 @@ const EXTRA_PROBES = Object.freeze([
   'option-cards-options',
   'option-cards-row',
   'option-cards-row-active',
+  'option-cards-head',
   'option-cards-icon',
-  'option-cards-body',
+  'option-cards-text',
   'option-cards-name',
   'option-cards-desc',
   'option-cards-radio',
@@ -498,8 +500,6 @@ const EXTRA_PROBES = Object.freeze([
   'toggle-card-title',
   'toggle-card-sub',
   'toggle-card-info-icon',
-  'link-field-icon',
-  'link-field-art',
   'link-field-copy',
   'link-field-name',
   'link-field-uuid',
@@ -522,10 +522,10 @@ const EXTRA_PROBES = Object.freeze([
   'pill-select-any',
 ]);
 
-/** The two family RAILS whose rendered border box follows the host's `box-sizing`. */
-const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
+/** The family RAIL whose rendered border box follows the host's `box-sizing`; the switch's track declares its own (issue 2525). */
+const BORDERED_TRACK_PROBES = Object.freeze(['slider-track']);
 
-/** Those two rails, plus the fill INSIDE one of them, which inherits the same dependence. */
+/** That rail, plus the fill INSIDE it, which inherits the same dependence. */
 const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   ...BORDERED_TRACK_PROBES,
   'slider-fill',
@@ -538,8 +538,9 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'option-cards-options',
   'option-cards-row',
   'option-cards-row-active',
+  'option-cards-head',
   'option-cards-icon',
-  'option-cards-body',
+  'option-cards-text',
   'option-cards-name',
   'option-cards-desc',
   // AND THE STATUS CARD'S COPY COLUMN AND ITS TWO LINES (issue 1509 phase 4).
@@ -580,10 +581,10 @@ const GLYPH_ONLY_PROBES = Object.freeze([
   // pill's icon slot — is compared instead, in all three.
   'pill-select-glyph',
   // AND THE LINK FIELD'S COMPACT GLYPH TILE (issue 1509 phase 4). The compact face's whole point
-  // is that it does NOT show the art, so the family replaces the default face's 44x44 plate with
-  // `width: auto; height: auto` and lets the glyph size itself — and the glyph is a Font Awesome
-  // ligature this core-less harness does not load, so the tile lays out at 0x0 in every host. Its
-  // DECLARED values are compared instead, in all three, which is where the family's claim lives.
+  // is that it does NOT show the art, so the family draws no plate and lets the glyph size
+  // itself — and the glyph is a Font Awesome ligature this core-less harness does not load, so
+  // the tile lays out at 0x0 in every host. Its DECLARED values are compared instead, in all
+  // three, which is where the family's claim lives.
   'link-field-compact-icon',
 ]);
 
@@ -649,9 +650,6 @@ const COMPARED = Object.freeze([
   'font-size',
 ]);
 
-/** `box-sizing` is compared on the two BUTTON families and not on the pager. */
-const COMPARED_PAGINATION = Object.freeze(COMPARED.filter((property) => property !== 'box-sizing'));
-
 /** What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`. */
 const FIELD_COMPARED = Object.freeze([
   'appearance',
@@ -689,9 +687,16 @@ const TOOLBAR_COMPARED = Object.freeze([
   'padding-right',
   'padding-bottom',
   'padding-left',
+  'border-top-width',
+  'border-right-width',
   'border-bottom-width',
+  'border-left-width',
+  'border-top-style',
+  'border-right-style',
   'border-bottom-style',
-  'border-bottom-color',
+  'border-left-style',
+  'border-top-color',
+  'border-radius',
   'background-color',
   'display',
   'align-items',
@@ -738,7 +743,7 @@ const TOGGLE_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/** The 34x20 rail and the 14x14 knob, which is the geometry the switch is recognisable by. */
+/** The 38x22 rail and the 18x18 knob, which is the geometry the switch is recognisable by. */
 const TOGGLE_TRACK_COMPARED = Object.freeze([
   'width',
   'height',
@@ -747,7 +752,9 @@ const TOGGLE_TRACK_COMPARED = Object.freeze([
   'border-top-style',
   'border-top-color',
   'background-color',
-  'position',
+  'background-clip',
+  'box-sizing',
+  'padding-top',
   'display',
   'align-items',
 ]);
@@ -756,9 +763,8 @@ const TOGGLE_KNOB_COMPARED = Object.freeze([
   'height',
   'border-radius',
   'background-color',
-  'position',
-  'top',
-  'left',
+  'display',
+  'margin-left',
 ]);
 /** The reading beside the rail, whose type is the family's own at (0,2,0). */
 const TOGGLE_LABEL_COMPARED = Object.freeze([
@@ -1006,10 +1012,12 @@ const OPTION_CARDS_OPTIONS_COMPARED = Object.freeze([
   'min-width',
 ]);
 
-/** The card ROW, resting and active, whose border and fill are what a selection reads as. */
+/** The card, resting and active, whose border and fill are what a selection reads as. */
 const OPTION_CARDS_ROW_COMPARED = Object.freeze([
   'display',
-  'align-items',
+  'align-content',
+  'position',
+  'isolation',
   'gap',
   'padding-top',
   'padding-left',
@@ -1021,36 +1029,25 @@ const OPTION_CARDS_ROW_COMPARED = Object.freeze([
   'cursor',
 ]);
 
-/** The 40x40 glyph plate, compared as the size and edge it DECLARES. */
+/** The chip's wrapper, which owns its flex sizing and nothing else; the chip is `Medallion`'s. */
 const OPTION_CARDS_ICON_COMPARED = Object.freeze([
-  'order',
   'display',
-  'align-items',
-  'justify-content',
   'width',
   'height',
   'flex-grow',
   'flex-shrink',
   'flex-basis',
-  'border-top-width',
-  'border-top-style',
-  'border-top-color',
-  'border-radius',
-  'background-color',
-  'color',
-  'font-size',
 ]);
 
-/** The copy column the tile leads, and the two lines inside it. */
-const OPTION_CARDS_BODY_COMPARED = Object.freeze([
-  'order',
-  'display',
-  'flex-direction',
-  'gap',
-  'flex-grow',
-  'min-width',
+/** The head that lines the chip, the text and the radio up, and the text column inside it. */
+const OPTION_CARDS_HEAD_COMPARED = Object.freeze(['display', 'align-items', 'gap', 'min-width']);
+const OPTION_CARDS_TEXT_COMPARED = Object.freeze(['display', 'gap', 'flex-grow', 'min-width']);
+const OPTION_CARDS_NAME_COMPARED = Object.freeze([
+  'font-size',
+  'font-weight',
+  'color',
+  'line-height',
 ]);
-const OPTION_CARDS_NAME_COMPARED = Object.freeze(['font-size', 'font-weight', 'color']);
 const OPTION_CARDS_DESC_COMPARED = Object.freeze([
   'font-size',
   'font-weight',
@@ -1132,7 +1129,12 @@ const TOGGLE_CARD_COPY_COMPARED = Object.freeze([
 ]);
 
 /** The title line. */
-const TOGGLE_CARD_TITLE_COMPARED = Object.freeze(['margin-top', 'margin-bottom', 'font-weight']);
+const TOGGLE_CARD_TITLE_COMPARED = Object.freeze([
+  'margin-top',
+  'margin-bottom',
+  'font-size',
+  'font-weight',
+]);
 
 /** The sub-line, scoped to what this family owns. */
 const TOGGLE_CARD_SUB_COMPARED = Object.freeze(['min-width']);
@@ -1170,22 +1172,6 @@ const LINK_FIELD_COMPACT_COMPARED = Object.freeze([
   'background-color',
   'text-align',
 ]);
-
-/** The linked face's 44px art tile. */
-const LINK_FIELD_ICON_COMPARED = Object.freeze([
-  'display',
-  'align-items',
-  'justify-content',
-  'width',
-  'height',
-  'border-radius',
-  'overflow-x',
-  'background-color',
-  'color',
-]);
-
-/** And the art inside it, which the family sizes and crops. */
-const LINK_FIELD_ART_COMPARED = Object.freeze(['width', 'height', 'object-fit']);
 
 /** The compact face's glyph, which the family re-sizes: it keeps the empty glyph's ink and no box. */
 const LINK_FIELD_COMPACT_ICON_COMPARED = Object.freeze(['width', 'height', 'font-size', 'color']);
@@ -1318,7 +1304,7 @@ const PILL_SELECT_REMOVE_COMPARED = Object.freeze([
 const PILL_SELECT_ANY_COMPARED = Object.freeze(['min-height', 'display', 'align-items']);
 
 const COMPARED_BY_CONTROL = Object.freeze({
-  pagination: COMPARED_PAGINATION,
+  pagination: COMPARED,
   field: FIELD_COMPARED,
   search: SEARCH_COMPARED,
   toolbar: TOOLBAR_COMPARED,
@@ -1360,8 +1346,9 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'option-cards-options': OPTION_CARDS_OPTIONS_COMPARED,
   'option-cards-row': OPTION_CARDS_ROW_COMPARED,
   'option-cards-row-active': OPTION_CARDS_ROW_COMPARED,
+  'option-cards-head': OPTION_CARDS_HEAD_COMPARED,
   'option-cards-icon': OPTION_CARDS_ICON_COMPARED,
-  'option-cards-body': OPTION_CARDS_BODY_COMPARED,
+  'option-cards-text': OPTION_CARDS_TEXT_COMPARED,
   'option-cards-name': OPTION_CARDS_NAME_COMPARED,
   'option-cards-desc': OPTION_CARDS_DESC_COMPARED,
   'option-cards-radio': OPTION_CARDS_RADIO_COMPARED,
@@ -1376,8 +1363,6 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'toggle-card-sub': TOGGLE_CARD_SUB_COMPARED,
   'link-field': LINK_FIELD_COMPARED,
   'link-field-compact': LINK_FIELD_COMPACT_COMPARED,
-  'link-field-icon': LINK_FIELD_ICON_COMPARED,
-  'link-field-art': LINK_FIELD_ART_COMPARED,
   'link-field-compact-icon': LINK_FIELD_COMPACT_ICON_COMPARED,
   'link-field-copy': LINK_FIELD_COPY_COMPARED,
   'link-field-compact-copy': LINK_FIELD_COMPACT_COPY_COMPARED,
@@ -1553,60 +1538,14 @@ test('each re-rooted control computes the same geometry and type in all three ho
   }
 });
 
-test('the pager’s box-sizing keyword differs by host, and nothing in the sheet lets that render', async () => {
-  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away.
+test('the pager root states its own border-box in every host', async () => {
   const measured = await measure(sheet);
-  const declaresNone =
-    'the pager root declares no `box-sizing` of its own and takes it from host chrome; in this ' +
-    'core-less harness that means `content-box` outside the manager, and a change here means ' +
-    'the family has started declaring one';
-  assert.equal(measured.pagination.bare['box-sizing'], 'content-box', declaresNone);
-  assert.equal(measured.pagination.app['box-sizing'], 'content-box', declaresNone);
-  assert.equal(
-    measured.pagination.manager['box-sizing'],
-    'border-box',
-    'the manager area`s universal rule must still be what supplies the pager root its border-box'
-  );
-
-  const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  try {
-    await tab.setContent(document_(sheet));
-    const sized = await tab.evaluate(() => {
-      const node = globalThis.document.querySelector('[data-probe="bare-pagination"]');
-      const out = [];
-      const walk = (rules) => {
-        for (const rule of rules) {
-          if (rule.cssRules) walk(rule.cssRules);
-          if (!rule.selectorText) continue;
-          // A sheet this size holds selectors this engine can parse but `matches` rejects.
-          const matches = (() => {
-            try {
-              return node.matches(rule.selectorText);
-            } catch {
-              return false;
-            }
-          })();
-          if (!matches) continue;
-          if (/(?:^|;\s*)(?:width|height)\s*:/.test(rule.style.cssText)) {
-            out.push(`${rule.selectorText} :: ${rule.style.cssText}`);
-          }
-        }
-      };
-      walk(globalThis.document.querySelector('#module-sheet').sheet.cssRules);
-      return out;
-    });
-    assert.deepEqual(
-      sized,
-      [],
-      'a rule now gives the pager root an explicit width or height outside the manager, which is ' +
-        'the condition that turns its host-supplied `box-sizing` into a different rendered box. ' +
-        'That is invisible in Foundry, where core`s `@layer reset` universal rule gives every ' +
-        'host `border-box`, and visible in any host without it — including this harness. Give ' +
-        '`.fabricate-pagination.fabricate-pagination` its own `box-sizing: border-box` and add the ' +
-        'property back to `COMPARED_PAGINATION`.'
+  for (const host of ['bare', 'app', 'manager']) {
+    assert.equal(
+      measured.pagination[host]['box-sizing'],
+      'border-box',
+      `the pager root takes border-box from its own rule, not from the ${host} host's chrome`
     );
-  } finally {
-    await tab.close();
   }
 });
 
@@ -1616,7 +1555,7 @@ test('the values the comparison holds over are the ones the family declares, not
 
   // The four properties acceptance 2 says DO resolve.
   assert.equal(bare('button')['box-sizing'], 'border-box');
-  // 9px, not the shared base block's 6: the probe carries `fab-manager-button`.
+  // 9px, not the shared base block's 6: the tripled root reaches the probe.
   assert.equal(bare('button')['border-radius'], '9px');
   assert.equal(bare('button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
@@ -2188,10 +2127,10 @@ test('the toggle and the slider declare their own control chrome rather than inh
   );
 
   // AND THE RAIL AND KNOB GEOMETRY the two families are recognisable by.
-  assert.equal(bare('toggle-track').width, '34px');
-  assert.equal(bare('toggle-track').height, '20px');
-  assert.equal(bare('toggle-knob').width, '14px');
-  assert.equal(bare('toggle-knob').height, '14px');
+  assert.equal(bare('toggle-track').width, '38px');
+  assert.equal(bare('toggle-track').height, '22px');
+  assert.equal(bare('toggle-knob').width, '18px');
+  assert.equal(bare('toggle-knob').height, '18px');
   assert.equal(bare('slider-track').height, '6px');
 });
 
@@ -2234,7 +2173,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
     );
   }
 
-  // THE TWO BORDERED RAILS, which are the field's case rather than the pager's.
+  // THE BORDERED RAIL, which is the field's case rather than the pager's.
   for (const probe of BORDERED_TRACK_PROBES) {
     assert.equal(
       measured[probe].bare['box-sizing'],
@@ -2253,6 +2192,11 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
       `the ${probe} rail must still declare the 1px border that is why its border box differs by ` +
         'host at all; without it the opt-out above would be hiding a real move'
     );
+  }
+
+  // THE SWITCH'S TRACK DECLARES ITS OWN, so its 38x22 box is compared in every host.
+  for (const host of HOSTS) {
+    assert.equal(measured['toggle-track'][host.id]['box-sizing'], 'border-box');
   }
 
   // AND THE SLIDER'S NUMBER INPUT DOES DECLARE ONE, in its own rule.
@@ -2314,11 +2258,15 @@ test('the filter bar and the card declare their own box rather than inheriting i
     }
   }
 
-  // THE BAR. `--fab-space-3` padding, the hairline bottom rule.
+  // The bar: `--fab-space-3` padding inside a bordered box: 1px solid on all four edges, radius 9,
+  // on the `--fab-bg-1` rung, one wrapping flex row at `--fab-space-2`.
   assert.equal(toolbar['padding-top'], '12px');
   assert.equal(toolbar['padding-left'], '12px');
-  assert.equal(toolbar['border-bottom-width'], '1px');
-  assert.equal(toolbar['border-bottom-style'], 'solid');
+  for (const edge of ['top', 'right', 'bottom', 'left']) {
+    assert.equal(toolbar[`border-${edge}-width`], '1px', `the bar's ${edge} edge must be a 1px border`);
+    assert.equal(toolbar[`border-${edge}-style`], 'solid', `the bar's ${edge} edge must be solid`);
+  }
+  assert.equal(toolbar['border-radius'], '9px');
   assert.equal(toolbar.display, 'flex');
   assert.equal(toolbar['flex-wrap'], 'wrap');
   assert.equal(toolbar['align-items'], 'center');
@@ -2326,23 +2274,11 @@ test('the filter bar and the card declare their own box rather than inheriting i
   assert.notEqual(
     toolbar['background-color'],
     'rgba(0, 0, 0, 0)',
-    'the bar declares its own translucent fill; a transparent one means the rule stopped matching'
-  );
-
-  // AND THE BRANCH THAT PAINTS IT IS THE FLEX ONE. `display: grid` is what
-  // `.fabricate-filter-bar.fabricate-filter-bar` states on its own; the `:not(:has(…))` branch
-  // overrides it to `flex`, and no component under `src/` writes `manager-toolbar-primary`, so
-  // that branch is ALWAYS taken. Measuring `flex` here is what says the branch re-rooted too —
-  // leaving it behind would give a bare-host bar the grid form nothing ships.
-  assert.equal(
-    toolbar.display,
-    'flex',
-    'the always-taken `:not(:has(.manager-toolbar-primary))` branch must travel with the family, ' +
-      'or a bar outside the manager renders the grid form no screen in the product uses'
+    'the bar declares its own fill; a transparent one means the rule stopped matching'
   );
 
   // THE CARD. Padding, a hairline border on all four edges, the 11px corner.
-  assert.equal(card['padding-top'], '12px');
+  assert.equal(card['padding-top'], '16px');
   assert.equal(card['border-top-width'], '1px');
   assert.equal(card['border-top-style'], 'solid');
   assert.equal(card['border-radius'], '11px');
@@ -2367,11 +2303,10 @@ test('the filter bar and the card declare their own box rather than inheriting i
 
 test('neither the filter bar nor the card declares a font floor or a focus pair', async () => {
   // THE NEGATIVE CONTROL FOR A POSITIVE DECISION. `openspec/specs/design-system/spec.md` forbids
-  // a primitive displacing an area's chrome for a control it does not own — the clause the
-  // pager's `<select>` established. These two families own no control at all, so the honest
-  // shape of "they declare neither" is an assertion that no rule rooted at either names a focus
-  // state or carries type. Without it, a later change adding a floor "for consistency with the
-  // other four" would pass every other gate in this repository.
+  // a primitive displacing an area's chrome for a control it does not own. These two families own
+  // no control at all, so the honest shape of "they declare neither" is an assertion that no rule
+  // rooted at either names a focus state or carries type. Without it, a later change adding a
+  // floor "for consistency with the other four" would pass every other gate in this repository.
   const tab = await browser.newPage();
   try {
     await tab.setContent(document_(sheet));
@@ -2386,11 +2321,14 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
         .split(',')
         .some((selector) => named.test(selector.trim().split(/[\s>+~]+/u, 1)[0]));
 
-    for (const root of ['.fabricate-filter-bar', '.fabricate-card']) {
+    for (const [root, floor] of [
+      ['.fabricate-filter-bar', 1],
+      ['.fabricate-card', 3],
+    ]) {
       const named = new RegExp(`\\${root}(?![\\w-])`);
       const family = rules.filter(rootedAt(named));
       assert.ok(
-        family.length >= 3,
+        family.length >= floor,
         `only ${family.length} rules are rooted at \`${root}\`, so the absences below hold over ` +
           'nothing. The family has been renamed or the re-root has been undone.'
       );
@@ -2435,9 +2373,10 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
       );
     }
 
-    // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT.
+    // And the family rules the three-host comparison does not cover, excluded by count: the bar has
+    // no container-scoped rule left, so a new one must be argued for here.
     for (const [root, expected] of [
-      ['.fabricate-filter-bar', 1],
+      ['.fabricate-filter-bar', 0],
       ['.fabricate-search', 2],
     ]) {
       const named = new RegExp(`\\${root}(?![\\w-])`);
@@ -2473,7 +2412,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
 /** The elements a widened floor would have reached. */
 const NEGATIVE_CONTROLS =
   '<fieldset class="fabricate-field fabricate-option-cards" data-probe="neg-root">' +
-  '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
+  '<label class="manager-resolution-option"><span class="manager-resolution-option-head"><input type="radio" data-probe="neg-radio"></span></label>' +
   '<label><input type="checkbox" data-probe="neg-checkbox"></label>' +
   '<span class="fabricate-slider manager-chance-slider"><span class="manager-drop-rate-control"><input type="range" data-probe="neg-range"></span></span>' +
   '<span class="fab-stepper"><input type="number" class="fab-stepper-input" data-probe="neg-stepper"></span>' +
@@ -2491,6 +2430,14 @@ const NEGATIVE_CONTROLS =
   // measurement rather than with an argument. The button's own (0,2,0) rule states the 12.5px
   // and its (0,3,0) current-tab rule the 600 weight, and the floor must not disturb either.
   '<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="neg-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="neg-tab"><span>Overview</span></button></div>';
+
+test('both option-card fixtures carry only classes RadioCardGroup writes (issue 2467)', () => {
+  const card = CONTROLS.find((control) => control.id === 'option-cards').markup('bare');
+  const start = NEGATIVE_CONTROLS.lastIndexOf('<label', NEGATIVE_CONTROLS.indexOf('manager-resolution-option'));
+  const negative = NEGATIVE_CONTROLS.slice(start, NEGATIVE_CONTROLS.indexOf('</label>', start));
+  assert.ok(start !== -1, 'the negative control no longer draws an option card');
+  assert.deepEqual(classesNotWritten(`${card}${negative}`), [], 'a static copy drifted from the component');
+});
 
 /**
  * Those elements measured in the manager host under a given sheet text.
@@ -2672,7 +2619,7 @@ test('the option-card family declares no font floor of its own', async () => {
         .some((compound) => compound !== '' && !compound.includes('.'))
     );
     assert.ok(
-      bareElement.length >= 7,
+      bareElement.length >= 5,
       `only ${bareElement.length} rules name a bare element under this root, so the type check ` +
         'below examines almost nothing: ' +
         bareElement.map((rule) => rule.selectorText).join(', ')
@@ -2905,15 +2852,15 @@ test('the link field family declares no font floor and no focus pair', async () 
     // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY.
     assert.equal(
       endingInBareElement(family).length,
-      9,
-      'the link field no longer ends nine rules in a bare element, so `floorShaped`s zero above ' +
+      8,
+      'the link field no longer ends eight rules in a bare element, so `floorShaped`s zero above ' +
         'has stopped discriminating and the docblock`s contrast with the status card is stale: ' +
         endingInBareElement(family)
           .map((rule) => rule.selectorText)
           .join(', ')
     );
 
-    // Of those nine, the five that TYPE it. Asserted separately because the zero above cannot be
+    // Of those eight, the five that TYPE it. Asserted separately because the zero above cannot be
     // mistaken for "this family types nothing" — the predicate is shape, not absence, and a
     // reader reconciling the two needs the second number.
     const typedBareElement = endingInBareElement(family).filter((rule) =>

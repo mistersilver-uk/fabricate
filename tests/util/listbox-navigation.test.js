@@ -7,6 +7,7 @@ import {
   holderKeyIntent,
   nextActiveIndex,
   openingKeyOwns,
+  squareTileName,
   typeAheadCursor,
   typeAheadOwnsKey,
 } from '../../src/ui/svelte/util/listboxNavigation.js';
@@ -612,5 +613,18 @@ describe('listbox navigation: the cursor arithmetic', () => {
     it('reads no context object at all, and then owns no row to land on', () => {
       assert.deepEqual(holderKeyIntent({ key: 'ArrowDown' }), { kind: 'open', index: null });
     });
+  });
+});
+
+describe('squareTileName (issue 2459)', () => {
+  it('is the label, joined to a gated tile`s reason', () => {
+    assert.equal(squareTileName({ label: 'Anvil' }), 'Anvil');
+    assert.equal(squareTileName({ label: 'Anvil', disabledReason: 'Spent' }), 'Anvil');
+    assert.equal(squareTileName({ label: 'Anvil', disabled: true }), 'Anvil');
+    assert.equal(
+      squareTileName({ label: 'Anvil', disabled: true, disabledReason: 'Spent' }),
+      'Anvil — Spent'
+    );
+    assert.equal(squareTileName({}), '');
   });
 });

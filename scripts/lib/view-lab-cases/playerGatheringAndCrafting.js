@@ -18,7 +18,7 @@ import { playerAdvantagePromptCases } from './playerAdvantagePromptCases.js';
 import { playerCountResultCases } from './playerCountResultCases.js';
 
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
-const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+const SINGLE_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 /** The files a count prompt case is drawn from (issue 2006). */
 const COUNT_PROMPT_SOURCES = Object.freeze([
   CRAFTING_SIMPLE,

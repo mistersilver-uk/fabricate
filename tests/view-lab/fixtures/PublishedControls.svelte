@@ -25,12 +25,19 @@
   element; and `card-on` and `card-off` on a `--fab-bg-2` strip. Each target is `display: flex`
   and `align-items: center`, as the spec asks.
 
+  Beneath the switches, two dismissable notices, `danger` and `accent`, each with an action and a
+  `dismissLabel`, so the dismiss control is drawn after the action, and each above a published
+  `Button` that stands for the companion's next control. Each `onDismiss` moves focus to that
+  button and then destroys its notice, the order a companion follows when the press removes the
+  focused control.
+
   The ground is two 280px cells on `--fab-bg-1`, a ground both labels are stated for. It sets the
   azure tag ink, so an ink a notice or a button fails to state shows in the frame. A case
   addresses the ground by `data-lab-controls` and each notice's section by its `data-lab-control`
   key, the buttons' band by `data-lab-buttons` and each button's section by its `data-lab-button`
-  key, and the switches' band by `data-lab-toggles` and each switch's section by its
-  `data-lab-toggle` key.
+  key, the switches' band by `data-lab-toggles` and each switch's section by its
+  `data-lab-toggle` key, and the dismissals' band by `data-lab-dismissals` and each dismissal's
+  section by its `data-lab-dismissal` tone, whose next control's target is `data-lab-next`.
 -->
 <script>
   import { publishedComponentSeam } from '../../../src/ui/publishedComponentSeam.js';
@@ -98,6 +105,26 @@
   ]);
   /** Where the switches on the `--fab-bg-2` strip start. */
   const TOGGLE_STRIP_FROM = TOGGLES.findIndex(([key]) => key === 'card-on');
+  /** Each dismissable notice's tone in fixture order, and its words. */
+  const DISMISSALS = Object.freeze([
+    [
+      'danger',
+      {
+        title: 'The mould cracked',
+        action: { label: 'Recast' },
+        dismissLabel: 'Dismiss the cracked-mould notice',
+      },
+    ],
+    [
+      'accent',
+      {
+        title: 'A new recipe is known',
+        action: { label: 'Open' },
+        dismissLabel: 'Dismiss the new-recipe notice',
+      },
+    ],
+  ]);
+
   /** The ids of a switch's visible label and hint, which its `aria` keys name. */
   const labelId = (key) => `lab-toggle-${key}-label`;
   const hintId = (key) => `lab-toggle-${key}-hint`;
@@ -112,6 +139,8 @@
   const sections = $state([]);
   const buttonTargets = $state([]);
   const toggleTargets = $state([]);
+  const dismissalTargets = $state([]);
+  const nextTargets = $state([]);
 
   function ignore() {}
 
@@ -209,12 +238,48 @@
     return Object.values(handles);
   }
 
+  /**
+   * Each dismissable notice above its next control. Its `onDismiss` focuses that control and then
+   * destroys the notice, so focus never falls to `body`; a second `destroy` at teardown does
+   * nothing.
+   */
+  function mountDismissals(mount) {
+    return DISMISSALS.flatMap(([tone, words], index) => {
+      const next = mount('Button', {
+        target: nextTargets[index],
+        props: { children: 'Next step', onclick: ignore },
+      });
+      const notice = mount('Notice', {
+        target: dismissalTargets[index],
+        props: {
+          tone,
+          ...words,
+          onAction: ignore,
+          dismissable: true,
+          onDismiss() {
+            nextTargets[index].querySelector('button').focus();
+            notice.destroy();
+          },
+        },
+      });
+      return [notice, next];
+    });
+  }
+
   $effect(() => {
     if (NOTICES.some((_, index) => !targets[index])) return undefined;
     if (BUTTONS.some((_, index) => !buttonTargets[index])) return undefined;
     if (TOGGLES.some((_, index) => !toggleTargets[index])) return undefined;
+    if (DISMISSALS.some((_, index) => !dismissalTargets[index] || !nextTargets[index])) {
+      return undefined;
+    }
     const { mount } = publishedComponentSeam.publicApi;
-    const handles = [...mountNotices(mount), ...mountButtons(mount), ...mountToggles(mount)];
+    const handles = [
+      ...mountNotices(mount),
+      ...mountButtons(mount),
+      ...mountToggles(mount),
+      ...mountDismissals(mount),
+    ];
     return () => {
       for (const handle of handles) handle.destroy();
     };
@@ -264,6 +329,14 @@
       {/each}
     </div>
   </div>
+  <div class="published-dismissals-band" data-lab-dismissals>
+    {#each DISMISSALS as [tone], index (tone)}
+      <section data-lab-dismissal={tone}>
+        <div bind:this={dismissalTargets[index]}></div>
+        <div class="button-target" data-lab-next bind:this={nextTargets[index]}></div>
+      </section>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -271,7 +344,8 @@
   .published-buttons-band,
   .published-buttons-strip,
   .published-toggles-band,
-  .published-toggles-strip {
+  .published-toggles-strip,
+  .published-dismissals-band {
     display: grid;
     grid-template-columns: repeat(2, 280px);
     gap: var(--fab-space-2);
@@ -289,7 +363,8 @@
   .published-buttons-band,
   .published-buttons-strip,
   .published-toggles-band,
-  .published-toggles-strip {
+  .published-toggles-strip,
+  .published-dismissals-band {
     grid-column: span 2;
   }
 
@@ -304,6 +379,12 @@
 
   section {
     min-width: 0;
+  }
+
+  section[data-lab-dismissal] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
   }
 
   section.is-wide {

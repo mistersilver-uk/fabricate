@@ -374,10 +374,12 @@
         text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')
       )}
     </div>
-    <InspectorCard class="is-rail-list" data-checks-all-checks="">
-      {#each allCheckRows as row (row.id)}
-        {@render railRow(row, 'data-checks-all-checks-row')}
-      {/each}
+    <InspectorCard flush data-checks-all-checks="">
+      <div class="manager-checks-rail-list">
+        {#each allCheckRows as row (row.id)}
+          {@render railRow(row, 'data-checks-all-checks-row')}
+        {/each}
+      </div>
     </InspectorCard>
   {:else}
     {#if activation}
@@ -524,22 +526,18 @@
       )}
       <Chip tone={digestStatus.tone}>{digestStatus.label}</Chip>
     </div>
-    <InspectorCard class="is-rail-list" data-checks-digest="">
-      {#each digestRows as row (row.id)}
-        {@render railRow(row, 'data-checks-digest-row')}
-      {/each}
+    <InspectorCard flush data-checks-digest="">
+      <div class="manager-checks-rail-list">
+        {#each digestRows as row (row.id)}
+          {@render railRow(row, 'data-checks-digest-row')}
+        {/each}
+      </div>
     </InspectorCard>
   {/if}
 </aside>
 
 <!--
-  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value taken from the
-  prototype, and they live together in the sheet's Checks Studio parity block, next to the
-  numbers they have to agree with.
-
-  THERE IS NO GATE BEHIND THEM. The live instrument is `scripts/visual-parity/`, which is
-  dev-time only and never runs in CI — so a number changed here reds nothing, which is exactly
-  how three type-scale values in this rail came to drift unnoticed. Measure by hand, and pin
-  anything that must not move again in `tests/components/manager-layout.test.js`, which does run
-  under `npm test`.
+  NO SCOPED BLOCK. The rail's rules live in the sheet's Checks Studio parity block, beside the
+  prototype values they match. `scripts/visual-parity/` measures them only at dev time, so pin
+  anything that must not move in `tests/components/manager-layout.test.js`.
 -->

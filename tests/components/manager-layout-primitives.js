@@ -177,7 +177,9 @@ test('manager body starts as a three-region grid and stacks at narrow width', ()
 // system (issue 1777), and a text back link out to the system library.
 test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const selectBlock = blockFor('.fabricate-manager .manager-scope-select .fabricate-select-trigger');
+  const selectBlock = blockFor(
+    '.fabricate-manager .manager-scope-select .fabricate-select-trigger'
+  );
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
@@ -404,9 +406,9 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 
   // Matched to the reference prototype.
   assert.ok(
-    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
+    emptyPanelBlock.includes('border: 1px dashed var(--fab-border-strong);') &&
       emptyPanelBlock.includes('border-radius: 11px;'),
-    'the no-state panel should be a rounded 1.5px dashed panel'
+    'the no-state panel should be a rounded 1px dashed panel on the strong border'
   );
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
   // for an AREA-SCOPED custom property, declared inside `.fabricate-manager` only, so
@@ -433,10 +435,10 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   );
   assert.ok(!emptyPanelBlock.includes('background:'), 'the prototype panel carries no fill');
   assert.ok(
-    emptyIconBlock.includes('font-size: 18px;') &&
-      emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
-      emptyIconBlock.includes('background: var(--fab-surface-soft);'),
-    'the glyph should be a small subtle icon on a soft rounded tile'
+    emptyIconBlock.includes('font-size: 15px;') &&
+      emptyIconBlock.includes('color: var(--fab-text-secondary);') &&
+      emptyIconBlock.includes('background: var(--fab-bg-3);'),
+    'the glyph should be the specimen 15px secondary icon on a bg-3 rounded tile'
   );
   // A per-icon OR per-screen size exception would reintroduce the inconsistency the
   // primitive exists to remove, so every empty state shares one tile and type scale. The
@@ -468,13 +470,13 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   }
   assert.ok(
     emptyHeadingBlock.includes('font-weight: 600;') &&
-      emptyHeadingBlock.includes('font-size: 13px;') &&
+      emptyHeadingBlock.includes('font-size: 15px;') &&
       emptyHeadingBlock.includes('font-family: var(--fab-font-serif);'),
-    'the title should be the prototype 13px/600 serif'
+    'the title should be the specimen 15px/600 serif'
   );
   assert.ok(
-    emptyBodyBlock.includes('font-size: 11px;') && emptyBodyBlock.includes('max-width: 280px;'),
-    'the body should be 11px and capped so it wraps into a readable column'
+    emptyBodyBlock.includes('font-size: 10.5px;') && emptyBodyBlock.includes('max-width: 34ch;'),
+    'the body should be 10.5px and capped at 34ch so it wraps into a readable column'
   );
   // The sidebar/inline scale is the SAME vocabulary, not a second look.
   assert.ok(
@@ -508,7 +510,10 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
-  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
+  const calloutIconBlock = blockIn(
+    calloutStyles,
+    '.manager-callout > i,\n  .manager-callout-item > i'
+  );
   const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
   const warningIconBlock = blockIn(
     calloutStyles,
@@ -575,7 +580,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
             <span class="manager-callout-actions"
               ><button
                 type="button"
-                class="fabricate-button fab-manager-button"
+                class="fabricate-button"
                 data-probe="callout-action"
                 ><i class="fas fa-globe" aria-hidden="true"></i><span>World Tool</span></button
               ></span
@@ -760,9 +765,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
   })
     .filter(
       (entry) =>
-        entry.isFile() &&
-        entry.name.endsWith('.svelte') &&
-        entry.name !== 'IconFactRow.svelte'
+        entry.isFile() && entry.name.endsWith('.svelte') && entry.name !== 'IconFactRow.svelte'
     )
     .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
     .join('\n');
@@ -926,8 +929,8 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
     'disabled manager buttons should have explicit disabled styling'
   );
   assert.ok(
-    css.includes('.fabricate-button.fabricate-button:not(:disabled):hover'),
-    'manager hover styles should not target disabled buttons'
+    css.includes(".fabricate-button.fabricate-button:not(:disabled, [aria-disabled='true']):hover"),
+    'manager hover styles should not target disabled or busy buttons (issue 2540)'
   );
 });
 
@@ -1287,8 +1290,9 @@ test('every view-specific manager-body grid override narrows the rail column whe
       columns: declaration(declarations, 'grid-template-columns'),
     }))
   );
-  const views = rules.filter(({ selector, columns }) =>
-    selector.includes('[data-manager-view') && selector.endsWith(' .manager-body') && columns
+  const views = rules.filter(
+    ({ selector, columns }) =>
+      selector.includes('[data-manager-view') && selector.endsWith(' .manager-body') && columns
   );
   assert.ok(views.length > 0, 'expected view-specific manager-body grid overrides');
 

@@ -102,6 +102,17 @@ describe('the environment mode controls are native radio groups', () => {
     harness.remount();
   });
 
+  it('render the English fallback for a key the active language lacks', async () => {
+    const target = await mountOverview([]);
+    const texts = (section) =>
+      [...sectionOf(target, section).querySelectorAll('.manager-segment-label')].map((label) =>
+        label.textContent.trim()
+      );
+    assert.deepEqual(texts('player'), ['Targeted', 'Blind']);
+    assert.deepEqual(texts('composition'), ['Automatic', 'Manual']);
+    harness.remount();
+  });
+
   it('report a change on the unchecked radio to the host once, and a checked one not at all', async () => {
     const calls = [];
     const target = await mountOverview(calls);

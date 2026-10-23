@@ -16,6 +16,7 @@ const harness = createMountedComponentHarness({
   // The card's ONE shared leaf (issue 1157).
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     // The shared card shell (issue 1427). The card's root element is an `<InspectorCard>`
     // now, so omitting it makes the harness's own closure validator throw in `before()`.
@@ -410,11 +411,12 @@ describe('1132 BulkDeleteCard — the two-step arm', () => {
 });
 
 describe('1132 BulkDeleteCard — the busy face', () => {
-  it('shows the in-progress label, disabled, while the caller is writing', async () => {
+  it('shows the in-progress label, aria-disabled and focusable, while the caller is writing', async () => {
     const root = await harness.mount(props({ armed: true, busy: true }));
 
     assert.equal(button(root).querySelector('span').textContent.trim(), 'Deleting…');
-    assert.equal(button(root).disabled, true);
+    assert.equal(button(root).disabled, false, 'busy keeps the tab stop, so focus survives the write');
+    assert.equal(button(root).getAttribute('aria-disabled'), 'true');
     assert.equal(button(root).getAttribute('aria-busy'), 'true');
     assert.equal(
       button(root).getAttribute('aria-label'),
@@ -429,11 +431,9 @@ describe('1132 BulkDeleteCard — the busy face', () => {
     harness.remount();
   });
 
-  it('SURVIVES the disarm a real browser fires when the control is disabled', async () => {
-    // THE TRAP. Chromium and Firefox fire `blur` on a focused button the moment it is disabled,
-    // and `ArmedDangerButton` disarms on blur — so a browser reaches `busy: true, armed: false`
-    // within a frame of the write starting. happy-dom fires no such blur, so this state has to
-    // be entered deliberately or the assertion below would never be reached at all.
+  it('survives a disarm underneath the write', async () => {
+    // `busy` keeps focus, so no browser blur disarms it; an owner that clears its arm on
+    // confirm still reaches `busy: true, armed: false`, and the face must read the busy flag.
     const root = await harness.mount(props({ armed: false, busy: true }));
 
     assert.equal(
@@ -447,7 +447,7 @@ describe('1132 BulkDeleteCard — the busy face', () => {
   });
 
   it('ignores a blur while busy, so an in-flight write cannot clear the owner\'s arm token', async () => {
-    // The other half of the same race, driven by the event happy-dom will not raise on its own.
+    // A blur during the write, from the GM or from a caller's native `disabled`, is not a disarm.
     const disarmed = [];
     const root = await harness.mount(
       props({ armed: true, busy: true, onDisarm: (token) => disarmed.push(token) })
@@ -455,7 +455,7 @@ describe('1132 BulkDeleteCard — the busy face', () => {
 
     button(root).dispatchEvent(new window.FocusEvent('blur'));
     flushSync();
-    assert.deepEqual(disarmed, [], 'a blur raised by the disable is not a GM leaving the control');
+    assert.deepEqual(disarmed, [], 'a blur during the write keeps the owner\'s arm token');
     harness.remount();
   });
 

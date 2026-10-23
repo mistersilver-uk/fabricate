@@ -68,7 +68,7 @@ import {
 } from '../../../systems/normalize/checkEvaluation.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
-import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
+import { summarizeModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
@@ -131,6 +131,7 @@ import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
 } from './adminSystemInspectorProjection.js';
+import { modeChangeConfirmContent } from './modeChangeConfirm.js';
 import { createWorldScopeActions } from './worldScopeActions.js';
 import {
   buildWorldScopeState as _buildWorldScopeState,

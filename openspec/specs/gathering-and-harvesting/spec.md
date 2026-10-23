@@ -573,7 +573,7 @@ Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`
 6. GM-customized vocabularies are preserved.
 Defaults are seeded only when a custom list is absent or empty.
 6a. `vocabularies.{biomes,danger,weather,timeOfDay}` normalize to a de-duplicated list of ids.
-Entries persisted as condition-option or biome-option records are accepted and normalized to their id; the label, icon and color token on such an entry are display metadata derived from the id, are not authored at this level, and are re-derived on read.
+Entries persisted as condition-option or biome-option records are accepted and normalized to their id; a biome-option record in `vocabularies.biomes.values` keeps its authored label, icon, colour token and custom hex, and one that omits its label, icon or colour token takes the id's default on read; a colour token outside the ten offered tints (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`, `verdant`, `azure`; see `design-system`, the entity-tint offering rule) folds to `sage`, the withheld `ember`, `bone` and `slate` included, and a custom hex that is not six-digit `#RRGGBB` is dropped.
 GM-authored option metadata lives in the per-system `conditions[kind].values` and `vocabularies.biomes.values` records.
 An entry whose normalized id is the lower-cased stringification of a plain object — `[object object]`, or `object-object` once condition-id normalization has stripped the brackets — is not a tag and is discarded.
 `weather` and `timeOfDay` ids are condition-option ids and are kebab-cased; `biomes` and `danger` ids are tags and are lower-cased only.

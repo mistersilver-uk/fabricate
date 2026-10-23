@@ -7,7 +7,7 @@
 import { COUNT_ADVANTAGE_FOOTER, CRAFTING_SHARED, CRAFTING_SIMPLE } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
-const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+const SINGLE_PROMPT = '.fabricate-app [data-manager-modal][data-roll-prompt="single"]';
 const CRAFT_HORSESHOE = Object.freeze([
   { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
   { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
@@ -225,7 +225,7 @@ export function playerCountResultCases() {
       query: { tab: 'crafting', dialog: 'open', viewer: 'gm', companionRoll: 'count' },
       steps: [{ selector: '[data-lab-companion-roll]' }],
       expectSelector:
-        '.fabricate-standalone-overlay .manager-modal[data-roll-prompt="single"]' +
+        '.fabricate-standalone-overlay [data-manager-modal][data-roll-prompt="single"]' +
         ':has(.manager-modal-subtitle:text-is("Brenna Karrunsdottir"))' +
         COUNT_ADVANTAGE_FOOTER +
         ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("4d10 · each ≥ 8"))' +

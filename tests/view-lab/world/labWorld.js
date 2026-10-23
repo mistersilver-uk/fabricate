@@ -185,6 +185,186 @@ function seedJustResolvedRewards(content) {
   });
 }
 
+/** `routed-shared` (issue 2512): the gold route also routes to the Ring, so two sets share it and
+ *  nothing reaches the Amulet. */
+function seedRoutedShared(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-shared');
+  recipe.ingredientSets = recipe.ingredientSets.map((set) =>
+    set.id === 'jw-set-gold' ? { ...set, resultGroupId: 'jw-grp-ring' } : set
+  );
+}
+
+/** `routed-shared-long`: the shared Ring with a silver route named at about forty characters. */
+function seedRoutedSharedLong(content) {
+  seedRoutedShared(content);
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-shared-long');
+  recipe.ingredientSets = recipe.ingredientSets.map((set) =>
+    set.id === 'jw-set-silver' ? { ...set, name: 'Silver route through the lost-wax mould' } : set
+  );
+}
+
+/** `routed-unreachable`: a third result set, the Brooch, that no ingredient set names. It is the
+ *  first card, so a frame shows it above the fold; both sets name their result set, so the first
+ *  card's default route reaches nothing. */
+function seedRoutedUnreachable(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-unreachable');
+  recipe.resultGroups = [
+    { id: 'jw-grp-brooch', name: 'Brooch', results: [{ componentId: 'jw-ring', quantity: 1 }] },
+    ...recipe.resultGroups,
+  ];
+}
+
+/** `routed-default`: neither set names a result set, so both reach the Ring by default. */
+function seedRoutedDefault(content) {
+  const { recipe } = recipeAndSystem(content, 'jw-r-cast', 'routed-default');
+  recipe.ingredientSets = recipe.ingredientSets.map(({ resultGroupId: _routed, ...set }) => set);
+}
+
+/** `routed-check-stale`: Runework stops offering a failed tier, and the Standard Blade still lists
+ *  it beside a tier id the check no longer defines. */
+function seedRoutedCheckStale(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routed-check-stale');
+  system.craftingCheck = { ...system.craftingCheck, failureResultPolicy: 'never' };
+  recipe.resultGroups = recipe.resultGroups.map((group) =>
+    group.id === 'rw-grp-standard'
+      ? { ...group, checkOutcomeIds: ['rw-standard', 'rw-ruined', 'rw-retired'] }
+      : group
+  );
+}
+
+/** `routed-check-no-success`: no Runework tier is a Success and failed checks produce nothing, so
+ *  no tier can be offered and each result set states the policy hint where Assign would be. */
+function seedRoutedCheckNoSuccess(content) {
+  const { system } = recipeAndSystem(content, 'rw-r-blade', 'routed-check-no-success');
+  const { craftingCheck } = system;
+  const routed = craftingCheck.routed;
+  system.craftingCheck = {
+    ...craftingCheck,
+    failureResultPolicy: 'never',
+    routed: {
+      ...routed,
+      relativeOutcomes: routed.relativeOutcomes.map((tier) => ({ ...tier, success: false })),
+    },
+  };
+}
+
+/** `check-two-sets`: the Runeblade gains a second, unnamed ingredient set. */
+function seedCheckTwoSets(content) {
+  const { recipe } = recipeAndSystem(content, 'rw-r-blade', 'check-two-sets');
+  const [stock] = recipe.ingredientSets;
+  recipe.ingredientSets = [
+    ...recipe.ingredientSets,
+    {
+      id: 'rw-set-salvaged',
+      name: '',
+      ingredientGroups: [{ ...stock.ingredientGroups[0], id: 'rw-set-salvaged-g1' }],
+    },
+  ];
+}
+
+/** `routing-fixed` (issue 2513): Runework rolls fixed tiers with a gap at 15 under `policy`; the
+ *  Runeblade's minimum is Standard, and its Standard Blade lists Fine and Standard. */
+function seedRoutingFixed(content, state = 'routing-fixed', policy = 'never') {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', state);
+  const tier = (id, name, success, start, end) => ({
+    id,
+    name,
+    success,
+    breakTools: !success,
+    start,
+    end,
+  });
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    failureResultPolicy: policy,
+    routed: {
+      ...system.craftingCheck.routed,
+      type: 'fixed',
+      fixedOutcomes: [
+        tier('rw-masterwork', 'Masterwork', true, 18, 20),
+        tier('rw-fine', 'Fine', true, 16, 17),
+        tier('rw-standard', 'Standard', true, 12, 14),
+        tier('rw-rough', 'Rough', true, 8, 11),
+        tier('rw-ruined', 'Ruined', false, 1, 7),
+      ],
+    },
+  };
+  recipe.minSuccessOutcomeId = 'rw-standard';
+  recipe.resultGroups = recipe.resultGroups.map((group) =>
+    group.id === 'rw-grp-standard'
+      ? { ...group, checkOutcomeIds: ['rw-fine', 'rw-standard'] }
+      : group
+  );
+}
+
+/** `routing-fixed-permitted`: the same under `perRecord`, so Ruined routes on a forced failure. */
+function seedRoutingFixedPermitted(content) {
+  seedRoutingFixed(content, 'routing-fixed-permitted', 'perRecord');
+}
+
+/** `routing-distinct`: each Runework tier reaches its own result set, so no row carries a marker. */
+function seedRoutingDistinct(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routing-distinct');
+  const tier = (id, name, success, start, end) => ({
+    id,
+    name,
+    success,
+    breakTools: !success,
+    start,
+    end,
+  });
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    failureResultPolicy: 'never',
+    routed: {
+      ...system.craftingCheck.routed,
+      type: 'fixed',
+      fixedOutcomes: [
+        tier('rw-masterwork', 'Masterwork', true, 16, 20),
+        tier('rw-standard', 'Standard', true, 8, 15),
+        tier('rw-ruined', 'Ruined', false, 1, 7),
+      ],
+    },
+  };
+  recipe.minSuccessOutcomeId = 'rw-standard';
+  recipe.resultGroups = recipe.resultGroups.map((group) => ({
+    ...group,
+    checkOutcomeIds: group.id === 'rw-grp-master' ? ['rw-masterwork'] : ['rw-standard'],
+  }));
+}
+
+/** `routing-multistep`: Runework turns multi-step on and the Runeblade keeps its result sets; its
+ *  first step has two that list no tier, and its second has none of its own, so it borrows them. */
+function seedRoutingMultistep(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'routing-multistep');
+  system.features = { ...system.features, multiStepRecipes: true };
+  const group = (id, name) => ({
+    id,
+    name,
+    checkOutcomeIds: [],
+    results: [{ componentId: 'rw-blade-standard', quantity: 1 }],
+  });
+  recipe.steps = [
+    {
+      id: 'rw-step-forge',
+      name: 'Forge the blank',
+      ingredientSets: recipe.ingredientSets,
+      resultGroups: [
+        group('rw-grp-step-master', 'Masterwork'),
+        group('rw-grp-step-standard', 'Standard'),
+      ],
+    },
+    { id: 'rw-step-etch', name: 'Etch the runes', ingredientSets: [], resultGroups: [] },
+  ];
+}
+
+/** `failure-policy-never` (issue 2514): Verrin Alchemy produces nothing on a failed check, and the
+ *  Elixir of Vigour keeps its failure set, which the editor then draws with the policy note. */
+function seedFailurePolicyNever(content) {
+  const { system } = recipeAndSystem(content, 'al-r-elixir', 'failure-policy-never');
+  system.craftingCheck = { ...system.craftingCheck, failureResultPolicy: 'never' };
+}
+
 const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
@@ -193,6 +373,18 @@ const RESULT_ROW_STATES = Object.freeze({
   'reward-group': seedRewardGroup,
   'reward-group-rolled': seedRewardGroupRolled,
   'reward-tiers': seedRewardTiers,
+  'routed-shared': seedRoutedShared,
+  'routed-shared-long': seedRoutedSharedLong,
+  'routed-unreachable': seedRoutedUnreachable,
+  'routed-default': seedRoutedDefault,
+  'routed-check-stale': seedRoutedCheckStale,
+  'routed-check-no-success': seedRoutedCheckNoSuccess,
+  'check-two-sets': seedCheckTwoSets,
+  'routing-fixed': seedRoutingFixed,
+  'routing-fixed-permitted': seedRoutingFixedPermitted,
+  'routing-distinct': seedRoutingDistinct,
+  'routing-multistep': seedRoutingMultistep,
+  'failure-policy-never': seedFailurePolicyNever,
 });
 
 function seedResultRowState(content, state) {
@@ -428,6 +620,21 @@ function seedDepletedImage(content) {
       : entry;
   slice.tasks = slice.tasks.map(withImage);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(withImage);
+}
+
+/** Choking dust's macro names `Macro.lab-retired`, which no lab document answers, so the macro
+ *  zone draws its missing face with Relink (issue 2466). */
+function seedMissingComplicationMacro(content) {
+  const retire = (entry) =>
+    entry.id === 'hb-comp-dust-cloud' ? { ...entry, macroUuid: 'Macro.lab-retired' } : entry;
+  const withRetired = (components) =>
+    components.map((entry) =>
+      entry.id === 'hb-mortar-dust'
+        ? { ...entry, complications: entry.complications.map(retire) }
+        : entry
+    );
+  for (const system of content.systems) system.components = withRetired(system.components ?? []);
+  content.components = withRetired(content.components);
 }
 
 function seedCheckOverride(content, state) {
@@ -693,12 +900,16 @@ function stripAuthoredWorldComponents(content) {
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
  *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
- *   for two groups drawn by roll, or `reward-tiers` for a Runeblade tier paying a commission.
+ *   for two groups drawn by roll, `reward-tiers` for a Runeblade tier paying a commission, or one
+ *   of issue 2512's routing states: `routed-shared`, `routed-shared-long`, `routed-unreachable`,
+ *   `routed-default`, `routed-check-stale`, `routed-check-no-success` or `check-two-sets`; or
+ *   issue 2514's `failure-policy-never`.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
  * @param {boolean} [options.scriptMacros] List the lab's script macro in `game.macros`, so a macro
  *   picker offers an option (issue 2466).
+ * @param {boolean} [options.missingComplicationMacro] See {@link seedMissingComplicationMacro}.
  * @param {string} [options.timeOfDayBar] `'1'` or `'fallback'`: the time-of-day bar's periods,
  *   and the world clock at 14:34. See {@link seedTimeOfDayBar}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -724,6 +935,7 @@ export async function buildLabWorld({
   systemBlocked = false,
   depletedImage = false,
   scriptMacros = false,
+  missingComplicationMacro = false,
   tagStacks = false,
   timeOfDayBar = '',
 } = {}) {
@@ -741,6 +953,7 @@ export async function buildLabWorld({
   seedCheckOverride(content, checkOverride);
   if (systemBlocked) blockHerbalism(content);
   if (depletedImage) seedDepletedImage(content);
+  if (missingComplicationMacro) seedMissingComplicationMacro(content);
   if (tagStacks) seedTagStacks(content);
   seedTimeOfDayBar(content, timeOfDayBar);
   if (noTools) stripTools(content);
@@ -799,40 +1012,7 @@ export async function buildLabWorld({
     seedLabInteractables(world);
   }
 
-  const shim = installFoundryShim(world);
-  world.shim = shim;
-  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
-  if (journalCaseState !== 'authority-unavailable') {
-    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
-    const journal = globalThis.game.journal;
-    const get = journal.get;
-    journal.contents.push(ledger);
-    journal.get = (id) => (id === ledger.id ? ledger : get(id));
-  }
-
-  // Dynamic, and only now: `src/main.js` registers hooks at module scope.
-  const runtime = await import('../../../src/main.js');
-  const fabricate = runtime.default;
-  await fabricate.initialize();
-  globalThis.game.fabricate = fabricate;
-  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
-
-  // The rest of `Hooks.once('ready')`, called directly. `initialize()` is not the whole startup.
-  await runtime.processFabricateWorldTime();
-  await runtime.runRecipeItemFlagAutoStamp();
-  await runtime.runComponentFlagAutoStamp();
-  await runtime.runToolFlagAutoStamp();
-  await runtime.runOwnedItemComponentIdentityRestamp();
-  world.fabricate = fabricate;
-
-  if (!fabricate.craftingSystemManager?.initialized) {
-    throw new Error(
-      'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
-    );
-  }
-  if (!fabricate.recipeManager?.initialized) {
-    throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
-  }
+  const fabricate = await bootLabRuntime(world, journalCaseState);
 
   // Journal runs. Written after the crafting data exists, because each run resolves to a real
   // recipe - a run pointing at a recipe that is not there renders as a redacted stub and proves
@@ -906,6 +1086,52 @@ export async function buildLabWorld({
   }
 
   return world;
+}
+
+/**
+ * Install the Foundry shim over an assembled world, then boot the real Fabricate runtime and its
+ * ready steps against it. Shared by the lab world and the demo world (issue 2571).
+ *
+ * @param {object} world The assembled world; gains `shim` and `fabricate`.
+ * @param {string|null} [journalCaseState] Withholds the run ledger or seeds a retained claim.
+ * @returns {Promise<object>} The initialized `game.fabricate` facade.
+ */
+export async function bootLabRuntime(world, journalCaseState = null) {
+  const shim = installFoundryShim(world);
+  world.shim = shim;
+  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
+  if (journalCaseState !== 'authority-unavailable') {
+    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
+    const journal = globalThis.game.journal;
+    const get = journal.get;
+    journal.contents.push(ledger);
+    journal.get = (id) => (id === ledger.id ? ledger : get(id));
+  }
+
+  // Dynamic, and only now: `src/main.js` registers hooks at module scope.
+  const runtime = await import('../../../src/main.js');
+  const fabricate = runtime.default;
+  await fabricate.initialize();
+  globalThis.game.fabricate = fabricate;
+  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
+
+  // The rest of `Hooks.once('ready')`, called directly. `initialize()` is not the whole startup.
+  await runtime.processFabricateWorldTime();
+  await runtime.runRecipeItemFlagAutoStamp();
+  await runtime.runComponentFlagAutoStamp();
+  await runtime.runToolFlagAutoStamp();
+  await runtime.runOwnedItemComponentIdentityRestamp();
+  world.fabricate = fabricate;
+
+  if (!fabricate.craftingSystemManager?.initialized) {
+    throw new Error(
+      'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
+    );
+  }
+  if (!fabricate.recipeManager?.initialized) {
+    throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
+  }
+  return fabricate;
 }
 
 function invalidateJournalFixtureCaches(fabricate) {

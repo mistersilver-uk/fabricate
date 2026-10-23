@@ -258,9 +258,12 @@ Hooks.once('fabricate.ready', async () => {
   `actorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
 - `submitAlchemyAttempt({ actorId, craftingSystemId, submittedComponentIds, componentSourceActorIds, interactive })` brews the submitted components as an attempt for the resolved actor.
   It is owner-scoped like `listAlchemyForActor` and delegates to the authoritative engine, which matches the submission against all enabled recipes in the system, known and undiscovered alike.
-  On a match the recipe is discovered and the ingredients are consumed.
+  On a match the recipe is discovered when Learn on Craft is on, and every submitted unit is spent when the brew starts, drawn only from the submitted items.
+  A matched brew that can resolve now resolves in this call through `executePublicBrew`, as `craftRecipe` does through `executePublicCraft`; a time-gated brew starts and returns the run for later completion in the Journal.
+  If the execute is cancelled or refused after the start, the reply still carries the started run's `runId`; its units are already spent, and the run can be finished or cancelled from the Journal.
+  A match the submitted units cannot fund is refused with nothing consumed.
   The system's alchemy check mode decides the result: `none` always produces the success set, a `simple` check produces the success set on a pass and the reserved failure set on a fail, and a `tiered` check routes to the result set for the rolled outcome tier.
-  A failed `simple` check still counts as a match, so it consumes, produces the failure set, and discovers the recipe.
+  A failed `simple` check still counts as a match, so it produces the failure set and discovers the recipe, and its spent units are kept, or returned when Consume on Fail is off.
   Otherwise the attempt fizzles with no check and no roll, consuming the components only when the system's Consume on Fail setting is on.
   `interactive` prompts a roll on a matched brew in `simple` or `tiered` check mode, and defaults to `false` for macros and automation, so it never triggers a roll on the fizzle path.
 - `getSelectedAlchemySystemId()` reads the persisted last-selected alchemy system from the `fabricate.lastAlchemySystem` client setting, returning `''` when unset.
@@ -1292,7 +1295,8 @@ All strings a provider supplies are used verbatim: **localize them yourself**.
 Fabricate localizes only its own fallback copy.
 
 `tone` selects the action's button treatment: `primary`, `ghost`, `danger`, or `neutral`, the default, which is the plain Manager button with no added styling.
-Every header action renders at the page header's 38px control height and carries `fabricate-button fab-manager-button is-size-38`, so a companion's actions match Core's own.
+Every header action renders at the page header's 38px control height and carries `fabricate-button is-size-38`, so a companion's actions match Core's own.
+It also carries `fab-manager-button`, deprecated at issue 2540: Fabricate styles nothing by it, and it is removed after at least one minor release, announced in the release notes.
 `primary: true` is the older, still-supported spelling of `tone: 'primary'`.
 An action that declares both `primary` and `tone` is refused at registration.
 
@@ -1979,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; bindables and overlays are the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -1993,7 +1997,7 @@ if (fabUi?.schemaVersion !== 1) return; // Absent, or a shape this companion doe
 if (!fabUi.components.includes(name)) return; // Not published by this Fabricate version.
 
 const handle = fabUi.mount(name, { target: element, props }); // `props` as `describe(name)` lists.
-handle.update(nextProps); // Replaces every prop; it never merges.
+handle.update(nextProps); // Replaces every prop but an omitted value prop; it never merges.
 handle.destroy(); // Required on every path that ends the mount.
 ```
 
@@ -2042,13 +2046,17 @@ The published components, in publication order:
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
 | `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
-| `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback) | yes |
+| `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
 | `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
 | `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
+| `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
+| `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
+| `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
+| `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Each row lists the component's published props, noting a prop's kind when it is not plain data and marking a required one, and says `yes` in Rest when it takes `data-*` attributes.
+Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none; see [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
@@ -2098,7 +2106,11 @@ Pass it unchanged; do not prefix it with `/` or run it through `foundry.utils.ge
 `alt` is as for `Avatar`.
 `tint` is one of `Avatar`'s tint keys, and it recolours the glyph alone.
 `variant` is `''` or `glyph-chip`.
-`tone` and `ink` are each `''`, `success` or `danger`: both outrank `tint`, and `ink` outranks `tone` on the glyph.
+`tone` is `''`, `success`, `danger` or `accent`, and it outranks `tint`.
+`ink` is `''`, `success`, `danger` or `neutral`, it outranks `tint`, and it outranks `tone` on the glyph.
+A `tone` of `accent` paints the edge, ground and glyph in `--fab-accent-border`, `--fab-accent-soft` and `--fab-accent-text`, and an `ink` of `neutral` inks the glyph alone in `--fab-text-secondary`.
+A `variant` of `glyph-chip` draws no edge, so a `tone` shows its ground and glyph alone.
+A `tone` or `ink` outside its set draws as `''`, byte-identical to unset.
 The glyph is hidden from assistive technology, so a tile without art carries no name: always draw the name as text beside it, and pass `alt: ''` when you set `art`.
 The tile is inline: give its `target` `display: flex`, so the tile is a flex item as every Fabricate site draws it.
 
@@ -2111,14 +2123,26 @@ The tile is inline: give its `target` `display: flex`, so the tile is a flex ite
 `density` is `default` or `compact`.
 It is decorative: it has no role and no name and reaches no assistive technology, so state the reading as text beside it.
 A value that must be announced is a `Meter`.
+It draws one fill; a fill in segments is a `Meter`.
 
 ### Meter
 
 `Meter` states a value against a maximum to assistive technology, over a `FillBar` track.
 `value` is read against `max`.
 `max` defaults to 100, and a `max` of zero or less reads full.
-`segments` is an array holding one `{ tone?, color? }`, each as `FillBar`'s, and an empty array draws `success`.
-A second or later entry is reserved and is not drawn.
+`segments` is an array of `{ value?, tone?, color? }`, drawn in order as segments of the one fill; `tone` and `color` are each as `FillBar`'s, and an empty array draws `success`.
+Each entry but the last spans its `value`, a finite number of zero or more on the scale of `max`, and stops where the fill ends.
+Any other `value` reads 0, a numeric string and `Infinity` included, and a `null` entry reads as `{}`.
+The last entry spans the rest of the fill, and its `value` is not read.
+An entry that spans 1e-9 or less on the scale of `max` is not drawn, so the segments drawn make up the fill.
+That bound is absolute, so a `max` of 1e-9 or less reads every entry as nothing.
+A list that draws one segment or none draws one fill: in that segment's paint, or in the first entry's paint when none spans anything, at a reading of 0 or at a `max` of zero or less, which reads full.
+The segments run left to right in every writing direction and abut with no gap, and only the fill's two ends are rounded, so two neighbours of one paint read as one segment.
+No segment takes a minimum width, so one narrower than a pixel or than the fill's rounded end may not be seen.
+The segments are colour and width alone, are not announced, and neighbouring tones can sit under 3:1 against each other, so always state each segment as text beside the meter and in `valueText`; the bar alone never carries the split.
+A `segments` that is not an array (`null`, an object, a string or a number) is a fault: Fabricate logs it, empties `target` and the handle goes inert, as [for any published component that faults](#mounting-updating-and-destroying).
+Drawing a second or later entry and reading an entry's `value` are additive, and the entry stays at `version` 1.
+A Fabricate that predates segments draws the whole fill in the first entry's paint and refuses nothing, and `describe` cannot tell you which one is running, so the text beside the meter carries the segments on either.
 `valueText` is the reading, announced in place of the bare number.
 Pass `valueText` whenever `max` is not 100 or the unit matters, because without it only the bare `value` is announced.
 `label` is required and is the meter's name, drawn visually hidden.
@@ -2150,6 +2174,9 @@ The glyph is hidden from assistive technology and the tone is colour alone, so `
 `InfoStrip` draws a read-only strip of current values under a kicker.
 `label` is required and is the kicker, which names the group.
 `facts` is required and is `{ icon?, label?, value }[]`: `icon` is Font Awesome classes for a decorative glyph hidden from assistive technology, `label` and `value` are final display text, and a fact whose meaning rests on its glyph needs a `label`.
+A fact takes no other member: `props`, which the component would spread onto the fact as attributes, is dropped from a copy of every fact on `mount` and on `update` and is never written.
+A `data-action`, a `class`, a `title` or an `aria-label` there reaches no element, and your own object is unchanged.
+Put a hook or a tooltip on your own `target` element, and carry each fact's meaning in its `label` and `value` text.
 `badge` is `{ label, tone }` or `null`, with `tone` one of `positive`, `warning`, `danger`, `info`, `neutral` and `accent`.
 
 ### Kicker
@@ -2198,6 +2225,7 @@ Pass sentence case.
 `children` is a content slot whose element is a `<div>`; the rail draws the content slot's children in a column it spaces, the first a little further below the label.
 A child that draws nothing still takes its gap, so remove or hide an empty one.
 The rail draws no box, fill or padding.
+It is lazy, so `mount('Rail', …)` throws `"Rail" is not loaded` until `load(['Rail'])` has resolved, as [Mounting, updating and destroying](#mounting-updating-and-destroying) describes.
 The label takes `Kicker`'s ink, size, weight and tracking, so the same four grounds apply; it inherits `target`'s face and line height, which a `Kicker` states for itself.
 It is not a heading.
 The rail never moves its content slot while it is requested.
@@ -2230,16 +2258,15 @@ Where no level-3 heading fits, draw your own heading above the panel and pass `h
 `hint` is optional final display text, the sentence beneath the title.
 Pass a title, a hint or both; with neither the panel is an empty box.
 `icon` is optional Font Awesome classes for a glyph tile above the title, hidden from assistive technology; absent, no tile is drawn.
-`filtered` is `true` or `false`: `true` draws the quieter panel for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
+`filtered` is `true` or `false`: `true` draws the plain panel, in the muted ink, with no tile or title, for filters that match nothing, which is not an absence of content, so pass `hint` alone with it.
 The hint is plain text, so a search term in it takes no emphasis.
 `children` is a content slot whose element is a `<div>`; the panel draws the content slot's children under the hint, centred, in the column it spaces.
 It is the way out of the dead end, a control or a link; what is drawn there is your own, and a control you draw there is named by you.
 Content there inherits the panel's quiet ink and centred alignment, not `target`'s, so state the ink of any text you draw there.
 It has no role and no name and is not a live region: when a list empties in answer to an action, the announcement is yours.
 It draws no fill, so it sits on `target`'s ground.
-The title clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
-The hint is the quiet ink, which falls short of that floor on every ground in six of the seven palettes, so pass a `title` that says what is absent where a level-3 heading fits, and where one does not, keep the hint to a sentence the surrounding text already says.
-At `filtered` the hint takes the muted ink and clears the floor on the title's four grounds.
+The title inks `--fab-text`, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2`, `--fab-surface-soft` over `--fab-bg-2` and `--fab-bg-3` in every palette.
+The hint inks `--fab-text-muted` on every variant, which clears the 4.5:1 small-text floor on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2` in every palette.
 The title states its own serif face, and the hint inherits `target`'s.
 The panel's own figures are private.
 The panel never moves its content slot while it is requested.
@@ -2274,23 +2301,37 @@ It is a live region, `role="status"` with `aria-live="polite"`: a change to its 
 An `update` that changes none of its text announces nothing.
 Mount it when the thing happens and destroy it when it no longer holds, never as standing text.
 Every mount is a new announcement, so when your content is drawn again with nothing new to report (a navigation provider's `mount` called again, a DialogV2 or Handlebars re-render), keep the notice through `update` where its `target` survives and do not mount an unchanged one again.
-It moves no focus, and takes none except on its action button; where the act that caused it also moves focus, move focus first and mount the notice after, because a focus change cancels polite speech.
+It moves no focus, and takes none except on its action button and its dismiss control; where the act that caused it also moves focus, move focus first and mount the notice after, because a focus change cancels polite speech.
 Several may be shown at once, stacked; Fabricate arbitrates nothing between them, and a notice that interrupts is not published at version 1.
 Foundry announces nothing of its own, so nothing else speaks for a notice, and one in a minimised window or behind a modal dialog is not announced.
 Fabricate removes no notice on a timer, so if you do, give a notice that carries an action no time limit.
 The button's label is part of the live region: an `update` that changes it is announced, by some screen readers together with the whole notice, so change it only to report a change of state.
 An `update` that keeps `action` and `onAction` keeps the same button, so focus stays on it.
 An `update` that omits `action` or `onAction`, and `destroy`, remove a button that may hold focus, so where it does, move focus first, as [Ownership and theme](#ownership-and-theme) states.
-The button is the only focusable element inside `target`, so `target.querySelector('button')` reaches it.
-In a host that replaces its content on render (DialogV2, a Handlebars part) the button is a new element after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus the button.
-The keyboard ring is the accent, 2px outside the button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
-It draws no dismissal at version 1, so remove it with `destroy`.
+The action button is the first `button` inside `target` and the dismiss control the last, so `target.querySelector('button')` reaches the action and the last of `target.querySelectorAll('button')` the dismissal.
+Reach them by that order and not by a `data-notice-*` name, which is the notice's own and private.
+In a host that replaces its content on render (DialogV2, a Handlebars part) the action button is a new element after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus the action button.
+The keyboard ring is the accent, 2px outside each button and inside the notice's own padding, and clears 3:1 against the notice's fill on the four grounds the label clears.
+`dismissable` is optional, `true` or `false`, and draws a dismiss control after the action.
+`dismissLabel` is required while `dismissable` is truthy; it names the control and says what is dismissed, and is never white space alone.
+`onDismiss` is required while `dismissable` is truthy, and is called with no argument, once, when the control is pressed by pointer, Enter or Space, while it still holds focus.
+Escape dismisses nothing.
+The control's face is the xmark glyph alone; no tooltip shows its name.
+Dismissal is final for the mount.
+In `onDismiss`, move focus to the destination [Ownership and theme](#ownership-and-theme) orders, starting at the next control, since the press leads nowhere, and then call `destroy`.
+Where no sensible next control exists, focus `target`'s container or the control that opened the notice.
+Removing the focused dismiss button drops focus to `body`, where Foundry's Escape closes every open window, so move focus to a control before `onDismiss` returns.
+An `update` after dismissal is validated, returns `true` and draws nothing.
+Until `destroy`, `target` still holds the mount, so a `mount` into it throws `target already holds a published component`.
+A notice is shown again only by a new `mount`, which is a new announcement.
+An `update` that clears `dismissable` removes a control that may hold focus, so move focus first.
 The title clears the 4.5:1 small-text floor at every tone on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
 The detail is the muted ink over the tone's fill, and clears that floor in every palette only at `danger`, on `--fab-bg-0`, `--fab-bg-1` and `--fab-surface`.
 At `warning`, `info` and `success` the detail falls short of it on `--fab-bg-1`, a Fabricate window's own ground, in up to four of the seven palettes, the default among them; at every tone it falls short on `--fab-bg-2`, so inside an `InspectorCard`, and on `--fab-bg-3`.
 So say in `title` whatever the reader must not miss.
 The action button's label clears the 4.5:1 small-text floor at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3` or on a tinted fill over any of them, so never mount a notice with an action inside a tinted panel of your own.
 Its tile is under 3:1 against the notice's fill in every palette, so the label alone marks it as a control: pass a verb phrase.
+The dismiss glyph clears 3:1 against its tile at every tone, at rest and under the pointer, on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and not on `--fab-bg-3`.
 It inherits `target`'s face, and outside the Manager its button takes Foundry's own button face.
 The notice's own figures are private, and so are its `accent` tone and what it draws for a tone outside its set.
 Rest `data-*` is for your own hooks.
@@ -2329,6 +2370,31 @@ const notice = fabUi.mount('Notice', {
 // Move focus only where the button holds it: the write that clears the hold reaches every client.
 if (target.contains(target.ownerDocument.activeElement)) rollControl.focus();
 notice.destroy(); // Fabricate moves no focus.
+```
+
+A worked dismissal follows: a notice the reader may close, which hands focus to your own next control.
+
+```javascript
+// After `load(['Notice'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the dismissal refuses these props: draw no dismiss control there.
+const dismissing = fabUi.describe('Notice').props.onDismiss?.kind === 'callback';
+
+const saved = fabUi.mount('Notice', {
+  target,
+  props: {
+    tone: 'success',
+    title: 'The recipe is saved.',
+    ...(dismissing && {
+      dismissable: true,
+      dismissLabel: 'Dismiss the saved-recipe notice',
+      onDismiss() {
+        nextControl.focus(); // The press leads nowhere, so focus moves on before the notice goes.
+        saved.destroy();
+      },
+    }),
+  },
+});
 ```
 
 ### Button
@@ -2483,11 +2549,12 @@ Answer its press with the reason, in a `Notice` or a notification of your own, a
 Say that a setting is unavailable in the visible text `aria-describedby` points at too, so it is heard when the switch takes focus, not only after a press.
 `StatusToggle` needs a Fabricate window ancestor, so its root is `fabricate`, and its track is drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the switch is refused there with `StatusToggle needs a Fabricate window ancestor`.
-Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 20px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
+Foundry gives a button a minimum height of 2em of its own font size, so in a Foundry window the switch's button is 24px tall at an inherited font size of 12px or less and 2em tall above that; where Foundry resizes buttons by container it follows that rule instead (2rem inside a `.standard-form` or a dialog's button row, 2.5rem for a direct child of a form footer), and the 22px track is centred in the button; give `target` `display: flex` and `align-items: center`, and centre your own label against the switch.
 The button is the only element Fabricate draws directly in `target` and the only focusable one, so `target.querySelector('button')` reaches it.
 An `update` keeps the same button, so focus stays on it while its state changes; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
 The keyboard ring is the accent, 2px wide and 2px clear of the button, so it reaches 4px beyond it on every side; leave that much inside any edge of your own that clips.
 The switch states whether it is on to assistive technology with `aria-pressed`; how it looks does not carry the state on its own.
+Under forced colours the switch draws in system colours and keeps its state visible.
 Give a switch you mount inside a `.tabs` element no `data-group`, because Foundry's `changeTab` writes `aria-pressed` and toggles `active` on every button inside a `.tabs` element of that window whose own `data-group` names the tab group it changes.
 Its track and knob sizes, its button's width, its 78px cap, its colours beyond what this section states, and what it draws for an `on` value other than `true` or `false` are private.
 Rest `data-*` is for your own hooks; name them for your module, as `data-<module-id>-…`.
@@ -2520,24 +2587,267 @@ const props = () => ({
 const toggle = fabUi.mount('StatusToggle', { target, props: props() });
 ```
 
+### Stepper
+
+`Stepper` draws the design system's stepper: a native `<input type="number">` between a decrement and an increment `<button>`, for a number the user types or steps.
+The input is the control, so the number is always typeable.
+`value` is required and is the finite number the stepper holds.
+A `value` that is not a finite number is outside the contract, and what is drawn for it is private.
+`ariaLabel` is required and is the input's name, final display text naming the quantity, as "Days to credit".
+`decrementLabel` and `incrementLabel` are required and name the two buttons from the same words: "Decrease days to credit", "Increase days to credit".
+The buttons' faces are a minus and a plus glyph alone, and no tooltip shows either name.
+Draw the quantity's name as visible text beside the stepper, and make `ariaLabel` contain those words.
+A name of white space alone leaves the control with no name, so never pass one.
+To return focus to a stepper, focus its input, `target.querySelector('input')`.
+`min` and `max` are optional finite numbers, the inclusive bounds; an absent one leaves that side open.
+`step` is an optional positive number, `1` when absent, which each button press adds or removes exactly; the Up and Down arrow keys and the wheel over the focused input move the input to the next point of the grid `min + k·step`, counted from the browser's step base when `min` is absent, so a number off that grid is reported as such.
+Outside this, what is drawn for `min`, `max` or `step` is private.
+The arrow keys and the wheel step to the next point on the grid from `min`, which is not always `value ± step`, so check what you are given.
+`onChange` is a required callback, called with one argument, a number, each time an edit leaves the input holding a number that differs from `value`: a button press, an arrow key, a turn of the wheel over the focused input, or a keystroke; and again when the input loses focus holding such a number, so if you refused the earlier call you are told again.
+Losing focus includes the input leaving the document as its window closes or a Foundry 14 window detaches, so do not assume the window is open when `onChange` runs; a mount you have destroyed reports nothing.
+The argument is the number edited, clamped to `min` and `max` and not rounded to `step`, so if you hold whole numbers, round it and pass your own value back.
+Pass an accepted value back in the same `onChange` handler, before any `await`; a later `update` draws after the field has shown the held value.
+An edit that clamps to `value`, leaves the input empty or leaves it holding no number is not reported.
+`onChange` is spelt in camel case, unlike `Button`'s and `StatusToggle`'s `onclick`.
+The input changes itself first: what the user types or steps shows at once, and a button press shows the new number when your `update` passes it.
+To refuse a number, pass `value` unchanged.
+The input shows what was typed until it loses focus, and Fabricate then replaces it with `value`, so say why in a live region of your own.
+Fabricate announces nothing when it restores a refused value; explain a refusal in your own live region.
+At `min` the decrement button, and at `max` the increment button, is natively disabled and dimmed, which takes it out of the tab order.
+Before an `update` that brings `value` to a bound, if the button toward that bound holds focus, move focus to the input, `target.querySelector('input')`, in the same handler.
+The stepper has no unavailable state at version 1 beyond its bounds.
+Do not draw a quantity the user cannot change right now as a stepper: destroy it, moving focus first if one of its parts holds it, and show the number as text of your own.
+Answer a refused edit in text of your own, in a live region.
+The input takes the keys a number field takes, Up and Down among them; the buttons are pressed by pointer, Enter or Space and never submit.
+The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so mount the stepper in no `<form>`, Foundry's or your own.
+`Stepper` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Stepper`.
+`Stepper` needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager and the player window; give `target` `display: flex` and align your own label to the stepper by centring.
+Your own window or dialog carries no Fabricate root, so the stepper is refused there with `Stepper needs a Fabricate window ancestor`.
+The input and the two buttons are the only focusable elements inside `target`.
+An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so leave no room for it, provided nothing of your own clips inside the stepper's box.
+Its sizes, glyphs, colours, and what it draws for a `value`, `min`, `max` or `step` outside its contract or for `min` above `max` are private.
+
+A worked stepper follows: a number of days to credit, which you hold in whole days and refuse below one.
+
+```javascript
+// After `load(['Stepper'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the stepper describes none: draw your own number field there.
+if (fabUi?.describe?.('Stepper')?.props.onChange?.kind !== 'callback') return;
+
+// Your label beside `target`, in the same Fabricate window: <span>Days to credit</span>,
+// and a live region of your own for a refusal: <p id="acme-credit-note" aria-live="polite"></p>.
+const note = target.ownerDocument.getElementById('acme-credit-note');
+target.style.display = 'flex';
+target.style.alignItems = 'center';
+const MOST_DAYS = 30;
+let days = acmeCredit.days;
+const props = () => ({
+  value: days,
+  max: MOST_DAYS,
+  ariaLabel: 'Days to credit', // The words your label draws.
+  decrementLabel: 'Decrease days to credit',
+  incrementLabel: 'Increase days to credit',
+  onChange: (next) => {
+    const whole = Math.round(next); // The argument is not rounded to the step.
+    if (whole < 1) {
+      // Pass nothing new: the input shows the typed number until it loses focus, then `days`.
+      // Fabricate announces nothing as it restores `days`, so your live region says why.
+      note.textContent = 'Credit at least one day.';
+      return;
+    }
+    note.textContent = '';
+    const input = target.querySelector('input');
+    const focused = target.ownerDocument.activeElement;
+    // The increment button disables at the bound, so move focus off it first.
+    if (whole === MOST_DAYS && focused !== input && target.contains(focused)) input.focus();
+    days = whole;
+    acmeCredit.days = days; // Your own state first.
+    // Every prop again, with the new `value`, in this handler and before any `await`:
+    // a later `update` draws after the field has shown the held value.
+    stepper.update(props());
+  },
+});
+const stepper = fabUi.mount('Stepper', { target, props: props() });
+```
+
+### SearchField
+
+`SearchField` draws the design system's search field: a native `<input type="search">` inside a `<label>` root that also draws a decorative glyph, for a query that narrows a list already on screen and commits nothing.
+The input is the only focusable element inside `target`, so to return focus to the field, focus `target.querySelector('input')`.
+`value` is the query, a string, and is `''` when absent.
+A `value` that is not a string is outside the contract, and what is drawn for it is private.
+It is a `value` prop: the field changes it itself as the user types, and an `update` that omits it keeps the current query, so you need not pass the query back on every `update`.
+`onValueChange` is called with two strings, `(next, previous)`, each time an edit of the user's changes the query: a keystroke, a paste or a cut, and a clear the browser makes from the field's cancel button or on Escape, which reports `''`.
+Whether the browser draws a cancel button or clears on Escape is the browser's: Chromium, and so Foundry's desktop app, does both.
+It is not called by `mount`, `update`, Enter or the field losing focus.
+To refuse or transform a query, pass the query you keep back through `update` before the call returns, and the field shows it before the user's `input` event has finished dispatching; the replaced query moves the caret to the end and ends any IME composition in progress.
+`placeholder` is optional final display text shown while the field is empty, and is not the field's name.
+`ariaLabel` is required and is the input's name, final display text naming what is searched, as "Search recipes".
+The field draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
+The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
+
+- Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
+- In a DialogV2 that wants Enter to confirm, handle Enter in your own listener above `target`, because the field cancels the form's implicit submission.
+- It stops the propagation of no key: every key reaches your listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where [Ownership and theme](#ownership-and-theme) says so.
+- In a DialogV2, Escape clears the query and closes the dialog; stop it in your own `keydown` if you must keep the dialog open.
+
+Rest `data-*` props land on the `<label>` root, never on the input, so no rest name is reserved.
+`SearchField` needs a Fabricate window ancestor, so its root is `fabricate`, and it is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, so give `target` `display: flex`.
+Your own window or dialog carries no Fabricate root, so the field is refused there with `SearchField needs a Fabricate window ancestor`.
+The keyboard mark is the design system's text-field variant for a field whose wrapper draws the box: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own, so leave no room for one.
+An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced; `destroy` removes it, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+Its sizes beyond its height and corner, its glyph and colours beyond what this section states, and what it draws for a `value` that is not a string are private.
+`label`, `ariaLabelledBy`, `density`, `icon`, `onChange` and `inputProps` are not published at version 1, so a `class` or any of those is refused as a rest prop.
+
+A worked search field follows: a filter over your own list of recipes, which you hold trimmed.
+
+```javascript
+// After `load(['SearchField'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the value prop describes no search field: draw your own there.
+if (fabUi?.describe?.('SearchField')?.props.value?.kind !== 'value') return;
+
+// Your text above `target`, in the same Fabricate window: <span>Search recipes</span>.
+target.style.display = 'flex';
+const props = () => ({
+  ariaLabel: 'Search recipes', // The words your text draws.
+  placeholder: 'Name or tag',
+  onValueChange: (next) => {
+    const kept = next.trimStart(); // Your own rule for the query.
+    if (kept !== next) search.update({ ...props(), value: kept }); // Before any `await`.
+    acmeRecipes.filter(kept); // Your own list narrows; the field commits nothing.
+  },
+});
+const search = fabUi.mount('SearchField', { target, props: props() });
+// Later, to clear the query from your own reset control:
+search.update({ ...props(), value: '' }); // Draws `''` without calling `onValueChange`.
+const query = search.value('value'); // The query the field holds now.
+```
+
+### Select
+
+`Select` draws the design system's select: a `<button>` trigger with `role="combobox"` that opens a list of options in an overlay, for one choice from a short, known set that commits as it is made.
+The trigger is the only focusable element inside `target`, so to return focus to the select, focus `target.querySelector('button')`.
+`options` is required and lists the choices in drawn order, each `{ value, label }`: `value` is a string or a number, unique as a string, and `label` is required final display text, the option's whole accessible name and what the trigger shows while it is chosen.
+Two values that are the same string, such as `1` and `'1'`, are outside the contract, because the list cannot draw two rows that share one.
+Opening the list then ends the mount as a fault, which empties `target` and reports to `onFault`, as [Mounting, updating and destroying](#mounting-updating-and-destroying) states.
+A member other than `value` and `label` is private, and an empty `options`, which `mount` and `update` both accept, opens a list that draws nothing and says nothing, so do not offer an empty select.
+`value` is the chosen option's `value`, matched by `===`, so `25` and `'25'` differ; absent, `null`, or matching no option, the trigger shows `placeholder`.
+A `value` that is neither a string, a number nor `null` is outside the contract, and what is drawn for it is private.
+`onChange` is a required callback, called with one argument, the chosen option's `value` exactly as `options` passed it, so a number stays a number, each time the user chooses an option by pointer or by Enter, the option already chosen included.
+It is not called by `mount`, `update`, opening or closing the list, Escape or an outside press.
+The select changes nothing itself: the trigger shows the new choice when your `update` passes it as `value`, so to refuse a choice, pass `value` unchanged.
+`ariaLabel` is required and names the trigger and its list, final display text naming the choice, as "Rows per page".
+The select draws no caption, so draw the same words as visible text beside it, and never pass a name of white space alone, which leaves the control with no name.
+`placeholder` is optional final display text the trigger shows while no option is chosen, and is not the select's name.
+`size` is `form`, `inline` or `toolbar`, and defaults to `form`: the 38px trigger on `--fab-surface-soft`, the 30px trigger on `--fab-bg-2` for a row, and the 34px trigger on `--fab-bg-1` for a toolbar, each with its own list width.
+
+- A press on the trigger opens the list and a second press closes it; Enter and Space press the trigger as they press any button, except that Enter while an option is active chooses it and Space inside a run of typed characters is typed.
+- While the list is closed, ArrowDown and Home open it at its first option, ArrowUp and End at its last, Alt with ArrowDown opens it with no option active, and a printable character opens it at the next option whose label starts with what has been typed.
+- While it is open, ArrowUp, ArrowDown, Home, End and a printable character move the active option, which the trigger names with `aria-activedescendant`, and Enter chooses it; focus stays on the trigger throughout, and the chosen option carries a tick and a fill.
+- Escape and a press outside the list close it without choosing; a choice closes it and returns focus to the trigger.
+- The trigger stops the propagation of every key pressed while it holds focus, so your listener above `target` receives no key from it, and while the trigger holds focus Foundry's Escape keybinding closes no window, an open ApplicationV1 `Dialog` included, because that dialog listens for Escape on the document, which the key never reaches.
+- Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the trigger still closes the list, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
+
+The list is the component's overlay, so `describe('Select').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the list's hidden live region is clipped only under a `.fabricate` ancestor.
+The list opens against the trigger, and its placement inside the host is private.
+`Select` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of Select`.
+`Select` needs a Fabricate window ancestor, so its root is `fabricate`; its trigger's height, corner, type size, weight and fill are drawn the same in the Manager and the player window, and its typeface and line height are inherited under the Manager and are Foundry's own button face elsewhere, as for every select of Fabricate's own.
+Your own window or dialog carries no Fabricate root, so the select is refused there with `Select needs a Fabricate window ancestor`.
+The keyboard mark is the trigger's own: while it holds focus by keyboard its 1px border takes `--fab-accent-border` and no ring is drawn, so leave no room for one.
+An `update` keeps the trigger, so focus stays on it, and an `update` while the list is open redraws the list in place; `destroy` removes the trigger and closes the list, so where the trigger holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
+A select is drawn only in a Fabricate window, which gives you no signal when Foundry 14 moves it to or from a detached window, and needs none: each list opened after the move is placed and heard in the window that then holds the trigger, as [Overlays](#overlays) states.
+Its sizes beyond each rung's height and corner, its tick, chevron and colours beyond what this section states, what it draws for a member of `options` other than `value` and `label` or for a `value` outside its contract, and the list's placement and width are private.
+`label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, so a `class` or any of those is refused with `"<key>" is not a prop of Select`.
+
+A worked select follows: a page size for your own list of recipes, which you hold as a number.
+
+```javascript
+// After `load(['Select'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the select describes none: draw your own control there.
+if (fabUi?.describe?.('Select')?.overlays !== true) return;
+
+// Your text beside `target`, in the same Fabricate window: <span>Rows per page</span>.
+target.style.display = 'flex';
+let pageSize = acmeRecipes.pageSize;
+const props = () => ({
+  options: [
+    { value: 10, label: 'Ten rows' },
+    { value: 25, label: 'Twenty-five rows' },
+  ],
+  value: pageSize,
+  ariaLabel: 'Rows per page', // The words your text draws.
+  size: 'inline',
+  onChange: (next) => {
+    pageSize = next; // A number, as `options` passed it.
+    acmeRecipes.setPageSize(pageSize); // Your own state first.
+    select.update(props()); // Every prop again, with the new `value`.
+  },
+});
+// Omit `overlayHost` to draw the list in the Fabricate window around `target`.
+const select = fabUi.mount('Select', { target, props: props() });
+```
+
+### StageBars
+
+`StageBars` draws how far a staged process has come: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value; it draws no control.
+`stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
+So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
+A member other than `name`, `label` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
+`currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
+`numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
+A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so keep each name short.
+`ariaLabel` is required and names the group, final display text, as "Forging progress".
+It also names the one bar of a one-stage list whose stage has no label or name.
+Rest `data-*` attributes land on the group root.
+`StageBars` needs no Fabricate ancestor, so its root is `any`, and it draws the same under any ancestor.
+It is not a live region: an `update` redraws the bars in place and announces nothing.
+Its track height and corner, its gaps, its caption's face, size and ink, each tone's colours, and what it draws for a `currentIndex` outside the list are private.
+`ariaLabelledBy` is not published at version 1, so it is refused with `"ariaLabelledBy" is not a data attribute`.
+
+A worked stage group follows: the stages of your own forging project, each named by its own title.
+
+```javascript
+// After `load(['StageBars'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+if (!fabUi?.components.includes('StageBars')) return;
+
+// Your heading above `target`: <h3>Forging progress</h3>.
+const props = () => ({
+  ariaLabel: 'Forging progress', // The words your heading draws.
+  currentIndex: acmeForge.stage,
+  stages: acmeForge.stages.map((stage) => ({ name: stage.title, value: stage.percent })),
+});
+const bars = fabUi.mount('StageBars', { target, props: props() });
+// After your own stage advances, pass every prop again.
+bars.update(props());
+```
+
 ### The descriptor
 
-`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load }`.
+`api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
-`describe(name)` returns a frozen `{ version, props, rest, root }`, where each prop is `{ kind, required }`, `rest` says whether the component takes `data-*` attributes and `root` is the Fabricate ancestor its `target` needs; it returns `null` for a name that is not published.
-A prop's `kind` is `data`, `text`, `slot`, `callback` or `aria`.
+`describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes, `root` is the Fabricate ancestor its `target` needs and `overlays` says whether it opens an overlay, described under [Overlays](#overlays); it returns `null` for a name that is not published.
+A prop's `kind` is `data`, `text`, `slot`, `callback`, `aria` or `value`.
+`requiredWhen` is present only where a prop is required while another is truthy, and names that other prop; `required` is then `false`.
 A `data` prop takes plain data, and the component receives a copy.
 A `text` prop takes a string, which Fabricate draws as plain text inside the component and never reads as HTML; the element Fabricate wraps it in is private.
 A `text` prop that is `undefined`, absent or `''` is omitted, so the component's own fallback applies; a required one refuses `''`.
 A `slot` prop is a content slot, a place where the component draws your own content.
 It takes `true` to request the content slot and `false`, `undefined` or absence to omit it, and it is never required.
 A `callback` prop takes a function, and `undefined` or absence omits it, so the component's own default applies.
-A required `callback` prop refuses absence and `undefined` with `<name> requires a non-empty "<key>"`, and any value that is not a function, `''` included, with `"<key>" must be a function`.
+A required `callback` prop refuses absence and `undefined` with `<name> requires a non-empty "<key>"`, and one whose `requiredWhen` names a prop that is truthy refuses them with `<name> requires a non-empty "<key>" when "<other>" is truthy`; either refuses any value that is not a function, `''` included, with `"<key>" must be a function`.
 The component holds one stable stand-in for your function for the life of the mount, so an `update` that passes another function re-renders nothing and the next call reaches the newest function.
-Fabricate calls your function with the arguments the component's section states, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
+Fabricate calls your function with the arguments the component's section states, or, for a value prop's `on<Key>Change`, `(next, previous)`, in that order, and with nothing else: each is a plain copy, and no event, DOM node or Fabricate object is passed.
 The call is synchronous, inside the user's event, after the component has finished its own state change; a published callback is never called while Fabricate renders or runs an effect.
 It runs under Fabricate's `untrack`, which covers Fabricate's runtime only, so if you are called back inside an effect of your own, untrack your own reads.
-Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush.
+Your function may call `update` or `destroy` on its own handle, or `mount`, before it returns; an `update` made there is drawn on Fabricate's next flush, except that a value it changes is drawn before the call returns.
 After `destroy`, a fault, or an `update` that omits the prop, Fabricate does not call the function again; a required prop cannot be omitted, so an `update` that omits it throws and the earlier function still answers.
 Detect a callback prop with `describe(name).props[key]?.kind === 'callback'`, because a Fabricate that predates it refuses the prop.
 An `aria` prop is an ARIA attribute Fabricate writes, under the prop's own name, on the control the component's section names; the component declares no prop of that name.
@@ -2548,22 +2858,43 @@ Fabricate writes the attribute only when the value differs from the one it last 
 Fabricate checks no value against the attribute's own set: the component's section states the accepted values, and any other is private.
 Detect an `aria` prop with `describe(name).props[key]?.kind === 'aria'`, because a Fabricate that predates it refuses the prop.
 A camel-case prop is one the component interprets, and a hyphenated `aria-*` prop is an attribute Fabricate writes under that name; a control's name is carried by the prop its section names, and by the text that an `aria-labelledby` prop its section names points at.
+A `value` prop is a value the component binds and may change itself, such as the text of a search field.
+It takes a string, a number, a boolean or `null`, and anything else throws `"<key>" must be a string, number, boolean or null`; `undefined` or absence means you pass none, so the mount starts at the component's own initial value, which its section states.
+A `value` prop is never required.
+Each `value` prop brings an optional callback prop named `on`, the prop's name with its first letter upper-cased, then `Change`: `query` brings `onQueryChange`.
+`describe` lists the value prop as `{ kind: 'value', required: false }` and directly after it that callback as `{ kind: 'callback', required: false }`.
+Fabricate calls it with `(next, previous)` only when the component changes the value itself, once per change, and never when the two are the same by `Object.is`; `mount` and `update` never call it.
+A component that clears a value to `undefined` changes it to its initial value, so `next` is never `undefined`.
+Inside the call, `handle.value(key)` already answers `next`.
+A throw from it is reported as any callback's is, under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+Inside that call, an `update` with the same value changes nothing, and one with another value is drawn before the call returns and wins, with no second call, so you can reject, revert or transform what the user typed; one made later shows on the next flush, so the user briefly sees their own text first.
+A replaced value moves a text input's caret to the end and ends any IME composition in progress.
+`handle.value(key)` reads a value prop's current value, and answers `undefined` for any other prop and after `destroy` or a fault; `null` is a legal value.
+Detect both before you rely on them, because a Fabricate that predates a value prop refuses it:
+
+```javascript
+const bound = fabUi.describe(name)?.props[key]?.kind === 'value';
+const readable = typeof handle.value === 'function'; // `handle` is what `fabUi.mount(...)` returned.
+```
+
 An ARIA attribute is published only as an `aria` prop a component's section names.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless a component's section names the prop (`StatusToggle`'s section names `aria-labelledby`); publishing one later is additive.
 `mount(name, options)` draws a component and `load(names)` loads its code first; both are described under [Mounting, updating and destroying](#mounting-updating-and-destroying).
+`mountMany(name, items)` draws one component into several targets, as [Mounting several at once](#mounting-several-at-once) describes.
 `typeof fabUi.load === 'function'` also says that `mount` honours `onFault`.
-Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive.
+Treat an unknown name, member, prop kind or root as absent, and never assume the list is closed: adding a component, an optional prop, a descriptor member, a handle method or a prop kind, or widening a component's root, is additive, and so is adding a value to a prop's accepted values where the prop's section states that a value outside its accepted values draws as unset, as `Medallion`'s `tone` and `ink` do: a Fabricate that predates the value draws the unset render and refuses nothing.
+Where a section says nothing of a value outside a prop's accepted values, or calls what is drawn for it private, pass only the values that section lists.
 Narrowing a component's root is a breaking change.
 The rest names a component reserves are fixed for its `version`, and reserving another is a narrowing; `describe` does not state them, so read them from the component's section.
 A breaking change to one component bumps that component's `version`, keeps the old shape as a deprecated delegate for at least one minor release, and is announced in the release notes; `schemaVersion` changes only with the seam's own shape.
 
 ### Mounting, updating and destroying
 
-`mount(name, { target, props = {}, onFault })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
+`mount(name, { target, props = {}, onFault, overlayHost })` is synchronous and returns with the DOM in place; effects and the component's scoped stylesheet apply on Fabricate's next microtask flush.
 It renders on Fabricate's own Svelte runtime, so a companion's own Svelte version does not have to match it; Fabricate's premium companion builds against Svelte 5.56 or later.
-It returns a frozen `{ update(props), destroy(), slot(key) }`.
-Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction.
+It returns a frozen `{ update(props), destroy(), slot(key), value(key) }`.
+Fabricate draws the component's elements inside `target` and attaches no shadow root of its own, so they share `target`'s root node and an id reference resolves across the mount in either direction; the one exception is an open overlay's panel, which is drawn in its host.
 
 - `target` must be an element (checked by `nodeType`, so an element in a Foundry 14 detached window is accepted), must be empty, and must not hold a live mount.
   A component whose root is not `any` also needs that Fabricate ancestor above `target`: otherwise `mount` throws `<name> needs a Fabricate window ancestor` or `<name> needs a Fabricate manager ancestor`, before it claims the target.
@@ -2575,12 +2906,15 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   A component whose `rest` is `true` also takes `data-*` attributes holding a string, number or boolean, and any other rest key throws `"<key>" is not a data attribute`.
   Where a component's section says its rest lands on a control, `data-keyboard-focus`, `data-action`, `data-cursor`, `data-tooltip`, every name that starts `data-tooltip-`, and the two names Fabricate's own stylesheet reads off its buttons, `data-validation-focused` and `data-essence-sort-direction`, throw `"<key>" is reserved on <name>`.
   An `aria` prop holds a string, a number or a boolean, and anything else there throws `"<key>" must be a string, number or boolean`.
+  A `value` prop holds a string, a number, a boolean or `null`, and anything else there throws `"<key>" must be a string, number, boolean or null`.
 - `onFault` is optional, and is described with faults below.
+- `overlayHost` is optional, and is described under [Overlays](#overlays).
+  When it is passed, on any component, it must be an element of `target`'s own document (checked by `nodeType`), or `mount` throws `overlayHost must be an element in the target's document`, after the root check and before it claims the target.
 - Props are copied when you pass them, so mutating your object afterwards changes nothing.
-- `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts.
+- `update(props)` replaces the props, so an omitted prop falls back to the component's default, and nothing remounts; an omitted or `undefined` value prop keeps its current value instead.
   It is atomic: when it throws, the previous props stay rendered.
   It returns `true` once accepted and `false` after `destroy` or a fault.
-- `destroy()` is idempotent, never throws, and releases the target.
+- `destroy()` is idempotent, never throws, releases the target, and closes every overlay the mount holds open.
   Call it from your own cleanup, from an ApplicationV2 `_preClose` or `_onClose` (or before `super.close`), and on any re-render that replaces the target or its ancestors (in `_preRender`, or in `_onRender` before mounting again), because DialogV2 and Handlebars `_replaceHTML` replace their content on render; `destroy` works whether or not `target` is still in the document.
   It is safe after a fault, and still expected there.
   A mount that is never destroyed leaks for the life of the page, and keeps its slot elements, their content and every nested mount with it.
@@ -2589,9 +2923,11 @@ Fabricate draws the component's elements inside `target` and attaches no shadow 
   The element is a `<div>`, or a `<span>` where the component draws the content slot inside phrasing content; each component's section says which.
   It is created by `target.ownerDocument` and carries `display: contents` and no other attribute, so its children lay out as the component's own would.
   The element Fabricate holds it in is private.
+- `value(key)` returns a value prop's current value, and `undefined` for any other prop and after `destroy` or a fault.
 
 `mount` and `update` throw a `TypeError` whose message starts with `Fabricate | published components:` for a malformed request, and `mount` throws a plain `Error` ending `not registered` if Fabricate's runtime has not loaded.
-A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A `mount` before the `fabricate.ready` hook has fired throws `mount before ready`, a `mount` of a lazy component before `load` has resolved for it throws `"<name>" is not loaded`, and a required prop that is absent, or `''` where it is not a callback prop, throws `<name> requires a non-empty "<key>"`; `''` on a callback prop throws `"<key>" must be a function`.
+A prop whose `requiredWhen` names a truthy prop is refused the same way while that prop is truthy, with `<name> requires a non-empty "<key>" when "<other>" is truthy`; with several, the first prop `describe` lists is named.
 The full list of fixed messages is in the `ui-extension-points` specification's Published UI Components section.
 
 Fill a content slot by mounting a component of your own into its element, or by appending an element you own.
@@ -2635,7 +2971,7 @@ Any fallback copy is yours to draw.
 A teardown that throws while Fabricate unmounts is reported the same way, a microtask later.
 After such a teardown the target may still hold a node of Fabricate's, so empty it before mounting there again.
 A cleanup that throws while Fabricate tears a faulted component down is reported as that mount's fault, once, with the cleanup's error.
-A fault ends nested published mounts and detaches slot elements as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
+A fault ends nested published mounts, detaches slot elements and closes open overlays as `destroy` does; a nested mount is destroyed, not faulted, so its own `onFault` is not called.
 Keep your own reference to content you drew in a content slot and tear it down from `onFault`, because `handle.slot` answers `null` from then on.
 
 Pass `onFault(error)` to `mount` to be told of that fault.
@@ -2663,9 +2999,17 @@ A refusal that an `update` throws inside your function is reported the same way 
 A value that is not an array is read as one name.
 It never throws synchronously, and is callable as soon as `api.ui` is readable, before `fabricate.ready`.
 `api.ui` is readable from `setup` onward; in your own `init` it may not be bound yet.
-It resolves `undefined` once every named component's code is loaded, which today is the next microtask, and rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published.
+It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
+It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button` and `StatusToggle` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select` and `StageBars` were published with `load`, so call it for each before mounting.
+`Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
+A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
+A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
+Fabricate draws no pending state and no error state for a load, so draw your own until `load` settles and, when it rejects, your own error state, announced through your own live region.
+When the fetch failed because the browser runs a stale copy of Fabricate, Fabricate also shows its reload notice, shared with the Manager's so one shows at a time, and at most once per page session.
+A failure before Foundry has created its notifications, which a `load` made in `setup` can meet, shows that notice when Foundry's `ready` hook fires.
+Once loaded, a lazy component mounts, draws and behaves exactly as it would if Fabricate loaded it with its entry script.
 Call `load` once, keep the promise, and mount only after it has resolved and Fabricate is ready:
 
 ```javascript
@@ -2688,6 +3032,97 @@ async _onRender(context, options) {
 
 An ApplicationV2 `_onRender` may await the promise, but handle its rejection where you keep it: Foundry awaits `_onRender`, so a rejection there fails the render and skips the `render` hooks.
 A navigation provider's `mount` callback may not, because it returns synchronously, so content drawn there mounts its published components when the kept promise settles.
+
+### Mounting several at once
+
+`mountMany(name, items)` draws one component into several targets in one call, such as a `Meter` in each row of a list.
+`items` is an array, and each item is what you would pass `mount` as its options, `{ target, props, onFault, overlayHost }`.
+Each item has its own `onFault` and `overlayHost`, and nothing is shared across the call.
+It returns a frozen array of handles, one for each item and in the same order, and each handle is the one `mount` would have returned.
+An empty array returns a frozen empty array.
+Detect it with `typeof fabUi.mountMany === 'function'`.
+
+```javascript
+#meters = [];
+
+// In your ApplicationV2, once `fabricate.ready` has fired. `Meter` never needs `load`.
+// `#party` is your own list.
+_onRender(context, options) {
+  super._onRender(context, options);
+  const fabUi = game.fabricate?.api?.ui;
+  if (typeof fabUi?.mountMany !== 'function') return;
+  for (const handle of this.#meters) handle.destroy(); // A re-render replaced the old targets.
+  this.#meters = fabUi.mountMany(
+    'Meter',
+    this.#party.map((member) => ({
+      target: this.element.querySelector(`[data-hp-meter="${member.id}"]`), // Empty, and yours.
+      props: {
+        label: `${member.name}'s hit points`,
+        value: member.hp,
+        max: member.maxHp,
+        valueText: `${member.hp} of ${member.maxHp} hit points`,
+      },
+    }))
+  );
+}
+
+async _preClose(options) {
+  for (const handle of this.#meters) handle.destroy(); // Each handle is destroyed on its own.
+  await super._preClose(options);
+}
+```
+
+`mountMany` checks the whole call before it draws anything, so a refused call draws nothing and you correct it and call again.
+The first problem it finds is the one it throws, with the message `mount` would give.
+It checks the name first, as `mount` does, so it throws `not registered`, `mount before ready`, `"<name>" is not published`, or, for a lazy component before `load` has resolved for it, `"<name>" is not loaded`.
+It then throws `items must be an array` for anything that is not an array, a single item included, because it never reads one item as a list of one.
+It reads the length of `items` once and follows no iterator, so an item added while the call is checked is not drawn.
+It then checks each item in order exactly as `mount` checks its options, apart from the stale-mount case below.
+An item that is not an object, or a hole in the array, has no `target`, so it throws `target must be an element`.
+Two items that name the same `target` throw `target already holds a published component`.
+The check ends no earlier mount.
+A mount whose content you cleared without destroying it is ended only when its target's item is drawn.
+If that mount left a node in the target, `mountMany` throws `target must be empty`, where `mount` would end that mount first and draw.
+Destroy that mount's handle or empty the target before you call.
+A target you mean to place inside the content slot of another item of the same call is not inside it yet.
+A component that needs a Fabricate ancestor refuses that target, so mount the outer items first and the nested ones in a later call.
+A stale mount can also have a content slot that holds a later item's target, when an earlier item's draw ends that stale mount.
+The later item is still drawn, into the detached slot, where separate `mount` calls would refuse it for a component that needs a Fabricate ancestor.
+Mount nested targets in a later call.
+Once the call has been checked, a fault while one item renders is that item's own.
+Its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
+There is no call that destroys them all.
+Destroying one handle leaves the others live, so destroy each handle on every path that ends its mount.
+
+### Overlays
+
+A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog.
+`Select` is the first, and its section states what its list draws.
+`mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
+Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
+
+1. the `overlayHost` element you passed, while it is connected and in `target`'s document;
+2. else the nearest Fabricate window root above `target` (`.fabricate-manager`, `.fabricate-app`), or a Fabricate standalone layer;
+3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
+
+Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
+A component's section may narrow where `overlayHost` sits, and `Select`'s does: keep it inside the same Fabricate window as `target`.
+The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
+That element, the panel and everything in it are private: select none of it.
+The standalone layer, its class and its `data-fabricate-theme` copy are private too.
+The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
+An overlay listens for outside presses, Escape and scrolls on the document that holds it, and for resizes on that document's window.
+An overlay whose document has no window stays closed.
+An overlay opened from a published mount nested in another mount's content slot, or from inside another overlay's panel, takes the host chain of that mount or panel.
+`destroy` and a fault close every open overlay and remove its panel, its element and a standalone layer nothing else uses.
+On Foundry 14 Fabricate does not follow a mount from one window to another, so destroy it and mount again in `_onDetach` and `_onAttach`; that `destroy` closes any open overlay.
+Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
+
+```javascript
+// A positioned element of your own window; a Fabricate that predates overlays ignores it.
+const overlayHost = this.element.querySelector('.my-module-overlay-host');
+const handle = fabUi.mount(name, { target, props, overlayHost });
+```
 
 ### Ownership and theme
 
@@ -2714,7 +3149,7 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in; in Foundry a submit closes a DialogV2 and saves a document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -2724,7 +3159,7 @@ A published component draws a control only where its section says so, and each c
 - A control consumes only the keys the platform gives its native element, and its section names any other.
   Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
-- A control draws its own mark for keyboard focus where the component's `root` is `any`, and takes the Fabricate window's ring otherwise.
+- A control draws its own mark for keyboard focus where the component's `root` is `any`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
@@ -2764,7 +3199,7 @@ A published component draws a control only where its section says so, and each c
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.
-  A control whose face is a glyph alone is published only with a required prop for its name, and its section says whether the pointer is shown that name.
+  A control whose face is a glyph alone is published only with a prop for its name that is `required`, or `requiredWhen` the prop that draws the control, and its section says whether the pointer is shown that name.
 
 ## Data Persistence
 

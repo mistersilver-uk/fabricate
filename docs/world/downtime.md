@@ -20,6 +20,8 @@ Use the **Tracking**, **Activities**, **Factions**, and **Settings** tabs to exp
 Each tab describes a possible Fabricate Premium workflow and shows a compact example board.
 The **Subscribe on Patreon & download Fabricate Premium** button opens Fabricate's Patreon page in a new browser tab.
 
+{% include screenshot.html case="manager-world-downtime-tracking" caption="The Tracking tab of the preview." %}
+
 Each tab carries a padlock after its name, marking it as a Fabricate Premium feature.
 The padlock does not stop you opening the tab.
 Hover over a tab or focus it with the keyboard to see a short description of it above the tab.

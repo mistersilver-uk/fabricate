@@ -37,6 +37,7 @@
     COUNT_REPEAT_OPTIONS,
     countTestOptions,
   } from './countPoolOptions.js';
+  import { localizedOptions } from './checksSelectOptions.js';
 
   let {
     evaluation,
@@ -69,7 +70,9 @@
       .map((die) => ({ value: String(die), label: `d${die}` }))
   );
 
-  const TEST_OPTIONS = $derived(countTestOptions(under));
+  const TEST_OPTIONS = $derived(localizedOptions(countTestOptions(under), text));
+  const REPEAT_OPTIONS = localizedOptions(COUNT_REPEAT_OPTIONS, text);
+  const DESTINATION_OPTIONS = localizedOptions(COUNT_DESTINATION_OPTIONS, text);
   // Spelled out, so each hook a test or capture names is greppable in source.
   const FACE_HOOKS = {
     explode: 'data-check-count-explode-face',
@@ -80,12 +83,11 @@
   function faceOptions(rule, extremeKey, extremeFallback, face, target) {
     const active = faceChoice(rule);
     const options = [
-      { value: 'off', labelKey: 'FABRICATE.Admin.Manager.Checks.Count.FaceOff', fallback: 'Off' },
-      { value: 'extreme', fallback: text(extremeKey, extremeFallback).replace('{face}', face) },
+      { value: 'off', label: text('FABRICATE.Admin.Manager.Checks.Count.FaceOff', 'Off') },
+      { value: 'extreme', label: text(extremeKey, extremeFallback).replace('{face}', face) },
       {
         value: 'from',
-        labelKey: 'FABRICATE.Admin.Manager.Checks.Count.FaceFrom',
-        fallback: 'From a face',
+        label: text('FABRICATE.Admin.Manager.Checks.Count.FaceFrom', 'From a face'),
       },
     ];
     return options.map((option) =>
@@ -254,7 +256,7 @@
       <SegmentedControl
         fill
         density="field"
-        options={COUNT_REPEAT_OPTIONS}
+        options={REPEAT_OPTIONS}
         value={pool.explode.once ? 'once' : 'keeps'}
         groupName="check-count-explode-repeat"
         ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.RepeatTitle', 'Explode repeat')}
@@ -296,7 +298,7 @@
     <SegmentedControl
       fill
       density="field"
-      options={COUNT_DESTINATION_OPTIONS}
+      options={DESTINATION_OPTIONS}
       value={pool.modifierDestination}
       groupName="check-count-destination"
       ariaLabel={text(

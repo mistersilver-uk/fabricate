@@ -9,12 +9,16 @@
   | `tone` | `'danger'` \| `'warning'` \| `'info'` \| `'success'` \| `'accent'` | `'danger'` | Changes the edge, the fill, the glyph's ink and the title's ink, NEVER the geometry or type scale. An unknown tone falls back to `danger`, the unmodified specimen. |
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
   | `action` | `{ label, onClick?, description? }` | `null` | Rendered as one button when its `label` is a string with non-blank text and there is a function to call, its own `onClick` or else `onAction`; an already-localized `description` becomes the button's accessible description. |
-  | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
+  | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state, final for the mount, and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
 
   Callbacks:
   - `onAction(event)` — called on each press of the action button when `action.onClick` is not a
     function, which wins when both are. The published seam passes it, because a function inside
     `action` is refused there.
+  - `onDismiss()` — called once, with no argument, when the dismiss control is pressed: after
+    `dismissed` is set and before the flush, so the control still holds focus and the caller can
+    move it before the notice leaves the DOM. Optional, because an internal caller dismisses with
+    none.
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class`, and exists for test and screenshot hooks.
@@ -42,14 +46,16 @@
     host's `.app button` rule would otherwise set, for the same reason; the pair is held equal to
     the module ring by `tests/published-component-controls.test.js`.
 
-  Eight recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  Nine recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
   an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
   resolve to the same tone; the rest spread, whose hooks carry no behaviour; the body's 12rem
   basis capped at its text, which wraps the action beneath it in a narrow host (issue 1773);
-  `onAction`, a top-level callback beside `action.onClick` (issue 2452); and the action button's
-  default role at every tone, where the danger specimen draws the danger role (issue 2452).
+  `onAction`, a top-level callback beside `action.onClick` (issue 2452); the action button's
+  default role at every tone, where the danger specimen draws the danger role (issue 2452); and
+  `onDismiss` (issue 2452), because a dismissal that removes a focused control without telling the
+  caller breaks the "Fabricate moves no focus" contract.
 -->
 <script>
   let {
@@ -59,6 +65,7 @@
     icon = '',
     action = null,
     onAction = undefined,
+    onDismiss = undefined,
     dismissable = false,
     dismissLabel = '',
     blocking = false,
@@ -89,6 +96,13 @@
   /** What a press calls: `onClick` when it is a function, else `fallback` when it is one. */
   const pressOf = (onClick, fallback) =>
     [onClick, fallback].find((candidate) => typeof candidate === 'function');
+
+  /** One dismissal per mount: a second press before the flush calls nothing. */
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    onDismiss?.();
+  }
 </script>
 
 {#if !dismissed}
@@ -124,7 +138,7 @@
         data-keyboard-focus="true"
         data-notice-dismiss
         aria-label={dismissLabel || undefined}
-        onclick={() => (dismissed = true)}
+        onclick={dismiss}
       >
         <i class="fas fa-xmark" aria-hidden="true"></i>
       </button>

@@ -41,7 +41,8 @@ The essence filter offers **All essences**, **Carries any essence**, and **No es
 The category filter offers **All categories** and **No world category**, then one option per category in the world's category vocabulary in its order, then any other category a component already carries.
 It is left off the toolbar entirely on a world with no categories yet.
 **Sort by** offers **Name**, **System count**, and **Source type**.
-The list column runs edge to edge across the middle of the screen, so the toolbar, the rows, and the pager at the foot share the same left and right edges with nothing wasted around them.
+The list column runs edge to edge across the middle of the screen, so the rows and the pager at the foot share the same left and right edges with nothing wasted around them.
+The filter controls sit together in a bordered box at the top of the column, set in a little from the sides.
 **Membership** offers **Any system**, a pair of options naming whichever crafting system is currently selected in the rail, such as **Has rules in Mythwright Forge** and **No rules in Mythwright Forge**, and **In no system at all**, for a component no crafting system has adopted.
 
 The list itself opens with a drop zone for dragging in items, spanning the full width of the row, so it scrolls with the rows rather than sitting fixed above the toolbar.
@@ -156,6 +157,8 @@ It reads **Cannot delete** instead, and the note beside it names which component
 Choose **Open catalogue entry** on a selected row, or drop a new item onto the catalogue, to open a component's entry.
 The header band across the top carries **Back** and **Save entry**, with an **Unsaved changes** marker while a change is pending.
 Two tabs sit below it, **Catalogue entry** and **Validation**.
+
+{% include screenshot.html case="manager-component-edit-normal" caption="A component's catalogue entry." %}
 
 ### Identity
 
@@ -273,6 +276,9 @@ On a narrow window the rail moves below the tab strip and its cards instead of s
 
 Open a crafting system, then choose **Component Rules** in its rail to work on what a component does in that system.
 That is its category, its tags, its essences, its salvage setup, and, in Progressive mode, its difficulty.
+
+{% include screenshot.html case="manager-components-essence-chips" caption="A system's Component Rules, with each component's essences as chips." %}
+
 **Add from catalogue**, in the header, opens a picker listing every world catalogue component this system does not already hold.
 Each row names the component, states what kind of source it has, and says how many other systems have rules for it.
 Search by name and tick as many as you want, and the foot of the picker keeps count of how many are ticked.

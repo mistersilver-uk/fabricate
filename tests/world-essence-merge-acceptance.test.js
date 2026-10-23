@@ -21,8 +21,8 @@ installFoundryStubs();
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 /**
- * Three `crypto.randomUUID()`-shaped ids, which is what `adminStore.addEssence` mints and therefore
- * the commonest thing this pass retires.
+ * Three `crypto.randomUUID()`-shaped ids, which is what the system-side essence create minted before
+ * issue 2554 removed it, and therefore the commonest thing this pass retires.
  */
 const MINTED_B = 'ktz9qplm2xr4vb1a';
 const MINTED_C = 'w7yh2ndfs0jq6xe3';

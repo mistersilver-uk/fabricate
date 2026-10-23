@@ -20,9 +20,14 @@ const harness = createMountedComponentHarness({
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // …which reads the routed warnings off the routing model (issue 2511).
+    'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+    'src/utils/routedOutcomeKeywords.js',
+    'src/utils/failureResultPolicy.js',
     // …which reads a result choice group's problems through its edits (issue 1773).
-    'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/resultGroupEdits.js',
+    'src/ui/svelte/util/draftId.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
     'src/utils/rollFormulaRollability.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
@@ -418,6 +423,31 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.equal(target.querySelector('[data-issue="unroutedResultGroup"]'), null, 'no routed warning off check-mode');
     assert.equal(target.querySelector('[data-issue="unproducedOutcomeTier"]'), null);
     assert.equal(target.querySelector('[data-check="routedResultGroupsRouted"]'), null, 'no routed checklist entry off check-mode');
+    harness.remount();
+  });
+
+  // Issue 2513: a result set no ingredient set reaches, under ingredient routing.
+  it('lists an unreachable result set as a warning row that focuses that set', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipe: {
+        name: 'Routed Brew',
+        enabled: true,
+        ingredientSets: [{ id: 's1', resultGroupId: 'g-good' }],
+        resultGroups: [{ id: 'g-good' }, { id: 'g-orphan' }]
+      },
+      routingProvider: 'ingredientSet',
+      onSelectIssue: (...args) => {
+        calls.push(args);
+      }
+    });
+    const check = target.querySelector('[data-check="routedResultGroupsReachable"]');
+    assert.equal(check.dataset.satisfied, 'false');
+    assert.match(check.textContent, /Every result set is reached by an ingredient set/);
+    assert.ok(check.classList.contains('is-warn'), 'it reads as a warning, not a blocker');
+    check.querySelector('[data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(rowActionArgs(calls), [['results', 'result-group-g-orphan']]);
     harness.remount();
   });
 });

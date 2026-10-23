@@ -1,7 +1,9 @@
 /**
  * Mount the bulk edit shell in the manager's inspector rail, `?h=` px tall (520 by default), with the
  * set delete in its dock. `?armed` arms it, and `?card=recipe` gives it the recipe card's longest
- * impact list in its shipped copy; otherwise it carries the component card's two rows.
+ * impact list in its shipped copy; otherwise it carries the component card's two rows. `?frame=world`
+ * mounts it in a world catalogue's flush bulk scroller instead, styled by the frame's scoped CSS the
+ * suite adds under the `?scope=` hash class; `?view=` sets `data-manager-view`.
  */
 import { mount } from 'svelte';
 
@@ -9,6 +11,7 @@ import en from '../../../lang/en.json';
 import { installFixtureI18n } from '../select-fixture-shared.js';
 
 import BulkDockHost from './BulkDockHost.svelte';
+import { railMarkup } from './rails.js';
 
 installFixtureI18n(en);
 
@@ -40,13 +43,24 @@ const componentCard = {
   armedLabel: 'Confirm delete',
 };
 
+const height = Number(params.get('h') ?? 520);
 const host = document.createElement('div');
-host.style.cssText = `width:1200px;height:${Number(params.get('h') ?? 520)}px`;
-// The two empty bands stand for the manager's header rows, so the body lands in its `1fr` track.
-host.innerHTML =
-  '<div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">' +
-  '<div></div><div></div><div class="manager-body"><div class="manager-rail"></div><div class="manager-main"></div>' +
-  '<aside class="manager-inspector" data-probe-inspector></aside></div></div>';
+host.style.cssText = `width:1200px;height:${height}px`;
+// The system rail's two empty bands stand for the manager's header rows, so the body lands in its
+// `1fr` track.
+// The query strings never reach the markup: the frame is picked from a fixed pair, and the view and
+// the frame's hash class are written through the DOM after it is built.
+host.innerHTML = railMarkup({
+  frame: params.get('frame') === 'world' ? 'world' : 'system',
+  height,
+});
+const view = params.get('view');
+if (view) host.querySelector('.fabricate-manager').dataset.managerView = view;
+const scope = params.get('scope');
+if (scope) {
+  for (const node of host.querySelectorAll('[data-probe-column], [data-probe-inspector]'))
+    node.classList.add(scope);
+}
 document.body.append(host);
 
 mount(BulkDockHost, {

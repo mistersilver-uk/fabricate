@@ -48,6 +48,32 @@ A player sees which materials lead to which result before committing to the craf
 
 {% include screenshot.html case="player-crafting-ingredient-routed" %}
 
+### Tying ingredient sets to result sets
+
+In the recipe editor, every ingredient set and every result set is a card.
+Each card is headed by a small label for its kind, **Ingredient set** or **Result set**, and a name you can edit in place.
+An ingredient set card has a menu at the end of its heading with **Duplicate set** and **Remove set**.
+A result set card's menu has **Remove result set**.
+
+A result set's **Produced by** line names the ingredient sets that lead to it.
+Choose **Assign** to open a searchable list of every ingredient set in the recipe.
+A set that already leads to another result set shows where it goes today, for example "now → Plain blade".
+Choosing it moves it to this result set, and a set leads to one result set at a time.
+Choosing a set you have already assigned to this result set takes it off.
+
+An ingredient set you have not assigned anywhere still reaches the recipe's first result set, and the line marks it **default**.
+A default set has no remove button, because there is nothing assigned to remove.
+When more than one ingredient set leads to a result set, a note on the card says how many.
+Editing that result set's results changes what each of those ingredient sets awards.
+
+A result set that no ingredient set leads to shows **Nothing — unreachable** on its line, and its border turns to a warning color.
+It is never produced until you assign an ingredient set to it.
+If the recipe has no ingredient sets yet, the line asks you to add one first.
+The recipe's Validation tab also warns about such a result set.
+See [Checking your routing in the editor](#checking-your-routing-in-the-editor).
+The **Routing** card on the Overview tab lists every ingredient set beside the result set it produces.
+See [The routing overview](#the-routing-overview).
+
 ---
 
 ## Routed by check
@@ -86,7 +112,23 @@ See [System Overview]({% link crafting-systems/system-overview.md %}).
 ### How outcomes match results
 
 You can tie each result set to a specific outcome tier.
-In the recipe editor, the result set's **Produced on outcome** control lists the success tiers from the routed crafting check.
+In the recipe editor, the result set's **Produced by** line names the outcome tiers that lead to it.
+**Assign** opens a searchable list of the outcome tiers from the routed crafting check that can route.
+The success tiers are always listed.
+A tier you have marked as a failure is listed too, but only while the check's **Produce a result on a failed check** setting permits results on a failed check.
+See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
+
+A tier that already leads to another result set, by assignment or by name, shows where it goes today, for example "now → Plain blade".
+Choosing it moves it to this result set, and a tier leads to one result set at a time.
+Choosing a tier you have already assigned to this result set takes it off.
+A tier that reaches a result set by name, or because it is the recipe's only result set, shows on the line marked **default** and has no remove button, because there is nothing assigned to remove.
+Until any result set lists a tier, the list warns that assigning one stops the other tiers reaching a result set by default.
+
+A tier you have marked as a failure while the setting is **Never** is not offered.
+An assignment you already made to one stays saved but stops routing.
+Fabricate keeps showing such an assignment on the line, struck through, with a note that it does not route and a button to remove it.
+The same happens to a tier that another result set lists first, and a tier that was deleted from the check, which reads **Deleted outcome tier**.
+Result sets and ingredient sets can be renamed on their cards in this mode too.
 When a result set is assigned to an outcome tier this way, a craft that rolls that tier produces that result set.
 This explicit assignment takes priority over name matching.
 
@@ -110,9 +152,11 @@ When a recipe has exactly one result set, you do not need to map outcomes to res
 The single result set is produced on any non-failure outcome, and nothing is produced when the outcome is a reserved failure name.
 This mirrors the single-result-set rule in Routed by ingredients.
 A craft that succeeds in this case never reports a setup problem, and the recipe editor raises no routing warnings for it.
+The exemption holds only while no result set lists an outcome tier.
+Once the single result set lists a tier, a craft that rolls any other success tier reports a setup problem, and the recipe editor warns that the tier produces nothing.
 
 In a multi-step recipe, each step is checked on its own.
-A step with a single result set uses the no-mapping rule, while a step with several result sets needs each success outcome routed to a result.
+A step with a single result set that lists no tier uses the no-mapping rule, while a step with several result sets, or one whose result set lists a tier, needs each success outcome routed to a result.
 
 ### Minimum success tier for fixed routed checks
 
@@ -134,14 +178,68 @@ The setting has no effect on relative checks or in Routed by ingredients mode, w
 
 ---
 
+## The routing overview
+
+The recipe editor's **Overview** tab ends with a **Routing** card in both routed modes.
+It answers what the recipe does on one screen, so you do not have to open each card on the **Results** tab.
+The card is not drawn in the other resolution modes.
+
+Each row names a source and the result set it produces.
+Under Routed by ingredients the source is an ingredient set, followed by a short summary of what it asks for.
+Under Routed by check the source is an outcome tier, followed by the roll range it owns when the check's tiers are fixed.
+A row shows the result set it effectively produces, so a source that reaches a result set only by default still names it.
+
+Choose another result set from a row's dropdown to re-point it in place.
+This makes the same assignment as **Assign** on the result set's card, and it is saved with the rest of the recipe.
+The dropdown lists every result set in that step, including one you have just added with the **Result set** button.
+A row with no result set shows **Not routed**.
+Under Routed by ingredients the **Ingredient set** button adds a new ingredient set row.
+
+Two markers sit at the end of a row.
+
+- **default** means the row reaches its result set because nothing is assigned.
+  Choosing that same result set from the dropdown assigns it explicitly.
+- **shared · N** means N sources produce that result set, so editing its results changes what each of them awards.
+
+A recipe without steps has one list, labelled **Routing**.
+A multi-step recipe has one list per step, each under a heading with the step's name.
+While the Multi-Step Recipes feature is off, a multi-step recipe shows the list for its final step.
+A step with no result sets of its own, in a recipe that has result sets, shows the recipe's result sets, read-only, as a craft would award them.
+A note on the step explains that the recipe cannot be enabled until the step has its own result set.
+Adding one with **Result set** gives the step its own list.
+
+### Rows under Routed by check
+
+The card states that the outcome tiers belong to the system and that the recipe chooses the result set each one produces.
+An **Edit outcome tiers** button opens the system's crafting check, where the tiers are authored.
+A fixed check lists its tiers best first, and a relative check keeps the order you authored.
+
+Some rows have no dropdown.
+
+- A failure tier that the check's **Produce a result on a failed check** setting does not permit reads **routing not permitted by this system**.
+- A success tier below the recipe's minimum success tier reads **below this recipe's minimum success tier**.
+- A **Gap** row names the roll values that no tier claims, with an **Edit outcome tiers** button beside it.
+  A roll in a gap matches no tier, so the row is a prompt to fix the tiers.
+
+A failure tier that the setting does permit can be routed, and its dropdown reads **Awards nothing** until you choose a result set.
+Where a fixed check's recipe sets a minimum success tier, every such failure tier is marked **only on a forced failure**.
+A roll that lands below the minimum fails the craft outright and awards nothing, and a check trigger that forces a failure skips the minimum and lands on the lowest-ranked failure tier, so that is the only failure tier whose result set such a craft awards.
+See [On failure]({% link checks/crafting.md %}#on-failure) for the setting.
+
+While no result set in a step lists an outcome tier and more than one success tier is offered, a **Routed by default** note warns that assigning a tier stops the other tiers reaching a result set by default.
+The note goes as soon as any result set lists a tier.
+
+---
+
 ## Checking your routing in the editor
 
-When a recipe is in Routed by check mode and has more than one result set, the recipe editor's **Validation** tab checks the wiring between outcome tiers and result sets and warns about two common gaps.
+When a recipe is in Routed by check mode and has more than one result set, or a result set that lists an outcome tier, the recipe editor's **Validation** tab checks the wiring between outcome tiers and result sets and warns about two common gaps.
 
 - A result set that is not assigned to any check outcome.
   It will never be produced, so a check that succeeds can silently make nothing.
   Assign the result set to an outcome tier, or give it a name that matches an outcome.
   This warning also appears when a result set is only assigned to an outcome tier that has since been deleted.
+  That tier shows struck through as **Deleted outcome tier** on the result set's **Produced by** line, where you can remove it.
 - A success outcome tier that no result set produces.
   A craft that rolls that tier resolves to nothing.
   Add a result set for that outcome, or remove the tier from the routed crafting check if you no longer need it.
@@ -149,7 +247,14 @@ When a recipe is in Routed by check mode and has more than one result set, the r
 These are warnings, not blockers.
 The recipe still saves, but the gaps are worth closing before players craft it.
 
-A recipe with a single result set never raises these warnings, because it needs no mapping.
+A recipe with a single result set that lists no outcome tier never raises these warnings, because it needs no mapping.
+
+In Routed by ingredients mode the **Validation** tab warns about a different gap.
+A result set that no ingredient set leads to, by assignment or by default, is never produced.
+Assign an ingredient set to it, or remove it.
+The warning is not a blocker, and a result set that is reached by default raises nothing.
+The same warning appears in the system's **Overview**, which lists the validation issues across the whole system.
+See [System Overview]({% link crafting-systems/system-overview.md %}).
 
 ---
 

@@ -10,18 +10,25 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeIngredientSetCard from './RecipeIngredientSetCard.svelte';
   import Button from '../../../components/Button.svelte';
+  import {
+    defaultSetName,
+    duplicateIngredientSet,
+    rendersBare,
+    withSoleEntry,
+  } from './setDrafts.js';
+  import { addIngredientSet } from './recipeRoutingEdits.js';
 
   let {
     ingredientSets = [],
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    onCreateTag = null,
     tagComponentCounts = null,
     currencyUnits = [],
     // Whether the system's currency feature is enabled, gating the kind menu's Currency entry and
     // the read-only rendering of existing currency requirements. Forwarded to every set card.
     currencyEnabled = true,
-    showSetName = true,
     // Whether this system's mode allows more than one ingredient set — not simple/progressive,
     // which are structurally 1×1, and not alchemy, which forces one. It gates the "Add ingredient
     // set" affordance, the ONLY promotion path to a multi-set recipe.
@@ -35,69 +42,42 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // An id eagerly at add time, so a new set is immediately routable in the Results tab.
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
-  // The default display name for an unnamed set, in the editable field so an unnamed set is
-  // not hidden behind a placeholder, and read-only in check mode.
-  function defaultSetName(index) {
-    return `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
-  }
-
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
 
   // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: a
   // single set (or none yet) renders CHROMELESS, its requirements on the tab background.
-  const effectiveComplex = $derived(sets.length > 1);
+  const effectiveComplex = $derived(!rendersBare(sets.length));
 
   // Simple mode binds one chromeless set to the first, synthesizing an empty one when absent;
   // the first edit writes the single-element array back and materializes a real set.
   const simpleSet = $derived(sets[0] || { ingredientGroups: [] });
-
-  // Materialize the single Simple set with an eager id so it is immediately routable, spreading
-  // the existing set so its id and unknown fields survive.
-  function updateSimpleSet(nextSet) {
-    const base = sets[0] || {};
-    onChange([{ ...base, ...nextSet, id: base.id || nextSet?.id || newId() }]);
-  }
 
   function updateSet(index, nextSet) {
     onChange(sets.map((set, i) => (i === index ? nextSet : set)));
   }
 
   function addSet() {
-    onChange([...sets, { id: newId(), name: '', ingredientGroups: [] }]);
+    onChange(addIngredientSet(sets));
   }
 
   function removeSet(index) {
     onChange(sets.filter((_, i) => i !== index));
   }
 
-  // Duplicate a set, for routed-by-ingredient recipes whose alternatives differ by a requirement
-  // or two. Deep-cloned so the copy shares no reference, with the set and group ids re-minted and
-  // the routing assignment DROPPED, so the copy starts unassigned rather than silently sharing
-  // the original's output. It is inserted right after the original so it reads as related.
+  // The copy is inserted right after the original so it reads as related.
   function duplicateSet(index) {
     const source = sets[index];
     if (!source) return;
-    const cloned = JSON.parse(JSON.stringify(source));
-    cloned.id = newId();
-    cloned.ingredientGroups = Array.isArray(cloned.ingredientGroups)
-      ? cloned.ingredientGroups.map((group) => ({ ...group, id: newId() }))
-      : [];
-    cloned.resultGroupId = null;
-    cloned.resultMapping = [];
-    cloned.name = source?.name?.trim()
-      ? `${source.name} (${text('FABRICATE.Admin.Manager.Recipe.SetCopySuffix', 'Copy')})`
-      : '';
-    onChange([...sets.slice(0, index + 1), cloned, ...sets.slice(index + 1)]);
+    const copy = duplicateIngredientSet(source);
+    onChange([...sets.slice(0, index + 1), copy, ...sets.slice(index + 1)]);
   }
 </script>
 
-<section class="manager-recipe-ingredients-section" data-recipe-section={`${idPrefix}ingredients`}>
+<section
+  class="manager-recipe-ingredients-section"
+  data-recipe-section={`${idPrefix}ingredients`}
+  data-set-card-scope
+>
   {#if !effectiveComplex}
     <!-- A single set, or none yet, renders CHROMELESS. The "Add ingredient set" button below
          is the only promotion path, so it shows only where the mode allows more than one. -->
@@ -108,14 +88,21 @@
         {componentOptions}
         {essenceOptions}
         {itemTags}
+        {onCreateTag}
         {tagComponentCounts}
         {currencyUnits}
         {currencyEnabled}
-        onChange={(nextSet) => updateSimpleSet(nextSet)}
+        onChange={(nextSet) => onChange(withSoleEntry(sets, nextSet))}
       />
     </div>
     {#if canAddSet}
-      <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
+      <Button
+        role="dashed"
+        fullWidth
+        data-recipe-add="ingredient-set"
+        data-set-card-remove-fallback
+        onclick={() => addSet()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
       </Button>
@@ -134,10 +121,10 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
-            {showSetName}
             defaultName={defaultSetName(index)}
             onChange={(nextSet) => updateSet(index, nextSet)}
             onRemove={() => removeSet(index)}
@@ -146,7 +133,13 @@
         </li>
       {/each}
     </ul>
-    <Button role="dashed" fullWidth data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    <Button
+      role="dashed"
+      fullWidth
+      data-recipe-add="ingredient-set"
+      data-set-card-remove-fallback
+      onclick={() => addSet()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
     </Button>

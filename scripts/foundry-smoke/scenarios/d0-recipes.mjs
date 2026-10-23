@@ -610,8 +610,8 @@ export default {
       }
     }
 
-    // Alchemy: the two-slot result shape — a success set plus a reserved,
-    // undeletable "On a failed check" set. In its own alchemy system; same
+    // Alchemy: the two-slot result shape — a success set plus, once opted into, a
+    // reserved "On a failed check" set. In its own alchemy system; same
     // switch-and-restore guard as the progressive capture.
     if (alchemyFixtures?.cauldronSystemId) {
       try {

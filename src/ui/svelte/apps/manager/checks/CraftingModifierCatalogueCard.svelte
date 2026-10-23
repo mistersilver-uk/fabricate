@@ -307,6 +307,7 @@
 
 <!-- CARD ONE: the library, read-only, with the selection control on each row. -->
 <InspectorCard
+  flush
   class="manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
@@ -489,7 +490,7 @@
 
 <!-- CARD TWO: how the marked entries reduce to the one number the roll gets, in its own
      studio card rather than under an uppercase micro-label. -->
-<InspectorCard class="manager-checks-card" data-crafting-modifier-policy-card="">
+<InspectorCard flush class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <h3 class="manager-checks-card-title">
@@ -515,7 +516,7 @@
       legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
       legend="How they combine"
       options={policyOptions}
-      selectedValue={selectedPolicy}
+      value={selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
       data-crafting-modifier-policy
@@ -568,17 +569,9 @@
 </InspectorCard>
 
 <style>
-  /* The card is the host the sheet's `.is-config-cards` radio reflow answers. That rule queries
-       `fabricate-option-host`, which the manager shell also carries, so without this the grid
-       reflowed only when the entire manager was narrow.
-
-       `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
-       `fabricate-card` is written by that primitive and a scoped rule stopped matching —
-       SILENTLY, because an `<i class={…}>` here makes every class selector in the block
-       possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
-       reported nothing. Anchored on the two `data-` hooks rather than the `.manager-checks-card`
-       modifier the cards share, because that has eleven other sites and `container-type` creates a
-       containment context rather than painting. Each half stays at (0,2,0). */
+  /* The card is the host the option cards' reflow queries: without it the grid answers the
+       manager's own `fabricate-option-host` and reflows only when the whole manager is narrow.
+       `:global()` because `InspectorCard` writes the element; each half stays at (0,2,0). */
   :global(.fabricate-card[data-crafting-modifier-catalogue]),
   :global(.fabricate-card[data-crafting-modifier-policy-card]) {
     container: fabricate-option-host / inline-size;
@@ -597,17 +590,6 @@
   :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
   :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
-  }
-
-  /* THE RULE GRID'S OWN GUTTER, on this card only: `RadioCardGroup`'s gutter is one shared
-     value across the manager, and the design's differs here and differs again on the Outcomes
-     screen's otherwise identical group — the mockup disagreeing with itself rather than a
-     second scale to adopt. So this states the measured value where it is measured and leaves
-     the primitive alone, by the same unlayered `:global()` route the chips above take, anchored
-     per card for the reason the container rule states. Each half stays at (0,3,0). */
-  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options),
-  :global(.fabricate-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options) {
-    gap: var(--fab-space-3);
   }
 
   .manager-modifier-bounds-error {

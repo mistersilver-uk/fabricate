@@ -8,7 +8,7 @@ import { createRawSnippet } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
+import { createMountedComponentHarness, OUTCOME_LADDER_RAW_MODULES, PAGINATION_COMPILED_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -63,8 +63,8 @@ const outcomeHarness = createHarness(
   ['Medallion', 'Chip', 'Kicker'].map(component),
   OUTCOME_LADDER_RAW_MODULES
 );
-const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], [
-  ...SEARCHABLE_POPOVER_RAW_MODULES,
+const pagerHarness = createHarness('Pagination', PAGINATION_COMPILED_MODULES, [
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
 ]);
 const harnesses = [
@@ -227,6 +227,15 @@ describe('run primitives mounted behavior', () => {
       0,
       'the completion holds only the shared kicker and the switch'
     );
+    assert.deepEqual(
+      [
+        ...target
+          .querySelector('[data-run-completion-switch]')
+          .querySelectorAll('.manager-segment-label'),
+      ].map((label) => label.textContent),
+      ['By hand', 'As time passes'],
+      'the completion switch draws each option’s already-localized label'
+    );
     const completion = target.querySelector('input[value="worldTime"]');
     completion.click();
     await flushRender();
@@ -238,7 +247,10 @@ describe('run primitives mounted behavior', () => {
     target.querySelector('[data-run-action="pause"]').click();
     assert.deepEqual(calls.shift(), ['pause']);
 
-    target.querySelector('[data-run-action="cancel-arm"]').click();
+    const cancelArm = target.querySelector('[data-run-action="cancel-arm"]');
+    assert.equal(cancelArm.getAttribute('data-tooltip-text'), 'Cancel Forge Iron Rivets');
+    assert.ok(!cancelArm.hasAttribute('title'), 'the cancel’s name is its tooltip (issue 2541)');
+    cancelArm.click();
     await flushRender();
     assert.ok(target.querySelector('[data-run-cancel-decision]'), 'cancel decision appears in the bar');
     assert.ok(!target.querySelector('[data-run-action="primary"]'), 'primary withdraws while cancel is armed');
@@ -260,9 +272,13 @@ describe('run primitives mounted behavior', () => {
       primary: { ...common.primary, busy: true, busyLabel: 'Rolling check…' },
     });
     const busyPrimary = busy.querySelector('[data-run-action="primary"]');
-    assert.equal(busyPrimary.disabled, true);
+    // Busy keeps the tab stop (issue 2540): aria-disabled, never `disabled`, and the press no-ops.
+    assert.equal(busyPrimary.disabled, false);
+    assert.equal(busyPrimary.getAttribute('aria-disabled'), 'true');
     assert.equal(busyPrimary.getAttribute('aria-busy'), 'true');
     assert.match(busyPrimary.textContent, /Rolling check/u);
+    busyPrimary.click();
+    assert.equal(calls.length, 0, 'a busy primary swallows the press');
     runActionHarness.remount();
 
     const paused = await runActionHarness.mount({
@@ -316,6 +332,19 @@ describe('run primitives mounted behavior', () => {
       /border:\s*1px solid var\(--fab-border\)/u,
       /background:\s*var\(--fab-bg-1\)/u,
     ]);
+  });
+
+  it('routes `cancel.title` to the cancel’s tooltip rather than a native title', async () => {
+    const target = await runActionHarness.mount({
+      run: { id: 'run-1' },
+      runLabel: 'Minor Elixir of Mending',
+      primary: { label: 'Roll check', enabled: true },
+      cancel: { title: 'Cancel and refund the stamina' },
+    });
+    const cancelArm = target.querySelector('[data-run-action="cancel-arm"]');
+    assert.equal(cancelArm.getAttribute('data-tooltip-text'), 'Cancel and refund the stamina');
+    assert.equal(cancelArm.getAttribute('aria-label'), 'Minor Elixir of Mending');
+    assert.ok(!cancelArm.hasAttribute('title'));
   });
 
   /** UX2-7. Arming UNMOUNTS the control that was activated and replaces the whole row. */

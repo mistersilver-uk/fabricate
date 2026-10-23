@@ -1030,7 +1030,6 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
 // The converted one-of-N controls (issue 1504). `locator.selectOption()` is Playwright's
 // `<select>`-ONLY API.
 const CONVERTED_SELECT_HOOKS = Object.freeze([
-  'data-pagination-size',
   'data-scoped-list-sort',
   'data-scoped-list-filter',
   'data-recipe-bulk-category',
@@ -1273,9 +1272,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 22,
+    replacements.length >= 19,
     `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
-      'against a floor of 22 — 21 call sites plus the definition in `caseFactories.js`, which the ' +
+      'against a floor of 19 — 18 call sites plus the definition in `caseFactories.js`, which the ' +
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );

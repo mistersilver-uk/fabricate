@@ -163,11 +163,12 @@ function recordingFacade() {
 
 /**
  * The docs row a described published component must carry: name, version, root, props and rest.
- * A prop cell notes its kind unless it is `data`, then `required`.
+ * A prop cell notes its kind unless it is `data`, then `required`, then `required when` its guard.
  */
 function documentedComponentRow(name, { version, props, rest, root }) {
   const cells = Object.entries(props).map(([key, spec]) => {
-    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : ''];
+    const when = spec.requiredWhen ? `required when \`${spec.requiredWhen}\`` : '';
+    const notes = [spec.kind === 'data' ? '' : spec.kind, spec.required ? 'required' : '', when];
     const noted = notes.filter(Boolean).join(', ');
     return noted ? `\`${key}\` (${noted})` : `\`${key}\``;
   });
@@ -191,11 +192,11 @@ function documentedComponentSections() {
 }
 
 /**
- * Each top-level bullet one component names under the spec's issue 2448, issue 2451 and issue 2452
- * headings, by name and in the order the spec states them.
+ * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454
+ * and 2455 headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -256,7 +257,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
     assert.equal(atReady.ui, atInit.ui, 'the ready rebind publishes the same api.ui');
   });
 
-  it('publishes exactly the pinned components, each described as pinned with its root, and documents them', () => {
+  it('publishes exactly the pinned components, each described as pinned with its root and whether it opens an overlay, and documents them', () => {
     installPublicGame();
     bindFabricateGlobal(recordingFacade().facade, {});
     const { ui } = globalThis.game.fabricate.api;
@@ -277,6 +278,10 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Notice',
       'Button',
       'StatusToggle',
+      'Stepper',
+      'SearchField',
+      'Select',
+      'StageBars',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -298,6 +303,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Avatar: {
         version: 1,
@@ -311,6 +317,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: false,
         root: 'any',
+        overlays: false,
       },
       Medallion: {
         version: 1,
@@ -327,12 +334,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: false,
         root: 'any',
+        overlays: false,
       },
       FillBar: {
         version: 1,
         props: { value: optional, tone: optional, color: optional, density: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Meter: {
         version: 1,
@@ -345,54 +354,63 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       BandedBar: {
         version: 1,
         props: { rows: required, direction: optional, density: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       StatBox: {
         version: 1,
         props: { value: required, label: required, icon: optional, tone: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       InfoStrip: {
         version: 1,
         props: { label: required, facts: required, badge: optional },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Kicker: {
         version: 1,
         props: { as: optional, tone: optional, children: requiredText },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Chip: {
         version: 1,
         props: { tone: optional, density: optional, children: requiredText },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Rail: {
         version: 1,
         props: { label: optional, children: slot },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       InspectorCard: {
         version: 1,
         props: { children: slot },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
       EmptyState: {
         version: 1,
         props: { icon: optional, title: optional, hint: optional, filtered: optional, children: slot },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Notice: {
         version: 1,
@@ -403,9 +421,13 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           icon: optional,
           action: optional,
           onAction: { kind: 'callback', required: false },
+          dismissable: optional,
+          dismissLabel: { kind: 'data', required: false, requiredWhen: 'dismissable' },
+          onDismiss: { kind: 'callback', required: false, requiredWhen: 'dismissable' },
         },
         rest: true,
         root: 'any',
+        overlays: false,
       },
       Button: {
         version: 1,
@@ -420,6 +442,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
       },
       StatusToggle: {
         version: 1,
@@ -432,12 +455,62 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         },
         rest: true,
         root: 'fabricate',
+        overlays: false,
+      },
+      Stepper: {
+        version: 1,
+        props: {
+          value: required,
+          min: optional,
+          max: optional,
+          step: optional,
+          ariaLabel: required,
+          decrementLabel: required,
+          incrementLabel: required,
+          onChange: { kind: 'callback', required: true },
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: false,
+      },
+      SearchField: {
+        version: 1,
+        props: {
+          value: { kind: 'value', required: false },
+          onValueChange: { kind: 'callback', required: false },
+          placeholder: optional,
+          ariaLabel: required,
+        },
+        rest: true,
+        root: 'fabricate',
+        overlays: false,
+      },
+      Select: {
+        version: 1,
+        props: {
+          options: required,
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          placeholder: optional,
+          size: optional,
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: true,
+      },
+      StageBars: {
+        version: 1,
+        props: { stages: required, currentIndex: optional, numbered: optional, ariaLabel: required },
+        rest: true,
+        root: 'any',
+        overlays: false,
       },
     });
     assert.deepEqual(
       Object.keys(ui),
-      ['schemaVersion', 'components', 'describe', 'mount', 'load'],
-      'the descriptor a bind publishes, `load` last'
+      ['schemaVersion', 'components', 'describe', 'mount', 'load', 'mountMany'],
+      'the descriptor a bind publishes, `mountMany` last'
     );
     const start = DOCUMENTED.indexOf(COMPONENTS_TABLE_HEADER);
     assert.ok(start !== -1, 'docs/api/index.md carries the published-components table');
@@ -574,6 +647,41 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         stated.filter((token) => !prose.includes(token)),
         [],
         `${where} states each reserved name and the tail that refuses it`
+      );
+    }
+  });
+
+  it('states mountMany’s M21 tail in the spec’s row and, with M5 and M19, in the docs’ subsection', () => {
+    const tail = (id) => {
+      const rows = SPECIFIED.split('\n').filter((line) => line.startsWith(`| ${id} |`));
+      assert.equal(rows.length, 1, `one ${id} row`);
+      return /`([^`]+)` \|$/u.exec(rows[0])[1];
+    };
+    assert.equal(tail('M21'), 'items must be an array');
+    const from = DOCUMENTED.indexOf('\n### Mounting several at once\n');
+    const to = DOCUMENTED.indexOf('\n### ', from + 1);
+    assert.ok(from !== -1 && to !== -1, 'the mountMany subsection, then another heading');
+    const prose = DOCUMENTED.slice(from, to);
+    assert.deepEqual(
+      ['M5', 'M19', 'M21'].map(tail).filter((stated) => !prose.includes(`\`${stated}\``)),
+      [],
+      'the subsection states each tail mountMany adds to or repeats from mount'
+    );
+    assert.ok(prose.includes("`typeof fabUi.mountMany === 'function'`"), 'and how to detect it');
+  });
+
+  it('spells the descriptor’s members, in publication order, as the spec and the docs do', () => {
+    const [, ...members] = Object.keys(publishedUi());
+    const descriptor = `{ schemaVersion: 1, ${members.join(', ')} }`;
+    for (const [where, prose] of [
+      ['the spec', SPECIFIED],
+      ['the docs', DOCUMENTED],
+    ]) {
+      const stated = [...prose.matchAll(/ is a frozen `(\{ schemaVersion: 1[^`]*\})`/gu)];
+      assert.deepEqual(
+        stated.map(([, spelled]) => spelled),
+        [descriptor],
+        `${where} spells the descriptor once, with every member`
       );
     }
   });

@@ -20,7 +20,7 @@ Issues are grouped by what they affect:
 
 - **System blockers** are problems that make the whole system unusable.
   They have no deep-link of their own because the Overview is where you resolve them.
-- **Recipes** lists per-recipe problems, such as a recipe with no name or a result set that is not assigned to any check outcome.
+- **Recipes** lists per-recipe problems, such as a recipe with no name, a result set that is not assigned to any check outcome, or a result set that no ingredient set reaches.
 - **Gathering environments**, **Gathering tasks**, and **Gathering events** list problems with your gathering setup.
 - **Component salvage** lists components whose salvage setup is invalid for the current salvage mode.
 

@@ -205,7 +205,7 @@ describe('CraftingView mounted behavior', () => {
     assertIdentityHeader(target, { primaries: 1 });
     const summary = target.querySelector('[data-crafting-run-summary]');
     const again = summary.querySelector('[data-crafting-craft]');
-    assert.ok(again.matches('.fab-manager-button.is-ghost'), 'the summary repeats it as a ghost');
+    assert.ok(again.matches('.fabricate-button.is-ghost'), 'the summary repeats it as a ghost');
     assert.ok(summary.querySelector('[data-crafting-run-dismiss]').matches('.is-ghost'));
   });
 

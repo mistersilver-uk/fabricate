@@ -4,6 +4,7 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 // THE REAL VOCABULARY STORE (issue 1371 r16-cat, maintainer ruling M20).
 import { createWorldVocabularyStore } from '../../src/systems/WorldVocabularyStore.js';
 import {
@@ -210,7 +211,8 @@ describe('world Component Catalogue (issue 1371)', () => {
         '[data-scoped-list-row="ingot"] [data-scoped-list-action="open-entry"]'
       );
       assert.ok(Boolean(pen), 'the row carries the action at all');
-      assert.equal(pen.getAttribute('title'), 'Open catalogue entry');
+      assert.equal(pen.getAttribute('data-tooltip-text'), pen.getAttribute('aria-label'));
+      assert.match(pen.getAttribute('aria-label'), /^Open catalogue entry — /);
       assert.ok(
         Boolean(pen.querySelector('i.fa-pen')),
         'and it is the icon control, not the 104px labelled button that shipped'
@@ -218,7 +220,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.equal(
         pen.textContent.trim(),
         '',
-        'a labelled button would print its verb; the reference draws a bare pen with a title'
+        'a labelled button would print its verb; the reference draws a bare pen named by its tooltip'
       );
       pen.click();
       await drain();
@@ -2095,17 +2097,27 @@ describe('world Component Catalogue (issue 1371)', () => {
         );
       });
 
-      it('asks the shell for the pane-wide dock bleed and the frame for the flush bulk scroller, while the panel is on screen', async () => {
+      it('asks the frame for the flush bulk scroller, which carries the 16px panel inset, while the panel is on screen', async () => {
         const { target } = await selectedCatalogue();
         const scroller = target.querySelector('.manager-scoped-list-inspector-scroll');
         assert.ok(
           scroller.classList.contains('is-flush-bulk'),
           'the bulk scroller takes the inspector column`s inset while the panel shows'
         );
-        assert.ok(
-          target.querySelector('.fab-bulk-edit-dock').classList.contains('is-bleed-space-4'),
-          'and the shell`s dock bleeds by the column`s own `--fab-space-4`'
-        );
+        // The manager sheet declares the token the dock bleeds by on the scroller (issue 2500).
+        const sheet = Object.assign(document.createElement('style'), {
+          textContent: readStylesheet(),
+        });
+        document.head.append(sheet);
+        try {
+          assert.equal(
+            getComputedStyle(scroller).getPropertyValue('--fab-manager-inspector-pad').trim(),
+            '16px',
+            'the flush bulk scroller pads, and the dock bleeds, by the column`s own `--fab-space-4`'
+          );
+        } finally {
+          sheet.remove();
+        }
         // AND BOTH GO WITH THE SELECTION: clearing it returns the column to the resting inspector.
         target.querySelector('[data-world-component-bulk-clear]').click();
         await drain();

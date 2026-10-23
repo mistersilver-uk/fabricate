@@ -216,6 +216,33 @@ test('narrowing routed → simple deletes ONLY the multi-set recipe and migrates
   assert.equal(recipeManager.getUpdate('keep-me').resultSelection, null);
 });
 
+test('simple → progressive keeps a recipe with a failure group and persists it without that group', async () => {
+  settingsStore.clear();
+  const recipeManager = makeRecipeManager([
+    oneByOneRecipe('with-failure', 'sys-1', {
+      resultGroups: [
+        { id: 'with-failure-g1', name: 'Default', results: [] },
+        { id: 'with-failure-fail', name: '', role: 'failure', results: [] }
+      ]
+    })
+  ]);
+  const manager = makeManager(recipeManager);
+  manager.systems.set('sys-1', manager._normalizeSystem({
+    id: 'sys-1',
+    name: 'Forge',
+    resolutionMode: 'simple'
+  }));
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'progressive' });
+
+  assert.deepEqual(recipeManager.getDeletedRecipeIds(), []);
+  assert.deepEqual(recipeManager.getUpdatedRecipeIds(), ['with-failure']);
+  assert.deepEqual(
+    recipeManager.getUpdate('with-failure').resultGroups.map((group) => group.id),
+    ['with-failure-g1']
+  );
+});
+
 test('moving a multi-step recipe into alchemy is the only alchemy-direction delete', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([

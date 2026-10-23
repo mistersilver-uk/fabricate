@@ -37,13 +37,13 @@
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Adds a tag to the system's vocabulary, from a tag row's catalogue footer.
+    onCreateTag = null,
     // The system's `{ id, tags }` components, which the tag adder counts each tag over.
     componentTagOptions = [],
     // Whether the system mode allows more than one ingredient set. Forwarded to each
     // section to gate the "Add ingredient set" promotion affordance (issue 643).
     canAddSet = false,
-    // Hidden in routed check-mode recipes (routing is by check outcome, not set name).
-    showSetName = true,
     // Drives the mode-adaptive heading + intro (§B5): 'ingredientSet' routing reads
     // as "Ingredient sets", everything else as "Ingredients".
     routingProvider = null,
@@ -137,10 +137,10 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {tagComponentCounts}
             {currencyUnits}
             {currencyEnabled}
-            {showSetName}
             onChange={(nextSets) => onUpdateIngredientSets(step.id, nextSets)}
           />
         {/snippet}
@@ -153,10 +153,10 @@
       {componentOptions}
       {essenceOptions}
       {itemTags}
+      {onCreateTag}
       {tagComponentCounts}
       {currencyUnits}
       {currencyEnabled}
-      {showSetName}
       onChange={(nextSets) => onUpdateIngredientSets(null, nextSets)}
     />
   {/if}

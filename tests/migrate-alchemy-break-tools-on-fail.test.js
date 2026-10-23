@@ -193,7 +193,7 @@ test('the runner applies 1.35.0 to craftingSystems and bumps the migration versi
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.35.0');
+  assert.equal(store.get('migrationVersion'), '1.36.0');
   assert.equal(consumption(store.get('craftingSystems')[0])[FIELD], true);
 });
 
@@ -209,7 +209,7 @@ test('the runner does not re-run 1.35.0 once the world is at that version', asyn
 
   const result = await runner.run();
 
-  assert.equal(result.ran, 0);
+  assert.equal(result.ran, 1, 'only the 1.36.0 pass above it is pending');
   assert.equal(
     consumption(store.get('craftingSystems')[0]),
     undefined,

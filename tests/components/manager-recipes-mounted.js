@@ -20,10 +20,13 @@ import {
   headerSaveButton,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   booksScrollsFixtures,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -60,6 +63,7 @@ export function registerRecipesCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -67,6 +71,7 @@ export function registerRecipesCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 
@@ -617,7 +622,7 @@ export function registerRecipesCases() {
       Boolean(target.querySelector('.fabricate-pagination')),
       'past one page the shared pager renders'
     );
-    chooseSelectOption(target, '[data-pagination-size]', 10);
+    choosePageSize(target, '', 10);
     await tick();
     flushSync();
     target.querySelector('[data-pagination-next]').click();

@@ -40,6 +40,11 @@ Later changes to the source Item do not refresh that stored display automaticall
 Open the Tool's entry in the world **Tools Catalogue** and drop another Item onto its linked source card when you want a new source and a fresh display snapshot.
 A crafting system's Tool rules editor cannot change which Item a Tool is.
 
+Whichever way you add it, a Tool saved in a crafting system is registered in the world **Tools Catalogue** automatically.
+Adding a Tool from an Item that already has a world Tool adopts that world Tool instead of making a second one.
+The world Tool owns the Tool's identity: the linked Item, art and description.
+The system keeps whether the Tool is enabled and any overrides.
+
 A **Display label** overrides the stored source name in Fabricate without changing the Item.
 The source name and description are read-only in the Tool Studio.
 Unlinking the Item preserves the draft, but the Tool cannot be saved until it has a linked Item or managed Component.
@@ -72,9 +77,19 @@ Because the library is a draft-and-save surface, your edits are held until you s
 
 A Tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
 The Save button stays disabled until every Tool is valid; hover it to see the first failing reason.
-Tools belong to the crafting system that owns them and cannot be shared across systems.
+Each crafting system keeps its own rules for a Tool, but the Tool itself is a world Tool, so several systems can hold the same one, each with its own enabled switch and overrides.
 A gathering task, recipe, or salvage configuration only references them.
 See [Tools]({% link gathering/tasks.md %}#tools) for how a gathering task does that.
+
+### Tools that cannot be linked
+
+A Tool cannot be linked to the world catalogue when a world Tool with the same id or the same source Item already describes something else, or when the Tool leaves breakage or what happens on a break unset while the world Tool sets a default for it.
+It keeps working in its own crafting system only, and the save still succeeds.
+After the save, Fabricate shows one warning for each affected system, naming up to five Tools and counting the rest, and warns about each Tool only once per session; the full list is in the browser console.
+Review them under World › Tools.
+
+On first load after upgrading to 1.36.0, Fabricate registers the Tools older versions left only inside a system, and posts a GM notice that lists what it created, adopted, could not link, found ambiguous, and kept as links to a row or system that no longer exists.
+Nothing is deleted or merged.
 
 ## Presence and prerequisites
 
@@ -193,6 +208,9 @@ Every required group must be satisfied, and any one option inside a group can sa
 Add a requirement with the dashed **Ingredient** adder, which opens a menu offering Components, tags, essences, and currency.
 To give a requirement another way to be met, use its **or…** control, which opens an **Accept instead** menu of the same kinds.
 A tag requirement's adder shows how many components carry each tag, marks the tags the row already holds, and removes a held tag when you choose it again.
+Tags read as a `#` followed by the tag as it is stored, in the row's chips and in the adder's list.
+A Tool's tag adder does not offer to create a new tag.
+A system Tool lists the system's tags, which you add on the **Tags & Categories** screen first.
 On a world Tool the count is of world catalogue components carrying the tag as a default, because the repair materials there are a seed each adopting system copies.
 Every added group must be complete and every option must have a positive quantity before the Tool can be saved.
 

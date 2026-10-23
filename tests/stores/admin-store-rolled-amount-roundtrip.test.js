@@ -10,7 +10,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 import { get } from 'svelte/store';
 
-import { fromValue, toValue } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { fromValue, toValue } from '../../src/ui/svelte/components/pickerRowKinds.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 import { seededRollClass } from '../helpers/seededRoll.js';
 

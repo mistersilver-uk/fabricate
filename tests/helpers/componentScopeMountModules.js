@@ -1,6 +1,7 @@
 /** The dependency manifest the mounted WORLD COMPONENT suites compile against (issue 1371). */
 
 import {
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from './svelte-component-harness.js';
@@ -66,16 +67,16 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/pickerOptionModel.js',
+  'src/ui/svelte/util/appLocalizer.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);
 
 /** The design-system primitives every component-scope tree renders. */
 export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
-  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination` draws its
-  // page-size list through `Select` now, so every tree that renders a pager also renders `Field`,
-  // `SearchablePopover`, the `Button` it renders its trigger through, and the `Chip`/
-  // `EmptyState` pair the popover's list renders.
+  // Select's own compiled closure (issue 1504), spread rather than copied: the inspector frame
+  // imports `Select`, so every scoped tree also renders `Field`, `SearchablePopover`, the `Button`
+  // it renders its trigger through, and the `Chip`/`EmptyState` pair the popover's list renders.
   ...SELECT_COMPILED_MODULES,
   // issue 1371 r18-colour: the tinted essence chip (M29) is rendered by the system inspector,
   // the rules list row and the world catalogue's rows; an omission here HANGS every suite that
@@ -85,9 +86,9 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
+  ...PAGINATION_COMPILED_MODULES,
   // `Select`, `Field` and `SearchablePopover` are already in this list via the
-  // `SELECT_COMPILED_MODULES` spread above — `Pagination` draws its page-size list through them.
+  // `SELECT_COMPILED_MODULES` spread above.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
 ]);
@@ -140,6 +141,7 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/InspectorPanel.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     // The bulk panel's shared staging inset (issue 1371 r16-cat, maintainer rulings M24/M25) and

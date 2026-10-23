@@ -1,19 +1,35 @@
 /**
  * The published component seam, `game.fabricate.api.ui` (issue 2426): a companion mounts a
- * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot }`, draws its
- * own content in a content slot, is told of a contained fault through `onFault` (issue 2451), is
- * told of a press through a callback prop, and sets an ARIA attribute on a control through an
- * `aria` prop (issue 2452).
+ * Fabricate primitive into an element it owns and gets back `{ update, destroy, slot, value }`.
+ * It draws its own content in a content slot, is told of a contained fault through `onFault`
+ * and of a press through a callback prop, sets an ARIA attribute on a control through an `aria`
+ * prop, reads and sets a bound value through a `value` prop, and hosts an entry's overlays through
+ * `overlayHost`. `load` fetches a lazy entry's code, and `mountMany` mounts one entry into
+ * several targets in one checked call.
  * Plain JS, so the public API binds it without Svelte; the runtime adapter registers the host,
- * `mount` and `unmount`.
+ * `mount`, `unmount`, `flush`, the empty `overlay` component and each lazy entry's loader.
  * The contract is `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
 import { callbackFor, takeCallbacks } from './publishedComponentCallbacks.js';
+import { createEntryLoading, lazyBindingFault } from './publishedComponentLoading.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
+import { openOverlayChain, unmountReporting } from './publishedComponentOverlays.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
+import {
+  changeKeyOf,
+  seedValues,
+  takeValues,
+  valueEntryFault,
+} from './publishedComponentValues.js';
 
 const FAULT_REPORT = 'Fabricate | Published component render failed:';
-const INERT_HANDLE = Object.freeze({ update: () => false, destroy: () => {}, slot: () => null });
+const HELD = 'target already holds a published component';
+const INERT_HANDLE = Object.freeze({
+  update: () => false,
+  destroy: () => {},
+  slot: () => null,
+  value: () => {},
+});
 
 /** Each required ancestor root: the selector `target` needs above it, and what M16 says it needs. */
 const ROOTS = Object.freeze({
@@ -27,17 +43,46 @@ const hasAncestorBySelector = (target, selector) => Boolean(target.closest?.(sel
 const isFabricateReady = () => globalThis.game?.fabricate?.ready === true;
 const reportToConsole = (...args) => console.error(...args);
 
+const OPTIONAL_CALLBACK = Object.freeze({ kind: 'callback', required: false });
+
+// A value key is never required, and its synthesised `on<Key>Change` follows it directly.
 function describeEntry(entry) {
   const props = {};
   for (const [key, spec] of Object.entries(entry.props)) {
-    props[key] = Object.freeze({ kind: spec.kind, required: spec.required === true });
+    const described = { kind: spec.kind, required: spec.required === true };
+    if (spec.requiredWhen !== undefined) described.requiredWhen = spec.requiredWhen;
+    props[key] = Object.freeze(described);
+    if (spec.kind === 'value') props[changeKeyOf(key)] = OPTIONAL_CALLBACK;
   }
   return Object.freeze({
     version: entry.version,
     props: Object.freeze(props),
     rest: entry.rest === true,
     root: entry.root,
+    overlays: entry.overlays === true,
   });
+}
+
+// The kinds that may state `requiredWhen`: a `slot`, `aria` or `value` key is never required.
+const CONDITIONAL_KINDS = new Set(['data', 'text', 'callback']);
+
+/**
+ * Whether a key's `requiredWhen` is sound: a string naming another `data` key of the entry that is
+ * neither `required` nor `requiredWhen` itself, on a key of a conditional kind that states no
+ * `required` (issue 2452).
+ */
+function isSoundGuard(entry, key, spec) {
+  const name = spec.requiredWhen;
+  const guard = typeof name === 'string' && Object.hasOwn(entry.props, name) && entry.props[name];
+  return (
+    Boolean(guard) &&
+    name !== key &&
+    guard.kind === 'data' &&
+    guard.required !== true &&
+    guard.requiredWhen === undefined &&
+    CONDITIONAL_KINDS.has(spec.kind) &&
+    spec.required === undefined
+  );
 }
 
 function assertKnownEntry(entry) {
@@ -45,15 +90,21 @@ function assertKnownEntry(entry) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
       throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown kind "${spec.kind}"`);
     }
+    if (spec.requiredWhen !== undefined && !isSoundGuard(entry, key, spec)) {
+      const other = String(spec.requiredWhen);
+      throw new Error(`${PREFIX}${entry.name} "${key}" has an unknown requiredWhen "${other}"`);
+    }
   }
   if (!Object.hasOwn(ROOTS, entry.root)) {
     throw new Error(`${PREFIX}${entry.name} has an unknown root "${entry.root}"`);
   }
+  const fault = valueEntryFault(entry);
+  if (fault) throw new Error(PREFIX + fault);
 }
 
 // The kinds the host builds something for: a snippet (`text`), a slot element (`slot`) or a
 // delivering function (`callback`). A `data` or `aria` key needs none, because its copied value
-// is already what the component takes.
+// is already what the component takes; a `value` key reaches the host as its own host prop.
 const HOST_DRAWN_KINDS = new Set(['text', 'slot', 'callback']);
 
 /**
@@ -98,7 +149,15 @@ function newRecord(entry, target, onFault) {
     onFault,
     slots: new Map(),
     callbacks: new Map(),
+    overlays: null,
   };
+}
+
+/** M18: an `overlayHost` other than `undefined` is an element of the target's document. */
+function assertOverlayHost(overlayHost, target, isElement) {
+  if (overlayHost === undefined) return;
+  if (isElement(overlayHost) && overlayHost.ownerDocument === target.ownerDocument) return;
+  throw refuse("overlayHost must be an element in the target's document");
 }
 
 /** Gives each `slot` key holding `true` its element, once; the element is kept while live. */
@@ -150,16 +209,21 @@ function underRoot(target, selector, hasAncestor, owner) {
 }
 
 /**
- * What the host receives beside its component; `slots` answers a requested key's element, and
- * `callbacks` a callback key's `{ arity, deliver }`.
+ * What the host receives beside its component; `values` holds each value key's value, `slots`
+ * answers a requested key's element, `callbacks` a callback or value key's `{ arity, deliver }`,
+ * and `flush` runs the runtime's flush, if it registered one, while the mount is live.
  */
-function hostPropsFor(entry, record, initial, onfault, report) {
+function hostPropsFor({ entry, record, initial, values, onfault, report, flush }) {
   return {
     initial,
+    values,
     onfault,
     kinds: contentKinds(entry),
     slots: (key) => record.slots.get(key) ?? null,
     callbacks: callbackFor(entry, record, report),
+    flush: () => {
+      if (record.live) flush?.();
+    },
   };
 }
 
@@ -169,12 +233,29 @@ function handleFor(entry, record, end) {
       if (!record.live) return false;
       const next = copyProps(entry, props);
       takeCallbacks(entry, record.callbacks, next);
+      const values = takeValues(entry, next);
       requestSlots(entry, record, next);
-      record.instance.setProps(next);
+      record.instance.setProps(next, values);
       return true;
     },
     destroy: () => end(record),
     slot: (key) => (record.live ? (record.slots.get(key) ?? null) : null),
+    value: (key) =>
+      record.live && entry.props[key]?.kind === 'value' ? record.instance.getValue(key) : undefined,
+  });
+}
+
+// An entry's overlay chain is registered before the runtime mounts it; defensive, because Svelte
+// 5.56 runs an action at the next flush, after `mount` returns.
+function openOverlays(entry, record, { overlayHost, runtime, report }) {
+  if (entry.overlays !== true) return;
+  const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
+  const { target } = record;
+  record.overlays = openOverlayChain({
+    target,
+    option: overlayHost,
+    runtime,
+    report: reportFailure,
   });
 }
 
@@ -197,12 +278,7 @@ function createMountLifecycle({ runtime, report }) {
   // returned, so a Promise settled inside the call reports before the fault notice queued after it.
   function unmountQuietly(record) {
     const reportFailure = (error) => report(FAULT_REPORT, record.name, error);
-    try {
-      const result = runtime().unmount(record.instance);
-      if (typeof result?.then === 'function') result.then(undefined, reportFailure);
-    } catch (error) {
-      reportFailure(error);
-    }
+    unmountReporting((instance) => runtime().unmount(instance), record.instance, reportFailure);
   }
 
   // A faulted mount leaves its target empty at once, however the runtime's unmount ended.
@@ -211,10 +287,12 @@ function createMountLifecycle({ runtime, report }) {
     record.target.replaceChildren?.();
   }
 
-  // A retired mount's nested mounts end first, and its slot elements leave after its own unmount.
+  // A retired mount's nested mounts end first; its slot elements and any overlay container still
+  // open leave after its own unmount.
   function close(record, unmount) {
     for (const nested of nestedIn(record, live)) end(nested);
     unmount(record);
+    record.overlays?.close();
     detachSlots(record);
     record.callbacks.clear();
   }
@@ -237,16 +315,18 @@ function createMountLifecycle({ runtime, report }) {
     queueFaultNotice(record, error, report, deferred);
   }
 
-  function start(entry, target, initial, onFault) {
+  function start(entry, target, initial, { component, onFault, overlayHost }) {
     const record = newRecord(entry, target, onFault);
     claims.set(target, record);
     live.add(record);
+    openOverlays(entry, record, { overlayHost, runtime, report });
     requestSlots(entry, record, initial);
     takeCallbacks(entry, record.callbacks, initial);
-    const { components, host, mount } = runtime();
+    const values = seedValues(entry, takeValues(entry, initial));
+    const { host, mount, flush } = runtime();
     const onfault = (error) => fault(record, error);
-    const component = components[entry.path];
-    const props = { component, ...hostPropsFor(entry, record, initial, onfault, report) };
+    const hosted = { entry, record, initial, values, onfault, report, flush };
+    const props = { component, ...hostPropsFor(hosted) };
     try {
       record.instance = mount(host, { target, props });
     } catch (error) {
@@ -261,23 +341,116 @@ function createMountLifecycle({ runtime, report }) {
     return handleFor(entry, record, end);
   }
 
-  // A claim holds only while its root is still inside the target; a stale one is destroyed first.
-  function claimTarget(target) {
+  // M5: a claim holds only while its root is still inside the target. It ends nothing, so
+  // `mountMany` can check every item with it before any claim is made.
+  function assertUnheld(target) {
     const held = claims.get(target);
-    if (held && held.root && target.contains(held.root)) {
-      throw refuse('target already holds a published component');
-    }
-    if (held) end(held);
-    if (target.firstChild) throw refuse('target must be empty');
+    if (held?.root && target.contains(held.root)) throw refuse(HELD);
+  }
+
+  // `mount`'s claim check: M5, then a stale claim is destroyed, then M6.
+  function claimTarget(target) {
+    assertUnheld(target);
+    const stale = claims.get(target);
+    if (stale) end(stale);
+    assertEmpty(target);
   }
 
   const owner = (target) => ownerOf(target, live);
-  return { start, claimTarget, owner, liveCount: () => live.size };
+  return { start, assertUnheld, claimTarget, owner, liveCount: () => live.size };
+}
+
+// M6. It destroys no stale claim, so it refuses a target holding a node that claim left, where
+// `claimTarget` destroys the claim first and may then pass.
+function assertEmpty(target) {
+  if (target.firstChild) throw refuse('target must be empty');
+}
+
+/** `mount` and `mountMany` over one seam's `entries`, sharing one name check and one options read. */
+function createMounting({
+  entries,
+  loading,
+  lifecycle,
+  isRegistered,
+  isReady,
+  isElement,
+  hasAncestor,
+}) {
+  function entryToMount(name) {
+    if (!isRegistered()) throw new Error(`${PREFIX}not registered`);
+    if (!isReady()) throw refuse('mount before ready');
+    const entry = entries.get(name);
+    if (!entry) throw refuse(`"${String(name)}" is not published`);
+    // M19, directly after M3: a lazy entry is refused until `load` has resolved for it.
+    if (!loading.isLoaded(entry)) throw refuse(`"${entry.name}" is not loaded`);
+    return entry;
+  }
+
+  // M4, M16 and M18; a value that is not an object reads as no options. It claims and renders
+  // nothing, so `mountMany` can read every item before any is drawn.
+  function readRequest(entry, options) {
+    const { target, props = {}, onFault, overlayHost } = options ?? {};
+    if (!isElement(target)) throw refuse('target must be an element');
+    const root = ROOTS[entry.root];
+    if (root && !underRoot(target, root.selector, hasAncestor, lifecycle.owner)) {
+      throw refuse(`${entry.name} needs ${root.needs}`);
+    }
+    assertOverlayHost(overlayHost, target, isElement);
+    const notify = typeof onFault === 'function' ? onFault : null;
+    return { target, props, onFault: notify, overlayHost };
+  }
+
+  function render(entry, { target, onFault, overlayHost }, props) {
+    const component = loading.componentOf(entry);
+    return lifecycle.start(entry, target, props, { component, onFault, overlayHost });
+  }
+
+  function mount(name, options) {
+    const entry = entryToMount(name);
+    const request = readRequest(entry, options);
+    lifecycle.claimTarget(request.target);
+    return render(entry, request, copyProps(entry, request.props));
+  }
+
+  /**
+   * Draws `name` into each item's target in order, or throws and draws nothing. The checks run in
+   * this order and the first refusal is thrown unchanged: the name (M1, M2, M3, M19), `items` being
+   * an array (M21), then each item as `mount` checks its options. That is its target, a repeat of an
+   * earlier target (M5), M5 and M6 against the claims, then its `props`. The check is pure: it makes
+   * no claim and ends no stale claim, and each item's props are copied there. `mount` differs in one
+   * case: it ends a stale claim before M6, so a target holding a node that claim left is M6 here
+   * where `mount` passes. A later target inside the detached slot of a stale mount an earlier item's
+   * draw ends is drawn, where sequential `mount` calls refuse it (M16). A fault while an item renders
+   * is that item's own: its handle is inert, only its own `onFault` is told, and the rest stay live.
+   */
+  function mountMany(name, items) {
+    const entry = entryToMount(name);
+    if (!Array.isArray(items)) throw refuse('items must be an array');
+    const targets = new Set();
+    // The length is read once and a hole reads as an item with no target; no iterator is followed.
+    const validated = Array.from({ length: items.length }, (_, index) => {
+      const request = readRequest(entry, items[index]);
+      if (targets.has(request.target)) throw refuse(HELD);
+      targets.add(request.target);
+      lifecycle.assertUnheld(request.target);
+      assertEmpty(request.target);
+      return { request, props: copyProps(entry, request.props) };
+    });
+    const handles = validated.map(({ request, props }) => {
+      lifecycle.claimTarget(request.target);
+      return render(entry, request, props);
+    });
+    return Object.freeze(handles);
+  }
+
+  return { mount, mountMany };
 }
 
 /**
- * One seam over `table` (the manifest by default). Passing `mount` registers the runtime at once,
- * binding each entry's own `component`; otherwise the adapter calls `register`, once.
+ * One seam over `table` (the manifest by default). Passing `mount` registers the runtime, `flush`,
+ * `overlay`, `loaders` and `reportLoadFailure` among it, at once, binding each eager entry's own
+ * `component`; otherwise the adapter calls `register`, once. `loaders` maps a lazy entry's `path` to
+ * a function resolving its component, and `reportLoadFailure(error)` takes a chunk-load failure.
  * `hasAncestor(target, selector)` decides an entry's required root, by `closest` unless injected.
  */
 export function createPublishedComponents({
@@ -285,6 +458,10 @@ export function createPublishedComponents({
   host,
   mount,
   unmount,
+  flush,
+  overlay,
+  loaders = {},
+  reportLoadFailure,
   report = reportToConsole,
   isElement = isElementNode,
   hasAncestor = hasAncestorBySelector,
@@ -294,40 +471,35 @@ export function createPublishedComponents({
   const descriptions = new Map(table.map((entry) => [entry.name, describeEntry(entry)]));
   let runtime = null;
   const lifecycle = createMountLifecycle({ runtime: () => runtime, report });
-
-  function mountPublished(name, options) {
-    if (!runtime) throw new Error(`${PREFIX}not registered`);
-    if (!isReady()) throw refuse('mount before ready');
-    const entry = entries.get(name);
-    if (!entry) throw refuse(`"${String(name)}" is not published`);
-    const { target, props = {}, onFault } = options ?? {};
-    if (!isElement(target)) throw refuse('target must be an element');
-    const root = ROOTS[entry.root];
-    if (root && !underRoot(target, root.selector, hasAncestor, lifecycle.owner)) {
-      throw refuse(`${entry.name} needs ${root.needs}`);
-    }
-    lifecycle.claimTarget(target);
-    const notify = typeof onFault === 'function' ? onFault : null;
-    return lifecycle.start(entry, target, copyProps(entry, props), notify);
-  }
-
-  // `async`, so the M3 refusal is a rejection and never a synchronous throw. Every entry is eager
-  // today, so there is no code to fetch; it needs neither a runtime nor `fabricate.ready`.
-  async function loadPublished(names) {
-    for (const name of Array.isArray(names) ? names : [names]) {
-      if (!entries.has(name)) throw refuse(`"${String(name)}" is not published`);
-    }
-  }
+  const loading = createEntryLoading({ entries, runtime: () => runtime });
+  const mounting = createMounting({
+    entries,
+    loading,
+    lifecycle,
+    isRegistered: () => runtime !== null,
+    isReady,
+    isElement,
+    hasAncestor,
+  });
 
   function register(adapter) {
     if (runtime) throw new Error(`${PREFIX}already registered`);
-    for (const entry of table) assertKnownEntry(entry);
-    const { components, host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
+    const { components = {}, loaders: adapterLoaders = {} } = adapter;
+    for (const entry of table) {
+      assertKnownEntry(entry);
+      const fault = lazyBindingFault(entry, components, adapterLoaders);
+      if (fault) throw new Error(PREFIX + fault);
+    }
+    const { host: adapterHost, mount: adapterMount, unmount: adapterUnmount } = adapter;
     runtime = Object.freeze({
       components,
+      loaders: adapterLoaders,
+      reportLoadFailure: adapter.reportLoadFailure,
       host: adapterHost,
       mount: adapterMount,
       unmount: adapterUnmount,
+      flush: adapter.flush,
+      overlay: adapter.overlay,
     });
   }
 
@@ -335,13 +507,15 @@ export function createPublishedComponents({
     schemaVersion: 1,
     components: Object.freeze(table.map((entry) => entry.name)),
     describe: (name) => descriptions.get(name) ?? null,
-    mount: mountPublished,
-    load: loadPublished,
+    mount: mounting.mount,
+    load: loading.load,
+    mountMany: mounting.mountMany,
   });
 
   if (mount) {
-    const components = Object.fromEntries(table.map((entry) => [entry.path, entry.component]));
-    register({ components, host, mount, unmount });
+    const eager = table.filter((entry) => entry.lazy !== true);
+    const components = Object.fromEntries(eager.map((entry) => [entry.path, entry.component]));
+    register({ components, loaders, reportLoadFailure, host, mount, unmount, flush, overlay });
   }
 
   return Object.freeze({

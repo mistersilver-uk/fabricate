@@ -115,11 +115,35 @@ function chromeStatusEndpoint() {
   };
 }
 
+/** The Primitive Lab's specimen document, the one page the Vite-client drop below targets. */
+export const SPECIMEN_PAGE = '/tests/view-lab/primitives/specimen.html';
+const VITE_CLIENT_TAG = /<script type="module" src="\/@vite\/client"><\/script>/;
+
+/**
+ * Drop the Vite client from each Primitive Lab specimen document. The client opens one WebSocket per
+ * document even with `hmr: false`, and Chromium refuses a renderer's 256th, so a catalogue past 254
+ * rows logs a connection error per extra frame. Specimens need no client: Svelte injects their CSS.
+ */
+function specimenWithoutViteClient() {
+  return {
+    name: 'view-lab-specimen-without-vite-client',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, { path }) {
+        if (path !== SPECIMEN_PAGE) return html;
+        if (!VITE_CLIENT_TAG.test(html)) throw new Error(`no Vite client tag to drop from ${path}`);
+        return html.replace(VITE_CLIENT_TAG, '');
+      },
+    },
+  };
+}
+
 export default defineConfig({
   root: repoRoot,
   plugins: [
     stripGlobalCssImport(),
     chromeStatusEndpoint(),
+    specimenWithoutViteClient(),
     svelte(),
     staticMount('/@foundry-chrome/', chromeCache?.dir ?? null, 'Harvested Foundry window chrome'),
     staticMount('/@foundry-system/dnd5e/', existsSync(dnd5eRoot) ? dnd5eRoot : null, 'The dnd5e system tree'),

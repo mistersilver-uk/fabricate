@@ -62,7 +62,7 @@ That gives three states.
 | Alchemy check | What happens on a match |
 |:--------------|:-------------------------------------------------------------------------------------------------|
 | Off | A matched brew always succeeds and produces its single result set. There is no roll. |
-| Simple check | A matched brew rolls a pass or fail check. A pass produces the success result set. A fail produces a separate failure result set. |
+| Simple check | A matched brew rolls a pass or fail check. A pass produces the success result set. A fail produces the recipe's failure result set, if it has one. |
 | Tiered check | A matched brew rolls a check with named outcome tiers. The tier that the roll lands on selects which result set is produced. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -72,11 +72,23 @@ A combination that matches nothing still fizzles without a roll, whatever the Al
 
 With the check switched **off**, each alchemy recipe has one result set, and a match always produces it.
 
-With a **Simple check**, each recipe has two result sets, shown in the recipe editor as **On success** and **On a failed check**.
+With a **Simple check**, each recipe has an **On success** result set, and it can also have an **On a failed check** result set.
+A new recipe has no failure set until you opt in.
+A recipe that already has one keeps it.
+Turn on **Award results on a failed check**, below the sets in the recipe editor, to add an empty failure set.
+Turn it off to remove the set and its results.
+Both sets are reserved sets, drawn with a lock, a **reserved role** badge, and a **Produced by** line that reads "a passed check — no assignment" or "a failed check — no assignment".
+You cannot rename them or assign anything to them, because the check picks them by role.
+The failure set has a danger-colored border.
 A passed roll produces the success set.
-A failed roll produces the failure set.
-A failed check is still a genuine outcome, not a fizzle, so the components are consumed and the recipe can still be learned.
-The failure set may be left empty, in which case a failed brew consumes the components and produces nothing, but it is still recorded as a failed brew rather than a fizzle.
+A failed roll produces the failure set, if the recipe has one.
+A failed check is still a genuine outcome, not a fizzle, so the recipe can still be learned, and the components are consumed unless the system's [Consume on Fail](#consume-on-fail) setting is off.
+The failure set may be left empty, in which case a failed brew produces nothing (and consumes the components while Consume on Fail is on), but it is still recorded as a failed brew rather than a fizzle.
+An empty failure set shows a note saying so, rather than a warning.
+
+If the system's **Produce a result on a failed check** setting is **Never**, for a recipe with no failure set the toggle is disabled and a note explains why.
+Choose **Open the crafting check** in that note, then change the setting on its **On failure** section.
+A failure set the recipe already has stays in the editor with a note that it awards nothing, and the toggle can still remove it.
 
 With a **Tiered check**, each success outcome tier is assigned its own result set, exactly the way [Routed by check]({% link crafting/recipes/routed.md %}) recipes work.
 A brew that fails the tiered check produces nothing.
@@ -99,7 +111,8 @@ You can change this with the system's Consume on Fail setting.
 
 You set this with the **Consume ingredients on a failed brew** toggle, on the **Alchemy behaviour** card of the **On failure** section of **Checks › Crafting**.
 It is on by default.
-The same toggle also governs a matched brew that fails its check, which consumes its ingredients the same way a fizzle does.
+The same toggle also governs a matched brew that fails a Simple check.
+A brew spends its bench when it starts, so with the toggle off a failed Simple brew returns those ingredients.
 You can also update it through the [System Manager API reference]({% link api/system-manager.md %}).
 
 ---
@@ -191,6 +204,8 @@ Below the list, a count tells you how many recipes in this discipline are still 
 You are never shown the names, ingredients, or results of a recipe that has not been revealed to you.
 That count is the only hint that there is more to find.
 
+{% include screenshot.html case="player-alchemy-known-recipe" caption="A known recipe loaded onto the bench, ready to brew." %}
+
 ### Building a combination
 
 Add a component to the bench by tapping it in Your components, or by dragging it onto the bench.
@@ -248,17 +263,25 @@ When that option is off, a combination that makes nothing keeps reading as **Unt
 **Brew** submits the components on the bench as an attempt for the selected character.
 
 - If the combination matches a recipe, that recipe is brewed.
-Its ingredients are consumed, its results are created, and a newly discovered recipe is added to your Known recipes list.
+Everything on the bench is consumed when the brew starts, including extra components the recipe does not need.
+The recipe's results are created, and when the system's [Learn on Craft](#learn-on-craft) setting is on, a newly discovered recipe is added to your Known recipes list.
+The brew draws only on the units you placed on the bench, never on other items the character holds.
+If the placed units cannot cover the recipe, for example because one component is needed both as itself and for its essence, the brew is refused and nothing is consumed.
+A refused brew is not recorded as a fizzle and does not discover the recipe.
+- A recipe with a time requirement starts when you brew it and finishes later from the Journal, and the banner says the mixture is set to work.
 - If the combination matches nothing, the attempt fizzles.
 Whether the components are consumed then depends on the system's [Consume on Fail](#consume-on-fail) setting.
 
 When the system's [Alchemy check](#the-alchemy-check) is Simple or Tiered, brewing a matching recipe prompts you to roll, the same way a check works elsewhere in Fabricate.
 The roll decides which result set the brew produces.
-A failed Simple check produces the recipe's failure result set instead of its success set, and it still counts as a brew, so the recipe can still be discovered.
+A failed Simple check produces the recipe's failure result set instead of its success set, if the recipe has one and the system's failed-check setting permits it, and it still counts as a brew, so the recipe can still be discovered.
 A combination that fizzles never runs a check, so there is no roll when an untried mix turns out to make nothing.
 
 A banner confirms the outcome after each brew.
-It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, or the mixture fizzled.
+It tells you whether you discovered a recipe, brewed a known one, produced a failure result because the check failed, failed its check with nothing produced, set a time-gated brew to work, left a brew waiting in your Journal, stopped a brew after it started, was refused, or the mixture fizzled.
+A brew that started but did not finish has already used the bench.
+When it is waiting for its check or a choice, the banner says the brew is waiting in your Journal.
+When you dismissed the roll or the brew was refused after it started, the banner says the brew did not finish, and you can finish or cancel it from the Journal.
 
 A failed brew is also recorded in the character's Journal history, whether it failed its check or fizzled with no match.
 A fizzle is listed there as a generic **Failed alchemy attempt** that never names a recipe, so it cannot reveal a recipe you have not yet discovered.
@@ -279,8 +302,9 @@ Each recipe has a single ingredient set that defines the hidden combination play
 
 {% include screenshot.html case="manager-recipe-edit-results-alchemy" caption="The result sets of an alchemy recipe." %}
 
-With a Simple check, each recipe has an **On success** result set and a separate **On a failed check** result set.
-Fill the failure set when you want a failed brew to produce something, or leave it empty to have a failed brew produce nothing.
+With a Simple check, each recipe has an **On success** result set.
+Turn on **Award results on a failed check** when you want a separate **On a failed check** result set, and fill it when you want a failed brew to produce something.
+Leave the toggle off, or leave the failure set empty, to have a failed brew produce nothing.
 Enable each recipe, because disabled recipes are never matched.
 The **Alchemy behaviour** card, on the **On failure** section of **Checks › Crafting**, carries the Consume on Fail, Learn on Craft, and Show attempt history to players settings.
 See the [System Manager API reference]({% link api/system-manager.md %}) and the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for the methods that create and configure systems and recipes.

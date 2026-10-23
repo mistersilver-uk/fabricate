@@ -63,7 +63,10 @@ describe('CraftingSystemManager attributes every persistence site', () => {
   const moduleSaveSites = (path) =>
     codeLines(managerModules.get(path) ?? '').filter((line) => /\bsaveSystems\(/.test(line));
   const saveSites = [
-    ...codeLines(systemManagerSource).filter((line) => /this\.save\(/.test(line)),
+    // `saveOrRestore(this, …)` persists through `save()` and restores memory on a throw.
+    ...codeLines(systemManagerSource).filter((line) =>
+      /this\.save\(|saveOrRestore\(this/.test(line)
+    ),
     ...[...managerModules.keys()].flatMap(moduleSaveSites),
   ];
 

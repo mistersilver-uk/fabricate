@@ -239,8 +239,15 @@ The setting **selects** a failure output you have already authored; it never inv
 A recipe with no failure result produces nothing on a failure even under **Always**, so switching to **Always** cannot make an existing recipe start handing out items you did not write.
 
 Where you author that output depends on the resolution mode.
-In **simple** mode and in Alchemy's **Simple check** mode it is the recipe's reserved failure result set, which the Results tab draws with a danger border.
-In **Routed by check** mode it is an outcome tier you have marked as a failure: while this setting permits failure results, those tiers appear in the result set's **Produced on outcome** picker and you bind a result set to them exactly as you would to a success tier.
+In **simple** mode and in Alchemy's **Simple check** mode it is the recipe's reserved failure result set.
+A recipe has none until its group is added through **Award results on a failed check** on the Results tab of a single-step recipe.
+A step of a multi-step recipe does not offer that toggle yet.
+Turning that on adds an empty **On a failed check** set, drawn locked with a **reserved role** badge.
+Turning it off removes the set and its results.
+An empty failure set is allowed, and a failed check then produces nothing.
+Under **Never**, a recipe with no failure set shows the toggle switched off and disabled, and a button opens this check so you can change the setting.
+A failure set the recipe already has stays drawn, and the toggle can still remove it, but it awards nothing while the setting is **Never**.
+In **Routed by check** mode it is an outcome tier you have marked as a failure: while this setting permits failure results, those tiers appear in the **Assign** list on the result set's **Produced by** line and you bind a result set to them exactly as you would to a success tier.
 Turn the setting back to **Never** and they stop being offered and stop routing — but nothing you authored is deleted, and it all comes back when you permit failure results again.
 
 **Routed by ingredients** and **Progressive** have no failure outcome to mark, so the setting is inert in those modes and the section says so rather than showing a control that does nothing.

@@ -56,8 +56,14 @@ describe('essence colour tokens (issue 917)', () => {
   it('offers exactly the shared --fab-tag-* palette', () => {
     assert.deepEqual(
       [...ESSENCE_COLOR_TOKENS],
-      ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']
+      ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve', 'verdant', 'azure']
     );
+  });
+
+  it('accepts verdant and azure, and normalizes a withheld tint to null', () => {
+    assert.equal(normalizeEssenceColorToken('verdant'), 'verdant');
+    assert.equal(normalizeEssenceColorToken('--fab-tag-azure'), 'azure');
+    assert.equal(normalizeEssenceColorToken('ember'), null, 'a withheld tint is not offered');
   });
 
   it('stores a palette token bare, stripping a --fab-tag- prefix', () => {

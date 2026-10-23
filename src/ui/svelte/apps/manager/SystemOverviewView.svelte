@@ -75,6 +75,10 @@
       'IssueUnproducedOutcomeTier',
       'A check outcome produces no result set.',
     ],
+    unreachableResultGroup: [
+      'IssueUnreachableResultGroup',
+      'A result set is not reached by any ingredient set.',
+    ],
     missingTaughtRecipe: [
       'IssueMissingTaughtRecipe',
       'A result teaches a recipe that is no longer in this system.',

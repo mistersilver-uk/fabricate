@@ -2,10 +2,9 @@
 import { flushSync, mount, unmount } from 'svelte';
 
 import { FABRICATE_THEME_ATTRIBUTE } from '../../../theme.js';
-import {
-  APPLICATION_HOST_SELECTOR,
-  STANDALONE_OVERLAY_HOST_CLASS,
-} from '../../util/overlayHost.js';
+import { mountWithLocalizer } from '../../util/appLocalizer.js';
+import { localize } from '../../util/foundryBridge.js';
+import { APPLICATION_HOST_SELECTOR, createStandaloneOverlayLayer } from '../../util/overlayHost.js';
 import { activeRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
 /**
@@ -31,13 +30,10 @@ function applicationOf(host) {
   return frame ? (globalThis.foundry?.applications?.instances?.get(frame.id) ?? null) : null;
 }
 
+// The prompt's own layer, never the published seam's shared one, so each is removed by its owner.
 function createStandaloneHost(doc) {
-  const layer = doc.createElement('div');
-  layer.className = `fabricate ${STANDALONE_OVERLAY_HOST_CLASS}`;
   const theme = doc.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE);
-  if (theme) layer.setAttribute(FABRICATE_THEME_ATTRIBUTE, theme);
-  doc.body.append(layer);
-  return layer;
+  return createStandaloneOverlayLayer(doc, theme ? { [FABRICATE_THEME_ATTRIBUTE]: theme } : {});
 }
 
 /**
@@ -68,7 +64,7 @@ export async function openRollPromptModal(
   {
     doc = globalThis.document,
     loadComponent = () => import('./RollPrompt.svelte'),
-    mountComponent = mount,
+    mountComponent = mountWithLocalizer(mount, localize),
     unmountComponent = unmount,
     resolveApplication = applicationOf,
   } = {}

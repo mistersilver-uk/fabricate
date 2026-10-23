@@ -51,6 +51,8 @@ Players still walk into the region and get the prompt.
 Placing interactables is **GM-only**.
 There are three ways to place one:
 
+{% include screenshot.html case="interactables-browser-tools" caption="The Interactable browser's Tools tab." %}
+
 1. **Interactable browser.** A GM-only **Fabricate** button in the scene controls (its own mortar-and-pestle control group) opens the **Interactable browser**.
    It lists the active crafting system's tools and gathering tasks that can be dragged out.
    Each row offers:

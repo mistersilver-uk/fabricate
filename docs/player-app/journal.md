@@ -180,6 +180,9 @@ When a run reaches a result that you choose, the run owes you a pick and nothing
 The run shows **Choose your reward** and waits.
 Pick the alternatives you want in the run's detail in the Journal.
 A line above the tiles states the ceiling, such as "Choose up to 2 rewards".
+
+{% include screenshot.html case="player-journal-award-choice" caption="A run waiting on a reward the player has not yet chosen." %}
+
 You may tick fewer, and unticking one frees a slot for another.
 Then use the claim button, such as **Claim 2 rewards**, to take what you ticked.
 

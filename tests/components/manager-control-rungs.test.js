@@ -68,7 +68,7 @@ function bodiesOf(selector) {
 }
 
 describe('M12a — a manager button takes the corner its height is on', () => {
-  const PRIMITIVE = '.fabricate-button.fabricate-button.fab-manager-button';
+  const PRIMITIVE = '.fabricate-button.fabricate-button.fabricate-button';
 
   it('publishes both ladders, so the numbers below are read and not restated', () => {
     // Non-vacuity for the whole file.
@@ -109,14 +109,17 @@ describe('M12a — a manager button takes the corner its height is on', () => {
    * @returns {Array<{ selector: string, height: number, radius: number | null }>}
    */
   function convertedButtonsBelowTheBand() {
+    // A converted button's rule names the root at least twice; issue 2540 re-spelled the retired
+    // primitive token as a repeat of the root, so the doubled root is now the marker.
+    const CHAINED = '.fabricate-button.fabricate-button';
     const all = rules();
     const heights = new Map();
     for (const { selector, body } of all) {
-      if (!selector.includes('fab-manager-button') || selector === PRIMITIVE) continue;
+      if (!selector.includes(CHAINED) || selector === PRIMITIVE) continue;
       const height = pixels(valueOf(body, 'height')) ?? pixels(valueOf(body, 'min-height'));
       if (height === null || height >= BAND_9[0]) continue;
       for (const part of selector.split(',').map((one) => one.trim())) {
-        if (part.includes('fab-manager-button')) heights.set(part, height);
+        if (part.includes(CHAINED)) heights.set(part, height);
       }
     }
     return [...heights].map(([selector, height]) => {
@@ -152,8 +155,8 @@ describe('M12a — a manager button takes the corner its height is on', () => {
       convertedButtonsBelowTheBand().map((entry) => [entry.selector, entry])
     );
     for (const selector of [
-      '.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters',
-      '.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button'
+      '.fabricate-button.fabricate-button.fabricate-button.manager-clear-filters',
+      '.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fabricate-button'
     ]) {
       const entry = bySelector.get(selector);
       assert.ok(entry, `\`${selector}\` is still a converted button below the band`);
@@ -270,7 +273,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
   const BUTTON = 'src/ui/svelte/components/Button.svelte';
-  const buttonRule = '.fabricate-button.fabricate-button.fab-manager-button.is-size-38';
+  const buttonRule = '.fabricate-button.fabricate-button.fabricate-button.is-size-38';
 
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
     const [body] = bodiesOf(buttonRule);
@@ -283,7 +286,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       null,
       'the rung restates a corner the primitive already declares for this whole band'
     );
-    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fabricate-button');
     assert.equal(
       pixels(valueOf(primitive, 'border-radius')),
       9,
@@ -293,7 +296,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
-    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fabricate-button');
     assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
     // A specificity claim, not a source-order one.
     assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
@@ -304,13 +307,30 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
   });
+
+  // ── THE 28px RUNG (issue 2515): a choice group's `Alternative` adder ──────────────────────
+  const rung28 = '.fabricate-button.fabricate-button.fabricate-button.is-size-28';
+  const dashed = '.fabricate-button.fabricate-button.fabricate-button.is-dashed';
+
+  it('gives the 28px rung its height, over the dashed role’s pinned 34, and the 26-32 band’s corner', () => {
+    const [body] = bodiesOf(rung28);
+    assert.equal(pixels(valueOf(body, 'height')), 28, 'the rung pins the height the role pins');
+    assert.equal(pixels(valueOf(body, 'min-height')), 28, 'and lowers the floor with it');
+    assert.equal(pixels(valueOf(body, 'border-radius')), 7, 'a 28px control corners at 7');
+    assert.ok(28 >= BAND_7[0] && 28 <= BAND_7[1], '28 is inside the band whose corner is 7');
+    const [roleBody] = bodiesOf(dashed);
+    assert.equal(pixels(valueOf(roleBody, 'height')), 34, 'the role it overrides pins 34');
+    // Both are four classes, so the rung wins by standing later in the one sheet.
+    const at = (selector) => rules().findIndex((rule) => rule.selector === selector);
+    assert.ok(at(rung28) > at(dashed), 'the rung follows the dashed role in source order');
+  });
 });
 
 describe('M12a — an inspector rail’s verbs take the manager button’s rung (issue 1521)', () => {
   const MANAGER = 'src/ui/svelte/apps/manager';
   const FILES = [...new Set(INSPECTOR_VERB_SITES.map(({ file }) => file))];
   const GEOMETRY = new Set(['min-height', 'height', 'border-radius', 'font-size', 'padding']);
-  const BUTTON_CLASSES = new Set(['fabricate-button', 'fab-manager-button', 'is-full-width']);
+  const BUTTON_CLASSES = new Set(['fabricate-button', 'is-full-width']);
 
   /** The value a bare attribute (`true`) or a static one gives, for matching a site's hook. */
   function hookValue(node, name) {
@@ -335,7 +355,7 @@ describe('M12a — an inspector rail’s verbs take the manager button’s rung 
 
   it('states no rung or corner of its own on the primary', () => {
     // The retired 36px primary is gone; `control-height-ladder.test.js` reports it as shrunk.
-    for (const body of bodiesOf('.fabricate-button.fabricate-button.fab-manager-button.is-primary')) {
+    for (const body of bodiesOf('.fabricate-button.fabricate-button.fabricate-button.is-primary')) {
       assert.equal(valueOf(body, 'min-height'), null, 'the primary states no height of its own');
       assert.equal(valueOf(body, 'border-radius'), null, 'and no corner of its own');
     }

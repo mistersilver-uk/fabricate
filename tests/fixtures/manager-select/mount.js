@@ -14,7 +14,7 @@ import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/syst
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
-import PickerRow from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
+import PickerRow from '../../../src/ui/svelte/components/PickerRow.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
@@ -43,9 +43,8 @@ frame.append(mountPoint);
 document.body.append(frame);
 
 /**
- * The three caption shapes around one bare `Select`, hosted the way the manager's `Pagination`
- * page-size row hosts its control (the wrapper class is the difference under test); the `showTick`
- * refusal matches that shipped row.
+ * The three caption shapes around one bare `Select`, hosted in an inline caption-and-control row
+ * (the wrapper class is the difference under test), with the tick column refused.
  */
 function mountShape() {
   mountCaptionShape({

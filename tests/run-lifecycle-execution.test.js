@@ -1114,6 +1114,7 @@ test('CraftingEngine prepares a versioned alchemy match from GM-resolved documen
     recipeId: 'secret-recipe',
     selectionPlan: { selectedIngredientSetId: 'set-secret' },
     submittedItemUuids: ['Actor.source.Item.herb'],
+    submittedComponentIds: ['herb'],
   });
   assert.equal(contexts[0].operation, 'prepareAlchemyStart');
   assert.deepEqual(actor.flags, {});

@@ -2,7 +2,11 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
-import { PREMIUM_ICONS_AD_PATTERN, WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  INSPECTOR_PANEL_PATTERN,
+  PREMIUM_ICONS_AD_PATTERN,
+  WORLD_SCOPE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -278,7 +282,9 @@ export const CASES = Object.freeze([
         target: '[data-world-component-bulk-mode]',
       },
       {
-        container: '[data-world-component-bulk-panel]',
+        // The dock bleeds past the panel's box and Apply ends on its content edge, so the dock is
+        // the container: a strict edge check against the panel would fail on sub-pixel rounding.
+        container: '[data-world-component-bulk-panel] > .fab-bulk-edit-dock',
         target: '[data-world-component-bulk-apply]',
       },
       // The two staged axes, so the frame is asserted to hold the changed panel rather than the resting one.
@@ -309,6 +315,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({
@@ -639,6 +646,29 @@ export const CASES = Object.freeze([
       WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
+  // The second frame of `world-vocabulary`: the tag band sits beneath the 2-up category grid and
+  // below the 1000px frame's fold, so this scrolls the band into the same frame (issue 2546).
+  managerCase({
+    id: 'world-vocabulary-tags',
+    label: 'Manager — World Tags & Categories, tag panel scrolled',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-vocabulary' },
+      { selector: '[data-vocabulary-panel="componentTags"]', scroll: true },
+    ],
+    expectView: 'world-vocabulary',
+    expectSelector: '[data-scoped-page="world-vocabulary"] [data-vocabulary-panel="componentTags"]',
+    position: { width: 1280, height: 1000 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
+    ],
+  }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
   managerCase({
     id: 'world-essence-catalogue-resting',
@@ -665,9 +695,9 @@ export const CASES = Object.freeze([
       expectedTracks: 2,
       fillSelector: '.manager-scoped-list-column > .manager-scoped-list-rows',
       alignedLeft:
-        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+        '.manager-scoped-list-frame, .manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-rows',
       alignedRight:
-        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-toolbar, .manager-scoped-list-column > .manager-scoped-list-rows',
+        '.manager-scoped-list-column, .manager-scoped-list-column > .manager-scoped-list-rows',
       controls: [
         {
           selector: '.manager-scoped-list-column > .manager-scoped-list-rows:last-child',
@@ -709,10 +739,10 @@ export const CASES = Object.freeze([
       },
     ],
     // The rail's one verb on the manager button's rung, in the success family (issue 1521), and
-    // the search and every row on one 12px gutter (issue 2373).
+    // the filter bar's box and every row on one 12px gutter (issues 2373, 2546).
     expectLayout: {
       containerSelector: '.manager-scoped-list-column',
-      alignedLeft: '.manager-scoped-list-toolbar .fabricate-search, [data-scoped-list-row]',
+      alignedLeft: '.manager-scoped-list-toolbar, [data-scoped-list-row]',
       controls: [
         {
           selector: '[data-scoped-essence-open-entry]',
@@ -761,7 +791,10 @@ export const CASES = Object.freeze([
         container: '[data-world-essence-bulk-panel]',
         target: '[data-world-essence-bulk-colour-state="rose"]',
       },
-      { container: '[data-world-essence-bulk-panel]', target: '[data-world-essence-bulk-apply]' },
+      {
+        container: '[data-world-essence-bulk-panel] > .fab-bulk-edit-dock',
+        target: '[data-world-essence-bulk-apply]',
+      },
       { container: '.manager-scoped-list-column', target: '[data-scoped-list-selection-count]' },
     ],
     expectCenterHit: '[data-world-essence-bulk-apply]',
@@ -773,6 +806,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
       // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/Bulk(?:EditPanelShell|EditSection|SelectionToolbar)\.svelte$/,
+      INSPECTOR_PANEL_PATTERN,
     ],
   }),
   managerCase({

@@ -25,6 +25,8 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
+  import { resultsProjection, scopeWrites } from './recipe/recipeRoutingEdits.js';
+  import { routedMinimum } from './recipe/recipeRoutingModel.js';
   import {
     blocksEnable,
     countRecipeReadiness,
@@ -32,14 +34,14 @@
   } from './recipe/recipeReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
+  import { arrayOrEmpty } from '../../../../utils/scalars.js';
 
   let {
     recipe = null,
     // Whether the mode allows more than one ingredient set: the single-set view's promotion (643).
     canAddSet = false,
-    // Alchemy Simple two-slot result editor (issue 554).
+    // The two-slot result editor: alchemy Simple (issue 554), and simple with the check on (643).
     alchemySimple = false,
-    // A simple system with the check enabled also gets the reserved-failure two slots (issue 643).
     simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
@@ -57,6 +59,8 @@
     componentTagOptions = [],
     essenceOptions = [],
     itemTags = [],
+    // Adds a tag to the system's vocabulary from an ingredient tag row's catalogue footer.
+    onCreateTag = null,
     checkTierOptions = [],
     checkEvaluation = null,
     minSuccessTierOptions = [],
@@ -73,11 +77,11 @@
     // Category lives on the Overview tab.
     categories = [],
     onSetCategory = () => {},
-    // Result routing (routed systems): the per-recipe routing mode and the system's routed-check
-    // outcome tiers for the result-set assignment controls.
+    // Result routing: the mode, the tiers the policy offers, and `routedCheckFacts`' every tier the
+    // system defines, the check's evaluation and its fixed gaps.
     routingProvider = null,
     routedOutcomeTierOptions = [],
-    routedOutcomeTiersDefined = false,
+    routedCheck = {},
     // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
     // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
@@ -119,9 +123,7 @@
 
   // Current single-step requirement scopes default to empty arrays so an unconfigured recipe still
   // renders the empty-state sections.
-  const ingredientSets = $derived(
-    Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
-  );
+  const ingredientSets = $derived(arrayOrEmpty(recipe?.ingredientSets));
   const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
@@ -142,65 +144,41 @@
   const collapsed = $derived(!multiStepEnabled && steps.length > 1);
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
-  // The recipe view the Results tab edits while collapsed: a single-step projection whose result
-  // groups, ingredient sets and routing come from the FINAL step. Writes route back to that step.
-  const resultsRecipe = $derived(
-    collapsed && finalStep
-      ? {
-          ...recipe,
-          resultGroups: Array.isArray(finalStep.resultGroups) ? finalStep.resultGroups : [],
-          ingredientSets: Array.isArray(finalStep.ingredientSets) ? finalStep.ingredientSets : [],
-          resultSelection: finalStep.resultSelection ?? recipe?.resultSelection ?? null,
-          outcomeRouting: finalStep.outcomeRouting ?? recipe?.outcomeRouting ?? null,
-        }
-      : recipe
-  );
-
-  // Check-mode routed recipes route by the crafting-check outcome, so ingredient sets are nameless
-  // there; ingredient mode and non-routed systems keep names.
-  const showSetName = $derived(routingProvider !== 'check');
+  // The recipe view the Results tab edits while collapsed. Writes route back to the final step.
+  const resultsRecipe = $derived(resultsProjection(recipe, finalStep));
 
   function stepById(stepId) {
     return steps.find((step) => step.id === stepId) || null;
-  }
-
-  // A set routes to at most one group, so assigning writes the canonical `resultGroupId` and
-  // replaces any prior target. A not-yet-saved group is ignored.
-  function assignIngredientSet(stepId, groupId, setId, assigned) {
-    if (!setId || (assigned && !groupId)) return;
-    // Collapsed chain (issue 710): the Results tab renders single-step (stepId null) over the
-    // FINAL step's data, so a routing assignment writes through to that step.
-    const scopeStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
-    const scopeSets =
-      scopeStepId == null ? ingredientSets : stepById(scopeStepId)?.ingredientSets || [];
-    const nextSets = scopeSets.map((set) =>
-      set.id === setId ? { ...set, resultGroupId: assigned ? groupId : null } : set
-    );
-    updateIngredientSets(scopeStepId, nextSets);
   }
   function stepToolIds(step) {
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
   }
 
-  // Append WITHOUT an id, since store normalization assigns one, and remove by id. A null stepId
-  // patches the recipe scope, a present one that step.
-  function updateIngredientSets(stepId, nextSets) {
-    if (stepId == null) onUpdateRecipe({ ingredientSets: nextSets });
-    else if (stepById(stepId)) onUpdateStep(stepId, { ingredientSets: nextSets });
-  }
-  // The section emits the whole replacement array, shallow-cloned to the changed node; group ids
-  // and names, which routing references, are preserved upstream.
-  function updateResultGroups(stepId, nextGroups) {
-    // Collapsed chain WRITE-THROUGH (issue 710): a null stepId edits the FINAL step's result
-    // groups, and recipe-level `resultGroups` stay empty, so re-enabling is lossless.
-    const targetStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
-    if (targetStepId == null) {
-      onUpdateRecipe({ resultGroups: nextGroups });
-      return;
-    }
-    if (!stepById(targetStepId)) return;
-    onUpdateStep(targetStepId, { resultGroups: nextGroups });
-  }
+  // The scope writers every tab shares: a null stepId patches the recipe, and a collapsed chain's
+  // groups and set routing write through to its final step (issue 710).
+  const writes = $derived(
+    scopeWrites({ ingredientSets, steps, finalStep, onUpdateRecipe, onUpdateStep })
+  );
+  const { tiers: routedOutcomeTiers = [], evaluation: routedEvaluation = null } = $derived(
+    routedCheck ?? {}
+  );
+  const minimum = $derived(
+    routedMinimum({
+      resolutionMode,
+      minSuccessOutcomeId: recipe?.minSuccessOutcomeId,
+      evaluation: routedEvaluation,
+    })
+  );
+  const routing = $derived({
+    provider: routingProvider,
+    tiers: routedOutcomeTierOptions,
+    rankedTiers: routedOutcomeTiers,
+    minimum,
+    gaps: routedCheck?.gaps ?? [],
+    componentOptions,
+    writes,
+  });
+
   // GM policy toggle (issue 651). Stages through the draft like every other authoring edit rather
   // than persisting immediately the way `onToggleEnabled` does.
   function toggleAllowPlayerResultReorder(next) {
@@ -289,10 +267,7 @@
   }
   function countResults(scope) {
     const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-    return groups.reduce(
-      (total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0),
-      0
-    );
+    return groups.reduce((total, group) => total + arrayOrEmpty(group?.results).length, 0);
   }
   function countTools(scope) {
     return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
@@ -487,6 +462,7 @@
             {craftingModifierMaxPicks}
             {craftingModifierInertCause}
             {onOpenChecks}
+            {routing}
             {locked}
             {onToggleLocked}
             {multiStepEnabled}
@@ -512,10 +488,10 @@
             {componentOptions}
             {essenceOptions}
             {itemTags}
+            {onCreateTag}
             {componentTagOptions}
-            {showSetName}
             {routingProvider}
-            onUpdateIngredientSets={updateIngredientSets}
+            onUpdateIngredientSets={writes.sets}
             onDeleteStep={deleteStepFrom('ingredients')}
           />
         {:else if activeTab === 'results'}
@@ -534,11 +510,14 @@
             {routingProvider}
             {progressive}
             {onOpenComponent}
+            {onOpenChecks}
             outcomeTierOptions={routedOutcomeTierOptions}
-            outcomeTiersDefined={routedOutcomeTiersDefined}
+            {routedOutcomeTiers}
+            routedMinimum={minimum}
+            outcomeTiersDefined={routedOutcomeTiers.length > 0}
             failureResultsAllowed={routedFailureResultsAllowed}
-            onAssignIngredientSet={assignIngredientSet}
-            onUpdateResultGroups={updateResultGroups}
+            onAssignIngredientSet={writes.assignSet}
+            onUpdateResultGroups={writes.groups}
             onDeleteStep={deleteStepFrom('results')}
             onToggleAllowPlayerResultReorder={toggleAllowPlayerResultReorder}
           />
@@ -551,6 +530,7 @@
             {toolIds}
             {toolsLibrary}
             {routingProvider}
+            onUpdateIngredientSets={writes.sets}
             onAddTool={addTool}
             onRemoveTool={removeTool}
             onAddStepTool={addStepTool}

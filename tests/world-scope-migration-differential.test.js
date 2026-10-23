@@ -942,7 +942,7 @@ function foldEssenceQuantities(projection, ids) {
 
 test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is unchanged but for the merge', () => {
   // The same criterion one migration later, over the corpus issue 1654 reports: two systems whose
-  // "Iron" arrived under unrelated ids, because `adminStore.addEssence` mints a
+  // "Iron" arrived under unrelated ids, because the retired system-side essence create minted a
   // `crypto.randomUUID()` and `1.30.0` groups essences by trimmed `id`.
   const raw = buildRawCorpus({
     seed: 1654,

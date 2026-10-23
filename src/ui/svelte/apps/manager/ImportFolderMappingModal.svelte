@@ -6,8 +6,7 @@
 
   The dialog chrome comes from the shared `Modal` primitive (issue 877), so this modal and
   the post-import reference report are ONE implementation of "manager modal dialog"; this file owns
-  only the mapping body, and each row mirrors the compact `RecipeRoutingAssignment` +
-  `SearchablePopover` "assign X per Y" pattern.
+  only the mapping body, and each row's tags are `SetPicker`'s staged token run (issue 2512).
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -17,9 +16,9 @@
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import Button from '../../components/Button.svelte';
   import Modal from '../../components/Modal.svelte';
-  import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import Select from '../../components/Select.svelte';
+  import SetPicker from '../../components/SetPicker.svelte';
 
   let {
     open = false,
@@ -138,26 +137,15 @@
   );
   const importDisabled = $derived(importCount === 0);
 
-  // Every existing tag, UNFILTERED, which IS `RecipeRoutingAssignment`'s contract: it derives its
-  // own picker from `options` beside `selectedIds`. Filtering here would be a divergent copy of
-  // that rule and would break the selected chips, whose labels resolve back through `options`.
-  function tagOptionsFor(_state) {
-    return (itemTags || []).map((tag) => ({ id: tag, name: `#${tag}` }));
-  }
+  // Every existing tag, unfiltered: the tokens resolve their labels back through these options.
+  const tagOptions = $derived((itemTags || []).map((tag) => ({ id: tag, label: `#${tag}` })));
 
   function setCategory(index, value) {
     assignments[index] = { ...assignments[index], category: value };
   }
 
-  function addTag(index, tag) {
-    const current = assignments[index].tags || [];
-    if (current.includes(tag)) return;
-    assignments[index] = { ...assignments[index], tags: [...current, tag] };
-  }
-
-  function removeTag(index, tag) {
-    const current = assignments[index].tags || [];
-    assignments[index] = { ...assignments[index], tags: current.filter((t) => t !== tag) };
+  function setTags(index, tags) {
+    assignments[index] = { ...assignments[index], tags };
   }
 
   function toggleSkip(index) {
@@ -329,21 +317,22 @@
                 <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
               </Button>
 
-              <RecipeRoutingAssignment
-                options={tagOptionsFor(row.state)}
-                selectedIds={row.state.tags}
+              <SetPicker
+                value={row.state.tags}
+                options={tagOptions}
                 label={text('FABRICATE.Admin.Items.ImportMapping.Tags', 'Tags')}
                 addLabel={text('FABRICATE.Admin.Items.ImportMapping.AddTag', 'Add tag')}
-                placeholder={text(
+                addProps={{ 'data-import-mapping-add-tag': '' }}
+                searchLabel={text(
                   'FABRICATE.Admin.Items.ImportMapping.SearchTags',
                   'Search tags...'
                 )}
-                emptyHint={text(
+                emptyLabel={text(
                   'FABRICATE.Admin.Items.ImportMapping.NoTags',
                   'No tags yet — create them in Tags & Categories.'
                 )}
-                onAdd={(tag) => addTag(row.index, tag)}
-                onRemove={(tag) => removeTag(row.index, tag)}
+                data-import-mapping-tags=""
+                onChange={(next) => setTags(row.index, next)}
               />
             </div>
 
@@ -410,15 +399,11 @@
   }
 
   /* The row's inline actions are secondary to the dialog's Cancel and Import, which keep the
-     default 34px so the commit action stays the heaviest thing in the footer.
-     RE-CHAINED, and split in two, at the conversion (issue 1118). `:global()` is load-bearing: the
-     row carries this component's hash and the buttons inside it do not. At (0,3,0) this rule TIED
-     the primitive's own compound and kept its 28px only on injection order, so naming that class
-     takes it to (0,4,0). The SECOND selector is the half a plain re-chain would have broken: the
-     "Add tag" control is a `SearchablePopover` trigger from a `triggerClass` STRING and will never
-     carry `fab-manager-button`, so it is named by its own trigger class instead. */
-  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button),
-  .manager-import-mapping-row :global(.fabricate-button.manager-recipe-routing-add-trigger) {
+     default 34px so the commit action stays the heaviest thing in the footer. `:global()` is
+     load-bearing: the row carries this component's hash and the buttons inside it do not. At
+     (0,3,0) this rule TIED the primitive's own compound and kept its 28px only on injection order,
+     so naming the root again takes it to (0,4,0) (issues 1118, 2540). */
+  .manager-import-mapping-row :global(.fabricate-button.fabricate-button) {
     min-height: 28px;
     border-radius: 7px;
     padding: 0 var(--fab-space-2);
@@ -428,7 +413,7 @@
   /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
      (0,4,0) and is settled by injection order, so the row's compact padding is restated one class
      higher. Only `padding`: the other two are uncontested. */
-  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button.is-primary) {
+  .manager-import-mapping-row :global(.fabricate-button.fabricate-button.is-primary) {
     padding: 0 var(--fab-space-2);
   }
 

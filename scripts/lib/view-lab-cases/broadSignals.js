@@ -26,13 +26,16 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * selects surface coverage.
  */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
-  // The tint palette's pressed cell (issue 2257) and keyboard cursor (issue 2416): the New-biome
-  // popover at rest and under the cursor, and the world essence entry's inline palette.
+  // The tint palette's selected tile (issue 2257), its cursor (issue 2416) and its grid form (issue
+  // 2459): the New-biome popover at rest and under the cursor, the biome edit palette, and the
+  // inline strip in the world essence entry and the catalogue's bulk panel.
   'src/ui/svelte/components/TintPicker.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
     'world-essence-entry-dirty',
     'manager-gathering-biome-colour-popover-cursor',
     'manager-gathering-biome-colour-popover-cursor-selected',
+    'manager-gathering-biome-colour-edit-popover',
+    'world-essence-catalogue-bulk',
   ]),
   'src/ui/svelte/components/TintPickerButton.svelte': Object.freeze([
     'manager-gathering-biome-colour-popover',
@@ -109,10 +112,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-finished-failure',
     'fabricate-journal-lifecycle-finished-cancelled',
   ]),
-  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's.
+  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's,
+  // then its specimen mounted through the published seam (issue 2455).
   'src/ui/svelte/components/StageBars.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
+    'manager-published-stage-bars-specimen',
   ]),
   // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage.
   'src/ui/svelte/components/Meter.svelte': Object.freeze([
@@ -181,6 +186,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-alchemy-workbench',
     'player-alchemy-chooser',
   ]),
+  // A browse list's loading and error forms (issue 2548): the systems library loading, the
+  // environment browser's failed load and the Knowledge roster loading.
+  'src/ui/svelte/components/ListState.svelte': Object.freeze([
+    'manager-systems-loading',
+    'manager-environments-load-error',
+    'manager-knowledge-loading',
+  ]),
   // The preview scale, the two historical branches no other frame draws, and the gathering
   // preview's authored-order scale, closed and with its breakdown open (issue 1644); then the
   // shared-model history rows at both widths (issue 2257).
@@ -223,10 +235,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
-  // the outcome tiers' Failure row is its formatted null endpoint (issue 2357).
+  // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
+  // specimens that mount it through the published seam (issue 2452).
   'src/ui/svelte/components/Stepper.svelte': Object.freeze([
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
+    'manager-published-steppers-specimen',
+    'manager-published-steppers-button-focus',
   ]),
   // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
@@ -258,23 +273,40 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'coverage-mode-routed-check-checks',
     'manager-gathering-time-of-day-bar',
   ]),
-  // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame.
+  // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame,
+  // plus the captions issue 2532's kicker reaches and two scoped captions it must leave alone.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-currency-body-empty',
+    'manager-selected-condition-select-long-option',
+    'manager-checks-crafting-trigger-break-tools',
+    'manager-gathering-task-stamina-modifier-list',
+    'world-tool-entry',
+    'interactables-config-configured',
+    'manager-component-edit-salvage',
+    'player-crafting-roll-prompt-basic',
+    'manager-import-folder-mapping',
   ]),
   // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches only its neutral state.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
-  // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections.
+  // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections: the
+  // pane host, the gathering panel, and the three hosts that pad their own content (issue 2546).
   'src/ui/svelte/components/FilterBar.svelte': Object.freeze([
     'world-component-catalogue',
     'manager-environments-browse-normal',
+    'manager-essences-normal',
+    'world-tool-catalogue',
+    'interactables-browser-tools',
+    'world-vocabulary',
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
-  // Tools library card, and the compact form in the task editor and the entry systems card.
+  // Tools library card, the compact form in the task editor and the entry systems card, and the
+  // specimen that mounts it through the published seam (issue 2453).
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
@@ -286,12 +318,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-access-recipe-selected',
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
+    'manager-published-search-specimen',
   ]),
-  // The manager's card shell (issue 1427), extracted from 80 hand-written inspector-card sections.
+  // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
+  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card.
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
     'manager-published-leaves-specimen',
+    'manager-tool-parity-01-library-1280x720',
+    'manager-world-travel-realms-normal',
+    'manager-world-travel-map-normal',
+    'manager-world-travel-map-empty',
   ]),
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
@@ -364,7 +402,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
   ]),
-  // The shared empty panel.
+  // The shared empty panel, then (issue 2550) the player window's `note` line, the `inline` form,
+  // a `compact fill` journal body and the hero in a narrow host.
   'src/ui/svelte/components/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
@@ -374,6 +413,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
     'manager-published-leaves-specimen',
+    'player-inventory-bulk-none-salvageable',
+    'manager-component-complications-empty',
+    'fabricate-journal-history-batch-empty-1240',
+    'player-alchemy-workbench',
   ]),
   // The link field (issue 2466): the world Tool screens, then at least one frame of each of its nine other hosts.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
@@ -394,15 +437,23 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-v3-count-additional-dice-macro-pair',
     'manager-checks-v3-count-additional-dice-macro-pair-narrow',
     'manager-component-complications-macro-linked',
+    'manager-component-complications-macro-missing',
   ]),
-  // The radio-card group (issue 1373), and the player's crafting routes (issue 1778).
+  // The radio-card group (issue 1373), the player's crafting routes (issue 1778), and the
+  // Crafting Settings, Checks Studio and Journal faces it converged (issue 2467).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
     'player-crafting-ingredient-routed',
+    'manager-crafting-settings',
+    'manager-checks-crafting-modifiers',
+    'fabricate-journal-lifecycle-ingredient-route',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
-  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze(['manager-recipe-edit-normal']),
+  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
+    'manager-recipe-edit-normal',
+    'manager-recipe-edit-results-failure-optin',
+  ]),
   // A third entry as of issue 1458, and it is a third mode rather than a third instance.
   'src/ui/svelte/components/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
@@ -427,6 +478,50 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-depleted-image-filled',
     'manager-gathering-task-depleted-image-empty',
   ]),
+  // The routing line (issue 2512): a routed result set in each routed mode, Assign open, and each
+  // state it draws — shared, long and truncated, unreachable, by default, struck tiers, and the
+  // longest hint at the floor.
+  'src/ui/svelte/components/RouteSources.svelte': Object.freeze([
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-failure-tier',
+    'manager-recipe-edit-results-routed-shared',
+    'manager-recipe-edit-results-routed-shared-narrow',
+    'manager-recipe-edit-results-routed-unreachable',
+    'manager-recipe-edit-results-routed-default',
+    'manager-recipe-edit-results-routed-assign',
+    'manager-recipe-edit-results-routed-check-stale',
+    'manager-recipe-edit-results-routed-check-policy-hint-narrow',
+  ]),
+  // The routing overview (issue 2513): the salvage well's outcome routing, at rest and shared at
+  // the declared floor, and the recipe Overview's routing card in each state it draws.
+  'src/ui/svelte/components/RoutingOverview.svelte': Object.freeze([
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-routed-narrow',
+    'manager-recipe-edit-overview-routing-ingredients',
+    'manager-recipe-edit-overview-routing-default',
+    'manager-recipe-edit-overview-routing-check',
+    'manager-recipe-edit-overview-routing-check-narrow',
+    'manager-recipe-edit-overview-routing-check-permitted',
+    'manager-recipe-edit-overview-routing-distinct',
+    'manager-recipe-edit-overview-routing-multistep',
+  ]),
+  // The set card (issue 2512): an ingredient set, a routed result set in each routed mode, the
+  // reserved pair and a salvage group.
+  'src/ui/svelte/components/SetCard.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients-sets',
+    'coverage-mode-routed-ingredients-results',
+    'coverage-mode-routed-check-results',
+    'manager-recipe-edit-results-alchemy',
+    'manager-component-edit-salvage',
+    'manager-recipe-edit-ingredients-check-rename',
+    'manager-recipe-edit-tools-ingredient-sets',
+    'manager-recipe-edit-results-routed-unreachable',
+    'manager-recipe-edit-results-set-menu',
+    'manager-recipe-edit-results-set-menu-narrow',
+    'manager-recipe-edit-results-alchemy-narrow',
+    'manager-recipe-edit-results-failure-optin-on',
+  ]),
   // The set picker (issue 1782): the session form, and the staged form closed, open, staged and over its bound.
   'src/ui/svelte/components/SetPicker.svelte': Object.freeze([
     'player-crafting-sources-picker',
@@ -445,12 +540,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-availability-menu',
     'player-actor-picker',
     'manager-recipe-edit-tag-picker',
+    'manager-recipe-edit-tag-picker-new-tag',
+    'manager-recipe-edit-tag-picker-new-tag-created',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-essences-source-picker',
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
     'manager-recipes-bulk-edit-check-tier',
-    'player-inventory-page-size',
+    'manager-component-edit-category-list',
     'interactables-manager-region-open',
     'manager-recipe-edit-crafting-modifier-cap-reached',
     'manager-system-edit-lists',
@@ -471,12 +568,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // body visible is the only state in which the control is more than a chevron.
   'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
-  // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510), and the two specimens
+  // that mount it through the published seam open its list in an overlay host and on the
+  // standalone layer (issue 2454).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'manager-recipe-edit-ingredients-kind-list',
-    'player-inventory-page-size',
+    'manager-component-edit-category-list',
     'interactables-manager-region-open',
+    'manager-published-select-specimen',
+    'manager-published-select-layer',
   ]),
   // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
@@ -509,12 +610,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-books-scrolls-item',
     'manager-published-leaves-specimen',
   ]),
-  // The surface that reports something that just happened (issue 1505), on two callers.
+  // The surface that reports something that just happened (issue 1505), on two callers. Then the
+  // specimens that mount it through the published seam, its dismissal's two among them (issue 2452).
   'src/ui/svelte/components/Notice.svelte': Object.freeze([
     'player-inventory-bulk-report',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'manager-published-notice-dismiss-focus',
+    'manager-published-notice-dismissed',
   ]),
   // The strip of current values (issue 1521): the check card's badge, target and source facts, its
   // formula fact over the danger notice, and the gathering stamina pool under its kicker.
@@ -528,6 +632,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
+    'manager-recipe-edit-results-failure-policy-never-present',
     // The `items` form, which only the essence On craft primer draws (issue 1521).
     'manager-essence-edit-unscoped-on-craft',
   ]),
@@ -575,10 +680,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
   ]),
-  // The pager's two player forms: the inventory's persistent bar and the recipe browser's threshold one.
+  // The arm-then-confirm control (issue 2563): the three bulk-delete cards and a knowledge row, armed.
+  'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze([
+    'manager-recipes-bulk-delete-armed',
+    'manager-components-bulk-delete-armed',
+    'manager-essences-bulk-delete-armed',
+    'manager-knowledge-delete-armed',
+  ]),
+  // The pager's two player forms (the inventory's persistent bar and the recipe browser's threshold
+  // one), its manager footer on a second page, and the journal's compact pager.
   'src/ui/svelte/components/Pagination.svelte': Object.freeze([
     'player-inventory',
     'player-crafting-simple',
+    'world-tool-catalogue-page-two',
+    'player-journal-stacked',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
   // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
@@ -590,9 +705,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-essence-shopping',
     'player-crafting-pick-for-me',
   ]),
-  // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
+  // The track (issue 1516): its 30px inline rung is drawn by the requirement row's amount toggle and the compact pager's page-size control.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
+    'player-journal-stacked',
   ]),
   // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
   'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([
@@ -614,11 +730,178 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-results-group-rolled-overlap-narrow',
     'manager-recipe-edit-results-group-failure-role',
   ]),
+  // The requirement row family (issue 2510), each part on the states that draw it: the row itself on
+  // ingredients, results, every chooser and strategy cell, salvage, a gathering task and Tool repair.
+  'src/ui/svelte/components/PickerRow.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-suggestions',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-player-upto',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-component-edit-salvage',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+    'world-tool-entry-on-break-repair-empty-tag',
+    'world-tool-entry-on-break-repair-suggestions',
+    'manager-component-edit-salvage-suggestions',
+    'manager-recipe-edit-tag-picker-new-tag',
+    'manager-recipe-edit-tag-picker-new-tag-created',
+    'manager-recipe-edit-ingredients-tag-row-two-tags',
+    'manager-recipe-edit-ingredients-cost',
+    'manager-recipe-edit-tag-picker',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
+  ]),
+  'src/ui/svelte/components/PickerRowNameField.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-suggestions',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-suggestions',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-player-upto',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-component-edit-salvage-suggestions',
+    'manager-component-edit-salvage-narrow',
+    'manager-gathering-task-editor-straight-rolled',
+    'world-tool-entry-on-break-repair-suggestions',
+    'manager-tool-stress-repair',
+  ]),
+  'src/ui/svelte/components/PickerRowAmount.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-suggestions',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-rolled',
+    'manager-recipe-edit-results-rolled-narrow',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-player-upto',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-component-edit-salvage-rolled-narrow',
+    'manager-gathering-task-editor-straight-rolled',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ]),
+  'src/ui/svelte/components/PickerRowKindMenu.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-ingredients-kind-list',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-kinds',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+  ]),
+  'src/ui/svelte/components/PickerRowRewardBody.svelte': Object.freeze([
+    'manager-recipe-edit-results-kinds',
+    'manager-recipe-edit-results-kinds-narrow',
+    'manager-recipe-edit-results-currency-body-empty',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-learning-off',
+    'manager-recipe-edit-results-missing-recipe',
+  ]),
+  'src/ui/svelte/components/PickerRowRangeCell.svelte': Object.freeze([
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-recipe-edit-results-group-rolled-upto-repeats-narrow',
+    'manager-recipe-edit-results-group-rolled-overlap',
+    'manager-recipe-edit-results-group-rolled-overlap-narrow',
+    'manager-recipe-edit-validation-choice-group',
+  ]),
+  'src/ui/svelte/components/ChoiceGroup.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-suggestions',
+    'manager-recipe-edit-choice-group-menu',
+    'manager-recipe-edit-ingredients-adder-menu',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-results-currency-body-filled',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-player-upto',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-recipe-edit-results-group-failure-role',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+    'manager-gathering-task-editor-straight-rolled',
+  ]),
+  'src/ui/svelte/components/ChoiceGroupAwardHeader.svelte': Object.freeze([
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-player-upto',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-recipe-edit-results-group-rolled-upto-repeats-narrow',
+    'manager-recipe-edit-results-group-rolled-overlap',
+    'manager-recipe-edit-results-group-rolled-overlap-narrow',
+    'manager-recipe-edit-results-group-failure-role',
+    'manager-recipe-edit-validation-choice-group',
+  ]),
+  'src/ui/svelte/components/KindAdder.svelte': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-ingredients-adder-menu',
+    'manager-recipe-edit-choice-group-menu',
+    'manager-recipe-edit-ingredients-sets',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-results-progressive-adder',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-rolled-anyone',
+    'manager-tool-stress-repair',
+    'world-tool-entry-on-break-repair',
+    'world-tool-entry-on-break-repair-empty-tag',
+  ]),
+  'src/ui/svelte/components/pickerRowKinds.js': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-kind-list',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-kinds',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-kind-list',
+  ]),
+  'src/ui/svelte/components/resultGroupEdits.js': Object.freeze([
+    'manager-recipe-edit-ingredients-choice-group',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-group-player-anyone',
+    'manager-recipe-edit-results-group-rolled-upto-repeats',
+    'manager-recipe-edit-validation-choice-group',
+  ]),
+  'src/ui/svelte/components/resultRows.js': Object.freeze([
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-results',
+    'manager-recipe-edit-results-rolled',
+    'manager-recipe-edit-results-kinds',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-rolled-narrow',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
+  // Every module-sheet partial stands as this key (issue 1711), so issue 2512's four name one frame
+  // each: the set card's rules in the recipe-editor sheet, the recipe editor's set chrome, the
+  // single bare set, and the salvage group card; issue 2513 adds the Overview's routing card.
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-world-downtime-tracking',
     'manager-world-downtime-collapsed',
+    'manager-recipe-edit-results-routed-shared',
+    'manager-recipe-edit-ingredients-sets',
+    'manager-recipe-edit-ingredients',
+    'manager-component-edit-salvage',
+    'manager-recipe-edit-overview-routing-check',
   ]),
 });
 

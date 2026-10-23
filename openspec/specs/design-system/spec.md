@@ -49,13 +49,15 @@ A ListRow given none of the selectable form's props MUST draw the dense output u
 The selectable dense form's opt-in `inset="row"` MUST take the dense row's space-2/space-3 inset; the default keeps space-1/space-2, and the prop is inert at `density="default"`, at `layout="card"` and on a row that draws no selectable form.
 The opt-in `detailAlign="end"` MUST hold a truncated row's detail at its trailing edge, at most 40% of the row, in the muted ink; the default keeps the 50% detail column.
 The opt-in `bodyBasis="fill"` MUST give a selectable form's body `flex: 1 1 0`, so a reading set under the name wraps inside the body and the row's trailing figures stay on its first flex line; the default keeps `flex: 1 1 auto` (issue 2257 D15).
-Its loading and error forms remain targets in the library.
+ListRow is shipped; a browse list's loading and error forms are `ListState`'s, not the row's (issue 2548).
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
 The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
 Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
-Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
+The page-size control is a `SegmentedControl` (SegmentedControl `inline` density in a compact pager), named by the visible "Per page" caption through `aria-labelledby` (the caption stays visible in a compact pager, where only the page-position label is visually hidden), and is not rendered when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values (issue 2546, M1, superseding issue 1504's `Select` for the pager).
+The default pager's fill is `--fab-bg-1` on every route and caller and its footer stays square; a compact pager is transparent.
+Journal browse density uses the 38px search shell, named by `ariaLabel` (maintainer ruling 2, 2026-09-19), inline Select (the search and filter controls) and spacing tokens, and four default Active and four Finished entries still share the wide window's vertical budget, re-measured in the journal capture at issue 1782.
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
@@ -114,6 +116,30 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 - **WHEN** an `XrefList` is given no `onOpen`
 - **THEN** no row renders a button
 
+### Requirement: SegmentedControl takes already-localized option labels
+
+`SegmentedControl` MUST take each option's `label` as an already-localized string and MUST NOT resolve a lang key itself: `label` is the segment's visible text and, in the icon-only form, its `title`.
+An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
+The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
+`SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` and `EditorTabs` keep a lang key plus fallback, because neither is a published-seam entry and neither is held by this rule.
+
+#### Scenario: A caller's key has no translation
+
+- **WHEN** a caller builds an option from a key the active language lacks
+- **THEN** the segment renders the caller's English fallback as its `label`
+
+#### Scenario: The closure stays clear of Foundry
+
+- **WHEN** the import closure of `SegmentedControl` or `ViewToggle` is computed
+- **THEN** it holds no module outside those two components and reaches no Foundry global
+
+#### Scenario: An icon-only segment
+
+- **WHEN** `iconOnly` is set
+- **THEN** each segment's `title` is its `label`
+- **AND** the clipped label stays its accessible name
+
 ### Requirement: A list's arrangement switch renders through ViewToggle
 
 A control that switches a browse list between its list and grid arrangements MUST render through `ViewToggle`, which is `SegmentedControl`'s icon-only form over a closed pair of options, composed rather than restated.
@@ -171,7 +197,7 @@ Its info-family fill, border and ink MUST remain distinct from the single shared
 Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
-IconButton's opt-in numeric `size={24}` and `size={26}` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
+IconButton's opt-in rungs `size="24"` and `size="26"` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
 The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
@@ -185,7 +211,8 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
 `NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
-`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 42 naming headings declare 71 distinct names.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 49 naming headings declare 79 distinct names.
+Issue 2548 added `<ListState>`, born shipped, to the `<ListRow>` heading.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -238,7 +265,7 @@ Every specimen in `openspec/specs/design-system/library.html` and every row of t
 An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
-The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 42 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 49 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the per-file deferral exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
@@ -277,7 +304,7 @@ Choosing an existing app root, or a second ancestor picked for reach, is the sam
 
 Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
 A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
-An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
+An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view="gathering-task-edit"] .fabricate-search.is-compact` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
 The boundary matters as much as the rule.
 An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]`, written before issue 1507 retired `manager-button` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
 One further case belongs in this paragraph, and recording it does not widen the exemption.
@@ -350,9 +377,14 @@ Issue 2465 moves the expression field (`RollDataExpressionInput`, the library's 
 It also emits `fab-expr-input-reading` on its reading, a class no rule paints, since the reading is drawn by `Chip`.
 Its reading is `Chip`'s and each token is `Button`'s, whose families it does not restate: its one rule on a token reaches `Button`'s own classes through a chained `:global` selector and sets the token's shrink, width floor, height, corner, line height and face alone.
 It writes no rule in the module sheet, wraps its input in nothing and portals nothing, so its input, its row and its status region are siblings in its caller's own column.
+Issue 2510 moves the requirement-row family into the shared directory, scoped `manager-only` on its member rows like the expression field it composes: `PickerRow` with its parts `PickerRowNameField`, `PickerRowAmount`, `PickerRowKindMenu` and `PickerRowRewardBody`, `ChoiceGroup` with `ChoiceGroupAwardHeader` and `PickerRowRangeCell`, `KindAdder`, and the modules they read, `pickerRowKinds.js`, `resultGroupEdits.js` and `resultRows.js`.
+It writes no root of its own and keeps its `manager-recipe-*` family, every global-sheet rule of which is rooted at `.fabricate-manager` (the two exceptions are the three layout rules for `manager-recipe-award-repeats-words` in `ChoiceGroupAwardHeader`'s own scoped block, which are unrooted and travel with the component, and the tag catalogue's new-tag footer, `manager-recipe-tag-create`, which is rooted at the picker's `.fabricate-picker-popover` namespace root because its panel portals out of the manager), so it is not adoptable outside the manager until that family is re-rooted, and that re-rooting, together with flipping the expression field's scope, is the change that would make its rows shared; the move changes no emitted family class, no declaration and no rendered frame.
+Issue 2515 gives `PickerRowAmount` and `KindAdder` library entries of their own, so both rows read `shipped`; their family and its `manager-only` scope are unchanged.
+Because scope is MEASURED over the import graph and read transitively, a `manager-only` row stays honest exactly when every importer outside `src/ui/svelte/components/` that reaches it, directly or through a file in that directory, lies under `src/ui/svelte/apps/manager/`.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
-The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issue 2315.
-`tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
+As of issue 2543 `manager-modal` is retired, a tenth token (root `fabricate-modal`, written by `Modal`); the retirement is of those ten exact tokens and family descendants remain.
+`fab-manager-button` was retired at issue 2540 on the same one-class-for-one-class rule, tripling the root where it was already doubled, and survives only as the deprecated header-action token.
+`tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists and the header-action token's compat lines, which name the release that removes them, and asserts that each retiring primitive's template still writes its root.
 All six that issue 1508 names are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
 The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageBand.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
@@ -364,14 +396,14 @@ Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `
 `CheckEvidenceRows` passes it for a counting check's `Count`, `Pool` and `Result` rows.
 Issue 2381 adds two more under `apps/crafting/detail/`: `ProgressiveStageRow.svelte` and `ProgressiveStageBand.svelte`, the player progressive stage row's content and its complication band, which the crafting and salvage bodies both render inside `SortableList`.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
-`Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
+The player application's `<Select size="inline">`s render with no `label`, `hint` or `error`, so `Select` computes `labelled` false and its `<Field as="label">` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
 Issue 1520 turned five of the six from claims into facts; the sixth, `ChanceSlider`, is recorded below.
 `src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
-A family reached only through another primitive is reached, so the `Pagination` chain above describes ONE caller's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
-The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the pager's, and the six that issue 1511 converted, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all seven and the `<Field as="label">` form still never renders there.
+A family reached only through another primitive is reached, so the player-application chain above describes ONE application's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
+The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the crafting browser's two filters, the inventory sort, the participation selector and the journal's sort, which renders twice, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all six and the `<Field as="label">` form still never renders there.
 What the interactables config window changes is the corpus that statement is true of, not the statement.
 The fifth phase discharged three more, and their importer paths are recorded because the claim is about where an importer lives rather than about how many there are.
 `src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `SearchField` and `FilterBar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
@@ -408,7 +440,7 @@ The picker is therefore held to the geometry as well as the markup — its panel
 The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
 A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
 `Button` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
-`Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
+`Pagination` is exercised DIRECTLY — nine of its 31 importers are player-app components — and `IconButton` is exercised both directly, by the journal history and the shopping list, and transitively, because `Pagination` renders two of them as its page arrows and those nine player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
 The player window is the second application for `EmptyState`, `Avatar` and `SegmentedControl`, and it deepens the `Medallion`, `Kicker`, `FillBar`, `Callout` and `Notice` adoptions that preceded it.
@@ -433,7 +465,7 @@ A recorded decision to LOCATE a component outside the shared directory rests on 
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
 `ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
 A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
-`ArmedDangerButton` writes `fabricate-button is-danger`, adding only `Button`'s own `fab-manager-button is-size-38` at its `size="38"` rung (issue 2257 D10), so the `Button` entry already roots every rule that paints it.
+`ArmedDangerButton` is the worked case: issue 1509 moved it into the shared directory while it wrote `fabricate-button is-danger` by hand, and it renders `Button` at `role="danger"` (issue 2563), so the `Button` entry roots every rule that paints it.
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
@@ -484,14 +516,14 @@ Scoping that third one to buttons is load-bearing, and it now reads as history p
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
 A family that ALREADY declares its own pair re-roots that pair IN PLACE, at unchanged specificity and unchanged declarations, rather than adding a second one at the family root.
 `StatusToggle`'s pair is at (0,3,0) and its repaint carries a `box-shadow: none` the module repaint does not; both survive the re-root unchanged, and a second pair at the root would have been a new rule rather than the same rule moved.
-`Field` is the second instance of the scoping rule the pager's `select` states above.
+`Field` is the second instance of the scoping rule the pager's buttons-only pair states above.
 Its pair covers `input` and `textarea` and excludes `select`, and the exclusion outlived the reason it was written for: at (0,2,1) a `select` leg tied `.fabricate-app select:focus-visible` and won on source order, deleting the inset ring that stopped a clipped outline, and that rule went with the player app's last native select at issue 1511.
 What keeps the exclusion is narrower and still true — issue 1777 converted the manager's last native selects a `Field` hosted, so its floor and element chrome cover `input` and `textarea` alone — and a leg here would be family chrome for a control this primitive no longer hosts.
 The STRIP half is declared on the element that can TAKE focus, which is not always the element the repaint paints.
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
 A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
-`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
+`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids.
 No rule rooted at the family reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
 
 The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
@@ -693,21 +725,31 @@ Neither is answerable by reading the source, so the method that settles both is 
 
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
-Every colour, spacing value and shadow MUST come from a `--fab-*` token.
+Every colour, spacing value and shadow MUST come from a `--fab-*` token, outside a gathering biome's stored `customColor`.
+A `@media (forced-colors: active)` block MAY name CSS system colours (`Canvas`, `CanvasText`, `Highlight`, `HighlightText`, `GrayText`) and set `forced-color-adjust: none`, because under forced colours the reader's palette, not a token, is the source.
 A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside the approved theme blocks fails `tests/components/theme-colour-contract.test.js`, so a literal is a gate failure rather than a style preference.
 
 Four background levels carry all depth: `--fab-bg-0` is the page ground, `--fab-bg-1` is rails, rows and wells, `--fab-bg-2` is cards and panels, and `--fab-bg-3` is icon chips.
 A well on a modal body, which is itself `--fab-bg-1`, takes the next level, `--fab-bg-2`, so its fill stays distinct from the body.
 Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-raised` on hover, and `--fab-surface-active` when pressed or selected.
+A radio card departs from that ladder in three ways: it rests on `--fab-bg-2`, its hover moves its border alone to `--fab-border-strong`, and its chosen card layers `--fab-surface-soft` over the `--fab-bg-2` ground behind `--fab-accent-border` (issue 2467).
+Its hover keeps the rest ground because `--fab-text-muted` on the raised ground computes under 4.5:1 in four of the seven palettes, at 4.33:1 in `foundry-native`.
+Its description inks `--fab-text-muted` and clears 4.5:1 at rest and chosen in every palette, at 4.99:1 on `--fab-bg-2` and 4.60:1 on `--fab-surface-soft` over `--fab-bg-2` in `foundry-native`, its weakest.
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
+The tag hue ships `--fab-purple-text` for the same reason: `--fab-purple` over its wash measures 2.17:1 in `foundry-native` at 11px, so a lit tag chip that carries no tint of its own, and the tag row's `+ Tag`, ink with `--fab-purple-text`, which is `--fab-purple`'s own value in the six palettes where that clears 4.5:1; a tinted chip keeps its tint's ink.
 A contrast claim about a translucent fill MUST name the ground it composites over, because `-soft` is an alpha and there are two.
-An unchecked selection control — a radio ring or a checkbox box — draws its outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
+An unchecked selection control — a radio ring or a checkbox box — and a switch's off track draw their outline in `--fab-control-outline`, a semantic token declared ONCE outside the palettes, on `:root` and every themed `.fabricate` root, as `var(--fab-text-subtle)`, so it resolves against each root's own palette and no palette restates it (issue 2047).
 That outline MUST meet WCAG 1.4.11's 3:1 against the control's surface in every palette: the fill it encloses where the control draws one — `--fab-bg-0` in a medium or large checkbox, `--fab-bg-1` in a radio card's dot — and otherwise the surface beneath it.
-Measured on the shipped surfaces it clears 3.34:1 at its weakest, where `--fab-border` and `--fab-border-strong`, which those outlines drew before, measured 1.52 to 2.21:1.
+A switch's off track is a translucent `--fab-surface-soft` wash clipped to its padding box rather than an enclosed fill, so its surface is the ground beneath it — `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2`, or `--fab-surface-soft` on `--fab-bg-2` (a card) — and its edge is measured there.
+Measured on the shipped surfaces it clears 3.34:1 at its weakest on a selection control and 3.11:1 on a switch's off track over a card in `ironblood-forge`, where `--fab-border` and `--fab-border-strong`, which those outlines drew before, measured 1.52 to 2.21:1.
 A FILLED control clips its fill to the padding box, so its outline composites over the surround rather than over its own fill.
-The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a radio card's dot on the gathering task editor's option cards measures 2.03:1 against that surround in `hearth-herb`, and a large checkbox on a selected row 2.76:1 in `hearth-herb`.
+The surround of a filled control is not its surface, and the outline's shortfall against it is recorded and accepted: a large checkbox on a selected row measures 2.76:1 in `hearth-herb`.
+A radio card's unchecked ring has no shortfall: its surround is its own card's `--fab-bg-2` rest ground, where it measures 3.34:1 at its weakest, in `ironblood-forge`, and 3.40:1 in `hearth-herb` (issue 2467).
 `tests/components/control-outline-contrast.test.js` holds the single declaration, the 3:1 floor on `--fab-bg-0`, `--fab-bg-1` and `--fab-bg-2` in all seven palettes, every outline site, and the padding-box clip on every filled one.
+The switch's off knob is `--fab-text-muted` and MUST clear 3:1 against its off track, `--fab-surface-soft`, composited over `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and over `--fab-surface-soft` on `--fab-bg-2` (a card), in every palette (issue 2492); `control-outline-contrast` holds it beside the outline floor.
+A labelled `Select`'s note (`.fabricate-select-note`) inks `--fab-text-muted` at 10.5px, weight 400, line height 1.5, a recorded correction of the specimen's subtle `k-hint` (issue 2315).
+It clears 4.5:1 on `--fab-bg-0`, `--fab-bg-1`, `--fab-bg-2` and `--fab-surface` in all seven palettes.
 
 The recessive tones `secondary`, `neutral`, `subtle` and `muted` are a FOUR-RANK ORDERED ink ladder routed by MEANING: `secondary` names the rule the GM is reading, `neutral` a fact that is merely present, `subtle` a quiet non-actionable state, and `muted` unavailable.
 Each is measurably weaker than the last in every theme, and the ORDER is the invariant rather than any percentage: `fabricate` and `sovereign` express the ladder as one opaque hue at 74%, 56% and 42% of itself, `ironblood-forge`, `hearth-herb` and `starglass-arcana` as one opaque hue at 80%, 56% and 42% of itself, `mythwright` states the first three as three DIFFERENT opaque hues plus one alpha, and `foundry-native` uses 80% and 60% of its secondary triple, then a different base triple at 50%.
@@ -717,20 +759,25 @@ A caller routes by MEANING and never by matching a tone name to a token name: `m
 `--fab-text-muted` MUST clear 4.5:1 in every palette on `--fab-surface-soft` over `--fab-bg-2`, on `--fab-bg-1`, on `--fab-bg-2`, on `--fab-danger-soft` over `--fab-bg-1` and on `--fab-surface-raised` over `--fab-bg-1`.
 `--fab-text-secondary` MUST read at least 1.3:1 above `--fab-text-muted` on `--fab-surface-soft` over `--fab-bg-2`, measured as the contrast between the two inks composited on that ground, so lifting muted cannot collapse the top two rungs.
 `tests/components/text-muted-ground-contrast.test.js` holds both in all seven palettes.
+`EmptyState`'s hint on every variant, its `note` title and line, and its `filtered` sentence MUST ink `--fab-text-muted` and clear 4.5:1 in every palette on `--fab-bg-0`, `--fab-bg-1`, `--fab-surface`, `--fab-bg-2` and `--fab-surface-soft` over `--fab-bg-2`, the grounds its unpainted panel sits on, because each is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2178).
+`tests/components/empty-state-mounted.test.js` holds it on the declared rules.
 `subtle`'s `--fab-surface-raised` fill is a RECORDED divergence from that token's hover role, kept because re-pointing it would move every subtle site; the follow-up is stated specifically — re-point `subtle`'s fill to `--fab-surface-soft`, after which `subtle` and `secondary` differ in ink and edge alone.
 And `--fab-surface-raised` and `--fab-overlay-light-06` differ in five of the seven themes — they are equal only in `mythwright` and `foundry-native` — so a ground swap between them is MEASURED per theme and never reasoned: it is why the chip's `neutral` tone, which inherits the base overlay rather than the raised surface, is a stated move for a converted caller that took the raised surface before.
 
-Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one.
-Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers eight of them, so adding a token to the stylesheet does not add it to a picker.
+Entity tint is a token NAME and never a hex, so a theme swap re-tints every entity that carries one; the one exception is the gathering biome, whose stored option carries a `customColor` sibling (see `gathering-and-harvesting`, the biome vocabulary), and no other model accepts a free hex.
+`TintPicker` offers free-hex entry only to a caller that passes `allowCustom`, which defaults to `false`, and a caller passes it only when its stored model carries a `customColor` sibling.
+Thirteen `--fab-tag-*` tokens are declared in every theme block and `src/ui/svelte/util/managerColorTokens.js` offers ten of them, so adding a token to the stylesheet does not add it to a picker.
 Which tokens are offered MUST follow a stated rule rather than an enumeration: a tint is pickable unless it is a NEUTRAL that would read as body text or as a disabled state, or it is BOUND to a fixed brand site.
-By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, while `verdant` and `azure` qualify and are not currently offered.
-Collision with a semantic token does NOT disqualify a tint, because three offered tints already collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple` and `butter` with `--fab-warning`.
-Widening the picker is a runtime change carrying new localized labels and is recorded as an open decision rather than made here.
+By that rule `bone` and `slate` are neutrals and `ember` is bound to the Downtime companion tint, and the other ten are offered, `verdant` and `azure` after the original eight in that order.
+Collision with a semantic token does NOT disqualify a tint: in the default palette five offered tints collide exactly — `mist` with `--fab-info`, `lavender` with `--fab-purple`, `butter` with `--fab-warning`, `verdant` with `--fab-success` and `azure` with `--fab-drop-rate-uncommon`.
+An offered tint is additive persisted vocabulary and takes no migration, because all thirteen tokens are declared in every build since issue 1229.
+A build that predates `verdant` and `azure` still draws an essence carrying one in that tint wherever the essence is drawn as a chip or tile; its colour editors do not offer the token, and the stored token is kept until the GM edits that essence's colour.
+The same build folds a gathering biome carrying one onto `sage` on read and writes `sage` back on its next save of the gathering configuration, so a downgrade loses that biome's tint.
 
 A tint token name is a PROMISE to the GM, who picks it by its localized word rather than by its value, so the same token MUST keep its hue across every theme while its saturation and lightness carry that theme’s character.
-All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the eight offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
+All thirteen are declared in all seven themes and every one clears 3:1 on its own theme’s `--fab-bg-1`, but five of the ten offered tints break the hue promise: `aqua` and `mist` invert by roughly 175 degrees, `mauve` by 160, `sage` by 88 and `peach` by 81.
 In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `ironblood-forge` one tagged Mist renders a warm red-brown — in both cases the picker’s own label is wrong.
-The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
+The five tints added later — `ember`, `verdant`, `azure`, `bone` and `slate` — hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
 Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
@@ -740,7 +787,8 @@ Whether a surface floats or sits is a judgement no pattern can read from a decla
 The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those two tokens.
 A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
-The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+The checked radio's dot of a tool bonus row, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+A radio card's checked radio draws a 4px accent border ring and no shadow.
 No rule in that scope draws depth through another channel: no `drop-shadow()`, no `text-shadow` other than `none`, and no `--fab-shadow-*` declaration outside the theme blocks.
 `tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds all of them to that set absolutely, the player apps included.
 
@@ -763,6 +811,21 @@ No rule in that scope draws depth through another channel: no `drop-shadow()`, n
 
 - **WHEN** a theme block's edit leaves `--fab-text-muted` under 4.5:1 on one of its five named grounds, or `--fab-text-secondary` under 1.3:1 above it on the soft ground
 - **THEN** `text-muted-ground-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A palette edit drops the switch's off knob under its floor
+
+- **WHEN** a theme block's edit leaves the off knob under 3:1 on its track over one of the four named grounds
+- **THEN** `control-outline-contrast` fails and names the palette, the ground and the ratio
+
+#### Scenario: A caller renders the tint picker without opting in to a hex
+
+- **WHEN** a caller renders `TintPicker` without passing `allowCustom`
+- **THEN** the palette offers the ten offered tints, in order, and no free-hex field
+
+#### Scenario: The offered tints stop following the offering rule
+
+- **WHEN** `managerColorTokens.js` offers a declared `--fab-tag-*` token that is a neutral or bound (`bone`, `slate`, `ember`), or omits a declared token that is neither
+- **THEN** `manager-color-tokens` fails and names the theme whose declared set disagrees
 
 ### Requirement: The token namespace is one generation and names its purpose
 
@@ -809,6 +872,7 @@ The search field is 38 at radius 9 on every non-compact site, the journal includ
 The two gathering typeaheads that drew the compact box by hand before issue 1782 keep it through `Typeahead`, which passes `density` through to its field; the ruling set those two aside as typeahead opt-outs, so they add no site to its four.
 A `Select` that shares a row with a non-compact search takes the `form` rung, so the row is one 38px shell; a select on a toolbar's second row keeps `toolbar`.
 The `Select` `toolbar` rung is 34px at radius 9, 11.5px at weight 600, the literal weight of the sort-direction `Button` sharing its `FilterBar` row (issue 2257 D8).
+`Button`'s `size` names a rung by its height: `''` draws the manager button's 34, `'38'` the page header's actions and `'28'` a choice group's `Alternative` adder, each at its band's corner (issue 2515).
 Art and portraits carry their own size ladder and are not controls, and this is that ladder rather than a forward reference to one.
 ART — a record's tile, the icon chip — is 22, 26, 30 or 38 with 26 the default, at radius 6, 7, 7 and 9 and glyph 10, 11, 12 and 15 at those four rungs.
 A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 stacked, and the 32px rounded-square portrait takes radius 9.
@@ -882,12 +946,24 @@ It joins a rule to a same-selector twin elsewhere in the same file, so a family 
 - **AND** that reason states the rung that was rejected and why
 - **AND** the resize is left to the geometry sweep that owns the ladder
 
+### Requirement: The card draws one box and its callers only place it
+
+`InspectorCard` (the library's `<Card>`) draws the specimen's box from the module sheet: radius 11, padding `--fab-space-4`, 1px `--fab-border`, `--fab-bg-2`.
+Its one variant, `flush`, emits `is-flush` and draws padding 0 for a card whose head and body inset themselves.
+A caller rule places a card (margin, flex or grid placement, gap, position) and never restates its padding, fill, radius or border; a status tone (`border-color` and a `--fab-*-soft` fill from one status ramp) is not a restatement.
+A card never contains a card.
+
+#### Scenario: A caller rule restates the card's box
+
+- **WHEN** a caller rule under a `.fabricate-card` selector declares padding, background, border-radius or border outside a status tone
+- **THEN** `card-drawing-parity` fails and names the rule
+
 ### Requirement: Field-sized empty states match their associated controls
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
 Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
-Ordinary empty panels retain their existing geometry (the hero `EmptyState` pads `--fab-space-4`, 16, on every side; issue 2257 D9).
+Ordinary empty panels draw the `<Empty>` specimen for their form.
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
 #### Scenario: A gathering availability selection is empty
@@ -904,9 +980,24 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 - **AND** adding a member replaces the placeholder with a removable chip, and removing the last member restores it
 - **AND** the separate guidance shown when no realms exist retains its existing presentation without a dropdown
 
+### Requirement: The no-state panel draws its library specimen
+
+`EmptyState`'s hero (central) panel MUST draw the `<Empty>` specimen: a 1px dashed `--fab-border-strong` edge at radius 11 padded `--fab-space-4`, a 38px radius-9 `--fab-bg-3` tile carrying a 15px `--fab-text-secondary` glyph, a serif 15px/600 `--fab-text` title, and a 10.5px hint capped at 34ch (maintainer ruling, 2026-10-20).
+Its `filtered` panel MUST draw the specimen's hint-and-way-out panel, with no tile or title, on the same edge, radius, padding and stack gap, in `--fab-text-muted`, and its hint is plain text carrying no emphasis.
+`compact`, `inline`, `note`, `field` and `fill` MUST each match a drawn unit of the `<Empty>` entry.
+A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY place it (width, grid column, minimum height); a caller that mirrors a form for a sibling state follows that form's geometry and inks and varies only the state's hue.
+
+#### Scenario: The hero panel is measured against its specimen
+
+- **WHEN** `manager-published-leaves-specimen` renders the hero and filtered panels
+- **THEN** the hero's edge is 1px `--fab-border-strong`, its tile 38px on `--fab-bg-3`, and its title 15px in `--fab-text`
+- **AND** the filtered panel pads 16px on the same 1px `--fab-border-strong` edge with an 8px stack gap and a 10.5px muted hint
+
 ### Requirement: Every interactive primitive declares its full state set
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
+`Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
+`ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
@@ -920,9 +1011,9 @@ The variant adds no glow and no second line: a field whose wrapper draws the box
 The `Field` family, the compact search field and the chance slider's percent half copy that variant rather than the outset ring — the default search field is a wrapper-drawn field, whose shell takes the full accent on `:focus-within` — and every input that is not text-like — a checkbox, a radio, a range, a colour, a file and the four button types — keeps the outset one.
 A text field's validation ring is inset the same way, at its own 2px width.
 The variant has three stated exceptions and no others.
-The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.
+The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts, and its `−`/`+` adjuncts draw the same 2px accent ring at a 1px offset; in the default horizontal row each sits at offset 0, the input's unless it fills its row and the adjuncts' unless the density is comfortable.
 A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
-A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper that also marks a typed-in state keeps the partial accent for that state alone.
+A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper whose specimen rests on the partial accent — the requirement row's search — keeps it whenever its field is not focused (issue 2515).
 While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
 An auto-focused field therefore never draws its placeholder, and that is accepted rather than opted out of: the shared picker's search is named by its trigger and its `aria-label`, and an opt-out would put the caret back over the glyph.
 A borderless input inside a box-drawing wrapper MUST stretch to that wrapper's height rather than size to its own text line, because an input exactly one line tall clips the caret an empty field draws.
@@ -939,6 +1030,9 @@ Its invalid face is the caller's own rule on `[aria-invalid='true']`, since neit
 No text input draws a hover face.
 It declares `disabled`, which disables its input and every token together and leaves its reading drawn, and it takes the invalid state as `aria-invalid` on its rest spread.
 A host MUST stack the input and its row in a column that states the gap between them, as `Field` does at 6px, and MUST host the field outside a `<label>` when it passes `tokens` or `resolve`, because a label would take every token, the reading and the status text into the field's name.
+
+The switch dims to opacity 0.45 when disabled on all three hosts and draws no hover face; an enabled off switch's hover changes its border only.
+Under forced colours the track and knob set `forced-color-adjust: none`: off is a `Canvas` track with a `CanvasText` edge and knob, on is a `Highlight` track and edge with a `HighlightText` knob, and disabled is `GrayText` at opacity 1 — a disabled off switch keeps its `Canvas` track with a `GrayText` edge and knob, a disabled on switch fills its track `GrayText` with a `Canvas` knob, and its reading is `GrayText`.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
@@ -959,8 +1053,13 @@ The quantity that orders them is the CONTRAST of each ink composited over that t
 
 A SELECTED face is a FILL and an EDGE.
 A swatch whose fill IS its value is the one exception: its selected mark MUST be an inset ring drawn as an inset `box-shadow`, never an outline, at 3:1 against every swatch on all seven themes (the No-colour cell's ring is `--fab-text`, at 3:1 against its `--fab-bg-3` ground), while pointer hover keeps the outset ring and never takes a fill, keyboard focus takes the keyboard cursor's inset outline, drawn on the cell's edge clear of the swatch so it composes with the selected mark's inset ring, and no tick is drawn (`TintPicker`, issues 2257 D3 and 2416).
+In the popover the swatch is the content of a square tile of the picker's grid form: the selected tile states its own ground, `--fab-surface-soft`, by the descendant rule the square-tile rule reserves for a caller, so the inset ring is the mark; the cursor and hover are the square tile's own.
+The inline strip's cells keep the states above.
+A SQUARE TILE in the picker's grid form is the second exception to the fill-and-edge rule: it is a text-free glyph or image whose tile is the cell, so its selected mark is the `--fab-surface-active` ground alone under the tile's ordinary 1px `--fab-border`, the keyboard cursor is the inset accent outline, and pointer hover is an outset 2px accent outline at a 1px offset and never a fill.
+A caller that marks selection inside the tile's own content (a swatch's inset ring) states its own ground as a descendant rule from its `popoverClass` (see the picker requirement), so the tile's ground does not compete with that mark.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
-So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
+So a selected row takes `--fab-surface-active` behind `--fab-accent-border`.
+A radio card group draws no bar either: its one answer is the chosen card's `--fab-accent-border` edge over `--fab-surface-soft` and its radio's 4px accent ring (issue 2467).
 Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
 
 A KEYBOARD CURSOR is a fourth state and takes a different CHANNEL rather than a fourth fill rung.
@@ -982,11 +1081,27 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **THEN** it sets `aria-busy` and changes its label
 - **AND** any spinner it renders is decorative and `aria-hidden`
 
+#### Scenario: A confirmed destructive write keeps its focus
+
+- **WHEN** a GM confirms an armed `ArmedDangerButton` and its caller sets `busy`
+- **THEN** the control keeps keyboard focus, carries `aria-busy` and `aria-disabled` and no `disabled`, and its label and accessible name read its `busyLabel`
+- **AND** a press while it is busy confirms nothing
+
 #### Scenario: A change writes its own motion
 
 - **WHEN** a change writes a literal duration or timing function on a transition or animation, or a scoped reduced-motion block
 - **THEN** `motion-token-gate` fails it
 - **AND** a control's state transition that names its property and reads `--fab-motion-control` passes
+
+#### Scenario: A switch is disabled
+
+- **WHEN** a switch is disabled outside forced colours
+- **THEN** it renders at opacity 0.45 and draws no hover face
+
+#### Scenario: Forced colours are active
+
+- **WHEN** forced colours are active
+- **THEN** a switch's on and off differ in track fill, knob colour and knob position, and a disabled switch draws in `GrayText` at full opacity, filled when on and hollow when off
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
@@ -995,7 +1110,8 @@ A name composed from a value MUST be derived by a shared helper, because the alt
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLabel` or `ariaLabelledBy`: `label` renders its root as `<Field as="label">`, so the input has exactly one label and the caption is its name.
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
-The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
+A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
+An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
@@ -1007,7 +1123,8 @@ A view toggle (`ViewToggle`) is a radio group named by its required `ariaLabel`,
 A tier track is an ordered list with an explicit `role="list"`, named by its required `ariaLabel`; its current tier carries `aria-current="step"` and its `currentLabel`, every other tier its visually hidden `reachedLabel` or `aheadLabel`; chevrons, dots and the current tier's glyph are decorative.
 A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 `AppTitleBar`'s bar, premium badge and status MUST NOT carry `aria-label` on an element without a role; each name is visually hidden text (issue 2257 D4): the mark's visible word is `aria-hidden` beside its read name, which is also its `title`, and the status reads a visually hidden prefix before its visible value, which is its `title` (issue 2420).
-`TintPicker`'s cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+`TintPicker`'s inline cells MUST sit in a `group` named by the palette label, each carrying `aria-pressed`, true on the selected cell alone (issue 2257 D3).
+Its popover is the picker's grid form: the swatches are square tiles, `option`s of a `listbox` named by the same label, each carrying `aria-selected`, true on the selected tile alone; free hex, where offered, is the panel's caller footer above the key hints, and No colour, where offered, is the picker's `footerAction` (issue 2459).
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -1043,16 +1160,22 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **THEN** its accessible name is a required prop
 - **AND** its hit area is at least 24 by 24 pixels
 
-#### Scenario: A screen reader reaches a palette cell
+#### Scenario: A screen reader reaches an inline palette cell
 
-- **WHEN** a screen reader reaches a palette cell
+- **WHEN** a screen reader reaches an inline palette cell
 - **THEN** it announces the colour's name and pressed state
 - **AND** only the selected cell announces pressed
+
+#### Scenario: A screen reader reaches a popover palette tile
+
+- **WHEN** a screen reader reaches a tile in the tint popover
+- **THEN** it announces the colour's name and selected state within a listbox named by the palette label
+- **AND** only the selected tile announces selected
 
 ### Requirement: Shared primitives share one API convention
 
 Every component under `src/ui/svelte/components/` MUST name its props by the API convention `openspec/specs/design-system/library.html` publishes in its five-rules block; the library holds the convention's wording and this requirement binds it.
-The convention fixes the accessible-name props, with `label` reserved for visible text; `density` as the one density prop, with `size` naming a published ladder rung only; `tone`; a `role` prop on `Button` only, which is its verb role, so an ARIA `role` reaches any other primitive's root through `...rest`; the callback names; and the passthrough shape of `class` plus a rest spread on the root, `<part>Props` for a fixed sub-element and `<part>DataAttr` for a per-item hook, with an attribute the primitive writes from a declared prop passed by that prop and never through rest.
+The convention fixes the accessible-name props, with `label` reserved for visible text; `density` as the one density prop, with `size` naming a published ladder rung only; `tone`; a `role` prop on `Button`, its verb role, and on `IconButton` the closed subset `neutral | primary | ghost | danger | ghost-danger`; an ARIA `role` reaches any other primitive's root through `...rest`; the callback names; and the passthrough shape of `class` plus a rest spread on the root, `<part>Props` for a fixed sub-element and `<part>DataAttr` for a per-item hook, with an attribute the primitive writes from a declared prop passed by that prop and never through rest.
 A prop name outside the convention MUST be carried in the gate's exceptions register with its component and a reason, and a register entry that matches no declared prop MUST fail.
 `tests/design-system-api-convention.test.js` is the gate, and it rules on prop NAMES because a `$props()` destructuring declares nothing else; it is a fixed rule, not a ratchet.
 Its one ratchet clause holds the spreads a caller writes onto a primitive's tag, because the gate cannot read what a spread carries: a spread new against the base commit fails unless a reasoned `ratchet-exempt(design-system)` marker sits above its tag.
@@ -1064,6 +1187,29 @@ A component outside that directory is not bound by this requirement, even where 
 - **WHEN** a component under `src/ui/svelte/components/` declares a prop the convention retires, such as `dataAttr`
 - **THEN** the convention gate fails naming the component and the prop
 - **AND** it passes only when the prop is renamed or the register carries it with a reason
+
+### Requirement: An icon button shows its name under pointer and keyboard focus alike
+
+An `IconButton` MUST write its name, or its `tooltip` when one is passed, as plain tooltip text — Foundry's `data-tooltip-text`, which no localize lookup or HTML path reaches — so Foundry's tooltip shows it on pointer hover.
+Keyboard focus MUST show the same tooltip, and only under `:focus-visible`, so a pointer focus adds no second tooltip.
+Blur, a click and Escape MUST each close the button's own tooltip and never another element's.
+No `IconButton` carries a native `title`: a caller's hand-written `title`, `data-tooltip`, `data-tooltip-html` or raw `data-tooltip-text` suppresses the primitive's own tooltip, on hover and focus alike, rather than stacking a second, and `tests/icon-button-source-contract.test.js` holds the call sites to none beyond its sweep ledger.
+`tests/components/icon-button-tooltip-mounted.test.js` is the gate, against a call-recording `game.tooltip`.
+
+#### Scenario: A user Tabs to an icon button
+
+- **WHEN** a user Tabs to an icon button
+- **THEN** its name shows as a tooltip once
+
+#### Scenario: A user clicks an icon button
+
+- **WHEN** the user clicks an icon button
+- **THEN** no second tooltip opens
+
+#### Scenario: An icon button blurs or hears Escape
+
+- **WHEN** the button blurs or the user presses Escape
+- **THEN** its own tooltip closes and no other
 
 ### Requirement: The Foundry contract binds every primitive
 
@@ -1100,6 +1246,7 @@ Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 This model is SHIPPED, by `SearchablePopover`, `IconPicker` and `EssenceSourceSelector` — the last two rendering through the first — and the element that holds DOM focus is named THE HOLDER.
 The holder carries `role="combobox"`, `aria-controls` and `aria-activedescendant`; in the search-suppressed shape it is the TRIGGER, at six shipped call sites, and it carries the keyboard-focus attribute too, because a button outside a form answers `hasFocus` false.
+The picker's own bare trigger button, neither `triggerChip` nor `triggerButton`, carries the keyboard-focus attribute whether or not it shows a query field, written after its attribute spread so a caller's `triggerProps` cannot unset it; a trigger drawn as a `Chip`, a `Button` or a caller's `trigger` snippet carries it in the search-suppressed shape only; the inline query's close control carries it too (issue 2454).
 Both `aria-controls` and `aria-activedescendant` are ABSENT while the list itself is absent — the empty branch renders a status note in place of the `role="listbox"` element, and an `aria-controls` pointing at an id nothing carries is a defect rather than a courtesy.
 An option row stays a `<button>` with `role="option"` and `tabindex="-1"` and NEVER RECEIVES DOM FOCUS: receiving it is what the prohibition forbids, not the tag.
 The library specifies `tabindex="-1"` options rather than a different element, and the tag is load-bearing — the row inherits the module's own `font: inherit` floor and its `display` through it.
@@ -1237,7 +1384,7 @@ The family reaches a TAB STRIP as well as the rail, because a tab's mark states 
 A caller that cannot name the vehicle it needs is a MISSING CAPABILITY on that primitive, never a licence to hand-roll a second strip or to draw one vehicle with another: a difference recorded between two strips MUST be a functional or informational one the shared primitive absorbs, because a deliberate STYLE divergence is precisely what a shared primitive exists to remove.
 The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, because the rail's PREMIUM chip and the title-bar badge already state the tier once and loudly, and a chip on every tab of a strip whose tabs are all gated would repeat it.
 A tab whose destination is tier-gated carries the strip's premium PADLOCK instead — the premium signal the rail's Downtime sub-items already carry — drawn by the tab-strip primitive, hidden from assistive technology, its meaning stated in words by the tab's description.
-The padlock is a state of the tab and not a mark of the family, so it does not enter the four-mark set and no call site names its glyph; it is not `<Locked>`, because a padlocked tab stays selectable; and like every premium signal it is drawn in the manager only, so no player-window caller marks a tab with it.
+The padlock is a state of the tab and not a mark of the family, so it does not enter the four-mark set and no call site names its glyph; it is not a disabled control, because a padlocked tab stays selectable; and like every premium signal it is drawn in the manager only, so no player-window caller marks a tab with it.
 A mark carries a LABEL and a TONE and never a glyph: a PASS mark is the issue vehicle carrying a tick character, not a fourth vehicle and not a caller-supplied icon, because a call site naming a Font Awesome class is a call site choosing a shape and that is the one thing the ownership rule above forbids.
 A PASS mark is toned neutral, because the issue vehicle's tone states how much attention the tab asks for, and a pass asks for none (issue 1373).
 On a tab strip the issue summary MUST be the shared chip primitive at its `inspector` density with `mono`, whatever badge class a caller passes: the mono face at weight 500, because it carries a number a GM compares and the mono face ships no weight above 500 (maintainer ruling 2026-10-14, issue 2464), and the size and box that density's, as the chip's library entry states them.
@@ -1248,6 +1395,12 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 The uppercase micro-label that names what follows is a kicker, at one size and one tracking.
+A `Field`'s caption takes the kicker's ink, size, weight, tracking and case, and the primitive draws it: the first-child `<span>` of a `.fabricate-field` takes 8.5px, weight 700, `0.11em` tracking, upper case and `--fab-text-muted` from a rule rooted at the family at (0,1,1).
+It inherits the host's face and line height, which a `Kicker` states for itself.
+At that rank a caption carrying a caller's own class at (0,2,0), or a component's scoped rule, keeps every property that class declares and takes the kicker's value for each it leaves undeclared, which is how the converted-select captions the ruled-out register records keep their own type.
+Inside a `RuleRow` body the caption is the one module-sheet exception: the rule-row family's own rule, at (0,3,1), keeps the `RuleRow` specimen's 8px, `0.64px` tracking and `--fab-text-subtle` at the kicker's weight and case.
+The `Field` box carries its value's type, 12.5px at weight 500, the `form` size rung's type, and a text control inside it takes that through the family's `font: inherit` floor, so no screen restates a value weight against its caption.
+The caption's text is the localized string as written; its case is presentation.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
 An empty state INSIDE AN OVERLAY the product has already drawn a boundary around — a picker popover, a suggestion list — is a note rather than a panel: one quiet line at that overlay's own scale, with no border, no fill and no icon tile, because a second bordered box inside a bordered panel reads as a card the GM could act on.
 
@@ -1261,6 +1414,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
 A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a typeahead combobox, which `Typeahead` implements save the requirement row's name cell.
+A search field never submits the form it is in: Enter in its input, outside IME composition, cancels the form's implicit submission.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 A BROWSE CARD is a `ListRow` at `layout="card"`, the same row model on one track, and the grid around the cards owns their track.
@@ -1313,6 +1467,12 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **THEN** it renders the shared chip at its `inspector` density in the mono face at weight 500
 - **AND** a record count on the same strip renders as the bare mono numeral, never as a chip
 - **AND** no rule in the module sheet names that badge's class, or changes its face, size or box
+
+#### Scenario: A field draws its caption and its value
+
+- **WHEN** a `<Field>` outside a `RuleRow` body renders a first-child `<span>` caption above a text input, in the manager or in a host carrying no application root
+- **THEN** the caption computes 8.5px at weight 700, `0.11em` tracking, upper case and the muted ink, and the input computes 12.5px at weight 500
+- **AND** a caption whose own class declares any of those properties keeps that class's value, and a span that is not the first child takes none of them
 
 ### Requirement: A tab strip always keeps a tab stop, and names and describes a tab from its own entry
 
@@ -1514,7 +1674,7 @@ The difference between the two is INFORMATIONAL — it tells assistive technolog
 
 `Select` IS THE SEARCH-SUPPRESSED SHAPE OF THIS SAME PICKER: it announces `aria-haspopup="listbox"`, renders no query field, and uses the primitive's OWN trigger rather than a `trigger` snippet, so the combobox contract, the attribute-omission rule below and the naming route are the primitive's throughout.
 A caller composing the primitive's own trigger INHERITS the primitive's whole class family and its paint, so a composing primitive states its own shell against that inherited cascade rather than assuming a bare element — including the panel's inherited width floor and its inherited corner, neither of which a width PROP alone can change, because a floor declared in the sheet outranks an inline width.
-A per-call-site deviation from that shell — a pager's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
+A per-call-site deviation from that shell — a caller's own fill, its own width floor — is stated as a DESCENDANT RULE from the caller's surviving wrapper class rather than as a new prop, because the trigger's box belongs to the row it sits in and not to the control.
 And the panel is PORTALED to the nearest application root, so every driver that clicks an option — a capture step, a mounted test, a smoke step — addresses it from that root rather than from the trigger's own subtree, and a mounted suite declares the application root its production mount really has.
 
 The picker MUST name both surfaces it renders.
@@ -1561,6 +1721,14 @@ Which specimen capabilities remain UNBUILT is recorded with the measurement that
 A primitive that has cleared this bar BELONGS in the shared directory, and the picker was moved into `src/ui/svelte/components/` at issue 1500 to say so; a shared primitive left under one application's directory tells every reader, and the View Lab's broad-signal routing, that it is that application's component.
 The bar runs the other way too, and moved out of the same directory in the same change: a 506-line screen region with one caller is not a shared component, whichever primitives it reuses.
 
+The shared picker's grid form and anchored open are SHAPES OF THIS SAME PICKER, so they are absorbed as props, not hand-rolled:
+The grid form draws two to six cells to a row by `columns`; any other value draws one column and the cursor maps one, so the drawn grid and the key map cannot disagree.
+With `squareTiles`, each option is a square, text-free tile whose label is both its `title` and its `aria-label`, the tile's size following from the panel width; its states are those of the square-tile rule.
+`keyHints` is off by default and adds the primitive's shared footer row beneath any caller footer: the key hints for the cursor's real key map, in `--fab-text-muted` in either form, and at its end the caller's one `footerAction`, handed the panel's `close`.
+The picker's own copy, its loading, error and no-match lines and its key hints, is localized by the localizer a Fabricate app root mounts its tree with as Svelte context, and is drawn as its English fallback in a tree mounted with none, so the primitive imports no Foundry bridge and a published mount calls no `game.i18n` (issue 2454).
+A panel MAY open from an `anchor` the caller owns rather than from a trigger of its own, for a control whose opening gesture belongs to another control: the primitive then renders no trigger, so the trigger-naming and `aria-haspopup` clauses do not apply; the PANEL's own naming obligation still does.
+It positions the panel against the anchor, counts the anchor inside for outside-click dismissal, and returns focus to it on close; an anchor the resolver can no longer answer closes the panel, and focus then goes to the nearest `[tabindex]` container when one exists, else is left to the browser.
+
 #### Scenario: A converted menu renders no query field
 
 - **WHEN** a caller opens the shared picker with its search field suppressed
@@ -1579,6 +1747,31 @@ The bar runs the other way too, and moved out of the same directory in the same 
 - **THEN** it is routed onto the picker's multi-select mode rather than hand-rolled or recorded as a non-member
 - **AND** its panel announces a multi-selectable list
 - **AND** any register row that rested on the mode's absence records the measurement that settled it
+
+#### Scenario: A square tile is named without text
+
+- **WHEN** a caller opens the picker with `as="grid"` and `squareTiles`
+- **THEN** each option renders no text node and carries its label as both `aria-label` and `title`
+- **AND** ArrowDown moves the cursor by `columns` options
+
+#### Scenario: A panel opens from a caller's anchor
+
+- **WHEN** a caller binds `open` and passes an `anchor`
+- **THEN** no trigger renders and a pointer press on the anchor does not dismiss the panel
+- **AND** the primitive writes no `aria-haspopup` or `aria-expanded`, because no trigger exists
+- **AND** closing the panel returns focus to the anchor
+
+#### Scenario: A GM picks a tint from the popover
+
+- **WHEN** a GM moves the cursor to a tile in an open tint popover and presses Enter
+- **THEN** that colour is committed, the panel closes and focus returns to the trigger that opened it
+- **AND** focus returns to the anchor instead when the panel was opened from one
+- **AND** a Space typed into the query moves no tile and commits nothing
+
+#### Scenario: A column count outside the supported range
+
+- **WHEN** a caller passes `as="grid"` with `columns` outside 2 to 6
+- **THEN** the grid draws one column and the cursor maps one column
 
 ### Requirement: The overflow action menu is a primitive of its own, and never a mode of the picker
 
@@ -1654,8 +1847,12 @@ The row writes a result's kind through that one module when the GM picks a kind,
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
-A kind that names a record renders its subject in a bordered cell of fixed minimum width so names align down the list.
+A kind that names a record renders its subject in a neutral bordered subject cell 34px tall and never narrower than 180px, holding the subject's image or glyph on a 26px subject plate at radius 6, its name and its clear, so names align down the list.
+The row's lead chip is a 26px lead plate at radius 6.
 `tag` renders no subject cell, because a tag row holds SEVERAL tags rather than one record: it carries a run of individually removable chips followed by a dashed adder that opens the tag catalogue.
+Each chip is the shared chip at its `tag-run` scale in the tag family's lit emphasis, a 28px pill at 11px/600, and the adder a 28px dashed pill in the same hue, with no word before the run.
+Each chip reads the tag as it is stored with a `#` before it — `solvent` reads `#solvent`, never `#Solvent` — and the catalogue's rows list each tag the same way; its new-tag footer names the tag as it will be stored.
+The `#` is drawn and never stored, so a tag's id, the comparison a requirement matches with and its normalization are unchanged.
 The catalogue lists every tag in the site's vocabulary, those already on the row included, each with the number of components already carrying it wherever the site supplies those counts, which is what distinguishes a real tag from a typo of one.
 That number is how many of the site's components carry the tag exactly, the comparison a tag requirement matches with, and a tag no component carries reads zero; a site that supplies no counts draws none rather than a zero.
 A tag already on the row that the vocabulary holds is listed SELECTED — the shared picker's multi-select state, announced as selected and marked with a check — so the panel doubles as the row's current state, and choosing a selected tag takes it off the row exactly as its chip's remove does.
@@ -1663,14 +1860,16 @@ Each choice writes at once, and the list keeps vocabulary order, so a choice mov
 The panel stays open across choices.
 The panel opens at a 300px minimum rather than the picker's 240px floor, so a held tag's name, its count and its check read whole at ordinary tag lengths; a longer name ellipsizes and keeps its full spelling as the row's title.
 Creating an absent tag is offered from the catalogue's own footer rather than by accepting a free value typed into the row — the vocabulary stays a catalogue.
-The any-of / all-of control MUST be absent while the row holds one tag and MUST be present once it holds two or more.
-Against a single tag both settings select the same items, and a control whose options mean the same thing invites the reader to hunt for a distinction that does not exist.
+The footer offers to create the typed name while the query, trimmed, lower-cased and less one leading `#`, names no tag the site's vocabulary holds under the same comparison and none the row already holds; creating it adds the tag to the site's vocabulary and to the row at once and keeps the panel open with focus in its query field; a site that offers no way to add a tag draws no footer.
+The any-of / all-of control MUST be present at every tag count, none and one included, and its place MUST NOT depend on the count.
+Against a single tag both settings select the same items, but the setting is the row's own and governs the next tag added, and a control that appeared with the second tag would reflow the row at the moment the GM extends it (ruled at issue 2534).
 
 Every STANDALONE row CARRIES the control that converts it into a choice group, because any requirement can acquire an alternative.
 It sits immediately before the remove action, which is always last.
+It is a 28px dashed control, level with the quantity stepper, and no divider stands before it.
 A row already inside a group MUST NOT render that control: the group carries the adder for its own alternatives, and a second one inside a member row would offer to nest a group inside a group.
 
-The purple treatment of `tag` is the whole row and not just its chip: the lead chip, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
+The purple treatment of `tag` is the whole row and not just its chip: the lead chip's glyph once the row holds a tag, the value chip and the any-of / all-of control all take the purple family, inside a choice group exactly as outside it, because the tint names the KIND and a group does not change what kind a row is.
 The group’s own accent border and header pill name the STATE — that this value is one of several the crafter may choose — so the two tints stay readable as two different facts.
 
 The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather than trailing its value, so that a column of mixed rows keeps its controls in one place.
@@ -1691,9 +1890,9 @@ The toggle selects which control occupies the quantity slot and MUST NOT be mode
 A rolled result amount resolves ONCE, when the craft is awarded, and is not re-rolled while it is being read.
 The persisted shape of an amount is out of scope for this capability: it is `quantity` beside a `quantityFormula` on `Result`, specified in the `data-models` capability.
 
-A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
-The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
-When a value is picked the search is replaced by the subject cell at its fixed width, so the row stops moving once it is complete.
+A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, at the cell's 34px height and 180px minimum and edged in the accent border at rest, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
+The lead chip stays untinted — a dashed neutral outline around a subtle glyph — until a value resolves, a named subject or a tag row's first tag, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
+When a value is picked the search is replaced by the subject cell at the same 34px height and 180px minimum, so the row does not jump once it is complete.
 
 The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
 That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.
@@ -1722,7 +1921,13 @@ Naming the adders after the kinds would state the menu's own list twice.
 
 - **WHEN** a GM adds a second tag to a tag row
 - **THEN** the row renders both as removable chips followed by the adder
-- **AND** the any-of / all-of control appears, having been absent while one tag was held
+- **AND** the any-of / all-of control stays where it stood while one tag was held
+
+#### Scenario: A tag requirement names its tags
+
+- **WHEN** a tag row holds the stored tag `solvent`
+- **THEN** its chip and its catalogue row read `#solvent`
+- **AND** the row still stores and matches `solvent`
 
 #### Scenario: A GM looks for a rolled amount on a requirement
 
@@ -1771,6 +1976,12 @@ Naming the adders after the kinds would state the menu's own list twice.
 `simple` and alchemy-simple do not route: one ingredient set, one success result set, and nothing to assign.
 They MAY carry a second result set selected BY ROLE — the results a failed check awards — and it is optional in both directions: absent, or authored and left empty, a failed check produces nothing.
 
+The GM opts in through one toggle, "Award results on a failed check", wherever the recipe's check can fail: `simple` with the crafting check enabled, and alchemy's simple check mode.
+The opt-in IS the presence of the `role: 'failure'` group, so the persisted shape gains nothing: turning the toggle on adds that group empty, and turning it off removes it, with any results it holds, from the draft as removing any set does.
+The surface MUST NOT draw or synthesize the failure set while the group is absent, and an edit to the success set MUST NOT create it.
+Where the system's failure-result policy forbids results on failure, the toggle cannot add the group: it is disabled while off, states why and links to the Checks Studio, because only the policy can make the set award anything.
+A group already present under such a policy stays drawn with that reason and awards nothing, and the toggle still removes it.
+
 A role-selected set carries NO source list and cannot be assigned to anything, because a role is not a mapping; the surface says what produces it in words rather than offering a control that would imply otherwise.
 It is also NOT RENAMEABLE: nothing refers to it by name, so a rename would change nothing, and offering the control would imply a reference that does not exist.
 The surface marks which sets those are — rather than shipping a name field that silently does nothing — so a GM can tell a role-selected set from an authored one at a glance.
@@ -1782,9 +1993,15 @@ An AUTHORED result set name MUST NOT be a reserved failure keyword, because the 
 
 #### Scenario: A GM allows results on a failed craft
 
-- **WHEN** a simple or alchemy recipe is set to award results on failure
-- **THEN** a second result set appears, marked as filled by role rather than by assignment
+- **WHEN** a GM turns on "Award results on a failed check" on a simple or alchemy recipe
+- **THEN** a `role: 'failure'` group is added and its set appears, marked as filled by role rather than by assignment
 - **AND** it offers no source list and no rename, because nothing routes to it and nothing refers to it by name
+
+#### Scenario: A recipe has not opted into failure results
+
+- **WHEN** a simple or alchemy recipe carries no `role: 'failure'` group
+- **THEN** the surface draws no failure set and the toggle reads off
+- **AND** an edit to the success set leaves the recipe without the group
 
 ### Requirement: Sets and groups are the container layer above the row
 
@@ -1819,7 +2036,8 @@ A surface that assumes single selection everywhere renders progressive wrongly.
 Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
 A set MUST NOT name more than one group: the engine would have no basis to choose between them.
 Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
-Failure-marked tiers are assignable only where the system policy permits it; otherwise a failed check produces nothing and the tier carries no assignment.
+A failure-marked tier is offered for assignment only where the system's failure-result policy permits results on failure, as `ui-system-studio` specifies.
+Where the policy forbids it, the tier is not offered, an assignment already authored stays on disk and stops routing, and the overview's row for that tier reads "routing not permitted by this system" in place of its select.
 
 A result set is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
 Wherever a group appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
@@ -1831,19 +2049,33 @@ Without the inbound direction a GM editing a group cannot tell what reaches it, 
 Where several sources share a group, each source says the target is shared and how many sources hold it.
 A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
 
+Each source MUST show the set a craft EFFECTIVELY awards, not only an explicit assignment.
+Where nothing names its target explicitly, the target is the mode's fallback and the source marks it with a "default" hint, so an inherited target reads differently from a chosen one.
+Under `routedByIngredients` the fallback is the result sets the set's legacy `resultMapping` names where it carries one, else the scope's first result set.
+Under `routedByCheck` a fallback exists only where no result set in the scope carries a tier assignment: the target is then the scope's only result set or, among several, the result set whose name matches the tier, and a tier named by a reserved failure keyword reaches nothing.
+Where any result set in the scope carries a tier assignment there is no fallback, and a success tier that no result set lists is unrouted rather than defaulted.
+A failure-marked tier never takes a fallback, because a failed check awards only through an explicit assignment the policy permits.
+The shared marker, its count and the unreachable state MUST be computed from that effective routing, so a set a fallback reaches is never reported unreachable.
+A set's own source list names a source that reaches it by fallback too, with the same hint, so the two directions agree.
+
 The routing surface MUST surface two authoring hazards rather than leaving them to be discovered at play.
-A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading — so it is reported as blocking rather than as a warning.
-A group that no set and no tier references is UNREACHABLE: authored, valid, and never producible.
+A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading.
+The overview draws a gap in place as a blocked row naming the unclaimed values, with no target select and with the "Edit outcome tiers" action, because the fix belongs to the system's tiers rather than to the recipe.
+Its blocking severity is owned by the Checks Studio, which reports it as the readiness issue `rangeGap` that `resolution-modes` specifies, and recipe readiness MUST NOT raise it a second time.
+A group that no set and no tier reaches, explicitly or by fallback, is UNREACHABLE: authored, valid, and never producible.
 
 The routing is authored in TWO surfaces, and neither is a copy of the other.
 
 A ROUTING OVERVIEW lists every source with the set it produces, one row each, and belongs on the record’s overview: it answers what the recipe does in one screen and lets a GM re-point routing without opening a set, which is the common edit.
+It ships as `RoutingOverview`; the recipe Overview draws one per step scope, and the component Salvage card draws its outcome routing with it.
 The SET CARD holds the set’s own contents and states what routes into it, which is where the rarer edit happens.
+It ships as `SetCard`, and the line naming what routes into the set as `RouteSources`.
+On the set card, an assignment that stays on disk but does not route is listed struck rather than hidden, and the GM can remove it there.
 Both write the same field, and assignment therefore works from either end.
 
 An overview row reserves a fixed trailing column for its shared-target marker, so the control naming the set sits at one position down the list and a marker on one row does not move the control on another.
 Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
-Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves elsewhere.
+Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves in the Checks Studio, which an "Edit outcome tiers" action beside the list opens.
 
 A mode change that would reduce the permitted cardinality MUST state what it will delete before the switch rather than reporting it afterwards.
 
@@ -1861,7 +2093,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 #### Scenario: A result set has no inbound route
 
-- **WHEN** a result set is named by no ingredient set and no outcome tier
+- **WHEN** a result set is reached by no ingredient set and no outcome tier, explicitly or by fallback
 - **THEN** the group states that it is unreachable, in place
 - **AND** it offers the action that routes something to it
 
@@ -1870,6 +2102,18 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result set
 - **AND** the group is not duplicated to serve them
+
+#### Scenario: An ingredient set names no result set
+
+- **WHEN** a recipe routed by ingredients holds an ingredient set that names no result set
+- **THEN** its overview row shows the result set resolution would award, with a "default" hint
+- **AND** that result set is not reported unreachable
+
+#### Scenario: Fixed tiers leave a gap
+
+- **WHEN** the system's fixed outcome tiers leave a value between two tiers unclaimed
+- **THEN** the overview draws a blocked row for it with no target select and the "Edit outcome tiers" action
+- **AND** recipe readiness raises no issue for it, the Checks Studio's `rangeGap` being its report
 
 ### Requirement: A result-side choice group states who chooses and how many it awards
 
@@ -1885,6 +2129,7 @@ It sits in the group HEADER because it governs the whole bundle, and a copy on e
 
 The chooser decides which controls the rows carry, and the surface MUST show only the ones the current value can fire.
 Under `rolled` the group states its SELECTION EXPRESSION in the header and each alternative carries a RANGE cell naming the values that select it.
+The range cell stands at the row's end, in the convert control's slot after the amount and a divider and before the remove: a die glyph, then the lowest and the highest roll.
 Under player-chooses both are hidden, because a range with no roll behind it is authoring that can never fire.
 The rows are otherwise the same row in both states: only the range cell appears and disappears.
 
@@ -1915,6 +2160,7 @@ Under `any one of` there is nothing to repeat, and under player-chooses a person
 A setting with no behaviour behind it invites a GM to hunt for a difference that does not exist, so it is ABSENT rather than disabled in the three cells that cannot use it.
 
 It defaults to NO REPEATS, and it states its own current value in plain terms rather than being read as a checked box or as the statistical name for it.
+It is a quiet status button that names its own value — a `···` mark, then the word, on no edge — and never a bordered button or a checkbox.
 A GM reads "up to 3, unique" and "up to 3, repeats allowed" without help; "with replacement" asks them to translate.
 With repeats allowed the same alternative may be awarded more than once and N is exact; without, the awards are distinct and an N above the alternative count exhausts the bundle rather than erroring.
 
@@ -1957,7 +2203,7 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 
 - **WHEN** a GM sets a result-side choice group's chooser to rolled
 - **THEN** the group states its selection expression in its header
-- **AND** each alternative carries the range cell that names the values selecting it
+- **AND** each alternative carries, at its row's end after its amount, the range cell that names the values selecting it
 
 #### Scenario: A GM offers the player a choice of two rewards
 
@@ -2037,7 +2283,7 @@ Every select in the product MUST therefore render the app’s own option list, u
 Consistency across machines is the reason, so a surface MUST NOT opt back into the native popup merely because a list is short.
 
 THE IMPLEMENTATION IS `src/ui/svelte/components/Select.svelte`, composed over `SearchablePopover` with the query field suppressed, and a surface that needs a one-of-N choice MUST render through it rather than restate its markup.
-The three shared CONTROLS that hosted a native select — `Pagination` from the primitive set, `BulkEditSelect`, an adjudicated non-member since issue 1371 left it one caller, and `EntityListInspectorFrame`, a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
+The shared CONTROLS that hosted a native select — `Pagination` from the primitive set (converted onto `SegmentedControl` at issue 2546), `BulkEditSelect`, an adjudicated non-member since issue 1371 left it one caller, and `EntityListInspectorFrame`, a shared component still on the unregistered-shared ledger — are converted, so no member of the shared primitive set renders an operating-system popup.
 
 A converted control keeps the identity handles its drivers address it by, and there are TWO of them rather than one.
 The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.
@@ -2070,7 +2316,7 @@ The gate compares with the base commit rather than with a recorded count, so a c
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was counted with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
-It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
+It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the bulk panel's category axis.
 It is a PROP rather than a variant so a caller states that judgement at the call site, which is why a component wrapping the select for several callers FORWARDS it rather than fixing it.
 
 #### Scenario: A select offers three plain options
@@ -2287,15 +2533,17 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
-The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a set of controls mixed into it.
+The selection bar is a BAND OF ITS OWN directly beneath the filter row, inside the filter bar's box, never a set of controls mixed into it.
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
-The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the per-page selector's exists only when the list holds more rows than the SMALLEST offered size.
+The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the page-size control's exists only when the list holds more rows than the SMALLEST offered size.
+Separately, the page-size control renders only when the sorted union of the offered sizes and the current size holds two or more values, an option-count gate on a different axis from the row count that decides whether the band renders at all.
 A surface that says nothing renders the band whenever EITHER control has a reachable second state, which reduces to the smallest-offered-size threshold, because below it every offered size draws the same list and the nav can only ever say `Page 1 of 1`.
 A surface MAY opt in to the STRICTER rule that the band renders only past one page, and MUST restore it the moment a second page exists.
 That opt-in is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
-Taking it also suppresses the per-page selector, so a surface that takes it accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+Taking it also suppresses the page-size control, so a surface that takes it accepts that a pointer GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+A pager stays mounted while focus is inside it and hides on blur, so a keyboard GM, whose arrow keys on the page-size control each commit a size, is not unmounted under the keyboard by choosing one that covers the whole list (issue 2546).
 A surface MAY instead opt OUT and render the band always, which is the choice for a surface whose footer is part of its frame rather than a control, and there the nav renders its disabled arrows rather than vanishing.
 The two opt-ins are mutually exclusive by meaning and rendering-always wins if both are named.
 
@@ -2356,6 +2604,25 @@ A compact pager (`density="compact"`) is not a player browse column's footer and
 - **WHEN** a compact pager closes a pane section that is not a player browse column
 - **THEN** its rule meets the section's edges
 - **AND** the next section's top rule sits directly beneath it
+
+### Requirement: The filter bar is a bordered box that every host insets
+
+The filter bar is a bordered box — 1px `--fab-border`, radius 9, `--fab-bg-1`, `--fab-space-3` padding, `--fab-space-2` gap — that every host insets: the stylesheet by `--fab-space-3` where the host does not pad its content, and the host's own padding where it does; no route, caller or panel flattens it to a full-width band (issue 2546, M2, superseding issue 1373's Tools and Essence flattening, the interactables browser's full-width bar and the Vocabulary panel's flattening).
+`<FilterBar>` is `shipped`, not `divergent`.
+The stylesheet insets the box in the manager's main pane, a gathering panel and the scoped list column; the top inset applies only where the bar opens its host or follows the recipe notice slot.
+A host that already pads its content, such as the Tools content column (its own `--fab-space-5`, 20px), the interactables column and the Vocabulary card, adds no inset of its own.
+Its API is the slot API (`children`, `ariaLabel`, `class` and the rest spread); the library sketch's data props are declined (issue 2546, M3).
+The search field inside the bar is the 38px field and a select takes the `toolbar` rung at 34px unless the caller lifts it to the `form` rung (the Component Rules filters do).
+
+#### Scenario: A browse bar sits in the manager's main pane
+
+- **WHEN** a filter bar renders directly in the manager's main pane, a gathering panel or the scoped list column
+- **THEN** it is a box bordered on all four sides at radius 9 on `--fab-bg-1`, inset `--fab-space-3` from the host's left and right edges, and from its top edge where the bar opens the host or follows the recipe notice slot (a drop zone, a column lead or a gap above the bar already spaces it, so its top margin is not doubled)
+
+#### Scenario: A host that pads its content holds the bar
+
+- **WHEN** a filter bar renders inside the Tools content column, the interactables column or the Vocabulary card
+- **THEN** it is the same box, inset by the host's own padding (20px in the Tools content column), and no rule on the host restyles it
 
 ### Requirement: The application shell renders through the shell primitives
 
@@ -2479,6 +2746,33 @@ Widening the composition with a background prop for one such caller is not the a
 - **THEN** it carries `aria-busy`
 - **AND** a visible label states what is loading
 
+### Requirement: A browse list that loads separately from its view draws its loading and error through ListState
+
+A browse list whose rows load separately from the view around it MUST render its loading and error states through `ListState` (`src/ui/svelte/components/ListState.svelte`), which replaces the list's body and leaves its header in place.
+While `loading` is true, `ListState` MUST set `aria-busy` on the region it renders, MUST state what is loading in a visible line carrying `role="status"`, and MUST draw static skeleton rows at the ListRow geometry of the list's `density`, hidden from the accessibility tree; nothing in it MUST animate or take focus.
+When `error` is set, `ListState` MUST render a danger-toned, non-blocking notice in the body.
+Loading masks error, and when neither holds the list's own body renders with no element of `ListState`'s around it.
+A list that declares `loading` MUST NOT draw its empty or no-match panel while it is true, and a list that declares `error` MUST NOT draw them for a failed load (for example a refused world-setting read).
+A list declares only the states it can reach: one with no reachable failure, or whose failure a sibling pane reports, passes no `error`, and then draws no body in that state rather than an empty or no-match claim.
+A list that loads together with its view takes the view's composition instead, and a pane that is not a list keeps its own no-state panel.
+The manager's crafting system library, gathering environment browser and Knowledge roster are its first callers (issue 2548).
+
+#### Scenario: A browse list is loading
+
+- **WHEN** a list's `loading` is true
+- **THEN** its header stays, and its body is a visible status line over static skeleton rows inside an `aria-busy` region
+- **AND** no row, empty panel or no-match panel renders
+
+#### Scenario: A browse list fails to load
+
+- **WHEN** the list's load fails
+- **THEN** its body is a danger-toned notice with a live-region role, and its header stays
+
+#### Scenario: A list loads together with its view
+
+- **WHEN** a player app view and its lists load together
+- **THEN** the view's composition draws the loading and error, and none of those lists renders through `ListState`
+
 ### Requirement: A well is the one container level below a card
 
 A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/components/Well.svelte`, issue 2008), the level below `<Card>` that the library specifies, and never hand-rolled at a call site.
@@ -2574,6 +2868,7 @@ The second difference is structural and smaller — `Kicker` takes no `class` an
 The run bar's and run progress's kickers adopt `Kicker` (each as `<Kicker as="span">`), because their shipped subtle ink is under the 4.5:1 floor; its muted ink clears 4.5:1 on the run ground.
 Run progress keeps the `id` its group's `aria-labelledby` names on a wrapper span around the `Kicker`, since `Kicker` forwards no `id`.
 The converted-select captions remain ruled out.
+`Field` draws its caption through its own rule rather than the `Kicker` primitive, which leaves this ruling unchanged.
 
 An `asidePlacement` prop on `ListRow`, which would draw the selectable form's `aside` inline beside its button, is recorded as declined (issue 1523, decision D1): the aside stays beneath the button, as "Dense result rows and compact rail pagination retain their meaning" states, and the library's list row specimens draw it there.
 

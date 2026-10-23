@@ -2,6 +2,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -22,6 +23,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -48,6 +50,7 @@ const radioHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
   ],
   componentPath: 'src/ui/svelte/components/RadioCardGroup.svelte',
 });
@@ -66,9 +69,7 @@ const RADIO_OPTIONS = Object.freeze([
 ]);
 
 /** The exact class string the `<fieldset>` carries, in source order. */
-const RADIO_CLASS_CONFIG_CARDS =
-  'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
-const RADIO_CLASS_PLAIN =
+const RADIO_CLASS =
   'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
 
 before(async () => {
@@ -91,7 +92,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       legend: 'Resolution',
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
-      selectedValue: 'simple',
+      value: 'simple',
       'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
@@ -119,7 +120,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       legend: 'Resolution',
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
-      selectedValue: 'simple',
+      value: 'simple',
       'data-radio-card-group': 'field-mounted',
     });
     const row = root.querySelector('.manager-resolution-option');
@@ -186,13 +187,13 @@ describe('Field (mounted, through its real callers)', () => {
       legend: 'Resolution',
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
-      selectedValue: 'simple',
+      value: 'simple',
       'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
     assert.ok(Boolean(group), 'the radio card group rendered');
     assert.equal(group.tagName, 'FIELDSET', 'the one fieldset field in the corpus stays one');
-    assert.equal(group.getAttribute('class'), RADIO_CLASS_CONFIG_CARDS);
+    assert.equal(group.getAttribute('class'), RADIO_CLASS);
 
     const legend = group.firstElementChild;
     assert.ok(Boolean(legend), 'the group has a first child');
@@ -203,27 +204,13 @@ describe('Field (mounted, through its real callers)', () => {
     );
   });
 
-  it('folds the config-cards flag into the class string without changing it', async () => {
-    // The `class:` directive this replaced emitted the token only when the flag was true.
-    const root = await radioHarness.mount({
-      legend: 'Resolution',
-      groupName: 'field-mounted-radio',
-      options: [...RADIO_OPTIONS],
-      selectedValue: 'simple',
-      'data-radio-card-group': 'field-mounted',
-      configCards: false,
-    });
-    const group = root.querySelector('[data-radio-card-group="field-mounted"]');
-    assert.equal(group.getAttribute('class'), RADIO_CLASS_PLAIN);
-  });
-
   it('forwards `disabled` to the fieldset as a real boolean attribute', async () => {
     // `disabled` is the third reason this field is a fieldset.
     const props = {
       legend: 'Resolution',
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
-      selectedValue: 'simple',
+      value: 'simple',
       'data-radio-card-group': 'field-mounted',
     };
     const on = await radioHarness.mount({ ...props, disabled: true });
@@ -243,5 +230,150 @@ describe('Field (mounted, through its real callers)', () => {
       'a cleared `disabled` must be REMOVED. Any value at all — including "false" — disables a ' +
         'fieldset and every control inside it.'
     );
+  });
+});
+
+describe('RadioCardGroup names each radio by its title and describes it by what renders (issue 2467)', () => {
+  const body = createRawSnippet((option) => ({
+    render: () => `<span class="probe-body">${option().value}</span>`,
+  }));
+  const OPTIONS = Object.freeze([
+    { value: 'open', label: 'Open', description: 'Anyone may choose it.' },
+    { value: 'later', label: 'Later', description: 'Not yet.' },
+    { value: 'bare', label: 'Bare' },
+  ]);
+  const mountGroup = (props = {}) =>
+    radioHarness.mount({
+      legend: 'Mode',
+      groupName: 'field-mounted-naming',
+      options: OPTIONS.map((option) => ({ ...option })),
+      value: 'open',
+      'data-radio-card-group': 'naming',
+      ...props,
+    });
+  const cardOf = (root, value) => root.querySelector(`[data-radio-card-option="${value}"]`);
+  const radioOf = (root, value) => cardOf(root, value).querySelector('input[type="radio"]');
+  const byId = (id) => document.querySelector(`[id="${id}"]`);
+  const describedIds = (radio) => {
+    const ids = (radio.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
+    for (const id of ids)
+      assert.ok(byId(id), `aria-describedby lists ${id}, which resolves to nothing`);
+    return ids;
+  };
+
+  it('labels every radio by its own title element', async () => {
+    const root = await mountGroup();
+    for (const { value } of OPTIONS) {
+      const radio = radioOf(root, value);
+      const title = byId(radio.getAttribute('aria-labelledby'));
+      assert.ok(
+        Boolean(title) && title === cardOf(root, value).querySelector('[data-tool-choice-title]'),
+        `the ${value} radio's aria-labelledby must resolve to its card's title`
+      );
+    }
+  });
+
+  it('describes a radio by its description, reason and body, and by no id that is absent', async () => {
+    const root = await mountGroup({
+      optionBody: body,
+      disabledOptions: [{ value: 'later', reason: 'Coming soon' }],
+    });
+    const card = cardOf(root, 'later');
+    const parts = [
+      '[data-tool-choice-description]',
+      '[data-radio-card-reason]',
+      '.manager-resolution-option-body',
+    ].map((selector) => card.querySelector(selector));
+    const ids = describedIds(radioOf(root, 'later'));
+    assert.equal(ids.length, 3, 'the description, the reason and the body');
+    for (const [index, id] of ids.entries()) {
+      assert.ok(
+        Boolean(parts[index]) && byId(id) === parts[index],
+        `aria-describedby id ${id} must resolve to the card's own part ${index}`
+      );
+    }
+    assert.equal(parts[1].textContent, 'Coming soon');
+    assert.equal(
+      describedIds(radioOf(root, 'bare')).length,
+      1,
+      'a bare option is described by its body alone'
+    );
+  });
+
+  it('omits aria-describedby when no description, reason or body renders', async () => {
+    const root = await mountGroup();
+    assert.ok(!radioOf(root, 'bare').hasAttribute('aria-describedby'));
+    assert.equal(describedIds(radioOf(root, 'open')).length, 1, 'a described option keeps its id');
+  });
+
+  it('disables a named option for real and ignores an entry that names none', async () => {
+    const root = await mountGroup({
+      disabledOptions: [
+        { value: 'later', reason: 'Coming soon' },
+        { value: 'missing', reason: 'Names nothing' },
+      ],
+    });
+    assert.deepEqual(
+      OPTIONS.map(({ value }) => [
+        radioOf(root, value).disabled,
+        cardOf(root, value).classList.contains('is-disabled'),
+      ]),
+      [
+        [false, false],
+        [true, true],
+        [false, false],
+      ]
+    );
+    assert.equal(
+      root.querySelectorAll('[data-radio-card-reason]').length,
+      1,
+      'the stray entry draws no reason'
+    );
+    assert.ok(!root.textContent.includes('Names nothing'));
+  });
+
+  it('disables an option whose reason is empty but draws no reason and describes by none', async () => {
+    const root = await mountGroup({ disabledOptions: [{ value: 'later', reason: '' }] });
+    const radio = radioOf(root, 'later');
+    assert.ok(radio.disabled, 'an empty reason still disables its option');
+    assert.ok(!root.querySelector('[data-radio-card-reason]'), 'and draws no reason element');
+    assert.equal(describedIds(radio).length, 1, 'its description is the only id described');
+  });
+
+  it('keeps the first non-empty reason for a value and lets a later empty one disable only', async () => {
+    const root = await mountGroup({
+      disabledOptions: [
+        { value: 'later', reason: 'Early reason' },
+        { value: 'later', reason: '' },
+        { value: 'open', reason: '' },
+        { value: 'open', reason: 'Late reason' },
+      ],
+    });
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-radio-card-reason]')].map((node) => node.textContent),
+      ['Late reason', 'Early reason'],
+      'a later empty reason does not erase an earlier one, and a later one fills an empty one'
+    );
+    assert.ok(radioOf(root, 'later').disabled && radioOf(root, 'open').disabled);
+    assert.equal(describedIds(radioOf(root, 'later')).length, 2, 'the description and the reason');
+  });
+
+  it('never calls onChange for a change dispatched on a disabled radio', async () => {
+    const calls = [];
+    const onChange = (next) => {
+      calls.push(next);
+    };
+    const root = await mountGroup({
+      onChange,
+      disabledOptions: [{ value: 'later', reason: 'Soon' }],
+    });
+    radioOf(root, 'later').dispatchEvent(new Event('change', { bubbles: true }));
+    radioOf(root, 'bare').dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(calls, ['bare'], 'only the enabled radio reports its value');
+
+    radioHarness.remount();
+    const off = await mountGroup({ onChange, disabled: true });
+    radioOf(off, 'bare').dispatchEvent(new Event('change', { bubbles: true }));
+    assert.deepEqual(calls, ['bare'], 'a disabled group reports nothing');
   });
 });

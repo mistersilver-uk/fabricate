@@ -250,16 +250,11 @@
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
-        title={localizeOr(
-          'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-          'Add modifier'
-        )}
         disabled={availableConditions.length === 0 || !pickerSelection}
-        data-tooltip={availableConditions.length === 0 ? allConditionsAdded : null}
+        tooltip={availableConditions.length === 0 ? allConditionsAdded : undefined}
         onclick={() => onAddConditionModifier(kind, pickerSelection)}
-      >
-        <i class="fas fa-plus" aria-hidden="true"></i>
-      </IconButton>
+        icon="fas fa-plus"
+      />
     </div>
     <div class="manager-condition-modifier-row-list">
       {#each attachedModifiers as modifier (modifier.id)}
@@ -406,15 +401,15 @@
             onChange={(next) => onUpdateCharacterModifier(ref.id, { operator: next })}
           />
           <IconButton
-            class="is-danger manager-character-modifier-row-reference-delete"
+            role="danger"
+            class="manager-character-modifier-row-reference-delete"
             ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
             )}
             onclick={() => onDeleteCharacterModifier(ref.id)}
-          >
-            <i class="fas fa-trash" aria-hidden="true"></i>
-          </IconButton>
+            icon="fas fa-trash"
+          />
         </header>
         {@render boundsRow(ref)}
         <div class="manager-character-modifier-override-row">

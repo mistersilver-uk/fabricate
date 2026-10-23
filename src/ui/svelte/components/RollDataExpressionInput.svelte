@@ -224,7 +224,7 @@
     input.focus();
     input.setSelectionRange(head.length, head.length);
     announceAfterFocusMove(
-      () => document.activeElement === input,
+      () => input.ownerDocument.activeElement === input,
       () => speak(mine)
     );
   }
@@ -295,7 +295,7 @@
 
   /* Clears the dashed role's 34px height and 600 weight, which the module sheet states at (0,4,0). */
   .fab-expr-input-row
-    :global(.fabricate-button.fabricate-button.fab-manager-button.fab-expr-input-token) {
+    :global(.fabricate-button.fabricate-button.fabricate-button.fab-expr-input-token) {
     flex: 0 1 auto;
     min-width: 0;
     height: 26px;

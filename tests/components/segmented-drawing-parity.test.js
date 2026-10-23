@@ -29,7 +29,7 @@ const shipped = scopedComponentCss(resolve(repoRoot, COMPONENT));
 const FORMS = Object.freeze({
   default: { props: {}, drawn: '.k-seg:not(.tag, .inline, .field)', uses: 10 },
   tag: { props: { tone: 'tag' }, drawn: '.k-seg.tag:not(.inline, .field)', uses: 4 },
-  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 30 },
+  inline: { props: { density: 'inline' }, drawn: '.k-seg.inline:not(.tag)', uses: 33 },
   field: { props: { density: 'field' }, drawn: '.k-seg.field:not(.tag)', uses: 1 },
   // The tag track on the 30 and 34 rungs: one specimen each, and no caller yet, so its geometry is
   // read too: the track's height and corner and the segments' type size.
@@ -111,8 +111,8 @@ async function shippedMarkup() {
   });
   await harness.setup();
   const options = [
-    { value: 'a', fallback: 'A' },
-    { value: 'b', fallback: 'B' },
+    { value: 'a', label: 'A' },
+    { value: 'b', label: 'B' },
   ];
   const markup = {};
   try {

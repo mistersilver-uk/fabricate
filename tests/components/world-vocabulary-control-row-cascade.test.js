@@ -62,17 +62,33 @@ const ROUTES = Object.freeze([
   Object.freeze({
     view: 'world-vocabulary',
     caseId: 'world-vocabulary',
+    scrollCaseId: 'world-vocabulary-tags',
     mainAttributes: 'class="manager-main" data-scoped-page="world-vocabulary"',
   }),
   Object.freeze({
     view: 'tags',
     caseId: 'manager-tags-categories-normal',
+    scrollCaseId: 'manager-tags-categories-tags-tab',
     mainAttributes: 'class="manager-main manager-tags-categories"',
   }),
 ]);
 
 /** The capture case's OWN declared frame, read from the registry rather than restated. */
 const caseFor = (route) => VIEW_LAB_CASES.find((entry) => entry.id === route.caseId);
+
+/**
+ * The selectors of the `scroll` steps the route's SECOND frame declares: the case that scrolls the
+ * panels the first frame cannot hold into view. Same frame as the first, taken after the step.
+ */
+const scrollSelectorsFor = (route) =>
+  (VIEW_LAB_CASES.find((entry) => entry.id === route.scrollCaseId)?.steps ?? [])
+    .filter((step) => step?.scroll)
+    .map((step) => step.selector);
+
+/** The panels whose first row ends past the budget AND that no scroll step brings inside the frame. */
+function unreachedPanels(bottoms, budget, reached) {
+  return bottoms.filter(({ kind, bottom }) => bottom > budget && !reached.has(kind));
+}
 
 /** What the manager draws ABOVE `.manager-body` in the real app. */
 const MEASURED_CHROME = 186;
@@ -123,9 +139,8 @@ function panelFixture(kind) {
     '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
     '<label class="fabricate-field"><span class="manager-field-label">Name</span>' +
-    // `fab-manager-button` is the primitive's OWN class.
     '<input type="text"></label>' +
-    '<button class="fabricate-button fab-manager-button">Add</button></div></form>' +
+    '<button class="fabricate-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
     '<label class="fabricate-search"><input type="text"></label>' +
     '<span class="manager-chip">3 entries</span></div>' +
@@ -349,21 +364,31 @@ perRoute('the sort trigger takes the toolbar rung under the panel’s own fill',
   }
 });
 
-perRoute('every control row stays one line high, flattened rather than a lit band', async (route) => {
+perRoute('every control row stays one line high inside the bordered filter bar', async (route) => {
   const { tab, close } = await open(1280, route);
   try {
-    const heights = await tab.evaluate(() =>
-      [...globalThis.document.querySelectorAll('.manager-scoped-list-toolbar')].map(
-        (bar) => bar.getBoundingClientRect().height
-      )
+    const bars = await tab.evaluate(() =>
+      [...globalThis.document.querySelectorAll('.manager-scoped-list-toolbar')].map((bar) => {
+        const style = globalThis.getComputedStyle(bar);
+        return {
+          height: bar.getBoundingClientRect().height,
+          border: ['top', 'right', 'bottom', 'left'].map((edge) => style[`border-${edge}-width`]),
+          radius: style.borderTopLeftRadius,
+          marginTop: style.marginTop,
+        };
+      })
     );
-    assert.equal(heights.length, 3, 'one control row per panel');
-    for (const height of heights) {
+    assert.equal(bars.length, 3, 'one control row per panel');
+    for (const bar of bars) {
+      // One 34px control line, 12px padding either side and the 1px border either side: 60px.
       assert.ok(
-        height < 60,
-        `a control row is ${Math.round(height)}px tall. One line of 34px controls with no bar ` +
-          'padding is about 34; anything near 100 is the row wrapped onto three lines'
+        Math.abs(bar.height - 60) <= 1,
+        `a control row is ${Math.round(bar.height)}px tall. One line of 34px controls inside the ` +
+          'bar is 60; anything near 100 is the row wrapped onto three lines'
       );
+      assert.deepEqual(bar.border, ['1px', '1px', '1px', '1px'], 'the box is bordered on all four sides');
+      assert.equal(bar.radius, '9px', 'and it keeps the library radius');
+      assert.equal(bar.marginTop, '0px', 'the panel card insets it; the sheet adds no margin here');
     }
   } finally {
     await close();
@@ -448,7 +473,30 @@ perRoute('the category grid collapses to ONE track below the manager’s 1120px 
   }
 });
 
-perRoute('all three panels’ first rows fit inside the frame the capture case declares', async (route) => {
+/**
+ * Run the second frame's scroll steps the way the runner does (`scrollIntoViewIfNeeded` on the
+ * first match) and name the panels whose first row then sits inside the frame's body budget.
+ */
+async function panelsReachedByScroll(tab, selectors, budget) {
+  const reached = new Set();
+  for (const selector of selectors) {
+    await tab.locator(selector).first().scrollIntoViewIfNeeded();
+    const inside = await tab.evaluate(
+      ({ kinds, limit }) => {
+        const body = globalThis.document.querySelector('.manager-body').getBoundingClientRect().top;
+        return kinds.filter((kind) => {
+          const first = globalThis.document.querySelector(`[data-row="${kind}-0"]`).getBoundingClientRect();
+          return first.top >= body && first.bottom <= body + limit;
+        });
+      },
+      { kinds: KINDS, limit: budget }
+    );
+    for (const kind of inside) reached.add(kind);
+  }
+  return reached;
+}
+
+perRoute('all three panels’ first rows fit inside the frame, or a declared scroll step brings them in', async (route) => {
   const frame = caseFor(route).position;
   const { tab, close } = await open(frame.width, route);
   try {
@@ -468,15 +516,66 @@ perRoute('all three panels’ first rows fit inside the frame the capture case d
       `expected the 2-up grid and the tag panel beneath it, got ${JSON.stringify(bottoms)}`
     );
 
+    // The case's own frame is taken before any scroll; the panel it cannot hold is the one the
+    // second frame must scroll to, in a frame of the SAME size.
     const budget = frame.height - CHROME_ALLOWANCE;
-    for (const { kind, bottom } of bottoms) {
-      assert.ok(
-        bottom <= budget,
-        `${kind}'s first row ends ${Math.round(bottom)}px into the body, past the ` +
-          `${budget}px this case's ${frame.height}px frame leaves for it. The ` +
-          'published frame would cut through the row the fixture exists to show.'
-      );
-    }
+    const secondFrame = VIEW_LAB_CASES.find((entry) => entry.id === route.scrollCaseId);
+    assert.ok(secondFrame, `the registry still carries a \`${route.scrollCaseId}\` case`);
+    assert.deepEqual(
+      secondFrame.position,
+      frame,
+      `${route.scrollCaseId} is a second frame, so it keeps ${route.caseId}'s ${frame.width}x${frame.height}`
+    );
+    const reached = await panelsReachedByScroll(tab, scrollSelectorsFor(route), budget);
+    const unreached = unreachedPanels(bottoms, budget, reached);
+    assert.deepEqual(
+      unreached.map((entry) => entry.kind),
+      [],
+      `${unreached.map((entry) => `${entry.kind}'s first row ends ${Math.round(entry.bottom)}px ` +
+        `into the body`).join(', ')}, past the ${budget}px this case's ${frame.height}px frame ` +
+        `leaves for it, and no scroll step of ${route.scrollCaseId} brings it inside. The ` +
+        'published frames would cut through the row the fixture exists to show.'
+    );
+    // Non-vacuity, as a deliberate tripwire: at least one panel is below the budget, otherwise the
+    // scroll step is decoration. It fails when the fixture gets short enough that the scroll case
+    // is no longer needed, which is the moment to retire that case.
+    assert.ok(
+      bottoms.some((entry) => entry.bottom > budget),
+      'no panel falls below the budget, so this clause no longer needs a scroll step'
+    );
+  } finally {
+    await close();
+  }
+});
+
+test('a panel below the budget that no scroll step reaches still fails the fit clause', () => {
+  const bottoms = [
+    { kind: 'recipeCategories', bottom: 600 },
+    { kind: 'componentTags', bottom: 824 },
+  ];
+  assert.deepEqual(
+    unreachedPanels(bottoms, 790, new Set()).map((entry) => entry.kind),
+    ['componentTags'],
+    'a panel past the budget with no scroll step is unreached'
+  );
+  assert.deepEqual(
+    unreachedPanels(bottoms, 790, new Set(['componentTags'])),
+    [],
+    'a scroll step that reaches the panel covers it'
+  );
+});
+
+perRoute('a scroll step aimed at another panel does not cover the tag panel', async (route) => {
+  const frame = caseFor(route).position;
+  const { tab, close } = await open(frame.width, route);
+  try {
+    const budget = frame.height - CHROME_ALLOWANCE;
+    const reached = await panelsReachedByScroll(
+      tab,
+      ['[data-vocabulary-panel="recipeCategories"]'],
+      budget
+    );
+    assert.equal(reached.has('componentTags'), false, 'scrolling to a sibling panel leaves the tag row out');
   } finally {
     await close();
   }

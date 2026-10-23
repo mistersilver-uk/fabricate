@@ -271,7 +271,7 @@ function navDeclarationScope(sources, template) {
  * compare them against the runner's own lists.
  */
 const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
-const PRESS_KEYS = ['Enter', 'Space', 'Tab'];
+const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -388,13 +388,17 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
  * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix: the
- * mount page, its companion stand-in, and the one specimen fixture whose case acts on what it mounts.
+ * mount page, its companion stand-in, and the specimen fixtures whose cases name what they mount.
  */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = [
   'tests/view-lab/mount.js',
   'tests/view-lab/labCompanionRoll.js',
   'tests/view-lab/fixtures/PublishedControls.svelte',
+  'tests/view-lab/fixtures/PublishedValues.svelte',
+  'tests/view-lab/fixtures/PublishedSearch.svelte',
+  'tests/view-lab/fixtures/PublishedSelect.svelte',
+  'tests/view-lab/fixtures/PublishedStageBars.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -754,6 +758,16 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-component-edit-salvage-narrow',
   'manager-checks-parity-outcomes-multiply',
   'manager-checks-parity-outcomes-under-fixed',
+  // The recipe Overview's routing card (issue 2513): one select x and the 84px marker column.
+  'manager-recipe-edit-overview-routing-ingredients',
+  'manager-recipe-edit-overview-routing-default',
+  'manager-recipe-edit-overview-routing-check',
+  'manager-recipe-edit-overview-routing-check-narrow',
+  'manager-recipe-edit-overview-routing-check-permitted',
+  'manager-recipe-edit-overview-routing-distinct',
+  'manager-recipe-edit-overview-routing-multistep',
+  // The published stage bars (issue 2455): each group's bars on one line, each caption whole.
+  'manager-published-stage-bars-specimen',
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
@@ -818,6 +832,29 @@ const PORTRAIT_BOX = 'box-sizing: border-box; width: 32px; height: 32px';
 const labButton = (key) => `[data-lab-buttons] [data-lab-button="${key}"] button`;
 /** One published switch of the same fixture, by its section's key. */
 const labToggle = (key) => `[data-lab-toggles] [data-lab-toggle="${key}"] button`;
+/** A part of one published stepper of the values fixture, by its section's key. */
+const labStepper = (key, part) => `[data-lab-values] [data-lab-stepper="${key}"] ${part}`;
+const DISMISSAL = (tone) =>
+  `[data-lab-controls] > [data-lab-dismissals] > [data-lab-dismissal="${tone}"]`;
+const STEPPER_RING = 'outline-style: solid; outline-width: 2px; outline-offset: 0px';
+/** A part of one published search field of the search fixture, by its section's key. */
+const labSearch = (key, part) => `[data-lab-search-ground] [data-lab-search="${key}"] ${part}`;
+/** A part of one published select of the select fixture, by its section's key. */
+const labSelect = (key, part) => `[data-lab-select-ground] [data-lab-select="${key}"] ${part}`;
+const FIRST_INGREDIENT_ROW =
+  '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
+const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
+const REPEATS = '[data-recipe-result-group="sm-r-horseshoe-draws"] [data-recipe-group-repeats]';
+// The quiet status button the "up to N, by roll" drawing draws (issue 2534).
+const REPEATS_CONTROLS = [
+  {
+    selector: REPEATS,
+    styles:
+      'height: 26px; border-top-left-radius: 7px; border-top-color: transparent; ' +
+      'color: var(--fab-text-secondary); font-size: 10.5px; font-weight: 500',
+  },
+  { selector: `${REPEATS} > i.fa-ellipsis`, styles: 'font-size: 11px' },
+];
 const NON_VERB_CONTROLS = Object.freeze({
   'manager-recipes-normal': [
     navGroupBox('.manager-nav-group:has(#manager-crafting-submenu)'),
@@ -835,6 +872,24 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-checks-v3-count-additional-dice-macro-narrow': macroZonesFill(),
   'manager-checks-v3-count-additional-dice-macro-pair-narrow': macroZonesFill(),
   'manager-component-edit-salvage': toolbarSelects('[data-salvage-dc-preset]'),
+  // The requirement row at the library specimen's figures, and its search's focus face (issue 2515).
+  'manager-recipe-edit-ingredients': [
+    {
+      selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-option-plate`,
+      styles: 'width: 26px; height: 26px; border-top-left-radius: 6px',
+    },
+    {
+      selector: `${FIRST_INGREDIENT_ROW} [data-recipe-option-chosen]`,
+      styles: 'height: 34px; border-top-left-radius: 7px',
+    },
+    { selector: `${FIRST_INGREDIENT_ROW} .manager-recipe-or-trigger`, styles: 'height: 28px' },
+  ],
+  'manager-recipe-edit-ingredients-suggestions': [
+    {
+      selector: '.manager-recipe-option-search',
+      styles: 'height: 34px; border-top-color: var(--fab-accent)',
+    },
+  ],
   'manager-checks-simple-two-band-strip': toolbarSelects(
     '[data-simple-band-record]',
     '[data-checks-preview-record]'
@@ -879,13 +934,38 @@ const NON_VERB_CONTROLS = Object.freeze({
     '.manager-recipe-ingredient-menu',
     '.manager-recipe-ingredient-menu [data-recipe-add="ingredient-tag"]'
   ),
-  // A choice group's one adder: the dashed `Button`'s pinned 34px (issue 2367).
+  // A choice group's one adder: the dashed `Button` at its 28px rung (issue 2515).
   'manager-recipe-edit-ingredients-choice-group': [
     {
       selector: '[data-recipe-group].has-alternatives [data-recipe-add="alternative"]',
-      styles: 'height: 34px; border-top-style: dashed',
+      styles: 'height: 28px; border-top-left-radius: 7px; border-top-style: dashed',
     },
   ],
+  // The tag row at the choice-group drawing's figures: `#` pills and a dashed adder (issue 2534).
+  'manager-recipe-edit-tag-picker': [
+    { selector: TAG_ADDER, styles: 'height: 28px; border-top-style: dashed' },
+  ],
+  'manager-recipe-edit-ingredients-tag-row-two-tags': [
+    {
+      selector: '[data-recipe-tag="vessel"]',
+      styles:
+        'height: 28px; border-top-left-radius: 999px; font-size: 11px; font-weight: 600; ' +
+        'text-transform: none; color: var(--fab-purple-text)',
+    },
+    {
+      selector: '[data-recipe-tag="vessel"] .manager-recipe-tag-remove',
+      styles: 'font-size: 0.62rem',
+    },
+    { selector: '[data-recipe-option-tags]', styles: 'column-gap: 8px' },
+    {
+      selector: TAG_ADDER,
+      styles:
+        'height: 28px; border-top-style: dashed; border-top-left-radius: 999px; ' +
+        'font-size: 11px; font-weight: 600; padding-left: 12px; background-color: transparent',
+    },
+  ],
+  'manager-recipe-edit-results-group-rolled-upto-repeats': REPEATS_CONTROLS,
+  'manager-recipe-edit-results-group-rolled-upto-repeats-narrow': REPEATS_CONTROLS,
   'manager-environment-edit-automatic-force-add': menuCorners(
     '.fabricate-action-menu-panel',
     '.fabricate-action-menu-panel [data-action="force-include"]'
@@ -984,8 +1064,8 @@ const NON_VERB_CONTROLS = Object.freeze({
   // its own ink on a danger ground; then the mounted accent kicker and both list chips at their own
   // size and ink, the rail's and the card's column, the card's box, and each slot element and its
   // wrapper taking no box; then the hero panel's dashed edge, column, tile, slot boxes and title,
-  // the filtered panel's gap and ink, and the notice's fill and inks (issue 2451); then each
-  // panel's nested button in its visual role's ink and fill (issue 2452).
+  // the filtered panel's edge, padding, gap and ink, and the notice's fill and inks (issue 2451);
+  // then each panel's nested button in its visual role's ink and fill (issue 2452).
   'manager-published-leaves-specimen': [
     { selector: '.fab-avatar[data-avatar="image"]', styles: PORTRAIT_BOX },
     { selector: '.fab-avatar-img', styles: 'object-fit: cover' },
@@ -1015,7 +1095,7 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '.fabricate-card',
       styles:
-        'display: flex; row-gap: 8px; padding-top: 12px; border-radius: 11px; background-color: var(--fab-bg-2)',
+        'display: flex; row-gap: 8px; padding-top: 16px; border-radius: 11px; background-color: var(--fab-bg-2)',
     },
     { selector: '.fab-rail > div', styles: 'display: contents' },
     { selector: '.fab-rail > div > div', styles: 'display: contents' },
@@ -1023,21 +1103,35 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: '.fabricate-card > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty:not(.is-filtered)',
-      styles: 'border-top-style: dashed; background-color: rgba(0, 0, 0, 0)',
+      styles:
+        'border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); background-color: rgba(0, 0, 0, 0)',
     },
     { selector: '.manager-empty:not(.is-filtered) > div', styles: 'display: flex; row-gap: 8px' },
     {
       selector: '.manager-empty:not(.is-filtered) > div > i',
-      styles: 'width: 46px; height: 46px',
+      styles:
+        'width: 38px; height: 38px; border-radius: 9px; color: var(--fab-text-secondary); background-color: var(--fab-bg-3); font-size: 15px',
     },
     { selector: '.manager-empty:not(.is-filtered) > div > div', styles: 'display: contents' },
     { selector: '.manager-empty:not(.is-filtered) > div > div > div', styles: 'display: contents' },
     {
       selector: '.manager-empty h3',
-      styles: 'color: var(--fab-text-secondary); font-size: 13px',
+      styles: 'color: var(--fab-text); font-size: 15px; font-weight: 600',
     },
-    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 12px' },
-    { selector: '.manager-empty.is-filtered p', styles: 'color: var(--fab-text-muted)' },
+    {
+      selector: '.manager-empty:not(.is-filtered) > div > p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
+    {
+      selector: '.manager-empty.is-filtered',
+      styles:
+        'padding: 16px; border-top-style: dashed; border-top-width: 1px; border-top-color: var(--fab-border-strong); border-radius: 11px',
+    },
+    { selector: '.manager-empty.is-filtered > div', styles: 'row-gap: 8px' },
+    {
+      selector: '.manager-empty.is-filtered p',
+      styles: 'color: var(--fab-text-muted); font-size: 10.5px',
+    },
     {
       selector: '.manager-empty:not(.is-filtered) .fabricate-button',
       styles: 'color: var(--fab-on-success); background-color: var(--fab-success)',
@@ -1055,7 +1149,7 @@ const NON_VERB_CONTROLS = Object.freeze({
   // tone's danger title in their own inks, under the fixture's azure.
   'manager-published-controls-specimen': [
     ...['info', 'danger', 'warning', 'success'].map((tone) => ({
-      selector: `.fab-notice.is-${tone} [data-notice-action]`,
+      selector: `[data-lab-controls] > section .fab-notice.is-${tone} [data-notice-action]`,
       styles: 'height: 28px; font-size: 12.5px; color: var(--fab-text-secondary)',
     })),
     {
@@ -1069,7 +1163,8 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'color: var(--fab-success-text)',
     },
     {
-      selector: '.fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
+      selector:
+        '[data-lab-controls] > section .fab-notice:not(.is-warning, .is-info, .is-success) .fab-notice-title',
       styles: 'color: var(--fab-danger-text)',
     },
     // The published buttons at rest (issue 2452): each visual role in the sheet's own values, a
@@ -1111,16 +1206,79 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-toggles-specimen': [
     {
       selector: `${labToggle('group')} > .manager-status-toggle-track`,
-      styles: 'width: 34px; height: 20px; background-color: var(--fab-surface-raised)',
+      styles: 'width: 38px; height: 22px; background-color: var(--fab-surface-soft)',
     },
     {
       selector: `${labToggle('hide')} > .manager-status-toggle-track`,
       styles: 'background-color: var(--fab-accent)',
     },
-    { selector: labToggle('long'), styles: 'width: 34px' },
+    { selector: labToggle('long'), styles: 'width: 38px' },
     {
       selector: `${labToggle('key')}:focus-visible`,
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The same fixture's dismissable notices (issue 2452): the accent one's dismiss control under
+  // keyboard focus in the accent ring, and each tone's dismiss tile at its square size.
+  'manager-published-notice-dismiss-focus': [
+    {
+      selector: `${DISMISSAL('accent')} [data-notice-dismiss]:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
+    ...['danger', 'accent'].map((tone) => ({
+      selector: `${DISMISSAL(tone)} [data-notice-dismiss]`,
+      styles: 'width: 28px; height: 28px',
+    })),
+  ],
+  // The same fixture after the danger notice's dismissal: its next control ringed, where its
+  // callback moved focus, and the accent notice's dismiss tile still drawn.
+  'manager-published-notice-dismissed': [
+    {
+      selector: `${DISMISSAL('danger')} > [data-lab-next] button:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+    },
+    { selector: `${DISMISSAL('accent')} .fab-notice [data-notice-dismiss]`, styles: 'width: 28px' },
+  ],
+  // The published steppers (issue 2452): the group's declared corner, the value's type size, and
+  // the focused field's ring by its shape alone, at its own edge.
+  'manager-published-steppers-specimen': [
+    { selector: labStepper('credit', '.fab-stepper'), styles: 'border-radius: 7px' },
+    { selector: labStepper('credit', 'input'), styles: 'font-size: 11.5px' },
+    { selector: `${labStepper('limit', 'input')}:focus-visible`, styles: STEPPER_RING },
+  ],
+  // The same fixture with keyboard focus on a plus on the darker strip, its ring at its own edge.
+  'manager-published-steppers-button-focus': [
+    {
+      selector: `${labStepper('card', 'button[data-stepper-increment]')}:focus-visible`,
+      styles: STEPPER_RING,
+    },
+  ],
+  // The published search fields (issue 2453): the default shell's declared corner, and the focused
+  // input drawing no ring of its own, the shell's border taking the accent instead.
+  'manager-published-search-specimen': [
+    { selector: labSearch('empty', '.fabricate-search'), styles: 'border-radius: 9px' },
+    { selector: `${labSearch('transform', 'input')}:focus`, styles: 'outline-style: none' },
+    {
+      selector: `${labSearch('transform', '.fabricate-search')}:focus-within`,
+      styles: 'border-color: var(--fab-accent)',
+    },
+  ],
+  // The published selects (issue 2454): each rung's declared corner, and the panel's own, in the
+  // overlay host the companion passed and on the standalone layer.
+  'manager-published-select-specimen': [
+    { selector: labSelect('hosted', '.fabricate-select-trigger'), styles: 'border-radius: 7px' },
+    {
+      selector: '[data-lab-select-ground] > div > .fabricate-select-popover',
+      styles: 'border-radius: 11px',
+    },
+  ],
+  'manager-published-select-layer': [
+    { selector: labSelect('layer', '.fabricate-select-trigger'), styles: 'border-radius: 9px' },
+    {
+      selector: 'body > .fabricate.fabricate-standalone-overlay > div > .fabricate-select-popover',
+      styles: 'border-radius: 11px',
     },
   ],
 });
@@ -1149,11 +1307,20 @@ const LAYOUT_CASE_REGISTRATIONS = [
 const LAYOUT_CASE_IDS = [...new Set(LAYOUT_CASE_REGISTRATIONS)];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
-test('the gutter-claim catalogue cases still declare their search field alignment', () => {
+test('the gutter-claim catalogue cases align the filter bar box with their rows', () => {
   for (const id of ['world-tool-catalogue', 'world-essence-catalogue']) {
     const { expectLayout } = getCaseById(id);
     assert.ok(expectLayout.containerSelector, `${id} declares a containerSelector`);
-    assert.match(expectLayout.alignedLeft, /search/i, `${id} names the search field`);
+    assert.match(
+      expectLayout.alignedLeft,
+      /\.manager-scoped-list-toolbar(?!\s+\.)/,
+      `${id} names the box`
+    );
+    assert.doesNotMatch(
+      expectLayout.alignedLeft,
+      /search/i,
+      `${id} no longer claims the search field`
+    );
   }
 });
 
@@ -1176,7 +1343,10 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.equal(viewCase.expectLayout.expectedTracks, 2);
       assert.equal(viewCase.expectLayout.fillSelector, `.manager-scoped-list-column > ${foot}`);
       for (const edge of [viewCase.expectLayout.alignedLeft, viewCase.expectLayout.alignedRight]) {
-        assert.ok(edge.includes('.manager-scoped-list-column > .manager-scoped-list-toolbar'));
+        assert.ok(
+          !edge.includes('.manager-scoped-list-toolbar'),
+          'the filter bar is inset from the column edges, so it stands in no edge list'
+        );
         assert.ok(edge.includes(`.manager-scoped-list-column > ${foot}`));
       }
       continue;
@@ -2489,6 +2659,48 @@ test('the Knowledge loading and error frames reach their state through the snaps
   }
 });
 
+test('the list-state frames reach their state through the readiness gate and the environment store', () => {
+  // Neither state is reachable in the smoke, so each case is `beyond`; the lab shuts
+  // `game.fabricate.ready` before the manager is built (the admin store then publishes its startup
+  // state and waits on a hook the lab never fires), and makes the shared environment store throw.
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  for (const [id, param] of [
+    ['manager-systems-loading', 'systemsLoading'],
+    ['manager-environments-load-error', 'environmentsError'],
+  ]) {
+    const capture = getCaseById(id);
+    assert.equal(capture.query?.[param], '1', `${id} does not set ${param}`);
+    assert.equal(capture.reaches, 'beyond', `${id} claims the smoke reaches it`);
+    assert.deepEqual(capture.smokeLabels, [], `${id} names a smoke label`);
+    assert.equal(capture.themeVariants, undefined, `${id} declares theme variants`);
+    assert.match(
+      mountSource,
+      new RegExp(String.raw`${param}: params\.get\('${param}'\) === '1'`),
+      `mount.js does not read ${param}`
+    );
+  }
+  assert.match(
+    mountSource,
+    /if \(params\.systemsLoading\) game\.fabricate\.ready = false;\s*mounted = await mountAppFor\(/,
+    'mount.js does not shut the readiness gate before the app is mounted'
+  );
+  assert.match(
+    mountSource,
+    /await settle\(\[built\.frame\][^\n]*\n\s*if \(params\.systemsLoading\) game\.fabricate\.ready = fabricateReady;/,
+    'mount.js does not restore the readiness gate after the first settle'
+  );
+  assert.match(
+    mountSource,
+    /params\.environmentsError\)\s*\{[^}]*getGatheringEnvironmentStore\(\)\.listBySystem = \(\) => \{\s*throw new Error\(\s*'"fabricate\.gatheringEnvironments" is not a registered game setting'/,
+    'mount.js does not make the shared environment store throw the unregistered-setting error'
+  );
+  assert.doesNotMatch(
+    mountSource,
+    /isFabricateReady\s*[:=]/,
+    'a shadowed isFabricateReady makes onFabricateReady fire at once and refresh recurse'
+  );
+});
+
 test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
   // WHY THIS EXISTS AT ALL is the reason its parties counterpart above does: an over-match is
   // INVISIBLE in a screenshot.
@@ -3155,10 +3367,19 @@ test('changed files map to the windows they affect', () => {
   // A shared primitive or a global stylesheet can change every screen (issue 1515).
   assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
     'fabricate-app-shell',
+    // Issue 2512: one frame for each partial whose set rules it moved, since a partial stands as
+    // the sheet — the salvage group card, the bare set, the set chrome, and the set card's own
+    // rules in the recipe-editor sheet.
+    'manager-component-edit-salvage',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
     // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
     'manager-gathering-task-editor-normal-hearth-herb',
+    'manager-recipe-edit-ingredients',
+    'manager-recipe-edit-ingredients-sets',
+    // Issue 2513: the Overview's routing card, whose rules sit in the recipe-editor sheet.
+    'manager-recipe-edit-overview-routing-check',
+    'manager-recipe-edit-results-routed-shared',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -3199,17 +3420,20 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // The representative pair plus the panel's fourteen overrides.
+  // The representative pair plus the panel's sixteen overrides.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
       'fabricate-app-shell',
       'interactables-manager-region-open',
+      'manager-component-edit-category-list',
       'manager-components-normal',
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-crafting-modifier-cap-reached',
       'manager-recipe-edit-tag-picker',
+      'manager-recipe-edit-tag-picker-new-tag',
+      'manager-recipe-edit-tag-picker-new-tag-created',
       'manager-recipe-item-contents-picker',
       'manager-recipes-bulk-edit-check-tier',
       'manager-system-edit-lists',
@@ -3217,20 +3441,20 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
       'player-crafting-sources-picker',
-      'player-inventory-page-size',
       'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );
 });
 
-// The forty-four frames a change to the shared positioning seam must publish: every case whose
+// The forty-three frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
 // canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
 // suggestion list open over the scroller that used to clip it, and issue 1782's three a `Typeahead`'s. Issue 1510's thirteen are the converted manager
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
-// floor the call site raises above its rung's.
+// floor the call site raises above its rung's. Issue 2512's three are a result set's open Assign
+// panel and its open kebab, at the default window and at the declared floor.
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -3257,8 +3481,13 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',
   'manager-recipe-edit-results-adder-menu',
+  'manager-recipe-edit-results-routed-assign',
+  'manager-recipe-edit-results-set-menu',
+  'manager-recipe-edit-results-set-menu-narrow',
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
+  'manager-recipe-edit-tag-picker-new-tag',
+  'manager-recipe-edit-tag-picker-new-tag-created',
   'manager-recipe-item-contents-picker',
   'manager-recipe-item-contents-picker-staged',
   'manager-recipe-item-limits-suggestions',
@@ -3274,7 +3503,6 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-actor-picker',
   'player-crafting-category-filter-list',
   'player-crafting-sources-picker',
-  'player-inventory-page-size',
   'player-inventory-sort-list',
   'player-journal-sort-list',
   'world-tool-entry-on-break-repair-suggestions',
@@ -3405,10 +3633,15 @@ test('a change confined to a new checks module selects the frames it determines'
 });
 
 // The time-of-day bar's modules (issue 2431): each selects the bar's frame, and the range bar's
-// pure geometry also selects the two check-strip frames, since a util is not a broad signal.
+// pure geometry and its words (issue 2435) also select the two check-strip frames, since a util is
+// not a broad signal.
 const TIME_OF_DAY_BAR_MODULES = [
   [
     'src/ui/svelte/util/rangeBarGeometry.js',
+    ['manager-checks-simple-two-band-strip', 'coverage-mode-routed-check-checks'],
+  ],
+  [
+    'src/ui/svelte/util/rangeBarText.js',
     ['manager-checks-simple-two-band-strip', 'coverage-mode-routed-check-checks'],
   ],
   ['src/ui/svelte/apps/manager/environment/timeOfDayBandModel.js', []],
@@ -5656,7 +5889,7 @@ test('a mount.js patch confined to the specimen region selects every specimen fr
   }
 });
 
-test('every published component seam module, and the host, selects the five specimens it mounts', () => {
+test('every published component seam module, and the host, selects the specimens it mounts', () => {
   const modules = readdirSync(resolve(ROOT, 'src/ui'))
     .filter((name) => /^publishedComponent.*\.js$/.test(name))
     .map((name) => `src/ui/${name}`);
@@ -5672,16 +5905,31 @@ test('every published component seam module, and the host, selects the five spec
       'manager-published-controls-specimen',
       'manager-published-buttons-specimen',
       'manager-published-toggles-specimen',
+      'manager-published-notice-dismiss-focus',
+      'manager-published-notice-dismissed',
+      'manager-published-steppers-specimen',
+      'manager-published-steppers-button-focus',
+      'manager-published-search-specimen',
+      'manager-published-select-specimen',
+      'manager-published-select-layer',
+      'manager-published-stage-bars-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, and the controls fixture's switch. */
-const SPECIMENED_ELSEWHERE = new Set(['TierTrack', 'StatusToggle']);
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, and the stage bars fixture's groups. */
+const SPECIMENED_ELSEWHERE = new Set([
+  'TierTrack',
+  'StatusToggle',
+  'Stepper',
+  'SearchField',
+  'Select',
+  'StageBars',
+]);
 
-test('the leaves specimen mounts every published component but TierTrack and StatusToggle and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select and StageBars and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -5847,8 +6095,8 @@ test('the controls specimen mounts through the seam and presses what it mounts: 
   );
   assert.equal(
     expectContained.length,
-    27,
-    'five notices, thirteen buttons and eight switches in the ground, and the ground in the window'
+    31,
+    'five notices, thirteen buttons, eight switches, and two dismissals each with its next control in the ground, and the ground in the window'
   );
 });
 
@@ -5897,7 +6145,7 @@ test('the buttons specimen presses two published buttons of the controls fixture
   assert.deepEqual(
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
-    'the same twenty-seven containments as the fixture’s other case'
+    'the same thirty-one containments as the fixture’s other case'
   );
 });
 
@@ -5948,7 +6196,258 @@ test('the toggles specimen presses two published switches of the controls fixtur
   assert.deepEqual(
     expectContained,
     getCaseById('manager-published-controls-specimen').expectContained,
-    'the same twenty-seven containments as the fixture’s other cases'
+    'the same thirty-one containments as the fixture’s other cases'
+  );
+});
+
+test('the dismissal specimens Tab onto a dismiss control, then press one whose callback moves focus on', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedControls.svelte');
+  assert.ok(
+    holds(instance, (node) => node.type === 'Property' && node.key?.name === 'onDismiss'),
+    'the fixture passes onDismiss through the seam’s mount'
+  );
+  for (const hook of ['data-lab-dismissals', 'data-lab-dismissal', 'data-lab-next']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the cases' selectors name`
+    );
+  }
+  const controls = getCaseById('manager-published-controls-specimen');
+  const focus = getCaseById('manager-published-notice-dismiss-focus');
+  const dismissed = getCaseById('manager-published-notice-dismissed');
+  for (const viewCase of [focus, dismissed]) {
+    assert.deepEqual(viewCase.query, controls.query);
+    assert.deepEqual(viewCase.expectContained, controls.expectContained);
+  }
+  assert.deepEqual(
+    focus.steps,
+    [{ selector: `${DISMISSAL('accent')} [data-notice-action]`, press: 'Tab' }],
+    'one move of keyboard focus from the action'
+  );
+  assert.ok(
+    focus.expectSelector.endsWith('[data-notice-action] ~ [data-notice-dismiss]:focus-visible'),
+    'the frame is taken with keyboard focus on the dismiss control after the action'
+  );
+  assert.deepEqual(
+    dismissed.steps,
+    [{ selector: `${DISMISSAL('danger')} [data-notice-dismiss]`, press: 'Enter' }],
+    'one keyboard press of the dismiss control'
+  );
+  assert.equal(
+    dismissed.expectSelector,
+    `${DISMISSAL('danger')}:not(:has(.fab-notice)) > [data-lab-next] button:focus`,
+    'the frame is taken only once the notice is gone and focus is on the next control, not body'
+  );
+});
+
+test('the steppers specimen cases act on what the values fixture mounts through the seam', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedValues.svelte';
+  const { instance, fragment } = componentAstOf(FIXTURE);
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Stepper'
+    ),
+    'the fixture mounts Stepper through the seam’s mount'
+  );
+  for (const hook of ['data-lab-values', 'data-lab-stepper', 'data-lab-value', 'data-lab-shown']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the cases' selectors name`
+    );
+  }
+  const stepped = getCaseById('manager-published-steppers-specimen');
+  assert.deepEqual(
+    stepped.steps.map((step) => step.press ?? (step.fill === undefined ? 'click' : 'fill')),
+    ['click', 'Space', 'fill', 'Tab', 'ArrowDown', 'ArrowUp'],
+    'a pointer press, a keyboard press, a refused typed number and its blur, then both arrow keys'
+  );
+  assert.deepEqual(
+    stepped.steps.map((step) => /\[data-lab-stepper="([a-z]+)"\]/.exec(step.selector)?.[1]),
+    ['credit', 'count', 'even', 'even', 'card', 'limit'],
+    'each step acts on a stepper the fixture mounted'
+  );
+  assert.ok(
+    stepped.expectSelector.includes('[data-lab-value="2"][data-lab-shown="2"]'),
+    'the frame is taken only once the refused number snapped back to the held one'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'Property' &&
+        node.key?.name === 'shown' &&
+        node.value?.type === 'Literal' &&
+        node.value.value === ''
+    ),
+    'data-lab-shown starts empty, so it reads "2" only after the blur step records it'
+  );
+  assert.ok(
+    stepped.expectSelector.endsWith(
+      ':has(button[data-stepper-increment]:disabled) input:focus-visible'
+    ),
+    'the frame is taken with keyboard focus on the field the Up arrow took to its bound'
+  );
+  const ringed = getCaseById('manager-published-steppers-button-focus');
+  assert.deepEqual(ringed.query, stepped.query);
+  assert.deepEqual(ringed.expectContained, stepped.expectContained);
+  assert.ok(
+    ringed.expectSelector.endsWith(
+      '[data-lab-stepper="card"] button[data-stepper-increment]:focus-visible'
+    ),
+    'the frame is taken with keyboard focus on the plus on the darker strip'
+  );
+});
+
+test('the search specimen case acts on what the search fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedSearch.svelte');
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'SearchField'
+    ),
+    'the fixture mounts SearchField through the seam’s mount'
+  );
+  for (const hook of ['data-lab-search-ground', 'data-lab-search', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit } = getCaseById(
+    'manager-published-search-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [/\[data-lab-search="([a-z]+)"\]/.exec(step.selector)?.[1], step.fill]),
+    [
+      ['filled', 'Iron'],
+      ['transform', '  SALT'],
+    ],
+    'a query kept as typed, then one the companion transforms inside its callback'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-search="transform"][data-lab-value="salt"]'),
+    'the frame is taken only once the transformed value was passed back'
+  );
+  assert.ok(
+    expectSelector.endsWith('.fabricate-search:focus-within') &&
+      expectCenterHit.endsWith('[data-lab-search="transform"] input'),
+    'the frame is taken with focus in the field that transformed'
+  );
+});
+
+test('the select specimen cases act on what the select fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedSelect.svelte');
+  const holds = (node, test) =>
+    node !== null &&
+    typeof node === 'object' &&
+    (test(node) || Object.values(node).some((child) => holds(child, test)));
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'Select' &&
+        node.arguments[1]?.properties?.some(({ key }) => key?.name === 'overlayHost')
+    ),
+    'the fixture mounts Select through the seam’s mount, passing an overlayHost'
+  );
+  for (const hook of ['data-lab-select-ground', 'data-lab-select', 'data-lab-value']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const opened = getCaseById('manager-published-select-specimen');
+  assert.deepEqual(
+    opened.steps.map((step) => /\[data-lab-select="([a-z]+)"\]/.exec(step.selector)?.[1]),
+    ['hosted'],
+    'one press, on the select whose list the ground hosts'
+  );
+  assert.ok(
+    opened.expectSelector.startsWith('[data-lab-select-ground]:has(') &&
+      opened.expectSelector.includes('> div > .fabricate-select-popover'),
+    'the frame is taken only once the list is open in the overlay host'
+  );
+  assert.deepEqual(
+    opened.expectCenterHit,
+    [
+      '[data-lab-select-ground] > div > .fabricate-select-popover [data-popover-option="25"]',
+      '[data-lab-select-ground] [data-lab-select="layer"] .fabricate-select-trigger',
+    ],
+    'the open hosted list is hit at a row, and leaves the second select’s trigger uncovered'
+  );
+  const layered = getCaseById('manager-published-select-layer');
+  assert.deepEqual(
+    layered.steps.map(({ selector }) => selector.split(' ').at(-1)),
+    ['.fabricate-select-trigger', '[data-popover-option="all"]', '.fabricate-select-trigger'],
+    'a choice in the hosted list, then a press on the select with no overlayHost'
+  );
+  assert.ok(
+    layered.expectSelector.includes('[data-lab-select="hosted"][data-lab-value="all"]') &&
+      layered.expectSelector.includes('> .fabricate.fabricate-standalone-overlay >'),
+    'the frame is taken once the choice was passed back and the list is open on the layer'
+  );
+});
+
+test('the stage bars specimen case names the groups the stage bars fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedStageBars.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'StageBars'
+    ),
+    'the fixture mounts StageBars through the seam’s mount'
+  );
+  for (const hook of ['data-lab-stage-bars-ground', 'data-lab-stage-bars']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes ${hook}, which the case's selectors name`
+    );
+  }
+  const groups = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'GROUPS').init.arguments[0].elements;
+  const { expectSelector, expectContained, expectLayout } = getCaseById(
+    'manager-published-stage-bars-specimen'
+  );
+  assert.deepEqual(
+    expectContained.flatMap(
+      ({ target }) => /\[data-lab-stage-bars="([a-z]+)"\]/.exec(target)?.[1] ?? []
+    ),
+    groups.map((group) => group.elements[0].value),
+    'one containment check per group, in fixture order'
+  );
+  for (const key of ['forge', 'brew', 'copy']) {
+    assert.ok(
+      expectSelector.includes(`[data-lab-stage-bars="${key}"]`),
+      `the frame is taken only once the ${key} group is drawn`
+    );
+  }
+  assert.ok(
+    expectLayout.oneLineRows.endsWith(' .fab-stage-bars') &&
+      expectLayout.unclipped.endsWith(' .fab-stage-bars-caption'),
+    'each group’s bars are held on one line, and every caption whole'
   );
 });
 

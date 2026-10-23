@@ -7,10 +7,8 @@
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
-    routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
     routedOutcomeTierNamesForPolicy,
-    routedHasOutcomeTiers,
     routedOutcomeTierCount,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
@@ -29,6 +27,7 @@
   // trigger carries no authored name — `_normalizeUnifiedTrigger` drops `label` deliberately.
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
+  import { routedCheckFacts } from './recipe/routedCheckFacts.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
@@ -555,15 +554,9 @@
       selectedSystem?.craftingCheck?.failureResultPolicy
     )
   );
-  // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
+  // Every routed tier with its bounds, the check's evaluation and its gaps; the library inspector
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
-  const recipeAllOutcomeTierOptions = $derived.by(() =>
-    routedOutcomeTierOptions(selectedSystem?.craftingCheck?.routed)
-  );
-  // Whether ANY outcome tier is defined (even failure-only).
-  const recipeRoutedHasOutcomeTiers = $derived.by(() =>
-    routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
-  );
+  const recipeRoutedCheck = $derived(routedCheckFacts(selectedSystem?.craftingCheck?.routed));
   // Whether this system's crafting failure-result policy permits results on a failed check (issue
   // 1098).
   const recipeFailureResultsAllowed = $derived(
@@ -1784,9 +1777,7 @@
     ) ?? null
   );
 
-  const libraryToolsList = $derived(
-    Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []
-  );
+  const libraryToolsList = $derived(selectedGatheringSystemTools);
   const focusedToolDraft = $derived($viewState.toolDraft || null);
   const focusedToolValidation = $derived(
     $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
@@ -1852,6 +1843,15 @@
   $effect(() => {
     if (selectedSystemId === lastEssenceSystemId) return;
     resetEssenceSelectionFor(selectedSystemId);
+  });
+
+  // Commits the vanished-essence redirect before the browser mounts, or its first-row auto-select
+  // reopens the editor on another essence (issue 2554).
+  $effect.pre(() => {
+    if (activeView !== 'essence-edit' || currentView !== 'essences') return;
+    essenceEditDirty = false;
+    essenceEditDraft = null;
+    activeView = 'essences';
   });
 
   $effect(() => gathering.resetOnSystemSwitch());
@@ -1993,6 +1993,7 @@
     )
       return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
+    if (view === 'essence-edit' && !selectedEssenceStrict) return 'essences';
     return view;
   }
 
@@ -3442,29 +3443,12 @@
     return store.removeTag?.(tag);
   }
 
+  // Only the World Essence Catalogue creates an essence, so an id-less save refuses (issue 2554).
   async function saveEssenceEdit(essenceId, updates) {
-    if (essenceEditSaving) return false;
+    if (!essenceId || essenceEditSaving) return false;
     essenceEditSaving = true;
     try {
-      const result = essenceId
-        ? await store.updateEssence?.(essenceId, updates)
-        : await store.addEssence?.(
-            updates.name,
-            updates.description,
-            updates.icon,
-            showEssenceSourceUi ? updates.sourceComponentId || null : null,
-            // The authored colour (issue 917) has to travel with the create call too, or a
-            // new essence loses the colour the GM picked before its first save.
-            updates.colorToken || null,
-            // …and so do the two fields issue 1036 added, for exactly the same reason: the editor
-            // can author both BEFORE the first save.
-            {
-              enabled: updates.enabled !== false,
-              ...(showEssencePropertyMacroUi
-                ? { propertyMacroUuid: updates.propertyMacroUuid || null }
-                : {}),
-            }
-          );
+      const result = await store.updateEssence?.(essenceId, updates);
       if (result === false) return false;
       essenceEditDirty = false;
       essenceEditDraft = null;
@@ -4806,7 +4790,7 @@
     {:else if currentView === 'essence-edit' && selectedSystem}
       <EssenceEditView
         {...essenceScopeProps}
-        essence={selectedEssenceId ? selectedEssenceStrict : null}
+        essence={selectedEssenceStrict}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         showSourceUi={showEssenceSourceUi}
         showPropertyMacroUi={showEssencePropertyMacroUi}
@@ -4935,6 +4919,7 @@
         componentTagOptions={selectedSystem?.componentTagOptions || []}
         {essenceOptions}
         itemTags={selectedSystem?.itemTags || []}
+        onCreateTag={addTag}
         checkTierOptions={recipeCheckTierOptions}
         checkEvaluation={recipeCheckTierEvaluation}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
@@ -4948,7 +4933,7 @@
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
-        routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedCheck={recipeRoutedCheck}
         routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
@@ -5367,23 +5352,16 @@
             <EmptyState
               fill
               icon="fas fa-mortar-pestle"
-              title={currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
-                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
-              hint={currentView === 'essence-edit'
+              title={text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
+              hint={showEssenceSourceUi
                 ? text(
-                    'FABRICATE.Admin.Manager.Essence.CreateInspectorHint',
-                    'The inspector will show the essence ID after the draft is saved.'
+                    'FABRICATE.Admin.Manager.Essence.InspectorHint',
+                    'The inspector shows source linkage and component usage for the selected essence.'
                   )
-                : showEssenceSourceUi
-                  ? text(
-                      'FABRICATE.Admin.Manager.Essence.InspectorHint',
-                      'The inspector shows source linkage and component usage for the selected essence.'
-                    )
-                  : text(
-                      'FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint',
-                      'The inspector shows identity and component usage for the selected essence.'
-                    )}
+                : text(
+                    'FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint',
+                    'The inspector shows identity and component usage for the selected essence.'
+                  )}
             />
           {/if}
         {:else if currentView === 'components'}
@@ -5564,7 +5542,7 @@
             <RecipeBrowserInspector
               {selectedRecipe}
               resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-              outcomeTiers={recipeAllOutcomeTierOptions}
+              outcomeTiers={recipeRoutedCheck.tiers}
               recipeCount={($viewState.recipes || []).length}
               componentCount={selectedCounts.components}
               componentOptions={selectedSystem?.managedItemOptions || []}

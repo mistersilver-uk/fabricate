@@ -570,14 +570,10 @@ test('no drawing a row replaces contains a drawing another row claims', () => {
     }))
   );
   assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
-  assert.ok(
-    hosts.some((outer) =>
-      hosts.some((inner) => inner !== outer && outer.host.contains(inner.host))
-    ),
-    'no claimed drawing nests inside another, so the beside exemption below is untested here'
-  );
+  assert.ok([...modes.values()].includes(BESIDE), 'no specimen stands beside its drawing');
   assert.deepEqual(detachedClaims(hosts), []);
 
+  // No shipped pair nests today, so the beside exemption is held on a synthetic pair alone.
   const [outer, inner] = [LIBRARY_BODY, LIBRARY_BODY.firstElementChild];
   const nested = [
     { host: outer, entry: { file: 'a.json', index: 0 } },
@@ -741,14 +737,7 @@ function unsectionedManifestRows({ library, manifestRows }) {
  * The manifest rows with no specimen yet, by section. Phase 18 catalogues sections 10–11, deleting
  * a line as it lands; the rule below is exact both ways. A row that stays carries its reason.
  */
-const AWAITING_SPECIMEN = Object.freeze({
-  pickers: [
-    // The parent's portaled panel, drawn as the icon-search grid form, which no caller composes (the
-    // library entry records why `EssenceSourceSelector` does not). The list-form `SearchablePopover`
-    // specimen mounts the panel through its one real caller.
-    '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
-  ],
-});
+const AWAITING_SPECIMEN = Object.freeze({});
 
 /** The baseline as the rule reports it. */
 function awaitingSpecimen(baseline) {

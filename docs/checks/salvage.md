@@ -24,6 +24,10 @@ See [The Checks screen]({% link checks/index.md %}#the-checks-screen) for the ed
 
 A salvaged component has a single ingredient, so ingredient-set routing does not apply here.
 
+{% include screenshot.html case="manager-checks-salvage-modifiers" caption="The salvage check's Modifiers tab." %}
+
+{% include screenshot.html case="manager-checks-salvage-on-failure" caption="The salvage check's On failure tab." %}
+
 Set the salvage check to **Which way is better** → **Lower is better**, or its **What the roll is measured against** to **Character value**, to grade the roll under a target or against the salvager's own character value instead of a fixed DC.
 See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including the component's own **Target override** or **Difficulty adjustment override**.
 

@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -49,12 +50,8 @@ const harness = createMountedComponentHarness({
 
 before(async () => {
   await harness.setup();
-  // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
-  // tests/helpers/svelte-dom.js), and `globalThis` itself has no `addEventListener`. The
-  // popover-positioning effect registers `window` resize/scroll listeners whenever the picker
-  // opens; stub them so the effect does not crash when tests open the picker.
-  window.addEventListener ??= () => {};
-  window.removeEventListener ??= () => {};
+  // The popover binds `resize` to its own `document.defaultView`, happy-dom's real Window, so it
+  // needs no stub on the flattened `globalThis` (issue 2454).
 });
 after(() => harness.teardown());
 afterEach(() => harness.remount());

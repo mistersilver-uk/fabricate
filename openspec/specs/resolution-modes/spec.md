@@ -13,7 +13,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   `destructive-changes-and-migrations/spec.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
-  be satisfied by clearing the result selection or collapsing a multi-set recipe.
+  be satisfied by clearing the result selection, collapsing a multi-set recipe, or dropping its reserved failure result group.
   System-level gaps (a target mode that needs a check the system has not
   configured, an alchemy signature collision, ...) never delete a recipe; they are
   surfaced as system-validation issues that gate visibility, not deletion.
@@ -29,7 +29,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   "carry" keeps the recipe verbatim;
   "reconcile" means the recipe survives but its stale routing is surfaced as a
   re-authoring validation issue, never silently mis-routed;
-  "1×1" means the recipe has exactly one ingredient set and one result group.
+  "1×1" means the recipe has exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted.
 
   | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`                          | `progressive`                | `alchemy`                                                           |
   |-----------------------|------------------------------|------------------------------|------------------------------------------|------------------------------|--------------------------------------------------------------------|
@@ -40,12 +40,13 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   | `alchemy`             | clear if 1×1 else **delete** | carry                        | carry; reconcile                         | clear if 1×1 else **delete** | —                                                                  |
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
-  (which require 1×1) from a recipe with more than one ingredient set or result
-  group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
+  (which require 1×1) from a recipe with more than one ingredient set or success
+  result group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
   support).
 Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
+  Migrating into `progressive` drops every reserved `role: 'failure'` group, because that mode has none; every other target keeps it, and only `simple` and alchemy's simple check mode select it by role.
   Re-running a `carry` migration with no reconcile pending is a no-op (idempotent).
 - Mode *cardinality* checks (e.g. "must have exactly/at least N ingredient set/result group", progressive "requires ordered results") are *completeness* and are waived under structural-only validation (`ResolutionModeService.validateRecipe(recipe, { requireComplete: false })`, used when persisting an authoring incomplete shell); mode *reference-integrity* checks always apply, per mode: `routedByIngredients` checks the invalid `resultGroupId` integrity, and `routedByCheck` checks the reserved/duplicate `ResultGroup.name`. (The routed modes carry no `resultSelection.provider`, so there is no provider value to validate.) (Legacy `mapped`/`tiered` are not live modes; they are accepted only as one-time migration inputs per `destructive-changes-and-migrations/spec.md §Resolution-Model Migration`, which hard-migrates `mapped → routedByIngredients` and `tiered → routedByCheck`.)
 
@@ -565,6 +566,7 @@ It never reads outcome tiers and never changes which result group is produced (r
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
 - Reference integrity (always applies): each `IngredientSet.resultGroupId` must point at a real `ResultGroup` in scope.
+- A result group no ingredient set reaches by effective routing — the set's `resultGroupId`, else the set's `resultMapping`, else the scope's first group — raises the readiness warning `unreachableResultGroup`, which never blocks enabling; this mode never awards a `role: 'failure'` group on a failed check, so such a group is held to the same rule.
 - This mode never raises `routedCheckNoFormula`: a missing `craftingCheck.simple.rollFormula` simply means no check runs.
 It shares the `craftingCheck.simple` config slot with its `simple`/`alchemy` peers, but its run condition matches alchemy-Simple (an authored formula rolls on its own), not simple mode (which also requires the crafting-checks toggle enabled).
 
@@ -619,18 +621,20 @@ Alchemy tiered brews already gate success through each outcome tier's own `succe
 This matches the authoring control, which auto-hides outside `routedByCheck` (`resolveRecipeFixedOutcomeTierOptions`): the value the GM cannot see or clear is also the value the runtime ignores.
 A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard rather than migrated away.
 - **Single-result-group exemption (mirrors `routedByIngredients`):** when a step (or an implicit recipe) has exactly one result group, no outcome/tier mapping is required.
+The exemption holds only while no result group in the scope lists a tier id; once one does, an unlisted tier is `unrouted-tier`.
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
-Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
+While the exemption holds, resolution never aborts with a misconfiguration for an unmatched success outcome.
 - **Routing is success-disposition-gated.**
-A check result whose final tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+A check result whose final tier has `success: false` takes the failure/consumption path regardless of the tier's name: under `failureResultPolicy: 'never'` the engine short-circuits on `!checkResult.success` before routing runs, and otherwise the failure branch asks routing only for an authored failure output (`recipes-and-steps`, "A FAILED check resolves an authored FAILURE result group when the policy permits it").
 **Invariant:** `data.success` and the final tier's own `success` can never disagree.
 Without a forced outcome `data.success` simply IS the final tier's flag; under a forced outcome the disposition is authoritative and tier stepping is confined to that disposition's tier subset (see *Routed Tier Stepping* below), so a forced success can never surface a failing tier's name and a forced failure can never surface a succeeding tier's name.
-Routing via `checkOutcomeIds` resolves only `success === true` tiers (a `success: false` tier must never produce a `disposition: 'success'` result), and validation/authoring offer success tiers only for assignment.
-So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never routes and never produces a success result.
+Routing via `checkOutcomeIds` never gives a `success: false` tier `disposition: 'success'`: a failing tier routes, as `disposition: 'failure'`, only where `craftingCheck.failureResultPolicy` permits results on failure (`recipes-and-steps`, "A FAILED check resolves an authored FAILURE result group when the policy permits it"), and authoring and validation offer a failing tier for assignment on the same condition.
+So a relative check's non-keyword-named failure tier (for example "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never produces a success result, and under `never` it does not route at all.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
-  1. Explicit tier assignment wins: when a **success** outcome resolves to a routed-check success outcome tier id, the result group listing that tier id in `checkOutcomeIds` is selected.
+  1. Explicit tier assignment wins: when an outcome resolves to a routed-check outcome tier id — a success tier always, a failure-marked tier only where `craftingCheck.failureResultPolicy` permits results on failure — the result group listing that tier id in `checkOutcomeIds` is selected, as `disposition: 'success'` or `disposition: 'failure'` respectively.
+     Where any result group in the scope lists a tier id and none lists the resolved tier, the outcome is `unrouted-tier` and no later rule applies.
   2. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes the failure path.
-  3. If the scope has exactly one result group, that single group is produced for any non-failure outcome (no mapping required).
+  3. If the scope has exactly one result group and it lists no tier id, that single group is produced for any non-failure outcome (no mapping required).
   4. Otherwise, with multiple result groups, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
   5. If multiple result groups are present and no result-group name matches, execution aborts with a crafting-system misconfiguration error (not a player failure outcome).
      For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
@@ -703,8 +707,8 @@ The minimum-success-tier gate consumes that ranking only to LOCATE the required 
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
-- **One result group → no mapping required:** a step with exactly one result group needs no outcome/tier mapping; it is produced on any non-failure outcome and yields nothing on a failure keyword.
-Outcome/tier mapping is required only when a step has multiple result groups (each success outcome must route to a group), and the `recipe-visibility` readiness warnings (`unroutedResultGroup`, `unproducedOutcomeTier`) do not fire for single-result-group steps.
+- **One result group → no mapping required:** a step with exactly one result group that lists no tier id needs no outcome/tier mapping; it is produced on any non-failure outcome and yields nothing on a failure keyword.
+Outcome/tier mapping is required only when a step has multiple result groups or any of its groups lists a tier id (each offered success tier must then route to a group), and the `recipe-visibility` readiness warnings (`unroutedResultGroup`, `unproducedOutcomeTier`) do not fire for a single-result-group step in which no group lists a tier id.
 - Reference integrity (always applies): `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison, and may not be any reserved failure keyword.
 - A missing routed crafting check (`craftingCheck.routed.rollFormula` unauthored) is an **unconditional system-level blocker** (`routedCheckNoFormula`), independent of any recipe — every recipe in this mode routes by the check, so no craft can resolve without it (see `recipe-visibility`).
 A `routedByCheck` recipe is otherwise structurally valid regardless of the check configuration; the formula requirement is a system-level concern, not a per-recipe validation error.
@@ -976,12 +980,13 @@ An item's own `flags.fabricate.essences` still take precedence over any componen
 This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingComponent`, `resolveComponentForItem`, or `getItemSourceReferences`; gathering, inventory, and standard crafting keep the narrower ladder unchanged, so the same tier-4-only item remains unrecognized in a standard (non-alchemy) craft.
 - Alchemy essence attribution and standard-craft essence resolution **agree on one axis and still differ on another**, and the agreement must not be overstated as "the two matchers agree".
 They agree that essence requirements share units **with each other**: alchemy credits every submitted unit's essences to every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block over a shared draw (`data-models` §Essence-Alternative Consumption).
-They still differ on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it (the whole submission is pooled with no draw-down, and extras are consumed as essence contributors), while standard craft does not, because that unit has already been spent through the set's `remaining`/`ingredientLedger.commitItemPlan` ledger.
-The same Duskcrystal therefore satisfies `Radiant 2 + Shadow 1` in both paths, but a Duskcrystal consumed by a component/tag requirement contributes its essences only in alchemy.
+They still differ on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy signature matching credits it (the whole submission is pooled with no draw-down, so extras count as essence contributors), while standard craft does not, because that unit has already been spent through the set's `remaining`/`ingredientLedger.commitItemPlan` ledger.
+A version-1 brew's start then funds the matched set through that same ledger over the submitted units alone, so a claimed unit funds no essence requirement there, and a match the submission cannot fund that way is refused with nothing spent rather than fizzled.
+The same Duskcrystal therefore satisfies `Radiant 2 + Shadow 1` in both paths, but a Duskcrystal consumed by a component/tag requirement contributes its essences only to alchemy signature matching, so a version-1 brew that needs it for both is refused at start.
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack count at the configured stack-quantity path; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - The runtime matcher resolves a submission to the **most-specific matching set**, not the first authored match.
-It collects EVERY enabled set whose every group is satisfied by the submission (superset-tolerant, `>= required`, extras consumed as essence contributors) and picks the unique maximum under a specificity partial order: set A is MORE SPECIFIC than B when a natural transversal of A also satisfies every group of B (A's required-group structure is a proper superset of B's — required-group containment, NOT units consumed) while no transversal of B satisfies A.
+It collects EVERY enabled set whose every group is satisfied by the submission (superset-tolerant, `>= required`, extras consumed with the brew) and picks the unique maximum under a specificity partial order: set A is MORE SPECIFIC than B when a natural transversal of A also satisfies every group of B (A's required-group structure is a proper superset of B's — required-group containment, NOT units consumed) while no transversal of B satisfies A.
 When no unique maximum exists — two incomparable co-matching sets (e.g. an over-submission satisfying both siblings `{S,V,E}` and `{S,V,R}`) — the runtime FAILS SAFE to a no-signature-match fizzle; it MUST NOT pick one by iteration order.
 This is the runtime counterpart of the enable-time guard below and consumes the SAME domination predicate, so the two can never disagree about which set is more specific.
 - Signature INSEPARABILITY is invalid across all recipes in the system.
@@ -1022,9 +1027,15 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
-- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched and the run is live in the Journal; version 1 defers editable-material spending to execution, while legacy runs consumed at START; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
-A started time-gated brew is identified by the engine's `disposition: 'timed-start'`, NOT by `success` — which is `false` for it, because nothing has been produced yet (issue 966).
-Without that disposition the workbench read a successfully started brew as a no-signature fizzle and told the player it had failed while their ingredients were being consumed.
+- **Brew-result banner status enum.** A brew reports one of nine banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched brew FAILED its check and produced results — styled with the warning tone, NEVER success-green, and composing with a discovery); `check-failed` (the check ran and failed with nothing produced, styled with the warning tone); `brewing` (a time-gated brew that STARTED and waits on world time; styled informationally, never as a failure, and composing with a discovery); `started` (a brew that started and that the call did not resolve, waiting in the Journal for its check or choices; styled informationally); `interrupted` (a brew whose execute was cancelled or refused after its start; styled with the warning tone); `no-match-fizzle` (a reply with `disposition: 'no-match'`, and nothing else); `refused` (anything else, its localized reason both banner and toast).
+`brewing` is identified by the legacy `disposition: 'timed-start'` or by a successful reply whose run status is `waitingTime`.
+`started` is a successful reply still `disposition: 'started'` or whose run is `inProgress`, and `interrupted` is an unsuccessful reply that carries the started run, because version-1 runs spend at start.
+Both tell the player the ingredients are used and the brew is in the Journal.
+Such a reply clears the bench and reloads, and never reads as a refusal that claims nothing was consumed.
+A refused execute after the start toasts the fixed interrupted sentence rather than its reason, whose wording may claim nothing was consumed; a cancelled one, or one whose bought-dice warning was already raised, raises nothing.
+A brew that throws keeps the bench, reloads the listing, and words its banner and toast without any claim about consumption.
+A reply whose check was kept secret from the player names no outcome, so it is read from where its run ended: `succeeded` is `success` and `failed` is `check-failed`, with no refusal toast.
+A version-1 `failed` reply that created results is `produced-on-failure`.
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.
 - **Hidden dead-end rule.** Non-revealed recipes and never-tried dead-ends BOTH present as `untried`.

@@ -94,7 +94,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
+The Overview tab's per-recipe crafting-check modifier control (`RecipeCraftingModifierField.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
 Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no callout: a control the engine will ignore is worse than no control, and a callout explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
@@ -165,7 +165,7 @@ That historical triple is not the live one: `noPlaceholder` retired with the pla
 **Checks studio — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
 It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Apply all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
-The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a named container (`container: fabricate-option-host / inline-size`), so the shipped `@container fabricate-option-host (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
+The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a named container (`container: fabricate-option-host / inline-size`), so the shipped `@container fabricate-option-host (max-width: 620px)` rule for `.fabricate-option-cards` measures the CARD rather than the whole manager shell.
 
 **NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, World › Rules & Resources › Modifiers (issue 1311; it was System settings › Modifiers until the library moved to world scope).
 Crafting used to carry an entry editor here, which made the Checks screen a second editor for a system-level library and made salvage and gathering second-class states of that asymmetry; two editors for one array is how two screens come to disagree about which wrote last.
@@ -234,7 +234,7 @@ The Checks screens' read-only modifier cards deep-link here, expanding the secti
 
 `SubjectModifierPicker.svelte` is the ONE authoring surface for the two NEW `bySubject` subjects, `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`.
 It is one component with two hosts — `ComponentEditView` (the component's Salvage tab) and `GatheringTaskEditView` (the task card) — rather than two copies, because the pick's semantics are subtle in exactly the way a copy gets wrong, and because the two hosts disagreeing about them is a defect no screen shows.
-The recipe's equivalent control (`RecipeOverviewTab`) is deliberately NOT converted onto it; the mismatch is named in the component's own header and is a behaviour decision about the recipe surface, not a refactor.
+The recipe's equivalent control (`RecipeCraftingModifierField`) is deliberately NOT converted onto it; the mismatch is named in the component's own header and is a behaviour decision about the recipe surface, not a refactor.
 
 - **It renders under the activity's `bySubject` rule and a NON-EMPTY system catalogue, and nothing else gates it.**
 Each host asks its OWN activity's rule (salvage's from `salvageCraftingCheck`, gathering's from `gatheringCraftingCheck`), never another activity's, because the catalogue is shared and the SELECTION is not.
@@ -243,7 +243,7 @@ An empty catalogue draws NOTHING at all — a control whose menu could only ever
 - **Three states, and the two absent-vs-empty ones are different rolls.** An ABSENT pick INHERITS the activity's `defaultModifierIds`; an AUTHORED EMPTY array is a real pick of zero and appends no term; an authored non-empty array is the pick.
 The authoredness toggle is the only place a GM moves between the first two: switching it ON emits `[]` and switching it OFF emits `null` (gathering's host patches `undefined`, which is what makes its normalizer drop the key).
 Turning it ON deliberately does NOT seed from the activity's default set — a record turning the switch on has stated that it picks its own, and seeding would author picks the GM never made.
-This is the one axis on which it differs from `RecipeOverviewTab`'s `changeModifierSetMode`, which does seed.
+This is the one axis on which it differs from `RecipeCraftingModifierField`'s `changeModifierSetMode`, which does seed.
 - **Under inheritance the inherited entries are NAMED, not merely announced.**
 The pill row has nothing to author, so it is hidden and the note lists the activity's default set, resolved against the catalogue and dropping unknown ids exactly as the resolver drops them — so the line cannot promise a modifier the roll would not apply.
 The names are joined by `formatList` (the active language's list conventions) and interpolated into a **`{list}` placeholder** on the sentence; a hand-joined `', '` tail is wrong in English before it is wrong in any other language, and a runtime value concatenated onto a localized string takes the list's position in the sentence away from the translator.
@@ -254,7 +254,7 @@ The internal noun for the abstraction the two share never reaches a screen.
 The inherit sentences name the ACTIVITY's check rather than "the system", because the default set is per-activity and a GM reading "the system default set" on the Salvage tab would look for it on the wrong screen.
 - **The cap is stated STANDING**, not only once the add button has already gone dead, with an at-cap clause appended when it is reached.
 It is read through `resolveMaxModifierPicks`, so a stored `0`, `-2` or `"three"` shows no cap at all — the picker bounds exactly what the engine bounds.
-A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeOverviewTab` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
+A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeCraftingModifierField` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
 - **The accessible control is the `SelectionCheckbox` and it carries the whole accessible name; the visible sentence beside it is `aria-hidden`.** One of the two, never both — the same rule the eligibility pill above follows, for the same reason.
 
 ### Tools tab
@@ -262,7 +262,8 @@ A cap of exactly **1 takes its own singular sentence**, never "up to 1 check mod
 The recipe editor's Tools tab authors Tool references only.
 Recipe-wide Tools are available in every resolution mode, and explicit multi-step recipes may author additional Tool references per step.
 Named ingredient sets receive their own Tool card only when the Crafting System uses `routedByIngredients`; unnamed sets and every other resolution mode expose no per-set Tool authoring.
-The per-set card reuses the Results tab's result-set outer card, header, and static-label hierarchy.
+The per-set card is the `SetCard` the Results tab draws, and the set is renamed in it.
+An empty name is refused there: the field restores the set's name, and the card notes that an ingredient set needs a name to carry Tools, because an unnamed set's Tool references are inert; they stay saved and apply again once the set is named.
 A row and the add-a-tool picker both resolve the Tool's name and image through the single precedence in `data-models/spec.md` `## Tool` requirement 13, so an item-sourced Tool renders its own snapshot rather than a placeholder.
 Rows contain Tool identity and removal only: Recipe data exposes no breakage, consumption, prerequisite, or bonus policy control because those behaviors belong to Tool Studio and Crafting System check settings.
 
@@ -274,10 +275,13 @@ ONE row shape authors every requirement and every result, on every surface that 
 Its anatomy is the kind FIRST and the value second:
 
 ```text
-[plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
+[lead plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
 
+Every row stands on one 34px minimum line, the subject cell's height, whatever its kind; a row that draws no subject cell, a tag row among them, keeps that line.
+
 The fixed-or-rolled toggle is drawn on component and currency result rows alone, and a knowledge result row draws no amount, because a recipe is taught once; a progressive result row draws neither the toggle nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
+A currency row, on either side, draws its unit's abbreviation, where the unit has one, to the right of its amount, never beneath the name.
 
 - **A result's amount is fixed or rolled.**
 Rolled swaps the stepper for a roll expression in the same slot, at the same width and height, so the toggle moves nothing else in the row; Fixed removes the expression from the result and keeps its quantity, and switching back restores what was typed.
@@ -303,26 +307,28 @@ A knowledge result on a system where learned knowledge is not observable is draw
 A knowledge result whose taught recipe is no longer in its system draws a "Missing recipe" face with the row's remove, and the Validation tab flags the set, because every craft of it would be refused.
 A fixed currency amount is a whole number, and a fraction is marked invalid on the row with its reason.
 - **A result row too narrow for one line wraps by rule, never by overflow.**
-Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+Where its list is narrower than one line needs, a flat row puts its lead plate, kind and name on the first line, and the toggle, the amount at the stepper's width and the remove at its end on the second, with any error across the row below; the 180px subject leaves the first line no room for the remove at the editor's declared floor.
 A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
-The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
-The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
+The lead plate, the subject plate's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
+The tint is on the MARK and never on the lead plate, the subject plate or the subject cell, which would make four rows of four kinds read as four differently-coloured cards; a tag row's own edge is the one row-level treatment, stated below.
+- **An unnamed row's lead plate is untinted.**
+Until a value resolves — a named subject, or a tag row's first tag — the lead plate is a dashed neutral outline around a subtle glyph, so a row still waiting for its value reads as unfinished; a missing recipe and a misconfigured row keep their own faces.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
 - **The kind is the shared select,** rendered through `components/Select.svelte` at its `inline` rung and never a native `<select>` (issue 1510), carrying the kinds the kind menu offers plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
-Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
-Unnamed, it is an inline search field — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
+Named, it is a neutral bordered subject cell, 34px tall and never narrower than 180px, carrying the subject's image or icon on a 26px subject plate, its name and a real clear BUTTON at the cell's end.
+Unnamed, it is an inline search field at that same height and minimum, edged in the accent border at rest — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
 The list's POSITION is the requirement and its DOM parent is not: it is a floating surface under `design-system`, portalled to the nearest application root, because a list positioned inside the row is clipped by the row's scrolling ancestor.
 It flips ABOVE the field only where that root has no room below, and in neither placement does it cover the field it completes.
 - **A suggestion starts where the query starts.**
 The panel shares the left edge of the field it completes, beneath it or flipped above it, so each suggestion's glyph and label are left-aligned against the typed text; a suggestion centred in its panel is not continuing what the GM typed.
 This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
-The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
+The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the subject cell showed the blur handler's value.
 Tabbing to a suggestion failed identically while the list sat in the row's tab order, which is why suppressing the pointer path alone was half a fix.
 The list is no longer in that order, so a suggestion is reached from the field's own keys and never by Tab.
 - **What Enter commits is a suggestion, not the typed string.**
@@ -337,18 +343,25 @@ The input still renders and is still typeable, and its own placeholder says ther
 A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
 
 A TAG row is one line.
-It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
-There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
+It reads as the sentence it writes — the chosen tag chips each with their own remove, then `+ Tag`, with no word before them — and the any-of / all-of control that sets how they match stands beside it at every tag count, none included, through the shared segmented-control primitive.
+Each chip is the shared chip at its `tag-run` scale in the tag family's lit emphasis, a 28px pill at 11px/600, reading the tag as it is stored after a `#`: `solvent` reads `#solvent`, and no chip capitalizes the stored spelling.
+The `#` is drawn and never stored, so a tag's id, the comparison a requirement matches with and `normalizeTag` are unchanged.
+There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row draws `+ Tag` alone in its arm.
 The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
 It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
-An unfilled tag row is therefore level with the component row beside it, and asks for less room than one.
+An unfilled tag row is therefore level with the component row beside it.
 The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
-What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
+What must hold there is that the tag ARM stays whole: the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
 Every surface that draws a tag row supplies its tag counts.
+Its catalogue lists each tag as its chip reads it, `#` and the stored spelling, beside that count.
 A recipe's ingredients and a system Tool's repair materials count the system's own components by their in-system tags, the set a tag requirement in that system matches against.
 A world Tool's repair materials count the world catalogue's components by their default tags, the same list that adder's tag vocabulary is derived from.
 That figure describes world authoring and not what the repair will match, because a world Tool's repair materials are a seed copied into each adopting system and matched there against that system's own components.
+The tag catalogue's footer offers **New tag “{name}”**, naming the typed query trimmed, lower-cased and less one leading `#`, as it will be stored, while that name matches no tag in the system's own tag vocabulary under the same comparison, whatever the World Vocabulary holds, and is not already on the row.
+A recipe's ingredient tag rows offer it: creating adds the tag to the system's tag vocabulary and to the row at once, keeps the panel open with its query, and returns focus to its query field, so the new tag reads checked beneath it.
+The vocabulary write is immediate and outside the recipe draft's Save, as a Tags & Categories add is; the row's tag stages into the draft like any other choice, so discarding the draft keeps the new tag in the vocabulary, where it lists with a zero count.
+A Tool's repair materials draw no footer: a system Tool's would write the same system vocabulary and is not yet offered, and a world Tool's vocabulary is derived from the world catalogue's component defaults, so it holds no list a tag could be added to.
 
 #### Adding a requirement, and adding an alternative
 
@@ -357,6 +370,7 @@ No adder chooses a subject, so none can dedupe against a requirement the set alr
 
 A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through ONE kind menu with two triggers.
 A bare requirement carries the **"or…"** control; a requirement holding two or more alternatives carries one dashed **`Alternative`** adder at the foot of its box instead, named "Add an alternative", and no row inside the box draws the `or…` control.
+A choice group draws no separator between its alternatives, on either side: its header, each alternative and its 28px adder stand 8px apart, so a result-side choice group awarding up to N of them is not misread as exclusive.
 Both triggers open the SAME menu — a single flat **"Accept instead"** list of the ingredient match types the system can honour, Component, Tag, Essence and Currency in that order — and choosing one appends a new OR alternative of that kind for the row's own field to name.
 The adder's menu opens from the button's start edge.
 A result-side box carries the same one `Alternative` adder, its menu headed **"Add an alternative"** as a standalone result row's convert menu is, offering its set's kinds, and appending directly where the set offers one kind.
@@ -371,11 +385,11 @@ The verb belongs to the panel, so an entry states only the kind it appends — `
 It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
 The width is stated by the caller and not left to the shared menu's own floor, which is sized for a row's overflow commands rather than four one-word kinds.
 
-Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
-One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
+Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's lead plate and its subject plate's mark rather than a second table of colours.
+One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's lead plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
 
 Both of the requirement row's in-row affordances — the `or…` trigger and a tag arm's `+ Tag` — are DASHED OUTLINES with no fill, because each is an affordance for adding standing among controls and chips that are values.
-They are drawn at their own two scales: `or…` is a control among controls, level with the quantity stepper beside it, while `+ Tag` is a chip among chips.
+Both are 28px and drawn in two shapes: `or…` is a control among controls at the 7px corner, level with the quantity stepper beside it and with no divider before it, while `+ Tag` is a pill among the tag chips it stands with — a 9px plus and `Tag` at 11px/600 on a dashed tag-hue edge.
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
@@ -399,7 +413,7 @@ The group's header is one `role="group"` described by its help line, and its fir
 
 - How many it awards: a `Select` offering **Any one of** and **Up to N of**; up to N opens on a fixed N of two.
 - N, under up to N only: the amount slot's Fixed | Rolled control, a fixed N held at two or more, and a rolled N exactly one expression in its place.
-- Repeats, under up to N by roll only: a neutral button naming its own state, **Unique** or **Repeats allowed**, defaulting to unique, its slot as wide as its wider word.
+- Repeats, under up to N by roll only: a quiet status button naming its own state, **Unique** or **Repeats allowed**, after a `···` mark — 26px, on no edge, in secondary ink at 10.5px/500 — defaulting to unique, its slot as wide as its wider word, the shorter word starting where the wider one does so the mark stays one gap from either.
 - Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
 
 Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
@@ -409,6 +423,7 @@ Focus moves to that row's `or…` control, never to the document.
 Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
 
 Under a roll each alternative carries a RANGE CELL in its convert control's slot, after the row's divider: a d20 glyph titled **"Selection roll range"**, then two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**, `{name}` being the alternative's subject or, unnamed, its kind's word.
+It is never drawn beside the subject (ruled at issue 2534).
 A range overlapping another's, one whose lowest roll is above its highest, or one with an end that is not a whole number marks both fields invalid with its reason on a line of its own across the row.
 The reason is stated once a field is committed, on its `change` or `blur`, rather than on every keystroke; at a narrow width the cell follows the toggle and the amount on the row's second line.
 A rolled group with no rollable expression or a missing range, an up-to group with no N, a group of fewer than two alternatives, and any group in a progressive system's set are flagged by the Validation tab on their set and refused by the save, both reading one set of shape rules.
@@ -452,6 +467,7 @@ The GM component surfaces: the component browser and the component editor.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
    The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
    The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
+   Routed salvage draws its outcome routing as a routing overview: one row per offered outcome with the result set it routes to and a shared marker.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
@@ -497,7 +513,7 @@ The GM component surfaces: the component browser and the component editor.
     The two recipe numbers are counts of DISTINCT recipes, so neither exceeds what the cascade will touch: a recipe naming two selected components is rewritten once, never counted once per component.
     The disabled number counts only recipes going from enabled to disabled, because it warns about craftability the GM is about to lose rather than restating what was already off, and it is worded as that transition rather than as the resulting state, so its exclusion of already-disabled recipes cannot read as an undercount.
     A recipe number of zero is omitted rather than stated as zero; the scope sentence always renders, because the note is what the armed confirmation is paired with and a control stating nothing has lost that pairing.
-    The note is programmatically associated with the armed control rather than merely adjacent to it, and arming — which changes the control's label and accessible name while it holds focus — is announced; a refused or no-op write that leaves the panel mounted is announced through the same region after focus is returned to the control.
+    The note is programmatically associated with the armed control rather than merely adjacent to it, and arming — which changes the control's label and accessible name while it holds focus — is announced; a refused or no-op write that leaves the panel mounted is announced through the same region, after focus is returned to the control if it had fallen to the document body.
     Deletion is WARNED, not BLOCKED: no component is refused and no set member is skipped on account of the recipes referencing it, matching the essence rule under Essences Tab.
     The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set.
     The set write persists through a single crafting-system write and a single recipes write regardless of set size, then clears the selection and returns the rail to the single-component inspector.
@@ -564,7 +580,9 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result set editor
+- One result set editor.
+  With the crafting check enabled, a single-step recipe draws it as the reserved "On success" set, and the reserved "On a failed check" set and its "Award results on a failed check" toggle follow on the terms Alchemy Simple states below.
+  NOT SHIPPED here yet, issue 2523: a step of a multi-step recipe offers no "Award results on a failed check" toggle, so a step's failure set can be neither added nor removed in the editor.
 
 ### Routed UI
 
@@ -578,9 +596,21 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
   - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
-    The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
-  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+    The `checkOutcomeIds` assignment picker offers the tiers the system's `craftingCheck.failureResultPolicy` lets route: success tiers only (`success === true`) under `never`, and failure-marked tiers as well where the policy permits results on failure, as `ui-system-studio` § Routed result-group authoring is policy-conditional specifies.
+  - A step with exactly one result set that lists no tier needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
 - Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
+- Every set drawn as a card is renameable in that card in both routed modes.
+  A result set's card names its effective sources: an explicit source is removable, and a fallback source is marked "default" and is not.
+  A set nothing reaches reads "Nothing — unreachable" beside its Assign control, and a shared set states how many sources route to it.
+  Assign lists every source the system offers, and choosing one routed elsewhere re-points it, with a "now → ⟨set⟩" note naming where it routes today.
+  While no result set in the scope lists a tier, the Assign panel warns that assigning one stops the other tiers reaching a result set by default.
+  A tier still listed on disk that does not route — not offered under the failure-result policy, listed first by another result set, no longer defined, or a success tier below the recipe's minimum success tier — shows struck, says it does not route, and stays removable.
+  NOT SHIPPED here yet, issue 2520: the unreachable reading skips a result set with the `failure` role, so such a set shows neither the "Nothing — unreachable" line nor the warning edge.
+- The Overview tab ends with a routing card in both routed modes: one routing overview per step scope, each row naming a source and the result set it effectively produces, marked "default" when inherited and "shared · N" when shared, re-pointed in place through the same fields the set card writes.
+  Under check routing the card states that the tiers belong to the system and offers "Edit outcome tiers"; a failure tier the policy forbids reads "routing not permitted by this system", a success tier below the recipe's minimum success tier reads "below this recipe's minimum success tier", and a gap between fixed tiers is a blocked row with "Edit outcome tiers".
+  Where the recipe sets a minimum success tier, a failure tier the policy permits is marked "only on a forced failure".
+  While no result set in a scope lists a tier and more than one success tier is offered, the card warns that assigning one stops the other tiers reaching a result set by default.
+  A step with no result sets of its own shows the recipe's, read-only, as the engine would award them, and the recipe cannot be enabled until the step has its own.
 
 ### Alchemy check-mode selector (issue 554)
 
@@ -620,7 +650,11 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
   Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
-  - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
+  - **Simple** → a reserved "On success" result set, and a reserved "On a failed check" failure result set present only while the recipe carries a `role: 'failure'` group; `Recipe.validate` tolerates its absence.
+    Each is drawn in `SetCard`'s reserved form — a lock glyph, its static name, a "reserved role" badge, and a Produced-by line stating the passed or failed check in words, with no assignment — and the failure set takes the danger accent.
+    An "Award results on a failed check" toggle adds that group empty and removes it, the editor never synthesizes the set, and an edit to the success set never creates it.
+    Under a failure-result policy of `never` the toggle cannot add the group, states why and links to the Checks studio, and a group already present stays drawn with that reason and can still be removed.
+    The toggle sits below the sets, and an empty failure set draws no "Nothing produced" warning, only a note that a failed check then produces nothing.
     No "add result set" beyond the two.
   - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
@@ -648,5 +682,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose subject cell carries the component's image and its name, never a native `<select>`.
   An art-less component falls back to a glyph rather than emitting an image element with no source.

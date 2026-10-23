@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -390,12 +391,19 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     flushSync();
 
     const card = root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]');
-    const title = card.querySelector('.manager-item-drop-zone-copy strong').textContent.trim();
+    const uuidLine = card.querySelector('[data-item-drop-zone-uuid]');
+    const title = uuidLine.textContent.trim();
     const sublines = [...card.querySelectorAll('.manager-item-drop-zone-copy small')].map(
       (line) => line.textContent.trim()
     );
 
-    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by the uuid — its only name');
+    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by its uuid line');
+    assert.equal(
+      uuidLine.id,
+      card.getAttribute('aria-labelledby'),
+      'which is the line that names the group'
+    );
+    assert.ok(!card.querySelector('.manager-item-drop-zone-copy strong'), 'with no name over it');
     assert.equal(
       sublines.includes(title),
       false,
@@ -936,6 +944,11 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     const palette = root.querySelector('[data-manager-essence-colour]');
     assert.ok(palette, 'the identity screen HAS a colour control — the non-vacuity half');
+    assert.equal(
+      globalThis.document.querySelector('[data-manager-custom-color]'),
+      null,
+      'the essence tint picker offers the ten presets and no free hex field'
+    );
     palette.querySelector('[data-manager-color-none]').click();
     flushSync();
     root.querySelector('#manager-essence-edit-form').dispatchEvent(

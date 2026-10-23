@@ -69,7 +69,7 @@ async function openedPrompt() {
   let dialog = null;
   for (let attempt = 0; attempt < 50 && !dialog; attempt += 1) {
     await tick();
-    dialog = document.querySelector('.manager-modal[data-roll-prompt="single"]');
+    dialog = document.querySelector('[data-manager-modal][data-roll-prompt="single"]');
   }
   assert.ok(Boolean(dialog), 'the Journal prompt opened');
   return dialog;

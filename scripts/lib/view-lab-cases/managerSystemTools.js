@@ -8,7 +8,7 @@ import {
   TOOL_LIST_MATCHES,
   WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, choosePageSize, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -274,7 +274,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-membership-option="all"]' },
-      ...chooseSelectOption('.manager-main [data-pagination-size]', '24'),
+      ...choosePageSize('24', '.manager-main'),
     ],
     expectView: 'tools',
     expectSelector: '.manager-tools-library-list > .manager-tools-row:nth-child(9)',
@@ -517,10 +517,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The repair set is `PickerRow` rows at system scope, and only this frame photographs them there.
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/PickerRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/KindAdder\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/ChoiceGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
       // The summary sentence's own module, claimed by name since the list cases stopped swallowing `tools/`.
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,

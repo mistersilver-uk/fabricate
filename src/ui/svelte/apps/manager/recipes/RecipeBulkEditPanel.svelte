@@ -364,8 +364,7 @@
   function segmentOptions(values, labels, disabled) {
     return values.map((value) => ({
       value,
-      labelKey: labels[value][0],
-      fallback: labels[value][1],
+      label: text(...labels[value]),
       disabled,
     }));
   }
@@ -935,15 +934,15 @@
       </div>
     {:else}
       <!-- The shipped `SearchablePopover`, not a hand-rolled search field: it owns the input, the
-           rows, outside-click and Escape dismissal, focus restoration on a DISMISSAL, and a portal
-           past the panel's `overflow: hidden`, and its list SCROLLS. Restoration on a CHOICE is
-           this component's, because choosing replaces the trigger and the popover's guard correctly
-           declines — see `focusAfterRerender` above. -->
+           rows, outside-click and Escape dismissal, DISMISSAL focus restoration, a portal past the
+           panel's `overflow: hidden`, and a SCROLLING list. CHOICE restoration is this component's:
+           choosing replaces the trigger, so the popover's guard declines (`focusAfterRerender`). -->
       <SearchablePopover
         options={bookOptions}
         disabled={inert}
         pickerClass="fab-bulk-book-picker"
-        triggerClass="fabricate-button manager-travel-picker-trigger fab-bulk-book-trigger"
+        triggerButton={{ role: 'neutral' }}
+        triggerClass="manager-travel-picker-trigger fab-bulk-book-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',

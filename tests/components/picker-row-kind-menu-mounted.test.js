@@ -19,10 +19,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...KIND_MENU_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/ui/svelte/components/pickerRowKinds.js',
   ],
   compiledModules: KIND_MENU_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/manager/recipe/PickerRowKindMenu.svelte',
+  componentPath: 'src/ui/svelte/components/PickerRowKindMenu.svelte',
 });
 
 const settle = () => new Promise((done) => setTimeout(done, 0));
@@ -49,6 +49,12 @@ describe('PickerRowKindMenu: the caller’s eyebrow and hint', () => {
       trigger.getAttribute('title'),
       'Accept another kind of ingredient in place of this one.'
     );
+  });
+
+  it('draws the trigger as text alone, with no glyph (ruled 2026-10-18, issue 2515)', async () => {
+    const { trigger } = await openMenu({});
+    assert.equal(trigger.querySelectorAll('i, svg').length, 0, 'no branch glyph');
+    assert.equal(trigger.textContent.trim(), 'or…');
   });
 
   it('heads the panel, names the trigger and titles it with a result row’s copy', async () => {

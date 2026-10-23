@@ -511,21 +511,25 @@ Spec reference: openspec/specs/ui-extension-points/spec.md
 ## Published UI Component
 
 A presentation primitive, not a record: Fabricate persists nothing for it.
-A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot }` handle.
+A companion calls `mount(name, { target, props })` and Fabricate renders the named primitive into **target**, the companion's own element, on Fabricate's own Svelte runtime, returning a frozen `{ update, destroy, slot, value }` handle.
 "Seam" names that mount function only; the target is the companion's element, and the component is Fabricate's primitive.
-The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, plus `restOn` where an entry's rest keys land on a control it draws, which `describe` omits and whose reserved names are fixed for the entry's `version`, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
-Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`; issue #2452 publishes callbacks, the first control and ARIA attributes on a control.
-A prop is plain data, a string of text, a content slot, a callback or an ARIA attribute Fabricate writes on a control; snippets, bindables and overlays wait for issue #2427.
+The published set is a frozen data manifest of `{ name, path, version, props, rest, root }` entries, plus `overlays: true` where an entry opens an overlay, plus `restOn` where an entry's rest keys land on a control it draws, which `describe` omits and whose reserved names are fixed for the entry's `version`, appended and never interleaved, and a breaking change to one entry bumps that entry's own `version` rather than the seam's `schemaVersion`.
+Issue #2426 published the seam and its first data-only leaf primitive; issue #2448 published more data-only leaves; issue #2451 publishes text content, content slots, the required ancestor root, `load` and `onFault`; issue #2452 publishes callbacks, the first control and ARIA attributes on a control; issue #2453 publishes bound values; issue #2454 publishes the overlay host.
+A prop is plain data, a string of text, a content slot, a callback, an ARIA attribute Fabricate writes on a control or a bound value; a snippet that takes arguments is never published, and the standalone style root waits for issue #2427.
+`describe` returns `{ version, props, rest, root, overlays }`, where `overlays` says whether the entry opens an overlay, and an entry states `overlays: true` in the manifest only where it does.
+The overlay host plumbing of issue #2454 is in place and every entry published so far has `overlays: false`, so none opens an overlay yet.
+An overlay host and the standalone layer are defined in the glossary, and the host is chosen each time an overlay opens.
 A content slot is a place inside a published component where the companion draws its own content, into an element Fabricate owns and returns from `handle.slot`.
 An entry's **required ancestor root** says which Fabricate ancestor its target needs.
 The published `Rail` is a section primitive, not the Manager rail.
 The published `Notice` is the design system's notice, drawn in the companion's element, and is unrelated to a Foundry notification.
 The published `Button` is the design system's button; its `role` is a visual role, not an ARIA role.
 The published `StatusToggle` is the design system's switch, a button that is on or off; its `on` is the companion's own state, which a press only reports, and it is unrelated to a Crafting System's feature toggle.
+The published `Stepper` is the design system's number field with its two step buttons; the number is the companion's, an edit only reports it, and the input shows what is typed until it loses focus.
 `load` loads a component's code before it is mounted, and `onFault` tells the companion of a contained fault.
 The companion owns the target's placement and box and calls `destroy` on every path that ends the mount; a fault is contained by Fabricate's boundary, reported, and leaves the target empty with an inert handle.
 
-Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentCallbacks.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
+Canonical mapping: `game.fabricate.api.ui`; `src/ui/publishedComponentSeam.js`; `src/ui/publishedComponentProps.js`; `src/ui/publishedComponentCallbacks.js`; `src/ui/publishedComponentManifest.js`; `src/ui/publishedComponentOverlays.js`; `src/ui/svelte/util/overlayHost.js`; `src/ui/publishedComponents.svelte.js`; `PublishedComponentHost.svelte`
 
 Spec reference: openspec/specs/ui-extension-points/spec.md
 
@@ -564,6 +568,14 @@ A crafting system's own `components` / `essenceDefinitions` / `tools` neverthele
 It is the first layer of `## Scoped Entity Definitions`; the second is its **World Defaults** and the third is a **System Membership Record**.
 The three shipped world-scope lifts (`CurrencyConfig`, `TravelConfig`, `CharacterLibraries`) moved their SUBSTANCE wholly, because two systems cannot meaningfully disagree about a coin ladder; here they SHOULD disagree, so only identity moves.
 **FOUR WRITERS ADD A WORLD COMPONENT, AND THE CATALOGUE'S DROP ZONE IS ONE OF THEM**: the `1.30.0` migration, the world catalogue's create, a crafting-system import merging into a scope that is already seeded, and, since issue 2218, every component import.
+**AN ESSENCE OR TOOL ROW IS REGISTERED AT THE SAVE CHOKEPOINT, NOT BY A WRITER OF ITS OWN** (issue 2554): `CraftingSystemManager.save` plans every system it serialises, so every path that writes a system obeys one rule.
+Each distinct id a system holds has exactly one world entity and one `(entity, system)` membership, and the world entity owns identity while the membership owns enablement and overrides.
+The planner decides per row: REGISTERED, CREATE (a new entity under the row's own id), ADOPT (a membership joining the same-id entity), or CONFLICTING, which stays unregistered and is reported once per session.
+A Tool adopts the same-id entity when the two share a source or are both source-less, and an essence adopts the same-id entity and never matches by name.
+CONFLICTING covers an id or source another entity owns, a retired essence id, and a Tool leaving unauthored a section the world default authors, which no membership can express.
+The `1.36.0` migration runs the same planner over stored systems, reports a Tool matching two or more entities as AMBIGUOUS, and deletes and re-keys nothing.
+Components are not yet held to this rule when created directly rather than imported (follow-up).
+
 **THE VOCABULARY THAT CHANGE SETTLES.**
 A component import REGISTERS the component it brings into a system as a World Component that system HOLDS, where the pair it writes is a world entity under the in-system record's own id, built as that record's lifted identity, and a `(component, system)` membership record.
 A system ADOPTS a World Component that already exists: the import matches the Item to it by a shared source reference before the new record's id is minted, the new record takes the entity's id, and no second entity is created, which is the verb the catalogue's `Add to this system` already carried.
@@ -644,6 +656,10 @@ For a record the run ADDED, a category other than the reserved `general` that di
 Neither exception can fire for a World Component the import itself creates, since that entity has no world default; its record inherits every section and resolves the in-system record's own values until one is authored.
 **THE IMPORT WRITES THE IN-SYSTEM RECORD FIRST AND THIS RECORD SECOND**, and only for a record the persisted `craftingSystems` setting holds: an in-system record with no membership record is the state every imported component was in before issue 2218 and the next import repairs it, where a membership record naming no in-system record would count the system as a member in the catalogue while its own list could not show the component.
 One residual is accepted: when two runs overlap over one system and one saves before the other flushes, the second registers the first's freshly adopted record as one the system already held, so its record keeps the in-system values instead of inheriting the world's.
+
+A registration that CREATES the entity writes a record that inherits every section and carries the row's `enabled`, plus a Tool's `repairRequirements`.
+A registration that ADOPTS an existing entity writes a record that overrides only the sections whose world default would change the row, which departs from the fully overriding `1.30.0` shape on purpose.
+A record whose `systemId` names no current system is a membership of a deleted system, reported at `1.36.0` and never deleted.
 
 Canonical mapping: `normalizeMemberships` / `resolveScopedDefinition` (`src/systems/scopedDefinitions.js`); `unionScopedDefinitions` (`src/systems/scopedDefinitionStore.js`) versus `CraftingSystemManager._scopeEntityBasis`; `planWorldComponentRegistration` (`src/systems/manager/worldComponentRegistration.js`)
 

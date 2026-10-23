@@ -17,6 +17,8 @@ import {
   assertShippedString,
   managerComponents,
   settleBetweenTests,
+  titledIconButtons,
+  assertNoTitledIconButton,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -76,9 +78,9 @@ const RAIL_CENSUS = Object.freeze({
     "4 p class=\"manager-kicker\" | Crafting system",
     "4 button aria-disabled=\"false\" aria-label=\"Collapse navigation rail\" aria-pressed=\"false\" class=\"manager-rail-toggle manager-scope-collapse\" data-manager-rail-toggle=\"\" title=\"Collapse navigation rail\" type=\"button\"",
     "5 i aria-hidden=\"true\" class=\"fas fa-angles-left\"",
-    "3 div class=\"fabricate-picker manager-travel-picker fabricate-select manager-scope-select svelte-1ele464\"",
-    "4 button aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-label=\"Select a system\" class=\"fabricate-select-trigger fabricate-select-trigger-inline svelte-1ele464\" data-keyboard-focus=\"true\" data-manager-scope-select=\"\" data-select-size=\"inline\" role=\"combobox\" type=\"button\"",
-    "5 span class=\"manager-travel-picker-value fabricate-select-value svelte-1ele464\" | Alchemy",
+    "3 div class=\"fabricate-picker manager-travel-picker fabricate-select manager-scope-select\"",
+    "4 button aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-label=\"Select a system\" class=\"fabricate-select-trigger fabricate-select-trigger-inline\" data-keyboard-focus=\"true\" data-manager-scope-select=\"\" data-select-size=\"inline\" role=\"combobox\" type=\"button\"",
+    "5 span class=\"manager-travel-picker-value fabricate-select-value\" | Alchemy",
     "5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
     "3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
     "4 i aria-hidden=\"true\" class=\"fas fa-arrow-left-long\"",
@@ -178,9 +180,9 @@ const RAIL_CENSUS = Object.freeze({
     "no crafting system selected, which is the other scope-card branch": [
       "- 4 p class=\"manager-kicker\" | Crafting system",
       "+ 4 p class=\"manager-kicker\" | Fabricate",
-      "- 3 div class=\"fabricate-picker manager-travel-picker fabricate-select manager-scope-select svelte-1ele464\"",
-      "- 4 button aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-label=\"Select a system\" class=\"fabricate-select-trigger fabricate-select-trigger-inline svelte-1ele464\" data-keyboard-focus=\"true\" data-manager-scope-select=\"\" data-select-size=\"inline\" role=\"combobox\" type=\"button\"",
-      "- 5 span class=\"manager-travel-picker-value fabricate-select-value svelte-1ele464\" | Alchemy",
+      "- 3 div class=\"fabricate-picker manager-travel-picker fabricate-select manager-scope-select\"",
+      "- 4 button aria-expanded=\"false\" aria-haspopup=\"listbox\" aria-label=\"Select a system\" class=\"fabricate-select-trigger fabricate-select-trigger-inline\" data-keyboard-focus=\"true\" data-manager-scope-select=\"\" data-select-size=\"inline\" role=\"combobox\" type=\"button\"",
+      "- 5 span class=\"manager-travel-picker-value fabricate-select-value\" | Alchemy",
       "- 5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
       "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
       "- 4 i aria-hidden=\"true\" class=\"fas fa-arrow-left-long\"",
@@ -450,6 +452,7 @@ export function registerRailCases() {
   });
 
   afterEach(async () => {
+    const titled = titledIconButtons();
     if (mounted) {
       unmount(mounted);
       mounted = null;
@@ -457,6 +460,7 @@ export function registerRailCases() {
     target?.remove();
     target = null;
     await settleBetweenTests();
+    assertNoTitledIconButton(titled);
   });
 
 

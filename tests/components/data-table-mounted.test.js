@@ -5,9 +5,10 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
+import { choosePageSize } from '../helpers/page-size-control.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -22,7 +23,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     DATA_TABLE,
   ],
   componentPath: DATA_TABLE,
@@ -152,7 +153,7 @@ describe('DataTable', () => {
         },
       })
     );
-    chooseSelectOption(root, '[data-pagination-size]', 5);
+    choosePageSize(root, '', 5);
     assert.deepEqual(sizes, [5]);
   });
 

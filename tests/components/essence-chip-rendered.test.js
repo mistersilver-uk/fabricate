@@ -32,9 +32,20 @@ const THEMES = [
 const LABEL_MIN_RATIO = 4.5;
 const MARK_MIN_RATIO = 3;
 
-/** The pairs measured below a floor at the base of issue 1371 r18-colour. */
-const KNOWN_BELOW_LABEL_FLOOR = new Map([['foundry-native/mauve', 3.36]]);
-const KNOWN_BELOW_MARK_FLOOR = new Map([['foundry-native/mauve', 2.72]]);
+/**
+ * The pairs measured below a floor, each pinned at its measured ratio rounded down so none may
+ * get worse. The `verdant` and `azure` pairs are owned by issue 2604, which lifts them.
+ */
+const KNOWN_BELOW_LABEL_FLOOR = new Map([
+  ['foundry-native/mauve', 3.36],
+  ['foundry-native/azure', 4.15],
+]);
+const KNOWN_BELOW_MARK_FLOOR = new Map([
+  ['foundry-native/mauve', 2.72],
+  ['ironblood-forge/verdant', 2.85],
+  ['hearth-herb/verdant', 2.66],
+  ['hearth-herb/azure', 2.44],
+]);
 
 /** THE SELECTED ROW'S OWN RATCHET (issue 1371 r19-gates2, UX review round 5 F-P5). */
 const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
@@ -47,6 +58,16 @@ const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
   ['ironblood-forge/rose', 4.19],
   ['hearth-herb/aqua', 4.35],
   ['starglass-arcana/aqua', 4.44],
+  ['fabricate/azure', 3.98],
+  ['ironblood-forge/verdant', 3.28],
+  ['ironblood-forge/azure', 3.5],
+  ['hearth-herb/verdant', 3.49],
+  ['hearth-herb/azure', 3.2],
+  ['starglass-arcana/verdant', 4.04],
+  ['starglass-arcana/azure', 4.14],
+  ['foundry-native/verdant', 2.68],
+  ['foundry-native/azure', 2.27],
+  ['sovereign/azure', 3.66],
 ]);
 
 /**
@@ -255,7 +276,7 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
 
   it('measured every theme the sheet declares and every tint the picker offers', () => {
     assert.ok(THEMES.length >= 7, `the sheet declares ${THEMES.length} theme roots`);
-    assert.ok(MANAGER_COLOR_TOKEN_KEYS.length >= 8, 'the picker offers at least the shipped eight');
+    assert.equal(MANAGER_COLOR_TOKEN_KEYS.length, 10, 'the picker offers the ten shipped tints');
     assert.equal(measured.size, THEMES.length * (MANAGER_COLOR_TOKEN_KEYS.length + 1));
     assert.ok(
       markup.chip.includes('fab-essence-chip'),
@@ -307,7 +328,7 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     holdContrast(t, labelRatioOnRow, LABEL_MIN_RATIO, KNOWN_BELOW_LABEL_FLOOR, 'chip label');
   });
 
-  it('and holds the SELECTED row — the lighter surface, where nine pairs are pinned short of AA', (t) => {
+  it('and holds the SELECTED row — the lighter surface, where the pinned pairs sit short of AA', (t) => {
     holdContrast(
       t,
       labelRatioOnSelectedRow,

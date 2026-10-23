@@ -7,6 +7,7 @@ import { tick } from 'svelte';
 
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { Recipe } from '../../src/models/Recipe.js';
+import { buildRoutingModel } from '../../src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
@@ -25,6 +26,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import { chooseSetCardAction } from '../helpers/setCardActions.js';
 import {
   CHOICE_GROUP_RAW_MODULES,
   CHOICE_GROUP_COMPILED_MODULES,
@@ -93,13 +95,20 @@ const RAW_MODULES = [
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
-  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/components/pickerRowKinds.js',
   // The result rows' catalogue, amount error and add rule (issue 1516).
-  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/components/resultRows.js',
   // Surplus: nothing this tree renders imports the copy module (issue 2465).
   'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  // Issue 2511: the set drafts and routing edits the sections write through, and the routing model.
+  'src/ui/svelte/apps/manager/recipe/setDrafts.js',
+  'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
+  'src/ui/svelte/apps/manager/recipe/recipeRoutingEdits.js',
+  'src/ui/svelte/apps/manager/recipe/resultSetSources.js',
+  // Issue 2513: the Overview routing card's scopes and rows.
+  'src/ui/svelte/apps/manager/recipe/routingOverviewRows.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
   // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
   // so omitting it throws a named "add it to rawModules" error rather than hanging.
@@ -186,18 +195,20 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
-  'src/ui/svelte/apps/manager/recipe/KindAdder.svelte',
+  'src/ui/svelte/components/ChoiceGroup.svelte',
+  'src/ui/svelte/components/PickerRow.svelte',
+  'src/ui/svelte/components/PickerRowAmount.svelte',
+  'src/ui/svelte/components/PickerRowNameField.svelte',
+  'src/ui/svelte/components/PickerRowRewardBody.svelte',
+  'src/ui/svelte/components/KindAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/components/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+  // Issue 2512: the set card and the routing line every result set draws.
+  'src/ui/svelte/components/SetCard.svelte',
+  'src/ui/svelte/components/RouteSources.svelte',
   // The ONE complication summary row.
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
@@ -205,6 +216,10 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeCraftingModifierField.svelte',
+  // Issue 2513: the Overview's routing card and the overview it draws per step scope.
+  'src/ui/svelte/apps/manager/recipe/RecipeRoutingCard.svelte',
+  'src/ui/svelte/components/RoutingOverview.svelte',
   // The Overview tab's recipe art (issue 1522).
   'src/ui/svelte/components/ArtPicker.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
@@ -233,6 +248,7 @@ const RECIPE_COMPILED = [
   // The read-only stage complication list's muted label (issue 2445).
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/StageComplicationList.svelte',
+  'src/ui/svelte/apps/manager/ProgressiveStageList.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
   'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   'src/ui/svelte/apps/manager/RecipeEditView.svelte',
@@ -398,6 +414,9 @@ function stepsProps(overrides = {}) {
     ...overrides,
   };
 }
+
+const FAILURE_TOGGLE = '[data-recipe-field="failureResults"]';
+const FAILURE_CARD = '[data-recipe-set-role="failure"]';
 
 function clickTab(target, tab) {
   target.querySelector(`[data-recipe-tab-button="${tab}"]`).click();
@@ -1576,7 +1595,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  // ── Result routing (routed systems) ──────────────────────────────────────
+  // ── Result routing (routed systems, issue 2512) ──────────────────────────
 
   const ROUTED_RESULT_GROUPS = [
     {
@@ -1597,49 +1616,376 @@ describe('RecipeEditView (mounted)', () => {
     { id: 'tier-std', name: 'Standard' },
   ];
 
-  function resultCardTrigger(target, cardIndex) {
-    return target
-      .querySelectorAll('[data-recipe-result-set-id]')
-      [cardIndex].querySelector('[data-recipe-add="routing-option"]');
-  }
+  const resultCard = (target, index) =>
+    target.querySelectorAll('[data-recipe-result-set-id]')[index];
+  const chipIds = (card) =>
+    [...card.querySelectorAll('[data-route-sources-chip]')].map((chip) =>
+      chip.getAttribute('data-route-sources-chip')
+    );
+  const chipFor = (card, id) => card.querySelector(`[data-route-sources-chip="${id}"]`);
+  const assignOptions = () => [
+    ...document.querySelectorAll('.fabricate-route-sources-popover [role="option"]'),
+  ];
 
-  async function openRoutingPopover(target, cardIndex) {
-    resultCardTrigger(target, cardIndex).click();
+  async function openAssign(target, cardIndex) {
+    resultCard(target, cardIndex).querySelector('[data-route-sources-assign]').click();
     await flushRender();
-    return [...document.querySelectorAll('.manager-travel-option')];
+    return assignOptions();
   }
 
-  it('ingredient mode: result sets assign ingredient sets instead of a name', async () => {
-    const { target, patches } = await mountResultGroups(ROUTED_RESULT_GROUPS, {
+  async function chooseAssign(target, cardIndex, label) {
+    const options = await openAssign(target, cardIndex);
+    const option = options.find((row) => row.textContent.includes(label));
+    assert.ok(Boolean(option), `Assign offers ${label}`);
+    option.click();
+    await flushRender();
+  }
+
+  async function removeChip(card, id) {
+    chipFor(card, id).querySelector('[data-chip-remove]').click();
+    await flushRender();
+  }
+
+  const ingredientRouted = (ingredientSets, groups = ROUTED_RESULT_GROUPS) =>
+    mountResultGroups(groups, {
       props: { routingProvider: 'ingredientSet' },
-      recipe: {
-        ingredientSets: [
-          { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },
-          { id: 'iset-2', name: 'Beta', ingredientGroups: [] },
-        ],
+      recipe: { ingredientSets },
+    });
+  const checkRouted = (groups, props = {}) =>
+    mountResultGroups(groups, {
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: TIER_OPTIONS,
+        routedCheck: { tiers: TIER_OPTIONS },
+        ...props,
       },
     });
+  const setRoutedTo = (patch, setId) =>
+    patch.ingredientSets.find((set) => set.id === setId).resultGroupId;
 
+  it('ingredient mode: a result set is a named card whose Assign routes an ingredient set to it', async () => {
+    const { target, patches } = await ingredientRouted([
+      { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },
+      { id: 'iset-2', name: '', ingredientGroups: [] },
+    ]);
+    const card = resultCard(target, 0);
+    assert.equal(card.querySelector('.fab-kicker')?.textContent.trim(), 'Result set');
+    assert.equal(card.querySelector('[data-recipe-result-set-field="name"]').value, 'Group A');
+    assert.ok(Boolean(card.querySelector('[data-route-sources-line]')), 'the routing line renders');
+
+    const labels = (await openAssign(target, 0)).map((row) => row.textContent);
+    assert.ok(
+      labels.some((text) => text.includes('Set 2')),
+      'a blank set shows as "Set N"'
+    );
+    assignOptions()
+      .find((row) => row.textContent.includes('Alpha'))
+      .click();
+    await flushRender();
+    assert.equal(setRoutedTo(patches.at(-1), 'iset-1'), 'grp-a', 'Alpha routes to this set');
+    editHarness.remount();
+  });
+
+  it('ingredient mode: Assign re-points a set routed elsewhere, leaving one target past its fallback', async () => {
+    const sets = [
+      { id: 'iset-1', name: 'Alpha', ingredientGroups: [], resultMapping: ['grp-a'] },
+      { id: 'iset-2', name: 'Beta', ingredientGroups: [], resultGroupId: 'grp-a' },
+    ];
+    const { target, patches } = await ingredientRouted(sets);
+    const options = await openAssign(target, 1);
+    assert.ok(
+      options.find((row) => row.textContent.includes('Beta')).textContent.includes('now → Group A'),
+      'Beta names where it routes today'
+    );
+    options.find((row) => row.textContent.includes('Alpha')).click();
+    await flushRender();
+    const written = patches.at(-1).ingredientSets;
+    assert.equal(setRoutedTo(patches.at(-1), 'iset-1'), 'grp-b', 'Alpha is re-pointed');
+    const model = buildRoutingModel({
+      provider: 'ingredientSet',
+      ingredientSets: written,
+      resultGroups: ROUTED_RESULT_GROUPS,
+      setName: (set) => set.name,
+    });
+    assert.deepEqual(model.sources[0].targets, [1], 'its resultMapping fallback no longer counts');
+    editHarness.remount();
+  });
+
+  it('ingredient mode: a chip’s × and a second choice in Assign each unassign, writing null', async () => {
+    const sets = [{ id: 'iset-1', name: 'Alpha', ingredientGroups: [], resultGroupId: 'grp-a' }];
+    let view = await ingredientRouted(sets);
+    await removeChip(resultCard(view.target, 0), 'iset-1');
+    assert.equal(setRoutedTo(view.patches.at(-1), 'iset-1'), null, 'the chip’s × unassigns');
+    editHarness.remount();
+
+    view = await ingredientRouted(sets);
+    await chooseAssign(view.target, 0, 'Alpha');
+    assert.equal(setRoutedTo(view.patches.at(-1), 'iset-1'), null, 'choosing it again unassigns');
+    editHarness.remount();
+  });
+
+  it('ingredient mode: a fallback source reads “default” and is not removable, and an unreached set warns', async () => {
+    const { target } = await ingredientRouted([
+      { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },
+    ]);
+    const chip = chipFor(resultCard(target, 0), 'iset-1');
+    assert.equal(chip.querySelector('.fabricate-route-sources-hint').textContent, 'default');
+    assert.ok(!chip.querySelector('[data-chip-remove]'), 'a fallback source cannot be removed');
+    const unreached = resultCard(target, 1);
+    assert.ok(
+      unreached.classList.contains('is-warning'),
+      'the unreached set takes the warning edge'
+    );
     assert.equal(
-      target.querySelector('[data-recipe-result-set-field="name"]'),
-      null,
-      'no free-text result-set name in ingredient mode'
+      unreached.querySelector('[data-route-sources-unreachable]').textContent,
+      'Nothing — unreachable'
+    );
+    editHarness.remount();
+  });
+
+  it('ingredient mode: a shared set says how many sets route to it', async () => {
+    const { target } = await ingredientRouted([
+      { id: 'iset-1', name: 'Alpha', ingredientGroups: [], resultGroupId: 'grp-a' },
+      { id: 'iset-2', name: 'Beta', ingredientGroups: [], resultGroupId: 'grp-a' },
+    ]);
+    assert.deepEqual(chipIds(resultCard(target, 0)), ['iset-1', 'iset-2']);
+    assert.equal(
+      resultCard(target, 0).querySelector('.fabricate-set-card-note').textContent.trim(),
+      '2 ingredient sets route here, so editing these results changes what each of them awards.'
     );
     assert.ok(
-      target.querySelector('[data-recipe-routing-assignment]'),
-      'the routing assignment control renders'
+      !resultCard(target, 1).querySelector('.fabricate-set-card-note'),
+      'one source, no note'
     );
+    editHarness.remount();
+  });
 
-    const options = await openRoutingPopover(target, 0);
-    options.find((option) => /Alpha/.test(option.textContent)).click();
-    await flushRender();
-
-    const patch = patches.at(-1);
-    assert.ok(patch.ingredientSets, 'assigning writes the ingredient sets');
+  it('ingredient mode: with no ingredient set, the line says to add one instead of offering Assign', async () => {
+    const { target } = await ingredientRouted([]);
+    const card = resultCard(target, 0);
+    assert.ok(!card.querySelector('[data-route-sources-assign]'));
     assert.equal(
-      patch.ingredientSets.find((set) => set.id === 'iset-1').resultGroupId,
-      'grp-a',
-      'the chosen set is routed to this result group'
+      card.querySelector('[data-route-sources-hint]').textContent,
+      'Add an ingredient set first.'
+    );
+    editHarness.remount();
+  });
+
+  it('ingredient mode: a collapsed chain routes on the final step through onUpdateStep', async () => {
+    const stepPatches = [];
+    const step = (id, sets, groups) => ({
+      id,
+      name: id,
+      ingredientSets: sets,
+      resultGroups: groups,
+    });
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        routingProvider: 'ingredientSet',
+        multiStepEnabled: false,
+        recipe: {
+          ...RECIPE,
+          steps: [
+            step('step-1', [], [{ id: 'rg-1', results: [] }]),
+            step(
+              'step-2',
+              [{ id: 'iset-f', name: 'Final', ingredientGroups: [] }],
+              ROUTED_RESULT_GROUPS
+            ),
+          ],
+        },
+        onUpdateStep: (stepId, patch) => {
+          stepPatches.push({ stepId, patch });
+        },
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+    await chooseAssign(target, 1, 'Final');
+    assert.equal(stepPatches.at(-1).stepId, 'step-2', 'the write goes through to the final step');
+    assert.equal(stepPatches.at(-1).patch.ingredientSets[0].resultGroupId, 'grp-b');
+    editHarness.remount();
+  });
+
+  it('check mode: tiers read their system names, and Assign moves a tier from the set listing it', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: [] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-myth'] },
+    ];
+    const { target, patches } = await checkRouted(groups);
+    assert.equal(
+      resultCard(target, 0).querySelector('[data-recipe-result-set-field="name"]').value,
+      'Group A'
+    );
+    assert.ok(chipFor(resultCard(target, 1), 'tier-myth').textContent.includes('Mythic'));
+    const options = await openAssign(target, 0);
+    assert.ok(
+      options
+        .find((row) => row.textContent.includes('Mythic'))
+        .textContent.includes('now → Group B')
+    );
+    options.find((row) => row.textContent.includes('Mythic')).click();
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1).resultGroups.map((group) => group.checkOutcomeIds),
+      [['tier-myth'], []],
+      'exactly one set lists the tier after the move'
+    );
+    editHarness.remount();
+  });
+
+  it('check mode: choosing a tier the set already lists removes it rather than re-adding it', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-std'] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-myth'] },
+    ];
+    const { target, patches } = await checkRouted(groups);
+    await chooseAssign(target, 0, 'Standard');
+    assert.equal(patches.length, 1);
+    assert.deepEqual(patches[0].resultGroups[0].checkOutcomeIds, []);
+    assert.equal(patches[0].resultGroups[1], groups[1], 'the other set is not rewritten');
+    editHarness.remount();
+  });
+
+  it('check mode: a chip’s × removes the tier from its set', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-std'] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-myth'] },
+    ];
+    const { target, patches } = await checkRouted(groups);
+    await removeChip(resultCard(target, 1), 'tier-myth');
+    assert.deepEqual(patches.at(-1).resultGroups[1].checkOutcomeIds, []);
+    editHarness.remount();
+  });
+
+  it('check mode: a listed tier that does not route is struck, named, and removable', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-std', 'tier-botch', 'tier-gone'] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-myth'] },
+    ];
+    const { target, patches } = await checkRouted(groups, {
+      routedCheck: { tiers: [...TIER_OPTIONS, { id: 'tier-botch', name: 'Botched' }] },
+    });
+    const card = resultCard(target, 0);
+    const struck = [...card.querySelectorAll('[data-route-sources-struck]')];
+    assert.deepEqual(
+      struck.map((chip) => chip.getAttribute('title')),
+      ['Botched, does not route', 'Deleted outcome tier, does not route'],
+      'an unoffered tier keeps its system name, and an undefined one reads as deleted'
+    );
+    await removeChip(card, 'tier-gone');
+    assert.deepEqual(patches.at(-1).resultGroups[0].checkOutcomeIds, ['tier-std', 'tier-botch']);
+    editHarness.remount();
+  });
+
+  it('check mode: Assign warns that a first tier ends the default route, only while none is listed', async () => {
+    const unlisted = ROUTED_RESULT_GROUPS.map((group) => ({ ...group, checkOutcomeIds: [] }));
+    let view = await checkRouted(unlisted);
+    await openAssign(view.target, 0);
+    assert.equal(
+      document.querySelector('[data-route-sources-note]')?.textContent,
+      'Assigning a tier stops the other tiers reaching a result set by default.'
+    );
+    editHarness.remount();
+
+    view = await checkRouted([{ ...unlisted[0], checkOutcomeIds: ['tier-std'] }, unlisted[1]]);
+    await openAssign(view.target, 1);
+    assert.ok(!document.querySelector('[data-route-sources-note]'), 'a listed tier: no warning');
+    editHarness.remount();
+  });
+
+  it('check mode: with no tier to offer, the hint distinguishes THREE states, not two', async () => {
+    const groups = [{ id: 'grp-a', name: 'Group A', checkOutcomeIds: [], results: [] }];
+    const hintFor = async (props) => {
+      const { target } = await checkRouted(groups, { routedOutcomeTierOptions: [], ...props });
+      const text = target.querySelector('[data-route-sources-hint]').textContent;
+      editHarness.remount();
+      return text;
+    };
+    assert.match(await hintFor({ routedCheck: { tiers: [] } }), /Define outcome tiers/);
+    assert.match(
+      await hintFor({ routedFailureResultsAllowed: false }),
+      /produces nothing on a failed check/,
+      'failure-only tiers under a forbidding policy name the policy too'
+    );
+    assert.match(
+      await hintFor({ routedFailureResultsAllowed: true }),
+      /marked as a Success/,
+      'under a permitting policy the success-tier hint stands'
+    );
+  });
+
+  it('check mode: a shared set says how many tiers route to it', async () => {
+    const { target } = await checkRouted([
+      { id: 'grp-a', name: 'Blade', checkOutcomeIds: [], results: [] },
+      { id: 'grp-b', name: 'Other', checkOutcomeIds: ['tier-myth', 'tier-std'], results: [] },
+    ]);
+    assert.equal(
+      resultCard(target, 1).querySelector('.fabricate-set-card-note').textContent.trim(),
+      '2 outcome tiers route here, so editing these results changes what each of them awards.'
+    );
+    assert.ok(!resultCard(target, 0).querySelector('.fabricate-set-card-note'));
+    editHarness.remount();
+  });
+
+  it('check mode: Assign on the card with a struck tier re-points it from the set listing it first', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-myth'] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: ['tier-std', 'tier-myth'] },
+    ];
+    const { target, patches } = await checkRouted(groups);
+    assert.ok(
+      chipFor(resultCard(target, 1), 'tier-myth').hasAttribute('data-route-sources-struck'),
+      'listed first elsewhere, so struck here'
+    );
+    await chooseAssign(target, 1, 'Mythic');
+    assert.deepEqual(
+      patches.at(-1).resultGroups.map((group) => group.checkOutcomeIds),
+      [[], ['tier-std', 'tier-myth']],
+      'the earlier lister is stripped, and this set is the only one listing it'
+    );
+    editHarness.remount();
+  });
+
+  it('check mode: renaming a result set writes its name and keeps its tiers', async () => {
+    const groups = [
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-myth'] },
+      { ...ROUTED_RESULT_GROUPS[1], checkOutcomeIds: [] },
+    ];
+    const { target, patches } = await checkRouted(groups);
+    const name = resultCard(target, 1).querySelector('[data-recipe-result-set-field="name"]');
+    assert.equal(name.getAttribute('aria-label'), 'Result set name');
+    name.value = 'Standard';
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.at(-1).resultGroups[1].name, 'Standard');
+    assert.equal(patches.at(-1).resultGroups[1].id, 'grp-b');
+    assert.equal(
+      resultCard(target, 1).querySelector('[data-route-sources-assign]').getAttribute('aria-label'),
+      'Assign to Group B',
+      'Assign is named for its set'
+    );
+    editHarness.remount();
+  });
+
+  it('check mode: a failure-role set nothing reaches shows neither the badge nor the edge', async () => {
+    const { target } = await checkRouted([
+      { ...ROUTED_RESULT_GROUPS[0], checkOutcomeIds: ['tier-myth', 'tier-std'] },
+      { id: 'grp-f', name: 'Ruin', role: 'failure', checkOutcomeIds: [], results: [] },
+    ]);
+    const failure = resultCard(target, 1);
+    assert.ok(!failure.classList.contains('is-warning'), 'no warning edge');
+    assert.ok(!failure.querySelector('[data-route-sources-unreachable]'), 'so no badge either');
+    editHarness.remount();
+  });
+
+  it('removes a routed result set from its kebab', async () => {
+    const { target, patches } = await checkRouted(ROUTED_RESULT_GROUPS);
+    await chooseSetCardAction(resultCard(target, 1), '[data-recipe-remove="result-set"]');
+    assert.deepEqual(
+      patches.at(-1).resultGroups.map((group) => group.id),
+      ['grp-a']
     );
     editHarness.remount();
   });
@@ -1696,18 +2042,25 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('alchemy Simple: two labeled result sets, reserved failure set undeletable, no Add result set (issue 554)', async () => {
+  it('alchemy Simple: two labeled result sets, no kebab on either, no Add result set (issue 554)', async () => {
     const target = await editHarness.mount(
       identityProps({
         alchemySimple: true,
         complex: false,
         componentOptions: COMPONENT_OPTIONS,
+        routedFailureResultsAllowed: true,
         recipe: {
           ...RECIPE,
           resultGroups: [
             {
               id: 'rg-ok',
               name: 'On success',
+              results: [{ componentId: 'cmp-herb', quantity: 1 }],
+            },
+            {
+              id: 'rg-fail',
+              name: '',
+              role: 'failure',
               results: [{ componentId: 'cmp-herb', quantity: 1 }],
             },
           ],
@@ -1722,7 +2075,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(view, 'the alchemy Simple two-slot view renders');
 
     // Exactly two result-set cards, each with a STATIC label (no free-text name input).
-    const cards = view.querySelectorAll('[data-recipe-set]');
+    const cards = [...view.querySelectorAll('[data-recipe-set]')];
     assert.equal(cards.length, 2, 'exactly two result sets (success + reserved failure)');
     const labels = [...view.querySelectorAll('[data-recipe-result-set-static-label]')].map((node) =>
       node.textContent.trim()
@@ -1735,17 +2088,54 @@ describe('RecipeEditView (mounted)', () => {
       labels.some((label) => label.includes('On a failed check')),
       'the reserved failure set shows a static "On a failed check" label'
     );
-    assert.equal(
-      view.querySelector('[data-recipe-result-set-field="name"]'),
-      null,
+    assert.ok(
+      !view.querySelector('[data-recipe-result-set-field="name"]'),
       'no free-text result-set name input in the alchemy Simple view'
     );
 
-    // Neither set is removable, and there is no "Add result set" affordance.
+    // Each slot is SetCard's reserved form: a lock, the role badge and the words that produce it.
+    const [success, failure] = cards;
+    assert.ok(
+      success.classList.contains('is-reserved') && success.classList.contains('is-success')
+    );
+    assert.ok(failure.classList.contains('is-danger'), 'the failure slot takes the danger edge');
+    assert.equal(failure.getAttribute('data-recipe-set-role'), 'failure');
+    for (const card of cards) {
+      assert.ok(Boolean(card.querySelector('.fabricate-set-card-name.is-static i.fa-lock')));
+      assert.equal(
+        card.querySelector('[data-set-card-reserved]').textContent.trim(),
+        'reserved role'
+      );
+    }
+    // The line's label already says "Produced by", so the role's words, the line and its summary
+    // each state it once.
+    const lineOf = (card) => card.querySelector('[data-route-sources-line]');
+    const visibleText = (line) =>
+      [...line.children]
+        .filter((child) => !child.classList.contains('visually-hidden'))
+        .map((child) => child.textContent.trim())
+        .join(' ');
+    assert.deepEqual(
+      cards.map((card) => card.querySelector('[data-route-sources-implicit]').textContent),
+      ['a passed check — no assignment', 'a failed check — no assignment']
+    );
+    assert.deepEqual(cards.map((card) => visibleText(lineOf(card))), [
+      'Produced by a passed check — no assignment',
+      'Produced by a failed check — no assignment',
+    ]);
+    for (const card of cards) {
+      const summary = lineOf(card).querySelector('[data-route-sources-summary]').textContent;
+      assert.equal(summary.match(/Produced by/g)?.length, 1, `"${summary}" says it once`);
+    }
     assert.equal(
-      view.querySelector('[data-recipe-remove="result-set"]'),
-      null,
-      'the reserved failure set (and the success set) cannot be removed'
+      lineOf(success).querySelector('[data-route-sources-summary]').textContent,
+      'Produced by a passed check — no assignment'
+    );
+
+    // Neither set is removable, and there is no "Add result set" affordance.
+    assert.ok(
+      !view.querySelector('[data-set-card-actions]'),
+      'the reserved failure set (and the success set) carry no kebab'
     );
     assert.equal(
       target.querySelector('[data-recipe-add="result-set"]'),
@@ -1755,12 +2145,13 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('simple-with-check: the same two-slot result editor renders (success + reserved failure)', async () => {
+  it('simple-with-check: the two-slot editor draws only the success set and the toggle off (issue 2514)', async () => {
     const target = await editHarness.mount(
       identityProps({
         simpleFailureSlot: true,
         complex: false,
         componentOptions: COMPONENT_OPTIONS,
+        routedFailureResultsAllowed: true,
         recipe: {
           ...RECIPE,
           resultGroups: [{ id: 'rg-ok', results: [{ componentId: 'cmp-herb', quantity: 1 }] }],
@@ -1773,135 +2164,219 @@ describe('RecipeEditView (mounted)', () => {
 
     const view = target.querySelector('[data-recipe-result-alchemy-simple]');
     assert.ok(view, 'a simple system with a check gets the two-slot success/failure editor');
-    assert.equal(
-      view.querySelectorAll('[data-recipe-set]').length,
-      2,
-      'exactly two result sets (success + reserved failure)'
-    );
-    assert.equal(
-      target.querySelector('[data-recipe-add="result-set"]'),
-      null,
+    assert.equal(view.querySelectorAll('[data-recipe-set]').length, 1, 'only the success set');
+    assert.ok(!view.querySelector(FAILURE_CARD), 'no failure set is drawn or synthesized');
+    const toggle = view.querySelector(FAILURE_TOGGLE);
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'the toggle reads off');
+    assert.equal(toggle.disabled, false);
+    assert.ok(!toggle.hasAttribute('title'), 'an enabled switch carries no tooltip');
+    assert.ok(!view.querySelector('[data-recipe-failure-results-policy]'), 'no policy callout');
+    assert.ok(
+      !target.querySelector('[data-recipe-add="result-set"]'),
       'no "Add result set" in the two-slot view'
     );
     editHarness.remount();
   });
 
-  it('check mode: result sets assign outcome tiers, disabling tiers used elsewhere', async () => {
-    const groups = [
-      {
-        id: 'grp-a',
-        name: 'Group A',
-        checkOutcomeIds: [],
-        results: [{ componentId: 'cmp-herb', quantity: 1 }],
-      },
-      {
-        id: 'grp-b',
-        name: 'Group B',
-        checkOutcomeIds: ['tier-myth'],
-        results: [{ componentId: 'cmp-water', quantity: 1 }],
-      },
-    ];
-    const { target, patches } = await mountResultGroups(groups, {
-      props: { routingProvider: 'check', routedOutcomeTierOptions: TIER_OPTIONS },
+  describe('the failure-results opt-in (issue 2514)', () => {
+    const SUCCESS = Object.freeze({
+      id: 'rg-ok',
+      results: [{ id: 'res-herb', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    const FAILURE = Object.freeze({
+      id: 'rg-fail',
+      name: '',
+      role: 'failure',
+      results: [{ id: 'res-ash', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    const failureOf = (groups) => groups.filter((group) => group.role === 'failure');
+
+    /** The two-slot editor over `resultGroups`, feeding each patch back as the parent does. */
+    async function mountTwoSlot(resultGroups, props = {}) {
+      const patches = [];
+      let recipe = { ...RECIPE, resultGroups };
+      const target = await editHarness.mount(
+        identityProps({
+          simpleFailureSlot: true,
+          componentOptions: COMPONENT_OPTIONS,
+          routedFailureResultsAllowed: true,
+          recipe,
+          onUpdateRecipe: (patch) => {
+            patches.push(patch);
+            recipe = { ...recipe, ...patch };
+            editHarness.setProps({ recipe });
+          },
+          ...props,
+        })
+      );
+      clickTab(target, 'results');
+      await flushRender();
+      return { target, patches };
+    }
+
+    async function toggleFailure(target) {
+      target.querySelector(FAILURE_TOGGLE).click();
+      await flushRender();
+    }
+
+    it('turning it on adds exactly one empty failure group and draws its reserved card', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS]);
+      await toggleFailure(target);
+
+      assert.equal(patches.length, 1);
+      const [success, failure, ...rest] = patches[0].resultGroups;
+      assert.deepEqual(success, SUCCESS);
+      assert.equal(rest.length, 0);
+      assert.deepEqual({ ...failure, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
+      assert.ok(failure.id, 'the group is minted an id');
+      const card = target.querySelector(FAILURE_CARD);
+      assert.ok(card?.classList.contains('is-reserved'), 'the reserved failure card is drawn');
+      assert.equal(target.querySelector(FAILURE_TOGGLE).getAttribute('aria-pressed'), 'true');
+      editHarness.remount();
     });
 
-    assert.equal(
-      target.querySelector('[data-recipe-result-set-field="name"]'),
-      null,
-      'no free-text result-set name in check mode'
-    );
-    // Group B already shows the assigned tier as a chip.
-    const groupBCard = target.querySelectorAll('[data-recipe-result-set-id]')[1];
-    assert.equal(
-      groupBCard.querySelector('[data-routing-chip]').getAttribute('data-routing-chip'),
-      'tier-myth'
-    );
+    it('turning it off removes the failure group with its results, without a confirm', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS, FAILURE]);
+      await toggleFailure(target);
 
-    // Group A's picker excludes the tier assigned to B, offers the free one.
-    const options = await openRoutingPopover(target, 0);
-    const texts = options.map((option) => option.textContent.trim());
-    assert.ok(
-      !texts.some((text) => /Mythic/.test(text)),
-      'Mythic is assigned to B, so unavailable for A'
-    );
-    assert.ok(
-      texts.some((text) => /Standard/.test(text)),
-      'Standard is available'
-    );
-
-    options.find((option) => /Standard/.test(option.textContent)).click();
-    await flushRender();
-    assert.deepEqual(
-      patches.at(-1).resultGroups[0].checkOutcomeIds,
-      ['tier-std'],
-      'the chosen tier is assigned to this result group'
-    );
-
-    // Removing group B's chip clears its assignment.
-    groupBCard.querySelector('[data-routing-chip-remove]').click();
-    await flushRender();
-    assert.deepEqual(patches.at(-1).resultGroups[1].checkOutcomeIds, []);
-    editHarness.remount();
-  });
-
-  it('check mode: empty routing hint distinguishes THREE states, not two', async () => {
-    const groups = [{ id: 'grp-a', name: 'Group A', checkOutcomeIds: [], results: [] }];
-
-    // No tiers authored at all → "define tiers first".
-    const noTiers = await mountResultGroups(groups, {
-      props: {
-        routingProvider: 'check',
-        routedOutcomeTierOptions: [],
-        routedOutcomeTiersDefined: false,
-      },
+      assert.deepEqual(patches.at(-1).resultGroups, [SUCCESS]);
+      assert.ok(!target.querySelector(FAILURE_CARD), 'the failure card is gone');
+      editHarness.remount();
     });
-    assert.match(
-      noTiers.target.querySelector(
-        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
-      ).textContent,
-      /Define outcome tiers/,
-      'with no tiers defined, the hint asks to define tiers'
-    );
-    editHarness.remount();
 
-    // Tiers exist, none can be offered.
-    const forbiddenPolicy = await mountResultGroups(groups, {
-      props: {
-        routingProvider: 'check',
-        routedOutcomeTierOptions: [],
-        routedOutcomeTiersDefined: true,
+    it('from no groups, turning it on writes only the failure group and the success card still draws', async () => {
+      const { target, patches } = await mountTwoSlot([]);
+      await toggleFailure(target);
+
+      const [group, ...rest] = patches[0].resultGroups;
+      assert.equal(rest.length, 0);
+      assert.deepEqual({ ...group, id: 'minted' }, { id: 'minted', name: '', role: 'failure', results: [] });
+      assert.equal(target.querySelectorAll(':scope [data-recipe-result-alchemy-simple] [data-recipe-set]').length, 2);
+      assert.ok(Boolean(target.querySelector('[data-recipe-set-role="success"]')), 'the success card draws');
+      editHarness.remount();
+    });
+
+    it('a success edit from no groups writes one success group and no failure group', async () => {
+      const { target, patches } = await mountTwoSlot([]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(groups.length, 1);
+      assert.equal(failureOf(groups).length, 0);
+      editHarness.remount();
+    });
+
+    it('a success edit after a failure-only state writes the success set first, then the failure set', async () => {
+      const { target, patches } = await mountTwoSlot([FAILURE]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.deepEqual(groups.map((group) => group.role ?? 'success'), ['success', 'failure']);
+      assert.deepEqual(groups[1], FAILURE);
+      editHarness.remount();
+    });
+
+    it('a success-set edit leaves no failure group in the patch', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS]);
+      await addResultRow(target, '[data-recipe-set-role="success"]');
+
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(groups.length, 1);
+      assert.equal(groups[0].results.length, 2, 'the row lands in the success set');
+      assert.equal(failureOf(groups).length, 0);
+      editHarness.remount();
+    });
+
+    it('an empty failure card draws no warning and no body, only the optional note, and its adder writes into it', async () => {
+      const empty = { ...FAILURE, results: [] };
+      const { target, patches } = await mountTwoSlot([SUCCESS, empty]);
+      const card = target.querySelector(FAILURE_CARD);
+
+      assert.ok(!card.querySelector('[data-recipe-result-empty]'), 'no "Nothing produced" panel');
+      assert.ok(!card.querySelector('.fabricate-set-card-body'), 'no empty body');
+      assert.ok(Boolean(card.querySelector('[data-recipe-failure-set-note="optional"]')));
+      assert.match(card.textContent, /Optional\. Leave it empty and a failed check produces nothing\./u);
+
+      await addResultRow(target, FAILURE_CARD);
+      const groups = patches.at(-1).resultGroups;
+      assert.equal(failureOf(groups)[0].results.length, 1, 'the row lands in the failure set');
+      assert.equal(groups[0].results.length, 1, 'the success set is untouched');
+      editHarness.remount();
+    });
+
+    it('under a never policy the toggle cannot add the set, says why, and links to the Checks tab', async () => {
+      const opened = [];
+      const { target } = await mountTwoSlot([SUCCESS], {
         routedFailureResultsAllowed: false,
-      },
-    });
-    assert.match(
-      forbiddenPolicy.target.querySelector(
-        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
-      ).textContent,
-      /produces nothing on a failed check/,
-      'with failure-only tiers under a forbidding policy, the hint names the policy too'
-    );
-    editHarness.remount();
+        onOpenChecks: () => {
+          opened.push('checks');
+        },
+      });
+      const toggle = target.querySelector(FAILURE_TOGGLE);
 
-    // The same two inputs under a PERMITTING policy keep the original sentence.
-    const permittingPolicy = await mountResultGroups(groups, {
-      props: {
-        routingProvider: 'check',
-        routedOutcomeTierOptions: [],
-        routedOutcomeTiersDefined: true,
-        routedFailureResultsAllowed: true,
-      },
+      assert.equal(toggle.disabled, true);
+      assert.equal(
+        toggle.getAttribute('title'),
+        'This system produces nothing on a failed check, so there is no failure set to add.'
+      );
+      const callout = target.querySelector('[data-recipe-failure-results-policy]');
+      assert.match(callout.textContent, /Failed checks produce nothing on this system/u);
+      callout.querySelector('[data-recipe-failure-results-checks]').click();
+      await flushRender();
+      assert.deepEqual(opened, ['checks']);
+      editHarness.remount();
     });
-    assert.match(
-      permittingPolicy.target.querySelector(
-        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
-      ).textContent,
-      /marked as a Success/,
-      'under a permitting policy the original success-tier hint stands'
-    );
-    editHarness.remount();
+
+    it('under a never policy a present failure set stays drawn with the policy note, and the toggle removes it', async () => {
+      const { target, patches } = await mountTwoSlot([SUCCESS, { ...FAILURE, results: [] }], {
+        routedFailureResultsAllowed: false,
+      });
+      const toggle = target.querySelector(FAILURE_TOGGLE);
+      assert.equal(toggle.disabled, false, 'a present set can still be removed');
+      assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+      assert.ok(Boolean(target.querySelector(`${FAILURE_CARD} [data-recipe-failure-set-note="policy"]`)));
+      assert.ok(!target.querySelector('[data-recipe-failure-set-note="optional"]'));
+
+      await toggleFailure(target);
+      assert.deepEqual(patches.at(-1).resultGroups, [SUCCESS]);
+      const button = target.querySelector('[data-recipe-failure-results-checks]');
+      assert.ok(
+        globalThis.document.activeElement === button,
+        'focus moves to the callout button, as the switch it was on is now disabled'
+      );
+      editHarness.remount();
+    });
+
+    it("a step section's callout opens the Checks tab too", async () => {
+      const opened = [];
+      const target = await editHarness.mount(
+        identityProps({
+          alchemySimple: true,
+          multiStepEnabled: true,
+          componentOptions: COMPONENT_OPTIONS,
+          routedFailureResultsAllowed: false,
+          onOpenChecks: () => {
+            opened.push('checks');
+          },
+          recipe: {
+            ...RECIPE,
+            steps: [{ id: 'st-1', name: 'Brew', ingredientSets: [], resultGroups: [SUCCESS] }],
+          },
+        })
+      );
+      clickTab(target, 'results');
+      await flushRender();
+
+      const section = target.querySelector('[data-recipe-section="step-st-1-results"]');
+      assert.ok(Boolean(section), 'PRE-CONDITION: the step section renders');
+      section.querySelector('[data-recipe-failure-results-checks]').click();
+      await flushRender();
+      assert.deepEqual(opened, ['checks']);
+      editHarness.remount();
+    });
   });
 
-  it('hides the ingredient-set name in check mode but shows it in ingredient mode', async () => {
+  it('names every ingredient set in its card, in check mode as in ingredient mode', async () => {
     const ingredientSets = [
       { id: 'iset-1', name: 'Alpha', ingredientGroups: [] },
       { id: 'iset-2', name: 'Beta', ingredientGroups: [] },
@@ -1917,15 +2392,13 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(checkTarget, 'ingredients');
     await flushRender();
+    const checkName = checkTarget.querySelector('[data-recipe-set-field="name"]');
+    assert.ok(checkName, 'check mode draws an editable ingredient-set name');
+    assert.equal(checkName.value, 'Alpha', 'it shows the stored name, not a default');
     assert.equal(
-      checkTarget.querySelector('[data-recipe-set-field="name"]'),
-      null,
-      'no editable ingredient-set name input in check mode'
+      checkName.closest('[data-recipe-set]').querySelector('.fab-kicker').textContent.trim(),
+      'Ingredient set'
     );
-    // The set still shows a read-only DEFAULT name (not the stored 'Alpha').
-    const readonlyName = checkTarget.querySelector('[data-recipe-set-default-name]');
-    assert.ok(readonlyName, 'check mode shows the read-only default name');
-    assert.equal(readonlyName.textContent.trim(), 'Set 1');
     editHarness.remount();
 
     const ingredientTarget = await editHarness.mount(
@@ -1941,6 +2414,159 @@ describe('RecipeEditView (mounted)', () => {
     const nameInput = ingredientTarget.querySelector('[data-recipe-set-field="name"]');
     assert.ok(nameInput, 'ingredient-set name shown in ingredient mode');
     assert.equal(nameInput.value, 'Alpha', 'shows the explicit name');
+    editHarness.remount();
+  });
+
+  it('renames an ingredient set in check mode', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        routingProvider: 'check',
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [
+            { id: 'iset-1', name: '', ingredientGroups: [] },
+            { id: 'iset-2', name: 'Beta', ingredientGroups: [] },
+          ],
+        },
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    const name = target.querySelector(
+      '[data-recipe-set-id="iset-1"] [data-recipe-set-field="name"]'
+    );
+    assert.equal(name.value, 'Set 1', 'an unnamed set shows its default');
+    name.value = 'Ore';
+    name.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.equal(patches.length, 0, 'typing alone writes nothing');
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1).ingredientSets.map((set) => set.name),
+      ['Ore', 'Beta']
+    );
+    editHarness.remount();
+  });
+
+  it('moves focus to the neighbouring set’s name when a set is removed from its kebab', async () => {
+    let recipe = {
+      ...RECIPE,
+      ingredientSets: ['a', 'b', 'c'].map((key) => ({
+        id: `iset-${key}`,
+        name: key.toUpperCase(),
+        ingredientGroups: [],
+      })),
+    };
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        canAddSet: true,
+        recipe,
+        onUpdateRecipe: async (patch) => {
+          recipe = { ...recipe, ...patch };
+          await editHarness.setProps({ recipe });
+        },
+      })
+    );
+    clickTab(target, 'ingredients');
+    await flushRender();
+    await chooseSetCardAction(
+      target.querySelector('[data-recipe-set-id="iset-b"]'),
+      '[data-recipe-remove="ingredient-set"]'
+    );
+    await flushRender();
+    assert.deepEqual(
+      recipe.ingredientSets.map((set) => set.id),
+      ['iset-a', 'iset-c']
+    );
+    const focused = document.activeElement;
+    assert.ok(focused?.matches('[data-recipe-set-field="name"]'), 'focus lands on a set name');
+    assert.equal(focused.closest('[data-recipe-set]').getAttribute('data-recipe-set-id'), 'iset-c');
+    editHarness.remount();
+  });
+
+  // Removing the second of two sets re-renders the list as one bare set, dropping every control
+  // the card chose before the removal, so focus re-finds a live one in the section.
+  async function mountControlled(recipe, { tab, ...props }) {
+    let current = recipe;
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: current,
+        onUpdateRecipe: async (patch) => {
+          current = { ...current, ...patch };
+          await editHarness.setProps({ recipe: current });
+        },
+        ...props,
+      })
+    );
+    clickTab(target, tab);
+    await flushRender();
+    return { target, current: () => current };
+  }
+
+  it('moves focus to the bare set’s Add ingredient set when a removal leaves one set', async () => {
+    const sets = ['a', 'b'].map((key) => ({ id: `iset-${key}`, name: key, ingredientGroups: [] }));
+    const { target, current } = await mountControlled(
+      { ...RECIPE, ingredientSets: sets },
+      { tab: 'ingredients', canAddSet: true }
+    );
+    await chooseSetCardAction(
+      target.querySelector('[data-recipe-set-id="iset-a"]'),
+      '[data-recipe-remove="ingredient-set"]'
+    );
+    await flushRender();
+    assert.deepEqual(
+      current().ingredientSets.map((set) => set.id),
+      ['iset-b']
+    );
+    assert.ok(
+      document.activeElement.matches('[data-recipe-add="ingredient-set"]'),
+      'focus lands on the live Add, not the body'
+    );
+    editHarness.remount();
+  });
+
+  it('moves focus into the bare result set when a removal leaves one unrouted set', async () => {
+    const { target, current } = await mountControlled(
+      { ...RECIPE, complex: true, resultGroups: ROUTED_RESULT_GROUPS },
+      { tab: 'results', complex: true }
+    );
+    await chooseSetCardAction(resultCard(target, 1), '[data-recipe-remove="result-set"]');
+    await flushRender();
+    assert.deepEqual(
+      current().resultGroups.map((group) => group.id),
+      ['grp-a']
+    );
+    assert.ok(Boolean(target.querySelector('[data-recipe-result-simple]')), 'the set is bare');
+    const focused = document.activeElement;
+    assert.ok(focused.matches('[data-recipe-add]'), 'focus lands on the bare set’s adder');
+    assert.ok(Boolean(focused.closest('[data-recipe-result-simple]')), 'inside the survivor');
+    editHarness.remount();
+  });
+
+  it('moves focus to the empty state’s Add result set when a routed recipe loses its last set', async () => {
+    const { target } = await mountControlled(
+      { ...RECIPE, complex: true, resultGroups: [ROUTED_RESULT_GROUPS[0]] },
+      {
+        tab: 'results',
+        complex: true,
+        routingProvider: 'check',
+        routedOutcomeTierOptions: TIER_OPTIONS,
+        routedCheck: { tiers: TIER_OPTIONS },
+      }
+    );
+    await chooseSetCardAction(resultCard(target, 0), '[data-recipe-remove="result-set"]');
+    await flushRender();
+    assert.ok(
+      document.activeElement.matches('[data-recipe-add="result-set"]'),
+      'focus lands on the empty state’s Add, not the body'
+    );
     editHarness.remount();
   });
 
@@ -2388,7 +3014,7 @@ describe('RecipeEditView (mounted)', () => {
       'ingredients section renders'
     );
     assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      target.querySelector('[data-recipe-set-id].fabricate-set-card.is-bare'),
       'the single set renders chromeless (no Set 1 box)'
     );
     assert.ok(
@@ -2438,7 +3064,7 @@ describe('RecipeEditView (mounted)', () => {
       'no OR separator in Simple mode'
     );
     assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      target.querySelector('[data-recipe-set-id].fabricate-set-card.is-bare'),
       'the single set renders chromeless'
     );
     editHarness.remount();
@@ -2457,9 +3083,8 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'no Add result set button in Simple mode'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-remove="result-set"]'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-recipe-result-set-id] [data-set-card-actions]'),
       'no remove control in Simple mode'
     );
     assert.ok(
@@ -2633,9 +3258,10 @@ describe('RecipeEditView (mounted)', () => {
     clickTab(target, 'ingredients');
     await flushRender();
     // Duplicate the FIRST set (its card carries data-recipe-set-id="set-1").
-    target
-      .querySelector('[data-recipe-set-id="set-1"] [data-recipe-duplicate="ingredient-set"]')
-      .click();
+    await chooseSetCardAction(
+      target.querySelector('[data-recipe-set-id="set-1"]'),
+      '[data-recipe-duplicate="ingredient-set"]'
+    );
     assert.equal(patches.length, 1, 'onUpdateRecipe invoked once');
     const nextSets = patches[0].ingredientSets;
     assert.equal(nextSets.length, 3, 'the ingredient set array grew by one');
@@ -3656,7 +4282,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders a populated set as component + tag requirements, with images, an OR separator, and no group-name/match toggle', async () => {
+  it('renders a populated set as component + tag requirements, with images, no OR separator, and no group-name/match toggle', async () => {
     // Two sets, so this set renders with chrome (a Set-N box + editable name). A single
     // set would render chromeless (issue 643); the requirement rendering under test is
     // identical either way, so a multi-set recipe keeps the name-field coverage too.
@@ -3699,8 +4325,10 @@ describe('RecipeEditView (mounted)', () => {
     const options = componentReq.querySelectorAll('[data-recipe-option]');
     assert.equal(options.length, 2, 'both component alternatives render');
     assert.ok(
-      componentReq.querySelector('.manager-recipe-ingredient-or-separator'),
-      'an OR separator links the alternatives'
+      [...componentReq.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'the alternatives sit in their box with nothing between them'
     );
     assert.match(
       options[0].textContent,
@@ -3708,7 +4336,7 @@ describe('RecipeEditView (mounted)', () => {
       'first alternative resolves the component name on the trigger'
     );
     // The component image renders on the CHOSEN CHIP (issue 1373, maintainer round 5).
-    const herbImg = options[0].querySelector('.manager-recipe-option-chosen-img');
+    const herbImg = options[0].querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(herbImg, 'the component alternative shows an image');
     assert.equal(
       herbImg.getAttribute('src'),
@@ -3813,9 +4441,7 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const foot = target.querySelector(
-      '[data-recipe-set-id="set-1"] .manager-recipe-ingredient-set-add'
-    );
+    const foot = target.querySelector('[data-recipe-set-id="set-1"] .fabricate-set-card-adder');
     const buttons = [...foot.querySelectorAll('button')];
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('data-recipe-add')),
@@ -3827,6 +4453,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an ingredient');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(!/\bis-size-/.test(adder.className), 'at the manager button’s 34, not a group’s 28');
 
     await openKindMenu(target, adder);
     assert.equal(
@@ -4057,7 +4684,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('mixes component and tag alternatives in one requirement, rendering the box + OR separator', async () => {
+  it('mixes component and tag alternatives in one requirement, rendering the box with no separator', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
@@ -4075,7 +4702,7 @@ describe('RecipeEditView (mounted)', () => {
 
     // The in-component state re-renders to two alternatives once we feed the
     // patch back in (the parent owns recipe state in production); render a
-    // pre-mixed requirement directly to assert the box + separator.
+    // pre-mixed requirement directly to assert the box.
     const { target: mixed } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4089,8 +4716,10 @@ describe('RecipeEditView (mounted)', () => {
       'a 2-alternative requirement renders the box'
     );
     assert.ok(
-      req.querySelector('.manager-recipe-ingredient-or-separator'),
-      'the "— or —" separator renders'
+      [...req.querySelector('.manager-recipe-ingredient-requirement-options').children].every(
+        (child) => child.hasAttribute('data-recipe-option')
+      ),
+      'nothing renders between the alternatives'
     );
     const optionRows = req.querySelectorAll('[data-recipe-option]');
     assert.ok(
@@ -4141,7 +4770,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders an OR separator once a component requirement has two alternatives', async () => {
+  it('draws no separator between a requirement’s alternatives, only the box’s rows', async () => {
     const { target } = await mountSingleGroup(
       [
         { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
@@ -4155,13 +4784,13 @@ describe('RecipeEditView (mounted)', () => {
       2,
       'both alternatives render'
     );
-    const separator = req.querySelector('.manager-recipe-ingredient-or-separator');
-    assert.ok(separator, 'the "— or —" separator renders between alternatives');
-    // The label is wrapped in its own span so the CSS can render it as a pill flanked
-    // by rules ("[ — OR — ]", issue 643), rather than as bare centred text.
-    const pill = separator.querySelector('span');
-    assert.ok(pill, 'the OR label is wrapped in a pill span');
-    assert.equal(pill.textContent.trim(), 'OR', 'the pill reads OR');
+    // Ruled 2026-10-18 (issue 2515): the rows stand 8px apart in the box, linked by nothing.
+    const options = req.querySelector('.manager-recipe-ingredient-requirement-options');
+    assert.deepEqual(
+      [...options.children].map((child) => child.hasAttribute('data-recipe-option')),
+      [true, true],
+      'the options list holds the two rows and nothing between them'
+    );
     editHarness.remount();
   });
 
@@ -4207,7 +4836,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     const chosen = row.querySelector('[data-recipe-option-chosen]');
     assert.ok(chosen, 'the named row reads back as a chip');
-    const image = chosen.querySelector('.manager-recipe-option-chosen-img');
+    const image = chosen.querySelector(':scope .manager-recipe-option-plate > img');
     assert.ok(image, 'the chip carries the component image');
     assert.equal(image.getAttribute('src'), 'icons/herb.webp', 'resolved from the component');
     assert.equal(
@@ -4281,6 +4910,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(adder.getAttribute('aria-label'), 'Add an alternative');
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
     assert.ok(adder.classList.contains('is-dashed'), 'the adder is dashed');
+    assert.ok(adder.classList.contains('is-size-28'), 'on the 28px rung (issue 2515)');
     assert.ok(!adder.classList.contains('is-full-width'), 'and does not span its wrapping row');
     assert.doesNotMatch(target.textContent, /\balt (component|tag|essence|currency)\b/);
     editHarness.remount();
@@ -4836,7 +5466,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   // REWRITTEN at issue 1373's maintainer round 5.
-  it('reads the tag row as a sentence: the policy word, the tags, then + Tag', async () => {
+  it('reads the tag row as a sentence: the tags, each after a #, then + Tag', async () => {
     const { target: tagTarget } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: ['herbal'], tagMatch: 'all' } }],
       { props: { itemTags: ITEM_TAGS } }
@@ -4847,17 +5477,14 @@ describe('RecipeEditView (mounted)', () => {
     // Ordering asserted over the rendered NODES rather than an innerHTML substring scan.
     const kids = [...tagArm.children];
     const has = (node, selector) => node.matches(selector) || Boolean(node.querySelector(selector));
-    const policyAt = kids.findIndex((node) => has(node, '[data-recipe-tag-policy]'));
-    const chipAt = kids.findIndex((node) => has(node, '[data-recipe-tag="herbal"]'));
-    const addAt = kids.findIndex((node) => has(node, '[data-recipe-add-tag]'));
-    assert.ok(
-      policyAt === 0 && policyAt < chipAt && chipAt < addAt,
-      `policy word, then chips, then + Tag (${policyAt}/${chipAt}/${addAt})`
-    );
+    const tags = ['herbal'];
+    assert.equal(kids.length, tags.length + 1, 'the arm holds the chips and + Tag, nothing more');
+    assert.ok(has(kids[0], '[data-recipe-tag="herbal"]'), 'the chip leads the arm');
+    assert.ok(has(kids[1], '[data-recipe-add-tag]'), 'and + Tag follows it');
     assert.equal(
-      tagArm.querySelector('[data-recipe-tag-policy]').textContent.trim(),
-      'All of',
-      'the policy word is the sentence the Any of / All of control writes'
+      tagArm.textContent.replaceAll(/\s+/gu, ' ').trim(),
+      '#herbal Tag',
+      'no word leads the run, and the chip reads # and the stored tag'
     );
     // And the control that writes it is the row's next sibling, not a second line's.
     assert.ok(
@@ -4960,6 +5587,10 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.ok(amount, 'the currency amount is a Stepper in the trailing control cluster');
     assert.ok(amount.closest('.fab-stepper'), 'the currency amount is the shared Stepper');
+    // The unit's abbreviation stands right of the stepper (issue 2515).
+    const unit = target.querySelector(':scope [data-recipe-option] [data-recipe-option-unit]');
+    assert.equal(unit.textContent, 'gp', 'the unit reads its abbreviation');
+    assert.ok(unit.previousElementSibling === amount.closest('.fab-stepper'), 'after the stepper');
 
     // Controlled component: each edit derives from the unchanged prop.
     amount.value = '250';
@@ -5438,7 +6069,7 @@ describe('RecipeEditView (mounted)', () => {
 
   // ONE LINE (`proto:2251`-`2258`). The tag row broke onto a second full-width line carrying an
   // `Any|All` segmented control, an `Add tag` dropdown and a large dashed `No tags set` box. The
-  // design draws the policy word, the chips, `+ Tag` and the Any of / All of control on the row.
+  // design draws the chips, `+ Tag` and the Any of / All of control on the row.
   it('draws the tag row on ONE line, with no empty-state box below it', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
@@ -5451,11 +6082,13 @@ describe('RecipeEditView (mounted)', () => {
       !row.querySelector('.manager-recipe-option-tags-detail'),
       'and so is the full-width second line it sat on'
     );
+    const arm = row.querySelector('[data-recipe-option-tags]');
+    assert.equal(arm.children.length, 1, 'an unfilled arm holds + Tag alone');
     assert.ok(
-      row.querySelector('[data-recipe-tag-policy]'),
-      'the policy word leads the tag list, as the sentence the row reads'
+      arm.children[0].querySelector('[data-recipe-add-tag]'),
+      'the + Tag control is on the row'
     );
-    assert.ok(row.querySelector('[data-recipe-add-tag]'), 'the + Tag control is on the row');
+    assert.equal(arm.textContent.replaceAll(/\s+/gu, ' ').trim(), 'Tag', 'and no word leads it');
     assert.ok(
       row.querySelector('[data-recipe-tag-match="all"]'),
       'and so is the Any of / All of control'
@@ -5988,11 +6621,102 @@ describe('RecipeEditView (mounted)', () => {
     const cards = target.querySelectorAll('[data-recipe-tools-ingredient-set]');
     assert.equal(cards.length, 1, 'only the named eligible set gets Tool authoring');
     assert.equal(cards[0].dataset.recipeToolsIngredientSet, 'set-a');
-    const label = cards[0].querySelector('[data-recipe-tool-set-label]');
-    assert.equal(label.textContent.trim(), 'Hot forge');
+    const name = cards[0].querySelector('[data-recipe-tools-set-field="name"]');
+    assert.equal(name.value, 'Hot forge');
     assert.ok(
-      label.closest('.manager-recipe-ingredient-set-head'),
-      'the Tool scope reuses the Results card header hierarchy'
+      name.closest('.fabricate-set-card-head'),
+      'the Tool scope is the set card the Results tab draws'
+    );
+    editHarness.remount();
+  });
+
+  it('renames a set on the Tools tab, and refuses an empty name with a note', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        recipe: {
+          ...RECIPE,
+          ingredientSets: [{ id: 'set-a', name: 'Hot forge', toolIds: [], ingredientGroups: [] }],
+        },
+        toolsLibrary: TOOLS_LIBRARY,
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    const card = target.querySelector('[data-recipe-tools-ingredient-set="set-a"]');
+    const name = card.querySelector('[data-recipe-tools-set-field="name"]');
+    const status = target.querySelector('[data-recipe-tools-set-status]');
+    assert.equal(status.getAttribute('role'), 'status', 'one live region, present before any edit');
+    assert.ok(status.classList.contains('visually-hidden'));
+    assert.equal(status.textContent, '', 'nothing announced yet');
+    assert.ok(!card.querySelector('[data-recipe-tools-set-note]'), 'no note before a refusal');
+    name.value = 'Cold forge';
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.at(-1).ingredientSets[0].name, 'Cold forge', 'a rename writes the name');
+
+    name.value = ' '.repeat(3);
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(patches.length, 1, 'an empty name writes nothing');
+    assert.equal(name.value, 'Hot forge', 'the field restores the set’s name');
+    const note = card.querySelector('[data-recipe-tools-set-note]');
+    assert.ok(!note.hasAttribute('role'), 'the visible note is not itself live');
+    assert.match(note.textContent, /needs a name to carry Tools/);
+    assert.ok(
+      target.querySelector('[data-recipe-tools-set-status]') === status,
+      'the same region announces'
+    );
+    assert.match(status.textContent, /needs a name to carry Tools/);
+
+    name.value = 'Warm forge';
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.ok(!card.querySelector('[data-recipe-tools-set-note]'), 'a named set clears the note');
+    assert.equal(status.textContent, '', 'and the announcement');
+    editHarness.remount();
+  });
+
+  it('renames a step’s set on the Tools tab through onUpdateStep', async () => {
+    const updates = [];
+    const target = await editHarness.mount(
+      identityProps({
+        routingProvider: 'ingredientSet',
+        recipe: {
+          ...RECIPE,
+          steps: [
+            {
+              id: 'sa',
+              name: 'Forge',
+              ingredientSets: [
+                { id: 'set-a', name: 'Hot forge', toolIds: [], ingredientGroups: [] },
+                { id: 'set-b', name: 'Cold forge', toolIds: [], ingredientGroups: [] },
+              ],
+            },
+          ],
+        },
+        toolsLibrary: TOOLS_LIBRARY,
+        onUpdateStep: (id, patch) => {
+          updates.push([id, patch]);
+        },
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    const name = target
+      .querySelector('[data-recipe-tools-ingredient-set="set-b"]')
+      .querySelector('[data-recipe-tools-set-field="name"]');
+    name.value = 'Quench';
+    name.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await flushRender();
+    assert.equal(updates.at(-1)[0], 'sa', 'the rename patches its step');
+    assert.deepEqual(
+      updates.at(-1)[1].ingredientSets.map((set) => set.name),
+      ['Hot forge', 'Quench']
     );
     editHarness.remount();
   });
@@ -6065,7 +6789,7 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'grp-2', name: 'Bonus', results: [] },
     ]);
     const second = target.querySelector('[data-recipe-result-set-id="grp-2"]');
-    second.querySelector('[data-recipe-remove="result-set"]').click();
+    await chooseSetCardAction(second, '[data-recipe-remove="result-set"]');
     assert.equal(patches.length, 1, 'removing a group patches the recipe once');
     assert.equal(patches[0].resultGroups.length, 1, 'the result group array shrank by one');
     assert.equal(patches[0].resultGroups[0].id, 'grp-1', 'the survivor keeps its id');
@@ -6266,7 +6990,7 @@ describe('RecipeEditView (mounted)', () => {
     const pill = named.querySelector('[data-recipe-option-chosen]');
     assert.equal(pill.textContent.trim(), 'Mountain Herb', 'the pill names the component');
     assert.equal(
-      pill.querySelector('.manager-recipe-option-chosen-img').getAttribute('src'),
+      pill.querySelector(':scope .manager-recipe-option-plate > img').getAttribute('src'),
       'icons/herb.webp',
       'with its image'
     );
@@ -6376,7 +7100,7 @@ describe('RecipeEditView (mounted)', () => {
       'the simple result wrapper renders'
     );
     assert.ok(
-      target.querySelector('.manager-recipe-ingredient-set.is-chromeless'),
+      target.querySelector('[data-recipe-result-set-id].fabricate-set-card.is-bare'),
       'the single group renders chromeless'
     );
     assert.equal(
@@ -6384,9 +7108,8 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'no Add result set button in Simple mode'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-remove="result-set"]'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-recipe-result-set-id] [data-set-card-actions]'),
       'no remove-set control in Simple mode'
     );
     assert.equal(
@@ -6446,7 +7169,7 @@ describe('RecipeEditView (mounted)', () => {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: TIER_OPTIONS,
-        routedOutcomeTiersDefined: true,
+        routedCheck: { tiers: TIER_OPTIONS },
       },
     });
     assert.ok(
@@ -6701,7 +7424,7 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
   const openPanel = () => document.querySelector('.fabricate-picker-popover');
   const optionTitled = (tag) =>
     [...(openPanel()?.querySelectorAll('[role="option"]') ?? [])].find(
-      (node) => node.title === tag
+      (node) => node.title === `#${tag}`
     );
 
   async function openTagAdder(scope) {
@@ -6743,7 +7466,7 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
         await flushRender();
         assert.deepEqual(
           await openTagAdder(target.querySelector(scope)),
-          ['herbal 2 components', 'liquid 1 component', 'rare 0 components'],
+          ['#herbal 2 components', '#liquid 1 component', '#rare 0 components'],
           `${shape}: every tag carries its exact count`
         );
       } finally {
@@ -6776,9 +7499,140 @@ describe('RecipeEditView — the tag adder counts the system’s components (mou
       assert.ok(Boolean(openPanel()), `the panel stays open after choosing ${tag}`);
       assert.equal(
         optionText(optionTitled(tag)),
-        tag === 'herbal' ? 'herbal 2 components' : 'liquid 1 component'
+        tag === 'herbal' ? '#herbal 2 components' : '#liquid 1 component'
       );
     }
+    editHarness.remount();
+  });
+});
+
+describe('RecipeEditView — a tag row creates an absent tag (issue 2515, mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const tagGroup = (id) => ({
+    id,
+    options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+  });
+  const tagSet = (id) => ({ id, name: id, ingredientGroups: [tagGroup(`${id}-grp`)] });
+
+  /** The view's immediate writers, recorded, beside the tag add. */
+  const IMMEDIATE_WRITERS = Object.freeze([
+    'onToggleEnabled',
+    'onToggleLocked',
+    'onSetCategory',
+    'onRemoveRecipeItem',
+    'onEnterMultiStep',
+    'onRevertToSingleStep',
+    'onAddStep',
+    'onReorderSteps',
+    'onDeleteStep',
+  ]);
+
+  /**
+   * RecipeEditView cannot reach `store.updateRecipe`: the header's Save owns it. The create's only
+   * writes are `onCreateTag` and one draft patch, so every immediate writer stays unrecorded.
+   */
+  function storeProps() {
+    const store = { addTag: [], persisted: [] };
+    const props = {
+      itemTags: ITEM_TAGS,
+      onCreateTag: (tag) => {
+        store.addTag.push(tag);
+      },
+      ...Object.fromEntries(
+        IMMEDIATE_WRITERS.map((name) => [
+          name,
+          () => {
+            store.persisted.push(name);
+          },
+        ])
+      ),
+    };
+    return { store, props };
+  }
+
+  /** Open a row's tag catalogue, type `  Brine `, and press the footer. */
+  async function createFrom(row) {
+    row.querySelector('[data-recipe-add-tag]').click();
+    await tick();
+    await settle();
+    const panel = document.querySelector('.fabricate-picker-popover');
+    await typeInto(panel.querySelector(':scope .manager-travel-popover-search input'), '  Brine ');
+    document.querySelector('[data-recipe-tag-create]').click();
+    await flushRender();
+  }
+
+  it('adds the normalized tag once from a flat, a multi-set and a stepped recipe', async () => {
+    const shapes = {
+      'one chromeless set': {
+        recipe: { ingredientSets: [tagSet('set-1')] },
+        scope: '[data-recipe-section="ingredients"]',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+      'two ingredient sets': {
+        recipe: { ingredientSets: [tagSet('set-1'), tagSet('set-2')] },
+        scope: '[data-recipe-set-id="set-2"]',
+        staged: (patch) => patch.ingredientSets[1],
+      },
+      'a step body': {
+        recipe: { steps: [{ id: 'sa', name: 'Forge', ingredientSets: [tagSet('set-1')] }] },
+        scope: '[data-recipe-section="step-sa-ingredients"]',
+        step: 'sa',
+        staged: (patch) => patch.ingredientSets[0],
+      },
+    };
+    for (const [shape, { recipe, scope, step, staged }] of Object.entries(shapes)) {
+      const { store, props } = storeProps();
+      const drafts = [];
+      const target = await editHarness.mount(
+        identityProps({
+          recipe: { ...RECIPE, ...recipe },
+          canAddSet: true,
+          multiStepEnabled: Boolean(step),
+          onUpdateRecipe: (patch) => {
+            drafts.push(patch);
+          },
+          onUpdateStep: (_stepId, patch) => {
+            drafts.push(patch);
+          },
+          ...props,
+        })
+      );
+      try {
+        clickTab(target, 'ingredients');
+        await flushRender();
+        if (step) target.querySelector(`[data-sortable-disclosure="${step}"]`).click();
+        await flushRender();
+        await createFrom(target.querySelector(scope));
+        assert.deepEqual(store.addTag, ['brine'], `${shape}: the store adds the tag once`);
+        assert.deepEqual(store.persisted, [], `${shape}: and the create persists nothing`);
+        assert.equal(drafts.length, 1, `${shape}: the row's tag stages into the draft`);
+        assert.deepEqual(
+          staged(drafts[0]).ingredientGroups[0].options[0].match.tags,
+          ['brine'],
+          `${shape}: as the normalized tag`
+        );
+      } finally {
+        editHarness.remount();
+      }
+    }
+  });
+
+  it('adds it from an alternative added through or…', async () => {
+    const { store, props } = storeProps();
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      { props: { ...props, componentOptions: COMPONENT_OPTIONS }, controlled: true }
+    );
+    await pickOrOption(target, 'grp-1', 'alternative-tag');
+    const rows = target.querySelectorAll(
+      ':scope [data-recipe-group-id="grp-1"] [data-recipe-option]'
+    );
+    assert.equal(rows.length, 2, 'the alternative is a second row');
+    await createFrom(rows[1]);
+    assert.deepEqual(store.addTag, ['brine']);
+    assert.deepEqual(store.persisted, []);
     editHarness.remount();
   });
 });
@@ -6838,7 +7692,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openBooks = books.querySelector('[data-recipe-open-books]');
     assert.equal(
       openBooks?.className,
-      'fabricate-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button manager-recipe-tab-action',
       'Open Books & Scrolls keeps its own class and the primitive`s'
     );
     editHarness.remount();
@@ -6850,7 +7704,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openAccess = access.querySelector('[data-recipe-open-access]');
     assert.equal(
       openAccess?.className,
-      'fabricate-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button manager-recipe-tab-action',
       'Manage access keeps its own class and the primitive`s'
     );
     editHarness.remount();
@@ -7713,6 +8567,199 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       null,
       'no rail All-clear pill'
     );
+    editHarness.remount();
+  });
+});
+
+// The Overview's routing card through the shell (issue 2513): the draft, the scope writes, the
+// minimum threaded to the Results tab, and the zero points.
+describe('RecipeEditView — the Overview routing card (mounted)', () => {
+  before(() => editHarness.setup());
+  after(() => editHarness.teardown());
+
+  const tier = (id, name, success, start, end) => ({ id, name, success, start, end });
+  const TIERS = [
+    tier('t-high', 'High', true, 15, 20),
+    tier('t-low', 'Low', true, 5, 14),
+    tier('t-fail', 'Fail', false, 1, 4),
+  ];
+  const OFFERED = TIERS.filter((entry) => entry.success).map(({ id, name, success }) => ({
+    id,
+    name,
+    success,
+  }));
+  const group = (id, checkOutcomeIds = []) => ({ id, name: id, checkOutcomeIds, results: [] });
+  const tierTrigger = (id) => `[data-routing-overview-row="tier:${id}"] .fabricate-select-trigger`;
+  const routingRow = (target, key) =>
+    target.querySelector(`[data-recipe-section="routing"] [data-routing-overview-row="${key}"]`);
+
+  /** The shell on `recipe`, every recipe and step patch fed back in, the Overview open. */
+  async function mountRouted(recipe, props = {}) {
+    let current = recipe;
+    const recipePatches = [];
+    const stepPatches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: current,
+        routingProvider: 'check',
+        resolutionMode: 'routedByCheck',
+        routedOutcomeTierOptions: OFFERED,
+        routedCheck: { tiers: TIERS, evaluation: null, gaps: [] },
+        onUpdateRecipe: async (patch) => {
+          recipePatches.push(patch);
+          current = { ...current, ...patch };
+          await editHarness.setProps({ recipe: current });
+        },
+        onUpdateStep: async (stepId, patch) => {
+          stepPatches.push({ stepId, patch });
+          const steps = current.steps.map((step) =>
+            step.id === stepId ? { ...step, ...patch } : step
+          );
+          current = { ...current, steps };
+          await editHarness.setProps({ recipe: current });
+        },
+        ...props,
+      })
+    );
+    await flushRender();
+    return { target, recipePatches, stepPatches, current: () => current };
+  }
+
+  it('re-points a tier on the Overview through the draft', async () => {
+    const recipe = { ...RECIPE, resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])] };
+    const { target, recipePatches } = await mountRouted(recipe);
+    chooseSelectOption(target, tierTrigger('t-low'), 'g-a');
+    await flushRender();
+    assert.deepEqual(
+      recipePatches.at(-1).resultGroups.map((entry) => entry.checkOutcomeIds),
+      [['t-high', 't-low'], []],
+      'the patch reaches the draft the header Save persists'
+    );
+    editHarness.remount();
+  });
+
+  it('strikes a listed success tier below the minimum on the Results tab', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-high',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe);
+    assert.equal(routingRow(target, 'tier:t-low').dataset.routingOverviewBlocked, 'below-minimum');
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(
+      Boolean(target.querySelector('[data-route-sources-chip="t-low"][data-route-sources-struck]')),
+      'the minimum reaches the set cards'
+    );
+    editHarness.remount();
+  });
+
+  it('under a roll-under sum, blocks the higher-start tier and routes the lower one', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-low',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe, {
+      routedCheck: { tiers: TIERS, evaluation: { product: 'sum', direction: 'under' }, gaps: [] },
+    });
+    const high = routingRow(target, 'tier:t-high');
+    assert.equal(
+      high.querySelector('.fabricate-routing-overview-blocked').textContent,
+      'below this recipe’s minimum success tier'
+    );
+    assert.equal(routingRow(target, 'tier:t-low').dataset.routingOverviewKind, 'source');
+    clickTab(target, 'results');
+    await flushRender();
+    assert.ok(
+      Boolean(target.querySelector('[data-route-sources-chip="t-high"][data-route-sources-struck]'))
+    );
+    assert.ok(
+      !target.querySelector('[data-route-sources-chip="t-low"][data-route-sources-struck]'),
+      'the lower-start tier routes'
+    );
+    editHarness.remount();
+  });
+
+  it('writes a multi-step tier re-point to that step through onUpdateStep', async () => {
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
+    const { target, stepPatches, recipePatches } = await mountRouted(
+      { ...RECIPE, steps: [step('s1'), step('s2')] },
+      { multiStepEnabled: true }
+    );
+    const scope = target.querySelector('[data-recipe-routing-scope="s2"]');
+    chooseSelectOption(target, `[data-recipe-routing-scope="s2"] ${tierTrigger('t-low')}`, 's2-a');
+    await flushRender();
+    assert.ok(Boolean(scope));
+    assert.equal(stepPatches.at(-1).stepId, 's2');
+    assert.deepEqual(stepPatches.at(-1).patch.resultGroups[0].checkOutcomeIds, ['t-low']);
+    assert.equal(recipePatches.length, 0);
+    editHarness.remount();
+  });
+
+  it('writes a collapsed chain’s re-point to its final step, not the recipe', async () => {
+    const step = (id) => ({ id, name: id, ingredientSets: [], resultGroups: [group(`${id}-a`), group(`${id}-b`, ['t-low'])] });
+    const { target, stepPatches, recipePatches } = await mountRouted(
+      { ...RECIPE, steps: [step('s1'), step('s2')] },
+      { multiStepEnabled: false }
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-recipe-routing-scope]')].map(
+        (scope) => scope.dataset.recipeRoutingScope
+      ),
+      ['s2']
+    );
+    chooseSelectOption(target, tierTrigger('t-low'), 's2-a');
+    await flushRender();
+    assert.equal(stepPatches.at(-1).stepId, 's2');
+    assert.equal(recipePatches.length, 0);
+    editHarness.remount();
+  });
+
+  it('shows no below-minimum row on an alchemy-tiered recipe carrying a minimum', async () => {
+    const recipe = {
+      ...RECIPE,
+      minSuccessOutcomeId: 't-high',
+      resultGroups: [group('g-a', ['t-high']), group('g-b', ['t-low'])],
+    };
+    const { target } = await mountRouted(recipe, { resolutionMode: 'alchemy' });
+    assert.ok(Boolean(routingRow(target, 'tier:t-low')));
+    assert.ok(!target.querySelector('[data-routing-overview-blocked="below-minimum"]'));
+    editHarness.remount();
+  });
+
+  it('writes a tier’s default target, which ends the fallback for every other tier', async () => {
+    const recipe = { ...RECIPE, resultGroups: [group('High'), group('g-b')] };
+    const { target, recipePatches } = await mountRouted(recipe);
+    assert.ok(Boolean(target.querySelector('[data-recipe-routing-fallback-note]')));
+    chooseSelectOption(target, tierTrigger('t-high'), 'High');
+    await flushRender();
+    assert.deepEqual(recipePatches.at(-1).resultGroups[0].checkOutcomeIds, ['t-high']);
+    assert.ok(!target.querySelector('[data-recipe-routing-fallback-note]'), 'the note goes');
+    assert.equal(selectTriggerText(target, tierTrigger('t-low')), 'Not routed');
+    editHarness.remount();
+  });
+
+  it('adds the first result set and the first ingredient set from the card', async () => {
+    let view = await mountRouted({ ...RECIPE, resultGroups: [] });
+    view.target.querySelector('[data-recipe-routing-add="resultGroup"]').click();
+    await flushRender();
+    for (const id of ['t-high', 't-low']) {
+      assert.deepEqual(selectOptionLabels(view.target, tierTrigger(id)), ['Set 1'], id);
+      closeSelectPanel(view.target, tierTrigger(id));
+    }
+    editHarness.remount();
+
+    view = await mountRouted(
+      { ...RECIPE, ingredientSets: [], resultGroups: [group('g-a')] },
+      { routingProvider: 'ingredientSet', resolutionMode: 'routedByIngredients' }
+    );
+    assert.equal(view.target.querySelectorAll('[data-routing-overview-row]').length, 0);
+    view.target.querySelector('[data-recipe-routing-add="ingredientSet"]').click();
+    await flushRender();
+    assert.equal(view.target.querySelectorAll('[data-routing-overview-row]').length, 1);
     editHarness.remount();
   });
 });

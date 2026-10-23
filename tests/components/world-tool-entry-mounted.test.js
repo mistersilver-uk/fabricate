@@ -18,6 +18,7 @@ import {
   KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
+  PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -69,6 +70,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/util/appLocalizer.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
@@ -88,6 +90,7 @@ const harness = createMountedComponentHarness({
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
     'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
@@ -109,18 +112,20 @@ const harness = createMountedComponentHarness({
     // The Breakage tab's two mode-argument controls.
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    // Issue 2512: every ingredient set is drawn in the set card.
+    'src/ui/svelte/components/SetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
-    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+    'src/ui/svelte/components/ChoiceGroup.svelte',
+    'src/ui/svelte/components/PickerRow.svelte',
+    'src/ui/svelte/components/PickerRowAmount.svelte',
+    'src/ui/svelte/components/PickerRowNameField.svelte',
+    'src/ui/svelte/components/PickerRowRewardBody.svelte',
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
     ...CHOICE_GROUP_COMPILED_MODULES,
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
-    'src/ui/svelte/components/Pagination.svelte',
+    ...PAGINATION_COMPILED_MODULES,
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/ChanceSlider.svelte',
@@ -708,6 +713,7 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.ok(Boolean(zone.querySelector('[data-world-tool-entry-source-unlink]')), 'unlink');
       assert.ok(!zone.querySelector('[data-tool-source-copy-uuid]'), 'no second action');
       assert.ok(!zone.querySelector('[data-item-drop-zone-subline]'), 'no raw uuid line');
+      assert.ok(!zone.querySelector('[data-item-drop-zone-uuid]'), 'nor a uuid line in linked');
       // AND NO `Linked` CHIP ON THE HEADING. A pill on the card of a record whose whole premise
       // is that it IS a game-world Item states the rule rather than the exception; the catalogue
       // row one route away already makes the identical split for the identical badge.
@@ -1704,7 +1710,38 @@ describe('the world Tool entry (issue 1373)', () => {
             .querySelector('.fabricate-picker-popover')
             .querySelectorAll('[role="option"]'),
         ].map((node) => node.textContent.replaceAll(/\s+/gu, ' ').trim()),
-        ['oak 1 component', 'wood 2 components']
+        ['#oak 1 component', '#wood 2 components']
+      );
+    });
+
+    it('offers no new-tag footer on a world repair tag row (issue 2515)', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+              },
+            ],
+          },
+          itemTags: ['oak', 'wood'],
+        }
+      );
+      target.querySelector(':scope [data-tool-repair-requirements] [data-recipe-add-tag]').click();
+      await tick();
+      await settle();
+      const panel = target.ownerDocument.querySelector('.fabricate-picker-popover');
+      const field = panel.querySelector(':scope .manager-travel-popover-search input');
+      field.value = 'brine';
+      field.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+      await tick();
+      await settle();
+      assert.equal(field.value, 'brine', 'the absent tag is typed');
+      assert.ok(
+        !target.ownerDocument.querySelector('[data-recipe-tag-create]'),
+        'and no footer offers it'
       );
     });
 
@@ -1742,7 +1779,7 @@ describe('the world Tool entry (issue 1373)', () => {
       await settleAll();
       const choose = async (tag) => {
         target.ownerDocument
-          .querySelector(`.fabricate-picker-popover [role="option"][title="${tag}"]`)
+          .querySelector(`.fabricate-picker-popover [role="option"][title="#${tag}"]`)
           .click();
         await settleAll();
       };

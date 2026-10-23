@@ -2,9 +2,10 @@
  * What the published component gates share (issue 2452): the three parses a gate reads of a file,
  * an entry's import closure, a component's declared props, the pinned tags of each
  * `svelte:element`, admission rule 9's scan of one component with each element's hook and guards,
- * and every stylesheet a published root's selectors are read from.
- * `tests/published-component-manifest.test.js` and `tests/published-component-controls.test.js`
- * import them.
+ * every stylesheet a published root's selectors are read from, and the ancestor and Foundry
+ * dependencies of a closure. `tests/published-component-manifest.test.js`,
+ * `tests/published-component-controls.test.js` and `tests/segmented-control-closure.test.js` import
+ * them.
  */
 import assert from 'node:assert/strict';
 import { posix, resolve } from 'node:path';
@@ -23,7 +24,7 @@ import {
 } from './moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from './parsedSource.js';
 import { readScannedDirectory, repoRoot } from './sourceScan.js';
-import { parseComponentScope } from './svelteStructureContract.js';
+import { parseComponentScope, readsGlobal } from './svelteStructureContract.js';
 
 export const byName = (a, b) => a.localeCompare(b);
 
@@ -60,7 +61,10 @@ export function importClosure(path, reader, seen = new Set()) {
   return seen;
 }
 
-/** Each `$props()` key with its local name and whether it is `$bindable`. */
+/**
+ * Each `$props()` key with its local name, whether it is `$bindable`, and its default as
+ * `fallback`: the node it is assigned, `$bindable`'s argument, or `undefined`.
+ */
 export function propLocals(ast) {
   for (const node of walkNodes(ast.instance)) {
     if (node.type !== 'VariableDeclarator' || node.init?.callee?.name !== '$props') continue;
@@ -68,10 +72,12 @@ export function propLocals(ast) {
       .filter((property) => property.type === 'Property')
       .map((property) => {
         const value = property.value;
-        const local = value.type === 'AssignmentPattern' ? value.left.name : value.name;
-        const bindable =
-          value.type === 'AssignmentPattern' && value.right.callee?.name === '$bindable';
-        return { key: property.key.name ?? property.key.value, local, bindable };
+        const defaulted = value.type === 'AssignmentPattern';
+        const local = defaulted ? value.left.name : value.name;
+        const bindable = defaulted && value.right.callee?.name === '$bindable';
+        const stated = defaulted ? value.right : undefined;
+        const fallback = bindable ? stated.arguments[0] : stated;
+        return { key: property.key.name ?? property.key.value, local, bindable, fallback };
       });
   }
   return [];
@@ -160,6 +166,10 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
   // `tag` and `href`, which could draw an `<a>`, are not published.
   'src/ui/svelte/components/Button.svelte: svelte:element': { tags: ['button'], keys: [] },
   'src/ui/svelte/components/Chip.svelte: svelte:element': { tags: ['span'], keys: [] },
+  // `SearchField` draws it only under its unpublished `label`, and passes `as="label"`.
+  // With no `as` it falls back to `div`; `field-source-contract` holds that hole by requiring a literal
+  // `as` on every `<Field>`, and neither tag is focusable.
+  'src/ui/svelte/components/Field.svelte: svelte:element': { tags: ['label'], keys: [] },
   'src/ui/svelte/components/Kicker.svelte: svelte:element': {
     tags: ['h3', 'p', 'span'],
     keys: ['as'],
@@ -224,7 +234,7 @@ const TEMPLATE_BINDERS = Object.freeze({
 });
 
 /** Every name a template block of one component binds, wherever in the template. */
-function templateBindings(ast) {
+export function templateBindings(ast) {
   const bound = new Set();
   for (const node of walkNodes(ast.fragment)) {
     for (const binder of TEMPLATE_BINDERS[node.type]?.(node) ?? []) {
@@ -295,15 +305,16 @@ export function nameSources(ast, expression) {
   const bound = templateBindings(ast);
   const found = { locals: new Set(), literal: false, unfollowed: false };
   const seen = new Set();
+  // `undefined` is read before the declarations, which also hold each name a pattern's default reads.
   const readName = (name) => {
-    if (seen.has(name)) return;
+    if (seen.has(name) || name === 'undefined') return;
     seen.add(name);
     const init = declared.get(name);
     if (bound.has(name) || init === null || init?.type === 'FunctionDeclaration') {
       found.unfollowed = true;
     } else if (props.has(name)) found.locals.add(name);
     else if (init) visit(init);
-    else if (name !== 'undefined') found.unfollowed = true;
+    else found.unfollowed = true;
   };
   const readRoot = (node) => {
     const root = chainRoot(node);
@@ -438,8 +449,8 @@ function pinFaults(id, pin, read, spelled) {
   return faults;
 }
 
-/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
-function componentTags(file, ast) {
+/** Each local one parsed file imports from a relative specifier, by the path it resolves to. */
+export function relativeImports(file, ast) {
   const imported = new Map();
   const statements = [ast.module, ast.instance].flatMap((script) => script?.content?.body ?? []);
   for (const statement of statements) {
@@ -447,6 +458,12 @@ function componentTags(file, ast) {
     const path = posix.join(posix.dirname(file), statement.source.value);
     for (const specifier of statement.specifiers) imported.set(specifier.local.name, path);
   }
+  return imported;
+}
+
+/** Each component tag one parsed file draws from a relative import, as `[path, node]`. */
+export function componentTags(file, ast) {
+  const imported = relativeImports(file, ast);
   return [...walkNodes(ast.fragment)]
     .filter((node) => node.type === 'Component' && imported.has(node.name))
     .map((node) => [imported.get(node.name), node]);
@@ -454,14 +471,24 @@ function componentTags(file, ast) {
 
 /**
  * What one file breaks by drawing a child whose pinned tags rest on a prop's default, `defaulted`
- * naming those props by the child's path: it states one of them on the child's tag, or a spread.
+ * naming those props and the pinned tags by the child's path: it states one of them on the child's
+ * tag, other than as a literal naming a pinned tag, or a spread. An entry's own file (`entryFile`)
+ * may spread its rest local, which holds `data-*` keys alone (M13). A tag `drawn` answers no
+ * published closure draws is not judged (issue 2454).
  */
-function passedFaults(file, ast, defaulted) {
-  return componentTags(file, ast).flatMap(([child, node]) => {
-    const keys = defaulted.get(child) ?? [];
+function passedFaults(file, ast, defaulted, entryFile, drawn) {
+  const rest = entryFile ? restLocal(ast) : null;
+  const tags = componentTags(file, ast).filter(([, node]) => drawn(file, node));
+  return tags.flatMap(([child, node]) => {
+    const { keys = [], tags = [] } = defaulted.get(child) ?? {};
     if (keys.length === 0) return [];
+    const literalTag = (value) => tags.includes(staticText({ value }));
+    const passes = ({ type, name, value, expression }) =>
+      type === 'SpreadAttribute'
+        ? !rest || expression?.name !== rest
+        : keys.includes(name) && !(type === 'Attribute' && literalTag(value));
     return node.attributes
-      .filter(({ type, name }) => type === 'SpreadAttribute' || keys.includes(name))
+      .filter((attribute) => passes(attribute))
       .map(
         ({ name = 'a spread' }) =>
           `${file} passes ${name} to ${child}, whose pinned tags rest on its default`
@@ -474,9 +501,10 @@ function passedFaults(file, ast, defaulted) {
  * `{ file, ast, published }`: every drawn element is pinned and no two share an id, every pin is
  * drawn, each pinned tag is a string literal its file spells, a pin's `keys` are what `tagKeys`
  * reads, a keyed pin that is not `open` states `heldBy`, no file under `src/` is `open`, and no
- * file passes a child a prop its tag reads and its pin does not follow.
+ * file passes a child a prop its tag reads and its pin does not follow, but as a pinned tag's literal,
+ * from a tag `drawnTag(file, node)` answers a published closure draws.
  */
-export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
+export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS, drawnTag = () => true) {
   const faults = [];
   const drawn = new Set();
   const defaulted = new Map();
@@ -493,10 +521,13 @@ export function dynamicElementFaults(files, dynamic = DYNAMIC_ELEMENTS) {
       const read = tagKeys(ast, node, published);
       faults.push(...pinFaults(id, dynamic[id], read, spelled));
       const unfollowed = read.props.filter((key) => !dynamic[id].keys.includes(key));
-      defaulted.set(file, [...(defaulted.get(file) ?? []), ...unfollowed]);
+      const { keys = [], tags = [] } = defaulted.get(file) ?? {};
+      defaulted.set(file, { keys: [...keys, ...unfollowed], tags: [...tags, ...dynamic[id].tags] });
     }
   }
-  const passed = files.flatMap(({ file, ast }) => passedFaults(file, ast, defaulted));
+  const passed = files.flatMap(({ file, ast, published }) =>
+    passedFaults(file, ast, defaulted, published.size > 0, drawnTag)
+  );
   const undrawn = Object.keys(dynamic).filter((id) => !drawn.has(id));
   return [...faults, ...passed, ...undrawn.map((id) => `${id} is pinned and no file draws it`)];
 }
@@ -511,12 +542,33 @@ function judgedAs(node, pin) {
 }
 
 /**
+ * Judged elements whose ids collide each take their static `type` as a suffix,
+ * `<id>[type="<type>"]`; a collision a static `type` cannot resolve is the fault
+ * `<id> names more than one element`.
+ */
+function distinctIds(elements) {
+  const shared = Map.groupBy(elements, ({ id }) => id);
+  const faults = [];
+  for (const [id, group] of shared) {
+    const types = group.map(({ node }) => staticText(attributeOf(node, 'type')));
+    const resolved = !types.includes(undefined) && new Set(types).size === types.length;
+    if (group.length > 1 && !resolved) faults.push(`${id} names more than one element`);
+  }
+  const typed = elements.map((element) => {
+    const type = staticText(attributeOf(element.node, 'type'));
+    const suffixed = shared.get(element.id).length > 1 && type !== undefined;
+    return suffixed ? { ...element, id: `${element.id}[type="${type}"]` } : element;
+  });
+  return { elements: typed, faults };
+}
+
+/**
  * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
  * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
  * `name`. A `svelte:element` is judged once, as the union of its pinned tags, and one with no pin
  * is a fault; its `type` is a mounted suite's. Answers each element it judged beside each fault,
  * both as `<file>: <tag> …`, and each judged element as `{ id, node, guards, tags }`, its `id`
- * being `<file>: <tag>[<hook>]`.
+ * being `<file>: <tag>[<hook>]`, as `distinctIds` resolves two that share one.
  */
 export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
   const judged = [];
@@ -539,11 +591,12 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
     }
     if (as.control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
   });
-  return { judged, faults, elements };
+  const distinct = distinctIds(elements);
+  return { judged, faults: [...faults, ...distinct.faults], elements: distinct.elements };
 }
 
 /** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */
-function restLocal(ast) {
+export function restLocal(ast) {
   const declarators = [...walkNodes(ast.instance)].filter(
     (node) => node.type === 'VariableDeclarator' && isCallTo(node.init, '$props')
   );
@@ -624,13 +677,13 @@ const ELEMENT_HANDLERS = Object.freeze({
 });
 
 /**
- * Every element one component spreads its `$props()` rest local on, a `svelte:element` included,
- * as `{ node, guards, before, written, spreads, handed }`: the names its `{#if}` and `{#each}`
- * ancestors read; each `data-*` attribute written ahead of the spread, static or not; every
- * attribute the element states, wherever it sits; every other spread as `{ local, before, keys }`,
- * `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it carries. An attribute's name is
- * read in lower case, as HTML reads it. A rest that reaches an element any other way (an alias, a
- * `$derived` copy, a child component) answers none.
+ * Every element one component spreads its `$props()` rest local on, a `svelte:element` and a
+ * child component included, as `{ node, guards, before, written, spreads, handed }`: the names its
+ * `{#if}` and `{#each}` ancestors read; each `data-*` attribute written ahead of the spread, static
+ * or not; every attribute the element states, wherever it sits; every other spread as
+ * `{ local, before, keys }`, `keys` being its `spreadKeys`; and each `ELEMENT_HANDLERS` it carries.
+ * An attribute's name is read in lower case, as HTML reads it. A rest that reaches an element any
+ * other way (an alias, a `$derived` copy) answers none.
  */
 export function restElements(ast) {
   const rest = restLocal(ast);
@@ -638,7 +691,7 @@ export function restElements(ast) {
   const isRest = ({ type, expression }) => type === 'SpreadAttribute' && expression?.name === rest;
   const elements = [];
   walkWithAncestors(ast.fragment, (node, ancestors) => {
-    if (node.type === 'RegularElement' || node.type === 'SvelteElement') {
+    if (['RegularElement', 'SvelteElement', 'Component'].includes(node.type)) {
       elements.push({ node, guards: guardNames(ancestors) });
     }
   });
@@ -1023,4 +1076,71 @@ export function unheldClauses(heldBys) {
       .map((node) => node.arguments[0]?.value);
     return !described.includes(title);
   });
+}
+
+const APP_ROOTS = new Set(['fabricate', 'fabricate-app', 'fabricate-manager']);
+const APP_TOKENS = ['var(--fab-manager-'];
+/** What a `fabricate` entry is still refused: the Manager root's own class and tokens. */
+const MANAGER_ROOTS = new Set(['fabricate-manager']);
+const MANAGER_RULES = new Set(['app-root selector', ...APP_TOKENS]);
+// A `--font-primary` read whose fallback ends in a literal resolves with no Foundry variable.
+const LITERAL_GUARDED_FACE = /var\(\s*--font-primary\s*,\s*[^\s(),][^()]*\)/g;
+export const FOUNDRY_GLOBALS = [
+  'game',
+  'foundry',
+  'Hooks',
+  'CONFIG',
+  'CONST',
+  'ui',
+  'canvas',
+  'fromUuid',
+  'fromUuidSync',
+  'getDocumentClass',
+];
+
+/** The static class names one template node writes, by attribute or directive. */
+export function classNames(node) {
+  if (node.type === 'ClassDirective') return [node.name];
+  if (node.type !== 'Attribute' || node.name !== 'class' || !Array.isArray(node.value)) return [];
+  return node.value.flatMap((part) => (part.type === 'Text' ? part.data.split(/\s+/) : []));
+}
+
+/**
+ * What a component's own stylesheet and template borrow from above the entry's `root`, by rule:
+ * every rule at `any`, the Manager root's selector and tokens at `fabricate`, none at `manager`.
+ */
+export function ancestorDependencies(ast, root = 'any') {
+  if (root === 'manager') return [];
+  const windowed = root === 'fabricate';
+  const refused = windowed ? MANAGER_ROOTS : APP_ROOTS;
+  const found = new Set();
+  for (const node of walkNodes(ast.css)) {
+    if (node.type === 'ClassSelector' && refused.has(node.name)) found.add('app-root selector');
+    if (node.type === 'Atrule' && node.name === 'container') found.add('@container');
+    if (node.type !== 'Declaration') continue;
+    for (const token of APP_TOKENS) if (node.value.includes(token)) found.add(token);
+    if (node.value.replaceAll(LITERAL_GUARDED_FACE, '').includes('--font-primary')) {
+      found.add('unguarded var(--font-primary)');
+    }
+  }
+  for (const node of walkNodes(ast.fragment)) {
+    if (classNames(node).includes('visually-hidden')) found.add('.visually-hidden');
+  }
+  return [...found].filter((rule) => !windowed || MANAGER_RULES.has(rule)).sort(byName);
+}
+
+/** Each Foundry global one file reads, as `reads <name>`; a local binding of the name is no read. */
+export function foundryReads(file, reader) {
+  const scope = isComponent(file) ? reader.componentScope(file) : reader.module(file);
+  return FOUNDRY_GLOBALS.filter((name) => readsGlobal(scope, name)).map((name) => `reads ${name}`);
+}
+
+/** Each ancestor dependency and Foundry read in an entry's closure, as `<file>: <rule>`. */
+export function closureDependencies(path, reader = SHIPPED, root = 'any') {
+  return [...importClosure(path, reader)].flatMap((file) =>
+    [
+      ...(isComponent(file) ? ancestorDependencies(reader.component(file), root) : []),
+      ...foundryReads(file, reader),
+    ].map((rule) => `${file}: ${rule}`)
+  );
 }

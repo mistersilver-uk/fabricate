@@ -428,11 +428,12 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
   // 1282), `1.28.0` lifts both character libraries (issue 1308), `1.29.0` folds manual force lists
   // into their picked lists (issue 1315), `1.30.0` lifts components, essences and tools to
   // world scope (issue 1363), `1.31.0` backfills each system's own tool prerequisites and check
-  // bonus as its own override (issue 1373), through `1.34.0`'s essence merge and `1.35.0`'s
-  // alchemy break-tools-on-fail default (issue 2100).
-  assert.equal(result.ran, 15);
+  // bonus as its own override (issue 1373), through `1.34.0`'s essence merge, `1.35.0`'s
+  // alchemy break-tools-on-fail default (issue 2100) and `1.36.0`'s identity reconciliation
+  // (issue 2554).
+  assert.equal(result.ran, 16);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.35.0');
+  assert.equal(store.get('migrationVersion'), '1.36.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

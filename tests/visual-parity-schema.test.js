@@ -97,10 +97,11 @@ test('edge agreement is measured, not assumed', async (subtests) => {
     assert.deepEqual(sharedEdges(edges, ['left', 'right']), { left: true, right: true });
   });
 
-  await subtests.test('the 12px inset that motivated the rule is NOT within the tolerance', () => {
+  await subtests.test('the card inset that motivated the rule is NOT within the tolerance', () => {
     // The shipped defect: `CraftingCheckEditor` wrapped its tier list in the bare
-    // `.fabricate-card` shell, whose 12px padding inset every tier row past the
-    // Difficulty card's content above it. Every region on that screen still measured right.
+    // `.fabricate-card` shell, whose padding inset every tier row past the Difficulty card's
+    // content above it, by the 12px these edges record. Every region on that screen still
+    // measured right.
     const edges = {
       'roll-card-body': { left: 464, right: 1366 },
       'roll-tier-inset': { left: 476, right: 1354 },

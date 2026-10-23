@@ -9,9 +9,9 @@
  * In-system writers: `CraftingSystemManager`'s `createItem`, `addItemFromUuid`,
  * `replaceItemSource`, `updateItem`, `applyBulkEditToComponents`, `addRecipeItemFromUuid` and
  * `refreshComponentMetadataForUpdatedItem`, bound unconditionally to the `updateItem` hook.
- * Snapshot writers: the world entry editors, through `worldScopeActions.updateEntity`, and a
- * component import, through `flushWorldComponentRegistrations`. The in-system list is
- * NOT PR 2's "five mutation-time bypass sites", which answers the basis concern. Contract:
+ * Snapshot writers: the world entry editors (`worldScopeActions.updateEntity`), a component import
+ * (`flushWorldComponentRegistrations`) and Essence and Tool registration in `save` (issue 2554).
+ * The in-system list is NOT PR 2's "five mutation-time bypass sites", the basis concern. Contract:
  * `data-models/spec.md` § Scoped Entity Definitions requirement 15.
  */
 
