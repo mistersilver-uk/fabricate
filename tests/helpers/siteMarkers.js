@@ -99,7 +99,7 @@ function orderedAnchors(a, b) {
     ordered.push(candidates[at]);
     at = previous[at];
   }
-  return ordered.reverse();
+  return ordered.toReversed();
 }
 
 /**
@@ -115,16 +115,16 @@ function alignAnchored(a, b, start, kept) {
   const gap = (toA, toB) => {
     const matched = new Map();
     if (alignMiddle(a.slice(fromA, toA), b.slice(fromB, toB), 0, matched)) {
-      for (const [headLine, baseLine] of matched) {
-        kept.set(start + fromB + headLine, start + fromA + baseLine);
+      for (const [targetIndex, sourceIndex] of matched) {
+        kept.set(start + fromB + targetIndex, start + fromA + sourceIndex);
       }
     }
   };
-  for (const [baseLine, headLine] of anchors) {
-    gap(baseLine, headLine);
-    kept.set(start + headLine, start + baseLine);
-    fromA = baseLine + 1;
-    fromB = headLine + 1;
+  for (const [sourceIndex, targetIndex] of anchors) {
+    gap(sourceIndex, targetIndex);
+    kept.set(start + targetIndex, start + sourceIndex);
+    fromA = sourceIndex + 1;
+    fromB = targetIndex + 1;
   }
   gap(a.length, b.length);
 }
