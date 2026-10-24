@@ -335,12 +335,12 @@ describe('the keyboard on the published SegmentedControl', () => {
 describe('a choice on the published SegmentedControl', () => {
   it('puts the check on the reached radio when onChange updates options as well as value', async () => {
     const { target, form } = formTarget();
-    let handle;
+    const held = {};
     const onChange = (next) => {
-      handle.update(controlProps(onChange, { options: [...OPTIONS].reverse(), value: next }));
+      held.handle.update(controlProps(onChange, { options: OPTIONS.toReversed(), value: next }));
     };
     const mounted = mountControl({}, onChange, target);
-    handle = mounted.handle;
+    held.handle = mounted.handle;
     await settle();
     const heard = [];
     form.addEventListener('change', () => {
@@ -350,7 +350,7 @@ describe('a choice on the published SegmentedControl', () => {
     assert.deepEqual(heard, [['missing']], 'the form reads the reached radio inside the change');
     await settle();
     assert.deepEqual(checkedValues(mounted.radios()), ['missing']);
-    handle.destroy();
+    held.handle.destroy();
   });
 
   it('checks no radio for a string value over numeric options, even after a declined press', async () => {
