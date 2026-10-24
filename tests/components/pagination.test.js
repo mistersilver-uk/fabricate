@@ -364,4 +364,26 @@ describe('Pagination focus when an update disables or removes the focused arrow'
     assert.ok(document.activeElement === own, "the caller's control keeps focus");
     own.remove();
   });
+
+  it('keeps focus that a caller takes while the update disables the focused arrow', async () => {
+    const target = await harness.mount({ totalCount: 60, pageSize: 25, pageIndex: 1 });
+    const own = document.createElement('button');
+    document.body.append(own);
+    const next = arrow(target, 'next');
+    next.focus();
+    // Stands in for a caller's element that focuses itself in the same flush.
+    const native = Object.getOwnPropertyDescriptor(HTMLButtonElement.prototype, 'disabled');
+    Object.defineProperty(next, 'disabled', {
+      configurable: true,
+      get: () => native.get.call(next),
+      set: (value) => {
+        native.set.call(next, value);
+        if (value) own.focus();
+      },
+    });
+    await harness.setProps({ pageIndex: 2 });
+    assert.ok(next.disabled, 'the update disabled Next');
+    assert.ok(document.activeElement === own, "the caller's control keeps focus");
+    own.remove();
+  });
 });
