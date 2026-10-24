@@ -34,7 +34,8 @@
  * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice`,
- * `Callout` and `IconButton`, `Callout`'s `items[].icon` and `EditorTabs`' `tabs[].icon`), or an
+ * `Callout` and `IconButton`, `Callout`'s `items[].icon`, `EditorTabs`' `tabs[].icon` and
+ * `RadioCardGroup`'s `options[].icon`), or an
  * unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
@@ -113,6 +114,7 @@ import {
   branchTwinFaults,
   byName,
   closureDependencies,
+  componentTags,
   controlRestFaults,
   declarationsOf,
   dynamicElementFaults,
@@ -668,11 +670,17 @@ const SHEET_REACH_PINS = Object.freeze([
   'src/ui/svelte/components/Notice.svelte: fab-notice',
 ]);
 
-/** Rule 9 over an entry's whole closure: every element judged, and every fault. */
-function closureFocusables(path, reader = SHIPPED, dynamic = undefined) {
-  const scans = [...importClosure(path, reader)]
-    .filter(isComponent)
-    .map((file) => focusableElements(file, reader.component(file), dynamic));
+/**
+ * Rule 9 over an entry's whole closure: every element judged, and every fault, a form control's
+ * `name` in the entry's own file judged against `entry`'s published locals.
+ */
+function closureFocusables(path, reader = SHIPPED, dynamic = undefined, entry = null) {
+  const scans = [...importClosure(path, reader)].filter(isComponent).map((file) => {
+    const ast = reader.component(file);
+    const own = file === path && entry;
+    const published = own ? new Set(publishedLocals(entry, ast).keys()) : null;
+    return focusableElements(file, ast, dynamic, published);
+  });
   return {
     judged: scans.flatMap((scan) => scan.judged),
     faults: scans.flatMap((scan) => scan.faults),
@@ -752,27 +760,51 @@ function landingPinFaults(entry, ast, landed, { drawn, undrawn, defaults, heldBy
 }
 
 /**
+ * Where a rest handed whole to one closure child lands: on the one element that child spreads its
+ * own rest on and reads it nowhere else, judged in the child's file, as `{ file, ast, landings }`
+ * (issue 2601). A rest on anything else, or handed to a child that spreads it on no element, on
+ * more than one, or on a component, is answered where the entry's own file spreads it.
+ */
+function followedRest(entry, ast, reader) {
+  const own = { file: entry.path, ast, landings: restElements(ast) };
+  const [only, ...others] = own.landings;
+  if (only?.node.type !== 'Component' || others.length > 0) return own;
+  const child = componentTags(entry.path, ast).find(([, node]) => node === only.node)?.[0];
+  if (!child) return own;
+  const childAst = reader.component(child);
+  const inner = restElements(childAst);
+  const followable =
+    inner.length === 1 && inner[0].node.type !== 'Component' && restReads(childAst) === 1;
+  return followable ? { file: child, ast: childAst, landings: inner } : own;
+}
+
+/**
  * What an entry's `restOn` breaks against where its component spreads rest: `'control'` exactly
  * when every element the rest local is spread on is one rule 9 judges, absent exactly when none
  * is, and a rest the gate sees on no element, reads anywhere but in those spreads, or hands to a
- * child component its pin does not name undrawn, fails closed.
+ * child component its pin does not name undrawn, fails closed; a rest `followedRest` follows into
+ * a child is judged on the child's element.
  * An entry `landings` pins is judged by its drawn landing alone, and every entry by the twin rule.
  * Where rest lands on a control, `controlRestFaults` judges what the component writes beside it,
  * the entry's `aria` keys among it, and `tooltip` is stated exactly when that control writes an
  * attribute Foundry's hover listener reads a tooltip from.
  */
-function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS) {
+function restOnFaults(entry, ast, dynamic = undefined, landings = REST_LANDINGS, reader = SHIPPED) {
   if (!entry.rest) return entry.restOn === undefined ? [] : [OVERSTATED_REST];
-  const every = restElements(ast);
+  const followed = followedRest(entry, ast, reader);
+  const every = followed.landings;
   if (every.every(({ node }) => node.type === 'Component')) return [NO_REST_ELEMENT];
   const pin = landings[entry.path];
   const pinned = pin ? landingPinFaults(entry, ast, every, pin) : [];
   const landed = pin ? every.filter(({ node }) => node.name === pin.drawn) : every;
-  const shape = [...pinned, ...branchTwinFaults(ast)];
+  const twins = followed.ast === ast ? [] : branchTwinFaults(followed.ast);
+  const shape = [...pinned, ...branchTwinFaults(ast), ...twins];
   const handed = every.filter(
     ({ node }) => node.type === 'Component' && !pin?.undrawn.includes(node.name)
   );
-  const judged = focusableElements(entry.path, ast, dynamic).elements.map(({ node }) => node);
+  const judged = focusableElements(followed.file, followed.ast, dynamic).elements.map(
+    ({ node }) => node
+  );
   const controls = landed.filter(({ node }) => judged.includes(node));
   if (controls.length > 0 && controls.length < landed.length) return [...shape, MIXED_REST];
   const lands = controls.length > 0;
@@ -1103,11 +1135,11 @@ describe('each entry matches its component declaration', () => {
     });
 
     it(`${entry.name} marks every focusable element it draws, and names no form control`, () => {
-      assert.deepEqual(closureFocusables(entry.path).faults, []);
+      assert.deepEqual(closureFocusables(entry.path, SHIPPED, undefined, entry).faults, []);
     });
   }
 
-  it('judges twenty-two focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges twenty-three focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1123,6 +1155,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/IconButton.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
+      'src/ui/svelte/components/RadioCardGroup.svelte: input',
       'src/ui/svelte/components/SearchablePopover.svelte: button',
       'src/ui/svelte/components/SearchablePopover.svelte: button',
       'src/ui/svelte/components/SearchablePopover.svelte: input',
@@ -1182,6 +1215,7 @@ describe('each entry matches its component declaration', () => {
         'Select.onChange: 1',
         'IconButton.onclick: 0',
         'EditorTabs.onSelect: 1',
+        'RadioCardGroup.onChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -2138,6 +2172,35 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(restOnFaults(entry, ast, pinned(['span'])), []);
   });
 
+  it('follows a rest handed whole to a closure child onto the one element the child spreads its own rest on, and refuses one that drops it', () => {
+    const parent =
+      "<script>import Child from './Child.svelte'; let { label, ...rest } = $props();</script>" +
+      '<Child {...rest} />';
+    const faultsOver = (template, restOn = null) => {
+      const reader = syntheticReader({
+        'src/E.svelte': parent,
+        'src/Child.svelte': `<script>let { ...rest } = $props();</script>${template}`,
+      });
+      const entry = { path: 'src/E.svelte', rest: true };
+      if (restOn) entry.restOn = restOn;
+      return restOnFaults(entry, reader.component(entry.path), undefined, REST_LANDINGS, reader);
+    };
+    assert.deepEqual(faultsOver('<fieldset {...rest}></fieldset>'), [], 'an element that is none');
+    assert.deepEqual(faultsOver(pressed(' {...rest}')), [UNSTATED_REST], 'judged in the child');
+    assert.deepEqual(faultsOver(pressed(' {...rest}'), 'control'), []);
+    assert.deepEqual(faultsOver('<div></div>'), [NO_REST_ELEMENT], 'a child that drops it');
+    assert.deepEqual(
+      faultsOver('<div {...rest}></div><p {...rest}></p>'),
+      [NO_REST_ELEMENT],
+      'a child that spreads it on two elements is not followed'
+    );
+    assert.deepEqual(
+      faultsOver("<fieldset {...rest}>{rest['data-x']}</fieldset>"),
+      [NO_REST_ELEMENT],
+      'a child that reads its rest beside the spread is not followed'
+    );
+  });
+
   it('refuses restOn on an entry that takes no rest', () => {
     const entry = { path: 'src/E.svelte', rest: false, restOn: 'control' };
     const { ast } = templateOf(entry.path, '<script>let { label } = $props();</script><p>x</p>');
@@ -2753,6 +2816,7 @@ describe('the module sheet and every component style against the published Inspe
         'Well',
         'IconButton',
         'EditorTabs',
+        'RadioCardGroup',
       ],
       'an entry with a required root needs a census of its own'
     );

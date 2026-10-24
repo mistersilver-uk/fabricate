@@ -385,6 +385,43 @@ describe('the static rules of a publishable component', () => {
     );
   });
 
+  it('admits a form control name unique to its mount, and refuses a literal or a published-key name', () => {
+    const SCRIPT = 'let { group = "", label = "" } = $props(); const uid = $props.id();';
+    const radio = (name) => `<input type="radio" ${name} />`;
+    const faults = (body, script = SCRIPT, manifest = []) =>
+      faultsOf({ 'src/A.svelte': COMPONENT(script, body) }, 'src/A.svelte', manifest);
+    const STATES = ['src/A.svelte: input states name'];
+    assert.deepEqual(faults(radio('name={`a-${uid}`}')), [], 'a template reading the mount id');
+    const derived = `${SCRIPT} const name = $derived(group || \`a-\${uid}\`);`;
+    assert.deepEqual(
+      faults(radio('{name}'), derived),
+      [],
+      'an unpublished blank prop, else the id'
+    );
+    assert.deepEqual(faults(radio('name="a"')), STATES, 'a literal');
+    assert.deepEqual(faults(radio('name={group}')), STATES, 'a prop with no unique fallback');
+    assert.deepEqual(faults(radio('name={group ?? `a-${uid}`}')), STATES, '?? keeps a blank prop');
+    assert.deepEqual(
+      faults(radio('name={label ? `a-${uid}` : "a"}')),
+      STATES,
+      'a conditional with one shared branch'
+    );
+    const child = faultsOf(
+      {
+        'src/A.svelte': COMPONENT("import B from './B.svelte';", '<B />'),
+        'src/B.svelte': COMPONENT(SCRIPT, radio('name={group || `a-${uid}`}')),
+      },
+      'src/A.svelte'
+    );
+    assert.deepEqual(child, ['src/B.svelte: input states name'], 'a closure child’s prop fallback');
+    const published = [{ name: 'A', path: 'src/A.svelte', props: { group: { kind: 'data' } } }];
+    assert.deepEqual(
+      faults(radio('name={group || `a-${uid}`}'), SCRIPT, published),
+      STATES,
+      'a published key'
+    );
+  });
+
   it('rejects a required prop no shipped kind carries, and accepts a default', () => {
     const faults = (script, body = '<div>x</div>') =>
       faultsOf({ 'src/A.svelte': COMPONENT(script, body) }, 'src/A.svelte');
@@ -462,6 +499,25 @@ describe('the per-item spreads of a published closure', () => {
       ),
       []
     );
+  });
+
+  it('reads an object literal by its computed keys: an unpublished prop key is no item, a published one is, and a fixed key fails closed', () => {
+    const script = 'let { items = [], tone = "", hook = "", ...rest } = $props();';
+    assert.deepEqual(
+      idsOf(script, '{#each items as item}<i {...{ [hook]: item.id }}></i>{/each}'),
+      []
+    );
+    assert.deepEqual(
+      idsOf(script, `<button {...{ type: 'submit' }}></button>`),
+      ['src/Fx.svelte: a spread of an item the entry does not publish'],
+      'a fixed key, which no attribute rule reads, is a spread the gate cannot name'
+    );
+    assert.deepEqual(idsOf(script, '<i {...{ [items]: 1 }}></i>'), [
+      'src/Fx.svelte: a spread of a whole item of Fx.items',
+    ]);
+    assert.deepEqual(idsOf(script, '{#each items as item}<i {...{ ...item.props }}></i>{/each}'), [
+      'Fx.items.props',
+    ]);
   });
 
   it('cannot name a spread off an item of a collection the entry does not publish', () => {

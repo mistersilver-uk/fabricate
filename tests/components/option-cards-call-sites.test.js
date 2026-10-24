@@ -1,7 +1,9 @@
 /**
  * Every `RadioCardGroup` render site and Primitive Lab row passes the `<OptionCards>` API (issue
- * 2467): `value`, `groupName`, `onChange` and a legend, and no name the component does not declare.
- * The component keeps no-op defaults for a JSON row, so "required" is held here, not at runtime.
+ * 2467): `value`, `groupName`, `onChange` and a `legend`, and no name the component does not declare.
+ * Copy is final text (issue 2601): a keyed option list reaches the group only through
+ * `localizeOptions`, called outside `<script module>`. The component keeps no-op defaults for a JSON
+ * row, so "required" is held here, not at runtime.
  */
 import assert from 'node:assert/strict';
 import { join, relative, sep } from 'node:path';
@@ -41,10 +43,12 @@ const OPTION_KEYS = new Set(
     )
     .map((node) => node.property.name)
 );
+/** The keyed copy members `localizeOptions` resolves and drops. */
+const KEYED_MEMBERS = Object.freeze(['labelKey', 'fallback', 'descKey', 'descFallback']);
+const LOCALIZER = 'localizeOptions';
 const FORWARDED = /^(?:data|aria)-/;
 
 const undeclared = (names) => names.filter((name) => !DECLARED.has(name) && !FORWARDED.test(name));
-const lacksLegend = (names) => !names.includes('legend') && !names.includes('legendKey');
 
 /** Every `src/` component importing the primitive, with the import declarations that name it. */
 const IMPORTERS = svelteFiles(join(repoRoot, 'src')).flatMap((absolute) => {
@@ -82,28 +86,70 @@ function declaredInit(name, ast) {
   return undefined;
 }
 
-/** Where an imported options list is declared: the relative module that exports the name. */
-function importedInit(name, file, ast) {
+const declaratorOf = (name) => (node) =>
+  node.type === 'VariableDeclarator' && node.id?.name === name ? node.init : undefined;
+
+/** Where an imported name is declared: the relative module that exports it, read by `pick`. */
+function importedInit(name, file, ast, pick = declaratorOf(name)) {
   for (const node of walkNodes([ast.module, ast.instance])) {
     if (node.type !== 'ImportDeclaration' || !node.source.value.endsWith('.js')) continue;
     if (node.specifiers.every((spec) => spec.local.name !== name)) continue;
     const target = join(file, '..', node.source.value).split(sep).join('/');
     const module = moduleAstOf(target).ast;
     for (const inner of walkNodes(module)) {
-      if (inner.type === 'VariableDeclarator' && inner.id?.name === name) return inner.init;
+      const found = pick(inner);
+      if (found) return found;
     }
   }
   return undefined;
 }
 
+/** The body of the function a site's list is built by, in its own file or a module it imports. */
+function calledBody(name, file, ast) {
+  const pick = (node) =>
+    node.type === 'FunctionDeclaration' && node.id?.name === name ? node.body : undefined;
+  for (const node of walkNodes([ast.module, ast.instance])) {
+    const found = pick(node);
+    if (found) return found;
+  }
+  return importedInit(name, file, ast, pick);
+}
+
 const attributeExpression = (attribute) =>
   attribute?.value?.expression ?? attribute?.value?.[0]?.expression;
 
-/** The expression an attribute passes, followed once through a same-file or imported binding. */
-function resolvedExpression(attribute, file, ast) {
-  const expression = attributeExpression(attribute);
+/** An expression followed once through a same-file or imported binding. */
+function resolved(expression, file, ast) {
   if (expression?.type !== 'Identifier') return expression;
   return declaredInit(expression.name, ast) ?? importedInit(expression.name, file, ast);
+}
+
+/** The expression an attribute passes, followed once through a same-file or imported binding. */
+const resolvedExpression = (attribute, file, ast) =>
+  resolved(attributeExpression(attribute), file, ast);
+
+const calleeName = (node) =>
+  node?.type === 'CallExpression' && node.callee.type === 'Identifier' ? node.callee.name : null;
+
+const inModuleScript = (node, ast) =>
+  Boolean(ast.module) && node.start >= ast.module.start && node.end <= ast.module.end;
+
+/**
+ * What a site's `options` draws, as `{ list, localized, faults }`: a `localizeOptions(...)` call
+ * is followed to its argument, a call to a named builder into that builder's body, and a call the
+ * gate cannot follow is a fault rather than a pass.
+ */
+function optionList(attribute, file, ast) {
+  const expression = resolvedExpression(attribute, file, ast);
+  const callee = calleeName(expression);
+  if (callee === LOCALIZER) {
+    const faults = inModuleScript(expression, ast) ? [`calls ${LOCALIZER} in <script module>`] : [];
+    return { list: resolved(expression.arguments[0], file, ast), localized: true, faults };
+  }
+  if (!callee) return { list: expression, localized: false, faults: [] };
+  const body = calledBody(callee, file, ast);
+  const faults = body ? [] : [`builds its options with \`${callee}\`, which this gate cannot read`];
+  return { list: body, localized: false, faults };
 }
 
 const SITES = IMPORTERS.flatMap(({ file, ast }) =>
@@ -113,13 +159,16 @@ const SITES = IMPORTERS.flatMap(({ file, ast }) =>
 const ROWS = catalogueEntries(repoRoot).filter(({ row }) => row.path === COMPONENT);
 
 const byPath = (left, right) => left.localeCompare(right);
+/** The seam adapter imports the primitive only to publish it in its `COMPONENTS` table (issue 2601). */
+const SEAM_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
 test('only the .svelte importers reference the primitive, in any form', () => {
   assert.deepEqual(
-    REFERENCING.sort(byPath),
+    REFERENCING.filter((path) => path !== SEAM_ADAPTER).sort(byPath),
     IMPORTERS.map(({ file }) => file).sort(byPath),
     `a src file imports, re-exports or lazily loads ${NAME} outside a .svelte template scan`
   );
+  assert.ok(REFERENCING.includes(SEAM_ADAPTER), 'the seam adapter publishes the primitive');
 });
 
 test('every importer binds RadioCardGroup by its own name and uses it only as a tag', () => {
@@ -152,7 +201,7 @@ test('every render site passes value, groupName, onChange and a legend, and only
     );
     const names = node.attributes.map((attribute) => attribute.name);
     for (const name of REQUIRED) assert.ok(names.includes(name), `${where} passes no \`${name}\``);
-    assert.ok(!lacksLegend(names), `${where} passes neither \`legend\` nor \`legendKey\``);
+    assert.ok(names.includes('legend'), `${where} passes no \`legend\``);
     const snippets = (node.fragment?.nodes ?? [])
       .filter((child) => child.type === 'SnippetBlock')
       .map((child) => child.expression.name);
@@ -161,15 +210,27 @@ test('every render site passes value, groupName, onChange and a legend, and only
       [],
       `${where} passes a name ${NAME} does not declare`
     );
-    const options = resolvedExpression(
+    const {
+      list: drawn,
+      localized,
+      faults,
+    } = optionList(
       node.attributes.find((attribute) => attribute.name === 'options'),
       file,
       ast
     );
-    assert.ok(options, `${where} passes \`options\` this gate cannot resolve to a declaration`);
-    const optionKeys = [...walkNodes(options)]
+    assert.deepEqual(faults, [], `${where} passes \`options\` this gate cannot hold`);
+    assert.ok(drawn, `${where} passes \`options\` this gate cannot resolve to a declaration`);
+    const optionKeys = [...walkNodes(drawn)]
       .filter((inner) => inner.type === 'ObjectExpression')
       .flatMap((entry) => entry.properties.map(keyName));
+    if (!localized) {
+      assert.deepEqual(
+        optionKeys.filter((key) => KEYED_MEMBERS.includes(key)),
+        [],
+        `${where} passes keyed copy the group does not read; resolve it with \`${LOCALIZER}\``
+      );
+    }
     assert.deepEqual(
       optionKeys.filter((key) => RETIRED_OPTION_KEYS.includes(key)),
       [],
@@ -197,10 +258,9 @@ test('every catalogue row renders the group directly with the required props, al
     assert.ok(!('fixture' in row) && !('data' in row), `${where} must render the group directly`);
     const props = row.props ?? {};
     const names = Object.keys(props);
-    for (const name of ['value', 'groupName']) {
+    for (const name of ['value', 'groupName', 'legend']) {
       assert.ok(names.includes(name), `${where} passes no \`${name}\``);
     }
-    assert.ok(!lacksLegend(names), `${where} passes neither \`legend\` nor \`legendKey\``);
     assert.deepEqual(undeclared(names), [], `${where} passes a prop ${NAME} does not declare`);
     const options = props.options ?? [];
     for (const option of options) {

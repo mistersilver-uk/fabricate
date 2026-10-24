@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton` and `EditorTabs`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -436,6 +436,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `Callout` (issue 2601).
 - The published set continues with `IconButton` (issue 2601).
 - The published set continues with `EditorTabs` (issue 2601).
+- The published set continues with `RadioCardGroup` (issue 2601).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -449,6 +450,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `Field`'s `label` and `fieldset` hosts of `as`, and a caption of its own, are not published at version 1; publishing one later is additive.
 - `IconButton`'s `tooltip` and `children`, and its `onfocus`, `onblur` and `onkeydown` handlers, are not published at version 1; publishing one later is additive.
 - `EditorTabs`' `badges`, `annotated`, `danger`, `buttonIdStem`, `panelIdStem` and `tooltipIdStem` are not published at version 1, and so neither are its marks nor a tab's name override, description or padlock; publishing one later is additive.
+- `RadioCardGroup`'s `groupName`, `cardId`, `hint` and `legendVisible` are not published at version 1, and `optionBody` is never published, being a snippet called with arguments; publishing one of the first four later is additive.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
@@ -456,7 +458,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton` and `EditorTabs` too (issue 2601); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -585,7 +587,7 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 ### Interactive components
 
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -600,7 +602,7 @@ Where the entry's rest keys land on the control itself, `data-validation-focused
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
 A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and never out of `target`.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` on the arrow keys, each never out of `target`.
 An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
 The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
 Where the destination is drawn by the same change, the companion draws it first, focuses it, and then removes the control.
@@ -1207,7 +1209,41 @@ Each group states the accepted values of every key that entry publishes.
     A companion's own window or dialog carries no Fabricate root, so the strip is refused there (M16).
   - The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
-- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards; `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors; `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors.
+- **`RadioCardGroup`.**
+  - It is the design system's option cards (`<OptionCards>` in the library): a named `<fieldset>` of cards, one for each item of `options`, each holding a native `<input type="radio">`, for one choice among a few options.
+  - `options` is required and is an array of `{ value, label, description, icon }` items, one card each, drawn in that order.
+    Each `value` is required and is a non-empty string, unique in the group; a list with a duplicate is unsupported and how it draws is private.
+    Each `label` is required and is final display text, the radio's whole name; a label of white space alone leaves the radio with no name, so the companion never passes one.
+    Each `description` is optional final display text drawn beneath the label, which describes the radio.
+    Each `icon` is optional Font Awesome classes for a glyph drawn in a chip, hidden from assistive technology.
+    An item's other members are private and Fabricate draws nothing from them; a function in one is M10.
+  - `value` is the chosen option's `value` and defaults to `''`: that option's card is drawn chosen and its radio checked, and a `value` that names no option leaves no card chosen.
+  - `onChange` is a required callback, called with one argument, the chosen option's `value`, a string, when a press or a key checks a radio; it is never called for a disabled option or a disabled group, and a press on the chosen card calls nothing, because a checked radio fires no `change`.
+    When `onChange` returns, or throws, Fabricate checks the radio of the mount's `value` again, so to accept a choice the companion makes the `update` that passes it from inside `onChange`, before any `await`, and the new card is drawn chosen; a choice the companion declines leaves the previous card chosen.
+  - `legend` is required and is the fieldset's name, final display text drawn visually hidden; a legend of white space alone leaves the fieldset with no name, so the companion never passes one.
+  - `layout` is `'row'` or `'stacked'` and defaults to `'row'`: the chip beside a card's text, or above it.
+  - `columns` is `1`, `2` or `3` and defaults to `2`, the cards' tracks per row; any other value is private.
+  - `disabled` is `true` or `false` and defaults to `false`: `true` disables every radio natively.
+  - `disabledOptions` is an array of `{ value, reason }` items, each disabling the option it names, and `reason` is required non-empty final display text drawn beneath the option's description inside its card, never dimmed, and added to the radio's `aria-describedby`.
+    An item that names no option is ignored, and where a value is named twice the first non-empty reason wins.
+  - Each control is a native radio, so the group consumes no key itself: the platform's radio group moves focus to the next or the previous enabled radio on the arrow keys, wrapping at either end and skipping a disabled one, and checks it, and `Space` checks the focused radio.
+    Each such check fires `change`, which calls `onChange`, and every key still bubbles to a companion's `keydown` listener above `target`.
+  - Focus moves only among one group's radios, by the platform's own handling, and never out of `target`.
+    To return focus to the group, the companion focuses `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when no option is chosen.
+    After a key, a declined choice leaves focus on the radio the key reached, drawn unchecked, so the companion moves focus to `target.querySelector('input[type="radio"]:checked')` after declining one.
+    In a host that replaces its content on render (a DialogV2, a Handlebars part, or a `submitOnChange` sheet that renders again after the update a choice causes) the radios are new elements after every render: the companion notes in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focuses `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when none is checked.
+    An `update` that sets `disabled`, or names the focused radio's option in `disabledOptions`, disables the radio holding focus, and the platform moves focus to the document body, where Foundry's keybindings hear Escape and the arrow keys, so the companion moves focus first.
+  - Each choice fires a bubbling `change`, so a form with `submitOnChange` submits on every choice.
+    The radios carry a private `name`, unique to the mount, so the chosen value appears under that name in a form's data, except while the group is disabled, and a document sheet's schema discards the key: the companion reads the choice from `onChange`, never from the form.
+    The group consumes no key, so where the platform applies implicit submission to a focused radio, Enter submits the `<form>` it is in; the companion mounts it in no form whose submit it does not want.
+  - Rest `data-*` attributes land on the fieldset, never on a card or a radio.
+  - It needs a Fabricate window ancestor, because its cards, chips and radios come from Fabricate's module sheet, rooted at `.fabricate-option-cards`, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
+    It reflows to fewer tracks only under a Fabricate host that names `fabricate-option-host`; when and how it reflows is private.
+    An empty `options` draws the named fieldset with no card and no radio, so nothing inside `target` takes focus; the companion passes at least one option where the group must be reachable.
+    A companion's own window or dialog carries no Fabricate root, so the group is refused there (M16).
+  - The radio's keyboard ring is the accent, 2px wide and 2px clear, drawn on the card's own ground.
+    The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against a chosen card's `--fab-surface-soft` over `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the group on one of those four grounds.
+- **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards; `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors; `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors; `RadioCardGroup`'s card, chip, radio and type figures, its `data-radio-card-*` and `data-tool-choice-*` hooks, the width it reflows at, and how Fabricate draws option cards in its own editors.
 
 ### The publishable subset
 
@@ -1363,7 +1399,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, as its group states, and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, as its group states (the platform moves it among one `RadioCardGroup`'s radios on the arrow keys, as that group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -1529,6 +1565,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** focus moves to the next tab, and then Fabricate calls `onSelect` once with that tab's `id`
 - **AND** the tab is drawn selected only once the companion's `update` passes that `id` as `activeTab`, and focus stays on it
 - **AND** a mount that omits `idStem` throws M9, and one that passes `badges` throws M13
+
+#### Scenario: A published option card group
+
+- **WHEN** a companion mounts `RadioCardGroup` with `options`, `value`, `legend` and `onChange` inside a Fabricate window and the user presses ArrowRight on the checked radio
+- **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
+- **AND** the card is drawn chosen when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
+- **AND** a mount that omits `legend` throws M9, and one that passes `groupName` throws M13
 
 #### Scenario: An overlay host
 

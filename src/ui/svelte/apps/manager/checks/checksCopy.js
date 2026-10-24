@@ -620,8 +620,8 @@ export function checkTargetChip(evaluation, dc, text) {
 }
 
 /**
- * The Check type chooser's two options (the prototype's copy), each sentence resolved with the
- * activity's own record words before it reaches `RadioCardGroup`, which takes no interpolation.
+ * The Check type chooser's two options (the prototype's copy), each label and sentence resolved,
+ * with the activity's own record words, before it reaches `RadioCardGroup`, which takes final text.
  * Icons name what a tier threshold IS: an offset from the record's DC, or a measured segment.
  */
 export function checkTypeOptions(text, { record, records }) {
@@ -630,8 +630,7 @@ export function checkTypeOptions(text, { record, records }) {
     {
       value: 'relative',
       icon: 'fas fa-plus-minus',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
-      fallback: 'Relative',
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative', 'Relative'),
       description: interpolate(
         text(
           'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
@@ -643,8 +642,7 @@ export function checkTypeOptions(text, { record, records }) {
     {
       value: 'fixed',
       icon: 'fas fa-ruler',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
-      fallback: 'Fixed',
+      label: text('FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed', 'Fixed'),
       description: interpolate(
         text(
           'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',

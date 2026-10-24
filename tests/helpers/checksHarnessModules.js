@@ -9,6 +9,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The range bar's pure geometry (issue 2431) and its own localized words (issue 2435).
   'src/ui/svelte/util/rangeBarGeometry.js',
   'src/ui/svelte/util/rangeBarText.js',
+  // The optimistic hold the failure-result and combination-rule cards draw (issue 2601).
+  'src/ui/svelte/util/latestRequestHold.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',

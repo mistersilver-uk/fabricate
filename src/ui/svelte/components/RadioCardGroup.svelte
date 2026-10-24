@@ -7,13 +7,14 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The chosen option's `value`. Not bindable: the caller owns it and moves it in `onChange`. |
-  | `groupName` | string | `''` | The radios' shared `name`, unique per rendered group; required by contract. |
-  | `legend` / `legendKey` | string | `''` | The fieldset's name, visually hidden unless `legendVisible`; one is required by contract. |
-  | `options` | `{ value, label \| labelKey + fallback, description \| descKey + descFallback, icon }[]` | `[]` | One card per entry, keyed by a unique `value`. a label is required by contract, the description and `icon` are optional, and an option carries no disabled flag, reason or badge: `disabledOptions` owns those. |
+  | `groupName` | string | `''` | The radios' shared `name`, unique per rendered group; empty falls back to a name unique to the mount. |
+  | `legend` | string | `''` | The fieldset's name, final display text, visually hidden unless `legendVisible`; required by contract. |
+  | `hint` | string | `''` | Final display text drawn as a warning note under the legend; none when empty. |
+  | `options` | `{ value, label, description?, icon? }[]` | `[]` | One card per entry, keyed by a unique `value`; `label` and `description` are final display text (`localizeOptions` resolves a keyed list). A label is required by contract, the description and `icon` are optional, and an option carries no disabled flag, reason or badge: `disabledOptions` owns those. |
   | `disabled` | boolean | `false` | Disables the whole group, which dims every card and fires no `onChange`. |
   | `disabledOptions` | `{ value, reason }[]` | `[]` | Each entry disables the option it names and draws its already-localized `reason` beneath the description; `reason` is required by contract and an empty one draws nothing. An entry naming no option is ignored. One entry per value: the first non-empty reason wins, and a later empty one does not erase an earlier one. |
   | `layout` | `'row'` \| `'stacked'` | `'row'` | Chip beside the text, or chip over it. The caller states it (`stacked` on three or more tracks); it is never derived from `columns`, and a reflowed card keeps it. |
-  | `columns` | number | `2` | Tracks per row. The group reflows to one track when its `fabricate-option-host` (a card or panel that names itself, else the manager) is 620px wide or narrower. |
+  | `columns` | positive integer | `2` | Tracks per row; any other value draws `2`, so no string reaches the `style` attribute. The group reflows to one track when its `fabricate-option-host` (a card or panel that names itself, else the manager) is 620px wide or narrower. |
 
   Snippets:
   - `optionBody(option)` — read-only content beneath the card's head: at the text column in a row
@@ -21,7 +22,8 @@
 
   Callbacks:
   - `onChange(value)` — the chosen input's value string; required by contract, and never fired for
-    a disabled option or group.
+    a disabled option or group. When it returns, or throws, every radio of this group is checked
+    as `value` then says, so a change the caller declines leaves the previous radio checked.
 
   Rest spread:
   - `{...rest}` lands on the `<Field>` fieldset root, written after `class`, and carries the
@@ -43,15 +45,12 @@
 <script>
   import Field from './Field.svelte';
   import Medallion from './Medallion.svelte';
-  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     cardId = undefined,
     legend = '',
-    legendKey = '',
     legendVisible = false,
     hint = '',
-    hintKey = '',
     options = [],
     value = '',
     groupName = '',
@@ -67,6 +66,8 @@
   } = $props();
 
   const uid = $props.id();
+  const name = $derived(groupName || `fabricate-option-cards-${uid}`);
+  const trackCount = $derived(Number.isInteger(columns) && columns > 0 ? columns : 2);
   const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
   const reasons = $derived(
     new Map([
@@ -86,8 +87,12 @@
       .join(' ') || undefined;
 
   function choose(option, event) {
-    if (isOff(option)) return;
-    onChange(event.currentTarget.value);
+    const radios = event.currentTarget.closest('fieldset').querySelectorAll('input[type="radio"]');
+    try {
+      if (!isOff(option)) onChange(event.currentTarget.value);
+    } finally {
+      for (const radio of radios) radio.checked = radio.value === value;
+    }
   }
 </script>
 
@@ -98,17 +103,20 @@
   {disabled}
   {...rest}
 >
-  <legend class="manager-resolution-mode-legend">{localizeOr(legendKey, legend)}</legend>
-  {#if hintKey || hint}
+  <legend class="manager-resolution-mode-legend">{legend}</legend>
+  {#if hint}
     <p class="manager-resolution-mode-note" role="note">
       <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{localizeOr(hintKey, hint)}</span>
+      <span>{hint}</span>
     </p>
   {/if}
-  <div class="manager-resolution-mode-options" style={`--manager-radio-card-columns: ${columns}`}>
+  <div
+    class="manager-resolution-mode-options"
+    style={`--manager-radio-card-columns: ${trackCount}`}
+  >
     {#each options as option, index (option.value)}
       {@const chosen = option.value === value}
-      {@const hasDesc = Boolean(option.description || option.descFallback)}
+      {@const hasDesc = Boolean(option.description)}
       {@const reason = reasons.get(option.value) || ''}
       <label
         class="manager-resolution-option"
@@ -134,15 +142,13 @@
             <span
               class="manager-resolution-option-name"
               id={`${uid}-${index}-title`}
-              data-tool-choice-title
-              >{localizeOr(option.labelKey, option.label || option.fallback)}</span
+              data-tool-choice-title>{option.label}</span
             >
             {#if hasDesc}
               <span
                 class="manager-resolution-option-desc"
                 id={`${uid}-${index}-desc`}
-                data-tool-choice-description
-                >{localizeOr(option.descKey, option.description || option.descFallback)}</span
+                data-tool-choice-description>{option.description}</span
               >
             {/if}
             {#if reason}
@@ -155,7 +161,7 @@
           </span>
           <input
             type="radio"
-            name={groupName}
+            {name}
             value={option.value}
             checked={chosen}
             disabled={isOff(option)}

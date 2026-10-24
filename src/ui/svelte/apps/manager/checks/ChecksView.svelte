@@ -180,7 +180,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  /** The Validation route's own sentence for a readiness issue — the same one, not a copy. */
   // The alchemy check-mode selector, at the TOP of the crafting route's roll section, STAGING
   // the mode on the root's draft and swapping the editor below. "NO CHECK" IS NOT A MODE
   // HERE: the persisted enum still carries `none`, but a third radio made the on/off decision
@@ -189,20 +188,20 @@
     {
       value: 'simple',
       icon: 'fas fa-dice-d20',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple',
-      fallback: 'Simple check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
-      descFallback:
-        'A pass/fail check you can switch off. On a pass the success result set is produced; on a fail, the recipe’s failure result set is, if it has one.',
+      label: text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple', 'Simple check'),
+      description: text(
+        'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
+        'A pass/fail check you can switch off. On a pass the success result set is produced; on a fail, the recipe’s failure result set is, if it has one.'
+      ),
     },
     {
       value: 'tiered',
       icon: 'fas fa-stairs',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered',
-      fallback: 'Tiered check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
-      descFallback:
-        'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.',
+      label: text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered', 'Tiered check'),
+      description: text(
+        'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
+        'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.'
+      ),
     },
   ];
 
@@ -1272,12 +1271,13 @@
                 )}
               </p>
               <RadioCardGroup
-                legendKey="FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading"
-                legend="Alchemy check"
+                legend={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading',
+                  'Alchemy check'
+                )}
                 options={ALCHEMY_CHECK_MODE_OPTIONS}
                 value={alchemyCheckMode}
                 groupName="crafting-alchemy-checkmode"
-                columns={2}
                 data-crafting-alchemy-checkmode
                 optionDataAttr="data-crafting-alchemy-checkmode-option"
                 onChange={(mode) => onSetAlchemyCheckMode(mode)}

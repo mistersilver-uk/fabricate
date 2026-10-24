@@ -572,14 +572,57 @@ function distinctIds(elements) {
 }
 
 /**
+ * Whether a form control's `name` is unique to its mount (issue 2601): its value, through a
+ * top-level `const` or `$derived` and either branch of a conditional, is a template that reads the
+ * component's `$props.id()` local, or `<prop> || <such a value>` where the prop is a local outside
+ * `published` whose default is `''`. `published` is the published locals of the entry whose own
+ * file it is, and `null`, which admits no prop, for any other file.
+ */
+function mountUniqueName(ast, attribute, published) {
+  const [tag, ...others] = [attribute.value].flat();
+  if (tag?.type !== 'ExpressionTag' || others.length > 0) return false;
+  const declared = scriptDeclarations(ast);
+  const bound = templateBindings(ast);
+  const isId = (init) =>
+    init?.callee?.type === 'MemberExpression' &&
+    init.callee.object.name === '$props' &&
+    init.callee.property.name === 'id';
+  const ids = new Set([...declared].flatMap(([local, init]) => (isId(init) ? [local] : [])));
+  const props = new Map(propLocals(ast).map(({ local, fallback }) => [local, fallback]));
+  const unpublishedBlank = (node) =>
+    node?.type === 'Identifier' &&
+    published !== null &&
+    !published.has(node.name) &&
+    props.get(node.name)?.value === '';
+  const unique = (node, depth = 0) => {
+    if (depth > 3) return false;
+    if (node?.type === 'TemplateLiteral') {
+      return node.expressions.some((part) => part.type === 'Identifier' && ids.has(part.name));
+    }
+    if (node?.type === 'LogicalExpression') {
+      const left = unpublishedBlank(node.left) || unique(node.left, depth + 1);
+      return node.operator === '||' && left && unique(node.right, depth + 1);
+    }
+    if (node?.type === 'ConditionalExpression') {
+      return unique(node.consequent, depth + 1) && unique(node.alternate, depth + 1);
+    }
+    if (node?.type !== 'Identifier' || bound.has(node.name) || props.has(node.name)) return false;
+    const init = declared.get(node.name);
+    return unique(isCallTo(init, '$derived') ? init.arguments[0] : init, depth + 1);
+  };
+  return unique(tag.expression);
+}
+
+/**
  * Admission rule 9 over one closure file: a `button`, `a` or `[tabindex]` element states
  * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
- * `name`. A `svelte:element` is judged once, as the union of its pinned tags, and one with no pin
- * is a fault; its `type` is a mounted suite's. Answers each element it judged beside each fault,
- * both as `<file>: <tag> …`, and each judged element as `{ id, node, guards, tags }`, its `id`
- * being `<file>: <tag>[<hook>]`, as `distinctIds` resolves two that share one.
+ * `name` but one `mountUniqueName` admits under `published`. A `svelte:element` is judged once, as
+ * the union of its pinned tags, and one with no pin is a fault; its `type` is a mounted suite's.
+ * Answers each element it judged beside each fault, both as `<file>: <tag> …`, and each judged
+ * element as `{ id, node, guards, tags }`, its `id` being `<file>: <tag>[<hook>]`, as
+ * `distinctIds` resolves two that share one.
  */
-export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
+export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS, published = null) {
   const judged = [];
   const faults = [];
   const elements = [];
@@ -598,7 +641,10 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS) {
     if (node.name === 'button' && !states('type', 'button')) {
       faults.push(`${file}: button does not state type="button"`);
     }
-    if (as.control && attributeOf(node, 'name')) faults.push(`${file}: ${node.name} states name`);
+    const name = attributeOf(node, 'name');
+    if (as.control && name && !mountUniqueName(ast, name, published)) {
+      faults.push(`${file}: ${node.name} states name`);
+    }
   });
   const distinct = distinctIds(elements);
   return { judged, faults: [...faults, ...distinct.faults], elements: distinct.elements };

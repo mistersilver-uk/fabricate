@@ -8,6 +8,7 @@
 -->
 <script>
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import { localizeOptions, localizeOr } from '../../../util/localizeOr.js';
 
   let { value = 'equal', name = 'progressive-award-mode', onChange = () => {} } = $props();
 
@@ -50,9 +51,8 @@
 </script>
 
 <RadioCardGroup
-  legendKey="FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle"
-  legend="Award mode"
-  options={OPTIONS}
+  legend={localizeOr('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
+  options={localizeOptions(OPTIONS)}
   value={selected}
   groupName={name}
   columns={2}

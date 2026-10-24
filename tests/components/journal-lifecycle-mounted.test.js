@@ -1159,6 +1159,50 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(saved.ingredientEssenceAllocation.ingredientSetId, second.id);
   });
 
+  it('draws the pressed route chosen while its command is in flight, then what the run saved', async () => {
+    for (const accepted of [true, false]) {
+      const first = ingredientSet('route-a', [
+        { id: 'a', options: [componentOption('iron', 'iron')] },
+      ]);
+      const second = ingredientSet('route-b', [
+        { id: 'b', options: [componentOption('copper', 'copper')] },
+      ]);
+      first.resultGroupId = 'a-results';
+      second.resultGroupId = 'b-results';
+      const fixture = selectionFixture(
+        [first, second],
+        { selectedIngredientSetId: first.id },
+        { mode: 'routedByIngredients' }
+      );
+      let finish;
+      const mounted = await mountState('ready-single', {
+        ...fixture,
+        prepare(runtime) {
+          fixture.prepare(runtime);
+          const execute = runtime.services.executeJournalRunCommand;
+          runtime.services.executeJournalRunCommand = (command) =>
+            new Promise((resolve) => (finish = resolve)).then(() =>
+              accepted ? execute(command) : { success: false, message: 'selection refused' }
+            );
+        },
+      });
+      const route = mounted.target.querySelector('[data-journal-route]');
+      const radio = (id) => route.querySelector(`input[value="${id}"]`);
+      const chosen = () => route.querySelector('.is-active')?.getAttribute('data-radio-card-option');
+      radio(second.id).click();
+      flushSync();
+      assert.equal(radio(second.id).checked, true, 'the pressed route stays checked in flight');
+      assert.equal(chosen(), second.id, 'and its card is drawn chosen');
+      finish();
+      await settleAction();
+      await settleAction();
+      const saved = accepted ? second.id : first.id;
+      assert.equal(chosen(), saved, `the run's saved route once the command settles`);
+      assert.equal(radio(saved).checked, true);
+      await harness.remount();
+    }
+  });
+
   it('labels an unnamed ingredient route by its ordinal and never by its raw id', async () => {
     const anonymous = (id, componentId) => {
       const set = ingredientSet(id, [{ id: componentId, options: [componentOption(componentId, componentId)] }]);

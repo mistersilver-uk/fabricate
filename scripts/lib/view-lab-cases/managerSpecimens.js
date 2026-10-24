@@ -360,6 +360,20 @@ const TABS_PANEL = `${TABS_GROUND} > [data-lab-tabs-panel]`;
 /** Sized to the fixture's 360px ground, its strip and its one panel. */
 const TABS_WINDOW = Object.freeze({ width: 480, height: 240 });
 
+/**
+ * The option cards fixture's ground and the group's target, its fieldset and legend, and the
+ * Breakable and Immune cards and their radios, by value.
+ */
+const CARDS_GROUND = '[data-lab-option-cards]';
+const CARDS_TARGET = `${CARDS_GROUND} > [data-lab-option-cards-target]`;
+const CARDS_FIELDSET = `${CARDS_TARGET} > fieldset`;
+const CARDS_LEGEND = `${CARDS_FIELDSET} > legend`;
+const optionCard = (value) => `${CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+const optionRadio = (value) => `${optionCard(value)} input[type="radio"]`;
+
+/** Sized to the fixture's 420px ground and its two rows of cards. */
+const CARDS_WINDOW = Object.freeze({ width: 540, height: 300 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1122,6 +1136,49 @@ export const CASES = Object.freeze([
     position: TABS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `EditorTabs.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-option-cards-specimen',
+    label:
+      'Specimen, mounted through the published seam — one option card group of three cards, Breakable with a hammer chip, Immune with a lock chip and Limited uses with an hourglass chip, disabled with its reason Coming soon, in two tracks across a 420px column on the --fab-bg-2 ground, its legend When the tool breaks visually hidden, after one step: ArrowRight pressed on the checked Breakable radio, which the platform moved to the next enabled radio, Immune, and checked, so Fabricate called onChange, whose update drew Immune chosen. So the Immune card carries the accent border over its surface-soft ground and its radio the accent keyboard ring, 2px wide with 2px of ground between ring and radio, and Breakable is drawn at rest',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each choice.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-option-cards' },
+    steps: [{ selector: optionRadio('breakable'), press: 'ArrowRight' }],
+    // The reached card chosen by the companion's own update, its radio checked and keyboard-focused,
+    // and the fixture's echo of the value, which only `onChange` writes.
+    expectSelector: `${CARDS_GROUND}[data-lab-option-cards-chosen="immune"]${optionCard('immune').slice(CARDS_GROUND.length)}.is-active input[type="radio"]:checked:focus-visible`,
+    expectCenterHit: optionCard('immune'),
+    expectContained: [
+      { container: CARDS_GROUND, target: CARDS_TARGET },
+      { container: '.window-content', target: CARDS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The reached radio's ring, the chosen card's border, and the legend held off the screen;
+        // the chosen ground is a `::before` no card-level probe reads. The ring's colour is read
+        // off the sheet (`published-radio-card-group-census.test.js`), because a probe inside a
+        // void `<input>` resolves no `var()`.
+        {
+          selector: `${optionRadio('immune')}:focus-visible`,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+        {
+          selector: optionCard('immune'),
+          styles:
+            'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
+        },
+        {
+          selector: CARDS_LEGEND,
+          styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+        },
+      ],
+    },
+    position: CARDS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `RadioCardGroup.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

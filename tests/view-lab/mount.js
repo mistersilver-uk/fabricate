@@ -790,6 +790,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-icon-buttons': () => import('./fixtures/PublishedIconButtons.svelte'),
   // Issue 2601: a three-tab strip whose selection the companion's own update draws.
   'published-tabs': () => import('./fixtures/PublishedTabs.svelte'),
+  // Issue 2601: a breakage choice of three cards whose choice the companion's own update draws.
+  'published-option-cards': () => import('./fixtures/PublishedOptionCards.svelte'),
 });
 // view-lab-region:end
 

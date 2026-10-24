@@ -393,8 +393,7 @@
       </div>
       <div class="manager-checks-card-body">
         <RadioCardGroup
-          legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
-          legend="Check type"
+          legend={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
           options={TYPE_OPTIONS}
           value={type}
           groupName="crafting-check-type"

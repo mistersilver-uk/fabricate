@@ -455,6 +455,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-crafting-settings',
     'manager-checks-crafting-modifiers',
     'fabricate-journal-lifecycle-ingredient-route',
+    // The group mounted through the published seam, keyboard-chosen (issue 2601).
+    'manager-published-option-cards-specimen',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([

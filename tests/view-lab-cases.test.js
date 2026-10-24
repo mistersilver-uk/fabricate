@@ -405,6 +405,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
+  'tests/view-lab/fixtures/PublishedOptionCards.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -861,6 +862,10 @@ const labIconButton = (key) => `[data-lab-icon-buttons] > [data-lab-icon-button=
 const LAB_TABLIST = '[data-lab-tabs] > [data-lab-tabs-target] > [role="tablist"]';
 const LAB_INPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:first-child`;
 const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
+/** The option cards fixture's fieldset, one card of it by value, and that card's radio. */
+const LAB_CARDS_FIELDSET = '[data-lab-option-cards] > [data-lab-option-cards-target] > fieldset';
+const labOptionCard = (value) => `${LAB_CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
+const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1423,6 +1428,23 @@ const NON_VERB_CONTROLS = Object.freeze({
         'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
     },
   ],
+  // The published option cards (issue 2601): the keyboard-reached radio's ring by its shape, the
+  // chosen card's border, and the legend held off the screen.
+  'manager-published-option-cards-specimen': [
+    {
+      selector: `${labOptionRadio('immune')}:focus-visible`,
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector: labOptionCard('immune'),
+      styles:
+        'border-top-style: solid; border-top-width: 1px; border-top-color: var(--fab-accent-border)',
+    },
+    {
+      selector: `${LAB_CARDS_FIELDSET} > legend`,
+      styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+    },
+  ],
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -1621,6 +1643,18 @@ test('the non-verb controls are measured by the cases that draw them', () => {
       `${caseId} measures its non-verb controls`
     );
   }
+});
+
+/** A selector whose subject is a void `<input>` or `<img>`, which a hidden probe cannot inherit from. */
+const VOID_SUBJECT = /(?:^|[\s>+~])(?:input|img)(?:[[:.#][^\s>+~]*)?$/;
+
+test('no case resolves a token through a probe inside a void element', () => {
+  const faults = VIEW_LAB_CASES.flatMap(({ id, expectLayout }) =>
+    (expectLayout?.controls ?? [])
+      .filter(({ selector, styles }) => VOID_SUBJECT.test(selector) && styles.includes('var('))
+      .map(({ selector }) => `${id}: ${selector}`)
+  );
+  assert.deepEqual(faults, [], 'read the token off the sheet; a probe in a void element has none');
 });
 
 // The side-rail routes' own scrollers below the 1120px rung (issue 1976): the two editors whose
@@ -6060,13 +6094,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-callout-specimen',
       'manager-published-icon-buttons-specimen',
       'manager-published-tabs-specimen',
+      'manager-published-option-cards-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, and the tabs fixture's strip. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, and the option cards fixture's group. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6079,9 +6114,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Callout',
   'IconButton',
   'EditorTabs',
+  'RadioCardGroup',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton and EditorTabs and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs and RadioCardGroup and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -8255,6 +8291,68 @@ test('the title bar selects the system frames and the premium-installed frame', 
   assert.deepEqual(
     ids(['src/ui/svelte/components/AppTitleBar.svelte']),
     [...titleBar, 'fabricate-app-shell', 'manager-components-normal'].sort(byCodePoint)
+  );
+});
+
+test('the option cards specimen case presses ArrowRight on the group the fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf(
+    'tests/view-lab/fixtures/PublishedOptionCards.svelte'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'RadioCardGroup'
+    ),
+    'the fixture mounts RadioCardGroup through the seam’s mount'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.callee.object?.name === 'group'
+    ),
+    'its onChange passes the chosen value back through the group’s own update'
+  );
+  for (const hook of [
+    'data-lab-option-cards',
+    'data-lab-option-cards-target',
+    'data-lab-option-cards-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectSelector, expectLayout } = getCaseById(
+    'manager-published-option-cards-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [[labOptionRadio('breakable'), 'ArrowRight']],
+    'one ArrowRight on the checked Breakable radio'
+  );
+  assert.ok(
+    expectSelector.includes('[data-lab-option-cards-chosen="immune"]'),
+    'the case waits on the echo only onChange writes'
+  );
+  assert.ok(
+    expectLayout.controls.some(
+      ({ selector }) => selector === `${labOptionRadio('immune')}:focus-visible`
+    ),
+    'the keyboard ring is measured on the radio the ArrowRight reached'
+  );
+  const options = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'OPTIONS').init.arguments[0].elements;
+  assert.deepEqual(
+    options.map(({ properties }) => properties.find(({ key }) => key.name === 'value').value.value),
+    ['breakable', 'immune', 'limited'],
+    'Immune is the next enabled option after Breakable'
   );
 });
 

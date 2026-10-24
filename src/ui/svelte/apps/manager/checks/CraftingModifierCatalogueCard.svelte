@@ -23,6 +23,8 @@
   import Chip from '../../../components/Chip.svelte';
   import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import { localizeOptions } from '../../../util/localizeOr.js';
+  import { latestRequestHold } from '../../../util/latestRequestHold.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import {
@@ -99,6 +101,10 @@
   };
 
   const subjectCopy = $derived(SUBJECT_COPY[activity] || SUBJECT_COPY.crafting);
+  const policyHeading = text(
+    'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading',
+    'How they combine'
+  );
 
   // Icon vocabulary for the four combination rules. THE GLYPH TEST IS WHETHER FOUNDRY CAN
   // RENDER IT, not whether the name is free: a module may write a configuration Foundry
@@ -126,10 +132,8 @@
     {
       value: 'bySubject',
       icon: 'fas fa-scroll',
-      labelKey: subjectCopy.labelKey,
-      fallback: subjectCopy.label,
-      descKey: subjectCopy.descKey,
-      descFallback: subjectCopy.desc,
+      label: text(subjectCopy.labelKey, subjectCopy.label),
+      description: text(subjectCopy.descKey, subjectCopy.desc),
     },
     {
       value: 'playerPicks',
@@ -217,6 +221,8 @@
   // Normalized through the resolver's OWN vocabulary rather than a local mirror, which is also
   // what makes a world carrying the legacy `byRecipe` select `bySubject`.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
+  let heldPolicy = $state('');
+  const holdPolicy = latestRequestHold((held) => (heldPolicy = held));
   // Whether the rule defers the selection, and so whether the cap means anything, asked of
   // the resolver rather than a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
@@ -257,13 +263,10 @@
 
   // The three SELECTION writes, the whole of what this card persists; none can touch the
   // library, the store's check-modifier saver accepting no library key at all.
-  function selectPolicy(policy) {
-    onChange({ defaultModifierPolicy: policy });
-  }
+  const selectPolicy = (policy) =>
+    holdPolicy(policy, () => onChange({ defaultModifierPolicy: policy }));
 
-  function selectMaxPicks(next) {
-    onChange({ maxModifierPicks: next });
-  }
+  const selectMaxPicks = (next) => onChange({ maxModifierPicks: next });
 
   function toggleDefault(id, checked) {
     const next = checked
@@ -493,9 +496,7 @@
 <InspectorCard flush class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
-      <h3 class="manager-checks-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'How they combine')}
-      </h3>
+      <h3 class="manager-checks-card-title">{policyHeading}</h3>
       <p class="manager-checks-card-description">
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyLead',
@@ -513,10 +514,9 @@
          cap applies to. It REFLOWS to 1x4 rather than overflowing at a narrow pane, the card
          declaring itself a container in the style block below. -->
     <RadioCardGroup
-      legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
-      legend="How they combine"
-      options={policyOptions}
-      value={selectedPolicy}
+      legend={policyHeading}
+      options={localizeOptions(policyOptions)}
+      value={heldPolicy || selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
       data-crafting-modifier-policy

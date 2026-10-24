@@ -618,6 +618,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the specimen that mounts the strip through the published seam, keyboard-selected',
     ],
     [
+      'src/ui/svelte/components/RadioCardGroup.svelte',
+      'manager-published-option-cards-specimen',
+      'the specimen that mounts the group through the published seam, keyboard-chosen',
+    ],
+    [
       'src/ui/svelte/components/Callout.svelte',
       'manager-essence-edit-unscoped-on-craft',
       'the one frame that draws the `items` form, the essence On craft primer',
@@ -947,6 +952,20 @@ test('(a) an EditorTabs change publishes its twenty frames, then the specimen th
     'player-salvage',
     'player-gathering-events',
     'manager-published-tabs-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) a RadioCardGroup change publishes its six frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/RadioCardGroup.svelte';
+  const frames = [
+    'world-tool-entry-requirements',
+    'manager-tool-parity-03-breakage-1280x720',
+    'player-crafting-ingredient-routed',
+    'manager-crafting-settings',
+    'manager-checks-crafting-modifiers',
+    'fabricate-journal-lifecycle-ingredient-route',
+    'manager-published-option-cards-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });

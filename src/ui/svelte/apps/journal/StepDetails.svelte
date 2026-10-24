@@ -8,6 +8,7 @@
   import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
+  import { arrayOrEmpty } from '../../../../utils/scalars.js';
   import {
     presentCurrencySpends,
     presentEssenceSpend,
@@ -16,6 +17,7 @@
 
   let { step = null, run = null, journal = null, editable = false } = $props();
   let openSlot = $state('');
+  let pendingRouteId = $state('');
   const busy = $derived(Boolean(journal?.busyRunKey || journal?.busyRunId));
 
   const snapshot = $derived(
@@ -23,9 +25,7 @@
       ? step.requirementSnapshot
       : null
   );
-  const groups = $derived(
-    Array.isArray(snapshot?.ingredientGroups) ? snapshot.ingredientGroups : []
-  );
+  const groups = $derived(arrayOrEmpty(snapshot?.ingredientGroups));
   const availability = $derived(step?.selectionAvailability ?? null);
   const plan = $derived(step?.selectionPlan ?? {});
 
@@ -76,11 +76,13 @@
   function chooseRoute(id) {
     if (!editable || busy || !routes.some((route) => route.id === id)) return;
     openSlot = '';
-    journal?.setSelection?.(run, {
+    pendingRouteId = id;
+    const saved = journal?.setSelection?.(run, {
       selectedIngredientSetId: id,
       ingredientOptionOverrides: {},
       ingredientEssenceAllocation: { stepId: step?.stepId, ingredientSetId: id, allocation: {} },
     });
+    Promise.resolve(saved).finally(() => (pendingRouteId = ''));
   }
   const requirementsHint = $derived.by(() => {
     if (busy) return localize('FABRICATE.App.Journal.Actions.Working');
@@ -133,9 +135,7 @@
         : null,
     };
   }
-  const requirements = $derived(
-    Array.isArray(availability?.requirements) ? availability.requirements : []
-  );
+  const requirements = $derived(arrayOrEmpty(availability?.requirements));
   const historicalRequirements = $derived(groups.map(historicalRequirement));
 
   function choiceOptions(groupId, fallback) {
@@ -345,7 +345,7 @@
         value: route.id,
         label: route.name || localize('FABRICATE.App.Journal.Stage.RouteOrdinal', { n: index + 1 }),
       }))}
-      value={availability?.selectedIngredientSetId ?? ''}
+      value={pendingRouteId || (availability?.selectedIngredientSetId ?? '')}
       groupName={`journal-route-${step?.stepId}`}
       disabled={!editable || busy}
       onChange={chooseRoute}

@@ -100,6 +100,54 @@ describe('CraftingSettingsView (mounted)', () => {
     assert.deepEqual(calls, ['global']);
   });
 
+  it('keeps a clicked visibility mode drawn chosen while its save is pending', async () => {
+    let settle;
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ visibilityMode: 'knowledge' }),
+      onSetVisibilityMode: () => new Promise((resolve) => (settle = resolve))
+    });
+
+    const radio = selectRadio(root, 'data-crafting-visibility-mode-option', 'global');
+    await flushRender();
+
+    assert.equal(radio.checked, true, 'the pressed radio stays checked while the save is in flight');
+    assert.equal(
+      activeOptionValue(root, 'data-crafting-visibility-mode', 'data-crafting-visibility-mode-option'),
+      'global'
+    );
+    settle();
+    await flushRender();
+    assert.equal(
+      activeOptionValue(root, 'data-crafting-visibility-mode', 'data-crafting-visibility-mode-option'),
+      'knowledge',
+      'once the save settles the group draws the saved system, here unchanged'
+    );
+  });
+
+  it('keeps a later visibility press drawn chosen when an earlier save settles first', async () => {
+    const settles = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ visibilityMode: 'knowledge' }),
+      onSetVisibilityMode: () =>
+        new Promise((resolve) => {
+          settles.push(resolve);
+        })
+    });
+    const drawn = () =>
+      activeOptionValue(root, 'data-crafting-visibility-mode', 'data-crafting-visibility-mode-option');
+
+    selectRadio(root, 'data-crafting-visibility-mode-option', 'global');
+    await flushRender();
+    selectRadio(root, 'data-crafting-visibility-mode-option', 'item');
+    await flushRender();
+    settles[0]();
+    await flushRender();
+    assert.equal(drawn(), 'item', 'the earlier save settling does not release the later press');
+    settles[1]();
+    await flushRender();
+    assert.equal(drawn(), 'knowledge', 'then the group draws the saved system, here unchanged');
+  });
+
   it('reflects the visibility mode in the effect panel (item shows Books & Scrolls + Limited use)', async () => {
     const root = await harness.mount({ selectedSystem: makeSystem({ visibilityMode: 'item' }) });
 
