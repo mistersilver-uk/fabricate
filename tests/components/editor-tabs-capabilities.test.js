@@ -226,8 +226,13 @@ describe('a tab entry may carry a description', () => {
     await settle();
     assert.deepEqual(shown(root), ['editor-tooltip-inputs']);
 
+    const reached = [];
+    const hear = (event) => reached.push(event.key);
+    globalThis.document.addEventListener('keydown', hear);
     press(inputs, 'Escape');
+    globalThis.document.removeEventListener('keydown', hear);
     await settle();
+    assert.deepEqual(reached, ['Escape'], 'with focus in the strip the key travels on to the window');
     assert.deepEqual(shown(root), [], 'Escape hides it');
     assert.ok(globalThis.document.activeElement === inputs, 'without moving focus');
     assert.deepEqual(selected, [], 'or selection');
@@ -363,6 +368,32 @@ describe('a tab entry may carry a description', () => {
     } finally {
       document.addEventListener = add;
       document.removeEventListener = remove;
+    }
+  });
+
+  it('binds its capturing listener on the document its tablist is in (issue 2627)', async () => {
+    const root = await annotated({ tabs: DESCRIBED, activeTab: 'overview' });
+    const second = globalThis.document.implementation.createHTMLDocument('second');
+    second.body.append(root);
+    const bound = { second: [], first: [] };
+    const watch = (doc, into) => {
+      const add = doc.addEventListener;
+      doc.addEventListener = function (type, listener, options) {
+        if (type === 'keydown' && options === true) into.push('+');
+        return add.call(this, type, listener, options);
+      };
+      return () => {
+        doc.addEventListener = add;
+      };
+    };
+    const stop = [watch(second, bound.second), watch(globalThis.document, bound.first)];
+    try {
+      fire(button(root, 'inputs'), 'mouseenter');
+      await settle();
+      assert.deepEqual(bound.second, ['+'], 'the document holding the strip got the listener');
+      assert.deepEqual(bound.first, [], 'and the global document did not');
+    } finally {
+      for (const restore of stop) restore();
     }
   });
 
