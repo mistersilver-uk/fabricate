@@ -227,12 +227,18 @@ describe('a tab entry may carry a description', () => {
     assert.deepEqual(shown(root), ['editor-tooltip-inputs']);
 
     const reached = [];
-    const hear = (event) => reached.push(event.key);
+    const hear = (event) => {
+      reached.push(event.key);
+    };
     globalThis.document.addEventListener('keydown', hear);
     press(inputs, 'Escape');
     globalThis.document.removeEventListener('keydown', hear);
     await settle();
-    assert.deepEqual(reached, ['Escape'], 'with focus in the strip the key travels on to the window');
+    assert.deepEqual(
+      reached,
+      ['Escape'],
+      'with focus in the strip the key travels on to the window'
+    );
     assert.deepEqual(shown(root), [], 'Escape hides it');
     assert.ok(globalThis.document.activeElement === inputs, 'without moving focus');
     assert.deepEqual(selected, [], 'or selection');
