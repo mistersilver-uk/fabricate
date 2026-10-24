@@ -405,6 +405,16 @@ const ICON_PINNED = `${ICON_PANEL} .essence-icon-picker-option.pinned`;
 /** Sized to the fixture's 320px ground and the list that opens below its trigger. */
 const ICON_WINDOW = Object.freeze({ width: 440, height: 560 });
 
+const MENU_GROUND = '[data-lab-action-menu]';
+const MENU_TARGET = `${MENU_GROUND} [data-lab-action-menu-target]`;
+const MENU_TRIGGER = `${MENU_GROUND} .fabricate-icon-button`;
+const MENU_PANEL = `${MENU_GROUND} > div > .fabricate-action-menu-panel`;
+const MENU_FIRST = `${MENU_PANEL} button.manager-action-menu-item:first-child`;
+const MENU_FOCUSED = `${MENU_GROUND} .fabricate-action-menu-panel button.manager-action-menu-item:focus`;
+
+/** Sized to the fixture's 320px ground and the menu that opens below its trigger. */
+const MENU_WINDOW = Object.freeze({ width: 440, height: 380 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1377,6 +1387,74 @@ export const CASES = Object.freeze([
     position: ICON_WINDOW,
     kinds: ['manager', 'specimen'],
     // `IconPicker.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-action-menu-specimen',
+    label:
+      'Specimen, mounted through the published seam — a reagent action menu at the end of a row on a 320px column of the --fab-bg-2 ground, which is also its overlay host, its trigger the overflow glyph named Reagent actions for Flask, after one step: Enter pressed on the trigger, which opened the menu below it in the ground with focus on its first item. So Duplicate reagent holds keyboard focus on the raised fill with its 1px accent ring drawn inside its edge, Archive reagent is dimmed as disabled, and Delete reagent is drawn in the danger ink',
+    // Beyond the smoke: a companion mounts it through `api.ui`; the menu is drawn in its own host.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-action-menu' },
+    steps: [{ selector: MENU_TRIGGER, press: 'Enter' }],
+    // The menu in the host the companion passed, focus on its first item.
+    expectSelector: `${MENU_FIRST}:focus-visible`,
+    expectCenterHit: MENU_FIRST,
+    expectContained: [
+      { container: MENU_GROUND, target: MENU_TARGET },
+      { container: MENU_GROUND, target: '.fabricate-action-menu-panel' },
+      { container: '.window-content', target: MENU_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The panel's and the item's concentric corners, and the focused item's inset ring by its
+        // shape; its colour is the census's.
+        { selector: MENU_PANEL, styles: 'border-radius: 11px' },
+        {
+          selector: MENU_FIRST,
+          styles:
+            'border-radius: 7px; outline-style: solid; outline-width: 1px; outline-offset: -1px',
+        },
+      ],
+    },
+    position: MENU_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ActionMenu.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-action-menu-choice',
+    label:
+      'Specimen, mounted through the published seam — the same reagent action menu, after three steps: Enter pressed on the trigger, which opened the menu with focus on Duplicate reagent; ArrowDown, which skipped the disabled Archive reagent to Delete reagent; and Enter, which chose it, so Fabricate called onSelect with delete, which the ground records. So the menu is closed and focus has returned to the trigger, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and trigger',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each command chosen.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-action-menu' },
+    steps: [
+      { selector: MENU_TRIGGER, press: 'Enter' },
+      { selector: MENU_FOCUSED, press: 'ArrowDown' },
+      { selector: MENU_FOCUSED, press: 'Enter' },
+    ],
+    // The id the companion was told of, the menu closed, and the focus Fabricate returned.
+    expectSelector: `${MENU_GROUND}[data-lab-action-chosen="delete"]:not(:has(.fabricate-action-menu-panel)) .fabricate-icon-button:focus-visible`,
+    expectCenterHit: MENU_TRIGGER,
+    expectContained: [
+      { container: MENU_GROUND, target: MENU_TARGET },
+      { container: '.window-content', target: MENU_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The returned focus's ring by its shape; its colour is the census's.
+        {
+          selector: MENU_TRIGGER,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: MENU_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `ActionMenu.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);
