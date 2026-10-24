@@ -394,6 +394,17 @@ const compactSegment = (value) =>
 /** Sized to the fixture's two 600px grounds, one above the other. */
 const PAGER_WINDOW = Object.freeze({ width: 720, height: 240 });
 
+/** The icon picker fixture's ground, which is also its overlay host, its target, trigger and list. */
+const ICON_GROUND = '[data-lab-icon-picker]';
+const ICON_TARGET = `${ICON_GROUND} > [data-lab-icon-picker-target]`;
+const ICON_TRIGGER = `${ICON_GROUND} .essence-icon-picker-trigger`;
+const ICON_PANEL = `${ICON_GROUND} > div > .fabricate-icon-picker-popover`;
+const ICON_FIELD = `${ICON_PANEL} input`;
+const ICON_PINNED = `${ICON_PANEL} .essence-icon-picker-option.pinned`;
+
+/** Sized to the fixture's 320px ground and the list that opens below its trigger. */
+const ICON_WINDOW = Object.freeze({ width: 440, height: 560 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1299,6 +1310,74 @@ export const CASES = Object.freeze([
     position: PAGER_WINDOW,
     kinds: ['manager', 'specimen'],
     // `Pagination.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-icon-picker-specimen',
+    label:
+      'Specimen, mounted through the published seam — a reagent icon picker on a 320px column of the --fab-bg-2 ground, which is also its overlay host, its trigger showing the flask glyph, the name Flask and a caret, after one step: Enter pressed on the trigger, which opened the list in the ground with focus in its query field. So the query field holds keyboard focus, its 1px border turned to the accent and its Search icons placeholder hidden, and the flask row is pinned first above the vocabulary and selected',
+    // Beyond the smoke: a companion mounts it through `api.ui`; the list is drawn in its own host.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-icon-picker' },
+    steps: [{ selector: ICON_TRIGGER, press: 'Enter' }],
+    // The list in the host the companion passed, focus in its query field, and the value's row
+    // pinned and selected.
+    expectSelector: `${ICON_GROUND} > div > .fabricate-icon-picker-popover:has(input:focus) .essence-icon-picker-option.pinned[aria-selected="true"]`,
+    expectCenterHit: ICON_PINNED,
+    expectContained: [
+      { container: ICON_GROUND, target: ICON_TARGET },
+      { container: '.window-content', target: ICON_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The trigger's and the pinned row's declared corners, and the focused field's want of a
+        // ring of its own; its accent border's colour is the census's.
+        { selector: ICON_TRIGGER, styles: 'border-radius: 9px' },
+        { selector: ICON_PINNED, styles: 'border-radius: 9px' },
+        { selector: `${ICON_FIELD}:focus-visible`, styles: 'outline-style: none' },
+      ],
+    },
+    position: ICON_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `IconPicker.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-icon-picker-choice',
+    label:
+      'Specimen, mounted through the published seam — the same reagent icon picker, after four steps: Enter pressed on the trigger, which opened the list with focus in its query field; ArrowDown pressed twice there, which moved the active row past the pinned flask row to the first glyph of the vocabulary; and Enter, which chose it, so Fabricate called onChange, whose update drew the chosen glyph. So the list is closed, the trigger shows the chosen glyph and its name, and focus has returned to the trigger, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and trigger',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each glyph chosen.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-icon-picker' },
+    steps: [
+      { selector: ICON_TRIGGER, press: 'Enter' },
+      { selector: ICON_FIELD, press: 'ArrowDown' },
+      { selector: ICON_FIELD, press: 'ArrowDown' },
+      { selector: ICON_FIELD, press: 'Enter' },
+    ],
+    // A glyph other than the flask, drawn on the trigger by the companion's own update, under the
+    // fixture's echo of the choice, which only `onChange` writes, and the focus Fabricate returned.
+    expectSelector:
+      '[data-lab-icon-chosen]:not([data-lab-icon-chosen="fas fa-flask"]) .essence-icon-picker-trigger:not(:has(.fa-flask)):focus-visible',
+    expectCenterHit: ICON_TRIGGER,
+    expectContained: [
+      { container: ICON_GROUND, target: ICON_TARGET },
+      { container: '.window-content', target: ICON_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The returned focus's ring by its shape; its colour is the census's.
+        {
+          selector: ICON_TRIGGER,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: ICON_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `IconPicker.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

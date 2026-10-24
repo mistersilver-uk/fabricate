@@ -1003,6 +1003,16 @@ test('(a) a Pagination change publishes its four frames, then the two specimens 
   assertBroadSignalFrames(file, frames);
 });
 
+test('(a) an IconPicker change publishes its frame, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/IconPicker.svelte';
+  const frames = [
+    'manager-system-edit-lists',
+    'manager-published-icon-picker-specimen',
+    'manager-published-icon-picker-choice',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [

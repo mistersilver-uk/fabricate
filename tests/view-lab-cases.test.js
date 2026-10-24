@@ -408,6 +408,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
   'tests/view-lab/fixtures/PublishedPagination.svelte',
+  'tests/view-lab/fixtures/PublishedIconPicker.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -1479,6 +1480,30 @@ const NON_VERB_CONTROLS = Object.freeze({
     {
       selector: '[data-lab-pagination="compact"] [data-pagination-page]',
       styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+    },
+  ],
+  // The published icon picker (issue 2647): the trigger's and the pinned row's corners, and the
+  // focused query field's want of a ring of its own.
+  'manager-published-icon-picker-specimen': [
+    {
+      selector: '[data-lab-icon-picker] .essence-icon-picker-trigger',
+      styles: 'border-radius: 9px',
+    },
+    {
+      selector:
+        '[data-lab-icon-picker] > div > .fabricate-icon-picker-popover .essence-icon-picker-option.pinned',
+      styles: 'border-radius: 9px',
+    },
+    {
+      selector: '[data-lab-icon-picker] > div > .fabricate-icon-picker-popover input:focus-visible',
+      styles: 'outline-style: none',
+    },
+  ],
+  // The trigger focus returned to after a keyboard choice: its ring, by its shape.
+  'manager-published-icon-picker-choice': [
+    {
+      selector: '[data-lab-icon-picker] .essence-icon-picker-trigger',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
 });
@@ -6151,13 +6176,15 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-segmented-specimen',
       'manager-published-pagination-specimen',
       'manager-published-pagination-size-specimen',
+      'manager-published-icon-picker-specimen',
+      'manager-published-icon-picker-choice',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, and the pagination fixture's two pagers. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, and the icon picker fixture's picker. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6173,9 +6200,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'RadioCardGroup',
   'SegmentedControl',
   'Pagination',
+  'IconPicker',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl and Pagination and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination and IconPicker and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])

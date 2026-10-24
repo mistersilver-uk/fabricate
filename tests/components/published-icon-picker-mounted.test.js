@@ -5,8 +5,8 @@
  * its query field, a choice by pointer and by key reaching `onChange` with the glyph's class
  * string, Escape and an outside press closing without one, the keys and presses that stop at the
  * picker, the list hosted by the `overlayHost` option, the nearest `.fabricate-app` and the
- * standalone layer, `destroy` and `update` while open, a second window, and every refusal the entry
- * adds. The query field and the panel's names are held here because the static gates pin them to
+ * standalone layer, `destroy` and `update` while open, a second window, every refusal the entry
+ * adds, and both View Lab specimens. The query field and the panel's names are held here because the static gates pin them to
  * the picker's defaults and keys, and the choice because it crosses into the shared picker.
  */
 import assert from 'node:assert/strict';
@@ -17,6 +17,8 @@ import { Window } from 'happy-dom';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { fixtureLiteral } from '../helpers/labFixtureLiterals.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
@@ -688,5 +690,105 @@ describe('the published IconPicker refuses', () => {
       fabricateTarget(shells),
       document.createTextNode('host')
     );
+  });
+});
+
+describe('the icon picker View Lab specimen cases against the DOM the fixture draws', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedIconPicker.svelte';
+  const count = (selector) => document.querySelectorAll(selector).length;
+
+  /**
+   * The fixture's ground, which is the overlay host, its picker mounted into the target, and the
+   * echo `onChange` writes; `update` false is a companion whose `onChange` passes nothing back.
+   */
+  function drawFixture({ update = true } = {}) {
+    const fixed = fixtureLiteral(FIXTURE, 'PICKER');
+    const ground = document.createElement('div');
+    ground.setAttribute('data-lab-icon-picker', '');
+    const slot = document.createElement('div');
+    slot.setAttribute('data-lab-icon-picker-target', '');
+    ground.append(slot);
+    fabricateTarget(shells, 'fabricate fabricate-app').append(ground);
+    let { value } = fixed;
+    const props = () => ({
+      ...fixed,
+      value,
+      onChange: (next) => {
+        if (update) {
+          value = next;
+          handle.update(props());
+        }
+        ground.setAttribute('data-lab-icon-chosen', next);
+      },
+    });
+    const handle = ui().mount('IconPicker', { target: slot, props: props(), overlayHost: ground });
+    handles.push(handle);
+    flushSync();
+    return { slot };
+  }
+
+  /** Runs each of the case's steps on the one element it names; happy-dom clicks no button on Enter. */
+  async function runSteps(viewCase) {
+    for (const [at, step] of viewCase.steps.entries()) {
+      assert.equal(count(step.selector), 1, `step ${at} names one element`);
+      const node = document.querySelector(step.selector);
+      if (node.tagName === 'BUTTON') node.click();
+      else press(node, step.press);
+      flushSync();
+      await settle();
+    }
+  }
+
+  const assertNamesOne = (viewCase) => {
+    for (const selector of [
+      viewCase.expectCenterHit,
+      ...viewCase.expectLayout.controls.map((control) => control.selector),
+    ]) {
+      assert.equal(count(selector), 1, `${selector} names one element`);
+    }
+  };
+
+  const SPECIMENS = [
+    {
+      id: 'manager-published-icon-picker-specimen',
+      reached: () => document.querySelector('[role="option"].pinned'),
+      // The open list is drawn whatever the companion passes back.
+      unchanged: false,
+    },
+    {
+      id: 'manager-published-icon-picker-choice',
+      reached: (slot) => slot.querySelector('button'),
+      unchanged: true,
+    },
+  ];
+
+  for (const { id, reached, unchanged } of SPECIMENS) {
+    const viewCase = getCaseById(id);
+
+    it(`${id} waits on exactly one element once its steps and the update have run`, async () => {
+      const { slot } = drawFixture();
+      await settle();
+      assert.equal(count(viewCase.expectSelector), 0, 'not before the steps');
+      await runSteps(viewCase);
+      assert.equal(count(viewCase.expectSelector), 1, 'one element after them');
+      assert.ok(document.querySelector(viewCase.expectSelector) === reached(slot));
+      assertNamesOne(viewCase);
+    });
+
+    if (unchanged) {
+      it(`${id} waits on nothing when the companion’s onChange passes no update`, async () => {
+        drawFixture({ update: false });
+        await settle();
+        await runSteps(viewCase);
+        assert.equal(count(viewCase.expectSelector), 0, 'its choice was never drawn');
+      });
+    }
+  }
+
+  it('matches neither case’s selector once a companion that passes no update has chosen', async () => {
+    drawFixture({ update: false });
+    await settle();
+    await runSteps(getCaseById('manager-published-icon-picker-choice'));
+    for (const { id } of SPECIMENS) assert.equal(count(getCaseById(id).expectSelector), 0, id);
   });
 });
