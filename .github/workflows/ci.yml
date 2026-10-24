@@ -84,17 +84,19 @@ jobs:
       # apt does not fail — it hangs, so a bare retry would never reach its second attempt.
       # Two 3-minute attempts cap this at ~6 minutes however badly the mirror behaves, which
       # is what makes the job timeout above a statement about the tests again.
+      # No `--with-deps`: a cache hit already launches Chromium without its apt packages, and a
+      # killed `apt-get` keeps the dpkg lock, so the retry would fail at once (issue 2642).
       - name: Install Playwright Chromium
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         timeout-minutes: 7
         run: |
           for attempt in 1 2; do
-            if timeout 180 npm run test:foundry:install; then
+            if timeout 180 npx playwright install chromium; then
               exit 0
             fi
             echo "::warning::playwright install attempt $attempt failed or timed out; retrying"
           done
-          echo "::error::playwright install failed twice; see issue 1264"
+          echo "::error::playwright install failed twice; see issues 1264 and 2642"
           exit 1
 
       # TEE'd to RUNNER_TEMP rather than the workspace: several suites scan the repository tree, and
