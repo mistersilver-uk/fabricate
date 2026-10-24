@@ -925,7 +925,7 @@ function segmentedControlCallSites() {
 // A real smoke failure, not a hypothetical: the two recipe bulk-edit frames staged their
 // segmented axes with `[data-recipe-bulk-lock-option="lock"] input`, and both steps timed out
 // after 30s with `<span class="manager-segment-label">Lock</span> intercepts pointer events`.
-// `SegmentedControl.svelte` hides its real radio at 1x1 under `clip: rect(0 0 0 0)`, and an
+// `SegmentedControl.svelte` hides its real radio at 1x1 under `clip-path: inset(50%)`, and an
 // absolutely-positioned child of a `justify-content: center` flex container takes its static
 // position at that container's CENTRE — so the radio's 1px box sits directly beneath the middle
 // of the visible span. Playwright does not fall back to the enclosing label; it fails the step.

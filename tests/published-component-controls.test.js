@@ -112,6 +112,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': null,
   // In the `control` snippet, which both branches of `{#if label}` render.
   'src/ui/svelte/components/SearchField.svelte: input': 'always',
+  // One radio for each item of `options`.
+  'src/ui/svelte/components/SegmentedControl.svelte: input': 'options',
   'src/ui/svelte/components/StatusToggle.svelte: button': {
     defaults: ['as'],
     heldBy:
@@ -178,6 +180,14 @@ const OWN_NAMES = Object.freeze({
     keys: ['options'],
     heldBy:
       'tests/components/published-radio-card-group-mounted.test.js: the published RadioCardGroup names',
+  },
+  // Each option's `label`, which the entry's group states is required, through the radio's
+  // wrapping `<label>`.
+  'src/ui/svelte/components/SegmentedControl.svelte: input': {
+    entry: 'SegmentedControl',
+    keys: ['options'],
+    heldBy:
+      'tests/components/published-segmented-control-mounted.test.js: the published SegmentedControl names',
   },
 });
 
@@ -246,6 +256,13 @@ const ENTRY_EVENTS = Object.freeze({
       tag: 'input',
       heldBy:
         'tests/components/published-radio-card-group-mounted.test.js: the keyboard on the published RadioCardGroup',
+    },
+  },
+  SegmentedControl: {
+    onchange: {
+      tag: 'input',
+      heldBy:
+        'tests/components/published-segmented-control-mounted.test.js: the keyboard on the published SegmentedControl',
     },
   },
 });
@@ -792,6 +809,23 @@ const SCOPED_RINGS = Object.freeze({
           ['outline', '2px solid var(--fab-accent)'],
           ['outline-offset', '1px'],
         ],
+      },
+    ],
+  },
+  'src/ui/svelte/components/SegmentedControl.svelte': {
+    statedBy:
+      'The `SegmentedControl` segment keeps its own ring, the 2px accent at a 2px offset drawn on the segment around its visually hidden radio, which the `tag` tone turns inward to a -2px offset.',
+    rules: [
+      {
+        selector: '.manager-segment:has(:focus-visible)',
+        declarations: [
+          ['outline', '2px solid var(--fab-accent)'],
+          ['outline-offset', '2px'],
+        ],
+      },
+      {
+        selector: '.manager-segmented.is-tag .manager-segment:has(:focus-visible)',
+        declarations: [['outline-offset', '-2px']],
       },
     ],
   },

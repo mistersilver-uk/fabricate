@@ -35,7 +35,7 @@
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice`,
  * `Callout` and `IconButton`, `Callout`'s `items[].icon`, `EditorTabs`' `tabs[].icon` and
- * `RadioCardGroup`'s `options[].icon`), or an
+ * `RadioCardGroup`'s and `SegmentedControl`'s `options[].icon`), or an
  * unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
@@ -1139,7 +1139,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges twenty-three focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges twenty-four focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1163,6 +1163,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: div',
       'src/ui/svelte/components/SearchablePopoverPanel.svelte: input',
       'src/ui/svelte/components/SearchField.svelte: input',
+      'src/ui/svelte/components/SegmentedControl.svelte: input',
       'src/ui/svelte/components/StatusToggle.svelte: button',
       'src/ui/svelte/components/StatusToggle.svelte: input',
       'src/ui/svelte/components/Stepper.svelte: button',
@@ -1216,6 +1217,7 @@ describe('each entry matches its component declaration', () => {
         'IconButton.onclick: 0',
         'EditorTabs.onSelect: 1',
         'RadioCardGroup.onChange: 1',
+        'SegmentedControl.onChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -2817,6 +2819,7 @@ describe('the module sheet and every component style against the published Inspe
         'IconButton',
         'EditorTabs',
         'RadioCardGroup',
+        'SegmentedControl',
       ],
       'an entry with a required root needs a census of its own'
     );

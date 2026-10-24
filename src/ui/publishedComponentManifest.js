@@ -389,4 +389,19 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'SegmentedControl',
+    path: 'src/ui/svelte/components/SegmentedControl.svelte',
+    version: 1,
+    props: Object.freeze({
+      options: Object.freeze({ kind: 'data', required: true }),
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      fill: Object.freeze({ kind: 'data' }),
+      density: Object.freeze({ kind: 'data' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);
