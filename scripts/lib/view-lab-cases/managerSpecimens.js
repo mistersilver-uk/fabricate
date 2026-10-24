@@ -1237,15 +1237,16 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-pagination-specimen',
     label:
-      'Specimen, mounted through the published seam — a reagent pager on a 600px column of the --fab-bg-2 ground, 60 records at 25 a page on page 2 of 3, its sizes 10, 25 and 50 with 25 selected, at the default density on its own --fab-bg-1 bar, after one step: Enter pressed on the Next arrow, so Fabricate called onPageChange, whose update drew the last page. So the summary reads 51–60 of 60 reagents and the page label Page 3 of 3, Next is disabled, and focus rests on the Previous arrow, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and arrow',
+      "Specimen, mounted through the published seam — a reagent pager on a 600px column of the --fab-bg-2 ground, 60 records at 25 a page on page 2 of 3, its sizes 10, 25 and 50 with 25 selected, at the default density on its own --fab-bg-1 bar, after one step: Enter pressed on the Next arrow, so Fabricate called onPageChange, whose update drew the last page. So the summary reads 51–60 of 60 reagents and the page label Page 3 of 3, Next is disabled, and focus rests on the Previous arrow, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and arrow, and whose name, Previous reagents page, shows in Foundry's tooltip, opened by the keyboard focus Fabricate moved to it",
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each page turn.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-pagination' },
     steps: [{ selector: `${pagerGround('browse')} [data-pagination-next]`, press: 'Enter' }],
     // The last page drawn by the companion's own update, under the fixture's echo of the page,
-    // which only `onPageChange` writes, and the focus Fabricate moved off the disabled Next.
-    expectSelector: `${pagerGround('browse')}[data-lab-pagination-page="2"]:has([data-pagination-next]:disabled) [data-pagination-prev]:focus-visible`,
+    // which only `onPageChange` writes, and the focus Fabricate moved off the disabled Next, which
+    // opens Previous's tooltip.
+    expectSelector: `${pagerGround('browse')}[data-lab-pagination-page="2"]:has([data-pagination-next]:disabled) [data-pagination-prev][aria-describedby="tooltip"]:focus-visible`,
     expectCenterHit: BROWSE_PREVIOUS,
     expectContained: [
       { container: pagerGround('browse'), target: pagerTarget('browse') },
