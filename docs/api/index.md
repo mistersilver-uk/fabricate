@@ -3427,12 +3427,13 @@ const fabUi = game.fabricate?.api?.ui;
 if (fabUi?.describe?.('IconPicker')?.overlays !== true) return;
 
 let icon = reagent.icon;
+// The glyph's name from a class string such as `fas fa-cog`, resolved through its aliases.
 const labelOf = (value) =>
-  game.fabricate.listCuratedIcons().find(({ iconCode }) => value.endsWith(`fa-${iconCode}`))?.label;
+  game.fabricate.findCuratedIcon(/\bfa-([a-z0-9-]+)$/.exec(value ?? '')?.[1] ?? '')?.label;
 const props = () => ({
   value: icon,
   // The choice is heard only through the trigger's name.
-  ariaLabel: `${game.i18n.localize('ACME.ReagentIcon')}: ${labelOf(icon) ?? icon}`,
+  ariaLabel: `${game.i18n.localize('ACME.ReagentIcon')}: ${labelOf(icon) ?? icon ?? ''}`,
   listLabel: game.i18n.localize('ACME.ReagentIcons'),
   searchLabel: game.i18n.localize('ACME.SearchReagentIcons'),
   searchPlaceholder: game.i18n.localize('ACME.SearchIcons'),
