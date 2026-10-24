@@ -407,7 +407,7 @@ function spreadTracer(entry, reader) {
     if (node.type === 'ObjectExpression') {
       return node.properties.flatMap((property) => {
         if (property.type === 'SpreadElement') return originsOf(property.argument, file, ancestors);
-        return property.computed ? originsOf(property.key, file, ancestors) : [];
+        return property.computed ? originsOf(property.key, file, ancestors) : [UNNAMEABLE];
       });
     }
     if (node.type !== 'MemberExpression') return [UNNAMEABLE];

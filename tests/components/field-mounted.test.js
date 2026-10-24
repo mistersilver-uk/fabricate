@@ -376,4 +376,35 @@ describe('RadioCardGroup names each radio by its title and describes it by what 
     radioOf(off, 'bare').dispatchEvent(new Event('change', { bubbles: true }));
     assert.deepEqual(calls, ['bare'], 'a disabled group reports nothing');
   });
+
+  it('checks the previous radio again when a synchronous onChange throws', async () => {
+    const failure = new Error('the caller failed');
+    const root = await mountGroup({
+      onChange: () => {
+        throw failure;
+      },
+    });
+    const radio = radioOf(root, 'later');
+    radio.checked = true;
+    const thrown = [];
+    const onError = (event) => {
+      thrown.push(event.error);
+      event.preventDefault();
+    };
+    const view = root.ownerDocument.defaultView;
+    view.addEventListener('error', onError);
+    try {
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (error) {
+      thrown.push(error);
+    } finally {
+      view.removeEventListener('error', onError);
+    }
+    assert.deepEqual(thrown, [failure], 'the throw is not swallowed');
+    assert.deepEqual(
+      OPTIONS.map(({ value }) => radioOf(root, value).checked),
+      [true, false, false],
+      'the radio `value` names is checked again, and the pressed one is not'
+    );
+  });
 });

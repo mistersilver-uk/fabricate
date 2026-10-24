@@ -372,6 +372,7 @@ describe('a choice on the published RadioCardGroup', () => {
       all.radios().every((node) => node.matches(':disabled')),
       'the fieldset disables every radio'
     );
+    assert.ok(all.fieldset().disabled, 'the fieldset itself is disabled');
     choose(all.radio('immune'));
     assert.deepEqual(all.calls, [], 'a disabled group');
     one.handle.destroy();

@@ -2194,6 +2194,11 @@ describe('each entry matches its component declaration', () => {
       [NO_REST_ELEMENT],
       'a child that spreads it on two elements is not followed'
     );
+    assert.deepEqual(
+      faultsOver("<fieldset {...rest}>{rest['data-x']}</fieldset>"),
+      [NO_REST_ELEMENT],
+      'a child that reads its rest beside the spread is not followed'
+    );
   });
 
   it('refuses restOn on an entry that takes no rest', () => {

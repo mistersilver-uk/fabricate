@@ -401,6 +401,19 @@ describe('the static rules of a publishable component', () => {
     assert.deepEqual(faults(radio('name="a"')), STATES, 'a literal');
     assert.deepEqual(faults(radio('name={group}')), STATES, 'a prop with no unique fallback');
     assert.deepEqual(faults(radio('name={group ?? `a-${uid}`}')), STATES, '?? keeps a blank prop');
+    assert.deepEqual(
+      faults(radio('name={label ? `a-${uid}` : "a"}')),
+      STATES,
+      'a conditional with one shared branch'
+    );
+    const child = faultsOf(
+      {
+        'src/A.svelte': COMPONENT("import B from './B.svelte';", '<B />'),
+        'src/B.svelte': COMPONENT(SCRIPT, radio('name={group || `a-${uid}`}')),
+      },
+      'src/A.svelte'
+    );
+    assert.deepEqual(child, ['src/B.svelte: input states name'], 'a closure child’s prop fallback');
     const published = [{ name: 'A', path: 'src/A.svelte', props: { group: { kind: 'data' } } }];
     assert.deepEqual(
       faults(radio('name={group || `a-${uid}`}'), SCRIPT, published),
@@ -488,11 +501,16 @@ describe('the per-item spreads of a published closure', () => {
     );
   });
 
-  it('reads an object literal by its keys: an unpublished prop key is no item, a published one is', () => {
+  it('reads an object literal by its computed keys: an unpublished prop key is no item, a published one is, and a fixed key fails closed', () => {
     const script = 'let { items = [], tone = "", hook = "", ...rest } = $props();';
     assert.deepEqual(
-      idsOf(script, '{#each items as item}<i {...{ [hook]: item.id, fixed: 1 }}></i>{/each}'),
+      idsOf(script, '{#each items as item}<i {...{ [hook]: item.id }}></i>{/each}'),
       []
+    );
+    assert.deepEqual(
+      idsOf(script, `<button {...{ type: 'submit' }}></button>`),
+      ['src/Fx.svelte: a spread of an item the entry does not publish'],
+      'a fixed key, which no attribute rule reads, is a spread the gate cannot name'
     );
     assert.deepEqual(idsOf(script, '<i {...{ [items]: 1 }}></i>'), [
       'src/Fx.svelte: a spread of a whole item of Fx.items',
