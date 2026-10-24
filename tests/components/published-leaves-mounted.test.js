@@ -6,8 +6,9 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination` and `IconPicker` mount here as leaves; what
- * each draws and refuses is `published-button-mounted.test.js`'s,
+ * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination` and
+ * `IconPicker` mount here as leaves; what each draws and refuses is
+ * `published-button-mounted.test.js`'s,
  * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
  * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
  * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s,

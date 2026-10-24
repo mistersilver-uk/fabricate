@@ -6,8 +6,9 @@
  * string, Escape and an outside press closing without one, the keys and presses that stop at the
  * picker, the list hosted by the `overlayHost` option, the nearest `.fabricate-app` and the
  * standalone layer, `destroy` and `update` while open, a second window, every refusal the entry
- * adds, and both View Lab specimens. The query field and the panel's names are held here because the static gates pin them to
- * the picker's defaults and keys, and the choice because it crosses into the shared picker.
+ * adds, and both View Lab specimens. The query field and the panel's names are held here because
+ * the static gates pin them to the picker's defaults and keys, and the choice because it crosses
+ * into the shared picker.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
