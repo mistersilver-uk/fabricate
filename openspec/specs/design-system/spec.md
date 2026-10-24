@@ -122,7 +122,7 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 An option is `{ value, label, icon?, variant?, disabled?, count? | badge?, validationTarget? }`, and no option carries `labelKey` or `fallback`.
 The caller resolves each label where it builds its options, so an untranslated key still renders the caller's English fallback.
 `SegmentedControl`'s import closure MUST reach no module outside its own file, and so no localization helper and no Foundry global, because the published-component seam refuses any closure that reads one; `ViewToggle`, which composes it, inherits that (issue 2588).
-The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` keeps a lang key plus fallback, because it is not a published-seam entry and is not held by this rule.
+The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` takes its legend, hint, option labels and descriptions as final display text the caller resolves, with `localizeOptions` from `util/localizeOr.js` for an option list; no option carries `labelKey`, `fallback`, `descKey` or `descFallback`, and the group takes no `legendKey` or `hintKey`, so its closure calls no `game.i18n` (issue 2601).
 `EditorTabs` takes its tab labels, accessible-name overrides and descriptions and its strip's `ariaLabel` as final display text the caller resolves, with `localizeTabs` from `util/localizeOr.js` for a tab list; no tab carries `labelKey`, `ariaLabelKey` or `tooltipKey` and the strip takes no `ariaLabelKey`.
 It localizes only the severity names it builds for a Validation tab, through the `APP_LOCALIZER` context, so a tree mounted with none draws their English and calls no `game.i18n`.
 

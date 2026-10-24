@@ -95,6 +95,8 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
+  // One radio for each item of `options`.
+  'src/ui/svelte/components/RadioCardGroup.svelte: input': 'options',
   // The picker's own trigger, past every trigger form `Select` does not pass.
   'src/ui/svelte/components/SearchablePopover.svelte: button': {
     defaults: ['anchor', 'inlineSearchTrigger', 'open', 'trigger', 'triggerButton', 'triggerChip'],
@@ -169,6 +171,14 @@ const OWN_NAMES = Object.freeze({
     heldBy:
       'tests/components/published-editor-tabs-mounted.test.js: the published EditorTabs names',
   },
+  // Each option's `label`, which the entry's group states is required, through the radio's
+  // `aria-labelledby`.
+  'src/ui/svelte/components/RadioCardGroup.svelte: input': {
+    entry: 'RadioCardGroup',
+    keys: ['options'],
+    heldBy:
+      'tests/components/published-radio-card-group-mounted.test.js: the published RadioCardGroup names',
+  },
 });
 
 /**
@@ -229,6 +239,13 @@ const ENTRY_EVENTS = Object.freeze({
       tag: 'button',
       heldBy:
         'tests/components/published-editor-tabs-mounted.test.js: the keyboard on the published EditorTabs',
+    },
+  },
+  RadioCardGroup: {
+    onchange: {
+      tag: 'input',
+      heldBy:
+        'tests/components/published-radio-card-group-mounted.test.js: the keyboard on the published RadioCardGroup',
     },
   },
 });

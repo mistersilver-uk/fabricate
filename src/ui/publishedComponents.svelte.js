@@ -26,6 +26,7 @@ import Kicker from './svelte/components/Kicker.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
 import Notice from './svelte/components/Notice.svelte';
+import RadioCardGroup from './svelte/components/RadioCardGroup.svelte';
 import SearchField from './svelte/components/SearchField.svelte';
 import Select from './svelte/components/Select.svelte';
 import StageBars from './svelte/components/StageBars.svelte';
@@ -64,6 +65,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Callout.svelte': Callout,
   'src/ui/svelte/components/IconButton.svelte': IconButton,
   'src/ui/svelte/components/EditorTabs.svelte': EditorTabs,
+  'src/ui/svelte/components/RadioCardGroup.svelte': RadioCardGroup,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

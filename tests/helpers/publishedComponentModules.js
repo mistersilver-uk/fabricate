@@ -72,6 +72,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

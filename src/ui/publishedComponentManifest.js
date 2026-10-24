@@ -372,4 +372,21 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: true,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'RadioCardGroup',
+    path: 'src/ui/svelte/components/RadioCardGroup.svelte',
+    version: 1,
+    props: Object.freeze({
+      options: Object.freeze({ kind: 'data', required: true }),
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      legend: Object.freeze({ kind: 'data', required: true }),
+      layout: Object.freeze({ kind: 'data' }),
+      columns: Object.freeze({ kind: 'data' }),
+      disabled: Object.freeze({ kind: 'data' }),
+      disabledOptions: Object.freeze({ kind: 'data' }),
+    }),
+    rest: true,
+    root: 'fabricate',
+  }),
 ]);

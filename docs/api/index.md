@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton` and `EditorTabs`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2058,6 +2058,7 @@ The published components, in publication order:
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
 | `IconButton` | 1 | `fabricate` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
 | `EditorTabs` | 1 | `fabricate` | `tabs` (required), `activeTab`, `onSelect` (callback, required), `ariaLabel` (required), `idStem` (required), `activePanelOnly` | yes |
+| `RadioCardGroup` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `legend` (required), `layout`, `columns`, `disabled`, `disabledOptions` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3145,6 +3146,72 @@ const strip = fabUi.mount('EditorTabs', { target, props: props() });
 // `strip.destroy()` when the sheet goes away, moving focus first if a tab holds it.
 ```
 
+### RadioCardGroup
+
+`RadioCardGroup` draws the design system's option cards (`<OptionCards>` in the library): a named `<fieldset>` of cards, one for each item of `options`, each holding a native `<input type="radio">`, for one choice among a few options.
+`options` is required and is an array of `{ value, label, description, icon }` items, one card each, drawn in that order.
+Each `value` is required and is a non-empty string, unique in the group; a list with a duplicate is unsupported and how it draws is private.
+Each `label` is required and is final display text, the radio's whole name; a label of white space alone leaves the radio with no name, so never pass one.
+Each `description` is optional final display text drawn beneath the label, which describes the radio.
+Each `icon` is optional Font Awesome classes for a glyph drawn in a chip, hidden from assistive technology.
+An item's other members are private and Fabricate draws nothing from them; a function in one is refused.
+`value` is the chosen option's `value` and defaults to `''`: that option's card is drawn chosen and its radio checked, and a `value` that names no option leaves no card chosen.
+`onChange` is a required callback, called with one argument, the chosen option's `value`, a string, when a press or a key checks a radio; it is never called for a disabled option or a disabled group, and a press on the chosen card calls nothing, because a checked radio fires no `change`.
+When `onChange` returns, or throws, Fabricate checks the radio of the mount's `value` again, so to accept a choice make the `update` that passes it from inside `onChange`, before any `await`, and the new card is drawn chosen; a choice you decline leaves the previous card chosen.
+`legend` is required and is the fieldset's name, final display text drawn visually hidden; a legend of white space alone leaves the fieldset with no name, so never pass one.
+`layout` is `'row'` or `'stacked'` and defaults to `'row'`: the chip beside a card's text, or above it.
+`columns` is `1`, `2` or `3` and defaults to `2`, the cards' tracks per row; any other value is private.
+`disabled` is `true` or `false` and defaults to `false`: `true` disables every radio natively.
+`disabledOptions` is an array of `{ value, reason }` items, each disabling the option it names, and `reason` is required non-empty final display text drawn beneath the option's description inside its card, never dimmed, and added to the radio's `aria-describedby`.
+An item that names no option is ignored, and where a value is named twice the first non-empty reason wins.
+Each control is a native radio, so the group consumes no key itself: the platform's radio group moves focus to the next or the previous enabled radio on the arrow keys, wrapping at either end and skipping a disabled one, and checks it, and `Space` checks the focused radio.
+Each such check fires `change`, which calls `onChange`, and every key still bubbles to a `keydown` listener of yours above `target`.
+Focus moves only among one group's radios, by the platform's own handling, and never out of `target`.
+To return focus to the group, focus `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when no option is chosen.
+After a key, a declined choice leaves focus on the radio the key reached, drawn unchecked, so move focus to `target.querySelector('input[type="radio"]:checked')` after you decline one.
+In a host that replaces its content on render (a DialogV2, a Handlebars part, or a `submitOnChange` sheet that renders again after the update a choice causes) the radios are new elements after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when none is checked.
+An `update` that sets `disabled`, or names the focused radio's option in `disabledOptions`, disables the radio holding focus, and the platform moves focus to the document body, where Foundry's keybindings hear Escape and the arrow keys, so move focus first.
+Each choice fires a bubbling `change`, so a form with `submitOnChange` submits on every choice.
+The radios carry a private `name`, unique to the mount, so the chosen value appears under that name in a form's data, except while the group is disabled, and a document sheet's schema discards the key: read the choice from `onChange`, never from the form.
+The group consumes no key, so where the platform applies implicit submission to a focused radio, Enter submits the `<form>` it is in; mount it in no form whose submit you do not want.
+Rest `data-*` attributes land on the fieldset, never on a card or a radio.
+It needs a Fabricate window ancestor, because its cards, chips and radios come from Fabricate's module sheet, rooted at `.fabricate-option-cards`, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
+It reflows to fewer tracks only under a Fabricate host that names `fabricate-option-host`; when and how it reflows is private.
+An empty `options` draws the named fieldset with no card and no radio, so nothing inside `target` takes focus; pass at least one option where the group must be reachable.
+Your own window or dialog carries no Fabricate root, so the group is refused there with `RadioCardGroup needs a Fabricate window ancestor`.
+The radio's keyboard ring is the accent, 2px wide and 2px clear, drawn on the card's own ground.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against a chosen card's `--fab-surface-soft` over `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so mount the group on one of those four grounds.
+`groupName`, `cardId`, `hint`, `legendVisible`, `optionDataAttr`, `optionBody` and a `class` are refused, because a rest key must be a `data-*` attribute, so the group never draws a hint, a visible legend or content of your own in a card.
+
+A worked group follows: a breakage choice on a tool sheet you draw inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['RadioCardGroup'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates `RadioCardGroup` describes none: draw your own choice there.
+if (!fabUi?.describe?.('RadioCardGroup')) return;
+
+let chosen = 'breakable';
+const props = () => ({
+  legend: 'When the tool breaks',
+  options: [
+    { value: 'breakable', label: 'Breakable', icon: 'fas fa-hammer' },
+    { value: 'immune', label: 'Immune', description: 'It never breaks.', icon: 'fas fa-lock' },
+    { value: 'limited', label: 'Limited uses', icon: 'fas fa-hourglass-half' },
+  ],
+  value: chosen,
+  disabledOptions: [{ value: 'limited', reason: 'Coming soon' }],
+  onChange: (value) => {
+    chosen = value;
+    group.update(props()); // Before any `await`, so the card is drawn chosen at once.
+    acmeTools.saveBreakage(value);
+  },
+});
+const group = fabUi.mount('RadioCardGroup', { target, props: props() });
+
+// `group.destroy()` when the sheet goes away, moving focus first if a radio holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3320,7 +3387,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well` and `Callout` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -3467,7 +3534,7 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -3482,7 +3549,7 @@ A published component draws a control only where its section says so, and each c
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and never out of `target`.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` on the arrow keys, each never out of `target`.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.

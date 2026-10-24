@@ -287,6 +287,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Callout',
       'IconButton',
       'EditorTabs',
+      'RadioCardGroup',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -563,6 +564,22 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: required,
           idStem: required,
           activePanelOnly: optional,
+        },
+        rest: true,
+        root: 'fabricate',
+        overlays: false,
+      },
+      RadioCardGroup: {
+        version: 1,
+        props: {
+          options: required,
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          legend: required,
+          layout: optional,
+          columns: optional,
+          disabled: optional,
+          disabledOptions: optional,
         },
         rest: true,
         root: 'fabricate',

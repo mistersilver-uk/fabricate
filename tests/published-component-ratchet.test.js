@@ -385,6 +385,30 @@ describe('the static rules of a publishable component', () => {
     );
   });
 
+  it('admits a form control name unique to its mount, and refuses a literal or a published-key name', () => {
+    const SCRIPT = 'let { group = "", label = "" } = $props(); const uid = $props.id();';
+    const radio = (name) => `<input type="radio" ${name} />`;
+    const faults = (body, script = SCRIPT, manifest = []) =>
+      faultsOf({ 'src/A.svelte': COMPONENT(script, body) }, 'src/A.svelte', manifest);
+    const STATES = ['src/A.svelte: input states name'];
+    assert.deepEqual(faults(radio('name={`a-${uid}`}')), [], 'a template reading the mount id');
+    const derived = `${SCRIPT} const name = $derived(group || \`a-\${uid}\`);`;
+    assert.deepEqual(
+      faults(radio('{name}'), derived),
+      [],
+      'an unpublished blank prop, else the id'
+    );
+    assert.deepEqual(faults(radio('name="a"')), STATES, 'a literal');
+    assert.deepEqual(faults(radio('name={group}')), STATES, 'a prop with no unique fallback');
+    assert.deepEqual(faults(radio('name={group ?? `a-${uid}`}')), STATES, '?? keeps a blank prop');
+    const published = [{ name: 'A', path: 'src/A.svelte', props: { group: { kind: 'data' } } }];
+    assert.deepEqual(
+      faults(radio('name={group || `a-${uid}`}'), SCRIPT, published),
+      STATES,
+      'a published key'
+    );
+  });
+
   it('rejects a required prop no shipped kind carries, and accepts a default', () => {
     const faults = (script, body = '<div>x</div>') =>
       faultsOf({ 'src/A.svelte': COMPONENT(script, body) }, 'src/A.svelte');
@@ -462,6 +486,20 @@ describe('the per-item spreads of a published closure', () => {
       ),
       []
     );
+  });
+
+  it('reads an object literal by its keys: an unpublished prop key is no item, a published one is', () => {
+    const script = 'let { items = [], tone = "", hook = "", ...rest } = $props();';
+    assert.deepEqual(
+      idsOf(script, '{#each items as item}<i {...{ [hook]: item.id, fixed: 1 }}></i>{/each}'),
+      []
+    );
+    assert.deepEqual(idsOf(script, '<i {...{ [items]: 1 }}></i>'), [
+      'src/Fx.svelte: a spread of a whole item of Fx.items',
+    ]);
+    assert.deepEqual(idsOf(script, '{#each items as item}<i {...{ ...item.props }}></i>{/each}'), [
+      'Fx.items.props',
+    ]);
   });
 
   it('cannot name a spread off an item of a collection the entry does not publish', () => {

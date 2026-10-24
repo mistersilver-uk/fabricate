@@ -166,25 +166,28 @@ function requiredPropFaults(ast) {
  * publishable: it exists; its closure reads no Foundry global and reaches no `resolveOverlayHost`;
  * a published entry states `overlays` where its closure reaches an overlay action; every element
  * rule 9 judges is marked and every `svelte:element` is pinned (`DYNAMIC_ELEMENTS`, read from the
- * head); and every required prop is a snippet without arguments, a callback or data.
+ * head), a form control's `name` judged against the root's published locals, none for a candidate;
+ * and every required prop is a snippet without arguments, a callback or data.
  */
 export function publishableFaults(path, { manifest, reader }) {
   if (reader.has && !reader.has(path)) return [`${path} does not exist`];
   const closure = [...importClosure(path, reader)];
+  const entry = manifest.find((candidate) => candidate.path === path);
   const faults = [];
   for (const file of closure) {
     faults.push(...foundryReads(file, reader).map((read) => `${file}: ${read}`));
     if (!isComponent(file)) continue;
     const ast = reader.component(file);
-    faults.push(...focusableElements(file, ast, DYNAMIC_ELEMENTS).faults);
-    if (file === path) faults.push(...requiredPropFaults(ast).map((fault) => `${file}: ${fault}`));
+    const root = file === path;
+    const published = root ? new Set(entry ? publishedLocals(entry, ast).keys() : []) : null;
+    faults.push(...focusableElements(file, ast, DYNAMIC_ELEMENTS, published).faults);
+    if (root) faults.push(...requiredPropFaults(ast).map((fault) => `${file}: ${fault}`));
   }
   faults.push(
     ...hostResolverImports(path, reader).map(
       (file) => `${file} imports resolveOverlayHost, which ignores the overlay chain`
     )
   );
-  const entry = manifest.find((candidate) => candidate.path === path);
   if (entry && entry.overlays !== true) {
     faults.push(
       ...closure
@@ -268,7 +271,8 @@ const through = (origin, path) =>
  * nothing in that file renders is unnameable). `{ key: null }` is a value that may be an item of a
  * collection the entry does not publish. A spread of the file's `$props()` rest, or of a
  * script-level `const` or `$derived`, is no item. A child's `$props()` key is what its parents
- * pass it. Every other spread fails closed.
+ * pass it. An object literal writes its own keys: each computed key and each spread inside it is
+ * traced as a spread is (issue 2601). Every other spread fails closed.
  */
 function spreadTracer(entry, reader) {
   const files = [...importClosure(entry.path, reader)].filter(isComponent);
@@ -400,6 +404,12 @@ function spreadTracer(entry, reader) {
     const node = unchained(expression);
     if (node.type === 'Identifier') return nameOrigins(node.name, file, ancestors);
     if (node.type === 'Literal') return [];
+    if (node.type === 'ObjectExpression') {
+      return node.properties.flatMap((property) => {
+        if (property.type === 'SpreadElement') return originsOf(property.argument, file, ancestors);
+        return property.computed ? originsOf(property.key, file, ancestors) : [];
+      });
+    }
     if (node.type !== 'MemberExpression') return [UNNAMEABLE];
     const named = !node.computed && node.property.type === 'Identifier';
     return originsOf(node.object, file, ancestors).map((base) =>
