@@ -1,13 +1,15 @@
 /**
  * Mount the real ingredient-route selector (three routes: craftable, blocked by a tool, short of
- * an ingredient) and one real recipe row, recording each callback on the document (issue 1778).
+ * an ingredient) inside a host that moves the chosen route as the crafting view does, and one real
+ * recipe row, recording each callback on the document (issue 1778).
  */
 import { mount } from 'svelte';
 
 import en from '../../../lang/en.json';
-import IngredientSetSelector from '../../../src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte';
 import RecipeListRow from '../../../src/ui/svelte/apps/crafting/RecipeListRow.svelte';
 import { installFixtureI18n } from '../select-fixture-shared.js';
+
+import RoutesHost from './RoutesHost.svelte';
 
 installFixtureI18n(en);
 
@@ -44,9 +46,9 @@ row.dataset.case = 'row';
 root.append(routes, row);
 document.body.append(root);
 
-mount(IngredientSetSelector, {
+mount(RoutesHost, {
   target: routes,
-  props: { sets, selectedSetId: 'set-a', onChoose: record('chosen') },
+  props: { sets, initialSetId: 'set-a', onChoose: record('chosen') },
 });
 mount(RecipeListRow, {
   target: row,
