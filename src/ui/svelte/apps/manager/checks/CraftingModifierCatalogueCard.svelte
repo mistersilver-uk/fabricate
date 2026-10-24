@@ -220,6 +220,7 @@
   // Normalized through the resolver's OWN vocabulary rather than a local mirror, which is also
   // what makes a world carrying the legacy `byRecipe` select `bySubject`.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
+  let heldPolicy = $state('');
   // Whether the rule defers the selection, and so whether the cap means anything, asked of
   // the resolver rather than a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
@@ -261,12 +262,11 @@
   // The three SELECTION writes, the whole of what this card persists; none can touch the
   // library, the store's check-modifier saver accepting no library key at all.
   function selectPolicy(policy) {
-    onChange({ defaultModifierPolicy: policy });
+    heldPolicy = policy;
+    Promise.resolve(onChange({ defaultModifierPolicy: policy })).finally(() => (heldPolicy = ''));
   }
 
-  function selectMaxPicks(next) {
-    onChange({ maxModifierPicks: next });
-  }
+  const selectMaxPicks = (next) => onChange({ maxModifierPicks: next });
 
   function toggleDefault(id, checked) {
     const next = checked
@@ -516,7 +516,7 @@
     <RadioCardGroup
       legend={policyHeading}
       options={localizeOptions(policyOptions)}
-      value={selectedPolicy}
+      value={heldPolicy || selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
       data-crafting-modifier-policy

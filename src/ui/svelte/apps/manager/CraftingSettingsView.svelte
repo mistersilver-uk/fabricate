@@ -159,10 +159,12 @@
 
   let systemResolutionModeValue = $state('simple');
   let systemSalvageResolutionModeValue = $state('simple');
+  let visibilityModeValue = $state('knowledge');
 
   $effect(() => {
     systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
     systemSalvageResolutionModeValue = selectedSystem?.salvageResolutionMode ?? 'simple';
+    visibilityModeValue = selectedSystem?.visibilityMode ?? 'knowledge';
   });
 
   const visibilityMode = $derived(selectedSystem?.visibilityMode ?? 'knowledge');
@@ -177,6 +179,16 @@
     const didApply = await onSetResolutionMode(nextMode);
     if (didApply === false) {
       systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
+    }
+  }
+
+  // Drawn chosen while the save is in flight, then whatever the saved system says.
+  async function handleVisibilityModeChange(mode) {
+    visibilityModeValue = mode;
+    try {
+      await onSetVisibilityMode(mode);
+    } finally {
+      visibilityModeValue = selectedSystem?.visibilityMode ?? 'knowledge';
     }
   }
 
@@ -256,11 +268,11 @@
                 'Recipe visibility'
               )}
               options={localizeOptions(visibilityModeOptions)}
-              value={visibilityMode}
+              value={visibilityModeValue}
               groupName="manager-crafting-visibility-mode"
               data-crafting-visibility-mode
               optionDataAttr="data-crafting-visibility-mode-option"
-              onChange={(mode) => onSetVisibilityMode(mode)}
+              onChange={handleVisibilityModeChange}
             />
           </section>
 

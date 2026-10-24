@@ -32,6 +32,13 @@
     onChange = () => {},
   } = $props();
 
+  let pendingValue = $state('');
+  // Drawn chosen while the save is in flight, then whatever the saved system says.
+  function choose(next) {
+    pendingValue = next;
+    Promise.resolve(onChange(next)).finally(() => (pendingValue = ''));
+  }
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -110,11 +117,11 @@
       'Produce a result on a failed check'
     )}
     {options}
-    {value}
+    value={pendingValue || value}
     groupName={`checks-${activity}-failure-result-policy`}
     columns={1}
     data-failure-result-policy-group
     optionDataAttr="data-failure-result-policy-option"
-    onChange={(next) => onChange(next)}
+    onChange={choose}
   />
 </InspectorCard>
