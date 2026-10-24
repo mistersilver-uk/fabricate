@@ -273,10 +273,12 @@ const through = (origin, path) =>
  * snippet parameter of the entry's own file as the arguments that file, or a child it hands the
  * snippet to, renders it with, an object literal's plain key read by name (a snippet nothing
  * renders is unnameable; issue 2647). `{ key: null }` is a value that may be an item of a
- * collection the entry does not publish. A spread of the file's `$props()` rest, or of a
- * script-level `const` or `$derived`, is no item. A child's `$props()` key is what its parents
- * pass it. An object literal writes its own keys: each computed key and each spread inside it is
- * traced as a spread is (issue 2601). Every other spread fails closed.
+ * collection the entry does not publish. A spread of the file's `$props()` rest is no item, and so
+ * is one of a script-level `const` or `$derived` unless it is an object literal, whose spreads and
+ * computed keys are traced, a branch or call inside it counting as its values (what a script
+ * function closes over is not traced). A child's `$props()` key is what its parents pass it. An
+ * object literal writes its own keys: each computed key and each spread inside it is traced as a
+ * spread is (issue 2601). Every other spread fails closed.
  */
 function spreadTracer(entry, reader) {
   const files = [...importClosure(entry.path, reader)].filter(isComponent);
@@ -293,7 +295,7 @@ function spreadTracer(entry, reader) {
   const scriptLocals = new Map(
     files.map((file) => {
       const ast = asts.get(file);
-      const names = new Set();
+      const names = new Map();
       for (const statement of topLevel(ast)) {
         if (statement.type !== 'VariableDeclaration') continue;
         for (const { id, init } of statement.declarations) {
@@ -301,9 +303,11 @@ function spreadTracer(entry, reader) {
           const derived = callee?.name === '$derived' || callee?.object?.name === '$derived';
           if (callee?.name === '$props') {
             const rest = id.properties?.find((property) => property.type === 'RestElement');
-            if (rest) names.add(rest.argument.name);
+            if (rest) names.set(rest.argument.name, null);
           } else if (statement.kind === 'const' || derived) {
-            for (const name of boundNames(id)) names.add(name);
+            const value = callee?.name === '$derived' ? init.arguments[0] : init;
+            const literal = id.type === 'Identifier' && value?.type === 'ObjectExpression';
+            for (const name of boundNames(id)) names.set(name, literal ? value : null);
           }
         }
       }
@@ -395,8 +399,28 @@ function spreadTracer(entry, reader) {
       if (key !== undefined) return entry.props[key].kind === 'data' ? [{ key, members: [] }] : [];
       if (prop) return [];
     }
-    if (scriptLocals.get(file).has(name)) return [];
+    const locals = scriptLocals.get(file);
+    if (locals.has(name)) {
+      const literal = locals.get(name);
+      return literal ? guarded(literal, () => literalOrigins(literal, file)) : [];
+    }
     return prop ? passedTo(file, prop.key) : [UNNAMEABLE];
+  }
+
+  /** A script-level literal's origins: its plain keys are no item, a branch or call is its values. */
+  function literalOrigins(expression, file) {
+    const node = unchained(expression);
+    if (node.type === 'ConditionalExpression') {
+      return [node.consequent, node.alternate].flatMap((branch) => literalOrigins(branch, file));
+    }
+    if (node.type === 'CallExpression') {
+      return node.arguments.flatMap((argument) => literalOrigins(argument, file));
+    }
+    if (node.type !== 'ObjectExpression') return originsOf(node, file, []);
+    return node.properties.flatMap((property) => {
+      if (property.type === 'SpreadElement') return literalOrigins(property.argument, file);
+      return property.computed ? originsOf(property.key, file, []) : [];
+    });
   }
 
   function nameOrigins(name, file, ancestors) {

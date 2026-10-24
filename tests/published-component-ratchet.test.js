@@ -689,6 +689,37 @@ describe('the per-item spreads of a published closure', () => {
       assert.deepEqual(idsOf(script, SNIPPET, picker('<p></p>')), [UNNAMED], 'and so is no render');
     });
 
+    it('a child literal spreading its own prop, judged by what the entry passes it (issue 2647)', () => {
+      const RENDER = '{@render trigger({ attributes: own })}';
+      const picker = (own, body = RENDER) => ({
+        'src/Picker.svelte': COMPONENT(
+          `let { trigger, extra } = $props(); const pick = (v) => v; const own = $derived(${own});`,
+          body
+        ),
+      });
+      const script = `import Picker from './Picker.svelte'; ${PROPS}`;
+      const handing = (passed) =>
+        `<Picker ${passed}>{#snippet trigger({ attributes })}<b {...attributes}></b>{/snippet}</Picker>`;
+      assert.deepEqual(idsOf(script, handing('extra={items[0]}'), picker('{ ...extra }')), [
+        UNNAMED,
+      ]);
+      const props = handing('extra={items.props}');
+      assert.deepEqual(idsOf(script, props, picker('{ type: "b", ...(tone ? extra : {}) }')), [
+        'Fx.items.props',
+      ]);
+      assert.deepEqual(idsOf(script, props, picker('{ ...pick(extra) }')), ['Fx.items.props']);
+      assert.deepEqual(
+        idsOf(script, props, picker('{ ...extra }', '<i {...own}></i>')),
+        ['Fx.items.props', UNNAMED],
+        'the child’s own spread of it is judged too, beside the snippet nothing renders'
+      );
+      assert.deepEqual(
+        idsOf(script, handing(''), picker('{ ...extra, type: "b" }')),
+        [],
+        'a prop the entry does not pass is no item'
+      );
+    });
+
     it('but not a snippet parameter of a child component', () => {
       const extra = {
         'src/Row.svelte': COMPONENT(
