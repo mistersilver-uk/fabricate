@@ -1710,7 +1710,7 @@ test('the pager names its page-size control with the words a GM can see', () => 
   );
   assert.match(
     source,
-    /<span id=\{captionId\}\s*>\{localizeOr\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    /<span id=\{captionId\}\s*>\{perPageLabel \|\| copy\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
     'the caption carries the per-instance id and is visible in every density'
   );
   assert.match(

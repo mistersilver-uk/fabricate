@@ -794,6 +794,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-option-cards': () => import('./fixtures/PublishedOptionCards.svelte'),
   // Issue 2644: an ingredient filter and a page size whose choice the companion's own update draws.
   'published-segmented': () => import('./fixtures/PublishedSegmented.svelte'),
+  // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.
+  'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
 });
 // view-lab-region:end
 

@@ -335,9 +335,19 @@ describe('destroy and a fault close every open overlay', () => {
       const { handle, panel } = openProbe(companionTarget(shells));
       const container = containerOf(panel);
       // Svelte binds every event a loaded component delegates to each mount root, as many times
-      // as it has roots, the published `Select`'s picker delegates `keydown` and `mousedown`, and
-      // the published `RadioCardGroup`'s radio delegates `change`.
-      const bound = ['change', 'click', 'keydown', 'mousedown', 'resize', 'scroll'];
+      // as it has roots, the published `Select`'s picker delegates `keydown` and `mousedown`, the
+      // published `RadioCardGroup`'s radio delegates `change`, and the published `Pagination`'s
+      // region delegates `focusin` and `focusout`.
+      const bound = [
+        'change',
+        'click',
+        'focusin',
+        'focusout',
+        'keydown',
+        'mousedown',
+        'resize',
+        'scroll',
+      ];
       assert.deepEqual(
         [...new Set(listeners.still())].sort((a, b) => a.localeCompare(b)),
         bound,

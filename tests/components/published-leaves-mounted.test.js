@@ -6,11 +6,12 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField`, `StageBars`, `IconButton` and `EditorTabs` mount here as leaves; what
+ * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs` and `Pagination` mount here as leaves; what
  * each draws and refuses is `published-button-mounted.test.js`'s,
  * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
  * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
- * `published-icon-button-mounted.test.js`'s and `published-editor-tabs-mounted.test.js`'s.
+ * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s and
+ * `published-pagination-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -110,6 +111,24 @@ const INGREDIENT_FILTERS = Object.freeze([
   { value: 'all', label: 'All' },
   { value: 'owned', label: 'Owned' },
 ]);
+/** A pager's seven labels, each its required final text. */
+const REAGENT_PAGER_LABELS = Object.freeze({
+  ariaLabel: 'Reagent pages',
+  navLabel: 'Reagent page navigation',
+  previousLabel: 'Previous reagents page',
+  nextLabel: 'Next reagents page',
+  perPageLabel: 'Per page',
+  rangeTemplate: '{first}–{last} of {total} reagents',
+  pageTemplate: 'Page {page} of {total}',
+});
+const REAGENT_PAGER = Object.freeze({
+  totalCount: 60,
+  pageSize: 25,
+  pageSizeOptions: [10, 25, 50],
+  ...REAGENT_PAGER_LABELS,
+  onPageChange() {},
+  onPageSizeChange() {},
+});
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
   { id: 'inputs', label: 'Inputs' },
@@ -366,6 +385,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.getAttribute('aria-label'),
     drawn: ['Ingredient filter', 'Ingredient view'],
   },
+  {
+    name: 'Pagination',
+    under: 'fabricate',
+    root: '.fabricate-pagination',
+    props: { ...REAGENT_PAGER, pageIndex: 0 },
+    next: { ...REAGENT_PAGER, pageIndex: 1 },
+    read: (root) => root.querySelector('[data-pagination-summary]').textContent.trim(),
+    drawn: ['1–25 of 60 reagents', '26–50 of 60 reagents'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -497,6 +525,10 @@ describe('a key a leaf does not publish', () => {
     ['EditorTabs', 'containerClass', 'is not a data attribute'],
     ['SegmentedControl', 'groupName', 'is not a data attribute'],
     ['SegmentedControl', 'class', 'is not a data attribute'],
+    ['Pagination', 'showPageSize', 'is not a prop of Pagination'],
+    ['Pagination', 'multiPageOnly', 'is not a prop of Pagination'],
+    ['Pagination', 'edge', 'is not a prop of Pagination'],
+    ['Pagination', 'class', 'is not a prop of Pagination'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

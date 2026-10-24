@@ -384,6 +384,16 @@ const filterSegment = (value) =>
 /** Sized to the fixture's two 360px grounds, one above the other. */
 const SEGMENTED_WINDOW = Object.freeze({ width: 480, height: 240 });
 
+/** The pagination fixture's ground and target for one pager, by the key both name. */
+const pagerGround = (key) => `[data-lab-pagination="${key}"]`;
+const pagerTarget = (key) => `${pagerGround(key)} > [data-lab-pagination-target="${key}"]`;
+const BROWSE_PREVIOUS = `${pagerGround('browse')} [data-pagination-prev]`;
+const compactSegment = (value) =>
+  `${pagerGround('compact')} label.manager-segment:has(> input[value="${value}"])`;
+
+/** Sized to the fixture's two 600px grounds, one above the other. */
+const PAGER_WINDOW = Object.freeze({ width: 720, height: 240 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1222,6 +1232,73 @@ export const CASES = Object.freeze([
     position: SEGMENTED_WINDOW,
     kinds: ['manager', 'specimen'],
     // `SegmentedControl.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-pagination-specimen',
+    label:
+      "Specimen, mounted through the published seam — a reagent pager on a 600px column of the --fab-bg-2 ground, 60 records at 25 a page on page 2 of 3, its sizes 10, 25 and 50 with 25 selected, at the default density on its own --fab-bg-1 bar, after one step: Enter pressed on the Next arrow, so Fabricate called onPageChange, whose update drew the last page. So the summary reads 51–60 of 60 reagents and the page label Page 3 of 3, Next is disabled, and focus rests on the Previous arrow, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and arrow, and which has opened Foundry's tooltip for its name, Previous reagents page, on the keyboard focus Fabricate moved to it (the lab records the tooltip as aria-describedby and draws none)",
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each page turn.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-pagination' },
+    steps: [{ selector: `${pagerGround('browse')} [data-pagination-next]`, press: 'Enter' }],
+    // The last page drawn by the companion's own update, under the fixture's echo of the page,
+    // which only `onPageChange` writes, and the focus Fabricate moved off the disabled Next, which
+    // opens Previous's tooltip.
+    expectSelector: `${pagerGround('browse')}[data-lab-pagination-page="2"]:has([data-pagination-next]:disabled) [data-pagination-prev][aria-describedby="tooltip"]:focus-visible`,
+    expectCenterHit: BROWSE_PREVIOUS,
+    expectContained: [
+      { container: pagerGround('browse'), target: pagerTarget('browse') },
+      { container: '.window-content', target: pagerGround('browse') },
+    ],
+    expectLayout: {
+      controls: [
+        // The moved focus's ring by its shape; its colour is the census's.
+        {
+          selector: BROWSE_PREVIOUS,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: PAGER_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Pagination.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-pagination-size-specimen',
+    label:
+      'Specimen, mounted through the published seam — a compact reagent rail pager on a 600px column of the --fab-bg-2 ground, 40 records at 10 a page, its sizes 10 and 25 on the inline rung, one transparent row whose Per page caption shows and whose page label is visually hidden, after one step: ArrowRight pressed on the checked 10 radio, which the platform moved to 25 and checked, so Fabricate called onPageSizeChange, whose update drew 25 a page from the first page. So the summary reads 1–25 of 40 reagents and the 25 segment is the raised selected tile carrying the accent keyboard ring, 2px wide with 2px of ground between ring and segment',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each size chosen.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-pagination' },
+    steps: [{ selector: `${pagerGround('compact')} input[value="10"]`, press: 'ArrowRight' }],
+    // The reached size selected by the companion's own update, its radio checked and
+    // keyboard-focused, under the fixture's echo of the size, which only `onPageSizeChange` writes.
+    expectSelector: `${pagerGround('compact')}[data-lab-pagination-size="25"] label.is-active:has(> input[value="25"]:checked:focus-visible)`,
+    expectCenterHit: compactSegment(25),
+    expectContained: [
+      { container: pagerGround('compact'), target: pagerTarget('compact') },
+      { container: '.window-content', target: pagerGround('compact') },
+    ],
+    expectLayout: {
+      controls: [
+        // The reached segment's ring by its shape, and the page label held off the screen.
+        {
+          selector: compactSegment(25),
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+        {
+          selector: `${pagerGround('compact')} [data-pagination-page]`,
+          styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
+        },
+      ],
+    },
+    position: PAGER_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Pagination.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

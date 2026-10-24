@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -438,6 +438,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `EditorTabs` (issue 2601).
 - The published set continues with `RadioCardGroup` (issue 2601).
 - The published set continues with `SegmentedControl` (issue 2644).
+- The published set continues with `Pagination` (issue 2646).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -454,6 +455,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - `RadioCardGroup`'s `groupName`, `cardId`, `hint` and `legendVisible` are not published at version 1, and `optionBody` is never published, being a snippet called with arguments; publishing one of the first four later is additive.
 - `SegmentedControl`'s `groupName`, `iconOnly`, `tone`, `shape` and its `compact` and `field` densities are not published at version 1, and nor are an option's `variant`, `count`, `badge` or `validationTarget`; publishing one later is additive.
 Its `optionDataAttr` is never published, because it takes an attribute name.
+- `Pagination`'s `showPageSize`, `multiPageOnly` and `edge` are not published at version 1; publishing one later is additive.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
@@ -461,7 +463,7 @@ Its `optionDataAttr` is never published, because it takes an attribute name.
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` is not an attribute channel, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -590,12 +592,12 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 ### Interactive components
 
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
-Enter presses on key down and again on each repeat while held, and Space on release.
+Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio Fabricate has moved focus to, as its group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
@@ -605,8 +607,8 @@ Where the entry's rest keys land on the control itself, `data-validation-focused
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
 A group names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` key holding the same text, so the control is never without a name: an id list that names no element leaves the name from that key.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, each never out of `target`.
-An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so the companion moves focus to an element of its own before it calls either.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its group names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its group states, each never out of `target`.
+An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where the sentence above has Fabricate move it off a `Pagination` arrow, so the companion moves focus to an element of its own before it calls either.
 The destination is, in order: the control the press leads to; the next control in the companion's own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which the companion gives `tabindex="-1"`.
 Where the destination is drawn by the same change, the companion draws it first, focuses it, and then removes the control.
 - To return focus to a published control, after a dialog its press opened has closed, the companion focuses the focusable element inside `target` that the entry's group names; nothing else inside `target` is the companion's to select.
@@ -616,8 +618,8 @@ The companion keeps `target` out of any element of its own that carries `data-ac
 Where the entry's rest keys land on the control itself, `data-action` is refused (M13): the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
 The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
 - A control is unavailable only through a key its group names.
-A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the "Fabricate moves no focus" bullet orders.
-Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
+A natively `disabled` control leaves the tab order and cannot take focus, so the companion never disables the control that holds focus, except a `Pagination` arrow, which its group lets an `update` disable: it ignores the press instead, and where the control must then become unavailable it first moves focus to the destination the "Fabricate moves no focus" bullet orders.
+Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does, except where `Pagination`'s group states that Fabricate moves it.
 In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, apart from a switch's pointer cursor, which becomes `not-allowed`, so the companion mounts a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` key and exposes it in the accessibility tree as well as in colour.
 A press reports through the callback, and the control shows the new state when the companion's `update` passes it; its group says where a native control changes itself first.
@@ -1287,6 +1289,58 @@ Each group states the accepted values of every key that entry publishes.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the control on one of those four grounds.
 - **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member or `density`, and how Fabricate draws a segmented control in its own rows, pager and editors.
 
+### The issue 2646 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`Pagination`.**
+  - It is the design system's pager (`<Pagination>` in the library): a named region holding a range summary, a named navigation of two arrow buttons around a page-position label, and a page-size control, for a list the companion draws a page at a time.
+  - It holds no page: it draws the window `totalCount`, `pageSize` and `pageIndex` describe, and the companion draws the rows.
+  - `totalCount` is required and is the number of records in the whole list, a whole number of 0 or more.
+  - `pageSize` is required and is the number of records on a page, a whole number of 1 or more.
+  - `pageIndex` is the zero-based index of the page shown and defaults to `0`.
+    The page count is `totalCount` divided by `pageSize`, rounded up, and never less than 1, and the companion keeps `pageIndex` below it.
+  - `pageSizeOptions` is required and is an array of whole numbers of 1 or more, the sizes offered.
+    The page-size control offers the sorted union of `pageSizeOptions` and `pageSize`, each once, and is not drawn, caption included, while that union holds fewer than two sizes, so `[]` draws none.
+    Each size's segment and radio are named by its numeral, the number in digits with no grouping.
+  - `onPageChange` is a required callback, called with one argument, the zero-based index of the page an arrow press reaches.
+    The Previous arrow is disabled on the first page and the Next arrow on the last, and a disabled arrow calls nothing.
+    The pager draws a page only once an `update` passes its index as `pageIndex`, so a second press before that `update` reports the same index again, and a call the companion declines leaves the page drawn as it was.
+  - `onPageSizeChange` is a required callback, called with one argument, the size, a number, of the segment a press or a key reaches; a press on the selected size calls nothing.
+    The page-size control is a `SegmentedControl`, so the companion makes the `update` that passes the new `pageSize`, and the `pageIndex` it keeps for that size, from inside `onPageSizeChange`, before any `await`.
+    A size the companion declines leaves the previous size's radio checked, and focus on the radio the key reached, drawn unchecked.
+  - `persistent` is `true` or `false` and defaults to `false`.
+    With `true` the pager is always drawn, and an arrow that leads nowhere is disabled.
+    With `false` the pager is drawn only while `totalCount` is greater than the smallest of `pageSize` and `pageSizeOptions`, and its navigation only while there is more than one page; otherwise `target` is empty and nothing inside it takes focus.
+    While focus is inside the pager it stays drawn, and it is removed once focus leaves it.
+  - `density` is `'default'` or `'compact'` and defaults to `'default'`; any other value is private.
+    `'default'` draws the bar on its own `--fab-bg-1` fill.
+    `'compact'` draws one transparent row whose page-position label is visually hidden and stays in the accessibility tree, and whose page-size control takes `SegmentedControl`'s `inline` rung.
+  - `ariaLabel` and `navLabel` are required and are the region's name and the navigation's name, each final display text.
+    Two pagers on one screen take distinct names, because a screen-reader user moves between landmarks by name.
+  - `previousLabel` and `nextLabel` are required and are the arrows' names, final display text.
+    Each arrow's name is also its tooltip, shown on hover and under keyboard focus as the `IconButton` group states, the focus Fabricate moves included.
+  - `perPageLabel` is required and is the page-size caption, final display text drawn visibly before the control, which names its radiogroup.
+    A name or caption of white space alone leaves its element with no name, so the companion never passes one.
+  - `rangeTemplate` is required and is the summary's template, final display text in which Fabricate replaces `{first}`, `{last}` and `{total}` with the first and last record shown and `totalCount`, as "{first}–{last} of {total} reagents"; with no record shown, `{first}` and `{last}` are both `0`.
+  - `pageTemplate` is required and is the page-position template, in which Fabricate replaces `{page}` with the one-based page shown and `{total}` with the page count, as "Page {page} of {total}".
+  - Fabricate fills each placeholder of either template with the number in digits, leaves any other `{name}` as written and changes nothing else, so the companion chooses each template's wording, its plural form included, from the `totalCount` it passes.
+  - Each arrow is a native `<button type="button">`, so `Enter` and `Space` press it, and the page-size radios take the keys `SegmentedControl`'s group states; Fabricate stops no key, and cancels only a held Enter's repeats on the arrow or page-size radio it moved focus to, as the next bullet states.
+  - Focus moves only as the page-size control's group states, except that when an `update` disables or removes the arrow holding focus, and focus has not moved elsewhere meanwhile, Fabricate moves focus to the other arrow while it is enabled, and otherwise to the checked page-size radio while one is drawn.
+    So a keyboard user who presses Next onto the last page rests on Previous.
+    On the arrow or page-size radio it moved focus to, Fabricate cancels the repeats of an Enter still held from that press until that key is released or Enter is pressed again, so a held Enter stops on the end page rather than walking back.
+    With neither to move to, Fabricate takes focus off the arrow, so focus is on the document body, where Foundry's keybindings hear Escape, and a pager that only focus kept drawn is removed; a companion making that `update` moves focus first.
+    To return focus to the pager, the companion focuses `target.querySelector('button:not(:disabled), input[type="radio"]:checked')`: the first enabled arrow, else the checked size.
+  - An arrow press bubbles one `click`, and the page-size control's clicks are as its group states, so a companion counts page turns from `onPageChange`, never from `click`.
+  - An arrow submits no `<form>`.
+    A size choice fires a bubbling `change` as `SegmentedControl`'s group states, so a form with `submitOnChange` submits on it; the companion reads the size from `onPageSizeChange`, never from the form.
+  - It takes no rest keys, so a `data-*` key is refused (M8).
+  - It needs a Fabricate window ancestor, because its bar, arrows and ring come from Fabricate's module sheet, rooted at `.fabricate-pagination`, and it is drawn the same in the Manager and the player window.
+    A companion's own window or dialog carries no Fabricate root, so the pager is refused there (M16).
+  - The arrows' keyboard ring is the accent, 2px wide and 2px clear of the arrow, so it reaches 4px beyond the arrow, and the page-size control's ring reaches as `SegmentedControl`'s group states.
+    The ring clears 3:1 against the default bar's `--fab-bg-1` and, under `'compact'`, against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts a compact pager on one of those four grounds and leaves room for the ring inside any edge of its own that clips.
+- **Private:** `Pagination`'s bar, arrow, label and type figures, its colours beyond what its group states, its `data-pagination-*` hooks, what it draws for a `totalCount`, `pageSize`, `pageIndex` or offered size outside what its group states, and how Fabricate draws a pager in its own browse columns, rails and inspectors.
+
 ### The publishable subset
 
 Each term is defined here and used in this sense throughout.
@@ -1441,7 +1495,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, as its group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, and off a `Pagination` arrow that an `update` disables or removes, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -1621,6 +1675,14 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** the next enabled option's radio is checked and focused, and Fabricate calls `onChange` once with that option's `value`
 - **AND** the segment is drawn selected when the companion's `update` passes that `value` inside the call, and a call it declines leaves the previous radio checked
 - **AND** a mount that omits `ariaLabel` throws M9, and one that passes `groupName` throws M13
+
+#### Scenario: A published pager
+
+- **WHEN** a companion mounts `Pagination` inside a Fabricate window with `totalCount` 60, `pageSize` 25, `pageIndex` 1, its labels and its callbacks, and the user presses Enter on the Next arrow
+- **THEN** Fabricate calls `onPageChange` once with `2`
+- **AND** once the companion's `update` passes `pageIndex: 2`, the summary and page label show the last page, the Next arrow is disabled and focus rests on the Previous arrow
+- **AND** a repeat of that held Enter on the Previous arrow presses nothing
+- **AND** a mount that omits `rangeTemplate` throws M9, and one that passes `edge` throws M8
 
 #### Scenario: An overlay host
 

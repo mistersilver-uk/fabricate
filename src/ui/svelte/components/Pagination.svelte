@@ -11,6 +11,8 @@
   | `showPageSize` | boolean | `true` | Opt-OUT. The page-size control is not rendered, caption included, when the sorted union of `pageSizeOptions` and `pageSize` holds fewer than two values. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
   | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the page-size control with it, so a POINTER reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. A KEYBOARD reader is spared: each arrow key on a page-size radio commits, so the bar stays mounted while focus is inside it, moving between its own controls included, and hides once focus leaves it entirely. |
   | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
+  | `previousLabel` / `nextLabel` / `perPageLabel` | resolved strings | `''` | The arrows' names, which are also their tooltips, and the page-size caption. |
+  | `rangeTemplate` / `pageTemplate` | resolved templates | `''` | The summary over `{first}` `{last}` `{total}` and the page label over `{page}` `{total}`; whoever supplies a template, it is filled here. |
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row: its page-size control takes SegmentedControl's `inline` rung (the default bar takes the default rung), the "Per page" caption stays visible, and the full page sentence stays in the accessibility tree. |
   | `edge` | boolean | `false` | With `compact`, the bar closes a pane section: its rule spans the section and it pads itself by `--fab-section-inset` (`--fab-space-2` by default) inline and below. |
 
@@ -28,10 +30,19 @@
     inside it is a second — so a screen drawing two bars would publish two identically named entries
     in the one list a screen-reader user navigates BY. Both names default to `''` with the fallback
     written at the USE SITE, which is the shape `tests/design-system-required-names.test.js`
-    requires; callers pass a RESOLVED string, not a key.
+    requires; callers pass a RESOLVED string, not a key. Each fallback is localized through the
+    `APP_LOCALIZER` context, and a tree mounted without one draws the English.
+  - AN UPDATE THAT DISABLES OR REMOVES THE FOCUSED ARROW moves focus to the other arrow while it is
+    enabled, else to the checked page-size radio, else blurs the arrow and releases the hold, unless
+    focus moved elsewhere meanwhile. On an arrow it moved focus to, a held Enter's repeats are
+    cancelled until that key is released or pressed afresh; `tests/components/pagination.test.js`.
 -->
 <script>
-  import { localizeOr } from '../util/localizeOr.js';
+  import { getContext } from 'svelte';
+
+  import { fill } from '../../../utils/fillPlaceholders.js';
+  import { localizeWith } from '../../../utils/localizeWithFallback.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import IconButton from './IconButton.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
 
@@ -47,9 +58,17 @@
     multiPageOnly = false,
     ariaLabel = '',
     navLabel = '',
+    previousLabel = '',
+    nextLabel = '',
+    perPageLabel = '',
+    rangeTemplate = '',
+    pageTemplate = '',
     density = 'default',
     edge = false,
   } = $props();
+
+  const localize = getContext(APP_LOCALIZER);
+  const copy = (key, fallback) => localizeWith(localize, key, undefined, fallback);
 
   const compact = $derived(density === 'compact');
 
@@ -65,8 +84,13 @@
   );
   const showNav = $derived(persistent || totalPages > 1);
 
-  function goToPage(index) {
-    const next = Math.max(0, Math.min(totalPages - 1, index));
+  function previousPage() {
+    const next = Math.max(0, Math.min(totalPages - 1, pageIndex - 1));
+    if (next !== pageIndex) onPageChange(next);
+  }
+
+  function nextPage() {
+    const next = Math.max(0, Math.min(totalPages - 1, pageIndex + 1));
     if (next !== pageIndex) onPageChange(next);
   }
 
@@ -77,6 +101,64 @@
 
   const instanceId = $props.id();
   const captionId = `${instanceId}-per-page`;
+
+  const ARROWS = '[data-pagination-prev], [data-pagination-next]';
+  let bar = $state(null);
+  // The arrow holding focus as an update starts, judged again once the DOM has changed.
+  let noted = null;
+  let stopCancel = null;
+
+  $effect.pre(() => {
+    void [pageIndex, totalPages, showNav, showPagination];
+    const active = bar?.ownerDocument.activeElement;
+    noted = active && bar.contains(active) && active.matches(ARROWS) ? active : null;
+  });
+
+  $effect(() => {
+    void [pageIndex, totalPages, showNav, showPagination];
+    const arrow = noted;
+    noted = null;
+    if (arrow && (!arrow.isConnected || arrow.disabled)) moveFocusOff(arrow);
+  });
+
+  // Focus that has moved to anything but the noted arrow, the body or nothing stays where it is.
+  function moveFocusOff(arrow) {
+    const doc = arrow.ownerDocument;
+    const active = doc.activeElement;
+    if (active !== arrow && active !== null && active !== doc.body) return;
+    const other = arrow.matches('[data-pagination-prev]')
+      ? '[data-pagination-next]'
+      : '[data-pagination-prev]';
+    const sibling = bar?.querySelector(other);
+    const radio = bar?.querySelector('[data-pagination-size] input[type="radio"]:checked');
+    if (sibling?.isConnected && !sibling.disabled) {
+      sibling.focus();
+      cancelHeldEnter(sibling);
+    } else if (radio) {
+      radio.focus();
+      cancelHeldEnter(radio);
+    } else {
+      if (arrow.isConnected && doc.activeElement === arrow) arrow.blur();
+      holdOpen = false;
+    }
+  }
+
+  // Prevents, never stops, the repeats of an Enter held from the press that moved focus here.
+  function cancelHeldEnter(arrow) {
+    stopCancel?.();
+    const types = ['keydown', 'keyup', 'focusout'];
+    const listen = (event) => {
+      if (event.type === 'keyup' && event.key !== 'Enter') return;
+      if (event.type !== 'keydown' || !event.repeat) stop();
+      else if (event.key === 'Enter') event.preventDefault();
+    };
+    function stop() {
+      for (const type of types) arrow.removeEventListener(type, listen);
+      if (stopCancel === stop) stopCancel = null;
+    }
+    for (const type of types) arrow.addEventListener(type, listen);
+    stopCancel = stop;
+  }
 
   const sizeOptions = $derived(
     [
@@ -91,6 +173,7 @@
 
 {#if showPagination}
   <section
+    bind:this={bar}
     class="fabricate-pagination"
     class:is-compact={compact}
     class:is-edge={compact && edge}
@@ -99,51 +182,53 @@
     onfocusout={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) holdOpen = false;
     }}
-    aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={ariaLabel || copy('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
-      {localizeOr('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}', {
-        first: firstShown,
-        last: lastShown,
-        total: totalCount,
-      })}
+      {fill(
+        rangeTemplate ||
+          copy('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}'),
+        { first: firstShown, last: lastShown, total: totalCount }
+      )}
     </span>
     {#if showNav}
       <nav
         class="manager-pagination-nav"
         aria-label={navLabel ||
-          localizeOr('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
+          copy('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
       >
         <IconButton
           data-pagination-prev=""
-          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+          ariaLabel={previousLabel ||
+            copy('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
           icon="fas fa-chevron-left"
           disabled={pageIndex === 0}
-          onclick={() => goToPage(pageIndex - 1)}
+          onclick={previousPage}
         />
         <span
           class="manager-pagination-page"
           class:manager-pagination-hidden={compact}
           data-pagination-page
         >
-          {localizeOr('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}', {
-            page: pageIndex + 1,
-            total: totalPages,
-          })}
+          {fill(
+            pageTemplate ||
+              copy('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}'),
+            { page: pageIndex + 1, total: totalPages }
+          )}
         </span>
         <IconButton
           data-pagination-next=""
-          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+          ariaLabel={nextLabel || copy('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
           icon="fas fa-chevron-right"
           disabled={pageIndex >= totalPages - 1}
-          onclick={() => goToPage(pageIndex + 1)}
+          onclick={nextPage}
         />
       </nav>
     {/if}
     {#if showPageSize && sizeOptions.length > 1}
       <span class="manager-pagination-size">
         <span id={captionId}
-          >{localizeOr('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
+          >{perPageLabel || copy('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
         >
         <SegmentedControl
           density={compact ? 'inline' : 'default'}

@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2060,6 +2060,7 @@ The published components, in publication order:
 | `EditorTabs` | 1 | `fabricate` | `tabs` (required), `activeTab`, `onSelect` (callback, required), `ariaLabel` (required), `idStem` (required), `activePanelOnly` | yes |
 | `RadioCardGroup` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `legend` (required), `layout`, `columns`, `disabled`, `disabledOptions` | yes |
 | `SegmentedControl` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `fill`, `density` | yes |
+| `Pagination` | 1 | `fabricate` | `totalCount` (required), `pageSize` (required), `pageIndex`, `pageSizeOptions` (required), `onPageChange` (callback, required), `onPageSizeChange` (callback, required), `persistent`, `ariaLabel` (required), `navLabel` (required), `previousLabel` (required), `nextLabel` (required), `perPageLabel` (required), `rangeTemplate` (required), `pageTemplate` (required), `density` | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3277,6 +3278,96 @@ const control = fabUi.mount('SegmentedControl', { target, props: props() });
 // `control.destroy()` when the panel goes away, moving focus first if a radio holds it.
 ```
 
+### Pagination
+
+`Pagination` draws the design system's pager (`<Pagination>` in the library): a named region holding a range summary, a named navigation of two arrow buttons around a page-position label, and a page-size control, for a list you draw a page at a time.
+It holds no page: it draws the window `totalCount`, `pageSize` and `pageIndex` describe, and you draw the rows.
+`totalCount` is required and is the number of records in the whole list, a whole number of 0 or more.
+`pageSize` is required and is the number of records on a page, a whole number of 1 or more.
+`pageIndex` is the zero-based index of the page shown and defaults to `0`.
+The page count is `totalCount` divided by `pageSize`, rounded up, and never less than 1, and you keep `pageIndex` below it.
+`pageSizeOptions` is required and is an array of whole numbers of 1 or more, the sizes offered.
+The page-size control offers the sorted union of `pageSizeOptions` and `pageSize`, each once, and is not drawn, caption included, while that union holds fewer than two sizes, so `[]` draws none.
+Each size's segment and radio are named by its numeral, the number in digits with no grouping.
+`onPageChange` is a required callback, called with one argument, the zero-based index of the page an arrow press reaches.
+The Previous arrow is disabled on the first page and the Next arrow on the last, and a disabled arrow calls nothing.
+The pager draws a page only once an `update` passes its index as `pageIndex`, so a second press before that `update` reports the same index again, and a call you decline leaves the page drawn as it was.
+`onPageSizeChange` is a required callback, called with one argument, the size, a number, of the segment a press or a key reaches; a press on the selected size calls nothing.
+The page-size control is a `SegmentedControl`, so make the `update` that passes the new `pageSize`, and the `pageIndex` you keep for that size, from inside `onPageSizeChange`, before any `await`.
+A size you decline leaves the previous size's radio checked, and focus on the radio the key reached, drawn unchecked.
+`persistent` is `true` or `false` and defaults to `false`.
+With `true` the pager is always drawn, and an arrow that leads nowhere is disabled.
+With `false` the pager is drawn only while `totalCount` is greater than the smallest of `pageSize` and `pageSizeOptions`, and its navigation only while there is more than one page; otherwise `target` is empty and nothing inside it takes focus.
+While focus is inside the pager it stays drawn, and it is removed once focus leaves it.
+`density` is `'default'` or `'compact'` and defaults to `'default'`; any other value is private.
+`'default'` draws the bar on its own `--fab-bg-1` fill.
+`'compact'` draws one transparent row whose page-position label is visually hidden and stays in the accessibility tree, and whose page-size control takes `SegmentedControl`'s `inline` rung.
+`ariaLabel` and `navLabel` are required and are the region's name and the navigation's name, each final display text.
+Two pagers on one screen take distinct names, because a screen-reader user moves between landmarks by name.
+`previousLabel` and `nextLabel` are required and are the arrows' names, final display text.
+Each arrow's name is also its tooltip, shown on hover and under keyboard focus as the `IconButton` section states, the focus Fabricate moves included.
+`perPageLabel` is required and is the page-size caption, final display text drawn visibly before the control, which names its radiogroup.
+A name or caption of white space alone leaves its element with no name, so never pass one.
+`rangeTemplate` is required and is the summary's template, final display text in which Fabricate replaces `{first}`, `{last}` and `{total}` with the first and last record shown and `totalCount`, as "{first}–{last} of {total} reagents"; with no record shown, `{first}` and `{last}` are both `0`.
+`pageTemplate` is required and is the page-position template, in which Fabricate replaces `{page}` with the one-based page shown and `{total}` with the page count, as "Page {page} of {total}".
+Fabricate fills each placeholder of either template with the number in digits, leaves any other `{name}` as written and changes nothing else, so you choose each template's wording, its plural form included, from the `totalCount` you pass.
+Each arrow is a native `<button type="button">`, so `Enter` and `Space` press it, and the page-size radios take the keys `SegmentedControl`'s section states; Fabricate stops no key, and cancels only a held Enter's repeats on the arrow or page-size radio it moved focus to, as the next paragraph states.
+Focus moves only as the page-size control's section states, except that when an `update` disables or removes the arrow holding focus, and focus has not moved elsewhere meanwhile, Fabricate moves focus to the other arrow while it is enabled, and otherwise to the checked page-size radio while one is drawn.
+So a keyboard user who presses Next onto the last page rests on Previous.
+On the arrow or page-size radio it moved focus to, Fabricate cancels the repeats of an Enter still held from that press until that key is released or Enter is pressed again, so a held Enter stops on the end page rather than walking back.
+With neither to move to, Fabricate takes focus off the arrow, so focus is on the document body, where Foundry's keybindings hear Escape, and a pager that only focus kept drawn is removed; when you make that `update`, move focus first.
+To return focus to the pager, focus `target.querySelector('button:not(:disabled), input[type="radio"]:checked')`: the first enabled arrow, else the checked size.
+An arrow press bubbles one `click`, and the page-size control's clicks are as its section states, so count page turns from `onPageChange`, never from `click`.
+An arrow submits no `<form>`.
+A size choice fires a bubbling `change` as `SegmentedControl`'s section states, so a form with `submitOnChange` submits on it; read the size from `onPageSizeChange`, never from the form.
+It takes no rest keys, so a `data-*` key is refused, and so are `showPageSize`, `multiPageOnly`, `edge` and a `class`.
+It needs a Fabricate window ancestor, because its bar, arrows and ring come from Fabricate's module sheet, rooted at `.fabricate-pagination`, and it is drawn the same in the Manager and the player window.
+Your own window or dialog carries no Fabricate root, so the pager is refused there with `Pagination needs a Fabricate window ancestor`.
+The arrows' keyboard ring is the accent, 2px wide and 2px clear of the arrow, so it reaches 4px beyond the arrow, and the page-size control's ring reaches as `SegmentedControl`'s section states.
+The ring clears 3:1 against the default bar's `--fab-bg-1` and, under `'compact'`, against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so mount a compact pager on one of those four grounds and leave room for the ring inside any edge of your own that clips.
+
+A worked pager follows: a reagent list you draw a page at a time on a panel inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['Pagination'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates `Pagination` describes none: draw your own pager there.
+if (!fabUi?.describe?.('Pagination')) return;
+
+let pageIndex = 0;
+let pageSize = 25;
+const props = () => ({
+  totalCount: acmeReagents.count(),
+  pageSize,
+  pageIndex,
+  pageSizeOptions: [10, 25, 50],
+  ariaLabel: 'Reagent pages',
+  navLabel: 'Reagent page navigation',
+  previousLabel: 'Previous reagents page',
+  nextLabel: 'Next reagents page',
+  perPageLabel: 'Per page',
+  rangeTemplate:
+    acmeReagents.count() === 1
+      ? '{first}–{last} of {total} reagent'
+      : '{first}–{last} of {total} reagents',
+  pageTemplate: 'Page {page} of {total}',
+  onPageChange: (index) => {
+    pageIndex = index;
+    pager.update(props()); // Before any `await`, so the summary and arrows move at once.
+    acmeReagents.showPage(pageIndex, pageSize);
+  },
+  onPageSizeChange: async (size) => {
+    pageSize = size;
+    pageIndex = 0;
+    pager.update(props()); // Before any `await`, so the chosen size stays checked.
+    await acmeReagents.showPage(pageIndex, pageSize);
+  },
+});
+const pager = fabUi.mount('Pagination', { target, props: props() });
+
+// `pager.destroy()` when the panel goes away, moving focus first if the pager holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3452,7 +3543,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup` and `SegmentedControl` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl` and `Pagination` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -3599,12 +3690,12 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
   A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
-  Enter presses on key down and again on each repeat while held, and Space on release.
+  Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio Fabricate has moved focus to, as its section states, and Space on release.
   In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its section names any other.
   Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
@@ -3614,8 +3705,8 @@ A published component draws a control only where its section says so, and each c
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, each never out of `target`.
-  An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its section states, each never out of `target`.
+  An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where the sentence above has Fabricate move it off a `Pagination` arrow, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.
 - To return focus to a published control, after a dialog its press opened has closed, focus the focusable element inside `target` that the component's section names; nothing else inside `target` is yours to select.
@@ -3625,8 +3716,8 @@ A published component draws a control only where its section says so, and each c
   Where a component's rest lands on the control itself, `data-action` is refused: the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
   Keep `target` out of a `<label>`, an `<a>` and a `<button>` of your own.
 - A control is unavailable only through a prop its section names.
-  A natively `disabled` control leaves the tab order and cannot take focus, so never disable the control that holds focus: ignore the press instead, and where the control must then become unavailable, first move focus to the destination the "Fabricate moves no focus" bullet orders.
-  Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does.
+  A natively `disabled` control leaves the tab order and cannot take focus, so never disable the control that holds focus, except a `Pagination` arrow, which its section lets an `update` disable: ignore the press instead, and where the control must then become unavailable, first move focus to the destination the "Fabricate moves no focus" bullet orders.
+  Disabling the control that holds focus drops focus to the document body, where Foundry's keybindings apply, as removing it does, except where `Pagination`'s section states that Fabricate moves it.
   In a document sheet the user cannot edit, Foundry disables every form control inside the sheet's `<form>` on each render, a published control already mounted there among them, and the control looks as it did, apart from a switch's pointer cursor, which becomes `not-allowed`, so mount a control there from the sheet's render hook or after `super._onRender`, once that pass has run.
 - A control that shows a state (pressed, checked, selected, current) takes it from a `data` prop and exposes it in the accessibility tree as well as in colour.
   A press reports through the callback, and the control shows the new state when your `update` passes it; its section says where a native control changes itself first.

@@ -74,6 +74,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Pagination.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

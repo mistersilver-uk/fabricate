@@ -711,7 +711,12 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
     [
       'src/ui/svelte/components/Pagination.svelte',
       ['player-inventory', 'player-crafting-simple'],
-      ['world-tool-catalogue-page-two', 'player-journal-stacked'],
+      [
+        'world-tool-catalogue-page-two',
+        'player-journal-stacked',
+        'manager-published-pagination-specimen',
+        'manager-published-pagination-size-specimen',
+      ],
     ],
   ];
   for (const [file, caseIds, specimens = []] of expectations) {
@@ -981,6 +986,19 @@ test('(a) a SegmentedControl change publishes its two frames, then the specimen 
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
     'manager-published-segmented-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) a Pagination change publishes its four frames, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/Pagination.svelte';
+  const frames = [
+    'player-inventory',
+    'player-crafting-simple',
+    'world-tool-catalogue-page-two',
+    'player-journal-stacked',
+    'manager-published-pagination-specimen',
+    'manager-published-pagination-size-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });

@@ -19,3 +19,5 @@ manager-published-icon-buttons-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
 manager-published-segmented-specimen
+manager-published-pagination-specimen
+manager-published-pagination-size-specimen

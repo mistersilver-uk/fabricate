@@ -407,6 +407,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
+  'tests/view-lab/fixtures/PublishedPagination.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -871,6 +872,9 @@ const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
 const labFilterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
 const labFilterSegment = (value) =>
   `[data-lab-segmented="filter"] label.manager-segment:has(> input[value="${value}"])`;
+/** The pagination fixture's compact segment by size. */
+const labPagerSegment = (value) =>
+  `[data-lab-pagination="compact"] label.manager-segment:has(> input[value="${value}"])`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1457,6 +1461,24 @@ const NON_VERB_CONTROLS = Object.freeze({
       selector: labFilterSegment('owned'),
       styles:
         'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+    },
+  ],
+  // The published pager (issue 2646): the ring on the arrow focus was moved to, by its shape.
+  'manager-published-pagination-specimen': [
+    {
+      selector: '[data-lab-pagination="browse"] [data-pagination-prev]',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The compact pager: the reached size segment's ring, and the page label held off the screen.
+  'manager-published-pagination-size-specimen': [
+    {
+      selector: labPagerSegment(25),
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+    {
+      selector: '[data-lab-pagination="compact"] [data-pagination-page]',
+      styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
     },
   ],
 });
@@ -6127,13 +6149,15 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-tabs-specimen',
       'manager-published-option-cards-specimen',
       'manager-published-segmented-specimen',
+      'manager-published-pagination-specimen',
+      'manager-published-pagination-size-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, and the segmented fixture's two controls. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, and the pagination fixture's two pagers. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6148,9 +6172,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'EditorTabs',
   'RadioCardGroup',
   'SegmentedControl',
+  'Pagination',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup and SegmentedControl and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl and Pagination and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
