@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-chromium-coldtest-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       # Cold cache only. Bounded per attempt rather than only at the step, because a stalled
       # apt does not fail — it hangs, so a bare retry would never reach its second attempt.
