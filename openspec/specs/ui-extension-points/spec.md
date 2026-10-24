@@ -1377,11 +1377,12 @@ Each group states the accepted values of every key that entry publishes.
     Typing narrows the rows to the glyphs the query matches, and an empty query lists them all; which glyphs a query matches and their order are private.
     ArrowDown and ArrowUp move the active row, which the field names with `aria-activedescendant`, and Home and End do so only from the caret's edge; Enter chooses the active row, and with no active row does nothing.
     A choice closes the list and returns focus to the trigger.
-    Escape in the query field closes the list without choosing, returns focus to the trigger, and stops there, so no window or dialog closes.
+    Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
     Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
   - The trigger stops the propagation of every key pressed while it holds focus and of its own `click`, and the open list stops every `click` inside it, so a companion's listener above `target` or the `overlayHost` hears none of them; while the trigger holds focus Escape closes no window, an open ApplicationV1 `Dialog` included.
+    Every key pressed in the query field, Escape included, may reach a companion's listener on the `overlayHost` or above it.
   - The no-match line is a polite live region, so it is announced when a query empties the list; the picker announces nothing else.
   - The list is the entry's overlay, so `describe('IconPicker').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
     An `overlayHost` the companion passes sits inside the same Fabricate window, because the list's rows, ring and hidden live region are drawn only under a `.fabricate` ancestor, and in no `<form>`, because Enter in the query field with no active row can submit a form it sits in.
