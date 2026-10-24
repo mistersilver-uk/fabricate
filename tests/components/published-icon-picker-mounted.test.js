@@ -698,8 +698,8 @@ describe('the icon picker View Lab specimen cases against the DOM the fixture dr
   const count = (selector) => document.querySelectorAll(selector).length;
 
   /**
-   * The fixture's ground, which is the overlay host, its picker mounted into the target, and the
-   * echo `onChange` writes; `update` false is a companion whose `onChange` passes nothing back.
+   * The fixture's ground, which is the overlay host, and its picker mounted into the target;
+   * `update` false is a companion whose `onChange` passes nothing back.
    */
   function drawFixture({ update = true } = {}) {
     const fixed = fixtureLiteral(FIXTURE, 'PICKER');
@@ -714,11 +714,9 @@ describe('the icon picker View Lab specimen cases against the DOM the fixture dr
       ...fixed,
       value,
       onChange: (next) => {
-        if (update) {
-          value = next;
-          handle.update(props());
-        }
-        ground.setAttribute('data-lab-icon-chosen', next);
+        if (!update) return;
+        value = next;
+        handle.update(props());
       },
     });
     const handle = ui().mount('IconPicker', { target: slot, props: props(), overlayHost: ground });

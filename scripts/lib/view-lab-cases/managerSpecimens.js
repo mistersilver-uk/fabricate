@@ -1357,10 +1357,9 @@ export const CASES = Object.freeze([
       { selector: ICON_FIELD, press: 'ArrowDown' },
       { selector: ICON_FIELD, press: 'Enter' },
     ],
-    // A glyph other than the flask, drawn on the trigger by the companion's own update, under the
-    // fixture's echo of the choice, which only `onChange` writes, and the focus Fabricate returned.
-    expectSelector:
-      '[data-lab-icon-chosen]:not([data-lab-icon-chosen="fas fa-flask"]) .essence-icon-picker-trigger:not(:has(.fa-flask)):focus-visible',
+    // A glyph other than the flask, drawn on the trigger by the companion's own update, and the
+    // focus Fabricate returned.
+    expectSelector: '.essence-icon-picker-trigger:not(:has(.fa-flask)):focus-visible',
     expectCenterHit: ICON_TRIGGER,
     expectContained: [
       { container: ICON_GROUND, target: ICON_TARGET },
