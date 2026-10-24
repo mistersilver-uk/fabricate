@@ -168,6 +168,7 @@ describe('the keyboard ring on the published SegmentedControl’s segment', () =
     moduleRings: ['.fabricate input:focus-visible'],
     stacks: GROUNDS.flatMap((ground) => [
       ['--fab-surface-soft', ground],
+      ['--fab-surface-active', ground],
       ['--fab-surface-active', '--fab-surface-soft', ground],
     ]),
   });
