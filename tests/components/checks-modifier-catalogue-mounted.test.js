@@ -414,6 +414,128 @@ describe('the check-modifier catalogue card (mounted)', () => {
   });
 });
 
+// ── A pressed radio card stays drawn chosen while its async save is in flight (issue 2601) ──
+describe('the checks route’s radio cards hold a pressed choice while its save is pending', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  const settle = () => new Promise((done) => setTimeout(done, 0));
+  /** Each save the card starts, with the hooks that settle it. */
+  function pendingSaves() {
+    const saves = [];
+    const save = () =>
+      new Promise((resolveSave, rejectSave) => {
+        saves.push({ resolveSave, rejectSave });
+      });
+    return { saves, save };
+  }
+  /** The value of every card drawn checked and of every card drawn active, in DOM order. */
+  function drawn(target, groupHook, optionHook) {
+    const cards = [...target.querySelectorAll(`[${groupHook}] [${optionHook}]`)];
+    return {
+      checked: cards
+        .filter((card) => card.querySelector('input[type="radio"]').checked)
+        .map((card) => card.getAttribute(optionHook)),
+      active: cards
+        .filter((card) => card.classList.contains('is-active'))
+        .map((card) => card.getAttribute(optionHook)),
+    };
+  }
+  const press = async (target, optionHook, value) => {
+    target.querySelector(`[${optionHook}="${value}"] input[type="radio"]`).click();
+    await settle();
+  };
+
+  const SURFACES = [
+    {
+      name: 'the combination rule',
+      group: 'data-crafting-modifier-policy',
+      option: 'data-crafting-modifier-policy-option',
+      saved: 'addAll',
+      values: ['highest', 'playerPicks'],
+      mountWith: (save) => mountChecks({ onUpdateCraftingCheckModifiers: save }),
+    },
+    {
+      name: 'the failure-result policy',
+      group: 'data-failure-result-policy-group',
+      option: 'data-failure-result-policy-option',
+      saved: 'perRecord',
+      values: ['always', 'never'],
+      mountWith: async (save) =>
+        openSection(
+          await mountChecks({
+            craftingFailureResultPolicy: 'perRecord',
+            onUpdateCraftingFailureResultPolicy: save,
+          }),
+          'on-failure'
+        ),
+    },
+  ];
+
+  for (const { name, group, option, saved, values, mountWith } of SURFACES) {
+    const [first, second] = values;
+    const only = (value) => ({ checked: [value], active: [value] });
+
+    it(`draws ${name} pressed while its save is pending, then the saved value`, async () => {
+      const { saves, save } = pendingSaves();
+      const target = await mountWith(save);
+      assert.deepEqual(drawn(target, group, option), only(saved), 'the saved value at rest');
+      await press(target, option, first);
+      assert.equal(saves.length, 1, 'the press started one save');
+      assert.deepEqual(drawn(target, group, option), only(first), 'held while the save runs');
+      saves[0].resolveSave();
+      await settle();
+      assert.deepEqual(
+        drawn(target, group, option),
+        only(saved),
+        'once the save settles with the prop unchanged, the saved value is drawn again'
+      );
+      harness.remount();
+    });
+
+    it(`releases ${name}'s hold when its save is rejected, and reports the refusal`, async () => {
+      const { saves, save } = pendingSaves();
+      const target = await mountWith(save);
+      await press(target, option, first);
+      assert.deepEqual(drawn(target, group, option), only(first));
+      const refusal = new Error('the save was refused');
+      const reported = [];
+      const { error } = console;
+      console.error = (...args) => {
+        reported.push(args);
+      };
+      try {
+        saves[0].rejectSave(refusal);
+        await settle();
+      } finally {
+        console.error = error;
+      }
+      assert.deepEqual(drawn(target, group, option), only(saved), 'the saved value is drawn again');
+      assert.deepEqual(reported, [[refusal]], 'the refusal is reported once');
+      harness.remount();
+    });
+
+    it(`keeps ${name}'s later press drawn when an earlier save settles first`, async () => {
+      const { saves, save } = pendingSaves();
+      const target = await mountWith(save);
+      await press(target, option, first);
+      await press(target, option, second);
+      assert.equal(saves.length, 2, 'each press started its own save');
+      saves[0].resolveSave();
+      await settle();
+      assert.deepEqual(
+        drawn(target, group, option),
+        only(second),
+        'the earlier save settling does not release the later press'
+      );
+      saves[1].resolveSave();
+      await settle();
+      assert.deepEqual(drawn(target, group, option), only(saved), 'then the saved value');
+      harness.remount();
+    });
+  }
+});
+
 // ── The `WHAT ACTUALLY GETS ROLLED` chips NAME their modifiers ────────────────────────
 describe('the formula inset names each applied modifier (issue 1097 follow-up)', () => {
   before(() => harness.setup());

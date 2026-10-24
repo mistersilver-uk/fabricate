@@ -124,6 +124,30 @@ describe('CraftingSettingsView (mounted)', () => {
     );
   });
 
+  it('keeps a later visibility press drawn chosen when an earlier save settles first', async () => {
+    const settles = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem({ visibilityMode: 'knowledge' }),
+      onSetVisibilityMode: () =>
+        new Promise((resolve) => {
+          settles.push(resolve);
+        })
+    });
+    const drawn = () =>
+      activeOptionValue(root, 'data-crafting-visibility-mode', 'data-crafting-visibility-mode-option');
+
+    selectRadio(root, 'data-crafting-visibility-mode-option', 'global');
+    await flushRender();
+    selectRadio(root, 'data-crafting-visibility-mode-option', 'item');
+    await flushRender();
+    settles[0]();
+    await flushRender();
+    assert.equal(drawn(), 'item', 'the earlier save settling does not release the later press');
+    settles[1]();
+    await flushRender();
+    assert.equal(drawn(), 'knowledge', 'then the group draws the saved system, here unchanged');
+  });
+
   it('reflects the visibility mode in the effect panel (item shows Books & Scrolls + Limited use)', async () => {
     const root = await harness.mount({ selectedSystem: makeSystem({ visibilityMode: 'item' }) });
 
