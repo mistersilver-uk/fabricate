@@ -87,10 +87,12 @@ export function installLabChatLog(frame, doc = globalThis.document, { side = 'ri
   });
   frame.append(log);
   const create = globalThis.ChatMessage.create.bind(globalThis.ChatMessage);
-  globalThis.ChatMessage.create = async (data = {}, options = {}) => {
-    const message = await create(data, options);
-    log.append(messageElement(doc, data, options));
-    return message;
-  };
+  Object.assign(globalThis.ChatMessage, {
+    async create(data = {}, options = {}) {
+      const message = await create(data, options);
+      log.append(messageElement(doc, data, options));
+      return message;
+    },
+  });
   return log;
 }
