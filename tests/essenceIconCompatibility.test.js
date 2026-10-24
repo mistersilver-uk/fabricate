@@ -340,7 +340,9 @@ describe('the release the vocabulary follows is the one registered', () => {
     for (const reader of [undefined, 14, { generation: 14 }, 'game.release']) {
       assert.throws(() => registerFoundryRelease(reader), TypeError);
     }
+    registerFoundryRelease(() => ({ generation: 14 }));
     registerFoundryRelease(null);
+    assert.deepEqual(codes(definitionsUnderV13Bundle()), ['flask', 'gear'], 'null clears it');
   });
 });
 
