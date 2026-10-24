@@ -1158,11 +1158,12 @@ export const CASES = Object.freeze([
     expectLayout: {
       controls: [
         // The reached radio's ring, the chosen card's border, and the legend held off the screen;
-        // the chosen ground is a `::before` no card-level probe reads.
+        // the chosen ground is a `::before` no card-level probe reads. The ring's colour is read
+        // off the sheet (`published-radio-card-group-census.test.js`), because a probe inside a
+        // void `<input>` resolves no `var()`.
         {
           selector: `${optionRadio('immune')}:focus-visible`,
-          styles:
-            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
         },
         {
           selector: optionCard('immune'),

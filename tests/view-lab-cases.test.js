@@ -1428,13 +1428,12 @@ const NON_VERB_CONTROLS = Object.freeze({
         'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
     },
   ],
-  // The published option cards (issue 2601): the keyboard-reached radio's ring, the chosen card's
-  // border, and the legend held off the screen.
+  // The published option cards (issue 2601): the keyboard-reached radio's ring by its shape, the
+  // chosen card's border, and the legend held off the screen.
   'manager-published-option-cards-specimen': [
     {
       selector: `${labOptionRadio('immune')}:focus-visible`,
-      styles:
-        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent)',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
     {
       selector: labOptionCard('immune'),
@@ -1644,6 +1643,18 @@ test('the non-verb controls are measured by the cases that draw them', () => {
       `${caseId} measures its non-verb controls`
     );
   }
+});
+
+/** A selector whose subject is a void `<input>` or `<img>`, which a hidden probe cannot inherit from. */
+const VOID_SUBJECT = /(?:^|[\s>+~])(?:input|img)(?:[[:.#][^\s>+~]*)?$/;
+
+test('no case resolves a token through a probe inside a void element', () => {
+  const faults = VIEW_LAB_CASES.flatMap(({ id, expectLayout }) =>
+    (expectLayout?.controls ?? [])
+      .filter(({ selector, styles }) => VOID_SUBJECT.test(selector) && styles.includes('var('))
+      .map(({ selector }) => `${id}: ${selector}`)
+  );
+  assert.deepEqual(faults, [], 'read the token off the sheet; a probe in a void element has none');
 });
 
 // The side-rail routes' own scrollers below the 1120px rung (issue 1976): the two editors whose
