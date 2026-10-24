@@ -898,7 +898,8 @@ function nestedRowFaults(nested = NESTED_NAMES, pins = FOCUSABLE_REACH, reader =
   return Object.entries(nested).flatMap(([name, rows]) => {
     const entry = ENTRIES.find((candidate) => candidate.name === name);
     if (!entry) return [`${name} is no published entry`];
-    const controls = controlsOf(entry, reader).filter((control) => isReached(control, pins));
+    const reach = pinsFor(entry, pins);
+    const controls = controlsOf(entry, reader).filter((control) => isReached(control, reach));
     const reached = new Set(controls.map(({ id }) => id));
     return Object.keys(rows)
       .filter((id) => !reached.has(id))
@@ -2610,6 +2611,12 @@ describe('a published child drawn inside another entry (issue 2646)', () => {
       `Pagination names ${unreached}, which its drawn closure does not reach`,
     ]);
     assert.deepEqual(nestedRowFaults({ Nowhere: {} }), ['Nowhere is no published entry']);
+    const press = 'src/ui/svelte/components/IconButton.svelte: button';
+    const elsewhere = { ...FOCUSABLE_REACH, [press]: { byEntry: { Select: 'always' } } };
+    assert.deepEqual(
+      nestedRowFaults({ Pagination: { [press]: { keys: ['nextLabel'] } } }, elsewhere),
+      [`Pagination names ${press}, which its drawn closure does not reach`]
+    );
   });
 
   const forwardedOf = (script, markup) =>
