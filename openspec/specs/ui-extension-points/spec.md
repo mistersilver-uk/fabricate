@@ -1429,7 +1429,8 @@ The list commits human decisions only, so no total or baseline is committed and 
 A change that makes a listed component fail a static rule, or stops it being a candidate (its design-system row's scope or library specimen changes, or the row is removed), drops it from the list without a review of that drop, and a renamed component's new path may be listed as if it were new.
 - **A per-item spread is stripped or the check fails, and the check fails closed.**
 Every spread attribute in a published closure is traced to the published `data` it comes from.
-A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local, a published key that is not `data`, and a literal.
+A spread that comes from no published `data` passes: the file's `$props()` rest, a script-level `const` or `$derived` local that is not an object literal, a published key that is not `data`, and a literal.
+A script-level `const` or `$derived` object literal is traced by its spreads and computed keys, a branch or call inside it counting as its values, and a value a script function closes over is not traced.
 A spread of a member of published `data` passes only when it is a stripped member.
 Every other spread fails: a whole item, an item of a collection the entry does not publish, and an expression no rule traces (a call, a `let`, an imported name, an `{#await}` value).
 A row names `<Entry>.<key>`, then each member that holds the items below it, then the member the seam drops.
