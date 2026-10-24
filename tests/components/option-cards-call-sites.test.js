@@ -159,13 +159,16 @@ const SITES = IMPORTERS.flatMap(({ file, ast }) =>
 const ROWS = catalogueEntries(repoRoot).filter(({ row }) => row.path === COMPONENT);
 
 const byPath = (left, right) => left.localeCompare(right);
+/** The seam adapter imports the primitive only to publish it in its `COMPONENTS` table (issue 2601). */
+const SEAM_ADAPTER = 'src/ui/publishedComponents.svelte.js';
 
 test('only the .svelte importers reference the primitive, in any form', () => {
   assert.deepEqual(
-    REFERENCING.sort(byPath),
+    REFERENCING.filter((path) => path !== SEAM_ADAPTER).sort(byPath),
     IMPORTERS.map(({ file }) => file).sort(byPath),
     `a src file imports, re-exports or lazily loads ${NAME} outside a .svelte template scan`
   );
+  assert.ok(REFERENCING.includes(SEAM_ADAPTER), 'the seam adapter publishes the primitive');
 });
 
 test('every importer binds RadioCardGroup by its own name and uses it only as a tag', () => {
