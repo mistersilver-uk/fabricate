@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertClipped, settle } from '../helpers/publishedComponentModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const segmentedSource = readFileSync(
@@ -551,5 +552,94 @@ describe('SegmentedControl (mounted)', () => {
     });
     assert.ok(root.querySelector('[data-when-spent-control]'));
     assert.ok(root.querySelector('[data-when-spent-option="inert"]'));
+  });
+});
+
+// Issue 2644: the per-mount name fallback, the re-sync after `onChange`, and the radio's clip.
+describe('SegmentedControl names its radios and puts the check back on value (issue 2644)', () => {
+  const radiosOf = (root) => [...root.querySelectorAll('input[type="radio"]')];
+  const checkedOf = (root) => radiosOf(root).map((radio) => radio.checked);
+  /** Checks `radio` and focuses it as the platform does on a key, then fires its `change`. */
+  const reach = (radio) => {
+    radio.focus();
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+  };
+
+  it('shares one fabricate-segmented- name across one mount’s radios when no groupName is passed', async () => {
+    const root = await harness.mount({ options: OPTIONS, value: 'destroyed' });
+    const names = [...new Set(radiosOf(root).map((radio) => radio.name))];
+    assert.equal(names.length, 1, 'one name per mount');
+    assert.match(names[0], /^fabricate-segmented-./);
+  });
+
+  it('keeps a passed groupName as every radio’s name', async () => {
+    const root = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'kept' });
+    assert.deepEqual(
+      radiosOf(root).map((radio) => radio.name),
+      ['kept', 'kept']
+    );
+  });
+
+  it('leaves the previous radio checked and focus on the reached one when the caller declines', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      onChange: (next) => {
+        calls.push(next);
+      },
+    });
+    const reached = radiosOf(root)[1];
+    reach(reached);
+    assert.deepEqual(calls, ['inert']);
+    assert.deepEqual(checkedOf(root), [true, false], 'the check is back on value at once');
+    assert.ok(document.activeElement === reached, 'focus stays on the reached radio');
+  });
+
+  it('keeps the new radio checked for an accepted numeric option, after the flush', async () => {
+    const options = [
+      { value: 10, label: '10' },
+      { value: 25, label: '25' },
+    ];
+    const root = await harness.mount({
+      options,
+      value: 10,
+      onChange: (next) => harness.component.$set({ value: next }),
+    });
+    reach(radiosOf(root)[1]);
+    assert.deepEqual(checkedOf(root), [false, true], 'checked inside the change');
+    await settle();
+    assert.deepEqual(checkedOf(root), [false, true], 'and still after the flush');
+    assert.ok(root.querySelectorAll('.manager-segment')[1].classList.contains('is-active'));
+  });
+
+  it('re-syncs the check when onChange throws', async () => {
+    const view = document.defaultView;
+    const swallow = (event) => event.preventDefault();
+    view.addEventListener('error', swallow);
+    try {
+      const root = await harness.mount({
+        options: OPTIONS,
+        value: 'destroyed',
+        onChange: () => {
+          throw new Error('the caller failed');
+        },
+      });
+      try {
+        reach(radiosOf(root)[1]);
+      } catch {
+        // Where the runtime rethrows a listener's error, the check is still put back.
+      }
+      assert.deepEqual(checkedOf(root), [true, false]);
+    } finally {
+      view.removeEventListener('error', swallow);
+    }
+  });
+
+  it('computes the radio and the icon-only label as clipped', async () => {
+    const root = await harness.mount({ options: OPTIONS, value: 'destroyed', iconOnly: true });
+    assertClipped(radiosOf(root)[0], 'the radio');
+    assertClipped(root.querySelector('.manager-segment-label'), 'the icon-only label');
   });
 });

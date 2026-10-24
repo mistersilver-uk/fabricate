@@ -18,3 +18,4 @@ manager-published-callout-specimen
 manager-published-icon-buttons-specimen
 manager-published-tabs-specimen
 manager-published-option-cards-specimen
+manager-published-segmented-specimen

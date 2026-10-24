@@ -125,6 +125,10 @@ The caller resolves each label where it builds its options, so an untranslated k
 The shape follows `Select`'s `{ value, label }`; `RadioCardGroup` takes its legend, hint, option labels and descriptions as final display text the caller resolves, with `localizeOptions` from `util/localizeOr.js` for an option list; no option carries `labelKey`, `fallback`, `descKey` or `descFallback`, and the group takes no `legendKey` or `hintKey`, so its closure calls no `game.i18n` (issue 2601).
 `EditorTabs` takes its tab labels, accessible-name overrides and descriptions and its strip's `ariaLabel` as final display text the caller resolves, with `localizeTabs` from `util/localizeOr.js` for a tab list; no tab carries `labelKey`, `ariaLabelKey` or `tooltipKey` and the strip takes no `ariaLabelKey`.
 It localizes only the severity names it builds for a Validation tab, through the `APP_LOCALIZER` context, so a tree mounted with none draws their English and calls no `game.i18n`.
+`SegmentedControl`'s radios share `groupName`, or a name unique to the mounted instance when the caller passes none, so two controls never uncheck each other and the arrow keys move within one control.
+When `onChange` returns, `SegmentedControl` sets each radio's check from `value` inside the same `change`, so a change the caller declines leaves the check on `value`'s segment.
+The `SegmentedControl` segment keeps its own ring, the 2px accent at a 2px offset drawn on the segment around its visually hidden radio, which the `tag` tone turns inward to a -2px offset.
+`SegmentedControl` is published through `game.fabricate.api.ui` (issue 2644).
 
 #### Scenario: A caller's key has no translation
 

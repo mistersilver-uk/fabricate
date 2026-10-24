@@ -289,7 +289,7 @@ describe('InteractablesManagerRoot body', () => {
     assert.ok(segmentedSource.includes('role="radiogroup"'), 'SegmentedControl is a radiogroup');
     assert.ok(/\n\s*type="radio"/.test(segmentedSource), 'SegmentedControl renders real radios');
     // ANCHORED AT ITS OWN LINE, not matched as a substring: `name` is a suffix of `data-name`.
-    assert.ok(/\n\s*name=\{groupName\}/.test(segmentedSource), 'SegmentedControl honours groupName');
+    assert.ok(/\n\s*name=\{groupName \|\| /.test(segmentedSource), 'SegmentedControl honours groupName');
   });
 
   // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520). The statement and this panel's

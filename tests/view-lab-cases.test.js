@@ -406,6 +406,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
   'tests/view-lab/fixtures/PublishedTabs.svelte',
   'tests/view-lab/fixtures/PublishedOptionCards.svelte',
+  'tests/view-lab/fixtures/PublishedSegmented.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -866,6 +867,10 @@ const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
 const LAB_CARDS_FIELDSET = '[data-lab-option-cards] > [data-lab-option-cards-target] > fieldset';
 const labOptionCard = (value) => `${LAB_CARDS_FIELDSET} [data-radio-card-option="${value}"]`;
 const labOptionRadio = (value) => `${labOptionCard(value)} input[type="radio"]`;
+/** The segmented fixture's filter radio by value, and the segment that wraps it. */
+const labFilterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
+const labFilterSegment = (value) =>
+  `[data-lab-segmented="filter"] label.manager-segment:has(> input[value="${value}"])`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1445,6 +1450,15 @@ const NON_VERB_CONTROLS = Object.freeze({
       styles: 'position: absolute; width: 1px; height: 1px; clip-path: inset(50%)',
     },
   ],
+  // The published segmented control (issue 2644): the keyboard-reached segment's ring, ink and
+  // weight, read on the segment, which is no void element.
+  'manager-published-segmented-specimen': [
+    {
+      selector: labFilterSegment('owned'),
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+    },
+  ],
 });
 const NON_VERB_SELECTORS = new Set(
   Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
@@ -1647,11 +1661,28 @@ test('the non-verb controls are measured by the cases that draw them', () => {
 
 /** A selector whose subject is a void `<input>` or `<img>`, which a hidden probe cannot inherit from. */
 const VOID_SUBJECT = /(?:^|[\s>+~])(?:input|img)(?:[[:.#][^\s>+~]*)?$/;
+/** A selector with each pseudo-class argument emptied, so a `:has(> input)` names no subject. */
+const withoutArguments = (selector) => {
+  let depth = 0;
+  return [...selector]
+    .filter((character) => {
+      if (character === '(') depth += 1;
+      const kept = depth === 0;
+      if (character === ')') depth -= 1;
+      return kept;
+    })
+    .join('');
+};
 
 test('no case resolves a token through a probe inside a void element', () => {
+  assert.ok(VOID_SUBJECT.test(withoutArguments('.row:has(> label) input:focus-visible')));
+  assert.ok(!VOID_SUBJECT.test(withoutArguments('label.manager-segment:has(> input[value="a"])')));
   const faults = VIEW_LAB_CASES.flatMap(({ id, expectLayout }) =>
     (expectLayout?.controls ?? [])
-      .filter(({ selector, styles }) => VOID_SUBJECT.test(selector) && styles.includes('var('))
+      .filter(
+        ({ selector, styles }) =>
+          VOID_SUBJECT.test(withoutArguments(selector)) && styles.includes('var(')
+      )
       .map(({ selector }) => `${id}: ${selector}`)
   );
   assert.deepEqual(faults, [], 'read the token off the sheet; a probe in a void element has none');
@@ -6095,13 +6126,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-icon-buttons-specimen',
       'manager-published-tabs-specimen',
       'manager-published-option-cards-specimen',
+      'manager-published-segmented-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, and the option cards fixture's group. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, and the segmented fixture's two controls. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6115,9 +6147,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'IconButton',
   'EditorTabs',
   'RadioCardGroup',
+  'SegmentedControl',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs and RadioCardGroup and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup and SegmentedControl and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -8354,6 +8387,68 @@ test('the option cards specimen case presses ArrowRight on the group the fixture
     ['breakable', 'immune', 'limited'],
     'Immune is the next enabled option after Breakable'
   );
+});
+
+test('the segmented specimen case presses ArrowRight on the filter the fixture mounts through the seam', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedSegmented.svelte';
+  const { instance, fragment } = componentAstOf(FIXTURE);
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'SegmentedControl'
+    ),
+    'the fixture mounts SegmentedControl through the seam’s mount'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.callee.object?.name === 'control'
+    ),
+    'its onChange passes the chosen value back through the control’s own update'
+  );
+  for (const hook of [
+    'data-lab-segmented',
+    'data-lab-segmented-ground',
+    'data-lab-segmented-chosen',
+  ]) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectSelector, expectCenterHit } = getCaseById(
+    'manager-published-segmented-specimen'
+  );
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [[labFilterRadio('all'), 'ArrowRight']],
+    'one ArrowRight on the checked All radio'
+  );
+  assert.ok(
+    expectSelector.startsWith('[data-lab-segmented-chosen="owned"] '),
+    'the case waits on the echo only onChange writes'
+  );
+  assert.equal(
+    expectCenterHit,
+    labFilterSegment('owned'),
+    'the hit lands on the segment, never the radio'
+  );
+  const filter = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'CONTROLS')
+    .init.arguments[0].properties.find(({ key }) => key.name === 'filter').value;
+  const values = filter.properties
+    .find(({ key }) => key.name === 'options')
+    .value.elements.map(
+      ({ properties }) => properties.find(({ key }) => key.name === 'value').value.value
+    );
+  assert.deepEqual(values, ['all', 'owned', 'missing'], 'Owned is the next option after All');
 });
 
 test('the tabs specimen case presses ArrowRight on the strip the fixture mounts through the seam', () => {

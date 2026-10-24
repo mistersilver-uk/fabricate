@@ -18,23 +18,27 @@ const RING_GROUNDS = Object.freeze(['--fab-bg-0', '--fab-bg-1', '--fab-surface',
 const RING_CONTRAST = 3;
 
 /**
- * Defines the ring clauses for a control whose own `:focus-visible` rule is `ownRing`, under the
- * module rings `moduleRings` name, `.fabricate button:focus-visible` unless stated.
+ * Defines the ring clauses for a control whose own `:focus-visible` rule is `ownRing`, read from
+ * `ownSheet` (a component's own `<style>` where its ring is scoped, the module sheet unless
+ * stated), under the module rings `moduleRings` name, `.fabricate button:focus-visible` unless stated.
  */
 export function defineAccentRingContrast(
   ownRing,
-  { moduleRings = [MODULE_RING], stacks = [] } = {}
+  { moduleRings = [MODULE_RING], stacks = [], ownSheet = SHEET } = {}
 ) {
-  const rules = rulesIn(collectStyleCorpus()[SHEET]);
+  const corpus = collectStyleCorpus();
+  const rules = rulesIn(corpus[SHEET]);
+  const ownRules = ownSheet === SHEET ? rules : rulesIn(corpus[ownSheet]);
   const themes = themePalettes(rules);
-  const listing = (selector) =>
-    rules.filter((rule) => splitSelectorList(rule.selector).includes(selector));
+  const listing = (selector, among = rules) =>
+    among.filter((rule) => splitSelectorList(rule.selector).includes(selector));
   const ringShortfalls = (stack) => shortfalls(themes, '--fab-accent', stack, RING_CONTRAST);
 
   const rings = [...moduleRings, ownRing];
+  const drawnBy = (selector) => listing(selector, selector === ownRing ? ownRules : rules);
   for (const selector of rings) {
     test(`${selector} draws the accent 2px wide and 2px clear`, () => {
-      const drawn = listing(selector);
+      const drawn = drawnBy(selector);
       assert.equal(drawn.length, 1, 'one rule draws it');
       const ring = propertiesOf(drawn[0]);
       assert.equal(ring.get('outline'), '2px solid var(--fab-accent)');
@@ -43,7 +47,7 @@ export function defineAccentRingContrast(
   }
 
   test(`${ownRing} is a rule of its own beside the module ring`, () => {
-    assert.equal(new Set(rings.flatMap(listing)).size, rings.length);
+    assert.equal(new Set(rings.flatMap(drawnBy)).size, rings.length);
   });
 
   for (const stack of [...RING_GROUNDS.map((ground) => [ground]), ...stacks]) {

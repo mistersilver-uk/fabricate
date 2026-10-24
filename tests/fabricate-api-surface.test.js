@@ -193,10 +193,10 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455 and 2601 headings, by name and in the order the spec states them.
+ * 2455, 2601 and 2644 headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -288,6 +288,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'IconButton',
       'EditorTabs',
       'RadioCardGroup',
+      'SegmentedControl',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -580,6 +581,20 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           columns: optional,
           disabled: optional,
           disabledOptions: optional,
+        },
+        rest: true,
+        root: 'fabricate',
+        overlays: false,
+      },
+      SegmentedControl: {
+        version: 1,
+        props: {
+          options: required,
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          fill: optional,
+          density: optional,
         },
         rest: true,
         root: 'fabricate',

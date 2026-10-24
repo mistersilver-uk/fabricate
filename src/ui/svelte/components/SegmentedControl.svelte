@@ -6,12 +6,13 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `options` | `[{ value, label, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `label` is already localized: the segment's text and, when `iconOnly`, its `title`, so the control resolves no lang key and imports nothing. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
-  | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
+  | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (empty falls back to a name unique to the mount) and the radiogroup's accessible name |
   | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'`/`'inline'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the construction, the scale and the paint, as variants on the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a prefix of `is-accent-soft`, so only a whole-token match tells the two apart. `tone="tag"` draws its own 22px track, and `density` `'inline'` / `'field'` beside it draw that track at 30px / 34px, bare: only the height, the type size and, at 34px, the corner follow the rung, never the well. |
 
   Callbacks:
-  - `onChange(value)` — the chosen option's `value`.
+  - `onChange(value)` — the chosen option's `value`. When it returns, or throws, each radio is
+    checked as `value` then says, so a change the caller declines leaves the previous radio checked.
 
   Rest spread:
   - `{...rest}` lands on the radiogroup root, written after `class`, and carries a caller's hook.
@@ -36,10 +37,24 @@
     ...rest
   } = $props();
 
+  const uid = $props.id();
   const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
+  const segmentHooks = $derived(
+    options.map((option) => (optionDataAttr ? { [optionDataAttr]: option.value } : {}))
+  );
+  let track;
 
+  // Re-syncs by option, never `input.value`, because a value may be a number.
   function select(next) {
-    if (next !== value) onChange(next);
+    const drawn = options;
+    try {
+      if (next !== value) onChange(next);
+    } finally {
+      if (track?.isConnected) {
+        const radios = [...track.querySelectorAll('input')];
+        for (const [i, radio] of radios.entries()) radio.checked = drawn[i]?.value === value;
+      }
+    }
   }
 
   // Class list for one segment; the variant tint applies to the ACTIVE segment only.
@@ -55,19 +70,20 @@
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...rest}
+  bind:this={track}
 >
-  {#each options as option (option.value)}
+  {#each options as option, i (option.value)}
     <!-- `title` ONLY in the icon-only variant, the pointer half of what the clipped label already
          gives the a11y tree; `undefined` omits it, so a labelled consumer's markup is untouched. -->
     <label
       class={segmentClass(option)}
       title={iconOnly ? option.label : undefined}
-      {...optionDataAttr ? { [optionDataAttr]: option.value } : {}}
+      {...segmentHooks[i]}
     >
       <input
         type="radio"
         class="manager-segment-input"
-        name={groupName}
+        name={groupName || `fabricate-segmented-${uid}`}
         value={option.value}
         checked={option.value === value}
         disabled={option.disabled === true}
@@ -448,7 +464,7 @@
     padding: 0;
     margin: -1px;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
   }

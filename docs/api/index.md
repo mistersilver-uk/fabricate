@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2059,6 +2059,7 @@ The published components, in publication order:
 | `IconButton` | 1 | `fabricate` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
 | `EditorTabs` | 1 | `fabricate` | `tabs` (required), `activeTab`, `onSelect` (callback, required), `ariaLabel` (required), `idStem` (required), `activePanelOnly` | yes |
 | `RadioCardGroup` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `legend` (required), `layout`, `columns`, `disabled`, `disabledOptions` | yes |
+| `SegmentedControl` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `fill`, `density` | yes |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3212,6 +3213,70 @@ const group = fabUi.mount('RadioCardGroup', { target, props: props() });
 // `group.destroy()` when the sheet goes away, moving focus first if a radio holds it.
 ```
 
+### SegmentedControl
+
+`SegmentedControl` draws the design system's segmented control (`<Segmented>` in the library): a `role="radiogroup"` track of native radios, each behind a label segment, one for each item of `options`, drawn in that order.
+`options` is required and is an array of `{ value, label, icon, disabled }` items.
+`value` is required, a string or a number, unique in the control; a list with a duplicate is unsupported and how it draws is private.
+`label` is required and is final display text, the segment's whole visible text and its radio's accessible name; a label of white space alone leaves the radio with no name, so never pass one.
+`icon` is optional Font Awesome classes for a glyph drawn before the label, hidden from assistive technology.
+`disabled: true` disables that option's radio natively, so the arrow keys skip it and it never calls `onChange`.
+An item's other members are private, so pass none; a function in one is refused.
+`value` is the `value` of the selected option and defaults to `''`.
+It is compared with `===`, so `'10'` selects no option whose `value` is `10`, and a `value` that names no option leaves no segment selected.
+`onChange` is a required callback, called with one argument, the `value` of the option a press or a key reaches; a press on the selected segment calls nothing, because a checked radio fires no `change`.
+The control holds no selection: it draws a segment selected only once an `update` passes that option's `value`, so make that `update` from inside `onChange`, before any `await`.
+The platform checks the reached radio first; when `onChange` returns, Fabricate sets the check back on the radio of `value`, inside that same `change`, so a declined change leaves the previous radio checked.
+Focus stays on the reached radio, drawn unchecked, so after you decline a change move focus to `target.querySelector('input[type="radio"]:checked')`.
+`ariaLabel` is required and is the radiogroup's name, final display text.
+`fill` is `true` or `false` and defaults to `false`: `true` stretches the track across `target` and gives every segment an equal share.
+`density` is `'default'` or `'inline'` and defaults to `'default'`; any other value is private.
+The radios share one name Fabricate makes unique to the mount, so two controls never uncheck each other.
+Fabricate handles and stops no key: the platform moves focus and the check to the next or previous enabled radio on the arrow keys, wrapping, and Space checks the focused radio, each check calling `onChange`.
+Focus moves only among one control's radios and never out of `target`.
+To return focus to the control, focus `target.querySelector('input[type="radio"]:checked')`, or the first enabled radio when no option is selected.
+A pointer press on a segment bubbles two `click`s, the label's and the one it forwards to the radio, and an arrow key may bubble one from the radio it reaches; count choices from `onChange`, never from `click`.
+An `update` keeps every radio whose option it keeps, so focus stays on it; one that drops the focused radio's option, and `destroy`, take focus from it, and one that disables it moves focus to `<body>`, where Foundry's keybindings hear Escape and the arrow keys, so move focus first.
+In a host that replaces its content on render (DialogV2, a Handlebars part, a `submitOnChange` sheet that re-renders after the update a change causes) the radios are new elements after every render: note in `_preRender` whether focus was inside `target` and, after mounting again in `_onRender`, focus the checked radio, or the first enabled one.
+Each change fires a bubbling `change`, so a form with `submitOnChange` submits on every change and reads its data inside that `change`, after Fabricate has set the check from `value`.
+The radios carry a private `name` that a document sheet's schema discards, and a form carries the value as a string: Foundry's `FormDataExtended` carries the checked radio's value even while that radio is disabled, as long as another radio of the control is enabled, and a native `FormData` omits a disabled radio; read the choice from `onChange`, never from the form.
+Where the browser's implicit submission covers a focused radio, Enter submits the form through its first submit button, which in `DialogV2.confirm` is Yes, so mount the control in no form whose submit you do not want.
+Rest `data-*` attributes land on the radiogroup, never on a segment or a radio.
+It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window.
+An empty `options` draws the named radiogroup with no segment and no radio, so nothing inside `target` takes focus; pass at least one option where the control must be reachable.
+Your own window or dialog carries no Fabricate root, so the control is refused there with `SegmentedControl needs a Fabricate window ancestor`.
+The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge; leave room for it inside any edge of your own that clips.
+The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's, in every palette, and falls short against `--fab-bg-3` in two, so mount the control on one of those four grounds.
+`groupName`, `iconOnly`, `tone`, `shape`, `optionDataAttr` and a `class` are refused, because a rest key must be a `data-*` attribute, so the control never draws a tone, a pill, an icon-only run or a hook of yours on a segment.
+
+A worked control follows: an ingredient filter on a panel you draw inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['SegmentedControl'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates `SegmentedControl` describes none: draw your own control there.
+if (!fabUi?.describe?.('SegmentedControl')) return;
+
+let filter = 'all';
+const props = () => ({
+  ariaLabel: 'Ingredient filter',
+  options: [
+    { value: 'all', label: 'All' },
+    { value: 'owned', label: 'Owned', icon: 'fas fa-check' },
+    { value: 'missing', label: 'Missing', icon: 'fas fa-xmark' },
+  ],
+  value: filter,
+  onChange: (value) => {
+    filter = value;
+    control.update(props()); // Before any `await`, so the segment is drawn selected at once.
+    acmeIngredients.applyFilter(value);
+  },
+});
+const control = fabUi.mount('SegmentedControl', { target, props: props() });
+
+// `control.destroy()` when the panel goes away, moving focus first if a radio holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3387,7 +3452,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup` and `SegmentedControl` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -3534,7 +3599,7 @@ Mount at the composite level, on stable keyed elements, and reuse a mount throug
 
 A published component draws a control only where its section says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 
-- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+- A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
@@ -3549,7 +3614,7 @@ A published component draws a control only where its section says so, and each c
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
-- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` on the arrow keys, each never out of `target`.
+- Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, each never out of `target`.
   An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.

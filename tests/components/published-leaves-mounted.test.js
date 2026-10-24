@@ -106,6 +106,10 @@ const BREAKAGE_OPTIONS = Object.freeze([
   { value: 'breakable', label: 'Breakable' },
   { value: 'immune', label: 'Immune' },
 ]);
+const INGREDIENT_FILTERS = Object.freeze([
+  { value: 'all', label: 'All' },
+  { value: 'owned', label: 'Owned' },
+]);
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
   { id: 'inputs', label: 'Inputs' },
@@ -353,6 +357,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('legend').textContent,
     drawn: ['When it breaks', 'Breakage'],
   },
+  {
+    name: 'SegmentedControl',
+    under: 'fabricate',
+    root: '.manager-segmented',
+    props: { options: INGREDIENT_FILTERS, ariaLabel: 'Ingredient filter', onChange() {} },
+    next: { options: INGREDIENT_FILTERS, ariaLabel: 'Ingredient view', onChange() {} },
+    read: (root) => root.getAttribute('aria-label'),
+    drawn: ['Ingredient filter', 'Ingredient view'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -482,6 +495,8 @@ describe('a key a leaf does not publish', () => {
     ['IconButton', 'class', 'is not a data attribute'],
     ['EditorTabs', 'annotated', 'is not a data attribute'],
     ['EditorTabs', 'containerClass', 'is not a data attribute'],
+    ['SegmentedControl', 'groupName', 'is not a data attribute'],
+    ['SegmentedControl', 'class', 'is not a data attribute'],
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {
