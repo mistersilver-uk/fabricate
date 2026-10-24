@@ -562,7 +562,10 @@ describe('1506 Chip — the bare emphasis', () => {
   function glyphFontSize(target) {
     const glyph = chipNode(target).querySelector('i');
     assert.ok(Boolean(glyph), 'the chip rendered a glyph from its `icon` prop');
-    return Number.parseFloat(getComputedStyle(glyph).fontSize);
+    const size = getComputedStyle(glyph).fontSize;
+    // happy-dom leaves a `rem` size inherited through an intermediate element unresolved.
+    const rootSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return Number.parseFloat(size) * (size.endsWith('rem') ? rootSize : 1);
   }
 
   it('emits the status dot rule, at the size that makes a dot a MARK', async () => {
