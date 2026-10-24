@@ -193,10 +193,10 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644 and 2646 headings, by name and in the order the spec states them.
+ * 2455, 2601, 2644, 2646, 2647 and 2652 headings, by name and in the order the spec states them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -291,6 +291,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'SegmentedControl',
       'Pagination',
       'IconPicker',
+      'ActionMenu',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -635,6 +636,18 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           searchLabel: required,
           searchPlaceholder: optional,
           noMatchesText: required,
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: true,
+      },
+      ActionMenu: {
+        version: 1,
+        props: {
+          items: required,
+          ariaLabel: required,
+          align: optional,
+          onSelect: { kind: 'callback', required: true },
         },
         rest: false,
         root: 'fabricate',
