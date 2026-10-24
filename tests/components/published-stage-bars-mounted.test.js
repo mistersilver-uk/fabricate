@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { stageBarsFixtureGroups } from '../helpers/labFixtureLiterals.js';
 import {
   PUBLISHED_ADAPTER,
   PUBLISHED_COMPILED_MODULES,
@@ -19,7 +20,6 @@ import {
   shippedSeam,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
-import { stageBarsFixtureGroups } from '../helpers/publishedStageBarsFixture.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const harness = createMountedComponentHarness({

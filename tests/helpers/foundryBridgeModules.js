@@ -22,3 +22,13 @@ export const LOCALIZE_OR_RAW_MODULES = Object.freeze([
   'src/utils/fillPlaceholders.js',
   'src/utils/localizeWithFallback.js',
 ]);
+
+/**
+ * `util/appLocalizer.js` and the two `src/utils/` leaves a component that localizes its own copy
+ * through `APP_LOCALIZER` binds; none reaches the bridge.
+ */
+export const APP_LOCALIZER_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/appLocalizer.js',
+  'src/utils/fillPlaceholders.js',
+  'src/utils/localizeWithFallback.js',
+]);

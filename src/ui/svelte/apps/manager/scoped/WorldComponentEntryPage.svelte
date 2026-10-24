@@ -431,17 +431,14 @@
     { id: 'definition', icon: 'fas fa-cube' },
     { id: 'validation', icon: 'fas fa-clipboard-check' },
   ];
-  const tabs = $derived(
-    TABS.map((tab) => ({
-      id: tab.id,
-      icon: tab.icon,
-      labelKey:
-        tab.id === 'definition'
-          ? 'FABRICATE.Admin.Manager.Scoped.Component.Entry.TabCatalogue'
-          : 'FABRICATE.Admin.Manager.Scoped.Component.TabValidation',
-      label: tab.id === 'definition' ? 'Catalogue entry' : 'Validation',
-    }))
-  );
+  const tabs = TABS.map((tab) => ({
+    id: tab.id,
+    icon: tab.icon,
+    label:
+      tab.id === 'definition'
+        ? text('FABRICATE.Admin.Manager.Scoped.Component.Entry.TabCatalogue', 'Catalogue entry')
+        : text('FABRICATE.Admin.Manager.Scoped.Component.TabValidation', 'Validation'),
+  }));
 
   /**
    * The Validation tab's badge. THE CLEAR STATE IS A TICK, NOT AN ABSENCE (`proto:824`): a tab
@@ -577,8 +574,10 @@
           {activeTab}
           {badges}
           onSelect={(tab) => (activeTab = tab)}
-          ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Component.EntryTabsLabel"
-          ariaLabel="Component definition sections"
+          ariaLabel={text(
+            'FABRICATE.Admin.Manager.Scoped.Component.EntryTabsLabel',
+            'Component definition sections'
+          )}
           idStem="scoped-component-entry"
           tabDataAttr="data-scoped-entry-tab"
           badgeDataAttr="data-scoped-entry-tab-badge"

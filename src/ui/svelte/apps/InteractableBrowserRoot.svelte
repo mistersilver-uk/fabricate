@@ -30,6 +30,7 @@
     pickDefaultSystemId,
   } from '../util/systemDisambiguation.js';
   import EditorTabs from '../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../util/localizeOr.js';
   import EmptyState from '../components/EmptyState.svelte';
   import IconButton from '../components/IconButton.svelte';
   import SearchField from '../components/SearchField.svelte';
@@ -255,14 +256,13 @@
     />
   {:else}
     <EditorTabs
-      tabs={BROWSER_TABS}
+      tabs={localizeTabs(BROWSER_TABS)}
       {activeTab}
       onSelect={(tabId) => (activeTab = tabId)}
       idStem="fab-ib"
       activePanelOnly
       tabDataAttr=""
-      ariaLabelKey="FABRICATE.Canvas.Browser.Title"
-      ariaLabel="Interactable browser"
+      ariaLabel={localizeOr('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}
     />
 
     <!-- Each panel is a static tab stop, as the ARIA tabs pattern requires: one Tab from the

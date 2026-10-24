@@ -16,6 +16,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -94,12 +95,11 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {badges}
   onSelect={onChange}
-  ariaLabelKey="FABRICATE.Admin.Manager.Tools.Editor.Tabs"
-  ariaLabel="Tool editor sections"
+  ariaLabel={localizeOr('FABRICATE.Admin.Manager.Tools.Editor.Tabs', 'Tool editor sections')}
   idStem="tool"
   tabDataAttr=""
   containerClass="manager-tool-editor-tabs manager-editor-tabs"
