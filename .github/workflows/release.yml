@@ -84,7 +84,27 @@ jobs:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
       - uses: ./.github/actions/release-setup
-      - run: ./node_modules/.bin/playwright install chromium --with-deps
+      # Cached under ci.yml's key, so a hit skips `--with-deps` and its apt leg. A cold install is
+      # bounded per attempt because a stalled apt hangs rather than fails, which would otherwise
+      # spend this job's 10 minutes before a test ran and cancel the mint (issue 2635).
+      - name: Cache Playwright Chromium
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright Chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        timeout-minutes: 7
+        run: |
+          for attempt in 1 2; do
+            if timeout 180 npm run test:foundry:install; then
+              exit 0
+            fi
+            echo "::warning::playwright install attempt $attempt failed or timed out; retrying"
+          done
+          echo "::error::playwright install failed twice; see issue 2635"
+          exit 1
       - run: npm run test:shard
       - if: matrix.shard == 1
         run: npm run build
