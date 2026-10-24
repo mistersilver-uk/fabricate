@@ -7,7 +7,20 @@
   `option` snippet, a trigger the caller styles and keys through the `trigger` snippet, and a
   right-aligned panel with a measured whole-row list height through props.
 
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `ariaLabel` / `listLabel` / `searchLabel` | resolved strings | `''` | The trigger's name and tooltip, the list's and its dialog's name, and the query field's name. |
+  | `searchPlaceholder` | resolved string | `''` | The query field's hint text, which is not its name. |
+  | `noMatchesText` | resolved string | `''` | The line the list draws when a query matches no glyph. |
+
   Invariants:
+  - Each copy fallback is written at its use site and localized through the `APP_LOCALIZER`
+    context; a tree mounted without one draws the English and no placeholder.
+  - The snippet trigger states `type="button"` and `data-keyboard-focus="true"` itself, in every
+    shape, as the published seam's keyboard-focus rule reads this file's markup.
+  - List metrics are read from the window holding the panel, so a detached window measures its
+    own styles.
   - THE `.essence-icon-picker-*` CLASS FAMILY IS PRESERVED DELIBERATELY, being addressed by the View
     Lab case registry, the live Foundry smoke and some thirty assertions.
     `fabricate-icon-picker` and `fabricate-icon-picker-popover` are this picker's own namespace ROOTS
@@ -22,8 +35,11 @@
     their glyph is present.
 -->
 <script>
+  import { getContext } from 'svelte';
+
+  import { localizeWith } from '../../../utils/localizeWithFallback.js';
+  import { APP_LOCALIZER } from '../util/appLocalizer.js';
   import SearchablePopover from './SearchablePopover.svelte';
-  import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
     getEssenceIconOptions,
@@ -37,6 +53,10 @@
     value = DEFAULT_ESSENCE_ICON,
     disabled = false,
     ariaLabel = '',
+    listLabel = '',
+    searchLabel = '',
+    searchPlaceholder = '',
+    noMatchesText = '',
     iconOnly = false,
     triggerClass = '',
     triggerStyle = '',
@@ -45,6 +65,9 @@
     bounds = MANAGER_SCROLLER_SELECTOR,
     onChange = () => {},
   } = $props();
+
+  const localize = getContext(APP_LOCALIZER);
+  const copy = (key, fallback) => localizeWith(localize, key, undefined, fallback);
 
   const iconOptions = getEssenceIconOptions();
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
@@ -57,9 +80,8 @@
     )?.iconClass ?? selectedOption.iconClass
   );
   const triggerName = $derived(
-    ariaLabel || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')
+    ariaLabel || copy('FABRICATE.Admin.Features.Essences.ChooseIcon', 'Choose icon')
   );
-  const dialogLabel = $derived(localize('FABRICATE.Admin.Features.Essences.IconDialogLabel'));
 
   function iconRow(option, pinned) {
     return {
@@ -88,8 +110,9 @@
 
   function measurePopoverMetrics({ popover, list, search }) {
     if (!popover || !list) return {};
-    const popoverStyles = getComputedStyle(popover);
-    const listStyles = getComputedStyle(list);
+    const view = popover.ownerDocument.defaultView;
+    const popoverStyles = view.getComputedStyle(popover);
+    const listStyles = view.getComputedStyle(list);
     const firstRow = list.querySelector('.essence-icon-picker-option');
     const rowHeight = firstRow?.getBoundingClientRect?.().height ?? 0;
     const rowGap = Number.parseFloat(listStyles.rowGap) || 0;
@@ -97,7 +120,7 @@
 
     const pinnedRow = list.querySelector('.essence-icon-picker-option.pinned');
     const pinnedMargin = pinnedRow
-      ? Number.parseFloat(getComputedStyle(pinnedRow).marginBottom) || 0
+      ? Number.parseFloat(view.getComputedStyle(pinnedRow).marginBottom) || 0
       : 0;
 
     const chromeHeight =
@@ -135,10 +158,16 @@
   searchClass="essence-icon-picker-search"
   listClass="essence-icon-picker-options"
   optionClass="essence-icon-picker-option"
-  panelLabel={dialogLabel}
-  searchPlaceholder={localize('FABRICATE.Admin.Features.Essences.SearchIconPlaceholder')}
-  searchLabel={localize('FABRICATE.Admin.Features.Essences.SearchIconLabel')}
-  noMatchesHint={localize('FABRICATE.Admin.Features.Essences.NoIconsFound')}
+  panelLabel={listLabel ||
+    copy('FABRICATE.Admin.Features.Essences.IconDialogLabel', 'Essence icon picker')}
+  searchPlaceholder={searchPlaceholder ||
+    (localize
+      ? copy('FABRICATE.Admin.Features.Essences.SearchIconPlaceholder', 'Search icons...')
+      : '')}
+  searchLabel={searchLabel ||
+    copy('FABRICATE.Admin.Features.Essences.SearchIconLabel', 'Search essence icons')}
+  noMatchesHint={noMatchesText ||
+    copy('FABRICATE.Admin.Features.Essences.NoIconsFound', 'No icons match that search.')}
   horizontalAlign={iconOnly ? 'left' : 'right'}
   minWidth={260}
   maxWidth={340}
@@ -157,6 +186,8 @@
       {disabled}
       aria-label={triggerName}
       title={triggerName}
+      type="button"
+      data-keyboard-focus="true"
       {...attributes}
     >
       <span class="essence-icon-picker-preview" aria-hidden="true">

@@ -50,6 +50,7 @@ import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 import './ui/publishedComponents.svelte.js';
 import { reportDeferredChunkFailure } from './ui/deferredChunkFailureReport.js';
+import { registerFoundryRelease } from './ui/svelte/util/essenceIcons.js';
 
 
 // A lazy chunk, so non-GM players never download the manager (issue 1565). A rejection clears the
@@ -396,6 +397,9 @@ const io = {
 
 // The two GM recovery repairs reach the facade through `src/bootstrap/migrations.js`.
 installIdentityRepairs({ applyWorldEssenceMergeFlagRemap, applyWorldScopeIdentityFlagRemap });
+
+// ratchet-exempt(lint): the icon vocabulary's release reader, lazy as `game` is a pre-`Game` stub here.
+registerFoundryRelease(() => globalThis.game?.release);
 
 registerModuleHooks(io);
 

@@ -26,6 +26,8 @@ import {
   expectedSpecimenCount,
   readLabExpectations,
 } from '../scripts/lib/primitiveLabSmoke.js';
+import { getFoundryCuratedIconDefinitionsForMajor } from '../src/ui/svelte/util/essenceIcons.js';
+import { FOUNDRY_CURATED_ICON_DEFINITIONS } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { readDesignLibrary } from './helpers/designLibrary.js';
@@ -125,7 +127,24 @@ test('the Primitive Lab declares the client release the harvested chrome is', ()
   });
 });
 
-test('the shared View Lab shim declares no release, so no View Lab frame changes icon path', () => {
+/** The curated vocabulary this client offers when its loaded Font Awesome draws `gear` alone. */
+const curatedUnderGearOnlyBundle = () =>
+  getFoundryCuratedIconDefinitionsForMajor(undefined, {
+    glyphsByName: new Map([['gear', 'u+f013']]),
+  });
+
+test('the Primitive Lab registers its release, so its curated vocabulary is the committed catalogue', () => {
+  withGlobals(installLab, () => {
+    assert.equal(curatedUnderGearOnlyBundle(), FOUNDRY_CURATED_ICON_DEFINITIONS);
+  });
+  assert.notEqual(
+    curatedUnderGearOnlyBundle(),
+    FOUNDRY_CURATED_ICON_DEFINITIONS,
+    'restore clears the registration, so the vocabulary is measured again'
+  );
+});
+
+test('the shared View Lab shim declares no release, and nothing registers one for the vocabulary', () => {
   withGlobals(installShared, () => {
     assert.equal(globalThis.game.release, undefined);
     assert.equal(globalThis.game.version, undefined);

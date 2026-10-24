@@ -18,7 +18,10 @@ import {
   typeQuery,
 } from '../helpers/listboxKeyboardDriver.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  APP_LOCALIZER_RAW_MODULES,
+  FOUNDRY_BRIDGE_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const ICON_PICKER = 'src/ui/svelte/components/IconPicker.svelte';
@@ -38,7 +41,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/util/appLocalizer.js',
+    ...APP_LOCALIZER_RAW_MODULES,
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/anchoredPopover.js',

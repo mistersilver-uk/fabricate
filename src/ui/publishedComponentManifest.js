@@ -428,4 +428,21 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     rest: false,
     root: 'fabricate',
   }),
+  Object.freeze({
+    name: 'IconPicker',
+    path: 'src/ui/svelte/components/IconPicker.svelte',
+    version: 1,
+    props: Object.freeze({
+      value: Object.freeze({ kind: 'data' }),
+      onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      listLabel: Object.freeze({ kind: 'data', required: true }),
+      searchLabel: Object.freeze({ kind: 'data', required: true }),
+      searchPlaceholder: Object.freeze({ kind: 'data' }),
+      noMatchesText: Object.freeze({ kind: 'data', required: true }),
+    }),
+    rest: false,
+    root: 'fabricate',
+    overlays: true,
+  }),
 ]);

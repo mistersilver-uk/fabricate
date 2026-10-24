@@ -5,7 +5,10 @@ import { resolve } from 'node:path';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  APP_LOCALIZER_RAW_MODULES,
+  FOUNDRY_BRIDGE_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const ICON_PICKER = 'src/ui/svelte/components/IconPicker.svelte';
@@ -15,6 +18,15 @@ const STORED_BUT_NOT_OFFERED = 'fas fa-folder';
 
 /** The picker's own no-matches sentence, as a KEY. */
 const NO_ICONS_FOUND = 'FABRICATE.Admin.Features.Essences.NoIconsFound';
+
+/** A context localizer that brackets each key, so a drawn key is the localizer's own answer. */
+const bracketKey = (key) => `[${key}]`;
+
+/** The Svelte context an app root mounts its tree with, carrying `localize`. */
+async function localizerContext(localize = bracketKey) {
+  const { APP_LOCALIZER } = await harness.loadRawModule('src/ui/svelte/util/appLocalizer.js');
+  return new Map([[APP_LOCALIZER, localize]]);
+}
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -29,7 +41,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/util/appLocalizer.js',
+    ...APP_LOCALIZER_RAW_MODULES,
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
@@ -81,8 +93,8 @@ function rowLabel(row) {
   return row?.querySelector('span:last-child')?.textContent?.trim() ?? '';
 }
 
-async function openPicker(value) {
-  const root = await harness.mount({ value });
+async function openPicker(value, options = {}) {
+  const root = await harness.mount({ value }, options);
   const trigger = root.querySelector('.essence-icon-picker-trigger');
   assert.ok(trigger, 'the picker trigger renders');
   trigger.click();
@@ -195,7 +207,7 @@ describe('IconPicker pinned resolved row', () => {
   });
 
   it('says NO ICONS MATCHED when a query matches nothing, in the primitive`s own empty branch', async () => {
-    const { root } = await openPicker('fas fa-cog');
+    const { root } = await openPicker('fas fa-cog', { context: await localizerContext() });
     await search(root, 'zzzznotaglyph');
 
     assert.equal(optionRows(root).length, 0, 'nothing matched');
@@ -214,7 +226,7 @@ describe('IconPicker pinned resolved row', () => {
 
     // WHICH EMPTINESS. `NoIconsFound` is the FILTERED sentence and belongs to `noMatchesHint`:
     const line = empty.textContent.replaceAll(/\s+/g, ' ').trim();
-    assert.match(line, new RegExp(NO_ICONS_FOUND));
+    assert.equal(line, `[${NO_ICONS_FOUND}]`);
     assert.doesNotMatch(
       line,
       /No matches/,
@@ -273,14 +285,29 @@ describe('IconPicker trigger, across the primitive`s spread', () => {
   });
 
   it('names the trigger from the picker`s own vocabulary when the caller passes no title', async () => {
-    const root = await harness.mount({ value: 'fas fa-cog' });
+    const root = await harness.mount(
+      { value: 'fas fa-cog' },
+      { context: await localizerContext() }
+    );
     const trigger = root.querySelector('.essence-icon-picker-trigger');
 
     assert.equal(
       trigger.getAttribute('aria-label'),
-      'FABRICATE.Admin.Features.Essences.ChooseIcon'
+      '[FABRICATE.Admin.Features.Essences.ChooseIcon]'
     );
-    assert.equal(trigger.getAttribute('title'), 'FABRICATE.Admin.Features.Essences.ChooseIcon');
+    assert.equal(trigger.getAttribute('title'), '[FABRICATE.Admin.Features.Essences.ChooseIcon]');
+  });
+
+  it('states `type="button"` and the keyboard-focus mark on the trigger itself', async () => {
+    const root = await harness.mount({ value: 'fas fa-cog' });
+    const trigger = root.querySelector('.essence-icon-picker-trigger');
+
+    assert.equal(trigger.getAttribute('type'), 'button');
+    assert.equal(
+      trigger.dataset.keyboardFocus,
+      'true',
+      'the open-list shape spreads no mark, so the trigger must state it to keep Foundry key-ups off'
+    );
   });
 
   it('keeps a caller`s disabled trigger disabled, so no panel opens mid-save', async () => {
@@ -330,5 +357,97 @@ describe('IconPicker popover repositioning', () => {
     root.dispatchEvent(new Event('scroll'));
     await settle();
     assert.ok(measurements > 0, 'scrolling an ancestor still repositions the popover');
+  });
+});
+
+/** The drawn copy of an open picker: the trigger, the dialog, the list, the field and its hint. */
+function drawnCopy(root) {
+  const trigger = root.querySelector('.essence-icon-picker-trigger');
+  const input = root.querySelector('.essence-icon-picker-search').querySelector('input');
+  return {
+    trigger: trigger.getAttribute('aria-label'),
+    title: trigger.getAttribute('title'),
+    dialog: root.querySelector('[role="dialog"]')?.getAttribute('aria-label'),
+    list: root.querySelector('[role="listbox"]')?.getAttribute('aria-label'),
+    search: input.getAttribute('aria-label'),
+    placeholder: input.getAttribute('placeholder'),
+  };
+}
+
+async function openWith(props, options = {}) {
+  const root = await harness.mount({ value: 'fas fa-cog', ...props }, options);
+  root.querySelector('.essence-icon-picker-trigger').click();
+  await settle();
+  return root;
+}
+
+async function noMatchLine(root) {
+  await search(root, 'zzzznotaglyph');
+  return root
+    .querySelector('.manager-travel-popover-empty')
+    .textContent.replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+describe('IconPicker copy', () => {
+  it('draws each label prop in place of its fallback', async () => {
+    const root = await openWith(
+      {
+        ariaLabel: 'Reagent icon',
+        listLabel: 'Reagent icons',
+        searchLabel: 'Search reagent icons',
+        searchPlaceholder: 'Search icons',
+        noMatchesText: 'No reagent icon matches.',
+      },
+      { context: await localizerContext() }
+    );
+    assert.deepEqual(drawnCopy(root), {
+      trigger: 'Reagent icon',
+      title: 'Reagent icon',
+      dialog: 'Reagent icons',
+      list: 'Reagent icons',
+      search: 'Search reagent icons',
+      placeholder: 'Search icons',
+    });
+    assert.equal(await noMatchLine(root), 'No reagent icon matches.');
+  });
+
+  it("draws the context localizer's copy", async () => {
+    const root = await openWith({}, { context: await localizerContext() });
+    const key = (name) => `[FABRICATE.Admin.Features.Essences.${name}]`;
+    assert.deepEqual(drawnCopy(root), {
+      trigger: key('ChooseIcon'),
+      title: key('ChooseIcon'),
+      dialog: key('IconDialogLabel'),
+      list: key('IconDialogLabel'),
+      search: key('SearchIconLabel'),
+      placeholder: key('SearchIconPlaceholder'),
+    });
+  });
+
+  it('draws the English and no placeholder under no context, and asks game.i18n for nothing', async () => {
+    const { game } = globalThis;
+    const saved = game.i18n;
+    const calls = [];
+    const record = (key) => {
+      calls.push(key);
+      return key;
+    };
+    game.i18n = { localize: record, format: record, has: () => true };
+    try {
+      const root = await openWith({});
+      assert.deepEqual(drawnCopy(root), {
+        trigger: 'Choose icon',
+        title: 'Choose icon',
+        dialog: 'Essence icon picker',
+        list: 'Essence icon picker',
+        search: 'Search essence icons',
+        placeholder: '',
+      });
+      assert.equal(await noMatchLine(root), 'No icons match that search.');
+      assert.deepEqual(calls, []);
+    } finally {
+      game.i18n = saved;
+    }
   });
 });

@@ -6,12 +6,12 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs` and `Pagination` mount here as leaves; what
+ * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination` and `IconPicker` mount here as leaves; what
  * each draws and refuses is `published-button-mounted.test.js`'s,
  * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
  * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
- * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s and
- * `published-pagination-mounted.test.js`'s.
+ * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s,
+ * `published-pagination-mounted.test.js`'s and `published-icon-picker-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -128,6 +128,14 @@ const REAGENT_PAGER = Object.freeze({
   ...REAGENT_PAGER_LABELS,
   onPageChange() {},
   onPageSizeChange() {},
+});
+/** An icon picker's published keys but its trigger's name. */
+const REAGENT_ICON_PICKER = Object.freeze({
+  value: 'fas fa-flask',
+  onChange() {},
+  listLabel: 'Reagent icons',
+  searchLabel: 'Search reagent icons',
+  noMatchesText: 'No reagent icon matches.',
 });
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
@@ -394,6 +402,15 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('[data-pagination-summary]').textContent.trim(),
     drawn: ['1–25 of 60 reagents', '26–50 of 60 reagents'],
   },
+  {
+    name: 'IconPicker',
+    under: 'fabricate',
+    root: '.fabricate-icon-picker',
+    props: { ...REAGENT_ICON_PICKER, ariaLabel: 'Reagent icon' },
+    next: { ...REAGENT_ICON_PICKER, ariaLabel: 'Tool icon' },
+    read: (root) => root.querySelector('button').getAttribute('aria-label'),
+    drawn: ['Reagent icon', 'Tool icon'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -529,6 +546,16 @@ describe('a key a leaf does not publish', () => {
     ['Pagination', 'multiPageOnly', 'is not a prop of Pagination'],
     ['Pagination', 'edge', 'is not a prop of Pagination'],
     ['Pagination', 'class', 'is not a prop of Pagination'],
+    ...[
+      'disabled',
+      'iconOnly',
+      'bounds',
+      'triggerClass',
+      'triggerStyle',
+      'onTriggerContextMenu',
+      'onTriggerKeydown',
+      'class',
+    ].map((key) => ['IconPicker', key, 'is not a prop of IconPicker']),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

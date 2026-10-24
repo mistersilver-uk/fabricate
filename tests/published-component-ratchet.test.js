@@ -648,7 +648,7 @@ describe('the per-item spreads of a published closure', () => {
       );
     });
 
-    it('a snippet the entry declares and a child component renders', () => {
+    it('a snippet the entry declares and a child component renders, as the child renders it', () => {
       const list = {
         'src/List.svelte': COMPONENT(
           'let { items, row } = $props();',
@@ -659,8 +659,34 @@ describe('the per-item spreads of a published closure', () => {
       const SNIPPET = '{#snippet row(o)}<i {...o.props}></i>{/snippet}';
       const inside = '<List {items}>' + SNIPPET + '</List>';
       const passed = SNIPPET + '<List {items} {row} />';
-      assert.deepEqual(idsOf(script, inside, list), [UNNAMED]);
-      assert.deepEqual(idsOf(script, passed, list), [UNNAMED]);
+      assert.deepEqual(idsOf(script, inside, list), ['Fx.items.props']);
+      assert.deepEqual(idsOf(script, passed, list), ['Fx.items.props']);
+    });
+
+    it('a snippet a child renders with an object of its own values, read by the member spread (issue 2647)', () => {
+      const picker = (render) => ({
+        'src/Picker.svelte': COMPONENT(
+          'let { trigger } = $props(); const own = $derived({ type: "button" });',
+          render
+        ),
+      });
+      const script = `import Picker from './Picker.svelte'; ${PROPS}`;
+      const SNIPPET =
+        '<Picker>{#snippet trigger({ attributes })}<b {...attributes}></b>{/snippet}</Picker>';
+      assert.deepEqual(
+        idsOf(script, SNIPPET, picker('{@render trigger({ attributes: own })}')),
+        []
+      );
+      assert.deepEqual(
+        idsOf(
+          script,
+          SNIPPET,
+          picker('{#each items as it}{@render trigger({ attributes: it })}{/each}')
+        ),
+        [UNNAMED],
+        'an item of the child’s own collection is still unnameable'
+      );
+      assert.deepEqual(idsOf(script, SNIPPET, picker('<p></p>')), [UNNAMED], 'and so is no render');
     });
 
     it('but not a snippet parameter of a child component', () => {

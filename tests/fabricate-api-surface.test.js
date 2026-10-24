@@ -290,6 +290,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'RadioCardGroup',
       'SegmentedControl',
       'Pagination',
+      'IconPicker',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -623,6 +624,21 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         rest: false,
         root: 'fabricate',
         overlays: false,
+      },
+      IconPicker: {
+        version: 1,
+        props: {
+          value: optional,
+          onChange: { kind: 'callback', required: true },
+          ariaLabel: required,
+          listLabel: required,
+          searchLabel: required,
+          searchPlaceholder: optional,
+          noMatchesText: required,
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: true,
       },
     });
     assert.deepEqual(

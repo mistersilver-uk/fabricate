@@ -1,7 +1,9 @@
 /**
  * The Primitive Lab's Foundry globals (issue 1487): the shared shim over the minimal world, plus the
- * harvested release. Lab-only, so the main View Lab keeps no `game.release` and its icon path.
+ * harvested release, on `game` and registered with the icon vocabulary as `src/main.js` registers it.
+ * Lab-only, so the main View Lab registers no release and keeps its measured icon path.
  */
+import { registerFoundryRelease } from '../../../src/ui/svelte/util/essenceIcons.js';
 import CHROME_PROVENANCE from '../chrome-provenance.json' with { type: 'json' };
 import { installFoundryShim } from '../foundry/installFoundryShim.js';
 import { createMinimalLabWorld } from '../foundry/minimalLabWorld.js';
@@ -30,5 +32,12 @@ export const LAB_RELEASE = parseLabRelease(CHROME_PROVENANCE.foundryVersion);
 export function installPrimitiveLabFoundry(i18n) {
   const shim = installFoundryShim(createMinimalLabWorld({ i18n }));
   Object.assign(globalThis.game, { release: LAB_RELEASE, version: LAB_RELEASE.version });
-  return shim;
+  registerFoundryRelease(() => LAB_RELEASE);
+  return {
+    ...shim,
+    restore() {
+      registerFoundryRelease(null);
+      shim.restore();
+    },
+  };
 }

@@ -4,7 +4,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  APP_LOCALIZER_RAW_MODULES,
+  FOUNDRY_BRIDGE_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -27,7 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/util/appLocalizer.js',
+    ...APP_LOCALIZER_RAW_MODULES,
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/components/stepperLabels.js',
     // The expression tokens' derivation (issue 1096) and the per-Foundry-system preset bundle

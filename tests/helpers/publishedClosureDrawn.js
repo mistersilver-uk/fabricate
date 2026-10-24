@@ -234,8 +234,9 @@ function untaggedDraws(closure, reader) {
 }
 
 /**
- * The files `entry`'s closure draws from its own, the start offsets each leaves undrawn, and its
- * falsy props by local name, as `{ files, undrawn, falsy }`, at the greatest fixed point.
+ * The files `entry`'s closure draws from its own, the start offsets each leaves undrawn, its falsy
+ * props by local name and each file's `const` inits, as `{ files, undrawn, falsy, inits }`, at the
+ * greatest fixed point.
  */
 export function drawnClosure(entry, reader) {
   const closure = [...importClosure(entry.path, reader)];
@@ -267,7 +268,10 @@ export function drawnClosure(entry, reader) {
       ...[...loose].map((child) => clearFalsy(falsy.get(child))),
       ...tags.map((tag) => narrowFalsy(tag, parsed, falsy, entry.path)),
     ];
-    if (!changed.includes(true)) return { files: drawn, undrawn, falsy };
+    if (!changed.includes(true)) {
+      const inits = new Map([...parsed].map(([file, parts]) => [file, parts.inits]));
+      return { files: drawn, undrawn, falsy, inits };
+    }
   }
 }
 
@@ -331,3 +335,7 @@ function drawnFrom(root, parsed, falsy, { always, byParent }) {
 /** Whether `entry`'s drawn closure draws `node` of `file`. */
 export const drawsNode = ({ files, undrawn }, file, node) =>
   files.has(file) && !undrawn.get(file)?.has(node.start);
+
+/** Whether `expression` of `file` is falsy whatever the companion passes, by `entry`'s drawn closure. */
+export const heldFalsy = ({ falsy, inits }, file, expression) =>
+  isFalsy(expression, falsy.get(file) ?? new Set(), inits.get(file) ?? new Map());

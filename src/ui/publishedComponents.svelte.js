@@ -20,6 +20,7 @@ import EmptyState from './svelte/components/EmptyState.svelte';
 import Field from './svelte/components/Field.svelte';
 import FillBar from './svelte/components/FillBar.svelte';
 import IconButton from './svelte/components/IconButton.svelte';
+import IconPicker from './svelte/components/IconPicker.svelte';
 import InfoStrip from './svelte/components/InfoStrip.svelte';
 import InspectorCard from './svelte/components/InspectorCard.svelte';
 import Kicker from './svelte/components/Kicker.svelte';
@@ -70,6 +71,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/RadioCardGroup.svelte': RadioCardGroup,
   'src/ui/svelte/components/SegmentedControl.svelte': SegmentedControl,
   'src/ui/svelte/components/Pagination.svelte': Pagination,
+  'src/ui/svelte/components/IconPicker.svelte': IconPicker,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

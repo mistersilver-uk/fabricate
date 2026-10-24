@@ -270,8 +270,9 @@ const through = (origin, path) =>
  * The places a published entry's closure spreads attributes from a value that is, or may be, data
  * the caller published, as `{ key, members }`: the published `data` key and the members read below
  * it, an `{#each}` item counting as the value it iterates, a `{@const}` as its initialiser and a
- * snippet parameter of the entry's own file as the arguments that file renders it with (a snippet
- * nothing in that file renders is unnameable). `{ key: null }` is a value that may be an item of a
+ * snippet parameter of the entry's own file as the arguments that file, or a child it hands the
+ * snippet to, renders it with, an object literal's plain key read by name (a snippet nothing
+ * renders is unnameable; issue 2647). `{ key: null }` is a value that may be an item of a
  * collection the entry does not publish. A spread of the file's `$props()` rest, or of a
  * script-level `const` or `$derived`, is no item. A child's `$props()` key is what its parents
  * pass it. An object literal writes its own keys: each computed key and each spread inside it is
@@ -320,14 +321,49 @@ function spreadTracer(entry, reader) {
     }
   };
 
+  /** An argument's origins down `path`, an object literal of plain keys read by the member named. */
+  const argumentOrigins = (argument, file, ancestors, path) => {
+    const node = unchained(argument);
+    const plain = node.type === 'ObjectExpression' && path?.length > 0;
+    if (plain && node.properties.every((p) => p.type === 'Property' && !p.computed)) {
+      const named = node.properties.find((p) => (p.key.name ?? p.key.value) === path[0]);
+      return named ? argumentOrigins(named.value, file, ancestors, path.slice(1)) : [];
+    }
+    return originsOf(argument, file, ancestors).map((o) => through(o, path));
+  };
+
+  /** Each render tag of `local` in `file`, as the origins of its argument at `index` down `path`. */
+  const rendersOf = (file, local, index, path) =>
+    [...ancestorsOf.get(file)]
+      .filter(([node]) => node.type === 'RenderTag' && renderCall(node).callee?.name === local)
+      .map(([tag, ancestors]) => {
+        const argument = renderCall(tag).arguments[index];
+        return argument ? argumentOrigins(argument, file, ancestors, path) : [];
+      });
+
+  /** The keys a tag hands `snippet` as: its own name when it is the tag's content, else each attribute naming it. */
+  const handedAs = (tag, snippet) => [
+    ...(tag.fragment?.nodes.some((n) => n.type === 'SnippetBlock' && n.expression.name === snippet)
+      ? [snippet]
+      : []),
+    ...tag.attributes
+      .filter(
+        ({ type, value }) => type === 'Attribute' && [value].flat()[0]?.expression?.name === snippet
+      )
+      .map(({ name }) => name),
+  ];
+
   const renderedWith = (file, snippet, index, path) => {
-    const rendered = [...ancestorsOf.get(file)].filter(
-      ([node]) => node.type === 'RenderTag' && renderCall(node).callee?.name === snippet.name
-    );
-    return rendered.flatMap(([tag, ancestors]) => {
-      const argument = renderCall(tag).arguments[index];
-      return argument ? originsOf(argument, file, ancestors).map((o) => through(o, path)) : [];
+    const own = rendersOf(file, snippet.name, index, path);
+    const byChildren = componentTags(file, asts.get(file)).flatMap(([child, tag]) => {
+      const keys = handedAs(tag, snippet.name);
+      if (keys.length === 0 || !asts.has(child)) return [];
+      const locals = propLocals(asts.get(child)).filter(({ key }) => keys.includes(key));
+      return locals.flatMap(({ local }) =>
+        guarded(`${child}#${local}`, () => rendersOf(child, local, index, path))
+      );
     });
+    return [...own, ...byChildren];
   };
 
   const passedTo = (file, key) =>
@@ -386,7 +422,7 @@ function spreadTracer(entry, reader) {
         if (file !== entry.path) return [];
         const path = bindingPath(block.parameters[index], name);
         const rendered = guarded(block, () => renderedWith(file, block.expression, index, path));
-        return rendered.length === 0 ? [UNNAMEABLE] : rendered;
+        return rendered.length === 0 ? [UNNAMEABLE] : rendered.flat();
       }
       if (block.type === 'Fragment') {
         for (const { type, declaration } of block.nodes) {

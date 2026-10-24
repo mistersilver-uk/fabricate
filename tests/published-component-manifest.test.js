@@ -1136,7 +1136,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges twenty-four focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges twenty-five focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the IconPicker trigger, the Notice action and dismiss buttons, the RadioCardGroup radio, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the SegmentedControl radio, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1150,6 +1150,7 @@ describe('each entry matches its component declaration', () => {
       'src/ui/svelte/components/Chip.svelte: button',
       'src/ui/svelte/components/EditorTabs.svelte: button',
       'src/ui/svelte/components/IconButton.svelte: button',
+      'src/ui/svelte/components/IconPicker.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/RadioCardGroup.svelte: input',
@@ -1217,6 +1218,7 @@ describe('each entry matches its component declaration', () => {
         'SegmentedControl.onChange: 1',
         'Pagination.onPageChange: 1',
         'Pagination.onPageSizeChange: 1',
+        'IconPicker.onChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -2863,6 +2865,7 @@ describe('the module sheet and every component style against the published Inspe
         'RadioCardGroup',
         'SegmentedControl',
         'Pagination',
+        'IconPicker',
       ],
       'an entry with a required root needs a census of its own'
     );

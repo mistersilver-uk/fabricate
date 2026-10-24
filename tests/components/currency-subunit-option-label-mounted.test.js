@@ -6,7 +6,10 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { assertSelectHasResolvedName, openSelectPanel } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  APP_LOCALIZER_RAW_MODULES,
+  FOUNDRY_BRIDGE_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -35,7 +38,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/util/appLocalizer.js',
+    ...APP_LOCALIZER_RAW_MODULES,
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
