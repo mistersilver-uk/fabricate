@@ -201,8 +201,7 @@ describe('1286 EmptyState — variant contract', () => {
   it('draws the note title in its parent face, not the serif the base heading states', async () => {
     const [title, parent] = await noteFaces('body { font-family: ProbeBody; }');
     assert.equal(parent, 'ProbeBody');
-    // happy-dom keeps the keyword rather than resolving it to the parent's value.
-    assert.equal(title, 'inherit', 'states the parent face, not the base heading serif');
+    assert.equal(title, parent, 'draws the parent face, not the base heading serif');
   });
 
   it('keeps inheriting the parent face when :root also defines --font-primary', async () => {
@@ -210,7 +209,7 @@ describe('1286 EmptyState — variant contract', () => {
       'body { font-family: ProbeBody; } :root { --font-primary: ProbeFace; }'
     );
     assert.equal(parent, 'ProbeBody');
-    assert.equal(title, 'inherit', 'the note title reads no --font-primary');
+    assert.equal(title, parent, 'the note title reads no --font-primary');
   });
 });
 
