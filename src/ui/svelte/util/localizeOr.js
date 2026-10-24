@@ -25,3 +25,16 @@ export function localizeTabs(tabs) {
     tooltip: localizeOr(tooltipKey, tab.tooltip),
   }));
 }
+
+/**
+ * An option list for `RadioCardGroup` with each option's `labelKey` and `descKey` resolved by
+ * `localizeOr` over its `label || fallback` and `description || descFallback`, and the four keys
+ * dropped.
+ */
+export function localizeOptions(options) {
+  return options.map(({ labelKey, fallback, descKey, descFallback, ...option }) => ({
+    ...option,
+    label: localizeOr(labelKey, option.label || fallback),
+    description: localizeOr(descKey, option.description || descFallback),
+  }));
+}

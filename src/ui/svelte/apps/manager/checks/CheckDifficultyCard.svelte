@@ -34,6 +34,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { localizeOptions, localizeOr } from '../../../util/localizeOr.js';
 
   let {
     dc = 15,
@@ -284,10 +285,12 @@
   <div class="manager-checks-card-body">
     {#if !count}
       <RadioCardGroup
-        legendKey="FABRICATE.Admin.Manager.Checks.Evaluation.SourceTitle"
-        legend="What the roll is measured against"
+        legend={localizeOr(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.SourceTitle',
+          'What the roll is measured against'
+        )}
         legendVisible
-        options={SOURCE_OPTIONS}
+        options={localizeOptions(SOURCE_OPTIONS)}
         value={normalized.target.source}
         groupName="check-target-source"
         columns={2}
@@ -302,10 +305,9 @@
       <!-- The target source leads the card, ruled off from the choice it governs. -->
       {#if !count}<div class="manager-checks-difficulty-rule" aria-hidden="true"></div>{/if}
       <RadioCardGroup
-        legendKey={dcSourceLegend[0]}
-        legend={dcSourceLegend[1]}
+        legend={localizeOr(...dcSourceLegend)}
         legendVisible
-        options={DC_MODE_OPTIONS}
+        options={localizeOptions(DC_MODE_OPTIONS)}
         value={resolvedDcMode}
         groupName="check-dc-mode"
         columns={2}

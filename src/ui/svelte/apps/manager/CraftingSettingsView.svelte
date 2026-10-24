@@ -23,6 +23,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
+  import { localizeOptions, localizeOr } from '../../util/localizeOr.js';
   import CraftingEffectPanel from './CraftingEffectPanel.svelte';
   import { resolutionModeOptions, salvageResolutionModeOptions } from './resolutionModeOptions.js';
 
@@ -220,11 +221,15 @@
             </p>
             <RadioCardGroup
               cardId="manager-crafting-resolution-mode"
-              legendKey="FABRICATE.Admin.SystemSettings.ResolutionMode"
-              legend="Recipe resolution mode"
-              hintKey="FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint"
-              hint="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
-              options={resolutionModeOptions}
+              legend={localizeOr(
+                'FABRICATE.Admin.SystemSettings.ResolutionMode',
+                'Recipe resolution mode'
+              )}
+              hint={localizeOr(
+                'FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint',
+                'Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts.'
+              )}
+              options={localizeOptions(resolutionModeOptions)}
               value={systemResolutionModeValue}
               groupName="manager-crafting-resolution-mode"
               data-crafting-resolution-mode
@@ -246,9 +251,11 @@
             <p class="crafting-settings-section-intro">{visibilityIntro}</p>
             <RadioCardGroup
               cardId="manager-crafting-visibility-mode"
-              legendKey="FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading"
-              legend="Recipe visibility"
-              options={visibilityModeOptions}
+              legend={localizeOr(
+                'FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading',
+                'Recipe visibility'
+              )}
+              options={localizeOptions(visibilityModeOptions)}
               value={visibilityMode}
               groupName="manager-crafting-visibility-mode"
               data-crafting-visibility-mode
@@ -276,11 +283,15 @@
               </p>
               <RadioCardGroup
                 cardId="manager-crafting-salvage-resolution-mode"
-                legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"
-                legend="Salvage resolution mode"
-                hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
-                hint="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
-                options={salvageResolutionModeOptions}
+                legend={localizeOr(
+                  'FABRICATE.Admin.SystemSettings.SalvageResolutionMode',
+                  'Salvage resolution mode'
+                )}
+                hint={localizeOr(
+                  'FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint',
+                  'Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled.'
+                )}
+                options={localizeOptions(salvageResolutionModeOptions)}
                 value={systemSalvageResolutionModeValue}
                 groupName="manager-crafting-salvage-resolution-mode"
                 data-crafting-salvage-resolution-mode

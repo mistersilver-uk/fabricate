@@ -8,8 +8,9 @@
   | --- | --- | --- | --- |
   | `value` | string | `''` | The chosen option's `value`. Not bindable: the caller owns it and moves it in `onChange`. |
   | `groupName` | string | `''` | The radios' shared `name`, unique per rendered group; required by contract. |
-  | `legend` / `legendKey` | string | `''` | The fieldset's name, visually hidden unless `legendVisible`; one is required by contract. |
-  | `options` | `{ value, label \| labelKey + fallback, description \| descKey + descFallback, icon }[]` | `[]` | One card per entry, keyed by a unique `value`. a label is required by contract, the description and `icon` are optional, and an option carries no disabled flag, reason or badge: `disabledOptions` owns those. |
+  | `legend` | string | `''` | The fieldset's name, final display text, visually hidden unless `legendVisible`; required by contract. |
+  | `hint` | string | `''` | Final display text drawn as a warning note under the legend; none when empty. |
+  | `options` | `{ value, label, description?, icon? }[]` | `[]` | One card per entry, keyed by a unique `value`; `label` and `description` are final display text (`localizeOptions` resolves a keyed list). A label is required by contract, the description and `icon` are optional, and an option carries no disabled flag, reason or badge: `disabledOptions` owns those. |
   | `disabled` | boolean | `false` | Disables the whole group, which dims every card and fires no `onChange`. |
   | `disabledOptions` | `{ value, reason }[]` | `[]` | Each entry disables the option it names and draws its already-localized `reason` beneath the description; `reason` is required by contract and an empty one draws nothing. An entry naming no option is ignored. One entry per value: the first non-empty reason wins, and a later empty one does not erase an earlier one. |
   | `layout` | `'row'` \| `'stacked'` | `'row'` | Chip beside the text, or chip over it. The caller states it (`stacked` on three or more tracks); it is never derived from `columns`, and a reflowed card keeps it. |
@@ -43,15 +44,12 @@
 <script>
   import Field from './Field.svelte';
   import Medallion from './Medallion.svelte';
-  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     cardId = undefined,
     legend = '',
-    legendKey = '',
     legendVisible = false,
     hint = '',
-    hintKey = '',
     options = [],
     value = '',
     groupName = '',
@@ -98,17 +96,17 @@
   {disabled}
   {...rest}
 >
-  <legend class="manager-resolution-mode-legend">{localizeOr(legendKey, legend)}</legend>
-  {#if hintKey || hint}
+  <legend class="manager-resolution-mode-legend">{legend}</legend>
+  {#if hint}
     <p class="manager-resolution-mode-note" role="note">
       <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{localizeOr(hintKey, hint)}</span>
+      <span>{hint}</span>
     </p>
   {/if}
   <div class="manager-resolution-mode-options" style={`--manager-radio-card-columns: ${columns}`}>
     {#each options as option, index (option.value)}
       {@const chosen = option.value === value}
-      {@const hasDesc = Boolean(option.description || option.descFallback)}
+      {@const hasDesc = Boolean(option.description)}
       {@const reason = reasons.get(option.value) || ''}
       <label
         class="manager-resolution-option"
@@ -134,15 +132,13 @@
             <span
               class="manager-resolution-option-name"
               id={`${uid}-${index}-title`}
-              data-tool-choice-title
-              >{localizeOr(option.labelKey, option.label || option.fallback)}</span
+              data-tool-choice-title>{option.label}</span
             >
             {#if hasDesc}
               <span
                 class="manager-resolution-option-desc"
                 id={`${uid}-${index}-desc`}
-                data-tool-choice-description
-                >{localizeOr(option.descKey, option.description || option.descFallback)}</span
+                data-tool-choice-description>{option.description}</span
               >
             {/if}
             {#if reason}

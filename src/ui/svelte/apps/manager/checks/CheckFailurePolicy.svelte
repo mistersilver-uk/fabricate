@@ -14,6 +14,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Callout from '../../../components/Callout.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
@@ -104,8 +105,10 @@
     <Callout tone="info" text={inertNote} data-failure-result-policy-inert />
   {/if}
   <RadioCardGroup
-    legendKey="FABRICATE.Admin.Manager.Checks.FailureResults.Heading"
-    legend="Produce a result on a failed check"
+    legend={localizeOr(
+      'FABRICATE.Admin.Manager.Checks.FailureResults.Heading',
+      'Produce a result on a failed check'
+    )}
     {options}
     {value}
     groupName={`checks-${activity}-failure-result-policy`}

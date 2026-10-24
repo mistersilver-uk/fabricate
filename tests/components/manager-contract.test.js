@@ -1060,17 +1060,31 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('draws a salvage resolution card of its own', CRAFTING_SETTINGS, {
     declaresProp: ['onSetSalvageResolutionMode'],
     attributes: [
-      ['legend', 'Salvage resolution mode'],
       ['cardId', 'manager-crafting-salvage-resolution-mode'],
       ['groupName', 'manager-crafting-salvage-resolution-mode'],
       ['optionDataAttr', 'data-crafting-salvage-resolution-mode-option'],
+    ],
+    gives: [
+      {
+        at: 'RadioCardGroup',
+        where: ['cardId', 'manager-crafting-salvage-resolution-mode'],
+        attribute: 'legend',
+        is: "localizeOr('FABRICATE.Admin.SystemSettings.SalvageResolutionMode', 'Salvage resolution mode')",
+      },
     ],
     writes: ['data-crafting-salvage-resolution-mode'],
   });
 
   // The recipe card's own legend fallback, stated apart from the salvage card's.
   defineStructureContract('keeps the recipe card legend beside it', CRAFTING_SETTINGS, {
-    attributes: [['legend', 'Recipe resolution mode']],
+    gives: [
+      {
+        at: 'RadioCardGroup',
+        where: ['cardId', 'manager-crafting-resolution-mode'],
+        attribute: 'legend',
+        is: "localizeOr('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Recipe resolution mode')",
+      },
+    ],
   });
 
   // Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy`

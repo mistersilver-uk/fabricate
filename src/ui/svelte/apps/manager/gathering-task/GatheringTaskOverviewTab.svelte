@@ -10,6 +10,7 @@
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import Select from '../../../components/Select.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
+  import { localizeOptions, localizeOr } from '../../../util/localizeOr.js';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../../gatheringImageDefaults.js';
   import { defaultEnvironmentOptions } from '../gatheringTaskSelectOptions.js';
   import GatheringTaskCard from './GatheringTaskCard.svelte';
@@ -217,9 +218,11 @@
   data-gathering-task-resolution
 >
   <RadioCardGroup
-    legendKey="FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title"
-    legend="Gathering resolution"
-    options={resolutionModeOptions}
+    legend={localizeOr(
+      'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title',
+      'Gathering resolution'
+    )}
+    options={localizeOptions(resolutionModeOptions)}
     value={taskResolutionMode}
     groupName={`gathering-task-resolution-${task.id}`}
     columns={3}

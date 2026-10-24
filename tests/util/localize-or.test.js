@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { localizeOr, localizeTabs } from '../../src/ui/svelte/util/localizeOr.js';
+import { localizeOptions, localizeOr, localizeTabs } from '../../src/ui/svelte/util/localizeOr.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
 const TRANSLATIONS = {
@@ -90,6 +90,29 @@ describe('localizeTabs', () => {
         tooltip: 'About the overview',
       },
       { id: 'tools', label: 'Tools', ariaLabel: 'Open the tools', tooltip: '' },
+    ]);
+  });
+});
+
+describe('localizeOptions', () => {
+  it('resolves each option`s label and description keys over its English, and drops the keys', () => {
+    const options = [
+      { value: 'a', icon: 'fas fa-lock', labelKey: 'T.Plain', fallback: 'A', descKey: 'T.Tip' },
+      {
+        value: 'b',
+        labelKey: 'T.Missing',
+        fallback: 'B',
+        descKey: 'T.Missing',
+        descFallback: 'Bee',
+      },
+      { value: 'c', label: 'Final', description: 'Said' },
+      { value: 'd', labelKey: 'T.Name', label: 'Shown over the fallback', fallback: 'unused' },
+    ];
+    assert.deepEqual(localizeOptions(options), [
+      { value: 'a', icon: 'fas fa-lock', label: 'Plain text', description: 'About the overview' },
+      { value: 'b', label: 'B', description: 'Bee' },
+      { value: 'c', label: 'Final', description: 'Said' },
+      { value: 'd', label: 'Open the inputs', description: '' },
     ]);
   });
 });

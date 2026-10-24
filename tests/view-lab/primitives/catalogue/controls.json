@@ -635,21 +635,21 @@
       "options": [
         {
           "value": "breakable",
-          "fallback": "Breakable",
+          "label": "Breakable",
           "icon": "fas fa-hammer",
-          "descFallback": "The tool can break based on the crafting check result."
+          "description": "The tool can break based on the crafting check result."
         },
         {
           "value": "immune",
-          "fallback": "Immune",
+          "label": "Immune",
           "icon": "fas fa-lock",
-          "descFallback": "The tool never breaks, whatever the check returns."
+          "description": "The tool never breaks, whatever the check returns."
         },
         {
           "value": "degrading",
-          "fallback": "Degrading",
+          "label": "Degrading",
           "icon": "fas fa-star",
-          "descFallback": "Quality drops with each failed check."
+          "description": "Quality drops with each failed check."
         }
       ],
       "disabledOptions": [
@@ -679,15 +679,15 @@
       "options": [
         {
           "value": "breakable",
-          "fallback": "Breakable",
+          "label": "Breakable",
           "icon": "fas fa-hammer",
-          "descFallback": "The active check may break this Tool."
+          "description": "The active check may break this Tool."
         },
         {
           "value": "immune",
-          "fallback": "Immune",
+          "label": "Immune",
           "icon": "fas fa-lock",
-          "descFallback": "This Tool ignores check-driven breakage."
+          "description": "This Tool ignores check-driven breakage."
         }
       ]
     }
