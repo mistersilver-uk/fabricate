@@ -134,8 +134,10 @@
     if (sibling?.isConnected && !sibling.disabled) {
       sibling.focus();
       cancelHeldEnter(sibling);
-    } else if (radio) radio.focus();
-    else {
+    } else if (radio) {
+      radio.focus();
+      cancelHeldEnter(radio);
+    } else {
       if (arrow.isConnected && doc.activeElement === arrow) arrow.blur();
       holdOpen = false;
     }
@@ -146,6 +148,7 @@
     stopCancel?.();
     const types = ['keydown', 'keyup', 'focusout'];
     const listen = (event) => {
+      if (event.type === 'keyup' && event.key !== 'Enter') return;
       if (event.type !== 'keydown' || !event.repeat) stop();
       else if (event.key === 'Enter') event.preventDefault();
     };

@@ -450,8 +450,12 @@ describe('a page turn in the published Pagination', () => {
     await settle();
     const other = document.implementation.createHTMLDocument('detached');
     other.body.append(other.adoptNode(mounted.target.parentElement));
+    const own = document.createElement('button');
+    document.body.append(own);
+    own.focus();
     await pressNext(mounted, 2);
     assert.ok(other.activeElement === mounted.prev(), 'focus is on that document’s Previous');
+    own.remove();
     mounted.handle.destroy();
   });
 
@@ -475,6 +479,18 @@ describe('a page turn in the published Pagination', () => {
 });
 
 describe('the keyboard on the published Pagination', () => {
+  /** A persistent pager whose update leaves one page, so focus falls to the checked size. */
+  async function movedToSize() {
+    const mounted = mountPager({ pageIndex: 1, persistent: true });
+    await settle();
+    mounted.next().focus();
+    mounted.next().click();
+    mounted.handle.update({ ...mounted.props, pageIndex: 0, totalCount: 10, persistent: true });
+    await settle();
+    assert.ok(document.activeElement === mounted.radio(25), 'focus was moved to the checked size');
+    return mounted;
+  }
+
   /** A pager whose Next has just reached the last page, focus moved to Previous. */
   async function movedToPrevious() {
     const mounted = mountPager({ pageIndex: 1 });
@@ -498,9 +514,50 @@ describe('the keyboard on the published Pagination', () => {
     handle.destroy();
   });
 
+  it('cancels a held Enter’s repeat on the size radio it moved focus to', async () => {
+    const { handle, radio } = await movedToSize();
+    const repeat = enter({ repeat: true });
+    radio(25).dispatchEvent(repeat);
+    assert.equal(repeat.defaultPrevented, true);
+    handle.destroy();
+  });
+
+  it('keeps cancelling while a key other than Enter is released', async () => {
+    const { handle, prev } = await movedToPrevious();
+    prev().dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
+    const repeat = enter({ repeat: true });
+    prev().dispatchEvent(repeat);
+    assert.equal(repeat.defaultPrevented, true);
+    handle.destroy();
+  });
+
+  it('holds no stale cancel after a second move', async () => {
+    const m = mountPager({ pageIndex: 1 });
+    await settle();
+    await pressNext(m, 2);
+    m.handle.update({ ...m.props, pageIndex: 0 });
+    await settle();
+    assert.ok(document.activeElement === m.next());
+    const repeat = enter({ repeat: true });
+    m.prev().dispatchEvent(repeat);
+    assert.equal(repeat.defaultPrevented, false);
+    m.handle.destroy();
+  });
+
+  it('leaves a removed size radio’s focus off the arrows', async () => {
+    const { handle, props, radio, prev, next } = mountPager({ persistent: true, pageIndex: 1 });
+    await settle();
+    radio(25).focus();
+    handle.update({ ...props, persistent: true, pageIndex: 1, pageSizeOptions: [] });
+    await settle();
+    assert.ok(document.activeElement !== prev() && document.activeElement !== next());
+    handle.destroy();
+  });
+
   for (const [claim, release] of [
     ['a keyup', (node) => node.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }))],
     ['a fresh Enter', (node) => node.dispatchEvent(enter())],
+    ['a focusout', (node) => node.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))],
   ]) {
     it(`cancels no repeat after ${claim}`, async () => {
       const { handle, prev } = await movedToPrevious();

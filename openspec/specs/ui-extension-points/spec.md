@@ -597,7 +597,7 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, and Foundry's keybindings stay held off as the bullet above states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
-Enter presses on key down and again on each repeat while held, except on a `Pagination` arrow Fabricate has moved focus to, as its group states, and Space on release.
+Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio Fabricate has moved focus to, as its group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
@@ -1325,10 +1325,10 @@ Each group states the accepted values of every key that entry publishes.
   - `rangeTemplate` is required and is the summary's template, final display text in which Fabricate replaces `{first}`, `{last}` and `{total}` with the first and last record shown and `totalCount`, as "{first}–{last} of {total} reagents"; with no record shown, `{first}` and `{last}` are both `0`.
   - `pageTemplate` is required and is the page-position template, in which Fabricate replaces `{page}` with the one-based page shown and `{total}` with the page count, as "Page {page} of {total}".
   - Fabricate fills each placeholder of either template with the number in digits, leaves any other `{name}` as written and changes nothing else, so the companion chooses each template's wording, its plural form included, from the `totalCount` it passes.
-  - Each arrow is a native `<button type="button">`, so `Enter` and `Space` press it, and the page-size radios take the keys `SegmentedControl`'s group states; Fabricate stops no key, and cancels only a held Enter's repeats on the arrow it moved focus to, as the next bullet states.
+  - Each arrow is a native `<button type="button">`, so `Enter` and `Space` press it, and the page-size radios take the keys `SegmentedControl`'s group states; Fabricate stops no key, and cancels only a held Enter's repeats on the arrow or page-size radio it moved focus to, as the next bullet states.
   - Focus moves only as the page-size control's group states, except that when an `update` disables or removes the arrow holding focus, and focus has not moved elsewhere meanwhile, Fabricate moves focus to the other arrow while it is enabled, and otherwise to the checked page-size radio while one is drawn.
     So a keyboard user who presses Next onto the last page rests on Previous.
-    On the arrow it moved focus to, Fabricate cancels the repeats of an Enter still held from that press until the key is released or pressed again, so a held Enter stops on the end page rather than walking back.
+    On the arrow or page-size radio it moved focus to, Fabricate cancels the repeats of an Enter still held from that press until that key is released or Enter is pressed again, so a held Enter stops on the end page rather than walking back.
     With neither to move to, Fabricate takes focus off the arrow, so focus is on the document body, where Foundry's keybindings hear Escape, and a pager that only focus kept drawn is removed; a companion making that `update` moves focus first.
     To return focus to the pager, the companion focuses `target.querySelector('button:not(:disabled), input[type="radio"]:checked')`: the first enabled arrow, else the checked size.
   - An arrow press bubbles one `click`, and the page-size control's clicks are as its group states, so a companion counts page turns from `onPageChange`, never from `click`.
