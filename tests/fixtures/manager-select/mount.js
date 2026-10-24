@@ -15,7 +15,6 @@ import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringE
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 import PickerRow from '../../../src/ui/svelte/components/PickerRow.svelte';
-import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
 import GatheringTasksBrowserView from '../../../src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
@@ -28,6 +27,8 @@ import ToolsBrowserView from '../../../src/ui/svelte/apps/manager/ToolsBrowserVi
 import WorldCurrencyTab from '../../../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 import { makeEssenceRow } from '../../helpers/makeEssenceRow.js';
 import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
+
+import EnvironmentOverviewHost from './EnvironmentOverviewHost.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const subject = params.get('subject') ?? 'span';
@@ -499,9 +500,10 @@ const SUBJECTS = {
       },
     }),
   // The overview's three: two add controls measurable only at their sentinel, and the ceiling.
-  // Its two mode controls start on `?selectionMode=` / `?compositionMode=` and record each report.
+  // Its two mode controls start on `?selectionMode=` / `?compositionMode=`, and the host records
+  // each report and moves the mode, as the environment editor does.
   'environment-overview': () =>
-    mount(EnvironmentOverviewTab, {
+    mount(EnvironmentOverviewHost, {
       target: mountPoint,
       props: {
         environment: {
