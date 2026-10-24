@@ -367,6 +367,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-validation',
     'player-salvage',
     'player-gathering-events',
+    // The strip mounted through the published seam, keyboard-selected (issue 2601).
+    'manager-published-tabs-specimen',
   ]),
   // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([

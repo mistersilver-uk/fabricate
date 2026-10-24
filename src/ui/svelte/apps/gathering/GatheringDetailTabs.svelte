@@ -10,6 +10,7 @@
 -->
 <script>
   import EditorTabs from '../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../util/localizeOr.js';
 
   let { activeTab = 'tasks', onSelect = () => {} } = $props();
 
@@ -30,10 +31,10 @@
 </script>
 
 <EditorTabs
-  tabs={TABS}
+  tabs={localizeTabs(TABS)}
   {activeTab}
   {onSelect}
-  ariaLabelKey="FABRICATE.App.Gathering.Detail.Tabs.Label"
+  ariaLabel={localizeOr('FABRICATE.App.Gathering.Detail.Tabs.Label', '')}
   idStem="gathering-detail"
   activePanelOnly
   tabDataAttr="data-gathering-detail-tab"

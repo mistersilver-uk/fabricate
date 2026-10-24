@@ -19,6 +19,7 @@
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import Kicker from '../../../components/Kicker.svelte';
   import Notice from '../../../components/Notice.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -273,14 +274,12 @@
     {
       id: 'info',
       icon: 'fas fa-circle-info',
-      labelKey: 'FABRICATE.App.Inventory.Detail.TabInfo',
-      label: 'Info',
+      label: localizeOr('FABRICATE.App.Inventory.Detail.TabInfo', 'Info'),
     },
     {
       id: 'salvage',
       icon: 'fas fa-recycle',
-      labelKey: 'FABRICATE.App.Inventory.Detail.TabSalvage',
-      label: 'Salvage',
+      label: localizeOr('FABRICATE.App.Inventory.Detail.TabSalvage', 'Salvage'),
     },
   ];
   let activeTab = $state('info');
@@ -374,7 +373,7 @@
       tabs={TABS}
       {activeTab}
       onSelect={(tabId) => (activeTab = tabId)}
-      ariaLabelKey="FABRICATE.App.Inventory.Detail.TabsLabel"
+      ariaLabel={localizeOr('FABRICATE.App.Inventory.Detail.TabsLabel', '')}
       idStem="inventory-detail"
       activePanelOnly
       tabDataAttr="data-inventory-detail-tab"

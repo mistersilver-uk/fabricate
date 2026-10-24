@@ -346,6 +346,20 @@ const ICON_BUTTON_KEYS = Object.freeze([
 /** Sized to the fixture's 360px ground and the height of its nine rows and the notes beneath. */
 const ICON_BUTTONS_WINDOW = Object.freeze({ width: 480, height: 560 });
 
+/**
+ * The tabs fixture's ground, the strip's target and tablist, its first two tabs, Inputs and
+ * Outputs, by place, and the companion's panel.
+ */
+const TABS_GROUND = '[data-lab-tabs]';
+const TABS_TARGET = `${TABS_GROUND} > [data-lab-tabs-target]`;
+const TABLIST = `${TABS_TARGET} > [role="tablist"]`;
+const INPUTS_TAB = `${TABLIST} > [role="tab"]:first-child`;
+const OUTPUTS_TAB = `${TABLIST} > [role="tab"]:nth-child(2)`;
+const TABS_PANEL = `${TABS_GROUND} > [data-lab-tabs-panel]`;
+
+/** Sized to the fixture's 360px ground, its strip and its one panel. */
+const TABS_WINDOW = Object.freeze({ width: 480, height: 240 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1064,6 +1078,50 @@ export const CASES = Object.freeze([
     position: ICON_BUTTONS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `IconButton.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-tabs-specimen',
+    label:
+      'Specimen, mounted through the published seam — one tab strip of three tabs, Inputs with a flask glyph, Outputs with a box glyph and Notes with none, across a 360px column on the window’s --fab-bg-1 ground, above the one tabpanel the companion draws, after one step: ArrowRight pressed on the selected Inputs, which moved keyboard focus to Outputs and then called onSelect, whose update drew Outputs selected and showed its panel, One iron ingot, and slag. So Outputs is drawn in the accent ink at weight 600 over its 2px accent underline and carries the accent keyboard ring, 2px wide with 2px of ground between ring and tab, and Inputs in the muted ink at weight 500 with no underline, 46px tall over the strip’s 1px rule',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each selection.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-tabs' },
+    steps: [{ selector: INPUTS_TAB, press: 'ArrowRight' }],
+    // The reached tab selected by the companion's own update, its panel shown, and keyboard focus
+    // on it, which only the ArrowRight and the update it led to produce.
+    expectSelector: `${TABS_GROUND}:has(> [data-lab-tabs-panel][aria-labelledby="lab-reagents-tab-outputs"])${OUTPUTS_TAB.slice(TABS_GROUND.length)}[id="lab-reagents-tab-outputs"][aria-selected="true"][tabindex="0"]:focus-visible`,
+    expectCenterHit: OUTPUTS_TAB,
+    expectContained: [
+      { container: TABS_GROUND, target: TABS_TARGET },
+      { container: TABS_GROUND, target: TABS_PANEL },
+      { container: '.window-content', target: TABS_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The focused, selected tab's ring, ink and underline, the unselected tab at rest, and the
+        // strip's rule.
+        {
+          selector: `${OUTPUTS_TAB}:focus-visible`,
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-accent); border-bottom-color: var(--fab-accent); font-weight: 600',
+        },
+        {
+          selector: INPUTS_TAB,
+          styles:
+            'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+        },
+        {
+          selector: TABLIST,
+          styles:
+            'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
+        },
+      ],
+    },
+    position: TABS_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `EditorTabs.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);

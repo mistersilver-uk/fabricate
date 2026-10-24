@@ -34,7 +34,8 @@
  * clause does not see which element a read is of, nor whether an inner function holding it runs.
  * Limit: sheet reach does not see a class composed across an interpolation, a class a published
  * `data` value writes (`icon` on `Medallion`, `StatBox`, `InfoStrip`, `EmptyState`, `Notice`,
- * `Callout` and `IconButton`, and `Callout`'s `items[].icon`), or an unprefixed state class.
+ * `Callout` and `IconButton`, `Callout`'s `items[].icon` and `EditorTabs`' `tabs[].icon`), or an
+ * unprefixed state class.
  * Limit: sheet reach reads the module sheet, not a component's `:global()` rule.
  * Limit: a census's `manager-*` clause shares sheet reach's limits.
  * Limit: `readsGlobal` sees a free reference or a member of a free host, not a destructure of one.
@@ -1106,7 +1107,7 @@ describe('each entry matches its component declaration', () => {
     });
   }
 
-  it('judges twenty-one focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the IconButton, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
+  it('judges twenty-two focusable elements across the shipped closures, each file read once: the Button, the Chip remove button, the EditorTabs tab button, the IconButton, the Notice action and dismiss buttons, the picker trigger, inline query and its close button, the panel, its option and its query field, the search input, the StatusToggle button and checkbox, the Stepper buttons and its number and formatted inputs, and the probe button and two inputs', () => {
     const files = new Set(
       [...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY].flatMap((entry) => [
         ...importClosure(entry.path, SHIPPED),
@@ -1118,6 +1119,7 @@ describe('each entry matches its component declaration', () => {
     assert.deepEqual(judged.sort(byName), [
       'src/ui/svelte/components/Button.svelte: svelte:element',
       'src/ui/svelte/components/Chip.svelte: button',
+      'src/ui/svelte/components/EditorTabs.svelte: button',
       'src/ui/svelte/components/IconButton.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
       'src/ui/svelte/components/Notice.svelte: button',
@@ -1179,6 +1181,7 @@ describe('each entry matches its component declaration', () => {
         'Stepper.onChange: 1',
         'Select.onChange: 1',
         'IconButton.onclick: 0',
+        'EditorTabs.onSelect: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -2749,6 +2752,7 @@ describe('the module sheet and every component style against the published Inspe
         'Field',
         'Well',
         'IconButton',
+        'EditorTabs',
       ],
       'an entry with a required root needs a census of its own'
     );

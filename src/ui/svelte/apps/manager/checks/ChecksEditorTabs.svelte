@@ -14,6 +14,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EditorTabs from '../../../components/EditorTabs.svelte';
+  import { localizeOr, localizeTabs } from '../../../util/localizeOr.js';
 
   let { sections = [], activeSection = 'roll', onSelect = () => {} } = $props();
 
@@ -58,12 +59,11 @@
 </script>
 
 <EditorTabs
-  {tabs}
+  tabs={localizeTabs(tabs)}
   activeTab={activeSection}
   badges={marks}
   {onSelect}
-  ariaLabelKey="FABRICATE.Admin.Manager.Checks.Tabs.Label"
-  ariaLabel="Checks sections"
+  ariaLabel={localizeOr('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
   buttonIdStem="checks-section"
   panelIdStem="checks-panel"
   activePanelOnly

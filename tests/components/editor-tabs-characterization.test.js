@@ -8,10 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, test } from 'node:test';
 
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { APP_LOCALIZER_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -21,7 +18,7 @@ const RECORD_ENV = 'UPDATE_EDITOR_TABS_CHARACTERIZATION_GOLDEN';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-characterization-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: APP_LOCALIZER_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
@@ -34,12 +31,11 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 const TABS = Object.freeze([
-  { id: 'overview', icon: 'fas fa-circle-info', labelKey: 'x.Overview', label: 'Overview' },
-  { id: 'inputs', icon: 'fas fa-list', labelKey: 'x.Inputs', label: 'Inputs' },
+  { id: 'overview', icon: 'fas fa-circle-info', label: 'Overview' },
+  { id: 'inputs', icon: 'fas fa-list', label: 'Inputs' },
   {
     id: 'validation',
     icon: 'fas fa-triangle-exclamation',
-    labelKey: 'x.Validation',
     label: 'Validation',
   },
 ]);
@@ -50,7 +46,6 @@ const SCENARIOS = Object.freeze({
   marks: {
     tabs: TABS,
     activeTab: 'inputs',
-    ariaLabelKey: 'x.Strip',
     ariaLabel: 'Editor sections',
     badgeDataAttr: 'data-x-badge',
     countDataAttr: 'data-x-count',
@@ -132,8 +127,8 @@ test('every shipped entry shape renders exactly the recorded markup', async () =
 test('an icon-less entry renders no glyph element', async () => {
   const root = await harness.mount({
     tabs: [
-      { id: 'tools', labelKey: 'x.Tools', label: 'Tools' },
-      { id: 'tasks', icon: '', labelKey: 'x.Tasks', label: 'Tasks' },
+      { id: 'tools', label: 'Tools' },
+      { id: 'tasks', icon: '', label: 'Tasks' },
     ],
     activeTab: 'tools',
   });

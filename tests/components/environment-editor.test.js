@@ -934,10 +934,11 @@ describe('environment composition editor structure', () => {
       passesValues: [
         ['EditorTabs', 'tabDataAttr', 'data-environment-tab-button'],
         ['EditorTabs', 'idStem', 'environment'],
-        ['EditorTabs', 'ariaLabelKey', 'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label'],
         ['EditorTabs', 'containerClass', 'manager-environment-tabs'],
         ['EditorTabs', 'buttonClass', 'manager-environment-tab-button'],
       ],
+      passesProps: [['EditorTabs', 'ariaLabel']],
+      callsLiteral: [['localizeOr', 'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label']],
     }
   );
 

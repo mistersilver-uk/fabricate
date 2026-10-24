@@ -404,6 +404,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedWell.svelte',
   'tests/view-lab/fixtures/PublishedCallout.svelte',
   'tests/view-lab/fixtures/PublishedIconButtons.svelte',
+  'tests/view-lab/fixtures/PublishedTabs.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -856,6 +857,10 @@ const labCallout = (key) =>
 const LAB_CALLOUT_ACTIONS = `${labCallout('actions')} > .manager-callout-actions`;
 /** The published icon button in one row of the icon button fixture, by its key. */
 const labIconButton = (key) => `[data-lab-icon-buttons] > [data-lab-icon-button="${key}"] button`;
+/** The tabs fixture's published tablist, and its first two tabs, Inputs and Outputs, by place. */
+const LAB_TABLIST = '[data-lab-tabs] > [data-lab-tabs-target] > [role="tablist"]';
+const LAB_INPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:first-child`;
+const LAB_OUTPUTS_TAB = `${LAB_TABLIST} > [role="tab"]:nth-child(2)`;
 const FIRST_INGREDIENT_ROW =
   '.manager-recipe-ingredient-set-groups > [data-recipe-group]:first-child [data-recipe-option]';
 const TAG_ADDER = '[data-recipe-option-tags] [data-recipe-add-tag]';
@@ -1398,6 +1403,25 @@ const NON_VERB_CONTROLS = Object.freeze({
     { selector: labIconButton('size-26'), styles: 'width: 26px; height: 26px' },
     { selector: labIconButton('disabled'), styles: 'opacity: 0.62' },
     { selector: labIconButton('expand'), styles: 'background-color: var(--fab-surface-raised)' },
+  ],
+  // The published tab strip (issue 2601): the keyboard-reached, selected tab's ring, ink and
+  // underline, the unselected tab at rest, and the strip's rule.
+  'manager-published-tabs-specimen': [
+    {
+      selector: `${LAB_OUTPUTS_TAB}:focus-visible`,
+      styles:
+        'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-accent); border-bottom-color: var(--fab-accent); font-weight: 600',
+    },
+    {
+      selector: LAB_INPUTS_TAB,
+      styles:
+        'height: 46px; color: var(--fab-text-muted); border-bottom-color: rgba(0, 0, 0, 0); font-weight: 500',
+    },
+    {
+      selector: LAB_TABLIST,
+      styles:
+        'display: flex; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: var(--fab-border)',
+    },
   ],
 });
 const NON_VERB_SELECTORS = new Set(
@@ -6035,13 +6059,14 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-well-specimen',
       'manager-published-callout-specimen',
       'manager-published-icon-buttons-specimen',
+      'manager-published-tabs-specimen',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, and the icon button fixture's buttons. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, and the tabs fixture's strip. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6053,9 +6078,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Well',
   'Callout',
   'IconButton',
+  'EditorTabs',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout and IconButton and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton and EditorTabs and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])
@@ -8229,5 +8255,55 @@ test('the title bar selects the system frames and the premium-installed frame', 
   assert.deepEqual(
     ids(['src/ui/svelte/components/AppTitleBar.svelte']),
     [...titleBar, 'fabricate-app-shell', 'manager-components-normal'].sort(byCodePoint)
+  );
+});
+
+test('the tabs specimen case presses ArrowRight on the strip the fixture mounts through the seam', () => {
+  const { instance, fragment } = componentAstOf('tests/view-lab/fixtures/PublishedTabs.svelte');
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'mount' &&
+        node.arguments[0]?.value === 'EditorTabs'
+    ),
+    'the fixture mounts EditorTabs through the seam’s mount'
+  );
+  assert.ok(
+    holds(
+      instance,
+      (node) =>
+        node.type === 'CallExpression' &&
+        node.callee?.property?.name === 'update' &&
+        node.callee.object?.name === 'strip'
+    ),
+    'its onSelect passes the reached tab back through the strip’s own update'
+  );
+  for (const hook of ['data-lab-tabs', 'data-lab-tabs-target', 'data-lab-tabs-panel']) {
+    assert.ok(
+      holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
+      `the fixture writes the ${hook} hook the case names`
+    );
+  }
+  const { steps, expectLayout } = getCaseById('manager-published-tabs-specimen');
+  assert.deepEqual(
+    steps.map((step) => [step.selector, step.press]),
+    [[LAB_INPUTS_TAB, 'ArrowRight']],
+    'one ArrowRight on the selected Inputs, the first tab'
+  );
+  assert.ok(
+    expectLayout.controls.some(({ selector }) => selector === `${LAB_OUTPUTS_TAB}:focus-visible`),
+    'the keyboard ring is measured on the tab the ArrowRight reached'
+  );
+  const tabs = instance.content.body
+    .flatMap((node) => node.declarations ?? [])
+    .find((declarator) => declarator.id.name === 'TABS').init.arguments[0].elements;
+  assert.deepEqual(
+    tabs
+      .slice(0, 2)
+      .map(({ properties }) => properties.find(({ key }) => key.name === 'id').value.value),
+    ['inputs', 'outputs'],
+    'the first two tabs, which the case reaches by place, are Inputs and Outputs'
   );
 });
