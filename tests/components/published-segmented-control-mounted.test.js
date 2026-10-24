@@ -333,6 +333,36 @@ describe('the keyboard on the published SegmentedControl', () => {
 });
 
 describe('a choice on the published SegmentedControl', () => {
+  it('puts the check on the reached radio when onChange updates options as well as value', async () => {
+    const { target, form } = formTarget();
+    let handle;
+    const onChange = (next) => {
+      handle.update(controlProps(onChange, { options: [...OPTIONS].reverse(), value: next }));
+    };
+    const mounted = mountControl({}, onChange, target);
+    handle = mounted.handle;
+    await settle();
+    const heard = [];
+    form.addEventListener('change', () => {
+      heard.push(checkedValues(mounted.radios()));
+    });
+    reach(mounted.radio('missing'));
+    assert.deepEqual(heard, [['missing']], 'the form reads the reached radio inside the change');
+    await settle();
+    assert.deepEqual(checkedValues(mounted.radios()), ['missing']);
+    handle.destroy();
+  });
+
+  it('checks no radio for a string value over numeric options, even after a declined press', async () => {
+    const declined = mountControl({ options: SIZES, value: '10' });
+    await settle();
+    reach(declined.radio(25));
+    assert.deepEqual(checkedValues(declined.radios()), []);
+    await settle();
+    assert.deepEqual(checkedValues(declined.radios()), []);
+    declined.handle.destroy();
+  });
+
   it('calls onChange once with the pressed segment’s value, and draws it selected only after the companion’s update', async () => {
     const { handle, props, calls, segment } = mountControl();
     await settle();
