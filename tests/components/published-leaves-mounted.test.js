@@ -101,6 +101,11 @@ afterEach(() => {
   for (const shell of targets) shell.remove();
 });
 
+/** Two options, each its required `value` and `label`. */
+const BREAKAGE_OPTIONS = Object.freeze([
+  { value: 'breakable', label: 'Breakable' },
+  { value: 'immune', label: 'Immune' },
+]);
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
   { id: 'inputs', label: 'Inputs' },
@@ -338,6 +343,15 @@ const LEAVES = Object.freeze([
     next: { tabs: REAGENT_TABS, ariaLabel: 'Reagent pages', idStem: 'acme', onSelect() {} },
     read: (root) => root.getAttribute('aria-label'),
     drawn: ['Reagent sections', 'Reagent pages'],
+  },
+  {
+    name: 'RadioCardGroup',
+    under: 'fabricate',
+    root: '.fabricate-option-cards',
+    props: { options: BREAKAGE_OPTIONS, legend: 'When it breaks', onChange() {} },
+    next: { options: BREAKAGE_OPTIONS, legend: 'Breakage', onChange() {} },
+    read: (root) => root.querySelector('legend').textContent,
+    drawn: ['When it breaks', 'Breakage'],
   },
 ]);
 
