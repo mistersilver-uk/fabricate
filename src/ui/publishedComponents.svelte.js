@@ -26,6 +26,7 @@ import Kicker from './svelte/components/Kicker.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
 import Notice from './svelte/components/Notice.svelte';
+import Pagination from './svelte/components/Pagination.svelte';
 import RadioCardGroup from './svelte/components/RadioCardGroup.svelte';
 import SearchField from './svelte/components/SearchField.svelte';
 import SegmentedControl from './svelte/components/SegmentedControl.svelte';
@@ -68,6 +69,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/EditorTabs.svelte': EditorTabs,
   'src/ui/svelte/components/RadioCardGroup.svelte': RadioCardGroup,
   'src/ui/svelte/components/SegmentedControl.svelte': SegmentedControl,
+  'src/ui/svelte/components/Pagination.svelte': Pagination,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

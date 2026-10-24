@@ -289,6 +289,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'EditorTabs',
       'RadioCardGroup',
       'SegmentedControl',
+      'Pagination',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -597,6 +598,29 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           density: optional,
         },
         rest: true,
+        root: 'fabricate',
+        overlays: false,
+      },
+      Pagination: {
+        version: 1,
+        props: {
+          totalCount: required,
+          pageSize: required,
+          pageIndex: optional,
+          pageSizeOptions: required,
+          onPageChange: { kind: 'callback', required: true },
+          onPageSizeChange: { kind: 'callback', required: true },
+          persistent: optional,
+          ariaLabel: required,
+          navLabel: required,
+          previousLabel: required,
+          nextLabel: required,
+          perPageLabel: required,
+          rangeTemplate: required,
+          pageTemplate: required,
+          density: optional,
+        },
+        rest: false,
         root: 'fabricate',
         overlays: false,
       },

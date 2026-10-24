@@ -575,10 +575,11 @@ function distinctIds(elements) {
  * Whether a form control's `name` is unique to its mount (issue 2601): its value, through a
  * top-level `const` or `$derived` and either branch of a conditional, is a template that reads the
  * component's `$props.id()` local, or `<prop> || <such a value>` where the prop is a local outside
- * `published` whose default is `''`. `published` is the published locals of the entry whose own
- * file it is, and `null`, which admits no prop, for any other file.
+ * `published` whose default is `''`, each such local added to `blank`. `published` is the
+ * published locals of the entry whose own file it is, and `null`, which admits no prop, for any
+ * other file.
  */
-function mountUniqueName(ast, attribute, published) {
+function mountUniqueName(ast, attribute, published, blank = new Set()) {
   const [tag, ...others] = [attribute.value].flat();
   if (tag?.type !== 'ExpressionTag' || others.length > 0) return false;
   const declared = scriptDeclarations(ast);
@@ -600,8 +601,11 @@ function mountUniqueName(ast, attribute, published) {
       return node.expressions.some((part) => part.type === 'Identifier' && ids.has(part.name));
     }
     if (node?.type === 'LogicalExpression') {
-      const left = unpublishedBlank(node.left) || unique(node.left, depth + 1);
-      return node.operator === '||' && left && unique(node.right, depth + 1);
+      const rests = unpublishedBlank(node.left);
+      const left = rests || unique(node.left, depth + 1);
+      const admitted = node.operator === '||' && left && unique(node.right, depth + 1);
+      if (admitted && rests) blank.add(node.left.name);
+      return admitted;
     }
     if (node?.type === 'ConditionalExpression') {
       return unique(node.consequent, depth + 1) && unique(node.alternate, depth + 1);
@@ -618,14 +622,16 @@ function mountUniqueName(ast, attribute, published) {
  * `data-keyboard-focus="true"`, a `button` states `type="button"`, and no form control states
  * `name` but one `mountUniqueName` admits under `published`. A `svelte:element` is judged once, as
  * the union of its pinned tags, and one with no pin is a fault; its `type` is a mounted suite's.
- * Answers each element it judged beside each fault, both as `<file>: <tag> …`, and each judged
+ * Answers each element it judged beside each fault, both as `<file>: <tag> …`, each judged
  * element as `{ id, node, guards, tags }`, its `id` being `<file>: <tag>[<hook>]`, as
- * `distinctIds` resolves two that share one.
+ * `distinctIds` resolves two that share one, and in `blank` the props whose blank default a
+ * name it admitted rests on.
  */
 export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS, published = null) {
   const judged = [];
   const faults = [];
   const elements = [];
+  const blank = new Set();
   walkWithAncestors(ast.fragment, (node, ancestors) => {
     if (node.type !== 'RegularElement' && node.type !== 'SvelteElement') return;
     const id = `${file}: ${node.name}${hookOf(node)}`;
@@ -642,12 +648,72 @@ export function focusableElements(file, ast, dynamic = DYNAMIC_ELEMENTS, publish
       faults.push(`${file}: button does not state type="button"`);
     }
     const name = attributeOf(node, 'name');
-    if (as.control && name && !mountUniqueName(ast, name, published)) {
+    if (as.control && name && !mountUniqueName(ast, name, published, blank)) {
       faults.push(`${file}: ${node.name} states name`);
     }
   });
   const distinct = distinctIds(elements);
-  return { judged, faults: [...faults, ...distinct.faults], elements: distinct.elements };
+  const keys = new Map(propLocals(ast).map(({ key, local }) => [local, key]));
+  return {
+    judged,
+    faults: [...faults, ...distinct.faults],
+    elements: distinct.elements,
+    blank: [...blank].map((local) => keys.get(local)),
+  };
+}
+
+/**
+ * What the files of a closure that draw `child` break by passing it `keys`, on which a name the
+ * child admits rests at their blank default: a spread onto the child's tag, or one of `keys` at a
+ * value `mountUniqueName` does not admit in the drawing file, judged under `publishedOf(file)`.
+ */
+function blankNameFaults(child, keys, files, reader, publishedOf) {
+  return files.flatMap((file) => {
+    const ast = reader.component(file);
+    const tags = componentTags(file, ast).filter(([path]) => path === child);
+    return tags.flatMap(([, tag]) =>
+      tag.attributes.flatMap((attribute) => {
+        if (attribute.type === 'SpreadAttribute') {
+          return [`${file} spreads onto ${child}, whose form control's name rests on [${keys}]`];
+        }
+        if (!keys.includes(attribute.name)) return [];
+        return mountUniqueName(ast, attribute, publishedOf(file, ast))
+          ? []
+          : [`${file} passes ${attribute.name} to ${child} at a value not unique to the mount`];
+      })
+    );
+  });
+}
+
+/**
+ * Admission rule 9 over the component files of `path`'s closure (issue 2646): the root is judged
+ * under `rootPublished`, a file that is another published entry's own path under that entry's
+ * published locals, and any other file under none. Where a published child's form control is named
+ * through a prop's blank default, each closure file drawing the child passes that prop only as
+ * `blankNameFaults` admits. Answers every element judged, and every fault.
+ */
+export function closureFocusables(
+  path,
+  reader,
+  { manifest = [], rootPublished = null, dynamic } = {}
+) {
+  const files = [...importClosure(path, reader)].filter(isComponent);
+  const publishedOf = (file, ast) => {
+    if (file === path) return rootPublished;
+    const owner = manifest.find((entry) => entry.path === file);
+    return owner ? new Set(publishedLocals(owner, ast).keys()) : null;
+  };
+  const scans = files.map((file) => {
+    const ast = reader.component(file);
+    const scan = focusableElements(file, ast, dynamic, publishedOf(file, ast));
+    const nested = file !== path && scan.blank.length > 0;
+    const drawn = nested ? blankNameFaults(file, scan.blank, files, reader, publishedOf) : [];
+    return { judged: scan.judged, faults: [...scan.faults, ...drawn] };
+  });
+  return {
+    judged: scans.flatMap((scan) => scan.judged),
+    faults: scans.flatMap((scan) => scan.faults),
+  };
 }
 
 /** The local a component's `$props()` pattern collects its rest keys under, or `undefined`. */

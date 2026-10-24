@@ -444,7 +444,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
-  // Issue 1521: `Pagination` localizes through `localizeOr`.
+  // The progressive bodies localize through `localizeOr`; its two leaves are also the `APP_LOCALIZER`
+  // copy's, which `Pagination` reads (issue 2646).
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
   // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every

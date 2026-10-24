@@ -12,8 +12,8 @@ import { readHeadFile } from './mergeBaseRatchet.js';
 import { parseModule, walkNodes, walkWithAncestors } from './moduleAst.js';
 import {
   DYNAMIC_ELEMENTS,
+  closureFocusables,
   componentTags,
-  focusableElements,
   foundryReads,
   importClosure,
   isComponent,
@@ -166,8 +166,9 @@ function requiredPropFaults(ast) {
  * publishable: it exists; its closure reads no Foundry global and reaches no `resolveOverlayHost`;
  * a published entry states `overlays` where its closure reaches an overlay action; every element
  * rule 9 judges is marked and every `svelte:element` is pinned (`DYNAMIC_ELEMENTS`, read from the
- * head), a form control's `name` judged against the root's published locals, none for a candidate;
- * and every required prop is a snippet without arguments, a callback or data.
+ * head), a form control's `name` judged as `closureFocusables` judges it, against the root's
+ * published locals, none for a candidate; and every required prop is a snippet without arguments,
+ * a callback or data.
  */
 export function publishableFaults(path, { manifest, reader }) {
   if (reader.has && !reader.has(path)) return [`${path} does not exist`];
@@ -176,12 +177,14 @@ export function publishableFaults(path, { manifest, reader }) {
   const faults = [];
   for (const file of closure) {
     faults.push(...foundryReads(file, reader).map((read) => `${file}: ${read}`));
-    if (!isComponent(file)) continue;
-    const ast = reader.component(file);
-    const root = file === path;
-    const published = root ? new Set(entry ? publishedLocals(entry, ast).keys() : []) : null;
-    faults.push(...focusableElements(file, ast, DYNAMIC_ELEMENTS, published).faults);
-    if (root) faults.push(...requiredPropFaults(ast).map((fault) => `${file}: ${fault}`));
+    if (file !== path || !isComponent(file)) continue;
+    faults.push(...requiredPropFaults(reader.component(file)).map((fault) => `${file}: ${fault}`));
+  }
+  if (isComponent(path)) {
+    const ast = reader.component(path);
+    const rootPublished = new Set(entry ? publishedLocals(entry, ast).keys() : []);
+    const options = { manifest, rootPublished, dynamic: DYNAMIC_ELEMENTS };
+    faults.push(...closureFocusables(path, reader, options).faults);
   }
   faults.push(
     ...hostResolverImports(path, reader).map(

@@ -114,6 +114,7 @@ import {
   branchTwinFaults,
   byName,
   closureDependencies,
+  closureFocusables,
   componentTags,
   controlRestFaults,
   declarationsOf,
@@ -671,20 +672,16 @@ const SHEET_REACH_PINS = Object.freeze([
 ]);
 
 /**
- * Rule 9 over an entry's whole closure: every element judged, and every fault, a form control's
- * `name` in the entry's own file judged against `entry`'s published locals.
+ * Rule 9 over an entry's whole closure, as `closureFocusables` judges it under the shipped
+ * manifest: a form control's `name` in the entry's own file judged against `entry`'s published
+ * locals, and in another published entry's own file against that entry's.
  */
-function closureFocusables(path, reader = SHIPPED, dynamic = undefined, entry = null) {
-  const scans = [...importClosure(path, reader)].filter(isComponent).map((file) => {
-    const ast = reader.component(file);
-    const own = file === path && entry;
-    const published = own ? new Set(publishedLocals(entry, ast).keys()) : null;
-    return focusableElements(file, ast, dynamic, published);
-  });
-  return {
-    judged: scans.flatMap((scan) => scan.judged),
-    faults: scans.flatMap((scan) => scan.faults),
-  };
+function closureFocusablesOf(path, reader = SHIPPED, dynamic = undefined, entry = null) {
+  const rootPublished = entry
+    ? new Set(publishedLocals(entry, reader.component(path)).keys())
+    : null;
+  const manifest = PUBLISHED_COMPONENT_MANIFEST;
+  return closureFocusables(path, reader, { manifest, rootPublished, dynamic });
 }
 
 const NO_REST_ELEMENT = 'rest lands on no element the gate can see';
@@ -1135,7 +1132,7 @@ describe('each entry matches its component declaration', () => {
     });
 
     it(`${entry.name} marks every focusable element it draws, and names no form control`, () => {
-      assert.deepEqual(closureFocusables(entry.path, SHIPPED, undefined, entry).faults, []);
+      assert.deepEqual(closureFocusablesOf(entry.path, SHIPPED, undefined, entry).faults, []);
     });
   }
 
@@ -1218,6 +1215,8 @@ describe('each entry matches its component declaration', () => {
         'EditorTabs.onSelect: 1',
         'RadioCardGroup.onChange: 1',
         'SegmentedControl.onChange: 1',
+        'Pagination.onPageChange: 1',
+        'Pagination.onPageSizeChange: 1',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -1740,7 +1739,7 @@ describe('each entry matches its component declaration', () => {
   });
 
   const focusOf = (markup) =>
-    closureFocusables('src/E.svelte', syntheticReader({ 'src/E.svelte': markup }));
+    closureFocusablesOf('src/E.svelte', syntheticReader({ 'src/E.svelte': markup }));
 
   it('passes a marked button and an unnamed input, and reports both as judged', () => {
     assert.deepEqual(
@@ -1776,6 +1775,49 @@ describe('each entry matches its component declaration', () => {
   ]) {
     it(`names ${claim} as a rule 9 fault`, () => {
       assert.deepEqual(focusOf(markup).faults, [`src/E.svelte: ${fault}`]);
+    });
+  }
+
+  const NESTED = 'src/C.svelte';
+  const CHILD_ENTRY = { name: 'C', path: NESTED, props: { options: { kind: 'data' } } };
+  const DRAWER_ENTRY = { name: 'E', path: 'src/E.svelte', props: { size: { kind: 'data' } } };
+  /** Rule 9 over a drawer that draws `tag`, beside a published child naming its radio through a blank `group`. */
+  const nestedFocusOf = (tag, manifest = [DRAWER_ENTRY, CHILD_ENTRY]) =>
+    closureFocusables(
+      'src/E.svelte',
+      syntheticReader({
+        'src/E.svelte': `<script>import C from './C.svelte'; let { size = 1, ...rest } = $props(); const id = $props.id();</script>${tag}`,
+        [NESTED]:
+          '<script>let { group = \'\', options = [] } = $props(); const uid = $props.id();</script><input type="radio" name={group || `c-${uid}`} />',
+      }),
+      { manifest, rootPublished: new Set(['size']) }
+    ).faults;
+
+  it("judges a published child's form control under its own entry, the drawer passing nothing or a mount-unique name", () => {
+    assert.deepEqual(nestedFocusOf('<C />'), []);
+    assert.deepEqual(nestedFocusOf('<C group={`${id}-size`} />'), []);
+    assert.deepEqual(nestedFocusOf('<C />', [DRAWER_ENTRY]), ['src/C.svelte: input states name']);
+  });
+
+  for (const [claim, tag, fault] of [
+    [
+      'a literal',
+      '<C group="sizes" />',
+      'src/E.svelte passes group to src/C.svelte at a value not unique to the mount',
+    ],
+    [
+      'its own published data key',
+      '<C group={size} />',
+      'src/E.svelte passes group to src/C.svelte at a value not unique to the mount',
+    ],
+    [
+      'a spread',
+      '<C {...rest} />',
+      "src/E.svelte spreads onto src/C.svelte, whose form control's name rests on [group]",
+    ],
+  ]) {
+    it(`names a drawer that passes a published child's blank name ${claim} as a rule 9 fault`, () => {
+      assert.deepEqual(nestedFocusOf(tag), [fault]);
     });
   }
 
@@ -1815,7 +1857,7 @@ describe('each entry matches its component declaration', () => {
   const UNMARKED = `${DYNAMIC} does not state data-keyboard-focus="true"`;
   /** Rule 9 over one `svelte:element` that states `attributes`, pinned to `tags` or unpinned. */
   const dynamicFocusOf = (attributes, tags) =>
-    closureFocusables(
+    closureFocusablesOf(
       'src/E.svelte',
       syntheticReader({
         'src/E.svelte': ['<svelte:element this={tag}', attributes, '>x</svelte:element>'].join(''),
@@ -2820,6 +2862,7 @@ describe('the module sheet and every component style against the published Inspe
         'EditorTabs',
         'RadioCardGroup',
         'SegmentedControl',
+        'Pagination',
       ],
       'an entry with a required root needs a census of its own'
     );

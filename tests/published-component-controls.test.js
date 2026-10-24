@@ -34,7 +34,9 @@
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
  * whether a name is drawn in every state is the mounted suite's; a control in a closure file other
  * than the entry's is named by its `CLOSURE_NAMES` pin, and one of the entry's own file named
- * through an item it cannot follow by its `OWN_NAMES` pin, which the mounted suite holds.
+ * through an item it cannot follow by its `OWN_NAMES` pin, which the mounted suite holds; one in
+ * another published entry's own file is judged by its `NESTED_NAMES` row, and its key pin under
+ * that entry alone (issue 2646).
  * Limit: whether a control draws text of its own follows the snippets its file defines, counts a
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
@@ -192,9 +194,31 @@ const OWN_NAMES = Object.freeze({
 });
 
 /**
+ * The reached controls an entry draws from another published entry's own file, by entry then id:
+ * the drawing entry's required `data` keys that feed the control's name, which the gate does not
+ * follow across files, and the mounted clause that reads its accessible name (issue 2646).
+ */
+const NESTED_NAMES = Object.freeze({
+  Pagination: {
+    'src/ui/svelte/components/IconButton.svelte: button': {
+      keys: ['previousLabel', 'nextLabel'],
+      heldBy:
+        'tests/components/published-pagination-mounted.test.js: the published Pagination names',
+    },
+    // Each size's numeral, from the sizes offered and the size shown.
+    'src/ui/svelte/components/SegmentedControl.svelte: input': {
+      keys: ['pageSizeOptions', 'pageSize'],
+      heldBy:
+        'tests/components/published-pagination-mounted.test.js: the published Pagination names',
+    },
+  },
+});
+
+/**
  * The callback keys an entry hands a closure child as the child's own callback, which the gate
- * does not follow into the child: the script function that calls the key, the child's prop it is
- * passed as, and the mounted clause that operates the child by pointer and by key.
+ * does not follow into the child: the script function, or the list of them, that calls the key,
+ * the child's prop each is passed as, and the mounted clause that operates the child by pointer
+ * and by key.
  */
 const FORWARDED_CALLBACKS = Object.freeze({
   Select: {
@@ -202,6 +226,20 @@ const FORWARDED_CALLBACKS = Object.freeze({
       by: 'choose',
       as: 'onSelect',
       heldBy: 'tests/components/published-select-mounted.test.js: a choice in the published Select',
+    },
+  },
+  Pagination: {
+    onPageChange: {
+      by: ['previousPage', 'nextPage'],
+      as: 'onclick',
+      heldBy:
+        'tests/components/published-pagination-mounted.test.js: a page turn in the published Pagination',
+    },
+    onPageSizeChange: {
+      by: 'changePageSize',
+      as: 'onChange',
+      heldBy:
+        'tests/components/published-pagination-mounted.test.js: a page-size choice in the published Pagination',
     },
   },
 });
@@ -398,13 +436,16 @@ function referenceSites(ast, local, extra) {
 }
 
 /**
- * What a forwarded callback key breaks: a reference that is not a call inside the function `by`,
- * and a reference to `by` that is not the whole value of a child component's `as` attribute.
+ * What a forwarded callback key breaks: a reference that is not a call inside a function `by`
+ * lists, a reference to one that is not the whole value of a child component's `as` attribute,
+ * and one handed to no child.
  */
 function forwardedFaults(ast, key, local, { by, as }) {
-  const holder = scriptFunctions(ast).get(by);
+  const listed = [by].flat();
+  const functions = scriptFunctions(ast);
+  const holders = listed.map((name) => functions.get(name)).filter(Boolean);
   const faults = new Set();
-  let handed = 0;
+  const handed = new Map(listed.map((name) => [name, 0]));
   for (const root of [ast.instance, ast.fragment]) {
     walkWithAncestors(root, (node, ancestors) => {
       if (node.type !== 'Identifier') return;
@@ -416,16 +457,19 @@ function forwardedFaults(ast, key, local, { by, as }) {
         ancestors.every((above) => above.init?.callee?.name !== '$props')
       ) {
         const called = parent?.type === 'CallExpression' && parent.callee === node;
-        if (!called || !ancestors.includes(holder)) faults.add(`${key} is called outside ${by}`);
+        const inside = holders.some((holder) => ancestors.includes(holder));
+        if (!called || !inside) faults.add(`${key} is called outside ${listed.join(', ')}`);
       }
-      if (node.name !== by || parent?.id === node) return;
+      if (!handed.has(node.name) || parent?.id === node) return;
       const [component, attribute, tag] = ancestors.slice(-3);
       const passed = component?.type === 'Component' && attribute?.name === as && tag === parent;
-      if (passed) handed += 1;
-      else faults.add(`${by} is referenced but as a child's ${as}`);
+      if (passed) handed.set(node.name, handed.get(node.name) + 1);
+      else faults.add(`${node.name} is referenced but as a child's ${as}`);
     });
   }
-  if (handed === 0) faults.add(`${by} is handed to no child as ${as}`);
+  for (const [name, count] of handed) {
+    if (count === 0) faults.add(`${name} is handed to no child as ${as}`);
+  }
   return [...faults];
 }
 
@@ -505,6 +549,7 @@ function controlsOf(entry, reader = SHIPPED, dynamic = DYNAMIC_ELEMENTS) {
     const published = file === entry.path ? own : new Map();
     return focusableElements(file, ast, dynamic).elements.map((element) => ({
       ...element,
+      file,
       entry,
       ast,
       published,
@@ -536,14 +581,22 @@ function defaultsPinFaults({ id, entry, ast }, { defaults, heldBy }, followed) {
   ];
 }
 
-/** What one control's pin breaks, its guards followed to the props they read. */
-function reachFaults(control, pins) {
+/** Whether a control sits in another published entry's own file than the entry drawing it. */
+const isNested = ({ file, entry }, entries = ENTRIES) =>
+  entries.some((owner) => owner.path === file && owner.name !== entry.name);
+
+/**
+ * What one control's pin breaks, its guards followed to the props they read. A key pin on a
+ * control in another published entry's own file is that entry's to judge (issue 2646).
+ */
+function reachFaults(control, pins, entries = ENTRIES) {
   const { id, guards, published, entry, ast } = control;
   if (!Object.hasOwn(pins, id)) return [`${id} has no reach pin`];
   const pin = pins[id];
   if (pin === 'always') return guards.size > 0 ? [`${id} is pinned always under a guard`] : [];
   const followed = followedProps(ast, guards, published);
   if (pin?.defaults) return defaultsPinFaults(control, pin, followed);
+  if (pin !== null && isNested(control, entries)) return [];
   if (pin !== null) {
     if (!Object.hasOwn(entry.props, pin)) {
       return [`${id} is pinned to ${pin}, which ${entry.name} does not publish`];
@@ -725,9 +778,15 @@ function nameFaults(
   control,
   pins,
   optional = OPTIONAL_NAME_PINS,
-  names = { ...CLOSURE_NAMES, ...OWN_NAMES }
+  names = { ...CLOSURE_NAMES, ...OWN_NAMES },
+  nested = NESTED_NAMES,
+  entries = ENTRIES
 ) {
-  const { id, node } = control;
+  const { id, node, entry } = control;
+  const row = nested[entry.name]?.[id];
+  if (row) return closureNameFaults(control, { ...row, entry: entry.name });
+  if (isNested(control, entries))
+    return [`${id} is drawn by ${entry.name} and has no NESTED_NAMES row`];
   if (Object.hasOwn(names, id)) return closureNameFaults(control, names[id]);
   const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
@@ -735,6 +794,22 @@ function nameFaults(
   const guard = typeof pins[id] === 'string' && pins[id] !== 'always' ? pins[id] : null;
   const faults = parts.map((part) => namePartFault(part, control, strict, guard)).filter(Boolean);
   return [...new Set(faults)].map((fault) => `${id} ${fault}`);
+}
+
+/**
+ * Each `nested` row naming a control its entry's drawn closure does not reach, or an entry that is
+ * not published.
+ */
+function nestedRowFaults(nested = NESTED_NAMES, pins = FOCUSABLE_REACH, reader = SHIPPED) {
+  return Object.entries(nested).flatMap(([name, rows]) => {
+    const entry = ENTRIES.find((candidate) => candidate.name === name);
+    if (!entry) return [`${name} is no published entry`];
+    const controls = controlsOf(entry, reader).filter((control) => isReached(control, pins));
+    const reached = new Set(controls.map(({ id }) => id));
+    return Object.keys(rows)
+      .filter((id) => !reached.has(id))
+      .map((id) => `${name} names ${id}, which its drawn closure does not reach`);
+  });
 }
 
 /** What a closure name pin breaks: another entry, or a key its entry does not publish as required data. */
@@ -1054,9 +1129,12 @@ describe('each published entry that draws a control', () => {
     assert.deepEqual(unheldClauses(held), []);
   });
 
-  it('names a describe block of its mounted suite in each name, forwarded callback and entry event pin', () => {
+  it('names a describe block of its mounted suite in each name, nested name, forwarded callback and entry event pin', () => {
     const held = [
       ...Object.values({ ...CLOSURE_NAMES, ...OWN_NAMES }).map(({ heldBy }) => heldBy),
+      ...Object.values(NESTED_NAMES).flatMap((rows) =>
+        Object.values(rows).map(({ heldBy }) => heldBy)
+      ),
       ...Object.values(ENTRY_EVENTS).flatMap((events) =>
         Object.values(events).map(({ heldBy }) => heldBy)
       ),
@@ -1080,12 +1158,20 @@ describe('each published entry that draws a control', () => {
         assert.equal(id.startsWith(`${published.path}: `), own, `${id} sits where its table says`);
       }
     }
-    for (const name of Object.keys(ENTRY_EVENTS)) {
+    for (const name of [...Object.keys(ENTRY_EVENTS), ...Object.keys(NESTED_NAMES)]) {
       assert.ok(
         ENTRIES.some((entry) => entry.name === name),
         `${name} is a published entry`
       );
     }
+    for (const [name, rows] of Object.entries(NESTED_NAMES)) {
+      for (const id of Object.keys(rows)) {
+        assert.ok(Object.hasOwn(FOCUSABLE_REACH, id), `${id} is a reach pin`);
+        const owner = ENTRIES.find(({ path }) => id.startsWith(`${path}: `));
+        assert.ok(owner && owner.name !== name, `${id} sits in another published entry's own file`);
+      }
+    }
+    assert.deepEqual(nestedRowFaults(), [], 'each nested name row is a control its entry reaches');
     for (const [name, keys] of Object.entries(FORWARDED_CALLBACKS)) {
       const entry = ENTRIES.find((candidate) => candidate.name === name);
       for (const key of Object.keys(keys)) {
@@ -2270,6 +2356,89 @@ describe('a control drawn in a closure child, and a callback handed to one (issu
       assert.ok(forwardedOf(script, markup).includes(fault), fault);
     });
   }
+});
+
+describe('a published child drawn inside another entry (issue 2646)', () => {
+  const C = 'src/C.svelte';
+  const CHILD_PRESS = `${C}: button[data-press]`;
+  const drawer = {
+    name: 'E',
+    path: E,
+    root: 'fabricate',
+    props: { label: { kind: 'data', required: true }, note: { kind: 'data' } },
+  };
+  const child = {
+    name: 'C',
+    path: C,
+    root: 'fabricate',
+    props: { shown: { kind: 'data' }, name: { kind: 'data', required: true } },
+  };
+  const reader = syntheticReader({
+    [E]: "<script>import C from './C.svelte'; let { label, note } = $props();</script><C name={label} shown />",
+    [C]:
+      "<script>let { shown = false, name = '' } = $props();</script>" +
+      '{#if shown}<button type="button" data-keyboard-focus="true" data-press aria-label={name}>x</button>{/if}',
+  });
+  const [control] = controlsOf(drawer, reader);
+  const pins = { [CHILD_PRESS]: 'shown' };
+
+  it('judges a key pin in another published entry’s own file under that entry alone', () => {
+    assert.deepEqual(reachFaults(control, pins, [drawer, child]), []);
+    assert.ok(isReached(control, pins), 'the drawing entry counts the control as reached');
+  });
+
+  it('judges the same key pin under the drawing entry where its file is no entry’s own', () => {
+    assert.deepEqual(reachFaults(control, pins, [drawer]), [
+      `${CHILD_PRESS} is pinned to shown, which E does not publish`,
+    ]);
+  });
+
+  const named = (rows) => nameFaults(control, pins, [], {}, rows, [drawer, child]);
+
+  it('names a nested control by the drawing entry’s required data keys its row states', () => {
+    assert.deepEqual(named({ E: { [CHILD_PRESS]: { keys: ['label'] } } }), []);
+  });
+
+  it('names a nested control with no row, or a row naming a key not required as data, as a fault', () => {
+    assert.deepEqual(named({}), [`${CHILD_PRESS} is drawn by E and has no NESTED_NAMES row`]);
+    assert.deepEqual(named({ E: { [CHILD_PRESS]: { keys: ['note'] } } }), [
+      `${CHILD_PRESS} is named by note, which E does not require as data`,
+    ]);
+  });
+
+  it('names a nested row for a control its entry does not reach, or for no published entry', () => {
+    const unreached = 'src/ui/svelte/components/Button.svelte: svelte:element';
+    assert.deepEqual(nestedRowFaults({ Pagination: { [unreached]: { keys: ['nextLabel'] } } }), [
+      `Pagination names ${unreached}, which its drawn closure does not reach`,
+    ]);
+    assert.deepEqual(nestedRowFaults({ Nowhere: {} }), ['Nowhere is no published entry']);
+  });
+
+  const forwardedOf = (script, markup) =>
+    eventFaults(
+      { name: 'E', props: { onTurn: { kind: 'callback', required: true } } },
+      templateOf(
+        E,
+        `<script>import C from './C.svelte'; let { onTurn } = $props(); function back() { onTurn(0); } function on() { onTurn(1); } ${script}</script>${markup}`
+      ).ast,
+      { E: { onTurn: { by: ['back', 'on'], as: 'onclick' } } }
+    );
+
+  it('passes a callback key called only in the functions its list names, each handed as the child’s callback', () => {
+    assert.deepEqual(forwardedOf('', '<C onclick={back} /><C onclick={on} />'), []);
+  });
+
+  it('names a key called in an unlisted function, and a listed function handed to no child', () => {
+    assert.ok(
+      forwardedOf(
+        'function skip() { onTurn(9); }',
+        '<C onclick={back} /><C onclick={on} /><C onclick={skip} />'
+      ).includes('onTurn is called outside back, on')
+    );
+    assert.deepEqual(forwardedOf('', '<C onclick={back} />'), [
+      'on is handed to no child as onclick',
+    ]);
+  });
 });
 
 describe('the drawn closure, which fails closed (issue 2454)', () => {
