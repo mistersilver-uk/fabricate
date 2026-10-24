@@ -707,6 +707,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-simple',
     'world-tool-catalogue-page-two',
     'player-journal-stacked',
+    // The pager mounted through the published seam: a keyboard page turn and a size choice (issue 2646).
+    'manager-published-pagination-specimen',
+    'manager-published-pagination-size-specimen',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
   // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
