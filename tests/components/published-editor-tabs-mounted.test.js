@@ -389,15 +389,40 @@ describe('the keys a modifier holds on the published EditorTabs', () => {
 });
 
 describe('a selection on the published EditorTabs', () => {
+  it('draws the named tablist with no tab for an empty tabs, then the first tab as the tab stop once an update gives some', async () => {
+    const { handle, props, tablist, tabs } = mountStrip({ tabs: [], activeTab: '' });
+    await settle();
+    assert.equal(tablist().getAttribute('aria-label'), 'Reagent sections');
+    assert.equal(tabs().length, 0, 'no tab');
+    assert.equal(handle.update({ ...props, tabs: TABS }), true);
+    await settle();
+    assert.deepEqual(
+      attributeOf(tabs(), 'tabindex'),
+      ['0', '-1', '-1'],
+      'the first tab is the stop'
+    );
+    handle.destroy();
+  });
+
   it('calls onSelect once with the pressed tab’s id, and again for the tab already selected, and focuses the pressed tab', async () => {
-    const { handle, calls, tab } = mountStrip();
+    const focused = [];
+    const select = recorder();
+    const { handle, tab } = mountStrip({}, (...args) => {
+      focused.push(document.activeElement?.id);
+      select.record(...args);
+    });
     await settle();
     tab('inputs').focus();
     tab('outputs').click();
-    assert.deepEqual(calls, [['outputs']]);
+    assert.deepEqual(select.calls, [['outputs']]);
+    assert.deepEqual(focused, [`${STEM}-tab-outputs`], 'focus had moved when onSelect ran');
     assert.ok(document.activeElement === tab('outputs'), 'the pressed tab holds focus');
     tab('inputs').click();
-    assert.deepEqual(calls, [['outputs'], ['inputs']], 'the selected tab’s press is reported too');
+    assert.deepEqual(
+      select.calls,
+      [['outputs'], ['inputs']],
+      'the selected tab’s press is reported too'
+    );
     handle.destroy();
     assert.deepEqual(reports, []);
   });

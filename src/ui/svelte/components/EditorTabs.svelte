@@ -316,9 +316,8 @@
   }
 
   function activate(event, tabId) {
-    const tabButton = event.currentTarget;
+    event.currentTarget.focus();
     onSelect(tabId);
-    tabButton.focus();
   }
 
   function onKeydown(event, index) {

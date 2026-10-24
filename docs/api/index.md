@@ -3097,7 +3097,7 @@ Draw each panel outside `target`, after it in document order so `Tab` moves from
 The strip is horizontal and selects as focus moves: `ArrowRight` and `ArrowLeft` move focus to the next and the previous tab, wrapping at either end, `Home` to the first and `End` to the last, and then call `onSelect` with the `id` of the tab focus reached.
 Those four keys have their default prevented and still bubble to a `keydown` listener of yours above `target`; the strip handles no other key, so `ArrowUp` and `ArrowDown` move nothing, and `Enter` and `Space` press the focused tab as a native button does.
 A key pressed with `Alt`, `Ctrl` or `Meta` held is left to the platform, so `Alt+ArrowLeft` still goes back where the browser binds it.
-A press, by pointer, `Enter` or `Space`, calls `onSelect` and focuses its tab.
+A press, by pointer, `Enter` or `Space`, focuses its tab and then calls `onSelect`.
 Focus moves only among the strip's tabs, on a press and on those four keys, and never out of `target`.
 To return focus to the strip, focus `target.querySelector('[role="tab"][tabindex="0"]')`, the strip's one tab stop: the selected tab, or the first tab when `activeTab` names none.
 An `update` keeps every tab whose `id` it keeps, so focus stays on it; one that drops the focused tab's item, and `destroy`, remove that tab, so where it holds focus, move focus first, as [Ownership and theme](#ownership-and-theme) states.
@@ -3105,7 +3105,8 @@ The strip adds no listener of its own to the document and stops the propagation 
 Rest `data-*` is for your own hooks, and lands on the tablist, never on a tab.
 Name them for your module, as `data-<module-id>-…`; a name Fabricate writes is private.
 It needs a Fabricate window ancestor, because its row, its tabs and their ring come from Fabricate's module sheet, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
-The row wraps onto a further row when `target` is narrower than its tabs, and a selected tab on an upper row then draws its underline above the row below.
+The row wraps onto a further row when `target` is narrower than its tabs.
+An empty `tabs` draws the named tablist with no tab, so pass at least one item where the strip must be reachable.
 Your own window or dialog carries no Fabricate root, so the strip is refused there with `EditorTabs needs a Fabricate window ancestor`.
 The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side; leave that much inside any edge of your own that clips.
 The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so mount the strip on one of those four grounds.
