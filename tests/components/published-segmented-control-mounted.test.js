@@ -4,7 +4,7 @@
  * radiogroup and its native radios, each named by its option's `label` and sharing one name unique
  * to the mount, a press and a key with the one `value` its `onChange` takes, a declined change put
  * back and an accepted one drawn, numeric values, what an enclosing form reads, the disabled option,
- * the clipped radio, every refusal the entry adds, and an empty `options`.
+ * the clipped radio, every refusal the entry adds, an empty `options`, and the View Lab specimen.
  * Limit: happy-dom runs no radio arrow navigation, so the key clause asserts the keys pass the
  * control unhandled and simulates the platform's check; the View Lab case presses the real key.
  */
@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { fixtureLiteral } from '../helpers/labFixtureLiterals.js';
 import { recorder } from '../helpers/publishedComponentFakes.js';
 import {
   CALLBACK_REPORT,
@@ -483,5 +485,82 @@ describe('what the published SegmentedControl refuses', () => {
       { name: 'TypeError', message: `${REFUSAL}SegmentedControl needs a Fabricate window ancestor` }
     );
     assert.equal(shell.childNodes.length, 0);
+  });
+});
+
+describe('the segmented View Lab specimen case against the DOM the fixture draws', () => {
+  const FIXTURE = 'tests/view-lab/fixtures/PublishedSegmented.svelte';
+  const viewCase = getCaseById('manager-published-segmented-specimen');
+  const count = (selector) => document.querySelectorAll(selector).length;
+
+  /**
+   * The fixture's filter ground: its control mounted into the target, and the echo its `onChange`
+   * writes; `update` false is a companion whose `onChange` passes no `value` back.
+   */
+  function drawFixture({ update = true } = {}) {
+    const { filter } = fixtureLiteral(FIXTURE, 'CONTROLS');
+    const ground = document.createElement('div');
+    ground.setAttribute('data-lab-segmented-ground', 'filter');
+    const slot = document.createElement('div');
+    slot.setAttribute('data-lab-segmented', 'filter');
+    ground.append(slot);
+    fabricateTarget(targets).append(ground);
+    let value = filter.value;
+    const props = () => ({
+      ...filter,
+      value,
+      onChange: (next) => {
+        if (update) {
+          value = next;
+          handle.update(props());
+        }
+        ground.setAttribute('data-lab-segmented-chosen', next);
+      },
+    });
+    const handle = ui().mount('SegmentedControl', { target: slot, props: props() });
+    const owned = () => slot.querySelector('input[value="owned"]');
+    return { handle, owned };
+  }
+
+  /** Presses the case's one step on the one element it names, then does what the platform does. */
+  function runStep(owned) {
+    const [step] = viewCase.steps;
+    assert.equal(count(step.selector), 1, 'the step names one radio');
+    const node = document.querySelector(step.selector);
+    node.focus();
+    const key = new KeyboardEvent('keydown', { key: step.press, bubbles: true, cancelable: true });
+    node.dispatchEvent(key);
+    assert.equal(key.defaultPrevented, false, 'the key is the platform’s');
+    reach(owned());
+  }
+
+  it('waits on exactly one element, the reached segment, once the step and the update have run', async () => {
+    const { handle, owned } = drawFixture();
+    await settle();
+    assert.equal(count(viewCase.expectSelector), 0, 'not before the step');
+    runStep(owned);
+    await settle();
+    assert.equal(count(viewCase.expectSelector), 1, 'one element after it');
+    assert.ok(
+      document.querySelector(viewCase.expectSelector) === owned().closest('label'),
+      'the Owned segment'
+    );
+    for (const selector of [
+      viewCase.expectCenterHit,
+      ...viewCase.expectLayout.controls.map((control) => control.selector),
+    ]) {
+      assert.equal(count(selector), 1, `${selector} names one element`);
+    }
+    handle.destroy();
+  });
+
+  it('waits on nothing when the companion’s onChange passes no update', async () => {
+    const { handle, owned } = drawFixture({ update: false });
+    await settle();
+    runStep(owned);
+    await settle();
+    assert.ok(document.activeElement === owned(), 'focus moved to Owned');
+    assert.equal(count(viewCase.expectSelector), 0, 'its choice was never drawn');
+    handle.destroy();
   });
 });

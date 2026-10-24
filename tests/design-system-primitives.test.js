@@ -623,6 +623,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the specimen that mounts the group through the published seam, keyboard-chosen',
     ],
     [
+      'src/ui/svelte/components/SegmentedControl.svelte',
+      'manager-published-segmented-specimen',
+      'the specimen that mounts the control through the published seam, keyboard-chosen',
+    ],
+    [
       'src/ui/svelte/components/Callout.svelte',
       'manager-essence-edit-unscoped-on-craft',
       'the one frame that draws the `items` form, the essence On craft primer',
@@ -966,6 +971,16 @@ test('(a) a RadioCardGroup change publishes its six frames, then the specimen th
     'manager-checks-crafting-modifiers',
     'fabricate-journal-lifecycle-ingredient-route',
     'manager-published-option-cards-specimen',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
+test('(a) a SegmentedControl change publishes its two frames, then the specimen that mounts it through the seam', () => {
+  const file = 'src/ui/svelte/components/SegmentedControl.svelte';
+  const frames = [
+    'manager-recipe-edit-results-rolled',
+    'player-journal-stacked',
+    'manager-published-segmented-specimen',
   ];
   assertBroadSignalFrames(file, frames);
 });

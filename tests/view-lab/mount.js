@@ -792,6 +792,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-tabs': () => import('./fixtures/PublishedTabs.svelte'),
   // Issue 2601: a breakage choice of three cards whose choice the companion's own update draws.
   'published-option-cards': () => import('./fixtures/PublishedOptionCards.svelte'),
+  // Issue 2644: an ingredient filter and a page size whose choice the companion's own update draws.
+  'published-segmented': () => import('./fixtures/PublishedSegmented.svelte'),
 });
 // view-lab-region:end
 

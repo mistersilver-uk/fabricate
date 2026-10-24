@@ -722,6 +722,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
+    // The control mounted through the published seam, keyboard-chosen (issue 2644).
+    'manager-published-segmented-specimen',
   ]),
   // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
   'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([

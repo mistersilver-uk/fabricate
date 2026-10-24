@@ -374,6 +374,16 @@ const optionRadio = (value) => `${optionCard(value)} input[type="radio"]`;
 /** Sized to the fixture's 420px ground and its two rows of cards. */
 const CARDS_WINDOW = Object.freeze({ width: 540, height: 300 });
 
+/** The segmented fixture's filter ground and target, and a filter segment and its radio, by value. */
+const SEGMENTED_GROUND = '[data-lab-segmented-ground="filter"]';
+const SEGMENTED_TARGET = `${SEGMENTED_GROUND} > [data-lab-segmented="filter"]`;
+const filterRadio = (value) => `[data-lab-segmented="filter"] input[value="${value}"]`;
+const filterSegment = (value) =>
+  `[data-lab-segmented="filter"] label.manager-segment:has(> input[value="${value}"])`;
+
+/** Sized to the fixture's two 360px grounds, one above the other. */
+const SEGMENTED_WINDOW = Object.freeze({ width: 480, height: 240 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1179,6 +1189,39 @@ export const CASES = Object.freeze([
     position: CARDS_WINDOW,
     kinds: ['manager', 'specimen'],
     // `RadioCardGroup.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-segmented-specimen',
+    label:
+      'Specimen, mounted through the published seam — two segmented controls, each on its own 360px column of the --fab-bg-1 ground: an ingredient filter of All, Owned with a check glyph and Missing with a cross glyph at the default density, and a page size of 10, 25, 50 and 100 at the inline density sharing its whole width, 25 selected and 100 dimmed as disabled, after one step: ArrowRight pressed on the checked All radio, which the platform moved to the next enabled radio, Owned, and checked, so Fabricate called onChange, whose update drew Owned selected. So the Owned segment is the raised selected tile in the primary ink at weight 600 and carries the accent keyboard ring, 2px wide with 2px of ground between ring and segment, and All is drawn at rest',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told of each choice.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-segmented' },
+    steps: [{ selector: filterRadio('all'), press: 'ArrowRight' }],
+    // The reached segment selected by the companion's own update, its radio checked and
+    // keyboard-focused, under the fixture's echo of the value, which only `onChange` writes.
+    expectSelector:
+      '[data-lab-segmented-chosen="owned"] [data-lab-segmented="filter"] label.is-active:has(> input[value="owned"]:checked:focus-visible)',
+    expectCenterHit: filterSegment('owned'),
+    expectContained: [
+      { container: SEGMENTED_GROUND, target: SEGMENTED_TARGET },
+      { container: '.window-content', target: SEGMENTED_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The reached segment's ring, ink and weight, each a value its scoped rules declare.
+        {
+          selector: filterSegment('owned'),
+          styles:
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-text); font-weight: 600',
+        },
+      ],
+    },
+    position: SEGMENTED_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `SegmentedControl.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);
