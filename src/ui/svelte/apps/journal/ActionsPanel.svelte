@@ -170,4 +170,12 @@
     flex: 1 1 auto;
     min-width: 0;
   }
+
+  /* The block grows to share the header row with the identity block, so it starts mid-row. The
+     bar's controls are packed from the start of a flex line, which left Pause, Roll check and the
+     cancel icon hugging the title with the free space to their right. The decisions already sit
+     on the edge through their own `margin-left: auto`; the plain control line takes the same edge. */
+  .journal-actions :global(.fab-run-action-bar) {
+    justify-content: flex-end;
+  }
 </style>
