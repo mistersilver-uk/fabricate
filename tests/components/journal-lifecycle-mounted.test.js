@@ -998,7 +998,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     );
   });
 
-  it('right-aligns the plain control line of an in-progress run on the card edge', async () => {
+  it('right-aligns the plain control line of a run on the card edge', async () => {
     const { target } = await mountState('ready-single');
     const layout = await measureDetailLayout(target);
     assert.ok(Number.isFinite(layout.controlsRight), 'the control line renders');
