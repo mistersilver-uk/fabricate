@@ -2,10 +2,10 @@
   A View Lab specimen, not a Fabricate surface (issue 2601). It mounts one `EditorTabs` through
   the page-session seam `game.fabricate.api.ui` binds, as a companion does: three tabs of a reagent
   sheet, two with a glyph, under `activePanelOnly`, and the one panel the companion draws beneath
-  the strip, named by the tab that shows it and a tab stop, since it holds no control. Its `onSelect` passes the reached tab back as
-  `activeTab` in its own `update`, before any `await`, and shows that tab's panel. Every word is a
-  companion's final text, so none is localized. `tests/view-lab/mount.js` mounts it for
-  `?specimen=published-tabs` only.
+  the strip, labelled by the tab that shows it and a tab stop because it holds no control. Its
+  `onSelect` passes the reached tab back as `activeTab` in its own `update`, before any `await`,
+  and shows that tab's panel. Every word is a companion's final text, so none is localized.
+  `tests/view-lab/mount.js` mounts it for `?specimen=published-tabs` only.
 
   The ground is one 360px column on `--fab-bg-1`; the strip's target is a plain block. A case
   addresses the ground by `data-lab-tabs`, the strip's target by `data-lab-tabs-target` and the

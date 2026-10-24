@@ -1490,9 +1490,9 @@ A tab entry MAY override its accessible name, and an overriding name MUST contai
 A tab entry MAY carry a description that the strip renders as a `role="tooltip"` element beside the tablist rather than inside it — a tablist owns only tabs — referenced by the tab's `aria-describedby`.
 The strip reads an entry's name override, description and `tierGated` only when its caller passes `annotated`; without it each tab is drawn from its id, glyph and label alone.
 A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
-The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
+The strip shows the hovered tab's description, else the focused tab's when no tab is hovered, and a hovered tab that carries none shows none; Escape hides it until that tab is next hovered or focused, without moving focus or selection.
 A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.
-Only a tab that carries a description shows one, and the strip listens for that Escape on its document only while a description shows, so with the pointer over a tab that carries none the strip stops no Escape.
+Only a tab that carries a description shows one, and the strip listens for that Escape only while a description shows, on the document that holds the strip when it binds, so with the pointer over a tab that carries none the strip stops no Escape.
 A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
