@@ -160,6 +160,7 @@
   let systemResolutionModeValue = $state('simple');
   let systemSalvageResolutionModeValue = $state('simple');
   let visibilityModeValue = $state('knowledge');
+  let visibilityRequest = 0;
 
   $effect(() => {
     systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
@@ -182,13 +183,16 @@
     }
   }
 
-  // Drawn chosen while the save is in flight, then whatever the saved system says.
+  // Drawn chosen while the latest save is in flight, then whatever the saved system says.
   async function handleVisibilityModeChange(mode) {
+    const request = ++visibilityRequest;
     visibilityModeValue = mode;
     try {
       await onSetVisibilityMode(mode);
     } finally {
-      visibilityModeValue = selectedSystem?.visibilityMode ?? 'knowledge';
+      if (request === visibilityRequest) {
+        visibilityModeValue = selectedSystem?.visibilityMode ?? 'knowledge';
+      }
     }
   }
 

@@ -24,6 +24,7 @@
   import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import { localizeOptions } from '../../../util/localizeOr.js';
+  import { latestRequestHold } from '../../../util/latestRequestHold.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import {
@@ -221,6 +222,7 @@
   // what makes a world carrying the legacy `byRecipe` select `bySubject`.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
   let heldPolicy = $state('');
+  const holdPolicy = latestRequestHold((held) => (heldPolicy = held));
   // Whether the rule defers the selection, and so whether the cap means anything, asked of
   // the resolver rather than a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
@@ -261,10 +263,8 @@
 
   // The three SELECTION writes, the whole of what this card persists; none can touch the
   // library, the store's check-modifier saver accepting no library key at all.
-  function selectPolicy(policy) {
-    heldPolicy = policy;
-    Promise.resolve(onChange({ defaultModifierPolicy: policy })).finally(() => (heldPolicy = ''));
-  }
+  const selectPolicy = (policy) =>
+    holdPolicy(policy, () => onChange({ defaultModifierPolicy: policy }));
 
   const selectMaxPicks = (next) => onChange({ maxModifierPicks: next });
 

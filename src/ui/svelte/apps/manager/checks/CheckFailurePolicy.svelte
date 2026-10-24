@@ -15,6 +15,7 @@
   import Callout from '../../../components/Callout.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
+  import { latestRequestHold } from '../../../util/latestRequestHold.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
@@ -33,11 +34,9 @@
   } = $props();
 
   let pendingValue = $state('');
-  // Drawn chosen while the save is in flight, then whatever the saved system says.
-  function choose(next) {
-    pendingValue = next;
-    Promise.resolve(onChange(next)).finally(() => (pendingValue = ''));
-  }
+  // Drawn chosen while the latest save is in flight, then whatever the saved system says.
+  const holdValue = latestRequestHold((held) => (pendingValue = held));
+  const choose = (next) => holdValue(next, () => onChange(next));
 
   function text(key, fallback) {
     const translated = localize(key);
