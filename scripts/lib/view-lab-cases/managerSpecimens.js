@@ -1105,7 +1105,7 @@ export const CASES = Object.freeze([
         {
           selector: `${OUTPUTS_TAB}:focus-visible`,
           styles:
-            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-accent); border-bottom-color: var(--fab-accent); border-bottom-width: 2px; font-weight: 600',
+            'outline-style: solid; outline-width: 2px; outline-offset: 2px; outline-color: var(--fab-accent); color: var(--fab-accent); border-bottom-color: var(--fab-accent); font-weight: 600',
         },
         {
           selector: INPUTS_TAB,
