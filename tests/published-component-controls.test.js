@@ -37,6 +37,9 @@
  * through an item it cannot follow by its `OWN_NAMES` pin, which the mounted suite holds; one in
  * another published entry's own file is judged by its `NESTED_NAMES` row, and its key pin under
  * that entry alone (issue 2646).
+ * Limit: a closure control two entries reach may take a `{ byEntry }` row, which `pinsFor` resolves
+ * for each, and a `class:` directive or `style` attribute the drawn closure holds falsy draws
+ * nothing (issue 2647).
  * Limit: whether a control draws text of its own follows the snippets its file defines, counts a
  * child component as text, and holds off only an `{#if}` on an unpublished prop at a falsy default.
  */
@@ -50,7 +53,7 @@ import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManife
 import { PROBE_ENTRY } from './fixtures/published-components/probeEntry.js';
 import { templateOf } from './helpers/apiConvention.js';
 import { literalStrings, walkNodes, walkWithAncestors } from './helpers/moduleAst.js';
-import { drawnClosure, drawsNode } from './helpers/publishedClosureDrawn.js';
+import { drawnClosure, drawsNode, heldFalsy } from './helpers/publishedClosureDrawn.js';
 import {
   DYNAMIC_ELEMENTS,
   SHIPPED,
@@ -83,13 +86,40 @@ import { styleRules } from './helpers/svelteStructureContract.js';
 const ENTRIES = Object.freeze([...PUBLISHED_COMPONENT_MANIFEST, PROBE_ENTRY]);
 
 /**
+ * One entry's flat view of a `FOCUSABLE_REACH` or `CLOSURE_NAMES` table: a `{ byEntry }` row gives
+ * that entry's pin, which gains `entry` when it is an object, or nothing.
+ */
+function pinsFor(entry, table) {
+  const view = {};
+  for (const [id, pin] of Object.entries(table)) {
+    if (!pin?.byEntry) view[id] = pin;
+    else if (Object.hasOwn(pin.byEntry, entry.name)) {
+      const own = pin.byEntry[entry.name];
+      view[id] = own && typeof own === 'object' ? { ...own, entry: entry.name } : own;
+    }
+  }
+  return view;
+}
+
+/** Every pin a table holds, a `{ byEntry }` row's each, with the entry a by-entry pin is for. */
+const flatPins = (table) =>
+  Object.entries(table).flatMap(([id, pin]) =>
+    pin?.byEntry
+      ? Object.entries(pin.byEntry).map(([entry, own]) => ({ id, pin: own, entry }))
+      : [{ id, pin, entry: pin?.entry }]
+  );
+
+/**
  * Each focusable element the shipped closures draw, by file and static hook: the published key
  * whose guard draws it, `'always'` for one no guard hides, `{ defaults, heldBy }` for one drawn
  * while each prop of `defaults`, which the entry does not publish, keeps its default, `heldBy`
- * naming the mounted clause that holds it, or `null` for one no published key reaches.
+ * naming the mounted clause that holds it, or `null` for one no published key reaches; a file two
+ * entries reach may take a `{ byEntry }` row of each one's pin, resolved by `pinsFor` (issue 2647).
  */
 const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
+  // The picker's own trigger, its `trigger` snippet, which no guard hides.
+  'src/ui/svelte/components/IconPicker.svelte: button': 'always',
   // Under `removeControl`, a derived of three props the entry does not publish.
   'src/ui/svelte/components/Chip.svelte: button[data-chip-remove]': null,
   // One tab button for each item of `tabs`.
@@ -99,19 +129,42 @@ const FOCUSABLE_REACH = Object.freeze({
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // One radio for each item of `options`.
   'src/ui/svelte/components/RadioCardGroup.svelte: input': 'options',
-  // The picker's own trigger, past every trigger form `Select` does not pass.
+  // The picker's own trigger, past every trigger form `Select` does not pass; `IconPicker` passes
+  // its own `trigger` snippet.
   'src/ui/svelte/components/SearchablePopover.svelte: button': {
-    defaults: ['anchor', 'inlineSearchTrigger', 'open', 'trigger', 'triggerButton', 'triggerChip'],
-    heldBy:
-      'tests/components/published-select-mounted.test.js: the published Select draws its trigger alone',
+    byEntry: {
+      Select: {
+        defaults: [
+          'anchor',
+          'inlineSearchTrigger',
+          'open',
+          'trigger',
+          'triggerButton',
+          'triggerChip',
+        ],
+        heldBy:
+          'tests/components/published-select-mounted.test.js: the published Select draws its trigger alone',
+      },
+      IconPicker: null,
+    },
   },
   // The inline query and its close control, under `inlineSearchTrigger`, which `Select` does not pass.
   'src/ui/svelte/components/SearchablePopover.svelte: button[data-picker-inline-close]': null,
   'src/ui/svelte/components/SearchablePopover.svelte: input': null,
-  // The panel and its rows, which its own file draws unguarded; the query field, under `showSearch`.
+  // The panel and its rows, which its own file draws unguarded; the query field, under `showSearch`,
+  // which `Select` turns off and `IconPicker` keeps at its default.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: div': 'always',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: button': 'always',
-  'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': null,
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': {
+    byEntry: {
+      Select: null,
+      IconPicker: {
+        defaults: ['inlineSearchTrigger', 'showSearch'],
+        heldBy:
+          'tests/components/published-icon-picker-mounted.test.js: the published IconPicker opens its list',
+      },
+    },
+  },
   // In the `control` snippet, which both branches of `{#if label}` render.
   'src/ui/svelte/components/SearchField.svelte: input': 'always',
   // One radio for each item of `options`.
@@ -140,8 +193,9 @@ const FOCUSABLE_REACH = Object.freeze({
 
 /**
  * The reached controls of a closure file other than the entry's own, by id: the published keys
- * whose text names it, which the gate does not follow across files, and the mounted clause that
- * reads its accessible name.
+ * whose text names it, which the gate does not follow across files, or the group sentence that
+ * states its `vocabulary`, and the mounted clause that reads its accessible name; a control two
+ * entries reach takes a `{ byEntry }` row (issue 2647).
  */
 const CLOSURE_NAMES = Object.freeze({
   'src/ui/svelte/components/SearchablePopover.svelte: button': {
@@ -150,15 +204,39 @@ const CLOSURE_NAMES = Object.freeze({
     heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
   },
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: div': {
-    entry: 'Select',
-    keys: ['ariaLabel'],
-    heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+    byEntry: {
+      Select: {
+        keys: ['ariaLabel'],
+        heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+      },
+      IconPicker: {
+        keys: ['listLabel'],
+        heldBy:
+          'tests/components/published-icon-picker-mounted.test.js: the published IconPicker names',
+      },
+    },
   },
-  // Each row's `label` member, which the entry's group states is required.
+  // `Select`'s, each row's `label` member, which the entry's group states is required;
+  // `IconPicker`'s, each glyph's vocabulary label, which its group states.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte: button': {
-    entry: 'Select',
-    keys: ['options'],
-    heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+    byEntry: {
+      Select: {
+        keys: ['options'],
+        heldBy: 'tests/components/published-select-mounted.test.js: the published Select names',
+      },
+      IconPicker: {
+        vocabulary:
+          "Each row is named by its glyph's `label`, as `game.fabricate.listCuratedIcons()` answers it on the same client, which is English and is not localized.",
+        heldBy:
+          'tests/components/published-icon-picker-mounted.test.js: the published IconPicker names',
+      },
+    },
+  },
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte: input': {
+    entry: 'IconPicker',
+    keys: ['searchLabel'],
+    heldBy:
+      'tests/components/published-icon-picker-mounted.test.js: the published IconPicker names',
   },
 });
 
@@ -167,6 +245,13 @@ const CLOSURE_NAMES = Object.freeze({
  * published keys whose items' text names it, and the mounted clause that reads its accessible name.
  */
 const OWN_NAMES = Object.freeze({
+  // `ariaLabel`, through the `$derived` that falls back to Fabricate's own copy.
+  'src/ui/svelte/components/IconPicker.svelte: button': {
+    entry: 'IconPicker',
+    keys: ['ariaLabel'],
+    heldBy:
+      'tests/components/published-icon-picker-mounted.test.js: the published IconPicker names',
+  },
   // Each tab's `label`, which the entry's group states is required; its `aria-label` is written
   // only under props the entry does not publish.
   'src/ui/svelte/components/EditorTabs.svelte: button': {
@@ -226,6 +311,14 @@ const FORWARDED_CALLBACKS = Object.freeze({
       by: 'choose',
       as: 'onSelect',
       heldBy: 'tests/components/published-select-mounted.test.js: a choice in the published Select',
+    },
+  },
+  IconPicker: {
+    onChange: {
+      by: 'selectIcon',
+      as: 'onSelect',
+      heldBy:
+        'tests/components/published-icon-picker-mounted.test.js: a choice in the published IconPicker',
     },
   },
   Pagination: {
@@ -778,16 +871,17 @@ function nameFaults(
   control,
   pins,
   optional = OPTIONAL_NAME_PINS,
-  names = { ...CLOSURE_NAMES, ...OWN_NAMES },
+  names = undefined,
   nested = NESTED_NAMES,
   entries = ENTRIES
 ) {
   const { id, node, entry } = control;
+  const named = names ?? { ...pinsFor(entry, CLOSURE_NAMES), ...OWN_NAMES };
   const row = nested[entry.name]?.[id];
   if (row) return closureNameFaults(control, { ...row, entry: entry.name });
   if (isNested(control, entries))
     return [`${id} is drawn by ${entry.name} and has no NESTED_NAMES row`];
-  if (Object.hasOwn(names, id)) return closureNameFaults(control, names[id]);
+  if (Object.hasOwn(named, id)) return closureNameFaults(control, named[id]);
   const parts = nameParts(node);
   if (parts.length === 0) return [`${id} has no name`];
   const strict = isAlwaysDrawn(control, pins) && !optional.includes(id);
@@ -804,7 +898,8 @@ function nestedRowFaults(nested = NESTED_NAMES, pins = FOCUSABLE_REACH, reader =
   return Object.entries(nested).flatMap(([name, rows]) => {
     const entry = ENTRIES.find((candidate) => candidate.name === name);
     if (!entry) return [`${name} is no published entry`];
-    const controls = controlsOf(entry, reader).filter((control) => isReached(control, pins));
+    const reach = pinsFor(entry, pins);
+    const controls = controlsOf(entry, reader).filter((control) => isReached(control, reach));
     const reached = new Set(controls.map(({ id }) => id));
     return Object.keys(rows)
       .filter((id) => !reached.has(id))
@@ -812,9 +907,83 @@ function nestedRowFaults(nested = NESTED_NAMES, pins = FOCUSABLE_REACH, reader =
   });
 }
 
-/** What a closure name pin breaks: another entry, or a key its entry does not publish as required data. */
-function closureNameFaults({ id, entry }, pin) {
+/**
+ * What the `{ byEntry }` rows break (issue 2647): a key that is no published entry, a row on a
+ * published entry's own path, which gate (b) judges through that entry, a reach row that does not
+ * name exactly the entries whose drawn closure lists its id, and a name row that does not name
+ * exactly those of them whose resolved reach pin reaches it.
+ */
+function byEntryRowFaults(
+  reach = FOCUSABLE_REACH,
+  names = CLOSURE_NAMES,
+  entries = ENTRIES,
+  reader = SHIPPED
+) {
+  const drawing = (id) =>
+    entries.filter((entry) => controlsOf(entry, reader).some((control) => control.id === id));
+  const reaching = (id) => drawing(id).filter((entry) => isReached({ id }, pinsFor(entry, reach)));
+  const rowFaults = (table, label, expected) =>
+    Object.entries(table).flatMap(([id, pin]) => {
+      if (!pin?.byEntry) return [];
+      const keys = Object.keys(pin.byEntry).sort(byName);
+      const named = expected(id)
+        .map(({ name }) => name)
+        .sort(byName);
+      return [
+        ...keys
+          .filter((key) => entries.every(({ name }) => name !== key))
+          .map((key) => `${label} ${id} names ${key}, which is no published entry`),
+        ...(entries.some(({ path }) => id.startsWith(`${path}: `))
+          ? [`${label} ${id} is a by-entry row on a published entry's own file`]
+          : []),
+        ...(keys.join(',') === named.join(',')
+          ? []
+          : [`${label} ${id} names [${keys}], and [${named}] reach it`]),
+      ];
+    });
+  return [...rowFaults(reach, 'reach', drawing), ...rowFaults(names, 'name', reaching)];
+}
+
+const EXTENSION_SPEC = 'openspec/specs/ui-extension-points/spec.md';
+let extensionSpecLines;
+/** The `ui-extension-points` spec's lines, read once. */
+const specLines = () =>
+  (extensionSpecLines ??= readFileSync(resolve(repoRoot, EXTENSION_SPEC), 'utf8').split('\n'));
+
+/** A group's opening line, `- **\`Name\`.**`, or its `- **Private:**` line, each closing the group above. */
+const GROUP_LINE = /^- \*\*(?:`([^`]+)`\.|Private:)\*\*/u;
+
+/** The lines of `entry`'s group in the spec, past its opening line to the next group, Private line or heading. */
+function groupLines(entry, lines) {
+  const start = lines.findIndex((line) => GROUP_LINE.exec(line)?.[1] === entry);
+  if (start === -1) return [];
+  const end = lines.findIndex(
+    (line, at) => at > start && (GROUP_LINE.test(line) || line.startsWith('#'))
+  );
+  return lines.slice(start + 1, end === -1 ? lines.length : end);
+}
+
+/** Whether `sentence` is one whole line of `entry`'s group, its list marker aside. */
+const groupStates = (entry, sentence, lines) =>
+  groupLines(entry, lines).some((line) => line.trim().replace(/^- /u, '') === sentence);
+
+/**
+ * What a closure name pin breaks: another entry, or a key its entry does not publish as required
+ * data; a vocabulary pin, a sentence its entry's group does not state as a whole line, or no
+ * `heldBy`.
+ */
+function closureNameFaults({ id, entry }, pin, lines = specLines()) {
   if (pin.entry !== entry.name) return [`${id} is named for ${pin.entry}, not ${entry.name}`];
+  if (Object.hasOwn(pin, 'vocabulary')) {
+    return [
+      ...(groupStates(entry.name, pin.vocabulary, lines)
+        ? []
+        : [`${id} is named by a vocabulary ${entry.name}'s group does not state`]),
+      ...(pin.heldBy
+        ? []
+        : [`${id} is named by a vocabulary and names no mounted clause in heldBy`]),
+    ];
+  }
   return pin.keys
     .filter((key) => entry.props[key]?.kind !== 'data' || entry.props[key].required !== true)
     .map((key) => `${id} is named by ${key}, which ${entry.name} does not require as data`);
@@ -952,11 +1121,14 @@ function scopedRingFaults(file, css, pinned = [], moduleRule = moduleRing()) {
   return { exempt, faults };
 }
 
-/** Every class one element's `class` attribute or `class:` directive spells, its expression's literals included. */
-function elementClasses(node) {
+/**
+ * Every class one element's `class` attribute or `class:` directive spells, its expression's
+ * literals included, but a directive `omits` answers true for.
+ */
+function elementClasses(node, omits = () => false) {
   const tokens = [];
   for (const attribute of node.attributes) {
-    if (attribute.type === 'ClassDirective') tokens.push(attribute.name);
+    if (attribute.type === 'ClassDirective' && !omits(attribute)) tokens.push(attribute.name);
     if (attribute.type !== 'Attribute' || attribute.name !== 'class') continue;
     for (const part of [attribute.value].flat()) {
       const texts = part.type === 'Text' ? [part.data] : literalStrings(part);
@@ -968,8 +1140,8 @@ function elementClasses(node) {
 
 /**
  * The classes one drawn closure file spells on elements only where no published key reaches them:
- * an element its drawn closure leaves undrawn, or a control the reach pins call unreached and what
- * it holds, and never in its script (issue 2454).
+ * an element its drawn closure leaves undrawn, a control the reach pins call unreached and what it
+ * holds, or a `class:` directive the drawn closure holds falsy, and never in its script (issue 2454).
  */
 function unreachedClasses(file, ast, drawn, controls, pins) {
   const unreached = new Set(
@@ -982,11 +1154,31 @@ function unreachedClasses(file, ast, drawn, controls, pins) {
     if (node.type !== 'RegularElement' && node.type !== 'SvelteElement') return;
     const hidden =
       !drawsNode(drawn, file, node) || [node, ...ancestors].some((above) => unreached.has(above));
-    for (const name of elementClasses(node)) off.set(name, (off.get(name) ?? true) && hidden);
+    const omits = (directive) => heldFalsy(drawn, file, directive.expression);
+    for (const name of elementClasses(node, omits)) {
+      off.set(name, (off.get(name) ?? true) && hidden);
+    }
+    const held = node.attributes.filter(
+      (attribute) => attribute.type === 'ClassDirective' && omits(attribute)
+    );
+    for (const { name } of held) if (!off.has(name)) off.set(name, true);
   });
   const scripted = new Set(literalStrings(ast.instance).flatMap((text) => text.split(/\s+/)));
   return new Set(
     [...off].filter(([name, hidden]) => hidden && !scripted.has(name)).map(([name]) => name)
+  );
+}
+
+/** Whether an attribute states an inline style: a `style:` directive, or a `style` the drawn closure does not hold falsy. */
+function statesStyle(attribute, drawn, file) {
+  if (attribute.type === 'StyleDirective') return true;
+  if (attribute.name !== 'style') return false;
+  const parts = [attribute.value].flat();
+  const [only] = parts;
+  return !(
+    parts.length === 1 &&
+    only.type === 'ExpressionTag' &&
+    heldFalsy(drawn, file, only.expression)
   );
 }
 
@@ -1011,7 +1203,7 @@ const onlyOn = (rule, classes) =>
  * What a closure whose reached control takes a window's ring breaks: no file of its closure holds
  * a selector that carries a focus pseudo-class anywhere, in or out of an at-rule, scoped or
  * `:global`, none declares `all` or a property whose name starts `outline`, and no reached control
- * states a `style` attribute or a `style:` directive. A rule `rings` pins for its file is exempt as
+ * states a `style:` directive or a `style` attribute the drawn closure does not hold falsy. A rule `rings` pins for its file is exempt as
  * `scopedRingFaults` judges it, so is one whose every selector names a class `unreachedClasses`
  * answers, and so is every rule holding no `:global` in a file the drawn closure does not reach.
  * Vacuous for a closure that draws no reached control, and at `any` but for a pin, which that
@@ -1027,8 +1219,8 @@ function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
       .map((file) => `${file} pins a scoped ring under an entry whose root is any`);
   }
   if (reached.length === 0) return [];
-  const styled = reached.filter(({ node }) =>
-    node.attributes.some(({ type, name }) => type === 'StyleDirective' || name === 'style')
+  const styled = reached.filter(({ node, file }) =>
+    node.attributes.some((attribute) => statesStyle(attribute, drawn, file))
   );
   const inline = styled.map(({ id }) => `${id} ${INLINE_STYLE}`);
   const ruled = components.flatMap((file) => {
@@ -1059,19 +1251,25 @@ function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
   return [...inline, ...ruled];
 }
 
-/** Every fault of every control an entry draws, against `pins`, then of its closure's focus rules. */
+/**
+ * Every fault of every control an entry draws, against its view of the reach `table` and of
+ * `closureNames`, then of its closure's focus rules.
+ */
 function controlFaults(
   entry,
-  pins,
+  table,
   reader = SHIPPED,
   dynamic = DYNAMIC_ELEMENTS,
-  rings = SCOPED_RINGS
+  rings = SCOPED_RINGS,
+  closureNames = CLOSURE_NAMES
 ) {
+  const pins = pinsFor(entry, table);
+  const names = { ...pinsFor(entry, closureNames), ...OWN_NAMES };
   const controls = controlsOf(entry, reader, dynamic);
   const faults = controls.flatMap((control) => [
     ...reachFaults(control, pins),
     ...(isReached(control, pins)
-      ? [...focusMarkFaults(control), ...nameFaults(control, pins)]
+      ? [...focusMarkFaults(control), ...nameFaults(control, pins, OPTIONAL_NAME_PINS, names)]
       : []),
   ]);
   return [
@@ -1122,7 +1320,7 @@ describe('each published entry that draws a control', () => {
   }
 
   it('names a describe block of its mounted suite in each defaults pin', () => {
-    const held = Object.values(FOCUSABLE_REACH).flatMap((pin) =>
+    const held = flatPins(FOCUSABLE_REACH).flatMap(({ pin }) =>
       pin?.defaults ? [pin.heldBy] : []
     );
     assert.ok(held.length > 0, 'the switch is pinned to the default of as');
@@ -1131,7 +1329,7 @@ describe('each published entry that draws a control', () => {
 
   it('names a describe block of its mounted suite in each name, nested name, forwarded callback and entry event pin', () => {
     const held = [
-      ...Object.values({ ...CLOSURE_NAMES, ...OWN_NAMES }).map(({ heldBy }) => heldBy),
+      ...[...flatPins(CLOSURE_NAMES), ...flatPins(OWN_NAMES)].map(({ pin }) => pin.heldBy),
       ...Object.values(NESTED_NAMES).flatMap((rows) =>
         Object.values(rows).map(({ heldBy }) => heldBy)
       ),
@@ -1151,7 +1349,7 @@ describe('each published entry that draws a control', () => {
       [CLOSURE_NAMES, false],
       [OWN_NAMES, true],
     ]) {
-      for (const [id, { entry }] of Object.entries(table)) {
+      for (const { id, entry } of flatPins(table)) {
         assert.ok(Object.hasOwn(FOCUSABLE_REACH, id), `${id} is a reach pin`);
         const published = ENTRIES.find(({ name }) => name === entry);
         assert.ok(published, `${id} names the published ${entry}`);
@@ -1172,6 +1370,7 @@ describe('each published entry that draws a control', () => {
       }
     }
     assert.deepEqual(nestedRowFaults(), [], 'each nested name row is a control its entry reaches');
+    assert.deepEqual(byEntryRowFaults(), [], 'each by-entry row names exactly its entries');
     for (const [name, keys] of Object.entries(FORWARDED_CALLBACKS)) {
       const entry = ENTRIES.find((candidate) => candidate.name === name);
       for (const key of Object.keys(keys)) {
@@ -2412,6 +2611,12 @@ describe('a published child drawn inside another entry (issue 2646)', () => {
       `Pagination names ${unreached}, which its drawn closure does not reach`,
     ]);
     assert.deepEqual(nestedRowFaults({ Nowhere: {} }), ['Nowhere is no published entry']);
+    const press = 'src/ui/svelte/components/IconButton.svelte: button';
+    const elsewhere = { ...FOCUSABLE_REACH, [press]: { byEntry: { Select: 'always' } } };
+    assert.deepEqual(
+      nestedRowFaults({ Pagination: { [press]: { keys: ['nextLabel'] } } }, elsewhere),
+      [`Pagination names ${press}, which its drawn closure does not reach`]
+    );
   });
 
   const forwardedOf = (script, markup) =>
@@ -2708,5 +2913,157 @@ describe('the drawn closure, which fails closed (issue 2454)', () => {
     const imports = "import * as Ns from './C.svelte';";
     assert.deepEqual(idsOver('<Ns.default {label} />', { imports }), [CHILD_PRESS]);
     assert.deepEqual(childFalsy('<Ns.default {label} />', { imports }), []);
+  });
+});
+
+describe('a control two published entries reach (issue 2647)', () => {
+  const C = 'src/C.svelte';
+  const F = 'src/F.svelte';
+  const CHILD_PRESS = `${C}: button[data-press]`;
+  const drawerOf = (name, path) => ({
+    name,
+    path,
+    root: 'fabricate',
+    props: { label: { kind: 'data', required: true } },
+  });
+  const [e, f, g] = [drawerOf('E', E), drawerOf('F', F), drawerOf('G', 'src/G.svelte')];
+  const DRAWING =
+    "<script>import C from './C.svelte'; let { label } = $props();</script><C {label} />";
+  const reader = syntheticReader({
+    [E]: DRAWING,
+    [F]: DRAWING,
+    'src/G.svelte': '<script>let { label } = $props();</script><p>{label}</p>',
+    [C]:
+      '<script>let { label } = $props();</script>' +
+      '<button type="button" data-keyboard-focus="true" data-press aria-label={label}>x</button>',
+  });
+  const NAMED = { [CHILD_PRESS]: { byEntry: { E: { keys: ['label'] }, F: { keys: ['label'] } } } };
+  const faultsOf = (entry, reach, names = NAMED) =>
+    controlFaults(entry, reach, reader, DYNAMIC_ELEMENTS, SCOPED_RINGS, names);
+
+  it('passes a flat always row under each entry that reaches its file', () => {
+    const reach = { [CHILD_PRESS]: 'always' };
+    assert.deepEqual(faultsOf(e, reach), []);
+    assert.deepEqual(faultsOf(f, reach), []);
+    assert.deepEqual(byEntryRowFaults(reach, NAMED, [e, f, g], reader), []);
+  });
+
+  it('faults an entry a by-entry reach row omits, though the row lists the id', () => {
+    const reach = { [CHILD_PRESS]: { byEntry: { F: 'always' } } };
+    assert.deepEqual(faultsOf(f, reach), []);
+    assert.deepEqual(faultsOf(e, reach), [`${CHILD_PRESS} has no reach pin`]);
+    assert.deepEqual(byEntryRowFaults(reach, {}, [e, f], reader), [
+      `reach ${CHILD_PRESS} names [F], and [E,F] reach it`,
+    ]);
+  });
+
+  it('faults a by-entry reach row naming an entry that does not draw the id, or no entry', () => {
+    const reach = {
+      [CHILD_PRESS]: { byEntry: { E: 'always', F: 'always', G: 'always', H: null } },
+    };
+    assert.deepEqual(byEntryRowFaults(reach, {}, [e, f, g], reader), [
+      `reach ${CHILD_PRESS} names H, which is no published entry`,
+      `reach ${CHILD_PRESS} names [E,F,G,H], and [E,F] reach it`,
+    ]);
+  });
+
+  it("faults a by-entry row on a published entry's own file", () => {
+    const owner = { ...drawerOf('C', C), props: { label: { kind: 'data', required: true } } };
+    const reach = { [CHILD_PRESS]: { byEntry: { C: 'always', E: 'always', F: 'always' } } };
+    assert.ok(
+      byEntryRowFaults(reach, {}, [e, f, owner], reader).includes(
+        `reach ${CHILD_PRESS} is a by-entry row on a published entry's own file`
+      )
+    );
+  });
+
+  it('faults a by-entry name row naming an entry under which the control is unreached', () => {
+    const reach = { [CHILD_PRESS]: { byEntry: { E: 'always', F: null } } };
+    assert.deepEqual(byEntryRowFaults(reach, NAMED, [e, f], reader), [
+      `name ${CHILD_PRESS} names [E,F], and [E] reach it`,
+    ]);
+  });
+
+  it('faults a flat key pin one reaching entry passes and another does not publish', () => {
+    const own = syntheticReader({
+      [E]: [script('label, shown'), '{#if shown}', button(), '{/if}', styled(PAIR)].join(''),
+      [F]: "<script>import E from './E.svelte'; let { label } = $props();</script><E {label} shown />",
+    });
+    const pins = { [PRESS]: 'shown' };
+    const entry = { ...e, root: 'any', props: { ...e.props, shown: { kind: 'data' } } };
+    assert.deepEqual(controlFaults(entry, pins, own), []);
+    assert.ok(
+      controlFaults(f, pins, own).includes(`${PRESS} is pinned to shown, which F does not publish`)
+    );
+  });
+
+  const GROUPS = [
+    '- **`E`.**',
+    '  - It is a picker.',
+    '    Rows are named by their glyph.',
+    '- **`F`.**',
+    '  - Rows are named by their tile.',
+    '- **Private:** Rows are named by their hook.',
+  ];
+  const [control] = controlsOf(e, reader);
+  const vocabulary = (sentence, heldBy = 'a mounted clause') =>
+    closureNameFaults(control, { entry: 'E', vocabulary: sentence, heldBy }, GROUPS);
+
+  it("passes a vocabulary pin whose sentence is a whole line of its entry's group", () => {
+    assert.deepEqual(vocabulary('Rows are named by their glyph.'), []);
+    assert.deepEqual(vocabulary('It is a picker.'), [], 'a list item reads as its sentence');
+  });
+
+  it("faults a vocabulary pin whose sentence its entry's group lacks, or that names no clause", () => {
+    const LACKS = `${CHILD_PRESS} is named by a vocabulary E's group does not state`;
+    for (const sentence of [
+      'Rows are named by their tile.',
+      'Rows are named by their hook.',
+      'Rows are named by',
+    ]) {
+      assert.deepEqual(vocabulary(sentence), [LACKS], sentence);
+    }
+    const unheld = { entry: 'E', vocabulary: 'Rows are named by their glyph.' };
+    assert.deepEqual(closureNameFaults(control, unheld, GROUPS), [
+      `${CHILD_PRESS} is named by a vocabulary and names no mounted clause in heldBy`,
+    ]);
+  });
+});
+
+describe('a class or a style the drawn closure holds falsy (issue 2647)', () => {
+  const OWN = `${E} ${OWN_FOCUS_RULE}`;
+  /** The faults at fabricate of a marked button beside `markup`, publishing `props` beside `label`. */
+  const heldFaults = (keys, markup, css, props = {}) =>
+    syntheticFaults(script(keys) + markup + button() + (css ? styled(css) : ''), {
+      pin: 'always',
+      root: 'fabricate',
+      props: { label: { kind: 'data', required: true }, ...props },
+    });
+  const RULE = '.x:focus-visible { color: var(--fab-text); }';
+  const CLASSED = '<span class:x={p}></span>';
+
+  it('exempts a focus rule on a class only a class: directive on an unpublished falsy prop writes', () => {
+    assert.deepEqual(heldFaults('label, p = false', CLASSED, RULE), []);
+  });
+
+  it('faults the same rule when the prop is published, or its default is truthy', () => {
+    assert.deepEqual(heldFaults('label, p = false', CLASSED, RULE, { p: { kind: 'data' } }), [OWN]);
+    assert.deepEqual(heldFaults('label, p = true', CLASSED, RULE), [OWN]);
+  });
+
+  const styledPress = (keys, props = {}) =>
+    syntheticFaults(script(keys) + button(LABEL, ' style={s}'), {
+      pin: 'always',
+      root: 'fabricate',
+      props: { label: { kind: 'data', required: true }, ...props },
+    });
+
+  it('reads a style attribute of one expression the drawn closure holds falsy as no inline style', () => {
+    assert.deepEqual(styledPress("label, s = ''"), []);
+  });
+
+  it('faults the same style attribute when its prop is published, or its default is truthy', () => {
+    assert.deepEqual(styledPress("label, s = ''", { s: { kind: 'data' } }), [INLINE_STYLE]);
+    assert.deepEqual(styledPress("label, s = 'outline: none'"), [INLINE_STYLE]);
   });
 });

@@ -248,6 +248,8 @@ function normalizePrefix(prefix) {
   return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
+let foundryReleaseReader = null;
+
 /**
  * The Foundry generation this client is running, or `null` when the client cannot say.
  *
@@ -258,14 +260,34 @@ function normalizePrefix(prefix) {
  * of names its font cannot draw, each rendering as a blank square, any of which a GM can persist
  * into world data. The rule is: WHEN IN DOUBT, MEASURE; when the measurement is empty, fall back
  * to the committed catalogue.
+ * The release is read through the reader `registerFoundryRelease` holds, called on every read and
+ * never cached; with no reader, or a reader that answers nothing or throws, the answer is `null`.
  */
 function currentFoundryMajor() {
-  const generation = Number(globalThis.game?.release?.generation);
+  let release;
+  try {
+    release = foundryReleaseReader?.();
+  } catch {
+    return UNDETERMINED_FOUNDRY_MAJOR;
+  }
+  const generation = Number(release?.generation);
   if (Number.isInteger(generation) && generation > 0) return generation;
 
-  const version = String(globalThis.game?.version ?? globalThis.game?.release?.version ?? '').trim();
+  const version = String(release?.version ?? '').trim();
   const major = Number.parseInt(version.split('.', 1)[0], 10);
   return Number.isInteger(major) && major > 0 ? major : UNDETERMINED_FOUNDRY_MAJOR;
+}
+
+/**
+ * Register the function answering this client's Foundry release (`game.release`), or `null` to
+ * clear it. `src/main.js` registers a lazy reader at evaluation, because `game` is not yet the
+ * `Game` then; this module never reads `game` itself.
+ */
+export function registerFoundryRelease(reader) {
+  if (reader !== null && typeof reader !== 'function') {
+    throw new TypeError('registerFoundryRelease takes a function or null');
+  }
+  foundryReleaseReader = reader;
 }
 
 /**

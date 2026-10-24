@@ -59,6 +59,8 @@ manager-published-option-cards-specimen
 manager-published-segmented-specimen
 manager-published-pagination-specimen
 manager-published-pagination-size-specimen
+manager-published-icon-picker-specimen
+manager-published-icon-picker-choice
 player-gathering-environments
 fabricate-app-shell
 player-inventory

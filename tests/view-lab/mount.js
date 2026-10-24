@@ -796,6 +796,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-segmented': () => import('./fixtures/PublishedSegmented.svelte'),
   // Issue 2646: a browse pager and a compact rail whose page and size the companion's update draws.
   'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
+  // Issue 2647: a reagent's icon whose choice the companion's own update draws.
+  'published-icon-picker': () => import('./fixtures/PublishedIconPicker.svelte'),
 });
 // view-lab-region:end
 

@@ -341,11 +341,44 @@ async function probeBinding(facade) {
   return rows;
 }
 
+/**
+ * Whether the release `src/main.js` registered selects the committed catalogue under a client on
+ * generation 14 and measures under 13. A missing registration measures under both, and a reader
+ * that snapshots `game.release` at evaluation keeps the release it saw then.
+ */
+async function probeRegisteredRelease(loadModule) {
+  const { getFoundryCuratedIconDefinitionsForMajor } = await loadModule(
+    '/src/ui/svelte/util/essenceIcons.js'
+  );
+  const { FOUNDRY_CURATED_ICON_DEFINITIONS } = await loadModule(
+    '/src/ui/svelte/util/foundryIconVocabulary.js'
+  );
+  const measurement = { glyphsByName: new Map([['gear', 'u+f013']]) };
+  const gameGlobal = globalThis.game;
+  const hadRelease = Object.hasOwn(gameGlobal, 'release');
+  const originalRelease = gameGlobal.release;
+  const committedUnder = (generation) => {
+    gameGlobal.release = { generation };
+    const curated = getFoundryCuratedIconDefinitionsForMajor(undefined, measurement);
+    return curated === FOUNDRY_CURATED_ICON_DEFINITIONS;
+  };
+  try {
+    return {
+      registeredReleaseSelectsCommittedUnder14: committedUnder(14),
+      registeredReleaseMeasuresUnder13: !committedUnder(13),
+    };
+  } finally {
+    if (hadRelease) gameGlobal.release = originalRelease;
+    else delete gameGlobal.release;
+  }
+}
+
 /** Everything the boot contract compares, measured from one real boot. */
 async function measureBootContract({ init, ready, loadModule }) {
   const hooks = globalThis.Hooks;
   const hookEventsAtYield = [...hooks.registrations.values()].map((entry) => entry.event);
   const instance = (await loadModule('/src/main.js')).default;
+  const registeredRelease = await probeRegisteredRelease(loadModule);
   // Before every recorder below, so `init`'s `game.fabricate` bind leaves the composition log alone.
   const keybindingRecorder = installKeybindingRecorder();
   await init();
@@ -488,6 +521,7 @@ async function measureBootContract({ init, ready, loadModule }) {
       readyFlag: facade.ready === true,
       whenReadyResolution: whenReady,
       ...wiringReferences(facade, runtime),
+      ...registeredRelease,
     },
     compositionLog: composition.log,
     worldStoreOrder: composition.storeOrder,

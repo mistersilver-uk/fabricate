@@ -10,6 +10,7 @@ import {
   getFoundryCuratedIconDefinitionsForMajor,
   getFoundryIconDefinitionsForMajor,
   measureLoadedFontAwesomeGlyphs,
+  registerFoundryRelease,
 } from '../src/ui/svelte/util/essenceIcons.js';
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
@@ -265,16 +266,16 @@ describe('an unreadable or unparsed bundle never empties a picker', () => {
 
   // `currentFoundryMajor()` cannot always tell which generation it is on, and v14 is the one branch
   // that never measures.
-  it('measures rather than assuming the newest generation when it cannot tell', () => {
+  it('measures rather than assuming the newest generation when nothing is registered', () => {
     const originalGame = globalThis.game;
-    globalThis.game = undefined;
+    globalThis.game = { release: { generation: 14 } };
 
     try {
       withDocument(makeImportingDocument(FOUNDRY_13_CLASSIC_RULES), () => {
         assert.deepEqual(
           getFoundryIconDefinitionsForMajor().map(({ iconCode }) => iconCode),
           ['flask', 'gear'],
-          'when in doubt, measure'
+          'when in doubt, measure: a v14 `game` the module was never handed is not read'
         );
       });
 
@@ -288,6 +289,60 @@ describe('an unreadable or unparsed bundle never empties a picker', () => {
     } finally {
       globalThis.game = originalGame;
     }
+  });
+});
+
+describe('the release the vocabulary follows is the one registered', () => {
+  const definitionsUnderV13Bundle = () =>
+    withDocument(makeImportingDocument(FOUNDRY_13_CLASSIC_RULES), () =>
+      getFoundryIconDefinitionsForMajor()
+    );
+  const codes = (definitions) => definitions.map(({ iconCode }) => iconCode);
+
+  it('selects the committed catalogue under a registered generation 14, and measures under 13', () => {
+    let release = { generation: 14 };
+    try {
+      registerFoundryRelease(() => release);
+      assert.equal(definitionsUnderV13Bundle(), FOUNDRY_ICON_DEFINITIONS);
+
+      release = { generation: 13 };
+      assert.deepEqual(
+        codes(definitionsUnderV13Bundle()),
+        ['flask', 'gear'],
+        'the reader is asked on every read, so a later answer is followed'
+      );
+
+      release = { version: '14.360' };
+      assert.equal(definitionsUnderV13Bundle(), FOUNDRY_ICON_DEFINITIONS, "a version's major stands in");
+    } finally {
+      registerFoundryRelease(null);
+    }
+  });
+
+  it('measures when the reader answers nothing or throws', () => {
+    const readers = [
+      () => undefined,
+      () => {
+        throw new Error('no game yet');
+      },
+    ];
+    try {
+      for (const reader of readers) {
+        registerFoundryRelease(reader);
+        assert.deepEqual(codes(definitionsUnderV13Bundle()), ['flask', 'gear']);
+      }
+    } finally {
+      registerFoundryRelease(null);
+    }
+  });
+
+  it('takes a function or null and refuses anything else', () => {
+    for (const reader of [undefined, 14, { generation: 14 }, 'game.release']) {
+      assert.throws(() => registerFoundryRelease(reader), TypeError);
+    }
+    registerFoundryRelease(() => ({ generation: 14 }));
+    registerFoundryRelease(null);
+    assert.deepEqual(codes(definitionsUnderV13Bundle()), ['flask', 'gear'], 'null clears it');
   });
 });
 

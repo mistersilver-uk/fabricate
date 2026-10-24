@@ -1624,6 +1624,8 @@
     "aliasIsAccessor": true
   },
   "references": {
+    "registeredReleaseSelectsCommittedUnder14": true,
+    "registeredReleaseMeasuresUnder13": true,
     "apiHooksIsFabricateHooks": true,
     "apiCompanionIsCompanionContract": true,
     "apiUiIsPublishedSeam": true,

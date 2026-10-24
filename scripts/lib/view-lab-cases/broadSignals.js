@@ -233,7 +233,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-count-simulator-bought',
   ]),
   // The shared icon picker (issue 1269).
-  'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
+  'src/ui/svelte/components/IconPicker.svelte': Object.freeze([
+    'manager-system-edit-lists',
+    // The picker mounted through the published seam: the list open, and a keyboard choice (issue 2647).
+    'manager-published-icon-picker-specimen',
+    'manager-published-icon-picker-choice',
+  ]),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
   // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
   // specimens that mount it through the published seam (issue 2452).
