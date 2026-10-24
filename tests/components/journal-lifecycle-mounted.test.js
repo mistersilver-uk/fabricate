@@ -1186,12 +1186,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
             );
         },
       });
-      const radio = (id) =>
-        mounted.target.querySelector(`[data-journal-route] input[value="${id}"]`);
-      const chosen = () =>
-        mounted.target
-          .querySelector('[data-journal-route] .is-active')
-          ?.getAttribute('data-radio-card-option');
+      const route = mounted.target.querySelector('[data-journal-route]');
+      const radio = (id) => route.querySelector(`input[value="${id}"]`);
+      const chosen = () => route.querySelector('.is-active')?.getAttribute('data-radio-card-option');
       radio(second.id).click();
       flushSync();
       assert.equal(radio(second.id).checked, true, 'the pressed route stays checked in flight');
