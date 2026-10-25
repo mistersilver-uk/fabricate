@@ -87,7 +87,7 @@
   outline-offset: 2px;
 }
 
-/* The `Modal` dialog is a `tabindex="-1"` focus target that draws no ring, pressed or keyed (issue 2661): at (0,3,0) it ties the pair's `[tabindex]` rows and, written after them, wins, so it must stay below the pair. */
+/* The `Modal` dialog is a `tabindex="-1"` focus target that draws no ring, pressed or keyed (issue 2661). Only `outline` is declared here: the dialog's elevation is its own unlayered `box-shadow`, which outranks the layered `box-shadow: none` of the pair above. At (0,3,0) this rule ties the pair's `[tabindex]` rows, so it must be written after them. */
 .fabricate-modal.fabricate-modal[tabindex] {
   outline: none;
 }
