@@ -16,6 +16,7 @@ import { OVERLAY_HOST_ROOT_CLASSES } from '../../src/ui/svelte/util/overlayHost.
 /** The one module allowed to name an application root: the shared resolver itself. */
 const RESOLVER = 'src/ui/svelte/util/overlayHost.js';
 const RESOLVER_FUNCTION = 'resolveOverlayHost';
+const ACQUIRE_FUNCTION = 'acquireOverlayHost';
 /** The action itself, whose own `anchoredPopover(node, …)` signature is not an adoption of it. */
 const ANCHORED_POPOVER = 'src/ui/svelte/actions/anchoredPopover.js';
 const PORTAL_ACTION = 'actions/portal.js';
@@ -404,7 +405,7 @@ test('every portal target is resolved through the shared resolver or handed in b
       const expression = use[1].trim();
       targets.push(`${file}: ${expression}`);
 
-      // Either the expression resolves the host itself.
+      // Either the expression resolves the host itself, or acquires it through the overlay chain.
       const callee = expression.match(/\(?\w*\)?\s*=>\s*(\w+)\(/)?.[1];
       const calleeBody = callee
         ? source.slice(source.indexOf(`function ${callee}(`)).slice(0, 400)
@@ -412,12 +413,14 @@ test('every portal target is resolved through the shared resolver or handed in b
       const resolved =
         expression.includes(RESOLVER_FUNCTION) ||
         calleeBody.includes(RESOLVER_FUNCTION) ||
+        calleeBody.includes(ACQUIRE_FUNCTION) ||
         /^[\w.]+$/.test(expression);
       if (!resolved) unresolved.push(`${file}: use:portal={${expression}}`);
     }
   }
 
-  // SIX SHIP as of issue 1503, down from eight.
+  // SIX SHIP as of issue 1503, down from eight. A `use:portal` callee may name `resolveOverlayHost`
+  // or, as `Modal` does since issue 2658, `acquireOverlayHost`.
   assert.ok(
     targets.length >= 5,
     `only ${targets.length} portaled overlays were found across the corpus. Six ship — one ` +

@@ -22,7 +22,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
   import IconButton from './IconButton.svelte';
-  import { resolveOverlayHost } from '../util/overlayHost.js';
+  import { acquireOverlayHost, releaseOverlayHost } from '../util/overlayHost.js';
 
   let {
     open = false,
@@ -45,12 +45,22 @@
     'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
     'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-  // Resolved from the dialog node UPWARDS, never by querying the document for an application root
-  // by name (issue 1466): a `document.querySelector` lookup finds the manager window wherever it
-  // is, so this chrome opened from another application portaled into a DIFFERENT WINDOW and the
-  // `|| document.body` fallback made that silent.
-  function getHost(node) {
-    return resolveOverlayHost(node, { component: 'Modal' });
+  // The host the dialog was last acquired into, kept for `modalFocus` to restore focus into.
+  let host = null;
+
+  // Acquired through the overlay chain (issue 2658): inside a published mount the dialog lives in
+  // the chain's container for it, and otherwise the class walk from the dialog node UPWARDS, never a
+  // document query for an application root by name (issue 1466): that found the manager window
+  // wherever it is, so this chrome opened from another application portaled into a DIFFERENT
+  // WINDOW and the `|| document.body` fallback made that silent.
+  function acquireHost(node) {
+    host = acquireOverlayHost(node, node, { component: 'Modal' });
+    return host;
+  }
+
+  // Gives the host back to the chain when the dialog closes or the component is destroyed.
+  function heldHost(node) {
+    return { destroy: () => releaseOverlayHost(node) };
   }
 
   function focusables(node) {
@@ -70,13 +80,13 @@
   function modalFocus(node, enabled) {
     if (!enabled) return {};
     const opener = node.ownerDocument.activeElement;
-    const host = getHost(node);
+    const held = host;
     const first = (initialFocus && node.querySelector(initialFocus)) || focusables(node)[0];
     first?.focus?.();
     return {
       destroy() {
         // A frame later, so an opener the answer's own flow re-enables can take focus back.
-        node.ownerDocument.defaultView.requestAnimationFrame(() => restoreFocus(opener, host));
+        node.ownerDocument.defaultView.requestAnimationFrame(() => restoreFocus(opener, held));
       },
     };
   }
@@ -136,7 +146,8 @@
       style={`--manager-modal-width: ${width};`}
       data-manager-modal
       {...dialogProps}
-      use:portal={(node) => getHost(node)}
+      use:portal={(node) => acquireHost(node)}
+      use:heldHost
       use:dismissOnOutsideClick={{ enabled: open && closeOnOutsideClick, onDismiss: onClose }}
       use:modalFocus={trapFocus}
       use:ownKeyboard={trapFocus}
