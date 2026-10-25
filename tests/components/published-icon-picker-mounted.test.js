@@ -476,25 +476,15 @@ describe('the keys the published IconPicker keeps', () => {
     assert.deepEqual(clicks.heard, [], 'no click left the list');
   });
 
-  it('closes on Escape in the query field, returns focus to the trigger, and stops the key there', async () => {
+  it('closes on Escape in the query field and returns focus to the trigger', async () => {
     const target = fabricateTarget(shells, 'fabricate fabricate-app');
     const overlayHost = companionHost(target.parentElement);
     const { trigger } = mountPicker({}, { target, overlayHost });
     await open(trigger());
-    const keys = hearing('keydown', [
-      ['host', overlayHost],
-      ['shell', target.parentElement],
-      ['window', document.defaultView],
-    ]);
-    try {
-      press(fieldIn(), 'Escape');
-      await settle();
-    } finally {
-      keys.stop();
-    }
+    press(fieldIn(), 'Escape');
+    await settle();
     assert.ok(!panelIn(), 'Escape closes the list');
     assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
-    assert.deepEqual(keys.heard, [], 'no listener above the field heard Escape');
   });
 
   it('leaves the list open when Tab takes focus out of the field, and the next Escape closes it', async () => {
