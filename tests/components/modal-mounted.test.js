@@ -130,15 +130,15 @@ for (const closeOnOutsideClick of [true, false]) {
         return () => document.removeEventListener('keydown', listener, { capture: true });
       }
 
-      for (const [label, before] of [
+      for (const [label, registeredBefore] of [
         ['registered before the dialog mounts', true],
         ['registered after the dialog is open', false],
       ]) {
         it(`judges an expanded control as the key goes down, with a collapsing listener ${label}`, async () => {
-          let remove = before ? collapseOnEscape() : () => {};
+          let remove = registeredBefore ? collapseOnEscape() : () => {};
           try {
             const calls = await open();
-            if (!before) remove = collapseOnEscape();
+            if (!registeredBefore) remove = collapseOnEscape();
             const event = escape();
             const seen = dispatchWithWindowListener(q('[data-expanded]'), event);
             assert.equal(
@@ -174,6 +174,36 @@ for (const closeOnOutsideClick of [true, false]) {
         button.dispatchEvent(escape());
         assert.equal(calls.length, 0);
       });
+
+      it('leaves an Escape on an expanded control inside an open shadow root to that control', async () => {
+        const calls = await open();
+        const shadowHost = document.createElement('span');
+        q('[data-probe-body]').append(shadowHost);
+        const inner = document.createElement('button');
+        inner.setAttribute('aria-expanded', 'true');
+        shadowHost.attachShadow({ mode: 'open' }).append(inner);
+        const collapse = (event) => {
+          if (event.key === 'Escape') inner.setAttribute('aria-expanded', 'false');
+        };
+        document.addEventListener('keydown', collapse, { capture: true });
+        try {
+          const event = escape();
+          inner.dispatchEvent(event);
+          assert.equal(inner.getAttribute('aria-expanded'), 'false', 'the control collapsed first');
+          assert.equal(calls.length, 0, 'the dialog still reads it as expanded');
+          assert.equal(event.defaultPrevented, false);
+        } finally {
+          document.removeEventListener('keydown', collapse, { capture: true });
+        }
+      });
+
+      if (closeOnOutsideClick) {
+        it('calls nothing for a composing Escape outside the dialog', async () => {
+          const calls = await open();
+          document.body.dispatchEvent(escape({ isComposing: true }));
+          assert.equal(calls.length, 0);
+        });
+      }
 
       it(
         closeOnOutsideClick
@@ -224,12 +254,16 @@ for (const closeOnOutsideClick of [true, false]) {
         const { releaseOverlayHost } = await harness.loadRawModule(OVERLAY_HOST_PATH);
         const dialog = q('[data-manager-modal]');
         const sibling = document.createElement('i');
-        harness.target.append(sibling);
-        harness.component.$destroy();
-        assert.equal(dialog.isConnected, false, 'the dialog went with the component');
-        assert.equal(sibling.parentElement, harness.target, 'the host other children stay');
-        assert.doesNotThrow(() => releaseOverlayHost(dialog));
-        sibling.remove();
+        const hostElement = harness.target;
+        hostElement.append(sibling);
+        try {
+          harness.remount();
+          assert.equal(dialog.isConnected, false, 'the dialog went with the component');
+          assert.equal(sibling.parentElement, hostElement, 'the host other children stay');
+          assert.doesNotThrow(() => releaseOverlayHost(dialog));
+        } finally {
+          sibling.remove();
+        }
       });
 
       it('draws exactly one dialog when opened, closed and opened again', async () => {
@@ -266,3 +300,115 @@ for (const closeOnOutsideClick of [true, false]) {
     });
   });
 }
+
+describe('Modal host and window lifecycle', () => {
+  const closeInto = (calls) => () => {
+    calls.push([]);
+  };
+
+  it('acquires its host through the overlay chain and releases it on close and on destroy', async () => {
+    await harness.mount({ open: false, title: 'Probe', body, onClose: closeInto([]) });
+    const { registerOverlayChain, unregisterOverlayChain } =
+      await harness.loadRawModule(OVERLAY_HOST_PATH);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const acquired = [];
+    const released = [];
+    const chain = {
+      acquire(overlay) {
+        acquired.push(overlay);
+        return container;
+      },
+      release(overlay) {
+        released.push(overlay);
+      },
+    };
+    const target = harness.target;
+    registerOverlayChain(target, chain);
+    try {
+      await harness.setProps({ open: true });
+      const dialog = q('[data-manager-modal]');
+      assert.equal(dialog.parentElement, container, 'the chain container hosts the dialog');
+      assert.deepEqual(acquired, [dialog]);
+      assert.deepEqual(released, []);
+      await harness.setProps({ open: false });
+      assert.deepEqual(released, [dialog], 'closing gives the host back with the dialog node');
+      await harness.setProps({ open: true });
+      assert.equal(acquired.length, 2, 'reopening acquires again');
+      assert.equal(acquired[1], q('[data-manager-modal]'));
+      harness.remount();
+      assert.equal(released.length, 2, 'destroying while open gives the host back once more');
+      assert.equal(released[1], acquired[1]);
+    } finally {
+      unregisterOverlayChain(target, chain);
+      container.remove();
+    }
+  });
+
+  it('keeps one capture keydown pair on the window and removes it on destroy', async () => {
+    const view = document.defaultView;
+    const prototype = Object.getPrototypeOf(view);
+    const added = [];
+    const removed = [];
+    view.addEventListener = (type, listener, options) => {
+      if (type === 'keydown' && options === true) added.push(listener);
+      return prototype.addEventListener.call(view, type, listener, options);
+    };
+    view.removeEventListener = (type, listener, options) => {
+      if (type === 'keydown' && options === true) removed.push(listener);
+      return prototype.removeEventListener.call(view, type, listener, options);
+    };
+    try {
+      await harness.mount({ open: true, title: 'Probe', body, onClose: closeInto([]) });
+      assert.equal(added.length, 1, 'one capture keydown listener while open');
+      assert.deepEqual(removed, []);
+      harness.remount();
+      assert.deepEqual(removed, added, 'and the same one is removed on destroy');
+    } finally {
+      delete view.addEventListener;
+      delete view.removeEventListener;
+    }
+  });
+
+  it('still closes once on Escape in a document with no window', async () => {
+    const calls = [];
+    const view = document.defaultView;
+    Object.defineProperty(document, 'defaultView', { configurable: true, get: () => null });
+    try {
+      await harness.mount({ open: true, title: 'Probe', body, onClose: closeInto(calls) });
+      const event = new view.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      });
+      q('[data-plain]').dispatchEvent(event);
+      assert.equal(calls.length, 1);
+      assert.equal(event.defaultPrevented, true);
+    } finally {
+      delete document.defaultView;
+    }
+  });
+
+  it('destroys a focus-trapping dialog after its window is gone without throwing', async () => {
+    let gone = false;
+    const view = document.defaultView;
+    Object.defineProperty(document, 'defaultView', {
+      configurable: true,
+      get: () => (gone ? null : view),
+    });
+    try {
+      await harness.mount({
+        open: true,
+        title: 'Probe',
+        body,
+        trapFocus: true,
+        onClose: closeInto([]),
+      });
+      gone = true;
+      assert.doesNotThrow(() => harness.remount());
+    } finally {
+      delete document.defaultView;
+    }
+  });
+});
