@@ -442,3 +442,96 @@ describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
     hostHarness.remount();
   });
 });
+
+describe('2667 ActionMenu marks the focus it moves', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  const MARK = 'data-action-menu-focused';
+
+  /** That `node` alone in its document carries the focus mark, and holds focus. */
+  function assertMarks(node, why) {
+    const marks = [...node.ownerDocument.querySelectorAll(`[${MARK}]`)];
+    assert.equal(marks.length, 1, `${why}: one element is marked`);
+    assert.ok(marks[0] === node, `${why}: the expected element`);
+    assert.ok(node.ownerDocument.activeElement === node, `${why}: which holds focus`);
+  }
+
+  it('on the item focus reaches, past the disabled note, in a click-opened menu', async () => {
+    const target = await open(await harness.mount(props()));
+    try {
+      const enabled = enabledItems(target);
+      assertMarks(enabled[0], 'on open');
+      for (const [key, index] of [
+        ['ArrowDown', 1],
+        ['ArrowDown', 2],
+        ['ArrowDown', 0],
+        ['End', 2],
+      ]) {
+        keydown(target.ownerDocument.activeElement, key);
+        assertMarks(enabled[index], key);
+      }
+    } finally {
+      harness.remount();
+    }
+  });
+
+  it('on the first item of an ArrowDown-opened headed menu', async () => {
+    const target = await harness.mount({ ...props(), heading: 'Accept instead' });
+    try {
+      keydown(trigger(target), 'ArrowDown');
+      await flushRender();
+      assertMarks(enabledItems(target.ownerDocument)[0], 'ArrowDown-opened');
+    } finally {
+      harness.remount();
+    }
+  });
+
+  it('drops the mark of a headed menu on a window blur, restores it, and drops it for good when focus leaves', async () => {
+    const target = await open(await harness.mount({ ...props(), heading: 'Accept instead' }));
+    try {
+      const owner = target.ownerDocument;
+      const item = enabledItems(target)[0];
+      const focusEvent = (node, type) => {
+        node.dispatchEvent(
+          new owner.defaultView.FocusEvent(type, { bubbles: true, relatedTarget: null })
+        );
+      };
+      owner.hasFocus = () => false;
+      try {
+        focusEvent(item, 'focusout');
+      } finally {
+        delete owner.hasFocus;
+      }
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'a blurred window shows no mark');
+      focusEvent(item, 'focusin');
+      await flushRender();
+      assertMarks(item, 'focus returns to the window');
+      const elsewhere = owner.createElement('button');
+      owner.body.append(elsewhere);
+      elsewhere.focus();
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'focus moved out of the menu');
+      focusEvent(item, 'focusin');
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'and a later focusin does not restore it');
+    } finally {
+      harness.remount();
+    }
+  });
+
+  for (const heading of ['', 'Accept instead']) {
+    it(`on the ${heading ? 'headed list' : 'panel'} when every item is disabled`, async () => {
+      const disabled = items().map((item) => ({ ...item, disabled: true }));
+      const target = await open(await harness.mount({ ...props(), items: disabled, heading }));
+      try {
+        const menu = panel(target.ownerDocument);
+        assert.equal(menu.classList.contains('manager-action-menu-list'), Boolean(heading));
+        assertMarks(menu, 'no item to choose');
+      } finally {
+        harness.remount();
+      }
+    });
+  }
+});

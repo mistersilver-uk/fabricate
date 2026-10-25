@@ -1424,7 +1424,8 @@ Each group states the accepted values of every key that entry publishes.
     A label too long for the menu is cut with an ellipsis, and its whole text stays its name.
     `icon` is a Font Awesome class string drawn before the label and hidden from assistive technology, and an item without one keeps the glyph's column empty.
     `disabled: true` draws the item dimmed as a natively disabled button, which the arrow keys skip and a press does not choose.
-    `danger: true` draws the item in the danger ink, which falls short of 4.5:1 on the menu's ground in one palette and on a hovered or focused item in four, so its label, not its colour, states what it does.
+    `danger: true` draws the item in the danger family's text ink, which clears 4.5:1 on the menu's ground and on a hovered or focused item in every palette.
+    In `foundry-native` that ink is the window's ordinary text ink, so the item's label, not its colour, states what it does, and the companion gives a danger item an `icon`.
     Fabricate drops an item's `data` and never writes it, and any other member is private.
     With `items` empty, or every item disabled, a press opens a menu with no item to choose, focus rests on the menu itself, and Escape, Tab or a press outside it closes it.
     A companion with no command to offer leaves the menu unmounted.
@@ -1438,7 +1439,7 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate calls `onSelect` only with the `id` of an item the menu draws when it is chosen.
     The companion runs a command only for an `id` it matches by name, so no item, the last one included, runs a command meant for another `id`.
   - A press on the trigger, by pointer, Enter or Space, opens the menu and moves focus to its first enabled item, outside `target`.
-    After a pointer press, the focus Fabricate moves into the menu shows no mark until a key moves it; this falls short of the design system's rule for programmatic focus, which requires a marker on that path, and is recorded, not fixed.
+    After a pointer press, the focus Fabricate moves into the menu shows the mark it shows after a key: the item takes its raised fill and a 1px accent ring drawn inside its edge, and a menu with no item to choose takes the window's accent ring, 2px wide and 2px clear of it.
     ArrowDown on the trigger does the same, and ArrowUp opens the menu onto its last enabled item.
     An Enter held on the trigger opens the menu once, and an Enter held on an item chooses it once; the repeats of either choose and open nothing, and a fresh Enter on an item chooses it.
     A second press on the trigger closes the menu without choosing and moves no focus, so focus goes where the pointer press puts it, which in Chromium, Foundry's desktop client, is the trigger.

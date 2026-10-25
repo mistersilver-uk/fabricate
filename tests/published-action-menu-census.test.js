@@ -1,10 +1,11 @@
 /**
  * The module sheet and every component style against the published `ActionMenu` (issue 2652): the
- * 20 selectors that name its two roots, the trigger side's `fabricate-action-menu` and the menu's
- * `fabricate-action-menu-panel`, the 14 of them a published menu matches with nothing above its
+ * 23 selectors that name its two roots, the trigger side's `fabricate-action-menu` and the menu's
+ * `fabricate-action-menu-panel`, the 16 of them a published menu matches with nothing above its
  * root, the classes its file spells on them, and the focus marks: the trigger's module ring, the
- * item's 1px accent ring drawn inside its edge on its raised fill, and the empty menu's module ring.
- * The danger item's ink is pinned shortfall for shortfall, recorded and not fixed.
+ * item's 1px accent ring drawn inside its edge on its raised fill, and the empty menu's module ring,
+ * each drawn alike on the `data-action-menu-focused` marker the menu stamps on the focus it moves.
+ * The danger item's ink is pinned in every palette.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
  * Limit: a companion passing an item's private `tone` still draws `is-<tone>`, and the five
  * `is-<kind>` glyph rules of the recipe editor's kind menu then reach its item.
@@ -22,8 +23,13 @@ import {
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
 import { SHIPPED, byName, declarationsOf, moduleRing } from './helpers/publishedComponentGate.js';
-import { collectStyleCorpus, rulesIn } from './helpers/styleBlockScan.js';
-import { propertiesOf, shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
+import { collectStyleCorpus, rulesIn, splitSelectorList } from './helpers/styleBlockScan.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls,
+  themePalettes,
+} from './helpers/themePaletteContrast.js';
 
 const COMPONENT = 'src/ui/svelte/components/ActionMenu.svelte';
 const SHEET = 'styles/fabricate-manager-tool-editor-environments.css';
@@ -56,7 +62,9 @@ const PANEL = Object.freeze({
 
 const ITEM = '.fabricate-action-menu-panel button.manager-action-menu-item';
 
-/** The eight rules that draw the panel and its items, every one in its sheet. */
+const MARKED_ITEM = `${ITEM}[data-action-menu-focused]:not(:disabled)`;
+
+/** The nine rules that draw the panel and its items, every one in its sheet. */
 const PANEL_FAMILY = Object.freeze([
   '.fabricate-action-menu-panel.manager-action-menu-panel',
   ITEM,
@@ -64,8 +72,15 @@ const PANEL_FAMILY = Object.freeze([
   `${ITEM} > span`,
   `${ITEM}:hover:not(:disabled)`,
   `${ITEM}:focus-visible`,
+  MARKED_ITEM,
   `${ITEM}:disabled`,
   `${ITEM}.is-danger`,
+]);
+
+/** The empty menu's markers: the unheaded panel, which a published menu draws, and the headed list. */
+const PANEL_MARKS = Object.freeze([
+  ".fabricate-action-menu-panel.manager-action-menu-panel[role='menu'][data-action-menu-focused]",
+  ".fabricate-action-menu-panel .manager-action-menu-list[role='menu'][data-action-menu-focused]",
 ]);
 
 /** The kind menu's glyph tints, which reach a published item only through its private `tone`. */
@@ -85,16 +100,16 @@ const ringProperty = ([property]) =>
   property === 'all' || property === 'box-shadow' || property.startsWith('outline');
 
 describe('the module sheet and every component style against the published ActionMenu', () => {
-  it('reaches a published menu through 14 of the 20 selectors that name its two roots', () => {
+  it('reaches a published menu through 16 of the 23 selectors that name its two roots', () => {
     const [menu, panel] = [census(MENU), census(PANEL)];
     assert.equal(menu.length, 1, 'the census of every selector naming the trigger side root');
-    assert.equal(panel.length, 19, 'the census of every selector naming the menu root');
+    assert.equal(panel.length, 22, 'the census of every selector naming the menu root');
     assert.deepEqual(writtenOf(reachingOf(menu)), [
       `${SHEET}: .fabricate-action-menu.fabricate-action-menu`,
     ]);
     assert.deepEqual(
       writtenOf(reachingOf(panel)),
-      [...inSheet(PANEL_FAMILY), ...TONE_RULES].sort(byName)
+      [...inSheet([...PANEL_FAMILY, PANEL_MARKS[0]]), ...TONE_RULES].sort(byName)
     );
     const entry = entryNamed('ActionMenu');
     assert.deepEqual(
@@ -104,11 +119,18 @@ describe('the module sheet and every component style against the published Actio
     );
   });
 
-  it('draws a published menu alike under any ancestor, and only the item focus rule draws a ring beside the menu’s elevation shadow', () => {
-    for (const shape of [MENU, PANEL]) {
+  it('draws a published menu alike under any ancestor, and only the item focus rule and its marker, and the empty-menu marker, draw a ring beside the menu’s elevation shadow', () => {
+    for (const [shape, hooks] of [
+      [MENU, []],
+      [PANEL, ['data-action-menu-focused']],
+    ]) {
       const reaching = reachingOf(census(shape));
       assert.deepEqual(placementFaults(reaching, shape, []), [], shape.root);
-      assert.deepEqual(dataHooksOf(reaching), [], `${shape.root}: no reaching rule reads a hook`);
+      assert.deepEqual(
+        dataHooksOf(reaching),
+        hooks,
+        `${shape.root}: the hooks its reaching rules read`
+      );
     }
     const rings = [...reachingOf(census(MENU)), ...reachingOf(census(PANEL))].flatMap(
       ({ written, rule }) =>
@@ -120,6 +142,10 @@ describe('the module sheet and every component style against the published Actio
       `${SHEET}: ${PANEL_FAMILY[0]} declares box-shadow`,
       `${SHEET}: ${ITEM}:focus-visible declares outline`,
       `${SHEET}: ${ITEM}:focus-visible declares outline-offset`,
+      `${SHEET}: ${MARKED_ITEM} declares outline`,
+      `${SHEET}: ${MARKED_ITEM} declares outline-offset`,
+      `${SHEET}: ${PANEL_MARKS[0]} declares outline`,
+      `${SHEET}: ${PANEL_MARKS[0]} declares outline-offset`,
     ]);
   });
 
@@ -165,14 +191,16 @@ describe('the focus marks in the published ActionMenu’s menu', () => {
   const rules = rulesIn(collectStyleCorpus()['styles/fabricate.css']);
   const themes = themePalettes(rules);
 
-  it('draws the item’s ring by its one focus rule, 1px of accent inside its edge on the raised fill', () => {
-    const focus = rules.filter((rule) => rule.selector === `${ITEM}:focus-visible`);
-    assert.equal(focus.length, 1, 'one rule marks the focused item');
-    assert.deepEqual(Object.fromEntries(propertiesOf(focus[0])), {
-      background: 'var(--fab-surface-raised)',
-      outline: '1px solid var(--fab-accent)',
-      'outline-offset': '-1px',
-    });
+  it('draws the item’s ring by its one focus rule and its one marker rule, 1px of accent inside its edge on the raised fill', () => {
+    for (const selector of [`${ITEM}:focus-visible`, MARKED_ITEM]) {
+      const focus = rules.filter((rule) => splitSelectorList(rule.selector).includes(selector));
+      assert.equal(focus.length, 1, `one rule marks the focused item: ${selector}`);
+      assert.deepEqual(Object.fromEntries(propertiesOf(focus[0])), {
+        background: 'var(--fab-surface-raised)',
+        outline: '1px solid var(--fab-accent)',
+        'outline-offset': '-1px',
+      });
+    }
     assert.equal(
       propertiesOf(rules.find((rule) => rule.selector === PANEL_FAMILY[0])).get('background'),
       'var(--fab-bg-0)',
@@ -197,29 +225,35 @@ describe('the focus marks in the published ActionMenu’s menu', () => {
       'the module ring'
     );
   });
+
+  it('draws the marked empty menu, headed or not, by one rule declaring exactly the module ring', () => {
+    const ring = moduleRing();
+    const marks = rules.filter((rule) =>
+      PANEL_MARKS.some((selector) => splitSelectorList(rule.selector).includes(selector))
+    );
+    assert.equal(marks.length, 1, 'one rule marks the empty menu');
+    assert.deepEqual(splitSelectorList(marks[0].selector), PANEL_MARKS);
+    assert.deepEqual(Object.fromEntries(propertiesOf(marks[0])), {
+      outline: ring.outline,
+      'outline-offset': ring.offset,
+    });
+  });
 });
 
-describe('the danger item’s ink in the published ActionMenu, recorded and not fixed', () => {
+describe('the danger item’s ink in the published ActionMenu', () => {
   const rules = rulesIn(collectStyleCorpus()['styles/fabricate.css']);
   const themes = themePalettes(rules);
+  const ink = declaredToken(rules, `${ITEM}.is-danger`, 'color');
 
-  it('is the danger token', () => {
-    const danger = rules.find((rule) => rule.selector === `${ITEM}.is-danger`);
-    assert.equal(propertiesOf(danger).get('color'), 'var(--fab-danger)');
+  it('is the danger family’s text token', () => {
+    assert.equal(ink, '--fab-danger-text');
   });
 
-  it('falls short of 4.5:1 on the menu’s ground in one palette', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-danger', ['--fab-bg-0']), [
-      'ironblood-forge: --fab-danger on --fab-bg-0 4.48:1',
-    ]);
+  it('clears 4.5:1 on the menu’s ground in every palette', () => {
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-bg-0']), []);
   });
 
-  it('falls short of 4.5:1 on a hovered or focused item in four palettes', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-danger', ['--fab-surface-raised', '--fab-bg-0']), [
-      'fabricate: --fab-danger on --fab-surface-raised over --fab-bg-0 4.37:1',
-      'ironblood-forge: --fab-danger on --fab-surface-raised over --fab-bg-0 3.76:1',
-      'hearth-herb: --fab-danger on --fab-surface-raised over --fab-bg-0 4.43:1',
-      'foundry-native: --fab-danger on --fab-surface-raised over --fab-bg-0 4.04:1',
-    ]);
+  it('clears 4.5:1 on a hovered or focused item in every palette', () => {
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-surface-raised', '--fab-bg-0']), []);
   });
 });

@@ -2226,6 +2226,13 @@
   outline-offset: -1px;
 }
 
+/* `ActionMenu` stamps `data-action-menu-focused` on the focus it moves, which after a pointer press matches no `:focus-visible` (issue 2667). */
+.fabricate-action-menu-panel button.manager-action-menu-item[data-action-menu-focused]:not(:disabled) {
+  background: var(--fab-surface-raised);
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
 /* NO `color` here, deliberately. `.manager-environment-comp-menu-note` declared `color: var(--fab-text-muted)` and it was DEAD: at (0,2,0) it lost to the item rule's `color: var(--fab-text)` at (0,2,1), so a disabled note has always rendered as ordinary ink at 45% opacity. */
 .fabricate-action-menu-panel button.manager-action-menu-item:disabled {
   opacity: 0.45;
@@ -2233,7 +2240,7 @@
 }
 
 .fabricate-action-menu-panel button.manager-action-menu-item.is-danger {
-  color: var(--fab-danger);
+  color: var(--fab-danger-text);
 }
 
 /* A headed panel holds the heading and the `role="menu"` list, which stacks its items as the bare panel does. */
@@ -2245,6 +2252,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
+}
+
+/* A menu with no item to choose holds the moved focus itself, and takes the module ring at (0,4,0), above the reset's `[tabindex]:focus`. */
+.fabricate-action-menu-panel.manager-action-menu-panel[role='menu'][data-action-menu-focused],
+.fabricate-action-menu-panel .manager-action-menu-list[role='menu'][data-action-menu-focused] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 /* Matching evidence — chips (compact) + table (inspector) */
