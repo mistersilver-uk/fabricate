@@ -9,7 +9,7 @@ import { managerCase } from './caseFactories.js';
 
 /**
  * The seam, its lazy loading, its prop kinds, its callbacks, its values, its overlay chain, its
- * manifest, its adapter and its host: each redraws what it mounts.
+ * standalone style root, its manifest, its adapter and its host: each redraws what it mounts.
  */
 const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentSeam\.js$/,
@@ -18,6 +18,7 @@ const PUBLISHED_SEAM_SOURCES = Object.freeze([
   /^src\/ui\/publishedComponentCallbacks\.js$/,
   /^src\/ui\/publishedComponentValues\.js$/,
   /^src\/ui\/publishedComponentOverlays\.js$/,
+  /^src\/ui\/publishedComponentStandaloneRoot\.js$/,
   /^src\/ui\/publishedComponentManifest\.js$/,
   /^src\/ui\/publishedComponents\.svelte\.js$/,
   /^src\/ui\/svelte\/published\/PublishedComponentHost\.svelte$/,

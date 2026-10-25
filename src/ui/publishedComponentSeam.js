@@ -16,6 +16,12 @@ import { PUBLISHED_COMPONENT_MANIFEST } from './publishedComponentManifest.js';
 import { openOverlayChain, unmountReporting } from './publishedComponentOverlays.js';
 import { PREFIX, SHIPPED_KINDS, copyProps, refuse } from './publishedComponentProps.js';
 import {
+  ANY_FABRICATE_SELECTOR,
+  FABRICATE_ROOT_SELECTOR,
+  inShadowRoot,
+  writeStandaloneRoot,
+} from './publishedComponentStandaloneRoot.js';
+import {
   changeKeyOf,
   seedValues,
   takeValues,
@@ -34,7 +40,10 @@ const INERT_HANDLE = Object.freeze({
 /** Each required ancestor root: the selector `target` needs above it, and what M16 says it needs. */
 const ROOTS = Object.freeze({
   any: null,
-  fabricate: Object.freeze({ selector: '.fabricate', needs: 'a Fabricate window ancestor' }),
+  fabricate: Object.freeze({
+    selector: FABRICATE_ROOT_SELECTOR,
+    needs: 'a Fabricate window ancestor',
+  }),
   manager: Object.freeze({ selector: '.fabricate-manager', needs: 'a Fabricate manager ancestor' }),
 });
 
@@ -98,6 +107,9 @@ function assertKnownEntry(entry) {
   if (!Object.hasOwn(ROOTS, entry.root)) {
     throw new Error(`${PREFIX}${entry.name} has an unknown root "${entry.root}"`);
   }
+  if (entry.standaloneRoot !== undefined && entry.root !== 'any') {
+    throw new Error(`${PREFIX}${entry.name} states standaloneRoot on the root "${entry.root}"`);
+  }
   const fault = valueEntryFault(entry);
   if (fault) throw new Error(PREFIX + fault);
 }
@@ -146,6 +158,7 @@ function newRecord(entry, target, onFault) {
     live: true,
     instance: null,
     root: null,
+    standaloneRoot: null,
     onFault,
     slots: new Map(),
     callbacks: new Map(),
@@ -192,19 +205,32 @@ function ownerOf(target, live) {
 }
 
 /**
- * Whether `target` has the ancestor `selector` names (M16). A target inside a slot element that
- * is not attached is judged by the target of the mount owning that element, and so on up; a mount
- * met twice is a cycle, which has no such ancestor.
+ * Whether `target` has the ancestor `selector` names (M16), and the element that was judged. A
+ * target inside a slot element that is not attached is judged by the element the mount owning that
+ * element draws in, its standalone style root or else its target, and so on up; a mount met twice
+ * is a cycle, which has no such ancestor.
  */
-function underRoot(target, selector, hasAncestor, owner) {
+function rootJudgement(target, selector, hasAncestor, owner) {
   const met = new Set();
   let judged = target;
   while (!hasAncestor(judged, selector)) {
     const record = owner(judged);
-    if (!record || met.has(record)) return false;
+    if (!record || met.has(record)) return { under: false, judged };
     met.add(record);
-    judged = record.target;
+    judged = record.standaloneRoot ?? record.target;
   }
+  return { under: true, judged };
+}
+
+/**
+ * Whether `entry` is drawn under a standalone style root written in `target`: it states
+ * `standaloneRoot` and no `.fabricate` is above `target`. M16 refuses it in a shadow root.
+ */
+function takesStandaloneRoot(entry, target, hasAncestor, owner) {
+  if (entry.standaloneRoot !== true) return false;
+  const { under, judged } = rootJudgement(target, ANY_FABRICATE_SELECTOR, hasAncestor, owner);
+  if (under) return false;
+  if (inShadowRoot(judged)) throw refuse(`${entry.name} cannot be drawn in a shadow root`);
   return true;
 }
 
@@ -287,11 +313,12 @@ function createMountLifecycle({ runtime, report }) {
     record.target.replaceChildren?.();
   }
 
-  // A retired mount's nested mounts end first; its slot elements and any overlay container still
-  // open leave after its own unmount.
+  // A retired mount's nested mounts end first; its standalone style root, its slot elements and any
+  // overlay container still open leave after its own unmount, the root by reference.
   function close(record, unmount) {
     for (const nested of nestedIn(record, live)) end(nested);
     unmount(record);
+    record.standaloneRoot?.remove();
     record.overlays?.close();
     detachSlots(record);
     record.callbacks.clear();
@@ -315,10 +342,12 @@ function createMountLifecycle({ runtime, report }) {
     queueFaultNotice(record, error, report, deferred);
   }
 
-  function start(entry, target, initial, { component, onFault, overlayHost }) {
+  function start(entry, target, initial, { component, onFault, overlayHost, standalone }) {
     const record = newRecord(entry, target, onFault);
     claims.set(target, record);
     live.add(record);
+    if (standalone) record.standaloneRoot = writeStandaloneRoot(target);
+    const drawnIn = record.standaloneRoot ?? target;
     openOverlays(entry, record, { overlayHost, runtime, report });
     requestSlots(entry, record, initial);
     takeCallbacks(entry, record.callbacks, initial);
@@ -328,7 +357,7 @@ function createMountLifecycle({ runtime, report }) {
     const hosted = { entry, record, initial, values, onfault, report, flush };
     const props = { component, ...hostPropsFor(hosted) };
     try {
-      record.instance = mount(host, { target, props });
+      record.instance = mount(host, { target: drawnIn, props });
     } catch (error) {
       retire(record);
       report(FAULT_REPORT, entry.name, error);
@@ -337,7 +366,7 @@ function createMountLifecycle({ runtime, report }) {
       return INERT_HANDLE;
     }
     if (!record.live) return INERT_HANDLE;
-    record.root = target.lastChild;
+    record.root = drawnIn.lastChild;
     return handleFor(entry, record, end);
   }
 
@@ -392,17 +421,18 @@ function createMounting({
     const { target, props = {}, onFault, overlayHost } = options ?? {};
     if (!isElement(target)) throw refuse('target must be an element');
     const root = ROOTS[entry.root];
-    if (root && !underRoot(target, root.selector, hasAncestor, lifecycle.owner)) {
+    if (root && !rootJudgement(target, root.selector, hasAncestor, lifecycle.owner).under) {
       throw refuse(`${entry.name} needs ${root.needs}`);
     }
+    const standalone = takesStandaloneRoot(entry, target, hasAncestor, lifecycle.owner);
     assertOverlayHost(overlayHost, target, isElement);
     const notify = typeof onFault === 'function' ? onFault : null;
-    return { target, props, onFault: notify, overlayHost };
+    return { target, props, onFault: notify, overlayHost, standalone };
   }
 
-  function render(entry, { target, onFault, overlayHost }, props) {
+  function render(entry, { target, onFault, overlayHost, standalone }, props) {
     const component = loading.componentOf(entry);
-    return lifecycle.start(entry, target, props, { component, onFault, overlayHost });
+    return lifecycle.start(entry, target, props, { component, onFault, overlayHost, standalone });
   }
 
   function mount(name, options) {
