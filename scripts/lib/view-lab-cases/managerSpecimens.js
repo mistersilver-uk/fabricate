@@ -443,12 +443,15 @@ const holdingDrawn = (within) =>
     .map(([key, drawn]) => `:has(> ${STANDALONE_TARGET(key)}${within}${drawn})`)
     .join('');
 
+/** A drawing directly under the style root the seam wrote in its target. */
+const UNDER_STANDALONE_ROOT = ` > ${STANDALONE_ROOT} `;
+
 /**
  * A ground with no `.fabricate` on it or above it, so none above a target, holding each drawing
  * directly under the style root the seam wrote in its target, and none inside the card, so the well
  * mounted in the card's slot wrote none.
  */
-const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(` > ${STANDALONE_ROOT} `)}:not(:has(.fabricate-card ${STANDALONE_ROOT}))`;
+const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT)}:not(:has(.fabricate-card ${STANDALONE_ROOT}))`;
 
 /** The same ground under the player window's Fabricate root, with no style root written in it. */
 const STANDALONE_IN_WINDOW = `${FABRICATE_WINDOW} ${STANDALONE_GROUND}:not(:has(${STANDALONE_ROOT}))${holdingDrawn(' ')}`;
