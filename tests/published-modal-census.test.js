@@ -1,7 +1,8 @@
 /**
  * The module sheet and every component style against the published `Modal` (issue 2656): the
- * three selectors that name its root, `fabricate-modal`, which are Well's modal-fill rule, the roll
- * prompt's height rule, which no published dialog matches, and Modal's own close-control paint;
+ * four selectors that name its root, `fabricate-modal`, which are Well's modal-fill rule, the roll
+ * prompt's height rule, which no published dialog matches, Modal's own close-control paint and the
+ * module sheet's hold on the focused dialog's elevation;
  * the subtitle, which no `.manager-muted` rule reaches; the close control's module ring; and the
  * header band's inks.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
@@ -39,11 +40,12 @@ const writtenOf = (census) =>
 describe('the module sheet and every component style against the published Modal', () => {
   const rules = rulesIn(collectStyleCorpus()['styles/fabricate.css']);
 
-  it('names the dialog root in three selectors: the modal-fill rule, the roll prompt’s and its own close-control paint', () => {
+  it('names the dialog root in four selectors: the modal-fill rule, the roll prompt’s, its own close-control paint and the focused dialog’s elevation', () => {
     assert.deepEqual(writtenOf(shippedCensus(DIALOG, 'Modal')), [
       `${ROLL_PROMPT}: :global(.fabricate-modal[data-manager-modal][data-roll-prompt])`,
       `${COMPONENT}: .fabricate-modal :global([data-manager-modal-close])`,
       `${WELL}: :global(.fabricate-modal) .fab-well`,
+      'styles/fabricate-base.css: .fabricate-modal.fabricate-modal[tabindex]',
     ]);
     const entry = entryNamed('Modal');
     assert.deepEqual(
@@ -80,6 +82,16 @@ describe('the module sheet and every component style against the published Modal
   it('pins the Well rule as the modal fill, a well inside a dialog taking --fab-bg-2', () => {
     const well = shippedCensus(DIALOG, 'Modal').find(({ written }) => written.startsWith(WELL));
     assert.deepEqual(declarationsOf(well.rule), [['background', 'var(--fab-bg-2)']]);
+  });
+
+  it('pins the module sheet rule on the dialog to its resting elevation and no ring, over the module focus pair', () => {
+    const hold = shippedCensus(DIALOG, 'Modal').find(({ written }) =>
+      written.startsWith('styles/fabricate-base.css:')
+    );
+    assert.deepEqual(declarationsOf(hold.rule), [
+      ['outline', 'none'],
+      ['box-shadow', 'var(--fab-shadow-lg)'],
+    ]);
   });
 
   it('holds no module sheet rule naming a manager-modal-* class or a data-manager-modal* hook', () => {
