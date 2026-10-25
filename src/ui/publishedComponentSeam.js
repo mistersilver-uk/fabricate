@@ -94,6 +94,15 @@ function isSoundGuard(entry, key, spec) {
   );
 }
 
+/** Registration's refusal of a `standaloneRoot` that is not `true`, or not on the `'any'` root. */
+function standaloneRootFault({ name, root, standaloneRoot }) {
+  if (standaloneRoot === undefined) return null;
+  if (standaloneRoot !== true) {
+    return `${name} has an unknown standaloneRoot "${String(standaloneRoot)}"`;
+  }
+  return root === 'any' ? null : `${name} states standaloneRoot on the root "${root}"`;
+}
+
 function assertKnownEntry(entry) {
   for (const [key, spec] of Object.entries(entry.props)) {
     if (!Object.hasOwn(SHIPPED_KINDS, spec.kind)) {
@@ -107,10 +116,7 @@ function assertKnownEntry(entry) {
   if (!Object.hasOwn(ROOTS, entry.root)) {
     throw new Error(`${PREFIX}${entry.name} has an unknown root "${entry.root}"`);
   }
-  if (entry.standaloneRoot !== undefined && entry.root !== 'any') {
-    throw new Error(`${PREFIX}${entry.name} states standaloneRoot on the root "${entry.root}"`);
-  }
-  const fault = valueEntryFault(entry);
+  const fault = standaloneRootFault(entry) ?? valueEntryFault(entry);
   if (fault) throw new Error(PREFIX + fault);
 }
 
@@ -450,8 +456,10 @@ function createMounting({
    * no claim and ends no stale claim, and each item's props are copied there. `mount` differs in one
    * case: it ends a stale claim before M6, so a target holding a node that claim left is M6 here
    * where `mount` passes. A later target inside the detached slot of a stale mount an earlier item's
-   * draw ends is drawn, where sequential `mount` calls refuse it (M16). A fault while an item renders
-   * is that item's own: its handle is inert, only its own `onFault` is told, and the rest stay live.
+   * draw ends is drawn, where sequential `mount` calls refuse it (M16); where that stale mount was
+   * drawn under a standalone style root, the target is judged under a root, so it is drawn with no
+   * standalone style root and no `.fabricate` above it. A fault while an item renders is that
+   * item's own: its handle is inert, only its own `onFault` is told, and the rest stay live.
    */
   function mountMany(name, items) {
     const entry = entryToMount(name);
