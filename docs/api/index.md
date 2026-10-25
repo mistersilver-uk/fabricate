@@ -3593,8 +3593,7 @@ Its width, height and placement are otherwise private.
 `Modal` needs a Fabricate window ancestor, because its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager and the player window.
 Your own window or dialog carries no Fabricate root, so the dialog is refused there with `Modal needs a Fabricate window ancestor`.
 The close control's keyboard ring is the window's accent ring, 2px wide and 2px clear of the control, and it clears 3:1 against the header band in every palette.
-The title clears 4.5:1 against the header band in every palette, and the close glyph clears 3:1 against it in every palette.
-The subtitle, in the weaker of its two inks, falls short of 4.5:1 against the header band in six of the seven palettes, the default among them, and clears it only in `mythwright`, so say in `title` whatever the reader must not miss.
+The title and the subtitle clear 4.5:1 against the header band in every palette, and the close glyph clears 3:1 against it in every palette.
 An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control you drew there; `destroy` removes the dialog, so where a control in it holds focus, move focus to an element of your own first.
 A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as [Overlays](#overlays) states.
 A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.

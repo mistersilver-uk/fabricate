@@ -126,7 +126,7 @@ describe('ImportReportModal (mounted)', () => {
     const heading = modal().querySelector('h3');
     assert.equal(heading.textContent.trim(), 'Import report');
     assert.equal(
-      modal().querySelector('p.manager-muted').textContent.trim(),
+      modal().querySelector('.manager-modal-subtitle').textContent.trim(),
       REPORTED_CONTENT.headline
     );
     // The old raw-HTML report used <h2> per kind; the card head is an <h4> inside a card.

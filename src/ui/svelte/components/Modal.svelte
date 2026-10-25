@@ -257,7 +257,7 @@
         <div class="manager-modal-heading">
           <h3 class="manager-modal-title">{title}</h3>
           {#if subtitle}
-            <p class="manager-modal-subtitle manager-muted">{subtitle}</p>
+            <p class="manager-modal-subtitle">{subtitle}</p>
           {/if}
         </div>
         <IconButton
@@ -338,10 +338,11 @@
 
   .manager-modal-subtitle {
     margin: 1px 0 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     font-weight: 500;
     line-height: normal;
+    overflow-wrap: break-word;
   }
 
   /* Paint only, at (0,3,0): above the family's resting paint and below its hover. */

@@ -1779,7 +1779,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="stage b0">
       <div style="width:100%;max-width:460px;display:flex;flex-direction:column;border-radius:11px;background:var(--fab-bg-1);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--fab-border);background:var(--fab-bg-2)">
-          <div class="grow" style="min-width:0"><div style="font-family:var(--fab-font-serif);font-size:14px;font-weight:600;color:var(--fab-text)">Map imported folders</div><div style="margin-top:1px;font-size:10.5px;font-weight:500;color:var(--fab-text-subtle)">Three folders in this pack have no match in your world.</div></div>
+          <div class="grow" style="min-width:0"><div style="font-family:var(--fab-font-serif);font-size:14px;font-weight:600;color:var(--fab-text)">Map imported folders</div><div style="margin-top:1px;font-size:10.5px;font-weight:500;color:var(--fab-text-muted)">Three folders in this pack have no match in your world.</div></div>
           <button class="k-btn icon s26" style="width:26px;height:26px;border-radius:7px;background:transparent;color:var(--fab-text-muted)"><svg class="i" style="width:11px;height:11px"><use href="#i-x"/></svg></button>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
@@ -1794,7 +1794,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     <div class="notes">
       <div><h5>Canonical spec</h5><ul>
         <li><b>panel</b> radius 11 · <code>--fab-bg-1</code> · 1px <code>--fab-border-strong</code> · <code>--fab-shadow-lg</code> · <b>width</b> <code>min(560px, 100vw &minus; 48px)</code> by default; the 460px here is the specimen&rsquo;s stage, not a width the component draws</li>
-        <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in subtle ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph. No header icon</li>
+        <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in muted ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph. No header icon</li>
         <li><b>body</b> padded 16, its sections 16 apart</li>
         <li><b>footer</b> a <code>--fab-bg-2</code> band under a hairline, padded 12/16/16, its actions 8 apart and right-aligned, at most one primary; <code>footerLayout="equal"</code> gives every child one equal share (<code>flex: 1 1 0; min-width: 0</code>)</li>
         <li>Portals into the application root, or into the host the overlay chain picks for a published mount, so it stacks above the window rather than under it</li>
@@ -1819,6 +1819,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
     </div>
     <div class="delta">It is distinct from a core <code>DialogV2</code>: this is a mounted Svelte surface inside the application, for a multi-step flow with its own state; a one-shot confirmation is still <code>confirmDialog</code>.<span class="cite"><b>Modal.svelte</b> (issue 877) · <b>RollPrompt.svelte</b> · <b>ImportFolderMappingModal.svelte</b> · <b>ImportReportModal.svelte</b> · <b>ComponentAddFromCatalogueDialog.svelte</b></span></div>
     <div class="delta ok"><code>Modal</code> is published through <code>game.fabricate.api.ui</code> (issue 2656).</div>
+    <div class="delta ok"><b>The subtitle inks <code>--fab-text-muted</code> (issue 2670).</b> The specimen&rsquo;s <code>--fab-text-subtle</code> measures 3.34&ndash;3.78:1 on <code>--fab-bg-2</code> in six palettes at 10.5px, under the 4.5:1 floor, and the spec already inks small text muted for the same reason (issue 2178); the size, weight and 1px gap are unchanged.</div>
   </div>
 
   <div class="spec" data-status="shipped" data-status-DataTable="shipped">
