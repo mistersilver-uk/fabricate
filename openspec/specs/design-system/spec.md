@@ -2509,7 +2509,7 @@ It dismisses on an outside click and on Escape.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
-A panel such a control portals outside the dialog is outside it, as a `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape there dismisses the modal too.
+A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
