@@ -2,8 +2,8 @@
  * The module sheet and every component style against the published `Modal` (issue 2656): the
  * three selectors that name its root, `fabricate-modal`, which are Well's modal-fill rule, the roll
  * prompt's height rule, which no published dialog matches, and Modal's own close-control paint;
- * the module sheet's `.manager-muted` rules that can restyle the subtitle; the close control's
- * module ring; and the header band's inks.
+ * the subtitle, which no `.manager-muted` rule reaches; the close control's module ring; and the
+ * header band's inks.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
  */
 import assert from 'node:assert/strict';
@@ -18,12 +18,7 @@ import {
   importClosure,
 } from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from './helpers/styleBlockScan.js';
-import {
-  declaredToken,
-  propertiesOf,
-  shortfalls,
-  themePalettes,
-} from './helpers/themePaletteContrast.js';
+import { declaredToken, shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
 
 const COMPONENT = 'src/ui/svelte/components/Modal.svelte';
 const WELL = 'src/ui/svelte/components/Well.svelte';
@@ -37,54 +32,6 @@ const DIALOG = Object.freeze({
   drawsChildren: true,
   undrawn: new Set(),
 });
-
-/** The properties the scoped `.manager-modal-subtitle` rule declares. */
-const SUBTITLE_PROPERTIES = Object.freeze([
-  'margin',
-  'color',
-  'font-size',
-  'font-weight',
-  'line-height',
-]);
-
-/**
- * The module sheet's `.fabricate-manager … .manager-muted` rules a subtitle can match, which sits
- * in `.manager-modal-heading` and carries no `is-danger`, beside what each declares that the
- * scoped subtitle rule also declares.
- */
-const SUBTITLE_RESTYLES = Object.freeze({
-  '.fabricate-manager .manager-checks-rail .manager-muted': [
-    ['margin', '0'],
-    ['color', 'var(--fab-text-subtle)'],
-    ['font-size', '10.5px'],
-    ['font-weight', '400'],
-    ['line-height', '1.5'],
-  ],
-  '.fabricate-manager .manager-checks-active-card .manager-muted': [
-    ['color', 'var(--fab-text-muted)'],
-    ['font-size', '10.5px'],
-    ['line-height', '1.35'],
-  ],
-  '.fabricate-manager[data-manager-view="recipe-edit"] .manager-muted': [['font-size', '0.64rem']],
-  '.fabricate-manager[data-manager-view="recipes"] .manager-muted': [['font-size', '0.64rem']],
-  '.fabricate-manager .manager-muted': [
-    ['margin', 'var(--fab-space-2xs) 0 0'],
-    ['color', 'var(--fab-text-muted)'],
-    ['font-size', '0.78rem'],
-    ['line-height', '1.35'],
-  ],
-  '.fabricate-manager .manager-tools-authority-card .manager-muted': [
-    ['margin', 'var(--fab-space-1) 0 0'],
-    ['font-size', '0.7rem'],
-    ['line-height', '1.3'],
-  ],
-});
-
-/** The `.manager-muted` selectors no subtitle can match: a danger note, and a direct child of another parent. */
-const UNMATCHED_MUTED = Object.freeze([
-  '.fabricate-manager .manager-muted.is-danger',
-  '.fabricate-manager .manager-tool-browser-inspector > .manager-muted',
-]);
 
 const writtenOf = (census) =>
   census.map(({ written }) => written.replaceAll(/\s+/g, ' ')).sort(byName);
@@ -142,23 +89,12 @@ describe('the module sheet and every component style against the published Modal
     assert.deepEqual(named, []);
   });
 
-  it('restyles a subtitle in the Manager through each .manager-muted rule that can match it', () => {
-    const muted = rules.flatMap((rule) =>
-      splitSelectorList(rule.selector)
-        .filter((selector) => /\.manager-muted\b/u.test(selector))
-        .map((selector) => [selector, rule])
+  it('draws the subtitle with no manager-muted class, so no .manager-muted rule reaches it', () => {
+    const tokens = new Set(
+      [...spelledStrings(COMPONENT, SHIPPED)].flatMap((text) => text.split(/\s+/u))
     );
-    const matching = muted.filter(([selector]) => !UNMATCHED_MUTED.includes(selector));
-    assert.deepEqual(
-      muted.map(([selector]) => selector).sort(byName),
-      [...Object.keys(SUBTITLE_RESTYLES), ...UNMATCHED_MUTED].sort(byName)
-    );
-    for (const [selector, rule] of matching) {
-      const shared = [...propertiesOf(rule)].filter(([property]) =>
-        SUBTITLE_PROPERTIES.includes(property)
-      );
-      assert.deepEqual(shared, SUBTITLE_RESTYLES[selector], selector);
-    }
+    assert.ok(tokens.has('manager-modal-subtitle'), `${COMPONENT} spells its subtitle class`);
+    assert.ok(!tokens.has('manager-muted'), `${COMPONENT} spells manager-muted`);
   });
 });
 
