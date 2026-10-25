@@ -1479,6 +1479,7 @@ Each group states the accepted values of every key that entry publishes.
     While `open` is `false`, `target` holds no element, and while it is `true`, `target` holds one empty element of Fabricate's, which is private.
     `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
     An `update` that passes `open: false` detaches the slot elements with their contents intact, and `open: true` attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and a companion's components, effects and listeners in them keep running.
+    The list of an overlay entry the companion mounts in a slot stays open in the host after such an `update`, until that entry closes it or the companion destroys that mount, so the companion closes or destroys it first.
   - `title` is required and is final display text, drawn as the dialog's level-3 heading, and it is the dialog's accessible name.
     `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.

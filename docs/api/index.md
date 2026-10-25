@@ -3545,6 +3545,7 @@ It draws nothing focusable inside `target`, so return focus to an element of you
 While it is closed, `target` holds no element, and while it is open, `target` holds one empty element of Fabricate's, which is private.
 An `update` replaces every prop, so pass the dialog's other props with `open` on each one, `title`, `closeLabel` and `onClose` among them.
 An `update` that closes the dialog detaches the slot elements with their contents intact, and one that opens it attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and your components, effects and listeners in them keep running.
+The list of an overlay entry you mount in a slot stays open in the host after such an `update`, until that entry closes it or you destroy that mount, so close or destroy it first.
 `title` is required and is final display text, drawn as the dialog's level-3 heading, and it is the dialog's accessible name.
 `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
 `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the [`IconButton`](#iconbutton) section states.

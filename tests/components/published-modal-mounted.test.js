@@ -330,6 +330,21 @@ describe('the published Modal opens and closes only through update', () => {
     assert.ok(!listboxIn(), 'no list is left in the host');
   });
 
+  it('leaves a slot-mounted published Select’s list open in the host when an update closes the dialog, as the group states', async () => {
+    const { api, handle, update } = mountModal();
+    await settle();
+    const { target } = mountIn(api, handle.slot('body'), 'Select', { ...SELECT, onChange() {} });
+    target.querySelector('button').click();
+    flushSync();
+    await settle();
+    assert.ok(listboxIn(), 'the list is open');
+    update({ open: false });
+    flushSync();
+    await settle();
+    assert.ok(!dialogIn(), 'the dialog is gone');
+    assert.ok(listboxIn(), 'the list stays until its mount closes it or is destroyed');
+  });
+
   it('leaves no dialog, container or layer when destroyed while open', async () => {
     const { handle } = mountModal({}, { target: fabricateTarget(shells, 'fabricate') });
     await settle();
