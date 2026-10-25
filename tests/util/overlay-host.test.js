@@ -136,6 +136,16 @@ describe('heldBy', () => {
     assert.equal(heldBy(element(), null), false);
   });
 
+  it('never hands a target that is not a node to contains, which throws on one in a browser', () => {
+    const strict = {
+      contains(node) {
+        if (typeof node?.nodeType !== 'number') throw new TypeError('not a Node');
+        return false;
+      },
+    };
+    assert.equal(heldBy(strict, document.defaultView), false);
+  });
+
   it('answers true for a node in the container and for one in an open shadow root under it', () => {
     const container = element();
     const inside = element('span', container);
