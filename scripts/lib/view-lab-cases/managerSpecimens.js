@@ -425,22 +425,39 @@ const MODAL_DONE = `${MODAL_GROUND} [data-lab-modal-footer] button`;
 /** Wider and taller than the 560px dialog, which is sized from the viewport and clipped past it. */
 const MODAL_WINDOW = Object.freeze({ width: 720, height: 560 });
 
-/** The standalone fixture's ground, one target by key, the style root the seam writes in it, and the player window's root. */
+/** The standalone fixture's ground, its two columns, one target by key, the style root the seam writes in it, and the player window's root. */
 const STANDALONE_GROUND = '[data-lab-standalone-ground]';
+const STANDALONE_COLUMNS = Object.freeze(
+  [1, 2].map((column) => `${STANDALONE_GROUND} > [data-lab-standalone-column="${column}"]`)
+);
 const STANDALONE_TARGET = (key) => `[data-lab-standalone-target="${key}"]`;
 const STANDALONE_ROOT = '.fabricate.fabricate-standalone-root';
 const FABRICATE_WINDOW = '.fabricate.fabricate-app';
 
-/** What each target draws: the three controls, and the companion's line in the card's well. */
+/**
+ * What each target draws: the three controls, the companion's line in the card's well, its input
+ * in the field's slot, and the search input, the stepper's input, the chosen segment, the chosen
+ * card, the selected tab and the pager's page-size control.
+ */
 const STANDALONE_DRAWN = Object.freeze({
   button: '.fabricate-button',
   'icon-button': '.fabricate-icon-button',
   toggle: '.manager-status-toggle-track',
   card: '.fabricate-card .fab-well p',
+  field: '.fabricate-field input[type="text"]',
+  search: '.fabricate-search input[type="search"]',
+  stepper: '.fab-stepper input[type="number"]',
+  segmented: '.manager-segmented .manager-segment.is-active',
+  cards: '.fabricate-option-cards .manager-resolution-option.is-active',
+  tabs: '.fabricate-tabs [role="tab"][aria-selected="true"]',
+  pager: '.fabricate-pagination [data-pagination-size]',
 });
 const holdingDrawn = (within) =>
   Object.entries(STANDALONE_DRAWN)
-    .map(([key, drawn]) => `:has(> ${STANDALONE_TARGET(key)}${within}${drawn})`)
+    .map(
+      ([key, drawn]) =>
+        `:has(> [data-lab-standalone-column] > ${STANDALONE_TARGET(key)}${within}${drawn})`
+    )
     .join('');
 
 /** A drawing directly under the style root the seam wrote in its target. */
@@ -448,16 +465,21 @@ const UNDER_STANDALONE_ROOT = ` > ${STANDALONE_ROOT} `;
 
 /**
  * A ground with no `.fabricate` on it or above it, so none above a target, holding each drawing
- * directly under the style root the seam wrote in its target, and none inside the card, so the well
- * mounted in the card's slot wrote none.
+ * directly under the style root the seam wrote in its target, and none inside the card or the
+ * field, so the well mounted in the card's slot and the field's own content wrote none.
  */
-const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT)}:not(:has(.fabricate-card ${STANDALONE_ROOT}))`;
+const STANDALONE_BARE = `${STANDALONE_GROUND}:not(.fabricate, .fabricate *)${holdingDrawn(UNDER_STANDALONE_ROOT)}:not(:has(.fabricate-card ${STANDALONE_ROOT})):not(:has(.fabricate-field ${STANDALONE_ROOT}))`;
 
 /** The same ground under the player window's Fabricate root, with no style root written in it. */
 const STANDALONE_IN_WINDOW = `${FABRICATE_WINDOW} ${STANDALONE_GROUND}:not(:has(${STANDALONE_ROOT}))${holdingDrawn(' ')}`;
 
 /** Sized to the companion frame, which is also the player window's own floor. */
 const STANDALONE_WINDOW = Object.freeze({ width: 1024, height: 640 });
+
+/** Each column inside the window's content, so a column the window clips fails the capture. */
+const STANDALONE_CONTAINMENT = Object.freeze(
+  STANDALONE_COLUMNS.map((target) => ({ container: '.window-content', target }))
+);
 
 /** A case in the classless companion frame; the light one differs from the dark by the page's colour scheme alone. */
 const standaloneCase = (entry) => ({
@@ -467,7 +489,7 @@ const standaloneCase = (entry) => ({
   smokeLabels: [],
   steps: [],
   expectSelector: STANDALONE_BARE,
-  expectContained: [{ container: '.window-content', target: STANDALONE_GROUND }],
+  expectContained: STANDALONE_CONTAINMENT,
   position: STANDALONE_WINDOW,
   kinds: ['standalone', 'specimen'],
   sourceMatches: PUBLISHED_SEAM_SOURCES,
@@ -1581,28 +1603,28 @@ export const CASES = Object.freeze([
   standaloneCase({
     id: 'published-standalone',
     label:
-      'Specimen, mounted through the published seam — the five entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it: a primary Button, an IconButton, a StatusToggle on, and an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, one above the other on a --fab-bg-1 ground the companion paints, because the style root paints none. The seam wrote one style root in each of the four targets and none for the well in the card; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the mounted suite’s',
+      'Specimen, mounted through the published seam — the twelve entries that state a standalone style root, each in a target of its own under a classless window frame with no Fabricate root above it, in two 360px columns on a --fab-bg-1 ground the companion paints, because the style root paints none: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column. The seam wrote one style root in each of the eleven targets and none for the well in the card or the field’s content; the ink is the root’s and the typeface is the window’s own. The frame is the evidence for the dark page; the measured equality with the in-window frame is the rendered suite’s',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with no Fabricate root.
     query: { specimen: 'published-standalone' },
   }),
   standaloneCase({
     id: 'published-standalone-light',
     label:
-      'Specimen, mounted through the published seam — the same five entries and ground, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot reads in that ink on the dark ground',
+      'Specimen, mounted through the published seam — the same twelve entries and two columns, in Foundry’s light application theme, so the window is light around the --fab-bg-1 ground: the style root states the dark scheme and the Fabricate ink for the content, and the companion’s line of text in the well’s slot, its caption and hint in the field’s slot, the card descriptions and the pager’s summary read in that ink on the dark ground',
     // Beyond the smoke: Foundry’s light theme is a condition the smoke never walks.
     query: { specimen: 'published-standalone', colorScheme: 'light' },
   }),
   playerCase({
     id: 'published-standalone-in-window',
     label:
-      'Specimen, mounted through the published seam — the five entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it: a primary Button, an IconButton, a StatusToggle on, and an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, one above the other on a --fab-bg-1 ground. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
+      'Specimen, mounted through the published seam — the twelve entries that state a standalone style root, each in a target of its own under the player window’s Fabricate root, as the reference for the two frames beside it, in two 360px columns on a --fab-bg-1 ground: in the first column, top to bottom, a primary Button, an IconButton, a StatusToggle on, an InspectorCard holding a Well labelled Chosen reagents and a line of the companion’s own text, a Field holding the companion’s caption Batch name over an empty text input with a placeholder and a hint, and an empty SearchField with a placeholder; in the second, a Stepper at 3 between 0 and 10, a SegmentedControl of three options with the first selected, a RadioCardGroup of two cards with icons and descriptions with the first chosen, an EditorTabs strip of three tabs with an icon on the first and the second active, and a Pagination on the first page of 42 at 10 a page with the sizes 10, 25 and 50, its bar wrapped to the column. The seam wrote no style root, because the window is one; the frame shows what each draws in the window',
     // Beyond the smoke: a companion mounts them through `api.ui` into a target with a Fabricate root.
     reaches: 'beyond',
     smokeLabels: [],
     query: { specimen: 'published-standalone' },
     steps: [],
     expectSelector: STANDALONE_IN_WINDOW,
-    expectContained: [{ container: '.window-content', target: STANDALONE_GROUND }],
+    expectContained: STANDALONE_CONTAINMENT,
     position: STANDALONE_WINDOW,
     kinds: ['standalone', 'specimen'],
     sourceMatches: PUBLISHED_SEAM_SOURCES,
