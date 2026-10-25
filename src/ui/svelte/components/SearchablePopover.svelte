@@ -52,9 +52,8 @@
   - `close()` IS NOT MERELY "HIDE THE PANEL": it clears the query, drops the type-ahead prefix and
     returns focus to the trigger, and `stayOpen` gates the WHOLE of it. That restoration waits for
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
-    while open. ESCAPE IS HANDLED IN ONE PLACE in every mode: `dismissOnOutsideClick` on the picker
-    root registers a DOCUMENT-level capture-phase keydown, so it does not depend on the key reaching
-    the portaled panel, which a key in the inline field, outside the panel, never does.
+    while open. ESCAPE IS HANDLED IN ONE PLACE, `dismissOnOutsideClick`'s DOCUMENT capture keydown,
+    which the inline field's keys reach; its `onDetached` closes, moving no focus, a detached root.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted
@@ -416,6 +415,7 @@
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: () => close(),
+    onDetached: anchored ? undefined : () => close({ restoreFocus: false }),
     additionalNodes: () => [popoverRoot, anchorNode()],
   }}
 >

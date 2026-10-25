@@ -12,7 +12,7 @@
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Window } from 'happy-dom';
 
@@ -330,20 +330,70 @@ describe('the published Modal opens and closes only through update', () => {
     assert.ok(!listboxIn(), 'no list is left in the host');
   });
 
-  it('leaves a slot-mounted published Select’s list open in the host when an update closes the dialog, as the group states', async () => {
-    const { api, handle, update } = mountModal();
+  it('closes a slot-mounted published Select’s list when an update closes the dialog, and its trigger reads aria-expanded false when the dialog opens again', async () => {
+    const { api, handle, target: modalTarget, update } = mountModal();
     await settle();
     const { target } = mountIn(api, handle.slot('body'), 'Select', { ...SELECT, onChange() {} });
-    target.querySelector('button').click();
+    const trigger = target.querySelector('button');
+    trigger.click();
     flushSync();
     await settle();
     assert.ok(listboxIn(), 'the list is open');
+    const host = modalTarget.parentElement;
+    assert.equal(host.children.length, 3, 'target, the dialog’s container and the list’s');
     update({ open: false });
     flushSync();
     await settle();
     assert.ok(!dialogIn(), 'the dialog is gone');
-    assert.ok(listboxIn(), 'the list stays until its mount closes it or is destroyed');
+    assert.ok(!listboxIn(), 'the list is gone');
+    assert.equal(host.children.length, 1, 'and no Select container is left in the host');
+    update({ open: true });
+    await settle();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
   });
+
+  /** Each slot entry with an open panel, and the `update` that detaches the slot holding it. */
+  const DETACHING = [
+    ['Select', 'open: false', { open: false }, '[role="listbox"]'],
+    ['Select', 'body: false', { body: false }, '[role="listbox"]'],
+    ['ActionMenu', 'open: false', { open: false }, '[role="menu"]'],
+  ];
+  for (const [name, label, next, panelHook] of DETACHING) {
+    it(`moves no focus and calls nothing as an update of ${label} closes a slot-mounted published ${name}’s open panel`, async () => {
+      const shellTarget = fabricateTarget(shells, 'fabricate fabricate-app');
+      const opener = companionButton(shellTarget.parentElement);
+      const { api, handle, update } = mountModal({}, { target: shellTarget });
+      await settle();
+      const callback = recorder();
+      const props =
+        name === 'Select'
+          ? { ...SELECT, onChange: callback.record }
+          : {
+              items: [{ id: 'rename', label: 'Rename reagent' }],
+              ariaLabel: 'Reagent actions',
+              onSelect: callback.record,
+            };
+      const { target } = mountIn(api, handle.slot('body'), name, props);
+      target.querySelector('button').click();
+      flushSync();
+      await settle();
+      assert.ok(document.querySelector(panelHook), 'the panel is open');
+      opener.focus();
+      assert.ok(document.activeElement === opener, 'the companion moved focus to its opener first');
+      const { HTMLElement } = document.defaultView;
+      const focus = mock.method(HTMLElement.prototype, 'focus');
+      try {
+        update(next);
+        await settle();
+        assert.ok(!document.querySelector(panelHook), 'the panel is gone');
+        assert.ok(document.activeElement === opener, 'focus stays on the opener');
+        assert.equal(focus.mock.callCount(), 0, 'nothing is focused');
+      } finally {
+        focus.mock.restore();
+      }
+      assert.deepEqual(callback.calls, [], `the ${name} calls nothing`);
+    });
+  }
 
   it('leaves no dialog, container or layer when destroyed while open', async () => {
     const { handle } = mountModal({}, { target: fabricateTarget(shells, 'fabricate') });
