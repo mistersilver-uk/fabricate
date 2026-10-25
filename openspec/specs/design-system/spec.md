@@ -2502,8 +2502,12 @@ The import flow — mapping folders, then reading the reference report — is th
 This is distinct from a one-shot confirmation, which stays `confirmDialog`, and from a Foundry-owned dialog, whose body is a cleaned HTML string rather than a mounted component.
 
 The modal portals into the application root so it stacks above the window rather than beneath it, and its close control is named by `closeLabel`, which every Fabricate caller passes, because it renders as an icon alone.
-It dismisses on an outside click and on Escape, which stops at the dialog in every mode, so Foundry's dismiss keybinding closes no window.
-An expanded control inside it, judged as the key goes down, keeps its own Escape; a step that would lose work confirms first.
+It dismisses on an outside click and on Escape.
+An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
+An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
+An expanded control inside it, judged as the key goes down, keeps its own Escape.
+A panel such a control portals outside the dialog is outside it, as a `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape there dismisses the modal too.
+A step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
 The shared `Modal` draws ONE frame, the library's banded Modal specimen, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.

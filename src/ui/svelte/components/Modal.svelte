@@ -21,11 +21,12 @@
   Invariants (issue 2658):
   - Body and footer are drawn once, inside the one `svelte:element` that is a `<form>` when
     `onSubmit` is passed and a `display: contents` `<div>` otherwise.
-  - Escape stops at the dialog in every mode, so Foundry's `core.dismiss` closes no window. It calls
-    `onClose` once per keydown, a held Escape once per repeat, and never for a composing key.
+  - An Escape inside the dialog stops there in every mode, so Foundry's `core.dismiss` never hears it.
+    An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry. It
+    calls `onClose` once per keydown, a held Escape once per repeat, and never for a composing key.
   - An expanded control inside the dialog, such as an open Select, keeps its own Escape. Whether a
     control is expanded is read as the key goes down, from a record `escapeOrigin` takes on the
-    WINDOW's capture phase: a browser flushes Svelte's update at the microtask checkpoint after each
+    window's capture phase: a browser flushes Svelte's update at the microtask checkpoint after each
     listener, so a control that collapses on Escape from a document capture listener has already
     written `aria-expanded="false"` by the time the key reaches the dialog. The window comes before
     the document in every capture path, so the record precedes every document capture listener
@@ -34,8 +35,11 @@
 
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new
-  window and reads the live attribute there. Escape or a press in a panel that a control in the
-  dialog portals outside it is an outside dismissal.
+  window and reads the live attribute there, and one left open across a Foundry 14 window move keeps
+  hearing the old window. A panel such a control portals outside the dialog is outside it, as a
+  `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape or a press there dismisses
+  the modal too. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
+  tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
@@ -73,11 +77,8 @@
   // The host the dialog was last acquired into, kept for `modalFocus` to restore focus into.
   let host = null;
 
-  // Acquired through the overlay chain (issue 2658): inside a published mount the dialog lives in
-  // the chain's container for it, and otherwise the class walk from the dialog node UPWARDS, never a
-  // document query for an application root by name (issue 1466): that found the manager window
-  // wherever it is, so this chrome opened from another application portaled into a DIFFERENT
-  // WINDOW and the `|| document.body` fallback made that silent.
+  // Inside a published mount, the chain's container for the dialog; otherwise the class walk from
+  // the dialog node upwards, never a document-wide query.
   function acquireHost(node) {
     host = acquireOverlayHost(node, node, { component: 'Modal' });
     return host;
@@ -88,25 +89,39 @@
     return { destroy: () => releaseOverlayHost(node) };
   }
 
-  // True when `target` sits in an expanded control that `container` holds. An expanded ancestor of
-  // the dialog itself never counts.
-  function expandedIn(container, target) {
-    const control = target?.closest?.('[aria-expanded="true"]');
-    return Boolean(control) && Boolean(container?.contains?.(control));
+  // Where an Escape started: the first entry of the composed path, so a target inside an open shadow
+  // root is not retargeted to its host.
+  function originOf(event) {
+    return event.composedPath?.()[0] ?? event.target;
   }
 
-  // Taken on the window's capture phase, which precedes every document capture listener, so it
-  // holds the attribute as the key went down and not as a later listener left it. The origin is the
-  // first entry of the composed path, so a target inside an open shadow root is not retargeted to
-  // its host. The window is kept and released from, never read again at destroy: after `adoptNode`
-  // it is the wrong one and once a detached window has closed it is `null`.
+  // True when `node` is in `container`, or in a shadow root whose host chain reaches it.
+  function heldBy(container, node) {
+    for (let at = node; at; at = at.getRootNode?.().host) {
+      if (container?.contains?.(at)) return true;
+    }
+    return false;
+  }
+
+  // True when `origin` sits in an expanded control that `container` holds, looking through open
+  // shadow roots to their hosts. An expanded ancestor of the dialog itself never counts.
+  function expandedIn(container, origin) {
+    for (let at = origin; at?.closest; at = at.getRootNode?.().host) {
+      const control = at.closest('[aria-expanded="true"]');
+      if (control) return heldBy(container, control);
+    }
+    return false;
+  }
+
+  // Taken on the window's capture phase; see Invariants. The window is kept and released from, never
+  // read again at destroy: after `adoptNode` it is the wrong one and once a detached window has
+  // closed it is `null`.
   function escapeOrigin(node) {
     const view = node.ownerDocument?.defaultView;
     if (typeof view?.addEventListener !== 'function') return {};
     const record = (event) => {
       if (event.key !== 'Escape') return;
-      const origin = event.composedPath?.()[0] ?? event.target;
-      escapeRecord = { event, expanded: expandedIn(node, origin) };
+      escapeRecord = { event, expanded: expandedIn(node, originOf(event)) };
     };
     view.addEventListener('keydown', record, true);
     return {
@@ -121,11 +136,15 @@
     onClose();
   }
 
+  // Whether the key started in the dialog, by the composed path so an open shadow root under it counts.
+  function cameFromInside(event) {
+    return event.composedPath?.().includes(dialog) ?? Boolean(dialog?.contains?.(event.target));
+  }
+
   // An outside mousedown or an Escape that did not come from inside the dialog. Escape inside it
   // is `handleKeydown`'s, so it is not closed twice, nor is an expanded control's.
   function dismissFromOutside(event) {
-    if (event?.type === 'keydown' && (event.isComposing || dialog?.contains?.(event.target)))
-      return;
+    if (event?.type === 'keydown' && (event.isComposing || cameFromInside(event))) return;
     requestClose();
   }
 
@@ -147,12 +166,13 @@
     if (!enabled) return {};
     const opener = node.ownerDocument.activeElement;
     const held = host;
+    const view = node.ownerDocument.defaultView;
     const first = (initialFocus && node.querySelector(initialFocus)) || focusables(node)[0];
     first?.focus?.();
     return {
       destroy() {
         // A frame later, so an opener the answer's own flow re-enables can take focus back.
-        node.ownerDocument.defaultView.requestAnimationFrame(() => restoreFocus(opener, held));
+        view?.requestAnimationFrame?.(() => restoreFocus(opener, held));
       },
     };
   }
@@ -176,7 +196,7 @@
       const expanded =
         escapeRecord?.event === event
           ? escapeRecord.expanded
-          : expandedIn(event.currentTarget, event.target);
+          : expandedIn(event.currentTarget, originOf(event));
       if (!expanded) {
         // Foundry's `core.dismiss` would otherwise close every framed window.
         event.preventDefault();

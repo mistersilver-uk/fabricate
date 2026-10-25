@@ -602,8 +602,8 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('closes once on Escape in the search field, claims the key and keeps it from the window', async () => {
-    // The dialog stops Escape at itself (issue 2658), so the browser no longer clears the field and
-    // Foundry's dismiss keybinding closes no window.
+    // The dialog stops Escape at itself (issue 2658) and default-prevents it. happy-dom shows
+    // `defaultPrevented`; in Chromium that also keeps the search field from clearing.
     const { closed } = await open();
     const search = document.querySelector('[data-component-add-from-catalogue-search]');
     const heard = [];
