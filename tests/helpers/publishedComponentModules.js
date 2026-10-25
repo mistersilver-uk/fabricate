@@ -43,6 +43,7 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',
+  'src/ui/svelte/util/actionMenuLayout.js',
 ]);
 
 export const PUBLISHED_RUNE_MODULES = Object.freeze(['src/ui/publishedComponents.svelte.js']);
@@ -80,6 +81,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  'src/ui/svelte/components/ActionMenu.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */

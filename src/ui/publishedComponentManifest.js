@@ -445,4 +445,18 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'fabricate',
     overlays: true,
   }),
+  Object.freeze({
+    name: 'ActionMenu',
+    path: 'src/ui/svelte/components/ActionMenu.svelte',
+    version: 1,
+    props: Object.freeze({
+      items: Object.freeze({ kind: 'data', required: true }),
+      ariaLabel: Object.freeze({ kind: 'data', required: true }),
+      align: Object.freeze({ kind: 'data' }),
+      onSelect: Object.freeze({ kind: 'callback', required: true, args: 1 }),
+    }),
+    rest: false,
+    root: 'fabricate',
+    overlays: true,
+  }),
 ]);

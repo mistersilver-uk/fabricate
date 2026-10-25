@@ -1983,7 +1983,7 @@ Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabI
 
 `game.fabricate.api.ui` lets a companion draw a Fabricate primitive into an element the companion owns, so it renders Fabricate's own component instead of keeping a copy.
 It is the other direction from the two navigation seams: they put a companion's content into Fabricate's windows, and this puts Fabricate's components into the companion's.
-[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
+[Issue #2426](https://github.com/mistersilver-uk/fabricate/issues/2426) published the seam and its first data-only leaf primitive, and [issue #2448](https://github.com/mistersilver-uk/fabricate/issues/2448) published more data-only leaves; [issue #2451](https://github.com/mistersilver-uk/fabricate/issues/2451) publishes content and fault handling through the seam; [issue #2452](https://github.com/mistersilver-uk/fabricate/issues/2452) publishes callbacks, the first control and ARIA attributes on a control; [issue #2453](https://github.com/mistersilver-uk/fabricate/issues/2453) publishes bound values; [issue #2454](https://github.com/mistersilver-uk/fabricate/issues/2454) publishes the overlay host and `Select`, its first overlay; [issue #2455](https://github.com/mistersilver-uk/fabricate/issues/2455) publishes `StageBars`, lazy components and `mountMany`; [issue #2601](https://github.com/mistersilver-uk/fabricate/issues/2601) publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; [issue #2644](https://github.com/mistersilver-uk/fabricate/issues/2644) publishes `SegmentedControl`; [issue #2646](https://github.com/mistersilver-uk/fabricate/issues/2646) publishes `Pagination`; [issue #2647](https://github.com/mistersilver-uk/fabricate/issues/2647) publishes `IconPicker`; [issue #2652](https://github.com/mistersilver-uk/fabricate/issues/2652) publishes `ActionMenu`; the standalone style root is the rest of phase 2, [issue #2427](https://github.com/mistersilver-uk/fabricate/issues/2427).
 
 {: .warning }
 > Do not destructure it as `const { ui } = game.fabricate.api`, because that shadows Foundry's own `ui` global.
@@ -2062,6 +2062,7 @@ The published components, in publication order:
 | `SegmentedControl` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `fill`, `density` | yes |
 | `Pagination` | 1 | `fabricate` | `totalCount` (required), `pageSize` (required), `pageIndex`, `pageSizeOptions` (required), `onPageChange` (callback, required), `onPageSizeChange` (callback, required), `persistent`, `ariaLabel` (required), `navLabel` (required), `previousLabel` (required), `nextLabel` (required), `perPageLabel` (required), `rangeTemplate` (required), `pageTemplate` (required), `density` | no |
 | `IconPicker` | 1 | `fabricate` | `value`, `onChange` (callback, required), `ariaLabel` (required), `listLabel` (required), `searchLabel` (required), `searchPlaceholder`, `noMatchesText` (required) | no |
+| `ActionMenu` | 1 | `fabricate` | `items` (required), `ariaLabel` (required), `align`, `onSelect` (callback, required) | no |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -3451,6 +3452,89 @@ const picker = fabUi.mount('IconPicker', { target, props: props() });
 // `picker.destroy()` when the panel goes away, moving focus first if the picker holds it.
 ```
 
+### ActionMenu
+
+`ActionMenu` draws Fabricate's overflow menu (`<Menu>` in the design-system library): an icon-only trigger button showing Fabricate's overflow glyph, which opens a menu of commands, in an overlay, each of which `onSelect` reports as it is chosen.
+The trigger is the only focusable element inside `target`, so to return focus to the `ActionMenu`, focus its trigger, `target.querySelector('button')`.
+`items` is required and is an array of the menu's commands, in order, each `{ id, label, icon, disabled, danger }`, of which `id` and `label` are required.
+`id` is a string unique within `items`, which `onSelect` reports.
+`label` is the item's final display text and its accessible name, and it names the command, not the record, because the trigger identifies the record.
+A label too long for the menu is cut with an ellipsis, and its whole text stays its name.
+`icon` is a Font Awesome class string drawn before the label and hidden from assistive technology, and an item without one keeps the glyph's column empty.
+`disabled: true` draws the item dimmed as a natively disabled button, which the arrow keys skip and a press does not choose.
+`danger: true` draws the item in the danger ink, which falls short of 4.5:1 on the menu's ground in one palette and on a hovered or focused item in four, so let its label, not its colour, state what it does.
+Fabricate drops an item's `data` and never writes it, and any other member is private.
+With `items` empty, or every item disabled, a press opens a menu with no item to choose, focus rests on the menu itself, and Escape, Tab or a press outside it closes it; with no command to offer, leave the menu unmounted.
+`ariaLabel` is required and is final display text naming the trigger and the menu, as "Reagent actions for Flask", and it is also the trigger's tooltip, shown as the [`IconButton`](#iconbutton) section states.
+Never pass a name of white space alone, which leaves the trigger and the menu with no name.
+`align` is `'end'` or `'start'` and defaults to `'end'`, and any other value is private.
+With `'end'` the menu lines up with the trigger's end edge, for a trigger at a row's end, and with `'start'` with its start edge, for one at a list's start; either way it is kept inside its host's left and right edges where the host is wide enough to hold it.
+`onSelect` is a required callback, called with one argument, the chosen item's `id`, each time the user chooses an enabled item by pointer, Enter or Space.
+It is not called by `mount`, `update`, opening or closing the menu, the arrow keys, Escape, Tab, a press outside the menu, or the repeats of an Enter held on the trigger.
+A menu marks no item selected or current, and each choice of an enabled item calls it, the item chosen last time included.
+Fabricate calls `onSelect` only with the `id` of an item the menu draws when it is chosen.
+Run a command only for an `id` you match by name, with no closing `else`, so no item, the last one included, runs a command meant for another `id`.
+
+- A press on the trigger, by pointer, Enter or Space, opens the menu and moves focus to its first enabled item, outside `target`.
+  After a pointer press, the focus Fabricate moves into the menu shows no mark until a key moves it; this falls short of the design system's rule for programmatic focus, which requires a marker on that path, and is recorded, not fixed.
+- ArrowDown on the trigger does the same, and ArrowUp opens the menu onto its last enabled item.
+- An Enter held on the trigger opens the menu once, and an Enter held on an item chooses it once; the repeats of either choose and open nothing, and a fresh Enter on an item chooses it.
+- A second press on the trigger closes the menu without choosing and moves no focus, so focus goes where the pointer press puts it, which in Chromium, Foundry's desktop client, is the trigger.
+- In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
+- A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger; to move focus in response, move it from a later task, as from a `setTimeout`.
+- Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog` also closes is private.
+- Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger.
+- A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
+- A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element you pressed when it, or an element around it, takes focus, and otherwise to the page.
+  With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
+- The trigger announces the menu with `aria-haspopup="menu"` and its open state with `aria-expanded`, and the menu is a `role="menu"` of `role="menuitem"` items named by `ariaLabel`, with no selection state.
+- The trigger stops the propagation of ArrowDown and ArrowUp and of its own `click`, so your listener above `target` hears none of them, and every other key on the trigger bubbles as it does from any button.
+  The open menu stops every `click` inside it, so your listener on the `overlayHost` or above it hears none, and every key pressed in the menu, Escape included, may reach that listener.
+
+The menu is the component's overlay, so `describe('ActionMenu').overlays` is `true`, and it is drawn in the host [Overlays](#overlays) picks when it opens.
+Pass an `overlayHost` inside the same Fabricate window, or none, because the menu's items, their focus mark and the theme are drawn as this section states only under a `.fabricate` ancestor.
+The menu opens below the trigger, or above it where the host has room above and none below, and its placement inside the host is otherwise private.
+`ActionMenu` takes no rest props, so a `data-*` prop is refused with `"<key>" is not a prop of ActionMenu`.
+`ActionMenu` needs a Fabricate window ancestor, because its trigger, items and marks come from Fabricate's module sheet, rooted at `.fabricate-action-menu` and `.fabricate-action-menu-panel`, and it is drawn the same in the Manager and the player window.
+Your own window or dialog carries no Fabricate root, so the menu is refused there with `ActionMenu needs a Fabricate window ancestor`.
+The trigger's keyboard ring is the window's accent ring, 2px wide and 2px clear of the trigger, and an item under keyboard focus takes a raised fill and a 1px accent ring drawn inside its edge.
+With no item to choose, the menu itself takes the window's accent ring, 2px wide and 2px clear of its edge.
+The trigger's ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, so mount the menu on one of those grounds and leave room for the ring inside any edge of your own that clips.
+The item's ring clears 3:1 against its raised fill over the menu's ground, and against that ground, in every palette.
+An `update` keeps the trigger, so focus stays on it, and an `update` while the menu is open redraws its items in place, focus staying on the item that holds it while that item is still drawn and enabled; `destroy` removes the trigger and closes the menu, so where the trigger or an item holds focus, move focus to an element of your own first.
+A menu opened after Foundry 14 moves the window is placed and heard in the window that then holds the trigger, its focus and arrow keys included, as [Overlays](#overlays) states.
+Its glyph, its trigger, menu, item and type figures, its colours beyond what this section states, the menu's placement and width, an item's `tone`, and its `manager-action-menu-*` classes and `data-action-menu-*` hooks are private.
+`disabled`, `heading`, `panelLabel`, `triggerIcon`, `triggerTitle` and `open` are not published at version 1, and `triggerClass`, `menuClass`, `triggerProps` and `trigger` never are, so each is refused, as is a `class`.
+
+A worked menu follows: a reagent row's commands on a panel inside a Fabricate window, for example in an extension target.
+
+```javascript
+// After `load(['ActionMenu'])` has resolved and `fabricate.ready` has fired.
+const fabUi = game.fabricate?.api?.ui;
+// A Fabricate that predates the menu describes none: draw your own control there.
+if (fabUi?.describe?.('ActionMenu')?.overlays !== true) return;
+
+const menu = fabUi.mount('ActionMenu', {
+  target,
+  props: {
+    items: [
+      { id: 'duplicate', label: game.i18n.localize('ACME.Duplicate'), icon: 'fas fa-copy' },
+      { id: 'delete', label: game.i18n.localize('ACME.Delete'), icon: 'fas fa-trash', danger: true },
+    ],
+    // The trigger names the record; each item names only its command.
+    ariaLabel: game.i18n.format('ACME.ReagentActions', { name: reagent.name }),
+    onSelect: (id) => {
+      // Each command by its own id, and no closing `else`; each from a later task, so the focus
+      // Fabricate returns to the trigger does not overwrite focus the command moves.
+      if (id === 'duplicate') setTimeout(() => duplicateReagent(reagent), 0);
+      else if (id === 'delete') setTimeout(() => confirmDeleteReagent(reagent), 0);
+    },
+  },
+});
+
+// `menu.destroy()` when the panel goes away, moving focus first if the menu holds it.
+```
+
 ### The descriptor
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
@@ -3626,7 +3710,7 @@ It never throws synchronously, and is callable as soon as `api.ui` is readable, 
 It resolves `undefined` once every named component's code is loaded: at once, on the next microtask, for a component Fabricate loads with its own entry script, and once its code is fetched for a lazy one.
 It rejects with a `TypeError` ending `"<name>" is not published` for a name that is not published, before it fetches anything, and with the browser's own error when a lazy component's code cannot be fetched.
 It does not wait for `fabricate.ready`, so `mount` still throws `mount before ready` until that hook has fired.
-`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination` and `IconPicker` were published with `load`, so call it for each before mounting.
+`TierTrack` and the seven components of issue #2448 never need it; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState`, `Notice`, `Button`, `StatusToggle`, `Stepper`, `SearchField`, `Select`, `StageBars`, `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs`, `RadioCardGroup`, `SegmentedControl`, `Pagination`, `IconPicker` and `ActionMenu` were published with `load`, so call it for each before mounting.
 `Rail` is lazy: Fabricate's entry script does not carry its code, `load` fetches it, and until `load(['Rail'])` has resolved, `mount('Rail', …)` throws `"Rail" is not loaded` and draws nothing.
 A `load` you do not await still starts the fetch, but `mount` refuses the component until it has resolved, and a rejection nothing handles is an unhandled rejection.
 A lazy component's code is fetched once per page session: calls made together share the one fetch, and a fetch that failed is not retried, so every later `load` naming it rejects with the same error and `mount` keeps refusing it until the user reloads.
@@ -3723,6 +3807,7 @@ Destroying one handle leaves the others live, so destroy each handle on every pa
 A component whose `describe(name).overlays` is `true` opens an overlay: a panel it draws outside `target` while it is open, such as a list, a menu or a dialog.
 `Select` is the first, and its section states what its list draws.
 `IconPicker` is the second: its list and its query field are the overlay, and its section states what they draw.
+`ActionMenu` is the third: its menu is the overlay, and its section states what it draws.
 `mount` ignores an option it does not know, so `overlays === true` is also your signal that `overlayHost` is honoured.
 Each time an overlay opens, Fabricate picks where to draw it, from `target`'s own document at that moment:
 
@@ -3731,7 +3816,7 @@ Each time an overlay opens, Fabricate picks where to draw it, from `target`'s ow
 3. else a standalone layer Fabricate keeps on `target.ownerDocument.body` while any overlay in that document is open on it, themed from the nearest ancestor of `target` inside its `<html>` that carries `data-fabricate-theme`, else from Fabricate's own document, copied when the layer is made.
 
 Give `overlayHost` a `position` other than `static` with a size, because it is the panel's containing block and the origin its coordinates are measured from; it need not be connected when you mount.
-A component's section may narrow where `overlayHost` sits, and `Select`'s and `IconPicker`'s do: keep it inside the same Fabricate window as `target`.
+A component's section may narrow where `overlayHost` sits, and `Select`'s, `IconPicker`'s and `ActionMenu`'s do: keep it inside the same Fabricate window as `target`.
 The panel is drawn inside a `display: contents` element Fabricate mounts on its own runtime, so the panel's own handlers run in whichever document holds it, a Foundry 14 detached window included.
 That element, the panel and everything in it are private: select none of it.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
@@ -3777,25 +3862,26 @@ A published component draws a control only where its section says so, and each c
 - A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
   Where a component's rest lands on the control itself, `data-keyboard-focus` is refused, so you cannot replace it.
-- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key as its section states, and Foundry's keybindings stay held off as the bullet above states.
+- A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its section names the key, as the `EditorTabs` section does: a `keydown` listener of yours above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each section states, and Foundry's keybindings stay held off as the bullet above states.
   A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
-  Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio Fabricate has moved focus to, as its section states, and Space on release.
+  Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each section states, and Space on release.
   In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its section names any other.
-  Tab moves focus as the browser does, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
+  Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its section states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
   In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
-- A control draws its own mark for keyboard focus where the component's `root` is `any`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states.
+- A control draws its own mark for keyboard focus where the component's `root` is `any`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the component's section states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, as its section states.
   Where a component's rest lands on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused: they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text you pass through a prop its section names, or your own visible text that an `aria` prop its section names points at, and Fabricate supplies none, except an `IconPicker` row, which its section names by its glyph's `label`.
   Where a prop carries the name, `aria-label` is refused, and so is `aria-labelledby` unless the component's section names it as an `aria` prop.
   A section names `aria-labelledby` only for a control that draws no text of its own and is named through `aria-label` by a required `data` prop holding the same text, so the control is never without a name: an id list that names no element leaves the name from that prop.
 - Fabricate moves no focus, except that focus moves among the tabs of one `EditorTabs` strip on a press and on the keys its section names, and the platform moves it among the radios of one `RadioCardGroup` or one `SegmentedControl` on the arrow keys, and when an `update` disables or removes the `Pagination` arrow that holds focus, Fabricate moves it to that pager's other arrow or its checked page-size radio, as its section states, each never out of `target`.
   An `IconPicker` is the exception to `target`: Fabricate moves focus from its trigger into its open list's query field, outside `target`, and back to the trigger when the list closes, as its section states.
-  An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where the sentence above has Fabricate move it off a `Pagination` arrow, so move focus to an element of your own before you call either.
+  An `ActionMenu` is another exception to `target`: Fabricate moves focus from its trigger into its open menu, among the menu's items on the keys its section names, and back to the trigger when a choice, Escape or Tab closes it, as its section states.
+  An `update` or `destroy` that removes a focused control leaves focus on the document body, where Foundry's keybindings apply, except where this bullet's first sentence has Fabricate move it off a `Pagination` arrow, so move focus to an element of your own before you call either.
   The destination is, in order: the control the press leads to; the next control in your own content, then the previous one; and where none exists, the heading or container of the region `target` sits in, which you give `tabindex="-1"`.
   Where the destination is drawn by the same change, draw it first, focus it, and then remove the control.
 - To return focus to a published control, after a dialog its press opened has closed, focus the focusable element inside `target` that the component's section names; nothing else inside `target` is yours to select.
-- A press bubbles from the control as a `click`, except a press on a `Select` or `IconPicker` trigger, which stops at the trigger, and a press inside an open `Select` or `IconPicker` list, which stops at the list.
+- A press bubbles from the control as a `click`, except a press on a `Select`, `IconPicker` or `ActionMenu` trigger, which stops at the trigger, and a press inside an open `Select` or `IconPicker` list or `ActionMenu` menu, which stops there.
   An element of yours above `target` that listens for `click` receives every other press too.
   Keep `target` out of any element of your own that carries `data-action`, and pass no `data-action` through rest to a component that draws a control: the window dispatches the nearest `data-action` above the press, and `close` closes it, as a DialogV2 button's own action name submits it.
   Where a component's rest lands on the control itself, `data-action` is refused: the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
@@ -3822,7 +3908,7 @@ A published component draws a control only where its section says so, and each c
 - A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
   Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no prop names one, and the HTML `title` attribute is refused as a rest key.
-  The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states.
+  The one exception is `IconButton`, and the `ActionMenu` trigger it draws, which shows its name as its tooltip under the pointer and keyboard focus alike, as its section states.
   A `data-tooltip-text` you pass through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
   Where a component's rest lands on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused, so the control shows the pointer nothing it does not show keyboard focus.
   A tooltip attribute on `target` itself is yours, and is held to the same rule.

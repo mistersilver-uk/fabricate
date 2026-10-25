@@ -39,6 +39,11 @@
   - NO SCOPED `<style>`: everything that paints this component lives in `styles/fabricate.css`,
     rooted at the two namespace classes it writes — one on its own root and one on the portaled
     panel — per `openspec/specs/design-system/spec.md`, which also owns the portal-host contract.
+  - Published through `game.fabricate.api.ui` with `items`, `ariaLabel`, `align` and `onSelect`
+    only, the seam dropping each item's `data` (`ui-extension-points`' issue 2652 group).
+  - The headed list's static `data-action-menu-list` hook tells the seam's gate its two menu divs apart.
+  - A repeating Enter in the menu is prevented, never stopped, so the repeats of an Enter held from
+    the press that opened it choose nothing; `tests/components/published-action-menu-mounted.test.js`.
 -->
 <script>
   import { tick } from 'svelte';
@@ -124,6 +129,11 @@
   }
 
   function onTriggerKeydown(event) {
+    // Not stopped: a choice returns focus here, and the Enter still held would press the trigger.
+    if (event.key === 'Enter' && event.repeat) {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     event.stopPropagation();
@@ -148,6 +158,10 @@
 
   function onPanelKeydown(event) {
     const { key } = event;
+    if (key === 'Enter' && event.repeat) {
+      event.preventDefault();
+      return;
+    }
     if (key === 'Escape') {
       stop(event);
       return;
@@ -261,6 +275,7 @@
       </div>
       <div
         class="manager-action-menu-list"
+        data-action-menu-list=""
         role="menu"
         tabindex="-1"
         data-keyboard-focus="true"
