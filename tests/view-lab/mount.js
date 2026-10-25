@@ -798,6 +798,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-pagination': () => import('./fixtures/PublishedPagination.svelte'),
   // Issue 2647: a reagent's icon whose choice the companion's own update draws.
   'published-icon-picker': () => import('./fixtures/PublishedIconPicker.svelte'),
+  // Issue 2652: a reagent's action menu whose choice the ground records.
+  'published-action-menu': () => import('./fixtures/PublishedActionMenu.svelte'),
 });
 // view-lab-region:end
 

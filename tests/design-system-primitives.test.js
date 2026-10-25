@@ -1013,6 +1013,21 @@ test('(a) an IconPicker change publishes its frame, then the two specimens that 
   assertBroadSignalFrames(file, frames);
 });
 
+test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/ActionMenu.svelte';
+  const frames = [
+    'manager-environment-edit-automatic-force-add',
+    'manager-systems-row-menu-open',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-choice-group-menu',
+    'manager-recipe-edit-results-adder-menu',
+    'manager-recipe-edit-ingredients-adder-menu',
+    'manager-published-action-menu-specimen',
+    'manager-published-action-menu-choice',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
 test('(a) a Notice change publishes the five specimens that mount it, after the frame that draws it', () => {
   const file = 'src/ui/svelte/components/Notice.svelte';
   const frames = [

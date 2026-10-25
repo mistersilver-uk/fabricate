@@ -409,6 +409,7 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedSegmented.svelte',
   'tests/view-lab/fixtures/PublishedPagination.svelte',
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
+  'tests/view-lab/fixtures/PublishedActionMenu.svelte',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -1503,6 +1504,26 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-icon-picker-choice': [
     {
       selector: '[data-lab-icon-picker] .essence-icon-picker-trigger',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The published action menu (issue 2652): the panel's and the first item's concentric corners,
+  // and the focused item's inset ring, by its shape.
+  'manager-published-action-menu-specimen': [
+    {
+      selector: '[data-lab-action-menu] > div > .fabricate-action-menu-panel',
+      styles: 'border-radius: 11px',
+    },
+    {
+      selector:
+        '[data-lab-action-menu] > div > .fabricate-action-menu-panel button.manager-action-menu-item:first-child',
+      styles: 'border-radius: 7px; outline-style: solid; outline-width: 1px; outline-offset: -1px',
+    },
+  ],
+  // The trigger focus returned to after a keyboard choice: its ring, by its shape.
+  'manager-published-action-menu-choice': [
+    {
+      selector: '[data-lab-action-menu] .fabricate-icon-button',
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
@@ -6178,13 +6199,15 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-pagination-size-specimen',
       'manager-published-icon-picker-specimen',
       'manager-published-icon-picker-choice',
+      'manager-published-action-menu-specimen',
+      'manager-published-action-menu-choice',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, and the icon picker fixture's picker. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, the icon picker fixture's picker, and the action menu fixture's menu. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6201,9 +6224,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'SegmentedControl',
   'Pagination',
   'IconPicker',
+  'ActionMenu',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination and IconPicker and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker and ActionMenu and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])

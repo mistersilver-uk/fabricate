@@ -118,7 +118,10 @@ function copyValue(value, key) {
  * `tests/published-component-ratchet.test.js` holds this list against the spreads the published
  * closures draw.
  */
-export const STRIPPED_ITEM_MEMBERS = Object.freeze(['InfoStrip.facts.props']);
+export const STRIPPED_ITEM_MEMBERS = Object.freeze([
+  'InfoStrip.facts.props',
+  'ActionMenu.items.data',
+]);
 
 const STRIPPED_PATHS = Map.groupBy(
   STRIPPED_ITEM_MEMBERS.map((spec) => {

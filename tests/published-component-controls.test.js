@@ -117,6 +117,16 @@ const flatPins = (table) =>
  * entries reach may take a `{ byEntry }` row of each one's pin, resolved by `pinsFor` (issue 2647).
  */
 const FOCUSABLE_REACH = Object.freeze({
+  // One item for each of `items`.
+  'src/ui/svelte/components/ActionMenu.svelte: button': 'items',
+  // The unheaded menu, drawn while the menu is open and `heading` keeps its default.
+  'src/ui/svelte/components/ActionMenu.svelte: div': {
+    defaults: ['heading', 'open'],
+    heldBy:
+      'tests/components/published-action-menu-mounted.test.js: the published ActionMenu opens its menu',
+  },
+  // The headed menu's list, under `heading`, which the entry does not publish.
+  'src/ui/svelte/components/ActionMenu.svelte: div[data-action-menu-list]': null,
   'src/ui/svelte/components/Button.svelte: svelte:element': 'always',
   // The picker's own trigger, its `trigger` snippet, which no guard hides.
   'src/ui/svelte/components/IconPicker.svelte: button': 'always',
@@ -245,6 +255,20 @@ const CLOSURE_NAMES = Object.freeze({
  * published keys whose items' text names it, and the mounted clause that reads its accessible name.
  */
 const OWN_NAMES = Object.freeze({
+  // Each item's `label`, which the entry's group states is required.
+  'src/ui/svelte/components/ActionMenu.svelte: button': {
+    entry: 'ActionMenu',
+    keys: ['items'],
+    heldBy:
+      'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
+  },
+  // `ariaLabel`, through `panelName`'s `$derived` past `panelLabel`, which the entry does not publish.
+  'src/ui/svelte/components/ActionMenu.svelte: div': {
+    entry: 'ActionMenu',
+    keys: ['ariaLabel'],
+    heldBy:
+      'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
+  },
   // `ariaLabel`, through the `$derived` that falls back to Fabricate's own copy.
   'src/ui/svelte/components/IconPicker.svelte: button': {
     entry: 'IconPicker',
@@ -284,6 +308,13 @@ const OWN_NAMES = Object.freeze({
  * follow across files, and the mounted clause that reads its accessible name (issue 2646).
  */
 const NESTED_NAMES = Object.freeze({
+  ActionMenu: {
+    'src/ui/svelte/components/IconButton.svelte: button': {
+      keys: ['ariaLabel'],
+      heldBy:
+        'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
+    },
+  },
   Pagination: {
     'src/ui/svelte/components/IconButton.svelte: button': {
       keys: ['previousLabel', 'nextLabel'],

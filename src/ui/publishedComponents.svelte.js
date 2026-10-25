@@ -10,6 +10,7 @@ import { flushSync, mount, unmount, untrack } from 'svelte';
 
 import { reportPublishedLoadFailure } from './deferredChunkFailureReport.js';
 import { publishedComponentSeam } from './publishedComponentSeam.js';
+import ActionMenu from './svelte/components/ActionMenu.svelte';
 import Avatar from './svelte/components/Avatar.svelte';
 import BandedBar from './svelte/components/BandedBar.svelte';
 import Button from './svelte/components/Button.svelte';
@@ -72,6 +73,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': SegmentedControl,
   'src/ui/svelte/components/Pagination.svelte': Pagination,
   'src/ui/svelte/components/IconPicker.svelte': IconPicker,
+  'src/ui/svelte/components/ActionMenu.svelte': ActionMenu,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.
