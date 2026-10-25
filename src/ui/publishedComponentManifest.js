@@ -459,4 +459,22 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
     root: 'fabricate',
     overlays: true,
   }),
+  Object.freeze({
+    name: 'Modal',
+    path: 'src/ui/svelte/components/Modal.svelte',
+    version: 1,
+    props: Object.freeze({
+      open: Object.freeze({ kind: 'data' }),
+      title: Object.freeze({ kind: 'data', required: true }),
+      subtitle: Object.freeze({ kind: 'data' }),
+      closeLabel: Object.freeze({ kind: 'data', required: true }),
+      closeOnOutsideClick: Object.freeze({ kind: 'data' }),
+      onClose: Object.freeze({ kind: 'callback', required: true }),
+      body: Object.freeze({ kind: 'slot' }),
+      footer: Object.freeze({ kind: 'slot' }),
+    }),
+    rest: false,
+    root: 'fabricate',
+    overlays: true,
+  }),
 ]);

@@ -317,6 +317,12 @@ const NESTED_NAMES = Object.freeze({
         'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
     },
   },
+  Modal: {
+    'src/ui/svelte/components/IconButton.svelte: button': {
+      keys: ['closeLabel'],
+      heldBy: 'tests/components/published-modal-mounted.test.js: the published Modal names',
+    },
+  },
   Pagination: {
     'src/ui/svelte/components/IconButton.svelte: button': {
       keys: ['previousLabel', 'nextLabel'],
@@ -353,6 +359,15 @@ const FORWARDED_CALLBACKS = Object.freeze({
       as: 'onSelect',
       heldBy:
         'tests/components/published-icon-picker-mounted.test.js: a choice in the published IconPicker',
+    },
+  },
+  Modal: {
+    // `requestClose` is the close control's `onclick`, and the outside-press and Escape listeners call it.
+    onClose: {
+      by: 'requestClose',
+      as: 'onclick',
+      listeners: ['dismissFromOutside', 'handleKeydown'],
+      heldBy: 'tests/components/published-modal-mounted.test.js: closing the published Modal',
     },
   },
   Pagination: {

@@ -6,14 +6,14 @@
  * prop; a `text` key drawn as text and a `slot` key filled, omitted and requested again; what
  * each `any` leaf draws from its own stylesheet under no Fabricate ancestor; and `Notice`'s action
  * button with its `onAction` callback (issue 2452). The published `Button`, `StatusToggle`,
- * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination`, `IconPicker`
- * and `ActionMenu` mount here as leaves; what each draws and refuses is
+ * `Stepper`, `SearchField`, `StageBars`, `IconButton`, `EditorTabs`, `Pagination`, `IconPicker`,
+ * `ActionMenu` and `Modal` mount here as leaves; what each draws and refuses is
  * `published-button-mounted.test.js`'s,
  * `published-toggle-mounted.test.js`'s, `published-stepper-mounted.test.js`'s,
  * `published-search-mounted.test.js`'s, `published-stage-bars-mounted.test.js`'s,
  * `published-icon-button-mounted.test.js`'s, `published-editor-tabs-mounted.test.js`'s,
- * `published-pagination-mounted.test.js`'s, `published-icon-picker-mounted.test.js`'s and
- * `published-action-menu-mounted.test.js`'s.
+ * `published-pagination-mounted.test.js`'s, `published-icon-picker-mounted.test.js`'s,
+ * `published-action-menu-mounted.test.js`'s and `published-modal-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -145,6 +145,13 @@ const REAGENT_ACTIONS = Object.freeze([
   { id: 'archive', label: 'Archive reagent', icon: 'fas fa-box-archive', disabled: true },
   { id: 'delete', label: 'Delete reagent', icon: 'fas fa-trash', danger: true },
 ]);
+/** An open dialog with its required `title`, `closeLabel` and `onClose`. */
+const MODAL_PROPS = Object.freeze({
+  open: true,
+  title: 'Rename the reagent',
+  closeLabel: 'Close',
+  onClose() {},
+});
 /** Two tabs, each its required `id` and `label`. */
 const REAGENT_TABS = Object.freeze([
   { id: 'inputs', label: 'Inputs' },
@@ -428,6 +435,16 @@ const LEAVES = Object.freeze([
     read: (root) => root.querySelector('button').getAttribute('aria-label'),
     drawn: ['Reagent actions for Flask', 'Reagent actions for Salt'],
   },
+  {
+    name: 'Modal',
+    under: 'fabricate',
+    root: '[data-manager-modal-overlay]',
+    props: MODAL_PROPS,
+    next: { ...MODAL_PROPS, title: 'Rename the tool' },
+    read: (root) =>
+      root.ownerDocument.querySelector('[data-manager-modal]').getAttribute('aria-label'),
+    drawn: ['Rename the reagent', 'Rename the tool'],
+  },
 ]);
 
 const propsOf = (name) => LEAVES.find((leaf) => leaf.name === name).props;
@@ -587,6 +604,16 @@ describe('a key a leaf does not publish', () => {
       'class',
       'data-x',
     ].map((key) => ['ActionMenu', key, 'is not a prop of ActionMenu']),
+    ...[
+      'width',
+      'dialogProps',
+      'trapFocus',
+      'initialFocus',
+      'footerLayout',
+      'onSubmit',
+      'class',
+      'data-x',
+    ].map((key) => ['Modal', key, 'is not a prop of Modal']),
   ];
   for (const [name, key, refusal] of UNPUBLISHED) {
     it(`${name} refuses ${key}, and renders nothing`, () => {

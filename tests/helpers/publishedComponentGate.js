@@ -184,6 +184,8 @@ export const DYNAMIC_ELEMENTS = Object.freeze({
     keys: ['as'],
     heldBy: "tests/components/published-leaves-mounted.test.js: Kicker's host element",
   },
+  // `onSubmit`, which draws a `<form>`, is not published.
+  'src/ui/svelte/components/Modal.svelte: svelte:element': { tags: ['div'], keys: [] },
   'tests/fixtures/published-components/PublishedProbe.svelte: svelte:element': {
     tags: ['div'],
     keys: ['bodyAs'],

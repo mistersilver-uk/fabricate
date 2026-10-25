@@ -390,7 +390,7 @@ const JS_ARIA_READERS = Object.freeze({
   'src/ui/svelte/apps/manager/validationAnnouncement.js: getAttribute(aria-labelledby)':
     "on Fabricate's own validation targets",
   'src/ui/svelte/components/Modal.svelte: closest([aria-expanded="true"])':
-    'no extension target sits in a Fabricate modal',
+    "a control a companion draws in a published Modal's slot keeps Escape while it is expanded, as Modal's group states",
 });
 
 /** The classes `tone` and `density` can write beside the root class, private values included. */
@@ -1226,6 +1226,7 @@ describe('each entry matches its component declaration', () => {
         'Pagination.onPageSizeChange: 1',
         'IconPicker.onChange: 1',
         'ActionMenu.onSelect: 1',
+        'Modal.onClose: 0',
       ],
       'a forwarded argument needs a mounted clause on its type'
     );
@@ -2874,6 +2875,7 @@ describe('the module sheet and every component style against the published Inspe
         'Pagination',
         'IconPicker',
         'ActionMenu',
+        'Modal',
       ],
       'an entry with a required root needs a census of its own'
     );
