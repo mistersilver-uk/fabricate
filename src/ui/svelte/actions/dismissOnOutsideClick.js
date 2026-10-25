@@ -5,6 +5,8 @@
  * While enabled, `onDetached` is called once when the node leaves that document, read when a
  * mutation is delivered, so a removal and re-insertion in one run of script calls nothing; a node
  * attached while disconnected is not watched, nor is a document the node moves to (issue 2671).
+ * A node inside a shadow root is reported when that root's host leaves the document, and not when
+ * the removal happens inside the root; a later mutation elsewhere in the document reports it.
  *
  * @param {HTMLElement} node
  * @param {{
