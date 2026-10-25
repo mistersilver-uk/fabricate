@@ -5,7 +5,8 @@
  * `<html>` naming the other palette. Every element computes the same compared properties and
  * border box in both hosts at rest, under keyboard focus, under the pointer and under reduced
  * motion, and the switch under forced colours; reachability and non-vacuity clauses hold each
- * state and the root itself. The harvested arm repeats the comparison over Foundry's own sheet.
+ * state and the root itself. The harvested arm repeats the comparison over Foundry's own sheet,
+ * with a layout-only rule written alike on both hosts that lays core's stacked windows back in flow.
  * Limit: happy-dom only produces the markup; it resolves no cascade layer and lays out nothing.
  * Limit: no arm loads Font Awesome's webfonts, since the harvested arm inlines its stylesheet and
  * its relative font URLs do not resolve, so a glyph's own box is unmeasured.
@@ -51,8 +52,12 @@ const HOSTS = Object.freeze(['window', 'bare']);
 /** The closures' components that state scoped rules; the other four draw from the module sheet. */
 const SCOPED = Object.freeze(['Well', 'Kicker']);
 const CONTROLS = new Set(['Button', 'IconButton', 'StatusToggle']);
-/** What the harness writes on both targets; ink is left to each host. */
-const TARGET_FACE = 'font-family: Arial, sans-serif; font-size: 14px; line-height: 20px';
+/**
+ * What the harness writes on both targets; ink is left to each host. The width is the companion's
+ * own, because core pads a bare `.window-content` and the player window's sheet does not.
+ */
+const TARGET_FACE =
+  'width: 280px; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px';
 const BUTTON_MIN = readFileSync(
   resolve(repoRoot, 'tests/fixtures/foundry-core-button-min.css'),
   'utf8'
@@ -283,7 +288,8 @@ async function bothHosts(readOne) {
 
 /** A page for `palette` over `sheets`, and every read the clause compares, state by state. */
 async function measure(browser, markup, palette, sheets) {
-  const tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  // Tall enough that no specimen needs a scroll to be hovered, under a sheet that clips the body.
+  const tab = await browser.newPage({ viewport: { width: 1280, height: 2000 } });
   await tab.setContent(pageFor(markup[palette], palette, sheets), { waitUntil: 'load' });
   const other = PALETTES.find((each) => each !== palette);
   await tab.evaluate(
@@ -391,11 +397,23 @@ let browser;
 let markup;
 /** Each palette's page and reads over the core-min sheet, measured in parallel pages. */
 const MEASURED = {};
+/** The harvested arm's measurement, started beside the palettes' and settled as `{ value | error }`. */
+let harvested = null;
 
 before(
   async () => {
     markup = await mountSpecimens();
     browser = await chromium.launch();
+    if (chrome) {
+      harvested = measure(browser, markup, 'fabricate', [
+        chrome,
+        fontAwesome(),
+        HOSTS_IN_FLOW,
+      ]).then(
+        (value) => ({ value }),
+        (error) => ({ error })
+      );
+    }
     const pages = await Promise.all(
       PALETTES.map((palette) => measure(browser, markup, palette, [BUTTON_MIN]))
     );
@@ -502,6 +520,15 @@ registerChromeRunnerGuards({
   chrome,
 });
 const skip = skipWithoutHarvest(chrome);
+/**
+ * Layout only, written on both hosts alike: core places every `.application` as a window, absolute
+ * and stacked, so each host is laid back in flow beside its sentinel. No compared property is a
+ * host's own, and every box offset is measured from `target`.
+ */
+const HOSTS_IN_FLOW = `[data-host] {
+  position: relative; inset: auto; transform: none; z-index: auto;
+  margin: 0; height: auto; max-height: none; min-width: 0;
+}`;
 const fontAwesome = () => {
   const cache = resolveChromeCache(repoRoot);
   return readFileSync(join(cache.dir, 'fonts', 'fontawesome', 'css', 'all.min.css'), 'utf8');
@@ -512,7 +539,9 @@ describe('the widened entries over Foundry’s harvested sheet and Font Awesome'
 
   before(
     async () => {
-      measured = await measure(browser, markup, 'fabricate', [chrome, fontAwesome()]);
+      const { value, error } = await harvested;
+      if (error) throw error;
+      measured = value;
     },
     { timeout: 600_000 }
   );
