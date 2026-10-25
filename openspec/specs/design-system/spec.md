@@ -2503,19 +2503,30 @@ The import flow — mapping folders, then reading the reference report — is th
 
 This is distinct from a one-shot confirmation, which stays `confirmDialog`, and from a Foundry-owned dialog, whose body is a cleaned HTML string rather than a mounted component.
 
-The modal portals into the application root so it stacks above the window rather than beneath it, and its close control takes an accessible name as a REQUIRED prop, because it renders as an icon alone.
-It dismisses on an outside click; a step that would lose work confirms first.
+The modal portals into the application root so it stacks above the window rather than beneath it, and its close control is named by `closeLabel`, which every Fabricate caller passes, because it renders as an icon alone.
+It dismisses on an outside click and on Escape.
+An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
+An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
+An expanded control inside it, judged as the key goes down, keeps its own Escape.
+A panel such a control portals outside the dialog is outside it, as a `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape there dismisses the modal too.
+A step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
 The shared `Modal` draws ONE frame, the library's banded Modal specimen, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
 It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then, when focus is nowhere, the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
-Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 
 - **WHEN** a flow spans more than one step and must complete before the manager continues
 - **THEN** it renders in the shared modal chrome
 - **AND** its close control carries an accessible name
+
+#### Scenario: Escape inside an import modal
+
+- **WHEN** the import folder mapping is open and the user presses Escape on its match-by-name checkbox
+- **THEN** the modal is dismissed once and Foundry's dismiss keybinding closes no window
+- **AND** Escape on an open category list closes that list and leaves the modal open
 
 #### Scenario: A roll prompt opens outside every Fabricate window
 

@@ -669,6 +669,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-roll-prompt-compact',
     'manager-import-report',
     'manager-components-add-from-catalogue',
+    'manager-import-folder-mapping',
   ]),
   // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
   // inspector's two groups and the recipe-item editor's preview rail.

@@ -600,4 +600,29 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
       'and keeps the chrome’s own close control'
     );
   });
+
+  it('closes once on Escape in the search field, claims the key and keeps it from the window', async () => {
+    // The dialog stops Escape at itself (issue 2658) and default-prevents it. happy-dom shows
+    // `defaultPrevented`; in Chromium that also keeps the search field from clearing.
+    const { closed } = await open();
+    const search = document.querySelector('[data-component-add-from-catalogue-search]');
+    const heard = [];
+    const onWindowKey = (event) => {
+      heard.push(event.key);
+    };
+    document.defaultView.addEventListener('keydown', onWindowKey);
+    const event = new document.defaultView.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    try {
+      search.dispatchEvent(event);
+    } finally {
+      document.defaultView.removeEventListener('keydown', onWindowKey);
+    }
+    assert.deepEqual(closed, [true], 'the dialog’s close is called once');
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(heard, [], 'and no window bubbling listener hears it');
+  });
 });

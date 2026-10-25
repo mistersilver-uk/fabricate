@@ -12,17 +12,40 @@
   Props added for the roll prompt (issue 2021); each default leaves an earlier caller unchanged:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click from dismissing; Escape still calls `onClose`. |
+  | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls `onClose`. |
   | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled. |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
+
+  Invariants (issue 2658):
+  - Body and footer are drawn once, inside the one `svelte:element` that is a `<form>` when
+    `onSubmit` is passed and a `display: contents` `<div>` otherwise.
+  - An Escape inside the dialog stops there in every mode, so Foundry's `core.dismiss` never hears it.
+    An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry. It
+    calls `onClose` once per keydown, a held Escape once per repeat, and never for a composing key.
+  - An expanded control inside the dialog, such as an open Select, keeps its own Escape. Whether a
+    control is expanded is read as the key goes down, from a record `escapeOrigin` takes on the
+    window's capture phase: a browser flushes Svelte's update at the microtask checkpoint after each
+    listener, so a control that collapses on Escape from a document capture listener has already
+    written `aria-expanded="false"` by the time the key reaches the dialog. The window comes before
+    the document in every capture path, so the record precedes every document capture listener
+    whatever its registration order.
+  - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
+
+  Limits: a window capture listener registered before the dialog opens that collapses on Escape
+  still runs first. A dialog left open across a move to another window gets no record in the new
+  window and reads the live attribute there, and one left open across a Foundry 14 window move keeps
+  hearing the old window. A panel such a control portals outside the dialog is outside it, as a
+  `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape or a press there dismisses
+  the modal too. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
+  tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
   import IconButton from './IconButton.svelte';
-  import { resolveOverlayHost } from '../util/overlayHost.js';
+  import { acquireOverlayHost, releaseOverlayHost } from '../util/overlayHost.js';
 
   let {
     open = false,
@@ -45,12 +68,84 @@
     'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), ' +
     'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-  // Resolved from the dialog node UPWARDS, never by querying the document for an application root
-  // by name (issue 1466): a `document.querySelector` lookup finds the manager window wherever it
-  // is, so this chrome opened from another application portaled into a DIFFERENT WINDOW and the
-  // `|| document.body` fallback made that silent.
-  function getHost(node) {
-    return resolveOverlayHost(node, { component: 'Modal' });
+  // The dialog element, to tell a key inside it from one outside it.
+  let dialog = $state(null);
+  // The last Escape the window saw as it went down: the event and whether it came from an expanded
+  // control inside the dialog.
+  let escapeRecord = null;
+
+  // The host the dialog was last acquired into, kept for `modalFocus` to restore focus into.
+  let host = null;
+
+  // Inside a published mount, the chain's container for the dialog; otherwise the class walk from
+  // the dialog node upwards, never a document-wide query.
+  function acquireHost(node) {
+    host = acquireOverlayHost(node, node, { component: 'Modal' });
+    return host;
+  }
+
+  // Gives the host back to the chain when the dialog closes or the component is destroyed.
+  function heldHost(node) {
+    return { destroy: () => releaseOverlayHost(node) };
+  }
+
+  // Where an Escape started: the first entry of the composed path, so a target inside an open shadow
+  // root is not retargeted to its host.
+  function originOf(event) {
+    return event.composedPath?.()[0] ?? event.target;
+  }
+
+  // True when `node` is in `container`, or in a shadow root whose host chain reaches it.
+  function heldBy(container, node) {
+    for (let at = node; at; at = at.getRootNode?.().host) {
+      if (container?.contains?.(at)) return true;
+    }
+    return false;
+  }
+
+  // True when `origin` sits in an expanded control that `container` holds, looking through open
+  // shadow roots to their hosts. An expanded ancestor of the dialog itself never counts.
+  function expandedIn(container, origin) {
+    for (let at = origin; at?.closest; at = at.getRootNode?.().host) {
+      const control = at.closest('[aria-expanded="true"]');
+      if (control) return heldBy(container, control);
+    }
+    return false;
+  }
+
+  // Taken on the window's capture phase; see Invariants. The window is kept and released from, never
+  // read again at destroy: after `adoptNode` it is the wrong one and once a detached window has
+  // closed it is `null`.
+  function escapeOrigin(node) {
+    const view = node.ownerDocument?.defaultView;
+    if (typeof view?.addEventListener !== 'function') return {};
+    const record = (event) => {
+      if (event.key !== 'Escape') return;
+      escapeRecord = { event, expanded: expandedIn(node, originOf(event)) };
+    };
+    view.addEventListener('keydown', record, true);
+    return {
+      destroy() {
+        view.removeEventListener('keydown', record, true);
+        escapeRecord = null;
+      },
+    };
+  }
+
+  function requestClose() {
+    onClose();
+  }
+
+  // Whether the key started in the dialog, by the composed path so an open shadow root under it counts.
+  function cameFromInside(event) {
+    return event.composedPath?.().includes(dialog) ?? Boolean(dialog?.contains?.(event.target));
+  }
+
+  // An outside mousedown or an Escape that did not come from inside the dialog. Escape inside it
+  // is `handleKeydown`'s, so it is not closed twice, nor is an expanded control's.
+  function dismissFromOutside(event) {
+    if (event?.type === 'keydown' && (event.isComposing || cameFromInside(event))) return;
+    requestClose();
   }
 
   function focusables(node) {
@@ -70,13 +165,14 @@
   function modalFocus(node, enabled) {
     if (!enabled) return {};
     const opener = node.ownerDocument.activeElement;
-    const host = getHost(node);
+    const held = host;
+    const view = node.ownerDocument.defaultView;
     const first = (initialFocus && node.querySelector(initialFocus)) || focusables(node)[0];
     first?.focus?.();
     return {
       destroy() {
         // A frame later, so an opener the answer's own flow re-enables can take focus back.
-        node.ownerDocument.defaultView.requestAnimationFrame(() => restoreFocus(opener, host));
+        view?.requestAnimationFrame?.(() => restoreFocus(opener, held));
       },
     };
   }
@@ -95,13 +191,18 @@
 
   function handleKeydown(event) {
     if (event.isComposing) return;
-    // An expanded control inside, such as an open Select, closes its own list first.
-    const expanded = event.target?.closest?.('[aria-expanded="true"]');
-    if (event.key === 'Escape' && !closeOnOutsideClick && !expanded) {
-      // Foundry's `core.dismiss` would otherwise close every framed window.
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
+    if (event.key === 'Escape') {
+      // An expanded control inside, such as an open Select, closes its own list first.
+      const expanded =
+        escapeRecord?.event === event
+          ? escapeRecord.expanded
+          : expandedIn(event.currentTarget, originOf(event));
+      if (!expanded) {
+        // Foundry's `core.dismiss` would otherwise close every framed window.
+        event.preventDefault();
+        event.stopPropagation();
+        requestClose();
+      }
       return;
     }
     if (event.key !== 'Tab' || !trapFocus) return;
@@ -126,30 +227,24 @@
   }
 </script>
 
-{#snippet content()}
-  {#if body}
-    <div class="manager-modal-body">{@render body()}</div>
-  {/if}
-
-  {#if footer}
-    <div class="manager-modal-footer" class:is-equal={footerLayout === 'equal'}>
-      {@render footer()}
-    </div>
-  {/if}
-{/snippet}
-
 {#if open}
   <div class="manager-modal-overlay" data-manager-modal-overlay>
     <div
       class="fabricate-modal"
+      bind:this={dialog}
       role="dialog"
       aria-modal="true"
       aria-label={title}
       style={`--manager-modal-width: ${width};`}
       data-manager-modal
       {...dialogProps}
-      use:portal={(node) => getHost(node)}
-      use:dismissOnOutsideClick={{ enabled: open && closeOnOutsideClick, onDismiss: onClose }}
+      use:portal={(node) => acquireHost(node)}
+      use:escapeOrigin
+      use:heldHost
+      use:dismissOnOutsideClick={{
+        enabled: open && closeOnOutsideClick,
+        onDismiss: dismissFromOutside,
+      }}
       use:modalFocus={trapFocus}
       use:ownKeyboard={trapFocus}
       use:modalKeys
@@ -166,15 +261,26 @@
           size="26"
           ariaLabel={closeLabel}
           icon="fas fa-xmark"
-          onclick={() => onClose()}
+          onclick={requestClose}
         />
       </div>
 
-      {#if onSubmit}
-        <form class="manager-modal-form" novalidate onsubmit={submit}>{@render content()}</form>
-      {:else}
-        {@render content()}
-      {/if}
+      <svelte:element
+        this={onSubmit ? 'form' : 'div'}
+        class="manager-modal-form"
+        novalidate={onSubmit ? true : undefined}
+        onsubmit={onSubmit ? submit : undefined}
+      >
+        {#if body}
+          <div class="manager-modal-body">{@render body()}</div>
+        {/if}
+
+        {#if footer}
+          <div class="manager-modal-footer" class:is-equal={footerLayout === 'equal'}>
+            {@render footer()}
+          </div>
+        {/if}
+      </svelte:element>
     </div>
   </div>
 {/if}

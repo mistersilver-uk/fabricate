@@ -952,11 +952,11 @@ describe('admission rule 10: an entry that opens an overlay states overlays', ()
     assert.deepEqual(overlayFaults(entry, through), [], 'through anchoredPopover.js is allowed');
   });
 
-  it('names Modal as unpublishable until it acquires through the chain', () => {
+  it("acquires Modal's host through the chain", () => {
     const modal = { name: 'Modal', path: 'src/ui/svelte/components/Modal.svelte', overlays: true };
     assert.ok(
-      hostResolverImports(modal.path, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
-      'Modal still portals through resolveOverlayHost'
+      !hostResolverImports(modal.path, SHIPPED).includes('src/ui/svelte/components/Modal.svelte'),
+      'Modal acquires its host through acquireOverlayHost, not resolveOverlayHost'
     );
   });
 

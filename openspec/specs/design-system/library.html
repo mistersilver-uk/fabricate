@@ -1799,19 +1799,19 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>footer</b> a <code>--fab-bg-2</code> band under a hairline, padded 12/16/16, its actions 8 apart and right-aligned, at most one primary; <code>footerLayout="equal"</code> gives every child one equal share (<code>flex: 1 1 0; min-width: 0</code>)</li>
         <li>Portals into the application root, so it stacks above the window rather than under it</li>
         <li>The dialog is <code>role="dialog"</code> with <code>aria-modal="true"</code>, named by its <b>title</b>; <b>trapFocus</b> opts in to a focus trap that enters on open, cycles Tab inside and returns focus to the opener</li>
-        <li>Dismissal: with <b>closeOnOutsideClick</b>, the default, an outside click or Escape dismisses it; without it only the close and Escape do, so a stray click loses no work, and that Escape waits while an inner control is <code>aria-expanded</code>. A step that would lose work confirms first</li>
+        <li>Dismissal: with <b>closeOnOutsideClick</b>, the default, an outside click or an Escape outside the dialog dismisses it, and without it neither does, so a stray click loses no work. In every mode an Escape inside the dialog dismisses it and stops there, so Foundry&rsquo;s dismiss keybinding never hears it, except from an inner control that is <code>aria-expanded</code> as the key goes down, which keeps its own Escape. An Escape outside the dialog goes on to Foundry, and a panel such a control portals outside the dialog is outside it. A step that would lose work confirms first</li>
         <li><b>one frame, no option</b> the component draws this specimen and nothing else, at the spacing ramp&rsquo;s values: a 12/16 header band with a 12 gap, a body padded 16 with 16 between sections, and a 12/16/16 footer. The frame is the GM Checks Studio prototype&rsquo;s by maintainer ruling (2026-09-28, &ldquo;change it everywhere&rdquo;), replacing the 24px close and 54px header it had; the prototype&rsquo;s measured 14/16 body, 14 section gap and 10 header gap are snapped to the ramp, which PR 2283 did (issue 1523). The <code>banded</code> prop that selected it is RETIRED: once every caller drew it by the second ruling (&ldquo;Move them too&rdquo;), the unbanded chrome had no caller and was deleted</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>
         <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>Modal.svelte</code>&rsquo;s <code>$props()</code> at issue 2543.</li>
         <li><b>open</b> &mdash; a plain prop, <b>NOT bindable</b>: the caller owns it and closes the modal from <b>onClose</b></li>
-        <li><b>onClose</b> = no-op &mdash; called on the close button, Escape and (with <b>closeOnOutsideClick</b>) an outside click; the caller sets <b>open</b> false from it</li>
+        <li><b>onClose</b> = no-op &mdash; called on the close button, on Escape inside the dialog and, with <b>closeOnOutsideClick</b>, on an outside click or an Escape outside it; the caller sets <b>open</b> false from it</li>
         <li><b>title · subtitle</b> &mdash; the dialog takes its accessible name from <b>title</b></li>
         <li><b>closeLabel</b> = 'Close' &mdash; the close renders as an icon alone, so it takes its own name</li>
         <li><b>width</b> = 560px, clamped to the viewport</li>
         <li><b>body</b> and <b>footer</b> snippets</li>
         <li><b>dialogProps</b> &mdash; an object spread onto the dialog element, for the caller&rsquo;s own <code>data-*</code> hooks only, never a <code>class</code></li>
-        <li><b>closeOnOutsideClick</b> = true &mdash; <code>false</code> keeps a stray click from dismissing; Escape still calls <b>onClose</b></li>
+        <li><b>closeOnOutsideClick</b> = true &mdash; <code>false</code> keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls <b>onClose</b></li>
         <li><b>trapFocus</b> = false &middot; <b>initialFocus</b> &mdash; a selector for the element the trap focuses first, the first focusable one when absent</li>
         <li><b>footerLayout</b> end | equal = end</li>
         <li><b>onSubmit</b>(event) &mdash; wraps body and footer in one form, so Enter submits through its first submit button</li>
