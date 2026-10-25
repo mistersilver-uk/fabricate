@@ -603,6 +603,44 @@ for (const closeOnOutsideClick of [true, false]) {
       assert.deepEqual(calls, []);
     });
 
+    it('reaches a slot listener of the companion before it stops, and calls onClose once', async () => {
+      const { calls, handle } = await open();
+      const button = companionButton(handle.slot('body'));
+      let heard = 0;
+      button.addEventListener('keydown', () => {
+        heard += 1;
+      });
+      press(button, 'Escape');
+      assert.equal(heard, 1);
+      assert.deepEqual(calls, [[]]);
+    });
+
+    it('calls nothing for a composing Escape on the page', async () => {
+      const { calls } = await open();
+      press(document.body, 'Escape', { isComposing: true });
+      assert.deepEqual(calls, []);
+    });
+
+    it('bubbles another key from a slot control to the host and above, and not through the target', async () => {
+      const { calls, handle, target } = await open();
+      const button = companionButton(handle.slot('body'));
+      const host = dialogIn().parentElement;
+      const keys = hearing('keydown', [
+        ['target', target],
+        ['host', host],
+        ['above', host.parentElement],
+      ]);
+      try {
+        press(button, 'a');
+      } finally {
+        keys.stop();
+      }
+      assert.ok(keys.heard.includes('host:a'), 'the host hears it');
+      assert.ok(keys.heard.includes('above:a'), 'and so does its parent');
+      assert.ok(!keys.heard.includes('target:a'), 'the target does not');
+      assert.deepEqual(calls, []);
+    });
+
     it('prevents an Escape in a published SearchField in the body slot and calls onClose once', async () => {
       const { api, calls, handle } = await open();
       const { target } = mountIn(api, handle.slot('body'), 'SearchField', {
