@@ -137,6 +137,22 @@ describe('an entry drawn under the standalone style root', () => {
     });
   }
 
+  for (const value of [false, 'true', 1]) {
+    it(`refuses at registration a standaloneRoot of ${JSON.stringify(value)}, naming the entry`, () => {
+      const table = [{ ...STANDALONE, standaloneRoot: value }];
+      const seam = createPublishedComponents({ table, isReady: () => true });
+      assert.throws(
+        () => seam.register({ ...fakeRuntime().runtime, components: {} }),
+        (error) => {
+          assert.equal(error.constructor, Error);
+          const tail = `Standalone has an unknown standaloneRoot "${String(value)}"`;
+          assert.match(error.message, exactly(PREFIX + tail));
+          return true;
+        }
+      );
+    });
+  }
+
   it('writes one display: contents root in a bare target, draws in it, and removes it by reference', () => {
     const { ui, mounts } = seamWith({ table: [STANDALONE], hasAncestor: () => false });
     const target = new FakeTarget();

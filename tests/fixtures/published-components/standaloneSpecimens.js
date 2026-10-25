@@ -4,6 +4,15 @@
  * components, and the computed properties it compares element by element.
  */
 
+import {
+  CARD_COMPARED,
+  COMPARED,
+  TOGGLE_COMPARED,
+  TOGGLE_KNOB_COMPARED,
+  TOGGLE_LABEL_COMPARED,
+  TOGGLE_TRACK_COMPARED,
+} from './comparedProperties.js';
+
 const press = () => {};
 
 /** Each widened entry's specimens, by id, with the props each mounts with. */
@@ -62,52 +71,34 @@ export const STANDALONE_SPECIMENS = Object.freeze({
 });
 
 /**
- * The computed properties compared on every element drawn: the union of the lists
- * `re-rooted-controls-host-independence.test.js` compares for these controls, then the ink, the
- * focus ring, the motion and the disabled face the admission clause reads.
+ * The computed properties compared on every element drawn: every list the three-host test
+ * compares for these controls, then the remaining border edges, the ink and scheme, the focus
+ * ring, the motion and the disabled face the admission clause reads.
  */
 export const STANDALONE_COMPARED = Object.freeze([
-  'min-height',
-  'height',
-  'max-width',
-  'width',
-  'box-sizing',
-  'display',
-  'flex-direction',
-  'align-items',
-  'gap',
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-  'margin-left',
-  'border-top-width',
-  'border-right-width',
-  'border-bottom-width',
-  'border-left-width',
-  'border-top-style',
-  'border-right-style',
-  'border-bottom-style',
-  'border-left-style',
-  'border-top-color',
-  'border-radius',
-  'background-color',
-  'background-clip',
-  'font-family',
-  'font-size',
-  'font-weight',
-  'line-height',
-  'overflow',
-  'text-overflow',
-  'flex-wrap',
-  'color',
-  'color-scheme',
-  'opacity',
-  'cursor',
-  'outline-style',
-  'outline-width',
-  'outline-color',
-  'outline-offset',
-  'box-shadow',
-  'transition-duration',
+  ...new Set([
+    ...COMPARED,
+    ...CARD_COMPARED,
+    ...TOGGLE_COMPARED,
+    ...TOGGLE_TRACK_COMPARED,
+    ...TOGGLE_KNOB_COMPARED,
+    ...TOGGLE_LABEL_COMPARED,
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width',
+    'border-right-style',
+    'border-bottom-style',
+    'border-left-style',
+    'flex-wrap',
+    'color',
+    'color-scheme',
+    'opacity',
+    'cursor',
+    'outline-style',
+    'outline-width',
+    'outline-color',
+    'outline-offset',
+    'box-shadow',
+    'transition-duration',
+  ]),
 ]);

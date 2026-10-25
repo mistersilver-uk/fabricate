@@ -7,6 +7,8 @@
  * motion, and the switch under forced colours; reachability and non-vacuity clauses hold each
  * state and the root itself. The harvested arm repeats the comparison over Foundry's own sheet.
  * Limit: happy-dom only produces the markup; it resolves no cascade layer and lays out nothing.
+ * Limit: no arm loads Font Awesome's webfonts, since the harvested arm inlines its stylesheet and
+ * its relative font URLs do not resolve, so a glyph's own box is unmeasured.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,12 +20,14 @@ import { chromium } from 'playwright';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../../src/ui/publishedComponentManifest.js';
+import * as SHARED_LISTS from '../fixtures/published-components/comparedProperties.js';
 import {
   STANDALONE_COMPARED,
   STANDALONE_SPECIMENS,
 } from '../fixtures/published-components/standaloneSpecimens.js';
 import {
   harvestedFoundryChromeCss,
+  registerChromeRunnerGuards,
   skipWithoutHarvest,
 } from '../helpers/harvestedFoundryChrome.js';
 import { walkNodes } from '../helpers/moduleAst.js';
@@ -122,33 +126,12 @@ describe('the standalone specimen table', () => {
   });
 
   it('compares every property the three-host test compares on these controls', () => {
-    const source = readFileSync(
-      resolve(repoRoot, 'tests/components/re-rooted-controls-host-independence.test.js'),
-      'utf8'
-    );
-    const lists = [
-      ...source.matchAll(
-        /const ((?:CARD_|TOGGLE_(?:TRACK_|KNOB_|LABEL_)?)?COMPARED) = Object\.freeze\(\[([^\]]*)\]/g
-      ),
-    ];
-    assert.deepEqual(
-      lists.map(([, list]) => list),
-      [
-        'COMPARED',
-        'CARD_COMPARED',
-        'TOGGLE_COMPARED',
-        'TOGGLE_TRACK_COMPARED',
-        'TOGGLE_KNOB_COMPARED',
-        'TOGGLE_LABEL_COMPARED',
-      ]
-    );
-    const named = lists.flatMap((list) =>
-      [...list[2].matchAll(/'([a-z-]+)'/g)].map(([, property]) => property)
-    );
-    assert.deepEqual(
-      named.filter((property) => !STANDALONE_COMPARED.includes(property)),
-      []
-    );
+    const shared = Object.entries(SHARED_LISTS);
+    assert.equal(shared.length, 6, 'the six lists the two tests share');
+    for (const [list, properties] of shared) {
+      const missing = properties.filter((property) => !STANDALONE_COMPARED.includes(property));
+      assert.deepEqual(missing, [], list);
+    }
   });
 });
 
@@ -267,19 +250,26 @@ function reachOf({ id, host }) {
   };
 }
 
-/** Past the fonts and every running animation and transition, transitions left on. */
-async function settled(tab) {
-  await tab.evaluate(async () => {
+/**
+ * Past the fonts and every running animation and transition on an element in `scope`, a selector,
+ * or in the whole page; transitions stay on, so a read never lands mid-transition.
+ */
+async function settled(tab, scope = null) {
+  await tab.evaluate(async (selector) => {
     const frame = () => new Promise((done) => requestAnimationFrame(() => done()));
     await frame();
     await frame();
     await document.fonts.ready;
-    await Promise.all(
-      document.getAnimations().map((animation) => animation.finished.catch(() => {}))
-    );
+    const within = selector ? document.querySelector(selector) : document.documentElement;
+    const running = document
+      .getAnimations()
+      .filter((animation) => within.contains(animation.effect?.target ?? null));
+    await Promise.all(running.map((animation) => animation.finished.catch(() => {})));
     await frame();
-  });
+  }, scope);
 }
+
+const hostOf = (id, host) => `[data-host="${id}-${host}"]`;
 
 const read = (tab, id, host) =>
   tab.evaluate(readHost, { id, host, properties: STANDALONE_COMPARED });
@@ -311,25 +301,24 @@ async function measure(browser, markup, palette, sheets) {
     reads.focus[id] = await bothHosts(async (host) => {
       await tab.focus(`[data-sentinel="${id}-${host}"]`);
       await tab.keyboard.press('Tab');
-      await settled(tab);
+      await settled(tab, hostOf(id, host));
       reads.reach[id].focus[host] = await reach(tab, id, host);
       const focused = await read(tab, id, host);
       await tab.evaluate(() => document.activeElement?.blur());
-      await settled(tab);
       return focused;
     });
   }
+  await settled(tab);
   for (const { id } of HOVERED) {
     reads.reach[id] ??= { hover: {} };
     reads.hover[id] = await bothHosts(async (host) => {
       await tab.mouse.move(0, 0);
-      await settled(tab);
-      await tab.hover(`[data-host="${id}-${host}"] button`);
-      await settled(tab);
+      await settled(tab, hostOf(id, host));
+      await tab.hover(`${hostOf(id, host)} button`);
+      await settled(tab, hostOf(id, host));
       reads.reach[id].hover[host] = await reach(tab, id, host);
       const hovered = await read(tab, id, host);
       await tab.mouse.move(0, 0);
-      await settled(tab);
       return hovered;
     });
   }
@@ -354,15 +343,17 @@ async function measure(browser, markup, palette, sheets) {
  * motion, with the standalone style root's classes stripped and then restored.
  */
 async function rootedReads(tab, id) {
-  const probe = ({ id: specimen, strip }) => {
-    const root = document.querySelector(
-      `[data-host="${specimen}-bare"] [data-target]`
-    ).firstElementChild;
-    root.className = strip ? '' : 'fabricate fabricate-standalone-root';
+  const bareTarget = `${hostOf(id, 'bare')} [data-target]`;
+  const classes = await tab.evaluate(
+    (selector) => document.querySelector(selector).firstElementChild.className,
+    bareTarget
+  );
+  const probe = ({ selector, className }) => {
+    document.querySelector(selector).firstElementChild.className = className;
   };
-  const sample = async (strip) => {
-    await tab.evaluate(probe, { id, strip });
-    await settled(tab);
+  const sample = async (className) => {
+    await tab.evaluate(probe, { selector: bareTarget, className });
+    await settled(tab, hostOf(id, 'bare'));
     const [first] = await read(tab, id, 'bare');
     await tab.emulateMedia({ reducedMotion: 'reduce' });
     const track = await tab.evaluate((specimen) => {
@@ -374,10 +365,10 @@ async function rootedReads(tab, id) {
     await tab.emulateMedia({ reducedMotion: 'no-preference' });
     return { color: first.properties.color, track };
   };
-  const stripped = await sample(true);
-  const rooted = await sample(false);
+  const stripped = await sample('');
+  const rooted = await sample(classes);
   await settled(tab);
-  return { stripped, rooted };
+  return { stripped, rooted, classes };
 }
 
 const STATES = Object.freeze(['rest', 'focus', 'hover', 'reduced', 'forced']);
@@ -398,13 +389,20 @@ function assertHostsAlike(reads, label) {
 
 let browser;
 let markup;
-/** Each palette's reads over the core-min sheet, for the comparison between palettes. */
-const READS = {};
+/** Each palette's page and reads over the core-min sheet, measured in parallel pages. */
+const MEASURED = {};
 
-before(async () => {
-  markup = await mountSpecimens();
-  browser = await chromium.launch();
-});
+before(
+  async () => {
+    markup = await mountSpecimens();
+    browser = await chromium.launch();
+    const pages = await Promise.all(
+      PALETTES.map((palette) => measure(browser, markup, palette, [BUTTON_MIN]))
+    );
+    for (const [index, palette] of PALETTES.entries()) MEASURED[palette] = pages[index];
+  },
+  { timeout: 600_000 }
+);
 
 after(async () => {
   await browser?.close();
@@ -414,15 +412,9 @@ for (const palette of PALETTES) {
   describe(`the widened entries in the ${palette} palette, over the core-min sheet`, () => {
     let measured;
 
-    before(
-      async () => {
-        measured = await measure(browser, markup, palette, [BUTTON_MIN]);
-        READS[palette] = measured.reads;
-      },
-      { timeout: 600_000 }
-    );
-
-    after(() => measured?.tab.close());
+    before(() => {
+      measured = MEASURED[palette];
+    });
 
     it('draws each bare specimen inside one display: contents standalone style root', async () => {
       for (const { id } of SPECIMENS) {
@@ -480,7 +472,8 @@ for (const palette of PALETTES) {
     it('draws nothing alike by accident: the root carries the ink and the reduced-motion rule', async () => {
       for (const name of Object.keys(STANDALONE_SPECIMENS)) {
         const id = SPECIMENS.find((specimen) => specimen.name === name).id;
-        const { stripped, rooted } = await rootedReads(measured.tab, id);
+        const { stripped, rooted, classes } = await rootedReads(measured.tab, id);
+        assert.ok(classes.split(' ').includes('fabricate'), `${name}'s root class was captured`);
         assert.notEqual(stripped.color, rooted.color, `${name}'s ink comes from the root`);
         if (name === 'StatusToggle') {
           assert.notEqual(stripped.track, rooted.track, "the track's reduced motion comes from it");
@@ -492,8 +485,8 @@ for (const palette of PALETTES) {
 
 describe('the two palettes', () => {
   it('differ in at least one compared property of every entry, at rest', () => {
-    assert.deepEqual(Object.keys(READS), PALETTES, 'both palettes were measured');
-    const restOf = (palette, id) => JSON.stringify(READS[palette].rest[id].bare);
+    assert.deepEqual(Object.keys(MEASURED), PALETTES, 'both palettes were measured');
+    const restOf = (palette, id) => JSON.stringify(MEASURED[palette].reads.rest[id].bare);
     for (const name of Object.keys(STANDALONE_SPECIMENS)) {
       const ids = SPECIMENS.filter((specimen) => specimen.name === name).map(({ id }) => id);
       const differs = ids.some((id) => restOf('fabricate', id) !== restOf('foundry-native', id));
@@ -503,6 +496,11 @@ describe('the two palettes', () => {
 });
 
 const chrome = harvestedFoundryChromeCss(repoRoot);
+registerChromeRunnerGuards({
+  repoRoot,
+  suitePath: 'tests/components/published-standalone-root-rendered.test.js',
+  chrome,
+});
 const skip = skipWithoutHarvest(chrome);
 const fontAwesome = () => {
   const cache = resolveChromeCache(repoRoot);

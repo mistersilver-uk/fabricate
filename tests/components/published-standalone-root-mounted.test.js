@@ -129,6 +129,22 @@ function detachedSlotTarget(seam, outer, target) {
   return { handle, inner };
 }
 
+/** A target in an open shadow root attached to a shell in `doc`. */
+function shadowTarget(doc) {
+  const shell = doc.createElement('section');
+  doc.body.append(shell);
+  targets.push(shell);
+  const target = doc.createElement('div');
+  shell.attachShadow({ mode: 'open' }).append(target);
+  assert.equal(target.getRootNode().nodeType, 11, 'a shadow root');
+  return target;
+}
+
+const SHADOW_REFUSAL = Object.freeze({
+  name: 'TypeError',
+  message: `${REFUSAL}Button cannot be drawn in a shadow root`,
+});
+
 describe('a widened entry and the standalone style root', () => {
   for (const [name, props] of Object.entries(WIDENED)) {
     it(`${name} writes exactly one in a bare target, and none in a Fabricate window`, () => {
@@ -215,17 +231,6 @@ describe('where a target has no Fabricate root and no document head', () => {
     await second.happyDOM.close();
   });
 
-  /** A target in an open shadow root attached to a shell in `doc`. */
-  function shadowTarget(doc) {
-    const shell = doc.createElement('section');
-    doc.body.append(shell);
-    targets.push(shell);
-    const target = doc.createElement('div');
-    shell.attachShadow({ mode: 'open' }).append(target);
-    assert.equal(target.getRootNode().nodeType, 11, 'a shadow root');
-    return target;
-  }
-
   it('draws in a detached div under the standalone style root', () => {
     const target = document.createElement('div');
     const handle = ui().mount('Button', { target, props: BUTTON });
@@ -260,6 +265,15 @@ describe('where a target has no Fabricate root and no document head', () => {
     assert.equal(target.childNodes.length, 0);
   });
 
+  it('judges a detached slot by the shadow root its owner sits in (M16)', () => {
+    const seam = ui();
+    const { handle, inner } = detachedSlotTarget(seam, 'EmptyState', shadowTarget(document));
+    assert.equal(inner.getRootNode().nodeType, 1, 'the nested target itself is in no shadow root');
+    assert.throws(() => seam.mount('Button', { target: inner, props: BUTTON }), SHADOW_REFUSAL);
+    assert.equal(inner.childNodes.length, 0);
+    handle.destroy();
+  });
+
   it("reads the theme from the main <html>, never a second window's stale copy", () => {
     second.document.documentElement.setAttribute(THEME, 'stale');
     document.documentElement.setAttribute(THEME, 'foundry-native');
@@ -268,6 +282,46 @@ describe('where a target has no Fabricate root and no document head', () => {
     const handle = ui().mount('Button', { target, props: BUTTON });
     assert.equal(standaloneRootIn(target).getAttribute(THEME), 'foundry-native');
     handle.destroy();
+  });
+});
+
+describe('mountMany and the standalone style root', () => {
+  it('writes one root in a bare item and none in an in-window one, and destroy empties the bare', () => {
+    const bare = companionTarget(targets);
+    const inWindow = fabricateTarget(targets, 'fabricate fabricate-app');
+    const items = [bare, inWindow].map((target) => ({ target, props: BUTTON }));
+    const [bareHandle, windowHandle] = ui().mountMany('Button', items);
+    assert.equal(standaloneRootIn(bare).firstElementChild.localName, 'button');
+    assert.equal(inWindow.children.length, 1, 'one element in the in-window target');
+    assert.equal(inWindow.firstElementChild.localName, 'button', 'and it is the button');
+    bareHandle.destroy();
+    assert.equal(bare.childNodes.length, 0);
+    windowHandle.destroy();
+  });
+
+  it('draws nothing when a later item is in a shadow root (M16)', () => {
+    const first = companionTarget(targets);
+    const items = [first, shadowTarget(document)].map((target) => ({ target, props: BUTTON }));
+    assert.throws(() => ui().mountMany('Button', items), SHADOW_REFUSAL);
+    assert.equal(first.childNodes.length, 0, 'the first item is not drawn');
+  });
+
+  it("judges a target in a stale standalone mount's detached slot as under a root", () => {
+    const seam = ui();
+    const target = companionTarget(targets);
+    const card = seam.mount('InspectorCard', { target, props: { children: true } });
+    flushSync();
+    const inner = document.createElement('div');
+    card.slot('children').append(inner);
+    target.replaceChildren();
+    const items = [target, inner].map((each) => ({ target: each, props: BUTTON }));
+    const [outer, nested] = seam.mountMany('Button', items);
+    assert.equal(card.update({ children: true }), false, "the first item's draw ended the card");
+    assert.equal(standaloneRootIn(target).firstElementChild.localName, 'button');
+    assert.equal(inner.firstElementChild.localName, 'button', 'drawn with no standalone root');
+    assert.ok(!inner.closest('.fabricate'), 'and with no .fabricate above it');
+    nested.destroy();
+    outer.destroy();
   });
 });
 
