@@ -31,6 +31,9 @@
     written `aria-expanded="false"` by the time the key reaches the dialog. The window comes before
     the document in every capture path, so the record precedes every document capture listener
     whatever its registration order.
+  - A panel a control inside the dialog opened, or a panel opened from such a panel, counts as
+    inside it wherever it is portaled, by `overlaysOpenedFrom` in `util/overlayHost.js`: a press
+    there dismisses nothing, and its Escape is left to the panel, judged from the same record.
   - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
   - Published through `game.fabricate.api.ui` with `open`, `title`, `subtitle`, `closeLabel`,
     `closeOnOutsideClick`, `onClose`, `body` and `footer` only (`ui-extension-points`' issue 2656
@@ -40,16 +43,21 @@
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new
   window and reads the live attribute there, and one left open across a Foundry 14 window move keeps
-  hearing the old window. A panel such a control portals outside the dialog is outside it, as a
-  `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape or a press there dismisses
-  the modal too. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
+  hearing the old window. A document capture listener registered before the dialog opened that
+  releases such a panel on mousedown runs first, and the press then counts as outside; a `Modal`
+  opened in another's slot counts as outside it. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
   tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
   import IconButton from './IconButton.svelte';
-  import { acquireOverlayHost, releaseOverlayHost } from '../util/overlayHost.js';
+  import {
+    acquireOverlayHost,
+    heldBy,
+    overlaysOpenedFrom,
+    releaseOverlayHost,
+  } from '../util/overlayHost.js';
 
   let {
     open = false,
@@ -99,12 +107,9 @@
     return event.composedPath?.()[0] ?? event.target;
   }
 
-  // True when `node` is in `container`, or in a shadow root whose host chain reaches it.
-  function heldBy(container, node) {
-    for (let at = node; at; at = at.getRootNode?.().host) {
-      if (container?.contains?.(at)) return true;
-    }
-    return false;
+  // True when `origin` is in a panel that counts as inside `container`; see Invariants.
+  function inPanelOpenedFrom(container, origin) {
+    return overlaysOpenedFrom(container).some((panel) => heldBy(panel, origin));
   }
 
   // True when `origin` sits in an expanded control that `container` holds, looking through open
@@ -125,7 +130,12 @@
     if (typeof view?.addEventListener !== 'function') return {};
     const record = (event) => {
       if (event.key !== 'Escape') return;
-      escapeRecord = { event, expanded: expandedIn(node, originOf(event)) };
+      const origin = originOf(event);
+      escapeRecord = {
+        event,
+        expanded: expandedIn(node, origin),
+        nested: inPanelOpenedFrom(node, origin),
+      };
     };
     view.addEventListener('keydown', record, true);
     return {
@@ -145,10 +155,18 @@
     return event.composedPath?.().includes(dialog) ?? Boolean(dialog?.contains?.(event.target));
   }
 
+  // An Escape is judged from the window's record, taken before a panel can close and release
+  // itself; a mousedown, or a key in a document with no window, live.
+  function fromPanelOpenedInside(event) {
+    if (escapeRecord?.event === event) return escapeRecord.nested;
+    return inPanelOpenedFrom(dialog, originOf(event));
+  }
+
   // An outside mousedown or an Escape that did not come from inside the dialog. Escape inside it
   // is `handleKeydown`'s, so it is not closed twice, nor is an expanded control's.
   function dismissFromOutside(event) {
     if (event?.type === 'keydown' && (event.isComposing || cameFromInside(event))) return;
+    if (fromPanelOpenedInside(event)) return;
     requestClose();
   }
 

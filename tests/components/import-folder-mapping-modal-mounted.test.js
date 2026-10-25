@@ -307,6 +307,70 @@ describe('Escape in the mapping modal', () => {
   });
 });
 
+describe('a panel the mapping modal opens counts as inside it (issue 2660)', () => {
+  const press = (node) =>
+    node.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+  const escapeOn = (node) =>
+    node.dispatchEvent(
+      new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
+  const settle = async () => {
+    flushSync();
+    await new Promise((done) => setTimeout(done, 0));
+    flushSync();
+  };
+
+  async function mountCounting() {
+    const closes = [];
+    const root = await harness.mount({
+      open: true,
+      folders: FOLDERS,
+      ...VOCAB,
+      onClose: () => {
+        closes.push(true);
+      },
+    });
+    return { root, closes };
+  }
+
+  it('chooses a category on a press then a click on its option, and the modal stays', async () => {
+    const { root, closes } = await mountCounting();
+    const panel = openSelectPanel(root, categoryTrigger(1));
+    const row = panel.querySelector('[data-popover-option="Metal"]');
+    press(row);
+    flushSync();
+    assert.ok(row.isConnected, 'the list is still open after the press');
+    row.click();
+    flushSync();
+    assert.equal(categoryTriggerText(root, 1), 'Metal');
+    assert.deepEqual(closes, [], 'onClose is not called');
+    assert.ok(dialog(), 'the dialog is still drawn');
+  });
+
+  it('keeps the modal through a press on a tag row and an Escape in the tag query field', async () => {
+    const { closes } = await mountCounting();
+    const trigger = rows()[0].querySelector('[data-import-mapping-add-tag]');
+    trigger.click();
+    await settle();
+    const panel = document.querySelector('.fabricate-set-picker-popover');
+    press(panel.querySelector('[role="option"]'));
+    flushSync();
+    assert.ok(panel.isConnected, 'the press leaves the tag panel open');
+    escapeOn(panel.querySelector('input'));
+    await settle();
+    assert.ok(!document.querySelector('.fabricate-set-picker-popover'), 'the Escape closed the panel');
+    assert.deepEqual(closes, [], 'onClose is not called');
+    assert.ok(dialog(), 'the dialog is still drawn');
+    assert.ok(document.activeElement === trigger, 'focus is back on the Add tag trigger');
+  });
+
+  it('still calls onClose once for a press on the page', async () => {
+    const { closes } = await mountCounting();
+    press(document.body);
+    assert.deepEqual(closes, [true]);
+  });
+});
+
 describe('ImportFolderMappingModal: tags through the set picker (issue 2512)', () => {
   const settle = async () => {
     flushSync();
