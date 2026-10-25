@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; the standalone style root is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; the standalone style root is the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -441,6 +441,7 @@ The names an entry reserves through `restOn` and `tooltip` are fixed for its `ve
 - The published set continues with `Pagination` (issue 2646).
 - The published set continues with `IconPicker` (issue 2647).
 - The published set continues with `ActionMenu` (issue 2652).
+- The published set continues with `Modal` (issue 2656).
 - A published component's contract is exactly the keys its manifest entry lists and the accepted values stated for each in this capability or in the design-system requirement for that component; `docs/api/index.md` MUST state the same.
 - A member or value of a published key that those statements do not name is private, and changing it is not a breaking change.
 - A component may declare props it does not publish: `class`, a class under another name (`EmptyState`'s `contextClass`), a deprecated alias, a prop that takes an attribute name and a prop that carries attributes (`Stepper`'s and `SearchField`'s `inputProps`) are never published, and an alternative name source (`Meter`'s `labelId`, `InfoStrip`'s `ariaLabelledBy` and `ariaLabel`, `SearchField`'s `label` and `ariaLabelledBy`, `StageBars`' `ariaLabelledBy`) is not published at version 1; publishing one later is additive.
@@ -463,6 +464,8 @@ Its `triggerClass` and `triggerStyle` are never published, being a class and a s
 - `ActionMenu`'s `disabled`, `heading`, `panelLabel`, `triggerIcon` and `triggerTitle` are not published at version 1, and nor is an item's `tone`; publishing one later is additive.
 Its `open` is not published at version 1, and publishing it later as a `value` key is additive.
 Its `triggerClass`, `menuClass` and `triggerProps` are never published, being classes and attributes under other names, and nor is `trigger`, a snippet called with arguments.
+- `Modal`'s `trapFocus`, `initialFocus`, `onSubmit`, `footerLayout` and `width` are not published at version 1; publishing one later is additive.
+Its `dialogProps` is never published, being attributes under another name.
 - `Select`'s `label`, `hint`, `error`, `ariaLabelledBy`, `ariaDescribedBy`, `id`, `name`, `showTick`, `minWidth`, `maxWidth`, `triggerProps`, `triggerTitle`, `readonly`, `disabled`, `invalid`, `mono` and `icon` are not published at version 1, and nor is its rest, which lands only on the root of the labelled form those first three draw; publishing one later is additive.
 - `FillBar`'s `shares` is not published at version 1, and a companion that needs a fill in segments mounts `Meter`; publishing it later is additive.
 - `Stepper`'s `formatValue` and `parseValue` run while Fabricate renders, so neither is a `callback` key, and so its formatted mode is not published at version 1; publishing it later needs a new prop kind, which is additive.
@@ -470,7 +473,7 @@ Its `triggerClass`, `menuClass` and `triggerProps` are never published, being cl
 A state the component shows (`aria-pressed`, `aria-checked`, `aria-selected`, `aria-current`, `aria-disabled`), `aria-hidden`, a live-region attribute (`aria-live`, `aria-atomic`, `aria-relevant`) and a reference that re-parents content (`aria-owns`, `aria-activedescendant`, `aria-flowto`) are never published as one.
 A name source (`aria-label`, `aria-labelledby`) and any other `aria-*` name, `aria-controls`, `aria-haspopup` and `aria-busy` among them, are not published at version 1 unless an entry's group names the key (`StatusToggle`'s group names `aria-labelledby`); publishing one later is additive.
 - Fabricate drops a stripped member from every item of a published `data` value and never writes it: an `InfoStrip` fact's `props` and an `ActionMenu` item's `data` are not attribute channels, and the publishable subset states which members are stripped.
-- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652); a companion calls it for each before mounting.
+- `TierTrack` and issue 2448's seven entries are eager for the life of `schemaVersion: 1`; `Kicker`, `Chip`, `Rail`, `InspectorCard`, `EmptyState` and `Notice` were published with `load` (issue 2451), `Button`, `StatusToggle` and `Stepper` too (issue 2452), `SearchField` too (issue 2453), `Select` too (issue 2454), `StageBars` too (issue 2455), and `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup` too (issue 2601), and `SegmentedControl` too (issue 2644), and `Pagination` too (issue 2646), and `IconPicker` too (issue 2647), and `ActionMenu` too (issue 2652), and `Modal` too (issue 2656); a companion calls it for each before mounting.
 - `Rail` is lazy (issue 2455): only the Manager's own chunk and `load` fetch its code, and `mount` and `mountMany` refuse it with M19 until `load` has fetched its code.
 A lazy entry mounts, draws and behaves, its focus and keyboard behaviour included, exactly as it would if it were eager.
 - Registration refuses a prop `kind` outside the shipped set, `'data'`, `'text'`, `'slot'`, `'callback'`, `'aria'` and `'value'`, with an `Error` ending `<name> "<key>" has an unknown kind "<kind>"`, and a `root` outside `'any'`, `'fabricate'` and `'manager'` with one ending `<name> has an unknown root "<root>"`.
@@ -576,6 +579,7 @@ A Foundry 14 detached window's target is judged the same way.
 `mount` ignores an option it does not know, so `overlays === true` is a companion's signal that `overlayHost` is honoured.
 - **`overlayHost` is optional, and names the element an overlay's panel is drawn in.**
 It is an element of `target.ownerDocument` (M18), positioned by the companion, because it is the panel's containing block and coordinate origin; it need not be connected at `mount`.
+A `Modal` dialog is `position: fixed`, so its host's `position` does not make the host its containing block, as its group states.
 On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ignored.
 - Each time an overlay opens, Fabricate picks its host from `target.ownerDocument` at that moment, and never from Fabricate's own `document`:
   1. `overlayHost`, while it is connected and in `target`'s document;
@@ -585,7 +589,7 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
 The `<div>` carries `display: contents` and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-- An overlay's outside-press, Escape and scroll listeners bind to the document that holds it and its resize listener to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
+- An overlay's outside-press, Escape and scroll listeners bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
 An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
 An overlay drawn by Fabricate outside every published mount keeps its own host as before.
@@ -597,6 +601,7 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 - `Select` (issue 2454) is the first entry whose `overlays` is `true`: its list is the overlay, and its group states what the list draws.
 - `IconPicker` (issue 2647) is the second: its list and its query field are the overlay, and its group states what they draw.
 - `ActionMenu` (issue 2652) is the third: its menu is the overlay, and its group states what it draws.
+- `Modal` (issue 2656) is the fourth: its dialog is the overlay, and its group states what it draws.
 
 ### Interactive components
 
@@ -605,12 +610,14 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
+A key pressed in an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`, and Escape there stops at the dialog, as its group states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
 Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
-In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document.
+In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog and asks the companion to close that `Modal`, as its group states.
+An open ApplicationV1 `Dialog` in the main window takes a Tab pressed outside it and moves focus to its own button.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, as its group states.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, which its group names by its glyph's `label`.
@@ -625,6 +632,7 @@ Where the destination is drawn by the same change, the companion draws it first,
 - To return focus to a published control, after a dialog its press opened has closed, the companion focuses the focusable element inside `target` that the entry's group names; nothing else inside `target` is the companion's to select.
 - A press bubbles from the control as a `click`, except a press on a `Select`, `IconPicker` or `ActionMenu` trigger, which stops at the trigger, and a press inside an open `Select` or `IconPicker` list or `ActionMenu` menu, which stops there.
 A companion element above `target` that listens for `click` receives every other press too.
+A press inside an open `Modal` dialog bubbles to the dialog's host and its ancestors, never through the `Modal`'s own `target`.
 The companion keeps `target` out of any element of its own that carries `data-action`, and passes no `data-action` through rest to a component that draws a control: the window dispatches the nearest `data-action` above the press, and `close` closes it, as a DialogV2 button's own action name submits it.
 Where the entry's rest keys land on the control itself, `data-action` is refused (M13): the press would dispatch it, `close` closing the window and, in Foundry 14, `detach` moving it to its own browser window.
 The companion keeps `target` out of a `<label>`, an `<a>` and a `<button>` of its own.
@@ -650,7 +658,7 @@ Where the entry's rest keys land on the control itself, `data-cursor` is refused
 - A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
 Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
-  The one exception is `IconButton`, and the `ActionMenu` trigger it draws, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states.
+  The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
 Where the entry's rest keys land on the control itself, `data-tooltip` and every name that starts `data-tooltip-` are refused (M13), so the control shows the pointer nothing it does not show keyboard focus.
 A tooltip attribute on `target` itself is the companion's, and is held to the same rule.
@@ -1118,7 +1126,7 @@ Each group states the accepted values of every key that entry publishes.
     Children appended to the slot directly, not inside that one element, lay out in ordinary block and inline flow: inline ones share a line and block ones keep their own margins.
   - The label is drawn by a `Kicker` as `p`, so the `Kicker` group's type and grounds apply; it is not a heading.
   - Its fill is `--fab-bg-1` inside a 1px `--fab-border` edge, or `--fab-bg-2` inside a Fabricate dialog.
-    A Fabricate dialog is the shared `Modal` Fabricate draws in its own window, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
+    A Fabricate dialog is the shared `Modal`, drawn in Fabricate's own windows or mounted as the published `Modal`, whose body is itself `--fab-bg-1`; a Foundry DialogV2 is not one.
     It states no ink or type, so its content inherits the Fabricate window's ink from `target`, and a `Kicker` clears 4.5:1 on either fill.
   - A well is never nested in a well: the design system has two container levels, the card and the well.
     Fabricate does not refuse a well nested in a well; the group only says not to.
@@ -1383,7 +1391,7 @@ Each group states the accepted values of every key that entry publishes.
     Typing narrows the rows to the glyphs the query matches, and an empty query lists them all; which glyphs a query matches and their order are private.
     ArrowDown and ArrowUp move the active row, which the field names with `aria-activedescendant`, and Home and End do so only from the caret's edge; Enter chooses the active row, and with no active row does nothing.
     A choice closes the list and returns focus to the trigger.
-    Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
+    Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window, though a `Modal` the picker is mounted in with `closeOnOutsideClick` `true` also calls its `onClose`, as that group states; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
     Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
@@ -1458,6 +1466,68 @@ Each group states the accepted values of every key that entry publishes.
     `destroy` removes the trigger and closes the menu, so where the trigger or an item holds focus the companion moves focus to an element of its own first.
   - A menu opened after Foundry 14 moves the window is placed and heard in the window that then holds the trigger, its focus and arrow keys included, as Overlays states.
 - **Private:** `ActionMenu`'s glyph, its trigger, menu, item and type figures, its colours beyond what its group states, the menu's placement and width, an item's `tone`, its `manager-action-menu-*` classes and `data-action-menu-*` hooks, and how Fabricate draws a menu in its own rows, adders and kind menus.
+
+### The issue 2656 components
+
+Each group states the accepted values of every key that entry publishes.
+
+- **`Modal`.**
+  - It is Fabricate's dialog (`<Modal>` in the library): a panel drawn over the window, in an overlay, with a header band holding the companion's title, an optional subtitle and a close control, then the companion's body and footer in their content slots.
+    It is for one step the user finishes or dismisses before going on.
+    It draws nothing focusable inside `target`, so the companion returns focus to an element of its own, the control that opened the dialog.
+  - `open` is `true` to draw the dialog and `false` or absent to draw none, and the companion opens and closes it only through `update`.
+    While `open` is `false`, `target` holds no element, and while it is `true`, `target` holds one empty element of Fabricate's, which is private.
+    `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
+    An `update` that passes `open: false` detaches the slot elements with their contents intact, and `open: true` attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and a companion's components, effects and listeners in them keep running.
+  - `title` is required and is final display text, drawn as the dialog's level-3 heading, and it is the dialog's accessible name.
+    `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
+    `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
+    A name of white space alone leaves its element with no name, so the companion never passes one.
+  - `body` is a content slot whose element is a `<div>`, and the dialog draws its top-level children, as the slot element draws no box, below the header in a padded column it spaces by `gap`.
+    `footer` is a content slot whose element is a `<div>`, and the dialog draws its top-level children in a row aligned to the end of a footer band, spaced by `gap`, of which the companion makes at most one primary.
+    An omitted slot draws no body or no footer band, so a dialog with neither draws its header alone.
+    The dialog's height is capped, so the companion scrolls tall content inside one element of its own in the body, which it gives `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
+    A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
+  - `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
+    With `true`, a pointer press anywhere in the document outside the dialog calls `onClose` as the pointer goes down, and so does Escape pressed while focus is outside the dialog.
+    A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
+    A press in the panel of an overlay entry the companion mounts in a slot, as a `Select`'s list, is outside the dialog, and so is focus in that panel, as in an `IconPicker`'s query field, so with `true` a press or an Escape there calls `onClose` as well as closing that panel.
+    A companion that mounts such an entry in a slot passes `false`, or passes that entry an `overlayHost` inside the slot, where its panel is inside the dialog, which clips what overflows it.
+    With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
+  - `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
+    An Escape held down calls it again on each repeat.
+    It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
+    Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing.
+    A companion that closes the dialog while focus is inside it first moves focus to an element of its own, as the opener, because removing the focused control leaves focus on the page.
+  - Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
+    Tab moves focus as the browser does, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed outside it and moves focus to its own button.
+    Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
+    The dialog is announced as modal, so a screen reader may keep its reading cursor inside the dialog while it is open, though Tab can still move focus to the window behind, which the screen reader may treat as hidden; the companion therefore moves focus into the dialog when it opens and back to its opener when it closes.
+    An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so the companion moves focus into the dialog onto an element that does not act on Enter, or ignores a `keydown` whose `repeat` is `true`.
+    A pointer press on the dialog's surface, outside every control, moves focus to the page, where Foundry's keybindings apply.
+  - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field the companion draws in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
+    Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
+    A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
+    Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
+    Escape with focus on the page, or on an element outside the dialog that Foundry does not treat as taking keyboard input, reaches Foundry's dismiss keybinding, which, unless it first closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
+    Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
+    Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
+  - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
+    An `overlayHost` the companion passes sits inside the same Fabricate window, because the close control, its ring and the theme are drawn as this group states only under a `.fabricate` ancestor, and in no `<form>`, `<label>`, `<a>` or `<button>` and under no element that carries `data-action`, because a press or a key in the dialog bubbles to the host's ancestors and a text field or an untyped button the companion draws in a slot would act on them.
+    The dialog is centred in the nearest element above it that makes itself the containing block of fixed content, as the Manager's root does and a Foundry window or its content can, and clipped where that element clips its overflow; otherwise it is centred in the viewport of the browser window that holds its host, so it may extend past the Fabricate window's edges.
+    It sits above the host's other content that sets no higher `z-index`, and under any Foundry window stacked above the window that holds it; in the standalone layer it sits above every Foundry window.
+    Its width, height and placement are otherwise private.
+  - It takes no rest keys, so a `data-*` key is refused (M8).
+  - It needs a Fabricate window ancestor, because its close control and its ring, and the theme its inks resolve from, come from Fabricate's module sheet, and its frame, header band and close control are drawn the same in the Manager and the player window.
+    A companion's own window or dialog carries no Fabricate root, so the dialog is refused there (M16).
+  - The close control's keyboard ring is the window's accent ring, 2px wide and 2px clear of the control; it clears 3:1 against the header band in every palette.
+    The title clears 4.5:1 against the header band in every palette, and the close glyph clears 3:1 against it in every palette.
+    The subtitle, stated for the weaker of its two inks, falls short of 4.5:1 against the header band in six of the seven palettes, the default among them, and clears it only in `mythwright`, so the companion says in `title` whatever the reader must not miss.
+  - An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control the companion drew there.
+    `destroy` removes the dialog, so where a control in it holds focus the companion moves focus to an element of its own first.
+  - A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as Overlays states.
+    A dialog left open across a move hears no outside press or outside Escape in the new window, and there judges an expanded control from its attribute as it then stands, not as the key went down.
+- **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its width, height and placement, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
 ### The publishable subset
 
@@ -1614,7 +1684,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -1816,6 +1886,13 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** focus moves to the first item when the menu opens, and ArrowDown skips the disabled item to the third
 - **AND** Fabricate calls `onSelect` once with the third item's `id`, closes the menu, and returns focus to the trigger
 - **AND** a mount that omits `ariaLabel` throws M9, and one that passes `heading` throws M8
+
+#### Scenario: A published dialog
+
+- **WHEN** a companion mounts `Modal` inside a Fabricate window with `open: true`, its `title`, `closeLabel` and `onClose`, fills its `body` slot with a text field, focuses that field and presses Escape
+- **THEN** Fabricate calls `onClose` once, the Escape reaches no bubble-phase `keydown` listener above the dialog's host, and Foundry's dismiss keybinding closes no window
+- **AND** the dialog stays open until the companion's `update` passes `open: false` with its other keys
+- **AND** a mount that omits `closeLabel` throws M9, and one that passes `trapFocus` throws M8
 
 #### Scenario: An overlay host
 
