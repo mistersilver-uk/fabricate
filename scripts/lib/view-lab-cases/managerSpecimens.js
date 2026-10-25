@@ -1426,7 +1426,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-published-action-menu-choice',
     label:
-      'Specimen, mounted through the published seam — the same reagent action menu, after three steps: Enter pressed on the trigger, which opened the menu with focus on Duplicate reagent; ArrowDown, which skipped the disabled Archive reagent to Delete reagent; and Enter, which chose it, so Fabricate called onSelect with delete, which the ground records. So the menu is closed and focus has returned to the trigger, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and trigger',
+      'Specimen, mounted through the published seam — the same reagent action menu, after three steps: Enter pressed on the trigger, which opened the menu with focus on Duplicate reagent; ArrowDown, which skipped the disabled Archive reagent to Delete reagent; and Enter, which chose it, so Fabricate called onSelect with delete, which the ground records. So the menu is closed and focus has returned to the trigger, which carries the accent keyboard ring, 2px wide with 2px of ground between ring and trigger, and which has opened the tooltip Foundry shows for its name on that keyboard focus (the lab records the tooltip as aria-describedby and draws none)',
     // Beyond the smoke: a companion mounts it through `api.ui` and is told of each command chosen.
     reaches: 'beyond',
     smokeLabels: [],
@@ -1437,7 +1437,7 @@ export const CASES = Object.freeze([
       { selector: MENU_FOCUSED, press: 'Enter' },
     ],
     // The id the companion was told of, the menu closed, and the focus Fabricate returned.
-    expectSelector: `${MENU_GROUND}[data-lab-action-chosen="delete"]:not(:has(.fabricate-action-menu-panel)) .fabricate-icon-button:focus-visible`,
+    expectSelector: `${MENU_GROUND}[data-lab-action-chosen="delete"]:not(:has(.fabricate-action-menu-panel)) .fabricate-icon-button[aria-describedby="tooltip"]:focus-visible`,
     expectCenterHit: MENU_TRIGGER,
     expectContained: [
       { container: MENU_GROUND, target: MENU_TARGET },

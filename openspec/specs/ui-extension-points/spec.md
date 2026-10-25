@@ -606,7 +606,7 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
 A pointer press acts on release, as a `click`, never on pointer down, so a pointer that leaves the control before release cancels it.
-Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` item, Fabricate has moved focus to, as each group states, and Space on release.
+Enter presses on key down and again on each repeat while held, except on the `Pagination` arrow or page-size radio, or the `ActionMenu` trigger or item, Fabricate has moved focus to, as each group states, and Space on release.
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
@@ -1409,7 +1409,7 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`ActionMenu`.**
   - It is Fabricate's overflow menu (`<Menu>` in the library): an icon-only trigger button showing Fabricate's overflow glyph, which opens a menu of commands, in an overlay, each of which `onSelect` reports as it is chosen.
-    The trigger is the only focusable element inside `target`, so to return focus to the menu the companion focuses `target.querySelector('button')`.
+    The trigger is the only focusable element inside `target`, so to return focus to the `ActionMenu` the companion focuses its trigger, `target.querySelector('button')`.
   - `items` is required and is an array of the menu's commands, in order, each `{ id, label, icon, disabled, danger }`, of which `id` and `label` are required.
     `id` is a string unique within `items`, which `onSelect` reports.
     `label` is the item's final display text and its accessible name, and it names the command, not the record, because the trigger identifies the record.
@@ -1430,13 +1430,13 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate calls `onSelect` only with the `id` of an item the menu draws when it is chosen.
     The companion runs a command only for an `id` it matches by name, so no item, the last one included, runs a command meant for another `id`.
   - A press on the trigger, by pointer, Enter or Space, opens the menu and moves focus to its first enabled item, outside `target`.
-    After a pointer press, the focus Fabricate moves into the menu shows no mark until a key moves it, as the design system's rule for programmatic focus states.
+    After a pointer press, the focus Fabricate moves into the menu shows no mark until a key moves it; this falls short of the design system's rule for programmatic focus, which requires a marker on that path, and is recorded, not fixed.
     ArrowDown on the trigger does the same, and ArrowUp opens the menu onto its last enabled item.
-    An Enter held on the trigger opens the menu once, and its repeats choose nothing; a fresh Enter on an item chooses it.
+    An Enter held on the trigger opens the menu once, and an Enter held on an item chooses it once; the repeats of either choose and open nothing, and a fresh Enter on an item chooses it.
     A second press on the trigger closes the menu without choosing and moves no focus, so focus goes where the pointer press puts it, which in Chromium, Foundry's desktop client, is the trigger.
     In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
     A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger, and a companion that moves focus in response moves it from a later task, as from a `setTimeout`.
-    Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
+    Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog` also closes is private.
     Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger.
     A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
     A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.

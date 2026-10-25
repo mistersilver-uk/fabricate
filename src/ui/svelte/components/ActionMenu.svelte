@@ -129,6 +129,11 @@
   }
 
   function onTriggerKeydown(event) {
+    // Not stopped: a choice returns focus here, and the Enter still held would press the trigger.
+    if (event.key === 'Enter' && event.repeat) {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     event.stopPropagation();
