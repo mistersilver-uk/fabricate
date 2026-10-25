@@ -670,6 +670,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-import-report',
     'manager-components-add-from-catalogue',
     'manager-import-folder-mapping',
+    // The dialog mounted through the published seam: open, and closed from its close glyph (issue 2656).
+    'manager-published-modal-specimen',
+    'manager-published-modal-close',
   ]),
   // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
   // inspector's two groups and the recipe-item editor's preview rail.

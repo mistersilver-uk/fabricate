@@ -800,6 +800,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-icon-picker': () => import('./fixtures/PublishedIconPicker.svelte'),
   // Issue 2652: a reagent's action menu whose choice the ground records.
   'published-action-menu': () => import('./fixtures/PublishedActionMenu.svelte'),
+  // Issue 2656: a reagent's rename dialog, opened and closed by the companion's own updates.
+  'published-modal': () => import('./fixtures/PublishedModal.svelte'),
 });
 // view-lab-region:end
 

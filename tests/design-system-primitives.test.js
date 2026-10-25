@@ -1013,6 +1013,20 @@ test('(a) an IconPicker change publishes its frame, then the two specimens that 
   assertBroadSignalFrames(file, frames);
 });
 
+test('(a) a Modal change publishes its five frames, then the two specimens that mount it through the seam', () => {
+  const file = 'src/ui/svelte/components/Modal.svelte';
+  const frames = [
+    'player-crafting-roll-prompt-basic',
+    'player-crafting-roll-prompt-compact',
+    'manager-import-report',
+    'manager-components-add-from-catalogue',
+    'manager-import-folder-mapping',
+    'manager-published-modal-specimen',
+    'manager-published-modal-close',
+  ];
+  assertBroadSignalFrames(file, frames);
+});
+
 test('(a) an ActionMenu change publishes its six frames, then the two specimens that mount it through the seam', () => {
   const file = 'src/ui/svelte/components/ActionMenu.svelte';
   const frames = [

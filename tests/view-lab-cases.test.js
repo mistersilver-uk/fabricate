@@ -410,6 +410,8 @@ const labHarnessSource = [
   'tests/view-lab/fixtures/PublishedPagination.svelte',
   'tests/view-lab/fixtures/PublishedIconPicker.svelte',
   'tests/view-lab/fixtures/PublishedActionMenu.svelte',
+  'tests/view-lab/fixtures/PublishedModal.svelte',
+  'tests/view-lab/fixtures/publishedModalSpecimen.js',
 ]
   .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
   .join('\n');
@@ -1524,6 +1526,22 @@ const NON_VERB_CONTROLS = Object.freeze({
   'manager-published-action-menu-choice': [
     {
       selector: '[data-lab-action-menu] .fabricate-icon-button',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The published dialog (issue 2656): the close control's corner, and the focused footer
+  // button's ring, by its shape.
+  'manager-published-modal-specimen': [
+    { selector: '[data-lab-modal] [data-manager-modal-close]', styles: 'border-radius: 7px' },
+    {
+      selector: '[data-lab-modal] [data-lab-modal-footer] button',
+      styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+    },
+  ],
+  // The opener focus returned to after a close: its ring, by its shape.
+  'manager-published-modal-close': [
+    {
+      selector: '[data-lab-modal] [data-lab-modal-open] button',
       styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
     },
   ],
@@ -5483,10 +5501,14 @@ function windowOccurrences(source, line) {
   return (windowIndex(source, 7).get(source.slice(from - 1, from + 6).join('\n')) ?? []).length;
 }
 
-/** Cases whose id line and last content line both anchor uniquely, so a fixture at either is exact. */
+/**
+ * Cases whose id line and last content line both anchor uniquely, so a fixture at either is exact;
+ * a case with theme variants is left out, because an edit to its literal selects each variant too.
+ */
 function uniquelyAnchoredCases(howMany) {
+  const varied = new Set(VIEW_LAB_CASES.map(({ baseCaseId }) => baseCaseId).filter(Boolean));
   const qualifying = caseIds
-    .filter((id) => id !== FALLBACK_CASE_ID && isInlineCase(id))
+    .filter((id) => id !== FALLBACK_CASE_ID && isInlineCase(id) && !varied.has(id))
     .map((id) => {
       const lines = caseLiteralLines(id);
       // `.at(-1)` is the `  }),` that closes the literal, so `.at(-2)` is its last content line —
@@ -6201,13 +6223,15 @@ test('every published component seam module, and the host, selects the specimens
       'manager-published-icon-picker-choice',
       'manager-published-action-menu-specimen',
       'manager-published-action-menu-choice',
+      'manager-published-modal-specimen',
+      'manager-published-modal-close',
     ]) {
       assert.ok(selected.includes(id), `a change to ${file} does not select ${id}`);
     }
   }
 });
 
-/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, the icon picker fixture's picker, and the action menu fixture's menu. */
+/** The published components a specimen other than the leaves one draws: the tier track's own, the controls fixture's switch, the values fixture's stepper, the search fixture's field, the select fixture's selects, the stage bars fixture's groups, the field fixture's column, the well fixture's well, the callout fixture's notes, the icon button fixture's buttons, the tabs fixture's strip, the option cards fixture's group, the segmented fixture's two controls, the pagination fixture's two pagers, the icon picker fixture's picker, the action menu fixture's menu, and the modal fixture's dialog. */
 const SPECIMENED_ELSEWHERE = new Set([
   'TierTrack',
   'StatusToggle',
@@ -6225,9 +6249,10 @@ const SPECIMENED_ELSEWHERE = new Set([
   'Pagination',
   'IconPicker',
   'ActionMenu',
+  'Modal',
 ]);
 
-test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker and ActionMenu and checks the containment of each mount, nested ones included', () => {
+test('the leaves specimen mounts every published component but TierTrack, StatusToggle, Stepper, SearchField, Select, StageBars, Field, Well, Callout, IconButton, EditorTabs, RadioCardGroup, SegmentedControl, Pagination, IconPicker, ActionMenu and Modal and checks the containment of each mount, nested ones included', () => {
   const { instance } = componentAstOf('tests/view-lab/fixtures/PublishedLeaves.svelte');
   const mounts = instance.content.body
     .flatMap((node) => node.declarations ?? [])

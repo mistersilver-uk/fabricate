@@ -415,6 +415,15 @@ const MENU_FOCUSED = `${MENU_GROUND} .fabricate-action-menu-panel button.manager
 /** Sized to the fixture's 320px ground and the menu that opens below its trigger. */
 const MENU_WINDOW = Object.freeze({ width: 440, height: 380 });
 
+const MODAL_GROUND = '[data-lab-modal]';
+const MODAL_OPENER = `${MODAL_GROUND} [data-lab-modal-open] button`;
+const MODAL_DIALOG = `${MODAL_GROUND} .fabricate-modal`;
+const MODAL_CLOSE = `${MODAL_GROUND} [data-manager-modal-close]`;
+const MODAL_DONE = `${MODAL_GROUND} [data-lab-modal-footer] button`;
+
+/** Wider and taller than the 560px dialog, which is sized from the viewport and clipped past it. */
+const MODAL_WINDOW = Object.freeze({ width: 720, height: 560 });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-bulk-edit-panel-shell-specimen',
@@ -1455,6 +1464,68 @@ export const CASES = Object.freeze([
     position: MENU_WINDOW,
     kinds: ['manager', 'specimen'],
     // `ActionMenu.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-modal-specimen',
+    label:
+      'Specimen, mounted through the published seam — a Rename the reagent dialog on the --fab-bg-2 ground, which is also its overlay host, after one step: Enter pressed on the Rename reagent opener, a published Button, which opened the dialog and then focused its footer button from a later task. So the dialog shows its header band with the title, the Flask of quicksilver subtitle beneath it and the close glyph, a body paragraph, and a footer band whose Done button, a published primary Button, holds keyboard focus with the accent ring 2px wide and 2px clear',
+    // Beyond the smoke: a companion mounts it through `api.ui`; the dialog is drawn in its own host.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-modal' },
+    steps: [{ selector: MODAL_OPENER, press: 'Enter' }],
+    // The dialog in the host the companion passed, focus on the footer button it moved there.
+    expectSelector: `${MODAL_GROUND} .fabricate-modal[role="dialog"] [data-lab-modal-footer] button:focus-visible`,
+    expectCenterHit: MODAL_CLOSE,
+    expectContained: [
+      { container: '.window-content', target: MODAL_DIALOG },
+      { container: '.window-content', target: MODAL_GROUND },
+    ],
+    expectLayout: {
+      controls: [
+        // The close control's declared corner, and the focused footer button's ring by its shape;
+        // its colour is the census's.
+        { selector: MODAL_CLOSE, styles: 'border-radius: 7px' },
+        {
+          selector: MODAL_DONE,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: MODAL_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
+    sourceMatches: PUBLISHED_SEAM_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-published-modal-close',
+    label:
+      'Specimen, mounted through the published seam — the same Rename the reagent dialog, after two steps: Enter pressed on the Rename reagent opener, which opened the dialog, and Enter pressed on its close glyph, so Fabricate called onClose, whose close path focused the opener and passed open false in its update. So the dialog is gone from the ground, and the opener holds keyboard focus with the accent ring 2px wide and 2px clear',
+    // Beyond the smoke: a companion mounts it through `api.ui` and is told when the user asks to close.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { specimen: 'published-modal' },
+    steps: [
+      { selector: MODAL_OPENER, press: 'Enter' },
+      { selector: MODAL_CLOSE, press: 'Enter' },
+    ],
+    // The close the companion was told of, the dialog gone, and the focus its close path moved.
+    expectSelector: `${MODAL_GROUND}[data-lab-modal-closed="1"]:not(:has(.fabricate-modal)) [data-lab-modal-open] button:focus-visible`,
+    expectCenterHit: MODAL_OPENER,
+    expectContained: [{ container: '.window-content', target: MODAL_GROUND }],
+    expectLayout: {
+      controls: [
+        // The returned focus's ring by its shape; its colour is the census's.
+        {
+          selector: MODAL_OPENER,
+          styles: 'outline-style: solid; outline-width: 2px; outline-offset: 2px',
+        },
+      ],
+    },
+    position: MODAL_WINDOW,
+    kinds: ['manager', 'specimen'],
+    // `Modal.svelte` is a broad signal, routed here by its `BROAD_SIGNAL_CASE_OVERRIDES` entry.
     sourceMatches: PUBLISHED_SEAM_SOURCES,
   }),
 ]);
