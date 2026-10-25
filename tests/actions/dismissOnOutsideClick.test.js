@@ -219,6 +219,53 @@ describe('dismissOnOutsideClick onDetached (issue 2671)', () => {
     action.destroy();
   });
 
+  it('keeps one observer across updates, so a removal calls onDetached once', async () => {
+    const view = document.defaultView;
+    const { MutationObserver } = view;
+    let made = 0;
+    view.MutationObserver = class extends MutationObserver {
+      constructor(callback) {
+        super(callback);
+        made += 1;
+      }
+    };
+    try {
+      const { node, calls, action } = watched();
+      for (let i = 0; i < 3; i += 1) {
+        action.update({
+          onDetached: () => {
+            calls.push('detached');
+          },
+        });
+      }
+      assert.equal(made, 1, 'one observer for the node, however often it updates');
+      node.remove();
+      await settle();
+      assert.deepEqual(calls, ['detached']);
+      action.destroy();
+    } finally {
+      view.MutationObserver = MutationObserver;
+    }
+  });
+
+  it('closes a target in a shadow root when the host of that root leaves the document', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const inner = document.createElement('div');
+    shadow.append(inner);
+    const calls = [];
+    const action = dismissOnOutsideClick(inner, {
+      onDetached: () => {
+        calls.push('detached');
+      },
+    });
+    host.remove();
+    await settle();
+    assert.deepEqual(calls, ['detached']);
+    action.destroy();
+  });
+
   it('throws nothing in a window with no MutationObserver, and calls nothing', async () => {
     const view = document.defaultView;
     const { MutationObserver } = view;

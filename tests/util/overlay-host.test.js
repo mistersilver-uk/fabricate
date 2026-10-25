@@ -314,6 +314,27 @@ describe('anchoredPopover under a registered chain', () => {
   });
 });
 
+describe('anchoredPopover when its layout throws at setup', () => {
+  it('leaves no registry entry and no panel in the host', () => {
+    const app = element();
+    app.className = 'fabricate-app';
+    const trigger = element('button', app);
+    const panel = element();
+    assert.throws(
+      () =>
+        anchoredPopover(panel, {
+          component: 'ThrowingPopover',
+          trigger,
+          layout() {
+            throw new Error('layout failed');
+          },
+        }),
+      /layout failed/
+    );
+    assert.deepEqual(overlaysOpenedFrom(app), [], 'the registry holds nothing');
+  });
+});
+
 describe('acquireStandaloneOverlayLayer', () => {
   it('shares one layer per document, made on the first acquire and removed on the last release', () => {
     const one = acquireStandaloneOverlayLayer(document, { 'data-fabricate-theme': 'night' });

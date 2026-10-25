@@ -285,6 +285,20 @@ for (const closeOnOutsideClick of [true, false]) {
         });
       }
 
+      it('judges a later press by its own origin, not by an earlier Escape in a panel', async () => {
+        const calls = await open();
+        await withPanel(q('[data-plain]'), (panel, field) => {
+          field.dispatchEvent(escape());
+          assert.deepEqual(calls, [], 'the Escape in the panel dismisses nothing');
+        });
+        document.body.dispatchEvent(press());
+        assert.deepEqual(
+          calls,
+          closeOnOutsideClick ? [[]] : [],
+          'a later press on the page decides alone'
+        );
+      });
+
       it('counts a panel opened from a panel the dialog opened', async () => {
         const calls = await open();
         await withPanel(q('[data-plain]'), async (first) => {

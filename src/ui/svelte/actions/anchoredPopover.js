@@ -260,7 +260,16 @@ export function anchoredPopover(node, params = {}) {
     afterFontsLoad(node.ownerDocument, () => !destroyed && measure());
   }
 
-  sync();
+  try {
+    sync();
+  } catch (error) {
+    destroyed = true;
+    detach();
+    portalHandle?.destroy();
+    portalHandle = null;
+    releaseHost();
+    throw error;
+  }
 
   return {
     update(next) {
