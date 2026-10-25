@@ -27,6 +27,7 @@ import InspectorCard from './svelte/components/InspectorCard.svelte';
 import Kicker from './svelte/components/Kicker.svelte';
 import Medallion from './svelte/components/Medallion.svelte';
 import Meter from './svelte/components/Meter.svelte';
+import Modal from './svelte/components/Modal.svelte';
 import Notice from './svelte/components/Notice.svelte';
 import Pagination from './svelte/components/Pagination.svelte';
 import RadioCardGroup from './svelte/components/RadioCardGroup.svelte';
@@ -74,6 +75,7 @@ export const COMPONENTS = Object.freeze({
   'src/ui/svelte/components/Pagination.svelte': Pagination,
   'src/ui/svelte/components/IconPicker.svelte': IconPicker,
   'src/ui/svelte/components/ActionMenu.svelte': ActionMenu,
+  'src/ui/svelte/components/Modal.svelte': Modal,
 });
 
 // Keyed by lazy manifest `path`, each resolving its component; only `import()` reaches its module.

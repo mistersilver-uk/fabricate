@@ -193,10 +193,11 @@ function documentedComponentSections() {
 
 /**
  * Each top-level bullet one component names under the spec's issue 2448, 2451, 2452, 2453, 2454,
- * 2455, 2601, 2644, 2646, 2647 and 2652 headings, by name and in the order the spec states them.
+ * 2455, 2601, 2644, 2646, 2647, 2652 and 2656 headings, by name and in the order the spec states
+ * them.
  */
 function specifiedComponentGroups() {
-  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652'].flatMap((issue) => {
+  const groups = ['2448', '2451', '2452', '2453', '2454', '2455', '2601', '2644', '2646', '2647', '2652', '2656'].flatMap((issue) => {
     const start = SPECIFIED.indexOf(`\n### The issue ${issue} components\n`);
     const end = SPECIFIED.indexOf('\n### ', start + 1);
     assert.ok(start !== -1 && end !== -1, `the issue ${issue} components, then another heading`);
@@ -292,6 +293,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
       'Pagination',
       'IconPicker',
       'ActionMenu',
+      'Modal',
     ]);
     const optional = { kind: 'data', required: false };
     const required = { kind: 'data', required: true };
@@ -648,6 +650,22 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: required,
           align: optional,
           onSelect: { kind: 'callback', required: true },
+        },
+        rest: false,
+        root: 'fabricate',
+        overlays: true,
+      },
+      Modal: {
+        version: 1,
+        props: {
+          open: optional,
+          title: required,
+          subtitle: optional,
+          closeLabel: required,
+          closeOnOutsideClick: optional,
+          onClose: { kind: 'callback', required: true },
+          body: slot,
+          footer: slot,
         },
         rest: false,
         root: 'fabricate',

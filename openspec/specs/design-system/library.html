@@ -1775,7 +1775,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   </div>
 
   <div class="spec" data-status="shipped" data-status-Modal="shipped">
-    <div class="spec-head"><h4>&lt;Modal&gt;</h4><span class="st st-shipped">shipped</span><p class="why">The one modal chrome of both apps. It exists for a flow that must finish before anything else continues, and four callers draw it: the player roll prompt (<code>RollPrompt</code>), the import report (<code>ImportReportModal</code>), the import folder mapping (<code>ImportFolderMappingModal</code>) and the add-from-catalogue picker (<code>ComponentAddFromCatalogueDialog</code>).</p></div>
+    <div class="spec-head"><h4>&lt;Modal&gt;</h4><span class="st st-shipped">shipped</span><p class="why">The one modal chrome of both apps. It exists for a flow that must finish before anything else continues, and four in-app callers draw it: the player roll prompt (<code>RollPrompt</code>), the import report (<code>ImportReportModal</code>), the import folder mapping (<code>ImportFolderMappingModal</code>) and the add-from-catalogue picker (<code>ComponentAddFromCatalogueDialog</code>); the published adapter draws it for a companion.</p></div>
     <div class="stage b0">
       <div style="width:100%;max-width:460px;display:flex;flex-direction:column;border-radius:11px;background:var(--fab-bg-1);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--fab-border);background:var(--fab-bg-2)">
@@ -1797,7 +1797,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <li><b>header</b> a <code>--fab-bg-2</code> band over a hairline, padded 12/16, with a 12px gap to the close: a 14px serif title at 600 on a normal line box, a 10.5px subtitle at 500 in subtle ink 1px beneath it, and a 26px close at radius 7, unfilled, in <code>--fab-text-muted</code> ink with an 11px glyph. No header icon</li>
         <li><b>body</b> padded 16, its sections 16 apart</li>
         <li><b>footer</b> a <code>--fab-bg-2</code> band under a hairline, padded 12/16/16, its actions 8 apart and right-aligned, at most one primary; <code>footerLayout="equal"</code> gives every child one equal share (<code>flex: 1 1 0; min-width: 0</code>)</li>
-        <li>Portals into the application root, so it stacks above the window rather than under it</li>
+        <li>Portals into the application root, or into the host the overlay chain picks for a published mount, so it stacks above the window rather than under it</li>
         <li>The dialog is <code>role="dialog"</code> with <code>aria-modal="true"</code>, named by its <b>title</b>; <b>trapFocus</b> opts in to a focus trap that enters on open, cycles Tab inside and returns focus to the opener</li>
         <li>Dismissal: with <b>closeOnOutsideClick</b>, the default, an outside click or an Escape outside the dialog dismisses it, and without it neither does, so a stray click loses no work. In every mode an Escape inside the dialog dismisses it and stops there, so Foundry&rsquo;s dismiss keybinding never hears it, except from an inner control that is <code>aria-expanded</code> as the key goes down, which keeps its own Escape. An Escape outside the dialog goes on to Foundry, and a panel such a control portals outside the dialog is outside it. A step that would lose work confirms first</li>
         <li><b>one frame, no option</b> the component draws this specimen and nothing else, at the spacing ramp&rsquo;s values: a 12/16 header band with a 12 gap, a body padded 16 with 16 between sections, and a 12/16/16 footer. The frame is the GM Checks Studio prototype&rsquo;s by maintainer ruling (2026-09-28, &ldquo;change it everywhere&rdquo;), replacing the 24px close and 54px header it had; the prototype&rsquo;s measured 14/16 body, 14 section gap and 10 header gap are snapped to the ramp, which PR 2283 did (issue 1523). The <code>banded</code> prop that selected it is RETIRED: once every caller drew it by the second ruling (&ldquo;Move them too&rdquo;), the unbanded chrome had no caller and was deleted</li>
@@ -1818,6 +1818,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       </ul></div>
     </div>
     <div class="delta">It is distinct from a core <code>DialogV2</code>: this is a mounted Svelte surface inside the application, for a multi-step flow with its own state; a one-shot confirmation is still <code>confirmDialog</code>.<span class="cite"><b>Modal.svelte</b> (issue 877) · <b>RollPrompt.svelte</b> · <b>ImportFolderMappingModal.svelte</b> · <b>ImportReportModal.svelte</b> · <b>ComponentAddFromCatalogueDialog.svelte</b></span></div>
+    <div class="delta ok"><code>Modal</code> is published through <code>game.fabricate.api.ui</code> (issue 2656).</div>
   </div>
 
   <div class="spec" data-status="shipped" data-status-DataTable="shipped">

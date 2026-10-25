@@ -63,6 +63,8 @@ manager-published-icon-picker-specimen
 manager-published-icon-picker-choice
 manager-published-action-menu-specimen
 manager-published-action-menu-choice
+manager-published-modal-specimen
+manager-published-modal-close
 player-gathering-environments
 fabricate-app-shell
 player-inventory

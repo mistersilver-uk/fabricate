@@ -29,6 +29,8 @@
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
  * to a child component fails closed unless `FORWARDED_CALLBACKS` pins it; an exported function and
  * one also called from `onMount` fail closed.
+ * Limit: a `listeners` function handed to an action is not followed into that action, so
+ * whether `dismissOnOutsideClick.js` calls `onDismiss` only from its listeners is not seen.
  * Limit: a scoped ring pin is matched by its selector as written, and judged by its declarations.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
  * local followed through its value operands, and not from a child element or `aria-labelledby`;
@@ -315,6 +317,12 @@ const NESTED_NAMES = Object.freeze({
         'tests/components/published-action-menu-mounted.test.js: the published ActionMenu names',
     },
   },
+  Modal: {
+    'src/ui/svelte/components/IconButton.svelte: button': {
+      keys: ['closeLabel'],
+      heldBy: 'tests/components/published-modal-mounted.test.js: the published Modal names',
+    },
+  },
   Pagination: {
     'src/ui/svelte/components/IconButton.svelte: button': {
       keys: ['previousLabel', 'nextLabel'],
@@ -334,7 +342,8 @@ const NESTED_NAMES = Object.freeze({
  * The callback keys an entry hands a closure child as the child's own callback, which the gate
  * does not follow into the child: the script function, or the list of them, that calls the key,
  * the child's prop each is passed as, and the mounted clause that operates the child by pointer
- * and by key.
+ * and by key. A `listeners` list names the script functions that may also call one of those
+ * functions, each handed only to an action, as `forwardedFaults` states.
  */
 const FORWARDED_CALLBACKS = Object.freeze({
   Select: {
@@ -350,6 +359,15 @@ const FORWARDED_CALLBACKS = Object.freeze({
       as: 'onSelect',
       heldBy:
         'tests/components/published-icon-picker-mounted.test.js: a choice in the published IconPicker',
+    },
+  },
+  Modal: {
+    // `requestClose` is the close control's `onclick`, and the outside-press and Escape listeners call it.
+    onClose: {
+      by: 'requestClose',
+      as: 'onclick',
+      listeners: ['dismissFromOutside', 'handleKeydown'],
+      heldBy: 'tests/components/published-modal-mounted.test.js: closing the published Modal',
     },
   },
   Pagination: {
@@ -559,16 +577,94 @@ function referenceSites(ast, local, extra) {
   return sites;
 }
 
+/** The script functions referenced only as a `use:` directive's name, each named by one at least. */
+function actionFunctions(ast, functions) {
+  const used = new Set();
+  const referenced = new Set();
+  walkWithAncestors(ast.fragment, (node) => {
+    if (node.type === 'UseDirective') used.add(node.name);
+  });
+  for (const root of [ast.instance, ast.fragment]) {
+    walkWithAncestors(root, (node, ancestors) => {
+      const parent = ancestors.at(-1);
+      const member = parent?.type === 'MemberExpression' && parent.property === node;
+      if (node.type === 'Identifier' && parent?.id !== node && !(member && !parent.computed)) {
+        referenced.add(node.name);
+      }
+    });
+  }
+  const actions = [...functions].filter(([name]) => used.has(name) && !referenced.has(name));
+  return actions.map(([, node]) => node);
+}
+
+const LISTENER_CALLS = new Set(['addEventListener', 'removeEventListener']);
+
+/**
+ * Whether a reference to a `listeners` function is a member value of the object that is a `use:`
+ * directive's whole expression, or the listener argument of an `addEventListener` or
+ * `removeEventListener` call inside an action function, the `destroy` it returns included.
+ */
+function isListenerSite(node, ancestors, actions) {
+  const [directive, object, property] = ancestors.slice(-3);
+  if (property?.type === 'Property' && property.value === node && !property.computed) {
+    return directive?.type === 'UseDirective' && directive.expression === object;
+  }
+  const call = ancestors.at(-1);
+  const { callee } = call ?? {};
+  const listening =
+    call?.type === 'CallExpression' &&
+    call.arguments[1] === node &&
+    callee?.type === 'MemberExpression' &&
+    !callee.computed &&
+    LISTENER_CALLS.has(callee.property.name);
+  return listening && actions.some((action) => ancestors.includes(action));
+}
+
+/**
+ * Where one reference to a `by` function sits: a call inside a `listeners` function
+ * (`'listener'`), the whole value of a child component's `as` attribute (`'handed'`), or else
+ * `'other'`.
+ */
+function byFunctionSite(node, ancestors, as, listening) {
+  const parent = ancestors.at(-1);
+  const called = parent?.type === 'CallExpression' && parent.callee === node;
+  if (called && listening.some((listener) => ancestors.includes(listener))) return 'listener';
+  const [component, attribute, tag] = ancestors.slice(-3);
+  const passed = component?.type === 'Component' && attribute?.name === as && tag === parent;
+  return passed ? 'handed' : 'other';
+}
+
+/** Whether a function node contains a call of one of the named functions. */
+function callsAny(fn, names) {
+  let found = false;
+  if (fn) {
+    walkWithAncestors(fn, (node) => {
+      if (node.type === 'CallExpression' && names.includes(node.callee?.name)) found = true;
+    });
+  }
+  return found;
+}
+
 /**
  * What a forwarded callback key breaks: a reference that is not a call inside a function `by`
- * lists, a reference to one that is not the whole value of a child component's `as` attribute,
- * and one handed to no child.
+ * lists, a reference to one that is neither the whole value of a child component's `as` attribute
+ * nor a call inside a function `listeners` lists, one handed to no child, and a reference to a
+ * `listeners` function that `isListenerSite` does not admit.
  */
-function forwardedFaults(ast, key, local, { by, as }) {
+function forwardedFaults(ast, key, local, { by, as, listeners = [] }) {
   const listed = [by].flat();
   const functions = scriptFunctions(ast);
   const holders = listed.map((name) => functions.get(name)).filter(Boolean);
+  const listening = listeners.map((name) => functions.get(name)).filter(Boolean);
+  const actions = actionFunctions(ast, functions);
   const faults = new Set();
+  for (const name of listeners) {
+    if (!callsAny(functions.get(name), listed)) {
+      faults.add(
+        `${name} is listed as a listener but is no script function that calls ${listed.join(', ')}`
+      );
+    }
+  }
   const handed = new Map(listed.map((name) => [name, 0]));
   for (const root of [ast.instance, ast.fragment]) {
     walkWithAncestors(root, (node, ancestors) => {
@@ -584,11 +680,16 @@ function forwardedFaults(ast, key, local, { by, as }) {
         const inside = holders.some((holder) => ancestors.includes(holder));
         if (!called || !inside) faults.add(`${key} is called outside ${listed.join(', ')}`);
       }
-      if (!handed.has(node.name) || parent?.id === node) return;
-      const [component, attribute, tag] = ancestors.slice(-3);
-      const passed = component?.type === 'Component' && attribute?.name === as && tag === parent;
-      if (passed) handed.set(node.name, handed.get(node.name) + 1);
-      else faults.add(`${node.name} is referenced but as a child's ${as}`);
+      if (parent?.id === node) return;
+      if (listeners.includes(node.name)) {
+        if (!isListenerSite(node, ancestors, actions)) {
+          faults.add(`${node.name} is referenced but as an action's listener`);
+        }
+      } else if (handed.has(node.name)) {
+        const site = byFunctionSite(node, ancestors, as, listening);
+        if (site === 'handed') handed.set(node.name, handed.get(node.name) + 1);
+        if (site === 'other') faults.add(`${node.name} is referenced but as a child's ${as}`);
+      }
     });
   }
   for (const [name, count] of handed) {
@@ -2674,6 +2775,80 @@ describe('a published child drawn inside another entry (issue 2646)', () => {
     assert.deepEqual(forwardedOf('', '<C onclick={back} />'), [
       'on is handed to no child as onclick',
     ]);
+  });
+});
+
+describe('a callback reached through an action’s listeners (issue 2656)', () => {
+  const LISTENING = { by: 'shut', as: 'onclick', listeners: ['outside', 'keys'] };
+  const SCRIPT =
+    "import C from './C.svelte'; let { onShut } = $props(); function shut() { onShut(); }" +
+    ' function outside() { shut(); }' +
+    " function keys(event) { if (event.key === 'Escape') shut(); }" +
+    " function listen(node) { node.addEventListener('keydown', keys);" +
+    " return { destroy: () => node.removeEventListener('keydown', keys) }; }";
+  const MARKUP =
+    '<div use:dismiss={{ enabled: true, onDismiss: outside }} use:listen><C onclick={shut} /></div>';
+  const forwardedOf = (script = '', markup = '', pin = LISTENING) =>
+    eventFaults(
+      { name: 'E', props: { onShut: { kind: 'callback', required: true } } },
+      templateOf(E, `<script>${SCRIPT} ${script}</script>${MARKUP}${markup}`).ast,
+      { E: { onShut: pin } }
+    );
+  const OFF_SITE = (name) => `${name} is referenced but as an action's listener`;
+
+  it('passes a listener as a use: object member and as the add and remove pair inside an action', () => {
+    assert.deepEqual(forwardedOf(), []);
+  });
+
+  it('names the calls inside the listeners as a fault where the pin lists no listeners', () => {
+    assert.deepEqual(forwardedOf('', '', { by: 'shut', as: 'onclick' }), [
+      "shut is referenced but as a child's onclick",
+    ]);
+  });
+
+  for (const [claim, script, markup, fault] of [
+    ['called from an $effect', "$effect(() => keys({ key: 'Escape' }));", '', OFF_SITE('keys')],
+    ['referenced at the top level of the script', 'const kept = outside;', '', OFF_SITE('outside')],
+    [
+      'removed by a removeEventListener outside a use: function',
+      "$effect(() => () => document.removeEventListener('keydown', keys));",
+      '',
+      OFF_SITE('keys'),
+    ],
+    [
+      'added inside an action function that is also referenced',
+      'const held = listen;',
+      '',
+      OFF_SITE('keys'),
+    ],
+    [
+      'passed as a use: directive’s whole value',
+      '',
+      '<p use:dismiss={outside}></p>',
+      OFF_SITE('outside'),
+    ],
+    ['handed to a child component', '', '<C onclick={outside} />', OFF_SITE('outside')],
+  ]) {
+    it(`names a listeners function ${claim} as a fault`, () => {
+      assert.deepEqual(forwardedOf(script, markup), [fault]);
+    });
+  }
+
+  it('names a listed listener that no longer calls the by function as a fault', () => {
+    assert.deepEqual(
+      forwardedOf('', '', { by: 'shut', as: 'onclick', listeners: ['outside', 'keys', 'gone'] }),
+      ['gone is listed as a listener but is no script function that calls shut']
+    );
+  });
+
+  it('names a call of the by function outside the listed functions as a fault', () => {
+    assert.deepEqual(
+      forwardedOf(
+        'function other() { shut(); }',
+        '<button type="button" onclick={other}>x</button>'
+      ),
+      ["shut is referenced but as a child's onclick"]
+    );
   });
 });
 

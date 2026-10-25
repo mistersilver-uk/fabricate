@@ -32,6 +32,10 @@
     the document in every capture path, so the record precedes every document capture listener
     whatever its registration order.
   - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
+  - Published through `game.fabricate.api.ui` with `open`, `title`, `subtitle`, `closeLabel`,
+    `closeOnOutsideClick`, `onClose`, `body` and `footer` only (`ui-extension-points`' issue 2656
+    group): a published dialog moves no focus, and an Escape a companion's slot content does not
+    keep stops at it; `tests/components/published-modal-mounted.test.js`.
 
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new

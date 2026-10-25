@@ -82,6 +82,7 @@ export const PUBLISHED_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
+  'src/ui/svelte/components/Modal.svelte',
 ]);
 
 /** Past Svelte's flush and the boundary's `onerror` microtask, and the deferred unmount after it. */
