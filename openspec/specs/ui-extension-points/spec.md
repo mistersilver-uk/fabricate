@@ -401,7 +401,7 @@ It reads the length of `items` once and follows no iterator, so an item added wh
 That judgement is pure: it ends no stale claim, and a stale claim is ended only as its own item renders.
 So a target that a stale mount has not left empty is M6 for `mountMany`, where `mount` would end that mount and pass; a companion destroys the stale handle or empties the target first.
 A target you mean to place in the content slot of another item of the call is not inside it yet, so an entry that needs a Fabricate ancestor refuses it with M16; a companion mounts the outer items first and the nested ones in a later call.
-When an earlier item's render ends a stale mount, and a later item's target sits in a content slot of that stale mount, the later item still renders, in the detached slot, where sequential `mount` calls would refuse it with M16; a companion mounts nested targets in a later call.
+When an earlier item's render ends a stale mount, and a later item's target sits in a content slot of that stale mount, the later item still renders, in the detached slot, where sequential `mount` calls would refuse it with M16, or, for an entry drawn under the standalone style root, would write a standalone style root in it, which `mountMany` does not because it judges that target from the stale mount; a companion mounts nested targets in a later call.
 Once every item is judged, a render fault is that item's own: its handle is inert, only its `onFault` is called, and the other mounts stay live.
 Destroying one handle leaves the others live, and there is no call that destroys them all.
 A companion detects it with `typeof ui.mountMany === 'function'`.
@@ -587,7 +587,7 @@ It is removed by reference, wherever it then is; a companion's re-render that al
 - An entry whose root is `'fabricate'` or `'manager'`, mounted in a content slot of such a mount with no Fabricate root above, is refused.
 - The module sheet reaches a document's head and no shadow root, so an entry drawn under the standalone style root is refused (M16) where `target` has no Fabricate root and its root node is a shadow root; a detached target that is no shadow root's is drawn, under a standalone style root written at `mount`.
 - In a Foundry 14 detached window the module sheet is present (read in the 14.365 sources, not run), so a mount made there is drawn in the theme read from Fabricate's own document element at `mount`; a later theme change reaches a standalone style root in Fabricate's own document and none in a detached window (issue 2432).
-- A normal declaration in an unlayered sheet of the host's outranks the module sheet that draws such an entry at any specificity, except `transition` under reduced motion, which the module sheet states `!important`; a companion's own module sheet loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
+- A normal declaration in an unlayered sheet of the host's outranks the module sheet that draws such an entry at any specificity, except `transition` under reduced motion, which the module sheet states `!important`; a companion's own module sheet, one its manifest gives no `layer`, loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
 - A document sheet disables every control in its form when the document is not editable, so a companion mounts after `super._onRender`.
 - A Font Awesome glyph's box follows the Font Awesome the running build ships, which the admission clause does not measure.
 - An entry is drawn under the standalone style root only where its admission clause holds: mounted in a bare ApplicationV2 `.window-content`, every element it draws computes the same styles and border box as with the same props in the player window, over the core-min fixture and, where the harvest exists, Foundry 14.365's core sheet, at rest, under keyboard focus, under the pointer and under reduced motion.
@@ -678,7 +678,7 @@ Without the `await` between them Fabricate may draw the two as the second alone,
 - A control shows nothing under the pointer that it does not also show under keyboard focus.
 Where the entry's rest keys land on the control itself, `data-cursor` is refused (M13): at the next pointer release anywhere in the document Foundry copies its value into the control's inline `cursor` and deletes the attribute.
 - A control's only motion is its own state change: a fade, and on `StatusToggle` the knob's travel along its track.
-Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window; outside one the fade is the host's own.
+Under `prefers-reduced-motion: reduce` Fabricate removes that motion inside a Fabricate window and under the standalone style root; elsewhere the fade is the host's own.
 - A control opens no tooltip of its own at version 1, Fabricate's or Foundry's: no key names one, and the HTML `title` attribute is not a rest key (M13).
   The one exception is `IconButton`, which shows its name as its tooltip under the pointer and keyboard focus alike, as its group states, and so do the `ActionMenu` trigger and the `Modal` close control, each of which is an `IconButton`.
 A Foundry tooltip attribute the companion passes through rest lands on the component's root: its tooltip stays open while the pointer is over the control and opens on pointer hover only, so it says nothing the control's name does not.
@@ -1174,7 +1174,7 @@ Each group states the accepted values of every key that entry publishes.
     An item with no `icon` releases the glyph column, so its text starts left of its glyph-led siblings', so the companion gives every item of a list an `icon`, or none.
   - `actions` is a content slot whose element is a `<span>`, drawn inside the strip after the body, so a note and the control that answers it are one object.
     Its host is a row that spaces the content slot's children by `gap`, centres them on one line and never shrinks; unlike a `Notice`'s action it never drops beneath the body, so the body narrows to make room, a long label squeezes it, and the companion keeps what it draws there short.
-    The companion fills it with phrasing content, a `<span>` for a mount target, for example of a published `Button` inside a Fabricate window; content there inherits the strip's muted ink and type.
+    The companion fills it with phrasing content, a `<span>` for a mount target, for example of a published `Button`; content there inherits the strip's muted ink and type.
     A published `Button`'s focus ring clears 3:1 against every tone's fill on the four grounds this group names.
     The companion gives that button the `neutral`, `primary`, `warning` or `danger` role, never `ghost` or `dashed`, whose transparent face draws the label in the muted ink, which falls short on a tinted fill as the body does.
   - It draws a `<p>` with no role unless it draws a `title`, an item or the `actions` slot, and then a `<div>` with `role="note"`, because a paragraph cannot hold them.

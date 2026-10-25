@@ -2070,7 +2070,7 @@ The published components, in publication order:
 Each row lists the component's published props, noting a prop's kind when it is not plain data, marking a required one and naming the prop while which one is required, and says `yes` in Rest when it takes `data-*` attributes.
 An `aria` prop is an ARIA attribute Fabricate writes on the component's control.
 Root names the Fabricate ancestor the component's `target` needs, and `any` needs none.
-Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them in a shadow root.
+Fabricate draws `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` under a [standalone style root](#standalone-style-root) in a target that has no Fabricate root, and refuses them there when `target`'s root node is a shadow root.
 See [Ownership and theme](#ownership-and-theme).
 Each component's section states the shape of every prop it publishes; a member or value a section does not state is private.
 A rest `data-*` attribute lands on the component's root, where Foundry reads it too: `data-tooltip` shows Foundry's tooltip, and `data-action` is dispatched by the window's own click handling, which reserves `close`, `tab` and `toggleControls`.
@@ -3674,7 +3674,7 @@ save.addEventListener('click', async () => {
 
 `api.ui` is a frozen `{ schemaVersion: 1, components, describe, mount, load, mountMany }`.
 `components` lists the published names in publication order, and a new name is appended, never interleaved.
-`describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes, `root` is the Fabricate ancestor its `target` needs, which does not say whether Fabricate draws the component under the standalone style root, and `overlays` says whether it opens an overlay, described under [Overlays](#overlays); it returns `null` for a name that is not published.
+`describe(name)` returns a frozen `{ version, props, rest, root, overlays }`, where each prop is `{ kind, required, requiredWhen? }`, `rest` says whether the component takes `data-*` attributes, `root` is the Fabricate ancestor its `target` needs (it does not say whether Fabricate draws the component under the standalone style root) and `overlays` says whether it opens an overlay, described under [Overlays](#overlays); it returns `null` for a name that is not published.
 A prop's `kind` is `data`, `text`, `slot`, `callback`, `aria` or `value`.
 `requiredWhen` is present only where a prop is required while another is truthy, and names that other prop; `required` is then `false`.
 A `data` prop takes plain data, and the component receives a copy.
@@ -3933,6 +3933,7 @@ A target you mean to place inside the content slot of another item of the same c
 A component that needs a Fabricate ancestor refuses that target, so mount the outer items first and the nested ones in a later call.
 A stale mount can also have a content slot that holds a later item's target, when an earlier item's draw ends that stale mount.
 The later item is still drawn, into the detached slot, where separate `mount` calls would refuse it for a component that needs a Fabricate ancestor.
+A component Fabricate draws under the standalone style root is drawn there with no standalone style root, where separate `mount` calls would write one.
 Mount nested targets in a later call.
 Once the call has been checked, a fault while one item renders is that item's own.
 Its handle is inert, only its own `onFault` is called, and the other mounts are drawn and stay live.
@@ -4095,10 +4096,10 @@ What it gives you and what it leaves to you:
   A later theme change reaches a standalone style root in Fabricate's own document and none in a detached window (issue 2432).
 - A normal declaration in an unlayered sheet of the host's outranks the module sheet that draws the component, at any specificity.
   The exception is `transition` under reduced motion, which the module sheet states `!important`.
-  Your own module sheet loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
+  Your own module sheet, one its manifest gives no `layer`, loads in `layer(modules)` beside Fabricate's, where specificity and then order decide.
 - A document sheet disables every control in its form when the document is not editable, so mount after `super._onRender`.
-- The component is drawn the same as in the player window only where its admission test holds.
-  That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws, with the same props, at rest, under keyboard focus, under the pointer and under reduced motion.
+- A component is drawn under the standalone style root only where its admission test holds.
+  That test mounts it in a bare ApplicationV2 `.window-content` and compares every element it draws with the same props in the player window, at rest, under keyboard focus, under the pointer and under reduced motion.
   It runs over Fabricate's core-min fixture and, where the harvest exists, Foundry 14.365's core sheet.
   Core's container rules (`.standard-form`, `.form-footer`, `.dialog-buttons`) size such a control in a dialog or form sheet as they size any button.
   An ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.

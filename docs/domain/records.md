@@ -525,7 +525,7 @@ A **Fabricate root** is a `.fabricate` ancestor of the target that is not a stan
 The **standalone style root** is the private `display: contents` element Fabricate writes in a target that has no Fabricate root, so an entry stating `standaloneRoot: true` is drawn under the module sheet's `.fabricate` rules in a companion's own window or dialog.
 It is distinct from the standalone layer, which holds an open overlay's panel, from the manifest's `root` value, and from a component's own root element.
 Fabricate removes it with `destroy` and with a fault, and it writes none under a Fabricate root.
-The standalone style root paints no ground, so the companion supplies the ground, and an entry drawn under it is refused (M16) in a shadow root.
+The standalone style root paints no ground, so the companion supplies the ground, and an entry drawn under it is refused (M16) where the target has no Fabricate root and its root node is a shadow root.
 An entry that states `standaloneRoot: true` states `root: 'any'`, and registration refuses `standaloneRoot` on any other root.
 The first five entries drawn this way are `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well`.
 Issue #2456 rules that no design-system row scoped `manager-only` is published.
