@@ -53,7 +53,7 @@
     returns focus to the trigger, and `stayOpen` gates the WHOLE of it. That restoration waits for
     `tick()`, not a bare microtask, because in `inlineSearchTrigger` mode the trigger is unmounted
     while open. ESCAPE IS HANDLED IN ONE PLACE, `dismissOnOutsideClick`'s DOCUMENT capture keydown,
-    which the inline field's keys reach; its `onDetached` closes, moving no focus, a detached root.
+    which the inline field's keys reach; its `onDetached` closes a detached root's panel, no focus moved.
   - A `trigger` SNIPPET'S SPREAD CAN ADD, BUT NEVER SUBTRACT OR OVERRIDE, and that takes two
     omissions: `set_attributes` REMOVES an attribute whose spread value is `undefined`, so
     `attributes` omits every undefined-valued key; and `disabled`/`aria-disabled` are omitted

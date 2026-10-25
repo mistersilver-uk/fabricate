@@ -598,6 +598,7 @@ An overlay drawn by Fabricate outside every published mount keeps its own host a
 Its panel and `<div>` are removed, focus is not moved, so focus left in the panel goes to the page, and the entry calls no callback.
 A `target` that is removed and inserted again within one run of script keeps its panel open.
 A panel stays watched in the document it opened in, so after a Foundry 14 move a detach in the new window does not close it.
+A `target` inside a shadow root closes its panel when that root's host leaves the document, and not when the removal happens inside the shadow root.
 A `Modal` mounted in another `Modal`'s content slot is not closed by this: its dialog stays open after an `update` detaches that slot, so the companion destroys it first and mounts it again when the outer dialog reopens.
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
@@ -1500,7 +1501,7 @@ Each group states the accepted values of every key that entry publishes.
     A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
     A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as a `Select`'s list, an `IconPicker`'s list and query field and an `ActionMenu`'s menu that the companion mounts in a slot.
     A press in such a panel does not call `onClose`, and the panel takes it as its own group states, so a press on an option chooses it as it does outside a dialog.
-    Escape pressed while focus is in such a panel is left to that panel: the dialog neither calls `onClose` nor stops it, and the panel closes and has returned focus to its trigger in the dialog by the time the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
+    Escape pressed while focus is in such a panel is left to that panel: the dialog neither calls `onClose` nor stops it, and the panel closes and returns focus to its trigger in the dialog, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog` also closes is private.
     A `Modal` the companion mounts in a slot does not count as inside the dialog, so with `true` a press or an Escape in its dialog calls this dialog's `onClose` too.
     An `overlayHost` inside the slot draws a panel inside the dialog, which clips what overflows it.
     With `false`, neither a press nor an Escape outside the dialog calls `onClose`.

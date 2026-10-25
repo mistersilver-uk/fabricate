@@ -42,10 +42,11 @@
 
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new
-  window and reads the live attribute there, and one left open across a Foundry 14 window move keeps
-  hearing the old window. A document capture listener registered before the dialog opened that
-  releases such a panel on mousedown runs first, and the press then counts as outside; a `Modal`
-  opened in another's slot counts as outside it. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
+  window and reads the live attribute there, and whether the key came from a panel opened inside,
+  live too; one left open across a Foundry 14 window move keeps hearing the old window. A document
+  capture listener registered before the dialog opened that releases such a panel on mousedown
+  runs first, and the press then counts as outside; a `Modal` opened in another's slot counts as
+  outside it. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
   tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>

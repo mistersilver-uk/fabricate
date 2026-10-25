@@ -337,6 +337,7 @@ describe('a panel the mapping modal opens counts as inside it (issue 2660)', () 
     const { root, closes } = await mountCounting();
     const panel = openSelectPanel(root, categoryTrigger(1));
     const row = panel.querySelector('[data-popover-option="Metal"]');
+    assert.ok(!dialog().contains(panel), 'the list is drawn outside the dialog');
     press(row);
     flushSync();
     assert.ok(row.isConnected, 'the list is still open after the press');
@@ -353,6 +354,7 @@ describe('a panel the mapping modal opens counts as inside it (issue 2660)', () 
     trigger.click();
     await settle();
     const panel = document.querySelector('.fabricate-set-picker-popover');
+    assert.ok(!dialog().contains(panel), 'the tag panel is drawn outside the dialog');
     press(panel.querySelector('[role="option"]'));
     flushSync();
     assert.ok(panel.isConnected, 'the press leaves the tag panel open');

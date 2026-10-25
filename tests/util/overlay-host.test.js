@@ -2,7 +2,8 @@
  * The overlay host registry and the seam's shared standalone layer (issue 2454), with stand-in
  * chains: the nearest registered target above an anchor wins, an overlay opened inside another's
  * container joins that chain, a held overlay keeps its container, the layer is counted per
- * document, and each held overlay is known by what it was opened from (issue 2660). The real chain is `components/published-overlays-mounted.test.js`'s.
+ * document, and each held overlay is known by what it was opened from (issue 2660).
+ * The real chain is `components/published-overlays-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -13,6 +14,7 @@ const {
   acquireOverlayHost,
   acquireStandaloneOverlayLayer,
   createOverlayContainer,
+  heldBy,
   overlayHostRect,
   overlaysOpenedFrom,
   registerOverlayChain,
@@ -125,6 +127,25 @@ describe('acquireOverlayHost', () => {
     root.className = 'fabricate-app';
     const anchor = element('button', root);
     assert.ok(acquireOverlayHost(document.createElement('div'), anchor, {}) === root);
+  });
+});
+
+describe('heldBy', () => {
+  it('answers false for a target that is not a node, as a Window', () => {
+    assert.equal(heldBy(element(), document.defaultView), false);
+    assert.equal(heldBy(element(), null), false);
+  });
+
+  it('answers true for a node in the container and for one in an open shadow root under it', () => {
+    const container = element();
+    const inside = element('span', container);
+    const hostNode = element('div', container);
+    const shadow = hostNode.attachShadow({ mode: 'open' });
+    const deep = document.createElement('i');
+    shadow.append(deep);
+    assert.equal(heldBy(container, inside), true);
+    assert.equal(heldBy(container, deep), true);
+    assert.equal(heldBy(element(), inside), false);
   });
 });
 

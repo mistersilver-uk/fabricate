@@ -107,9 +107,9 @@ export function releaseOverlayHost(overlay) {
   chain?.release(overlay);
 }
 
-/** True when `node` is in `container`, or in an open shadow root whose host chain reaches it. */
+/** True when `node`, told by its `nodeType`, is in `container`, or in an open shadow root whose host chain reaches it. */
 export function heldBy(container, node) {
-  for (let at = node; at; at = at.getRootNode?.().host) {
+  for (let at = node; typeof at?.nodeType === 'number'; at = at.getRootNode?.().host) {
     if (container?.contains?.(at)) return true;
   }
   return false;
