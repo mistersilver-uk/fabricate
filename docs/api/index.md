@@ -2044,19 +2044,19 @@ The published components, in publication order:
 | `Kicker` | 1 | `any` | `as`, `tone`, `children` (text, required) | yes |
 | `Chip` | 1 | `any` | `tone`, `density`, `children` (text, required) | yes |
 | `Rail` | 1 | `any` | `label`, `children` (slot) | yes |
-| `InspectorCard` | 1 | `fabricate` | `children` (slot) | yes |
+| `InspectorCard` | 1 | `any` | `children` (slot) | yes |
 | `EmptyState` | 1 | `any` | `icon`, `title`, `hint`, `filtered`, `children` (slot) | yes |
 | `Notice` | 1 | `any` | `tone`, `title` (required), `detail`, `icon`, `action`, `onAction` (callback), `dismissable`, `dismissLabel` (required when `dismissable`), `onDismiss` (callback, required when `dismissable`) | yes |
-| `Button` | 1 | `fabricate` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
-| `StatusToggle` | 1 | `fabricate` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
+| `Button` | 1 | `any` | `role`, `fullWidth`, `disabled`, `children` (text, required), `onclick` (callback, required), `aria-expanded` (aria), `aria-describedby` (aria) | yes |
+| `StatusToggle` | 1 | `any` | `on` (required), `ariaLabel` (required), `onclick` (callback, required), `aria-labelledby` (aria), `aria-describedby` (aria) | yes |
 | `Stepper` | 1 | `fabricate` | `value` (required), `min`, `max`, `step`, `ariaLabel` (required), `decrementLabel` (required), `incrementLabel` (required), `onChange` (callback, required) | no |
 | `SearchField` | 1 | `fabricate` | `value` (value), `onValueChange` (callback), `placeholder`, `ariaLabel` (required) | yes |
 | `Select` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `placeholder`, `size` | no |
 | `StageBars` | 1 | `any` | `stages` (required), `currentIndex`, `numbered`, `ariaLabel` (required) | yes |
 | `Field` | 1 | `fabricate` | `as` (required), `children` (slot) | yes |
-| `Well` | 1 | `fabricate` | `label`, `children` (slot) | yes |
+| `Well` | 1 | `any` | `label`, `children` (slot) | yes |
 | `Callout` | 1 | `any` | `tone`, `title`, `text`, `icon`, `items`, `actions` (slot) | yes |
-| `IconButton` | 1 | `fabricate` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
+| `IconButton` | 1 | `any` | `icon` (required), `ariaLabel` (required), `role`, `size`, `disabled`, `onclick` (callback, required), `aria-expanded` (aria) | yes |
 | `EditorTabs` | 1 | `fabricate` | `tabs` (required), `activeTab`, `onSelect` (callback, required), `ariaLabel` (required), `idStem` (required), `activePanelOnly` | yes |
 | `RadioCardGroup` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `legend` (required), `layout`, `columns`, `disabled`, `disabledOptions` | yes |
 | `SegmentedControl` | 1 | `fabricate` | `options` (required), `value`, `onChange` (callback, required), `ariaLabel` (required), `fill`, `density` | yes |
