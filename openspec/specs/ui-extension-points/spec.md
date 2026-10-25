@@ -616,8 +616,8 @@ Enter presses on key down and again on each repeat while held, except on the `Pa
 In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter anywhere inside it and submits its default button, so a control there is pressed by pointer or Space.
 - A control consumes only the keys the platform gives its native element, and its group names any other.
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
-In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog and asks the companion to close that `Modal`, as its group states.
-An open ApplicationV1 `Dialog` in the main window takes a Tab pressed outside it and moves focus to its own button.
+In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
+An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
 - A control draws its own mark for keyboard focus where the entry's `root` is `'any'`; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, as its group states.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, which its group names by its glyph's `label`.
@@ -1479,7 +1479,9 @@ Each group states the accepted values of every key that entry publishes.
     While `open` is `false`, `target` holds no element, and while it is `true`, `target` holds one empty element of Fabricate's, which is private.
     `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
     An `update` that passes `open: false` detaches the slot elements with their contents intact, and `open: true` attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and a companion's components, effects and listeners in them keep running.
-    The list of an overlay entry the companion mounts in a slot stays open in the host after such an `update`, until that entry closes it or the companion destroys that mount, so the companion closes or destroys it first.
+    The list of an overlay entry the companion mounts in a slot stays open in the window after such an `update`, until the user dismisses it or the companion destroys that mount, so the companion destroys that mount first and mounts it again when the dialog reopens.
+    No prop of a published entry closes its list.
+    A list drawn in an `overlayHost` inside the slot is detached with the slot instead.
   - `title` is required and is final display text, drawn as the dialog's level-3 heading, and it is the dialog's accessible name.
     `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
@@ -1490,7 +1492,7 @@ Each group states the accepted values of every key that entry publishes.
     The dialog's height is capped, so the companion scrolls tall content inside one element of its own in the body, which it gives `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
     A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
   - `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-    With `true`, a pointer press anywhere in the document outside the dialog calls `onClose` as the pointer goes down, and so does Escape pressed while focus is outside the dialog.
+    With `true`, a pointer press anywhere in the document outside the dialog calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside the dialog.
     A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
     A press in the panel of an overlay entry the companion mounts in a slot, as a `Select`'s list, is outside the dialog, and so is focus in that panel, as in an `IconPicker`'s query field, so with `true` a press or an Escape there calls `onClose` as well as closing that panel.
     A companion that mounts such an entry in a slot passes `false`, or passes that entry an `overlayHost` inside the slot, where its panel is inside the dialog, which clips what overflows it.
@@ -1501,7 +1503,7 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing.
     A companion that closes the dialog while focus is inside it first moves focus to an element of its own, as the opener, because removing the focused control leaves focus on the page.
   - Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
-    Tab moves focus as the browser does, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed outside it and moves focus to its own button.
+    Tab moves focus as the browser does, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
     Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
     The dialog is announced as modal, so a screen reader may keep its reading cursor inside the dialog while it is open, though Tab can still move focus to the window behind, which the screen reader may treat as hidden; the companion therefore moves focus into the dialog when it opens and back to its opener when it closes.
     An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so the companion moves focus into the dialog onto an element that does not act on Enter, or ignores a `keydown` whose `repeat` is `true`.
@@ -1510,7 +1512,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
     A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
-    Escape with focus on the page, or on an element outside the dialog that Foundry does not treat as taking keyboard input, reaches Foundry's dismiss keybinding, which, unless it first closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
+    Escape with focus on the page, or on an element outside the dialog that Foundry does not treat as taking keyboard input, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
     Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
     Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
   - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
@@ -1527,7 +1529,7 @@ Each group states the accepted values of every key that entry publishes.
   - An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control the companion drew there.
     `destroy` removes the dialog, so where a control in it holds focus the companion moves focus to an element of its own first.
   - A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as Overlays states.
-    A dialog left open across a move hears no outside press or outside Escape in the new window, and there judges an expanded control from its attribute as it then stands, not as the key went down.
+    A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
 - **Private:** `Modal`'s frame, band, type and spacing figures, its colours beyond what its group states, its width, height and placement, the element it keeps in `target`, its `manager-modal-*` classes and `data-manager-modal*` hooks, and how Fabricate draws a dialog in its own windows.
 
 ### The publishable subset

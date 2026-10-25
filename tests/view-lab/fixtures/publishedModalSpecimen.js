@@ -50,11 +50,16 @@ export function mountModalSpecimen({ mount, ground, opener, target }) {
     if (opener.contains(event.target)) openAtPress = isOpen;
   };
   ground.addEventListener('pointerdown', recordPress);
+  // A press that never clicked must not swallow a keyboard open.
+  ground.addEventListener('keydown', () => {
+    openAtPress = false;
+  });
 
   function show() {
     isOpen = true;
     ground.removeAttribute('data-lab-modal-closed');
     dialog.update({ ...props, open: true });
+    // Done is focused for the photograph; a held Enter from the opener is not modelled.
     doc.defaultView.setTimeout(() => footer.querySelector('button')?.focus());
   }
 

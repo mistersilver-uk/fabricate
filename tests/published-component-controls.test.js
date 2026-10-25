@@ -29,7 +29,7 @@
  * call inside another such function; inside one, a deferred call is not seen. A callback handed
  * to a child component fails closed unless `FORWARDED_CALLBACKS` pins it; an exported function and
  * one also called from `onMount` fail closed.
- * Limit: a `listeners` function handed to an action is not followed into the action's file, so
+ * Limit: a `listeners` function handed to an action is not followed into that action, so
  * whether `dismissOnOutsideClick.js` calls `onDismiss` only from its listeners is not seen.
  * Limit: a scoped ring pin is matched by its selector as written, and judged by its declarations.
  * Limit: a name is read from the element's own `aria-label` or content, a `const` or `$derived`
@@ -634,6 +634,17 @@ function byFunctionSite(node, ancestors, as, listening) {
   return passed ? 'handed' : 'other';
 }
 
+/** Whether a function node contains a call of one of the named functions. */
+function callsAny(fn, names) {
+  let found = false;
+  if (fn) {
+    walkWithAncestors(fn, (node) => {
+      if (node.type === 'CallExpression' && names.includes(node.callee?.name)) found = true;
+    });
+  }
+  return found;
+}
+
 /**
  * What a forwarded callback key breaks: a reference that is not a call inside a function `by`
  * lists, a reference to one that is neither the whole value of a child component's `as` attribute
@@ -647,6 +658,13 @@ function forwardedFaults(ast, key, local, { by, as, listeners = [] }) {
   const listening = listeners.map((name) => functions.get(name)).filter(Boolean);
   const actions = actionFunctions(ast, functions);
   const faults = new Set();
+  for (const name of listeners) {
+    if (!callsAny(functions.get(name), listed)) {
+      faults.add(
+        `${name} is listed as a listener but is no script function that calls ${listed.join(', ')}`
+      );
+    }
+  }
   const handed = new Map(listed.map((name) => [name, 0]));
   for (const root of [ast.instance, ast.fragment]) {
     walkWithAncestors(root, (node, ancestors) => {
@@ -2815,6 +2833,13 @@ describe('a callback reached through an action’s listeners (issue 2656)', () =
       assert.deepEqual(forwardedOf(script, markup), [fault]);
     });
   }
+
+  it('names a listed listener that no longer calls the by function as a fault', () => {
+    assert.deepEqual(
+      forwardedOf('', '', { by: 'shut', as: 'onclick', listeners: ['outside', 'keys', 'gone'] }),
+      ['gone is listed as a listener but is no script function that calls shut']
+    );
+  });
 
   it('names a call of the by function outside the listed functions as a fault', () => {
     assert.deepEqual(
