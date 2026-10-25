@@ -1,10 +1,10 @@
 /**
  * The published `StatusToggle` on Fabricate's real Svelte runtime (issue 2452), through a fresh
- * seam registered with the adapter's own table, under the Fabricate window root it needs: the one
- * native button its default host draws, its state, a press and its `onclick`, an update that keeps
- * the node and its focus, its two `aria` keys read off the button, every refusal the entry adds, and
- * its required root. The default host is held here because the static gates pin it to the default
- * of the unpublished `as`.
+ * seam registered with the adapter's own table, under a Fabricate window root: the one native
+ * button its default host draws, its state, a press and its `onclick`, an update that keeps the
+ * node and its focus, its two `aria` keys read off the button, every refusal the entry adds, and
+ * the standalone style root it is drawn under in a companion's own shell (issue 2456). The default
+ * host is held here because the static gates pin it to the default of the unpublished `as`.
  * Limit: happy-dom activates no button from a key, so the View Lab's toggles case holds the Space
  * press, and no accessible name is computed here: that case's Playwright clause reads it.
  */
@@ -25,6 +25,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -371,13 +372,21 @@ describe('what the published StatusToggle refuses', () => {
       await assertUpdateRefused(base({ [key]: value }), tail);
     });
   }
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
+describe('the published StatusToggle in a companion’s own shell', () => {
+  it('draws its button host inside one standalone style root, and destroy leaves the shell empty', async () => {
     const target = companionTarget(targets);
-    assert.throws(() => ui().mount('StatusToggle', { target, props: base() }), {
-      name: 'TypeError',
-      message: `${REFUSAL}StatusToggle needs a Fabricate window ancestor`,
-    });
+    const press = recorder();
+    const handle = ui().mount('StatusToggle', { target, props: base({ onclick: press.record }) });
+    await settle();
+    const button = standaloneRootIn(target).firstElementChild;
+    assert.equal(button.localName, 'button');
+    assert.equal(button.getAttribute('type'), 'button');
+    assert.equal(button.getAttribute('aria-pressed'), 'false');
+    button.click();
+    assert.deepEqual(press.calls, [[]]);
+    handle.destroy();
     assert.equal(target.childNodes.length, 0);
   });
 });

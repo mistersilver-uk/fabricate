@@ -414,7 +414,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: { children: slot },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       EmptyState: {
@@ -453,7 +453,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       StatusToggle: {
@@ -466,7 +466,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Stepper: {
@@ -529,7 +529,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: { label: optional, children: slot },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Callout: {
@@ -558,7 +558,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-expanded': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       EditorTabs: {
