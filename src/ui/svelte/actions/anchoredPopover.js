@@ -260,6 +260,7 @@ export function anchoredPopover(node, params = {}) {
     afterFontsLoad(node.ownerDocument, () => !destroyed && measure());
   }
 
+  // ratchet-exempt(file-size): a throwing layout must release what the first sync took (issue 2671)
   try {
     sync();
   } catch (error) {
