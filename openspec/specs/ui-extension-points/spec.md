@@ -1439,7 +1439,7 @@ Each group states the accepted values of every key that entry publishes.
     Fabricate calls `onSelect` only with the `id` of an item the menu draws when it is chosen.
     The companion runs a command only for an `id` it matches by name, so no item, the last one included, runs a command meant for another `id`.
   - A press on the trigger, by pointer, Enter or Space, opens the menu and moves focus to its first enabled item, outside `target`.
-    After a pointer press, the focus Fabricate moves into the menu shows no mark until a key moves it; this falls short of the design system's rule for programmatic focus, which requires a marker on that path, and is recorded, not fixed.
+    After a pointer press, the focus Fabricate moves into the menu shows the mark it shows after a key: the item takes its raised fill and a 1px accent ring drawn inside its edge, and a menu with no item to choose takes the window's accent ring, 2px wide and 2px clear of it.
     ArrowDown on the trigger does the same, and ArrowUp opens the menu onto its last enabled item.
     An Enter held on the trigger opens the menu once, and an Enter held on an item chooses it once; the repeats of either choose and open nothing, and a fresh Enter on an item chooses it.
     A second press on the trigger closes the menu without choosing and moves no focus, so focus goes where the pointer press puts it, which in Chromium, Foundry's desktop client, is the trigger.

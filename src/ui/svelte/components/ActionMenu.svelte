@@ -42,6 +42,8 @@
   - Published through `game.fabricate.api.ui` with `items`, `ariaLabel`, `align` and `onSelect`
     only, the seam dropping each item's `data` (`ui-extension-points`' issue 2652 group).
   - The headed list's static `data-action-menu-list` hook tells the seam's gate its two menu divs apart.
+  - Each element it focuses carries `data-action-menu-focused` while it holds focus, the marker the
+    sheet paints, because a focus moved after a pointer press matches no `:focus-visible`.
   - A repeating Enter in the menu is prevented, never stopped, so the repeats of an Enter held from
     the press that opened it choose nothing; `tests/components/published-action-menu-mounted.test.js`.
 -->
@@ -74,6 +76,7 @@
   const menuLayout = (triggerRect, panelRect, hostRect) =>
     computeActionMenuLayout(triggerRect, panelRect, hostRect, { align });
 
+  const FOCUS_MARK = 'data-action-menu-focused';
   const instanceId = $props.id();
   const headingId = `${instanceId}-heading`;
 
@@ -82,6 +85,7 @@
   let panelRoot = $state(null);
 
   let pendingFocusIndex = 0;
+  let markedEl = null;
 
   const panelName = $derived(panelLabel || ariaLabel || undefined);
 
@@ -90,14 +94,40 @@
     return [...panelRoot.querySelectorAll('[role="menuitem"]:not([disabled])')];
   }
 
+  function unmark() {
+    markedEl?.removeAttribute(FOCUS_MARK);
+    markedEl = null;
+  }
+
+  // Stamped once it holds focus, never on focusin: a focus made in a blurred window fires none.
+  function focusAndMark(target) {
+    unmark();
+    target?.focus?.();
+    if (target && target.ownerDocument?.activeElement === target) {
+      markedEl = target;
+      target.setAttribute(FOCUS_MARK, '');
+    }
+  }
+
   function focusItemAt(index) {
     const focusable = focusableItems();
     if (focusable.length === 0) {
-      (panelRoot?.querySelector('[role="menu"]') ?? panelRoot)?.focus?.();
+      focusAndMark(panelRoot?.querySelector('[role="menu"]') ?? panelRoot);
       return;
     }
     const resolved = ((index % focusable.length) + focusable.length) % focusable.length;
-    focusable[resolved]?.focus?.();
+    focusAndMark(focusable[resolved]);
+  }
+
+  // A window blur keeps `markedEl` for the focusin that returns; any other focus loss drops it.
+  function onPanelFocusout(event) {
+    if (!markedEl) return;
+    markedEl.removeAttribute(FOCUS_MARK);
+    if (event.relatedTarget !== null || markedEl.ownerDocument.hasFocus()) markedEl = null;
+  }
+
+  function onPanelFocusin(event) {
+    if (markedEl && event.target === markedEl) markedEl.setAttribute(FOCUS_MARK, '');
   }
 
   function restoreTriggerFocus() {
@@ -109,6 +139,7 @@
 
   function close({ restoreFocus = true } = {}) {
     open = false;
+    markedEl = null;
     if (restoreFocus) restoreTriggerFocus();
   }
 
@@ -206,10 +237,15 @@
   });
 
   $effect(() => {
+    if (!open) markedEl = null;
     if (!open || !panelRoot) return;
     tick().then(() => {
       if (open) focusItemAt(pendingFocusIndex);
     });
+  });
+
+  $effect(() => {
+    if (items.some((item) => item.disabled === true) && markedEl?.disabled) unmark();
   });
 </script>
 
@@ -269,6 +305,8 @@
         layout: menuLayout,
       }}
       onclick={stop}
+      onfocusin={onPanelFocusin}
+      onfocusout={onPanelFocusout}
     >
       <div class="manager-action-menu-heading" id={headingId}>
         <Kicker as="span">{heading}</Kicker>
@@ -300,6 +338,8 @@
       }}
       onclick={stop}
       onkeydown={onPanelKeydown}
+      onfocusin={onPanelFocusin}
+      onfocusout={onPanelFocusout}
     >
       {@render menuItems()}
     </div>

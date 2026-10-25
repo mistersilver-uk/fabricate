@@ -1826,7 +1826,7 @@ The panel lines up with its trigger's END edge, which suits a kebab at the end o
 The requirement row's kind menu is this primitive: the `or…` control opens it under the heading that states what choosing does, each kind's item toned with that kind.
 The panel MUST be radius 11 and each item radius 7, concentric with its 4px padding; this binds `ActionMenu` and the requirement row's kind menu.
 `ActionMenu` is published through `game.fabricate.api.ui` (issue 2652) with only `items`, `ariaLabel`, `align` and `onSelect`, as its group in `ui-extension-points` states.
-Recorded, not fixed: a pointer press that opens the menu moves focus into it with no focus marker, which the programmatic-focus rule above requires.
+Each focus the menu moves, to an item or to the menu itself when it holds no item to choose, MUST carry the marker the programmatic-focus rule above requires, set when that element is focused and cleared when it loses focus, and the menu's own rules paint it as they paint `:focus-visible` (issue 2667).
 
 #### Scenario: A surface needs a kebab over two or more commands
 
