@@ -979,11 +979,6 @@ const FLOATING_SURFACES = Object.freeze([
   ['src/ui/svelte/components/Modal.svelte', '.fabricate-modal', 'a dialog over the window'],
   [
     MODULE_SHEET,
-    '.fabricate-modal.fabricate-modal[tabindex]',
-    'the same dialog, held over the module focus pair while it holds focus',
-  ],
-  [
-    MODULE_SHEET,
     '.fabricate-typeahead-list.fabricate-typeahead-list',
     'opens over the fields below',
   ],

@@ -87,10 +87,9 @@
   outline-offset: 2px;
 }
 
-/* The `Modal` dialog is a `tabindex="-1"` focus target that keeps its elevation and draws no ring, pressed or keyed (issue 2661): at (0,3,0) it outranks both halves of the pair above. */
+/* The `Modal` dialog is a `tabindex="-1"` focus target that draws no ring, pressed or keyed (issue 2661): at (0,3,0) it ties the pair's `[tabindex]` rows and, written after them, wins, so it must stay below the pair. */
 .fabricate-modal.fabricate-modal[tabindex] {
   outline: none;
-  box-shadow: var(--fab-shadow-lg);
 }
 
 /* A TEXT FIELD's ring is drawn inside its own box: an outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip. `:where()` keeps the module ring's (0,2,1), so a component's own ring still wins. */
