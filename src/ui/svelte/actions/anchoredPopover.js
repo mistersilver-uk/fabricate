@@ -122,6 +122,7 @@ function panelStyle(layout, { applyWidth, maxHeightCap }) {
 // `ignoreScrollWithin` drops events from inside the panel, which move neither it nor its trigger.
 // Every listener binds to the panel's own document and window; a panel whose document has no window
 // binds none and is treated as closed. `layout` is called with that window as a sixth argument.
+// ratchet-exempt(file-size): a throwing layout must release what the first sync took (issue 2671)
 export function anchoredPopover(node, params = {}) {
   if (!node?.ownerDocument) {
     return {
@@ -260,7 +261,6 @@ export function anchoredPopover(node, params = {}) {
     afterFontsLoad(node.ownerDocument, () => !destroyed && measure());
   }
 
-  // ratchet-exempt(file-size): a throwing layout must release what the first sync took (issue 2671)
   try {
     sync();
   } catch (error) {
