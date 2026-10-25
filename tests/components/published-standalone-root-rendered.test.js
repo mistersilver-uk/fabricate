@@ -286,11 +286,48 @@ async function bothHosts(readOne) {
   return reads;
 }
 
+/**
+ * Sizes the viewport to the whole page, so no host needs a scroll to be hovered or focused, and
+ * fails by name where a host still lies outside it.
+ */
+async function fitViewport(tab) {
+  const extent = () =>
+    tab.evaluate(() => {
+      const hosts = [...document.querySelectorAll('[data-host]')].map((host) =>
+        host.getBoundingClientRect()
+      );
+      return {
+        width: Math.ceil(
+          Math.max(document.documentElement.scrollWidth, ...hosts.map((r) => r.right))
+        ),
+        height: Math.ceil(
+          Math.max(document.documentElement.scrollHeight, ...hosts.map((r) => r.bottom))
+        ),
+      };
+    });
+  for (let pass = 0; pass < 2; pass += 1) {
+    const { width, height } = await extent();
+    await tab.setViewportSize({
+      width: Math.max(1280, width + 24),
+      height: Math.max(900, height + 24),
+    });
+  }
+  const outside = await tab.evaluate(() =>
+    [...document.querySelectorAll('[data-host]')]
+      .filter((host) => {
+        const box = host.getBoundingClientRect();
+        return box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight;
+      })
+      .map((host) => host.dataset.host)
+  );
+  assert.deepEqual(outside, [], 'every host lies inside the viewport');
+}
+
 /** A page for `palette` over `sheets`, and every read the clause compares, state by state. */
 async function measure(browser, markup, palette, sheets) {
-  // Tall enough that no specimen needs a scroll to be hovered, under a sheet that clips the body.
-  const tab = await browser.newPage({ viewport: { width: 1280, height: 2000 } });
+  const tab = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await tab.setContent(pageFor(markup[palette], palette, sheets), { waitUntil: 'load' });
+  await fitViewport(tab);
   const other = PALETTES.find((each) => each !== palette);
   await tab.evaluate(
     ([name, value]) => document.documentElement.setAttribute(name, value),
@@ -522,13 +559,19 @@ registerChromeRunnerGuards({
 const skip = skipWithoutHarvest(chrome);
 /**
  * Layout only, written on both hosts alike: core places every `.application` as a window, absolute
- * and stacked, so each host is laid back in flow beside its sentinel. No compared property is a
- * host's own, and every box offset is measured from `target`.
+ * and stacked, and may fix and clip the page, so the page grows to its content and each host is
+ * laid back in flow, unclipped, beside its sentinel. None of these is inherited or compared, and
+ * every box offset is measured from `target`, so a difference core makes between the hosts stays.
  */
-const HOSTS_IN_FLOW = `[data-host] {
+const HOSTS_IN_FLOW = `html, body {
+  display: block; position: static; inset: auto; width: auto; height: auto;
+  min-height: 0; max-height: none; overflow: visible; transform: none;
+}
+[data-host] {
   position: relative; inset: auto; transform: none; z-index: auto;
-  margin: 0; height: auto; max-height: none; min-width: 0;
-}`;
+  margin: 0; height: auto; max-height: none; min-width: 0; overflow: visible;
+}
+[data-host] > .window-content { overflow: visible; }`;
 const fontAwesome = () => {
   const cache = resolveChromeCache(repoRoot);
   return readFileSync(join(cache.dir, 'fonts', 'fontawesome', 'css', 'all.min.css'), 'utf8');
