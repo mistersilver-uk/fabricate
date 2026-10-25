@@ -487,6 +487,40 @@ describe('2667 ActionMenu marks the focus it moves', () => {
     }
   });
 
+  it('drops the mark of a headed menu on a window blur, restores it, and drops it for good when focus leaves', async () => {
+    const target = await open(await harness.mount({ ...props(), heading: 'Accept instead' }));
+    try {
+      const owner = target.ownerDocument;
+      const item = enabledItems(target)[0];
+      const focusEvent = (node, type) => {
+        node.dispatchEvent(
+          new owner.defaultView.FocusEvent(type, { bubbles: true, relatedTarget: null })
+        );
+      };
+      owner.hasFocus = () => false;
+      try {
+        focusEvent(item, 'focusout');
+      } finally {
+        delete owner.hasFocus;
+      }
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'a blurred window shows no mark');
+      focusEvent(item, 'focusin');
+      await flushRender();
+      assertMarks(item, 'focus returns to the window');
+      const elsewhere = owner.createElement('button');
+      owner.body.append(elsewhere);
+      elsewhere.focus();
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'focus moved out of the menu');
+      focusEvent(item, 'focusin');
+      await flushRender();
+      assert.ok(!item.hasAttribute(MARK), 'and a later focusin does not restore it');
+    } finally {
+      harness.remount();
+    }
+  });
+
   for (const heading of ['', 'Accept instead']) {
     it(`on the ${heading ? 'headed list' : 'panel'} when every item is disabled`, async () => {
       const disabled = items().map((item) => ({ ...item, disabled: true }));

@@ -42,7 +42,7 @@
   - Published through `game.fabricate.api.ui` with `items`, `ariaLabel`, `align` and `onSelect`
     only, the seam dropping each item's `data` (`ui-extension-points`' issue 2652 group).
   - The headed list's static `data-action-menu-list` hook tells the seam's gate its two menu divs apart.
-  - Each element it focuses carries `data-action-menu-focused` while it holds focus, the marker the
+  - Each element it focuses in the menu carries `data-action-menu-focused` while it holds focus, the marker the
     sheet paints, because a focus moved after a pointer press matches no `:focus-visible`.
   - A repeating Enter in the menu is prevented, never stopped, so the repeats of an Enter held from
     the press that opened it choose nothing; `tests/components/published-action-menu-mounted.test.js`.
@@ -244,8 +244,10 @@
     });
   });
 
+  // An item disabled while marked drops its mark; the sheet's :not(:disabled) already hides the paint.
   $effect(() => {
-    if (items.some((item) => item.disabled === true) && markedEl?.disabled) unmark();
+    const anyDisabled = items.filter((item) => item.disabled === true).length > 0;
+    if (anyDisabled && markedEl?.disabled) unmark();
   });
 </script>
 

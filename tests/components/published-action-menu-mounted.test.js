@@ -703,6 +703,48 @@ describe('the published ActionMenu marks the focus it moves', () => {
     assertMarks(item, 'focus returns to the window');
   });
 
+  it('drops the mark for good on a focusout that leaves its window focused', async () => {
+    const { trigger } = mountMenu();
+    await open(trigger());
+    const item = itemIn('duplicate');
+    focusEvent(item, 'focusout');
+    assert.ok(!item.hasAttribute(MARK), 'a focus that left the menu drops the mark');
+    focusEvent(item, 'focusin');
+    assert.ok(!item.hasAttribute(MARK), 'and a later focusin does not restore it');
+  });
+
+  it('restores the mark on the item that held it and on no other after a blur', async () => {
+    const { trigger } = mountMenu();
+    await open(trigger());
+    const item = itemIn('duplicate');
+    const other = itemIn('delete');
+    const owner = doc(item);
+    owner.hasFocus = () => false;
+    try {
+      focusEvent(item, 'focusout');
+    } finally {
+      delete owner.hasFocus;
+    }
+    focusEvent(other, 'focusin');
+    assert.ok(!other.hasAttribute(MARK), 'another item is never marked by a focusin');
+    assert.ok(!item.hasAttribute(MARK), 'and the first stays unmarked until its own focusin');
+    focusEvent(item, 'focusin');
+    assertMarks(item, 'its own focusin');
+  });
+
+  it('marks nothing when the focus it asked for was not granted', async () => {
+    const { trigger } = mountMenu();
+    const proto = doc(trigger()).defaultView.HTMLElement.prototype;
+    const focus = proto.focus;
+    proto.focus = function refused() {};
+    try {
+      await open(trigger());
+      assert.equal(document.querySelectorAll(`[${MARK}]`).length, 0);
+    } finally {
+      proto.focus = focus;
+    }
+  });
+
   it('drops the mark for good when focus moves out of the open menu', async () => {
     const { target, trigger } = mountMenu();
     await open(trigger());
@@ -804,6 +846,24 @@ describe('the published ActionMenu in a second window', () => {
     const { trigger } = mountMenu({}, { target: detachedTarget() });
     await open(trigger());
     assertMarks(itemIn('duplicate', second.document), 'the second window');
+  });
+
+  it('reads that document’s focus when its window is blurred, and restores the mark when focus returns', async () => {
+    const { trigger } = mountMenu({}, { target: detachedTarget() });
+    await open(trigger());
+    const item = itemIn('duplicate', second.document);
+    // The blur is stubbed on the second document only, so the main document's answer would keep the mark.
+    second.document.hasFocus = () => false;
+    try {
+      item.dispatchEvent(new second.FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      flushSync();
+    } finally {
+      delete second.document.hasFocus;
+    }
+    assert.ok(!item.hasAttribute(MARK), 'a blurred second window shows no mark');
+    item.dispatchEvent(new second.FocusEvent('focusin', { bubbles: true }));
+    flushSync();
+    assertMarks(item, 'focus returns to the second window');
   });
 
   it('closes on an outside press in that document', async () => {
