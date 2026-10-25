@@ -137,6 +137,8 @@ const FOCUSABLE_REACH = Object.freeze({
   // One tab button for each item of `tabs`.
   'src/ui/svelte/components/EditorTabs.svelte: button': 'tabs',
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
+  // The dialog element, a `tabindex="-1"` target drawn while `open` (issue 2661).
+  'src/ui/svelte/components/Modal.svelte: div[data-manager-modal]': 'open',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // One radio for each item of `options`.

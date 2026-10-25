@@ -414,6 +414,88 @@ for (const closeOnOutsideClick of [true, false]) {
   });
 }
 
+for (const trapFocus of [false, true]) {
+  describe(`the Modal dialog as a focus target with trapFocus ${trapFocus} (issues 2661, 2662)`, () => {
+    /** Mounts an open Modal, focuses its dialog element and returns it with the onClose calls. */
+    async function focusedDialog(props = {}) {
+      const calls = [];
+      await harness.mount({
+        open: true,
+        title: 'Probe',
+        body,
+        footer,
+        trapFocus,
+        onClose: (...args) => {
+          calls.push(args);
+        },
+        ...props,
+      });
+      const dialog = q('[data-manager-modal]');
+      dialog.focus();
+      return { dialog, calls };
+    }
+
+    it('is a tabindex -1 target held off Foundry, and aria-modal only with trapFocus', async () => {
+      const { dialog } = await focusedDialog();
+      assert.equal(dialog.getAttribute('tabindex'), '-1');
+      assert.equal(dialog.getAttribute('data-keyboard-focus'), 'true');
+      assert.equal(dialog.getAttribute('role'), 'dialog');
+      assert.equal(dialog.getAttribute('aria-label'), 'Probe');
+      if (trapFocus) assert.equal(dialog.getAttribute('aria-modal'), 'true');
+      else assert.ok(!dialog.hasAttribute('aria-modal'), 'not announced as modal');
+      assert.ok(document.activeElement === dialog, 'the dialog takes focus');
+    });
+
+    it('closes once on an Escape on the dialog element, claims it and keeps it from the window', async () => {
+      const { dialog, calls } = await focusedDialog();
+      const event = escape();
+      const seen = dispatchWithWindowListener(dialog, event);
+      assert.equal(calls.length, 1, 'onClose is called once');
+      assert.equal(event.defaultPrevented, true);
+      assert.deepEqual(seen, [], 'no bubbling keydown listener on the window hears it');
+    });
+
+    for (const [label, shiftKey, hook] of [
+      ['Tab focuses the close control', false, '[data-manager-modal-close]'],
+      ['Shift+Tab focuses the last control', true, '[data-footer-button]'],
+    ]) {
+      it(`${label} from the dialog element`, async () => {
+        const { dialog } = await focusedDialog();
+        const event = key('keydown', { key: 'Tab', shiftKey });
+        dialog.dispatchEvent(event);
+        assert.equal(event.defaultPrevented, true);
+        assert.ok(document.activeElement === q(hook), `focus is on ${hook}`);
+      });
+    }
+
+    it(
+      trapFocus
+        ? 'wraps Tab from the last control to the close control'
+        : 'leaves Tab from a control inside to the browser',
+      async () => {
+        await focusedDialog();
+        const last = q('[data-footer-button]');
+        last.focus();
+        const event = key('keydown', { key: 'Tab' });
+        last.dispatchEvent(event);
+        assert.equal(event.defaultPrevented, trapFocus);
+        if (trapFocus) {
+          assert.ok(document.activeElement === q('[data-manager-modal-close]'), 'wrapped');
+        }
+      }
+    );
+  });
+}
+
+describe('the Modal dialog inline style', () => {
+  it('states no inline style without width, and the width custom property with it', async () => {
+    await harness.mount({ open: true, title: 'Probe', body, onClose: () => {} });
+    assert.ok(!q('[data-manager-modal]').getAttribute('style'), 'no inline style by default');
+    await harness.setProps({ width: '720px' });
+    assert.equal(q('[data-manager-modal]').getAttribute('style'), '--manager-modal-width: 720px;');
+  });
+});
+
 describe('Modal host and window lifecycle', () => {
   const closeInto = (calls) => () => {
     calls.push([]);
