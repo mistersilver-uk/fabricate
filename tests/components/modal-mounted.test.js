@@ -1,0 +1,268 @@
+/**
+ * Issue 2658 — `Modal` mounted on its own: Escape stops inside the dialog in every mode, the host
+ * is acquired through the overlay chain, and body and footer are drawn once.
+ */
+import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+
+import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+
+const MODAL_PATH = 'src/ui/svelte/components/Modal.svelte';
+const OVERLAY_HOST_PATH = 'src/ui/svelte/util/overlayHost.js';
+
+const harness = createMountedComponentHarness({
+  repoRoot: resolve(import.meta.dirname, '../..'),
+  tmpPrefix: 'fabricate-modal-',
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/util/appLocalizer.js',
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    OVERLAY_HOST_PATH,
+  ],
+  compiledModules: [
+    // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled).
+    'src/ui/svelte/components/IconButton.svelte',
+    MODAL_PATH,
+  ],
+  componentPath: MODAL_PATH,
+});
+
+const body = createRawSnippet(() => ({
+  render: () =>
+    '<div data-probe-body><button type="button" data-plain>Plain</button>' +
+    '<button type="button" data-expanded aria-expanded="true">Open list</button></div>',
+}));
+const footer = createRawSnippet(() => ({
+  render: () => '<button type="button" data-footer-button>Done</button>',
+}));
+
+const key = (type, init = {}) =>
+  new document.defaultView.KeyboardEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    ...init,
+  });
+const escape = (init = {}) => key('keydown', { key: 'Escape', ...init });
+
+/** Dispatches `event` on `element` with a bubbling `keydown` listener on the window. */
+function dispatchWithWindowListener(element, event) {
+  const seen = [];
+  const onWindowKey = (heard) => {
+    seen.push(heard.key);
+  };
+  document.defaultView.addEventListener('keydown', onWindowKey);
+  try {
+    element.dispatchEvent(event);
+  } finally {
+    document.defaultView.removeEventListener('keydown', onWindowKey);
+  }
+  return seen;
+}
+
+const q = (selector) => document.querySelector(selector);
+
+before(() => harness.setup());
+after(() => harness.teardown());
+afterEach(() => harness.remount());
+
+for (const closeOnOutsideClick of [true, false]) {
+  describe(`Modal with closeOnOutsideClick ${closeOnOutsideClick}`, () => {
+    /** Mounts an open Modal and returns the calls its `onClose` received. */
+    async function open(props = {}) {
+      const calls = [];
+      await harness.mount({
+        open: true,
+        title: 'Probe',
+        body,
+        footer,
+        closeOnOutsideClick,
+        onClose: (...args) => {
+          calls.push(args);
+        },
+        ...props,
+      });
+      return calls;
+    }
+
+    describe('Escape in the dialog', () => {
+      it('closes once from a body button, claims the key and keeps it from the window', async () => {
+        const calls = await open();
+        const event = escape();
+        const seen = dispatchWithWindowListener(q('[data-plain]'), event);
+        assert.equal(calls.length, 1, 'onClose is called once');
+        assert.equal(event.defaultPrevented, true);
+        assert.deepEqual(seen, [], 'no bubbling keydown listener on the window hears it');
+      });
+
+      it('calls onClose again for each repeat of a held Escape', async () => {
+        const calls = await open();
+        q('[data-plain]').dispatchEvent(escape());
+        q('[data-plain]').dispatchEvent(escape({ repeat: true }));
+        assert.equal(calls.length, 2);
+      });
+
+      it('calls nothing for a composing Escape', async () => {
+        const calls = await open();
+        q('[data-plain]').dispatchEvent(escape({ isComposing: true }));
+        assert.equal(calls.length, 0);
+      });
+
+      it('leaves an Escape on an aria-expanded control to that control', async () => {
+        const calls = await open();
+        const event = escape();
+        const seen = dispatchWithWindowListener(q('[data-expanded]'), event);
+        assert.equal(calls.length, 0);
+        assert.equal(event.defaultPrevented, false);
+        assert.deepEqual(seen, ['Escape'], 'and does not stop it');
+      });
+
+      /** A control that collapses on Escape from a document capture listener, as a picker does. */
+      function collapseOnEscape() {
+        const listener = (event) => {
+          if (event.key === 'Escape') q('[data-expanded]').setAttribute('aria-expanded', 'false');
+        };
+        document.addEventListener('keydown', listener, { capture: true });
+        return () => document.removeEventListener('keydown', listener, { capture: true });
+      }
+
+      for (const [label, before] of [
+        ['registered before the dialog mounts', true],
+        ['registered after the dialog is open', false],
+      ]) {
+        it(`judges an expanded control as the key goes down, with a collapsing listener ${label}`, async () => {
+          let remove = before ? collapseOnEscape() : () => {};
+          try {
+            const calls = await open();
+            if (!before) remove = collapseOnEscape();
+            const event = escape();
+            const seen = dispatchWithWindowListener(q('[data-expanded]'), event);
+            assert.equal(
+              q('[data-expanded]').getAttribute('aria-expanded'),
+              'false',
+              'the listener collapsed the control before the key reached the dialog'
+            );
+            assert.equal(calls.length, 0, 'the dialog still reads it as expanded');
+            assert.equal(event.defaultPrevented, false);
+            assert.deepEqual(seen, ['Escape'], 'and does not stop it');
+          } finally {
+            remove();
+          }
+        });
+      }
+
+      it('is not stopped by an expanded element above the host, outside the dialog', async () => {
+        const calls = await open();
+        harness.target.setAttribute('aria-expanded', 'true');
+        document.body.setAttribute('aria-expanded', 'true');
+        try {
+          q('[data-manager-modal-close]').dispatchEvent(escape());
+        } finally {
+          document.body.removeAttribute('aria-expanded');
+        }
+        assert.equal(calls.length, 1);
+      });
+
+      it('keeps onClose uncalled when a body listener stops Escape', async () => {
+        const calls = await open();
+        const button = q('[data-plain]');
+        button.addEventListener('keydown', (event) => event.stopPropagation());
+        button.dispatchEvent(escape());
+        assert.equal(calls.length, 0);
+      });
+
+      it(
+        closeOnOutsideClick
+          ? 'closes once on an Escape outside the dialog and does not stop it'
+          : 'ignores an Escape outside the dialog',
+        async () => {
+          const calls = await open();
+          const event = escape();
+          const seen = dispatchWithWindowListener(document.body, event);
+          assert.equal(calls.length, closeOnOutsideClick ? 1 : 0);
+          assert.equal(event.defaultPrevented, false);
+          assert.deepEqual(seen, ['Escape']);
+        }
+      );
+    });
+
+    describe('the close control', () => {
+      it('calls onClose once with no arguments on a click', async () => {
+        const calls = await open();
+        q('[data-manager-modal-close]').click();
+        assert.deepEqual(calls, [[]]);
+      });
+
+      for (const pressed of ['Enter', ' ']) {
+        it(`calls nothing on a keydown of ${JSON.stringify(pressed)}, and claims no key`, async () => {
+          const calls = await open();
+          const event = key('keydown', { key: pressed });
+          q('[data-manager-modal-close]').dispatchEvent(event);
+          // happy-dom activates no button on a key, so a real activation is a click's job.
+          assert.equal(calls.length, 0);
+          assert.equal(event.defaultPrevented, false);
+        });
+      }
+    });
+
+    describe('hosting', () => {
+      it('draws the dialog in the element resolveOverlayHost returns for it', async () => {
+        await open();
+        const { resolveOverlayHost } = await harness.loadRawModule(OVERLAY_HOST_PATH);
+        const dialog = q('[data-manager-modal]');
+        assert.ok(dialog.parentElement.classList.contains('fabricate-manager'));
+        assert.equal(dialog.parentElement, resolveOverlayHost(dialog));
+        assert.equal(dialog.parentElement, harness.target);
+      });
+
+      it('leaves the host other children when destroyed open, and releasing throws nothing', async () => {
+        await open();
+        const { releaseOverlayHost } = await harness.loadRawModule(OVERLAY_HOST_PATH);
+        const dialog = q('[data-manager-modal]');
+        const sibling = document.createElement('i');
+        harness.target.append(sibling);
+        harness.component.$destroy();
+        assert.equal(dialog.isConnected, false, 'the dialog went with the component');
+        assert.equal(sibling.parentElement, harness.target, 'the host other children stay');
+        assert.doesNotThrow(() => releaseOverlayHost(dialog));
+        sibling.remove();
+      });
+
+      it('draws exactly one dialog when opened, closed and opened again', async () => {
+        await open();
+        await harness.setProps({ open: false });
+        assert.equal(document.querySelectorAll('[data-manager-modal]').length, 0);
+        await harness.setProps({ open: true });
+        assert.equal(document.querySelectorAll('[data-manager-modal]').length, 1);
+      });
+    });
+
+    describe('slots', () => {
+      it('draws one body and one footer and no form without onSubmit', async () => {
+        await open();
+        const dialog = q('[data-manager-modal]');
+        assert.equal(dialog.querySelectorAll('.manager-modal-body').length, 1);
+        assert.equal(dialog.querySelectorAll('.manager-modal-footer').length, 1);
+        assert.equal(dialog.querySelectorAll('[data-probe-body]').length, 1);
+        assert.equal(dialog.querySelectorAll('[data-footer-button]').length, 1);
+        assert.equal(dialog.querySelector('form'), null);
+        assert.equal(dialog.querySelector('.manager-modal-form').tagName, 'DIV');
+      });
+
+      it('wraps both in one form with onSubmit', async () => {
+        await open({ onSubmit: () => {} });
+        const dialog = q('[data-manager-modal]');
+        const forms = dialog.querySelectorAll('form');
+        assert.equal(forms.length, 1);
+        assert.ok(forms[0].querySelector('.manager-modal-body'));
+        assert.ok(forms[0].querySelector('.manager-modal-footer'));
+        assert.equal(dialog.querySelectorAll('.manager-modal-body').length, 1);
+        assert.equal(dialog.querySelectorAll('.manager-modal-footer').length, 1);
+      });
+    });
+  });
+}

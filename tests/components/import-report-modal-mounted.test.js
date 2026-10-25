@@ -241,8 +241,8 @@ describe('ImportReportModal (mounted)', () => {
     } finally {
       document.defaultView.removeEventListener('keydown', onWindowKey);
     }
-    assert.equal(closed, 1, 'Escape closes once, through the outside-click dismissal alone');
-    assert.deepEqual(seen, [['Escape', false]], 'the modal neither stops nor claims Escape');
+    assert.equal(closed, 1, 'Escape on a control in the dialog closes once');
+    assert.deepEqual(seen, [], 'and stops at the dialog');
     document.body.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
     assert.equal(closed, 2, 'an outside click still dismisses the report');
     opener.remove();

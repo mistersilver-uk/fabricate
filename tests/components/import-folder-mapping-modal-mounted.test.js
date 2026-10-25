@@ -9,6 +9,7 @@ import {
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
+  openSelectPanel,
   selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
@@ -256,6 +257,53 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
     assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.equal(root.getAttribute('role'), 'dialog');
+  });
+});
+
+describe('Escape in the mapping modal', () => {
+  const escapeEvent = () =>
+    new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+
+  it('closes once from the match-by-name checkbox and reaches no window listener', async () => {
+    const closes = [];
+    await harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose: () => {
+        closes.push(true);
+      },
+    });
+    const heard = [];
+    const onWindowKey = (event) => {
+      heard.push(event.key);
+    };
+    document.defaultView.addEventListener('keydown', onWindowKey);
+    const event = escapeEvent();
+    try {
+      document.querySelector('[data-import-mapping-match] input').dispatchEvent(event);
+    } finally {
+      document.defaultView.removeEventListener('keydown', onWindowKey);
+    }
+    assert.deepEqual(closes, [true], 'the modal is dismissed once');
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(heard, [], 'and Foundry’s window-level keybinding never hears the key');
+  });
+
+  it('closes an open category list and leaves the modal open', async () => {
+    const closes = [];
+    const root = await harness.mount({
+      open: true,
+      folders: FOLDERS,
+      ...VOCAB,
+      onClose: () => {
+        closes.push(true);
+      },
+    });
+    openSelectPanel(root, categoryTrigger(0));
+    const trigger = root.querySelector(categoryTrigger(0));
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+    trigger.dispatchEvent(escapeEvent());
+    flushSync();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'the list closed');
+    assert.deepEqual(closes, [], 'and the modal stayed open');
+    assert.ok(dialog(), 'the dialog is still drawn');
   });
 });
 
