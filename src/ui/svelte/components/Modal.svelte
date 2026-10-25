@@ -126,18 +126,6 @@
   }
 </script>
 
-{#snippet content()}
-  {#if body}
-    <div class="manager-modal-body">{@render body()}</div>
-  {/if}
-
-  {#if footer}
-    <div class="manager-modal-footer" class:is-equal={footerLayout === 'equal'}>
-      {@render footer()}
-    </div>
-  {/if}
-{/snippet}
-
 {#if open}
   <div class="manager-modal-overlay" data-manager-modal-overlay>
     <div
@@ -170,11 +158,22 @@
         />
       </div>
 
-      {#if onSubmit}
-        <form class="manager-modal-form" novalidate onsubmit={submit}>{@render content()}</form>
-      {:else}
-        {@render content()}
-      {/if}
+      <svelte:element
+        this={onSubmit ? 'form' : 'div'}
+        class="manager-modal-form"
+        novalidate={onSubmit ? true : undefined}
+        onsubmit={onSubmit ? submit : undefined}
+      >
+        {#if body}
+          <div class="manager-modal-body">{@render body()}</div>
+        {/if}
+
+        {#if footer}
+          <div class="manager-modal-footer" class:is-equal={footerLayout === 'equal'}>
+            {@render footer()}
+          </div>
+        {/if}
+      </svelte:element>
     </div>
   </div>
 {/if}
