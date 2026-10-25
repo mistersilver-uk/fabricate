@@ -1,10 +1,11 @@
 /** Mount a REAL overlay component inside a chosen host, for the positioning proof (issue 1466). */
-import { mount } from 'svelte';
+import { createRawSnippet, mount } from 'svelte';
 
 import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
 import ActorSelectTopBar from '../../../src/ui/svelte/apps/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
+import Modal from '../../../src/ui/svelte/components/Modal.svelte';
 import RecipeDurationEditor from '../../../src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte';
 import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
 import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
@@ -129,6 +130,30 @@ function actorBarStore() {
   };
 }
 
+/** A static snippet drawing `html`. */
+const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
+
+/**
+ * The shared dialog (issue 2661), trapping focus under `?trap=1`; `<body data-modal-closes>`
+ * counts `onClose`.
+ *
+ * @returns {object} The Modal's props.
+ */
+function modalProps() {
+  document.body.dataset.modalCloses = '0';
+  return {
+    open: true,
+    title: 'Import report',
+    subtitle: 'Three components imported',
+    trapFocus: params.get('trap') === '1',
+    onClose: () => {
+      document.body.dataset.modalCloses = String(Number(document.body.dataset.modalCloses) + 1);
+    },
+    body: snippet('<p data-modal-text>Every component kept its source link.</p>'),
+    footer: snippet('<button type="button" data-modal-done>Done</button>'),
+  };
+}
+
 /** The overlay subjects this fixture can mount, by `?component=` (issue 1470). */
 const COMPONENTS = {
   icon: [IconPicker, { value: 'fas fa-fire', ariaLabel: 'Choose an icon' }],
@@ -193,6 +218,7 @@ const COMPONENTS = {
   'anchored-popover': [AnchoredPopoverHost, { form: params.get('form') ?? 'element' }],
   // The tint palette opened from a caller's anchor, as the biome edit palette opens it (issue 2459).
   'tint-anchored': [TintAnchoredHost, {}],
+  modal: [Modal, componentKind === 'modal' ? modalProps() : {}],
   actorbar: [
     ActorSelectTopBar,
     {
