@@ -3828,19 +3828,23 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     });
     const target = await harness.mount({ services });
     await settle();
+    // Every `Modal` is `.fabricate-modal`, whether or not it is `aria-modal` (issue 2662).
     const modal = document.createElement('div');
-    modal.setAttribute('aria-modal', 'true');
+    modal.className = 'fabricate-modal';
+    modal.tabIndex = -1;
     const field = document.createElement('input');
     modal.append(field);
     target.append(modal);
-    let reachedModal = false;
-    modal.addEventListener('keydown', () => (reachedModal = true));
+    let reached = 0;
+    modal.addEventListener('keydown', () => (reached += 1));
 
     fire(field, 'keydown', { key: 'Escape' });
     await settle();
+    fire(modal, 'keydown', { key: 'Escape' });
+    await settle();
 
     assert.deepEqual(calls.bulkClear, [], 'the selection underneath is kept');
-    assert.equal(reachedModal, true, 'the key reaches the modal');
+    assert.equal(reached, 2, 'the key reaches the modal from the field and from the dialog');
   });
 
   it('does NOT arm Escape when the selection is empty', async () => {
