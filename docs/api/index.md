@@ -3463,7 +3463,8 @@ The trigger is the only focusable element inside `target`, so to return focus to
 A label too long for the menu is cut with an ellipsis, and its whole text stays its name.
 `icon` is a Font Awesome class string drawn before the label and hidden from assistive technology, and an item without one keeps the glyph's column empty.
 `disabled: true` draws the item dimmed as a natively disabled button, which the arrow keys skip and a press does not choose.
-`danger: true` draws the item in the danger ink, which falls short of 4.5:1 on the menu's ground in one palette and on a hovered or focused item in four, so let its label, not its colour, state what it does.
+`danger: true` draws the item in the danger family's text ink, which clears 4.5:1 on the menu's ground and on a hovered or focused item in every palette.
+In `foundry-native` that ink is the window's ordinary text ink, so let the item's label, not its colour, state what it does, and give a danger item an `icon`.
 Fabricate drops an item's `data` and never writes it, and any other member is private.
 With `items` empty, or every item disabled, a press opens a menu with no item to choose, focus rests on the menu itself, and Escape, Tab or a press outside it closes it; with no command to offer, leave the menu unmounted.
 `ariaLabel` is required and is final display text naming the trigger and the menu, as "Reagent actions for Flask", and it is also the trigger's tooltip, shown as the [`IconButton`](#iconbutton) section states.

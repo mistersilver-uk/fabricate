@@ -1424,7 +1424,8 @@ Each group states the accepted values of every key that entry publishes.
     A label too long for the menu is cut with an ellipsis, and its whole text stays its name.
     `icon` is a Font Awesome class string drawn before the label and hidden from assistive technology, and an item without one keeps the glyph's column empty.
     `disabled: true` draws the item dimmed as a natively disabled button, which the arrow keys skip and a press does not choose.
-    `danger: true` draws the item in the danger ink, which falls short of 4.5:1 on the menu's ground in one palette and on a hovered or focused item in four, so its label, not its colour, states what it does.
+    `danger: true` draws the item in the danger family's text ink, which clears 4.5:1 on the menu's ground and on a hovered or focused item in every palette.
+    In `foundry-native` that ink is the window's ordinary text ink, so the item's label, not its colour, states what it does, and the companion gives a danger item an `icon`.
     Fabricate drops an item's `data` and never writes it, and any other member is private.
     With `items` empty, or every item disabled, a press opens a menu with no item to choose, focus rests on the menu itself, and Escape, Tab or a press outside it closes it.
     A companion with no command to offer leaves the menu unmounted.

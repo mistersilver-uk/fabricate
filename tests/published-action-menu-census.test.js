@@ -4,7 +4,7 @@
  * `fabricate-action-menu-panel`, the 14 of them a published menu matches with nothing above its
  * root, the classes its file spells on them, and the focus marks: the trigger's module ring, the
  * item's 1px accent ring drawn inside its edge on its raised fill, and the empty menu's module ring.
- * The danger item's ink is pinned shortfall for shortfall, recorded and not fixed.
+ * The danger item's ink is pinned in every palette.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
  * Limit: a companion passing an item's private `tone` still draws `is-<tone>`, and the five
  * `is-<kind>` glyph rules of the recipe editor's kind menu then reach its item.
@@ -23,7 +23,12 @@ import {
 } from './helpers/publishedComponentCensus.js';
 import { SHIPPED, byName, declarationsOf, moduleRing } from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn } from './helpers/styleBlockScan.js';
-import { propertiesOf, shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls,
+  themePalettes,
+} from './helpers/themePaletteContrast.js';
 
 const COMPONENT = 'src/ui/svelte/components/ActionMenu.svelte';
 const SHEET = 'styles/fabricate-manager-tool-editor-environments.css';
@@ -199,27 +204,20 @@ describe('the focus marks in the published ActionMenu’s menu', () => {
   });
 });
 
-describe('the danger item’s ink in the published ActionMenu, recorded and not fixed', () => {
+describe('the danger item’s ink in the published ActionMenu', () => {
   const rules = rulesIn(collectStyleCorpus()['styles/fabricate.css']);
   const themes = themePalettes(rules);
+  const ink = declaredToken(rules, `${ITEM}.is-danger`, 'color');
 
-  it('is the danger token', () => {
-    const danger = rules.find((rule) => rule.selector === `${ITEM}.is-danger`);
-    assert.equal(propertiesOf(danger).get('color'), 'var(--fab-danger)');
+  it('is the danger family’s text token', () => {
+    assert.equal(ink, '--fab-danger-text');
   });
 
-  it('falls short of 4.5:1 on the menu’s ground in one palette', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-danger', ['--fab-bg-0']), [
-      'ironblood-forge: --fab-danger on --fab-bg-0 4.48:1',
-    ]);
+  it('clears 4.5:1 on the menu’s ground in every palette', () => {
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-bg-0']), []);
   });
 
-  it('falls short of 4.5:1 on a hovered or focused item in four palettes', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-danger', ['--fab-surface-raised', '--fab-bg-0']), [
-      'fabricate: --fab-danger on --fab-surface-raised over --fab-bg-0 4.37:1',
-      'ironblood-forge: --fab-danger on --fab-surface-raised over --fab-bg-0 3.76:1',
-      'hearth-herb: --fab-danger on --fab-surface-raised over --fab-bg-0 4.43:1',
-      'foundry-native: --fab-danger on --fab-surface-raised over --fab-bg-0 4.04:1',
-    ]);
+  it('clears 4.5:1 on a hovered or focused item in every palette', () => {
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-surface-raised', '--fab-bg-0']), []);
   });
 });

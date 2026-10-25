@@ -2233,7 +2233,7 @@
 }
 
 .fabricate-action-menu-panel button.manager-action-menu-item.is-danger {
-  color: var(--fab-danger);
+  color: var(--fab-danger-text);
 }
 
 /* A headed panel holds the heading and the `role="menu"` list, which stacks its items as the bare panel does. */
