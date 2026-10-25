@@ -494,6 +494,9 @@ async function measureDetailLayout(target, { width = 1240 } = {}) {
         return node ? node.getBoundingClientRect() : null;
       };
       const detail = document.querySelector('[data-journal-detail]');
+      const controls = [
+        ...document.querySelectorAll('[data-run-action-bar] [data-run-action]'),
+      ].map((node) => node.getBoundingClientRect());
       const style = getComputedStyle(detail);
       const rect = detail.getBoundingClientRect();
       return {
@@ -501,6 +504,9 @@ async function measureDetailLayout(target, { width = 1240 } = {}) {
         cancelRight: box('[data-run-cancel-decision]')?.right ?? null,
         beginRight: box('[data-run-begin]')?.right ?? null,
         actionsRight: box('[data-journal-actions]')?.right ?? null,
+        controlsRight: Math.max(...controls.map((node) => node.right)),
+        controlsLeft: Math.min(...controls.map((node) => node.left)),
+        identityRight: box('[data-player-detail-header]')?.right ?? null,
       };
     });
   } finally {
@@ -989,6 +995,20 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(
       Math.abs(armed.actionsRight - armed.contentRight) <= 1,
       'because the actions block reaches the edge rather than shrinking to its own content'
+    );
+  });
+
+  it('right-aligns the plain control line of a run on the card edge', async () => {
+    const { target } = await mountState('ready-single');
+    const layout = await measureDetailLayout(target);
+    assert.ok(Number.isFinite(layout.controlsRight), 'the control line renders');
+    assert.ok(
+      Math.abs(layout.controlsRight - layout.contentRight) <= 1,
+      `the last control ends on the card's content edge: ${layout.controlsRight} vs ${layout.contentRight}`
+    );
+    assert.ok(
+      layout.controlsLeft >= layout.identityRight - 1,
+      'and the line sits after the identity block rather than under it'
     );
   });
 

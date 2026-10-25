@@ -219,6 +219,7 @@ A settle interrupted before it applied anything is discarded when the GM reconci
 Versioned crafting and gathering actions use the shared RunActionBar and the projection's authoritative action availability.
 It exposes pause/resume, manual execution, cancellation and an eligible completion preference with visible disabled reasons and busy state.
 Arming cancellation replaces the sibling actions with confirm/keep controls in the bar.
+In the opened run's header the bar's plain control line sits on the card's right content edge after the identity block.
 The completion switch is visible on an actively counting-down stage without a player check even when unresolved materials block automatic execution.
 Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.

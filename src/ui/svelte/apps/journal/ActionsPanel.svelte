@@ -170,4 +170,10 @@
     flex: 1 1 auto;
     min-width: 0;
   }
+
+  /* This block shares the header row with the identity block, so it starts mid-row: the plain
+     control line takes the card edge the decisions already reach with `margin-left: auto`. */
+  .journal-actions :global(.fab-run-action-bar) {
+    justify-content: flex-end;
+  }
 </style>
