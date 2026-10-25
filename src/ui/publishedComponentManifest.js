@@ -265,7 +265,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'SearchField',
@@ -277,7 +278,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Select',
@@ -317,7 +319,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       children: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Well',
@@ -378,7 +381,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       activePanelOnly: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'RadioCardGroup',
@@ -395,7 +399,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       disabledOptions: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'SegmentedControl',
@@ -410,7 +415,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Pagination',
@@ -434,7 +440,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'IconPicker',
