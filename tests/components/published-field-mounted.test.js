@@ -1,8 +1,9 @@
 /**
  * The published `Field` on Fabricate's real Svelte runtime (issue 2601), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window roots it needs: the column
- * root and its content slot, a companion's caption and text input inside it, an `update` that keeps
- * focus on that input, the host element `as` draws, and every refusal the entry adds.
+ * registered with the adapter's own table, under a Fabricate window root: the column root and its
+ * content slot, a companion's caption and text input inside it, an `update` that keeps focus on
+ * that input, the host element `as` draws, every refusal the entry adds, and the standalone style
+ * root it is drawn under in a companion's own shell (issue 2679).
  * Limit: happy-dom computes no accessible name and shows no focus ring, so a name is read off
  * `aria-labelledby` and a rule's reach off `matches`.
  */
@@ -21,6 +22,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -124,7 +126,7 @@ describe('the published Field draws its column', () => {
       version: 1,
       props: { as: { kind: 'data', required: true }, children: { kind: 'slot', required: false } },
       rest: true,
-      root: 'fabricate',
+      root: 'any',
       overlays: false,
     });
   });
@@ -258,8 +260,19 @@ describe('the published Field refuses', () => {
   it('a slot value that is no boolean (M15)', () => {
     assertRefused({ as: 'div', children: 'Name' }, '"children" is a slot and takes true or false');
   });
+});
 
-  it('a target outside a Fabricate window (M16)', () => {
-    assertRefused(COLUMN, 'Field needs a Fabricate window ancestor', companionTarget(targets));
+describe('the published Field in a companion’s own shell', () => {
+  it('draws its column inside one standalone style root, a control in its slot is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const { handle, root } = mountField(COLUMN, target);
+    await settle();
+    const column = standaloneRootIn(target).firstElementChild;
+    assert.equal(column.className, 'fabricate-field');
+    const { input } = drawCaptionAndInput(handle.slot('children'));
+    assert.ok(target.querySelector(FOCUSABLE) === input, 'the companion’s input is all it focuses');
+    assert.ok(root().classList.contains('fabricate-standalone-root'), 'the root is the only child');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });

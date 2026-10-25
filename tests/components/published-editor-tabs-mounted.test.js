@@ -1,11 +1,12 @@
 /**
  * The published `EditorTabs` on Fabricate's real Svelte runtime (issue 2601), through a fresh seam
- * registered with the adapter's own table, under the Fabricate window root it needs: the tablist
- * and its native tab buttons, the ids built from `idStem` that a companion's panels answer, each
- * tab named by its `label`, a press and the four keys its group names with the one `id` its
- * `onSelect` takes, focus moved first and the selection drawn only on the companion's `update`,
- * `activePanelOnly`, every refusal the entry adds, what a tab member it does not publish draws
- * (nothing), no listener on the document, and the docs section's worked strip run as written.
+ * registered with the adapter's own table, under a Fabricate window root and the standalone style
+ * root it is drawn under in a companion's own shell (issue 2679): the tablist and its native tab
+ * buttons, the ids built from `idStem` that a companion's panels answer, each tab named by its
+ * `label`, a press and the four keys its group names with the one `id` its `onSelect` takes, focus
+ * moved first and the selection drawn only on the companion's `update`, `activePanelOnly`, every
+ * refusal the entry adds, what a tab member it does not publish draws (nothing), no listener on the
+ * document, and the docs section's worked strip run as written.
  * Limit: happy-dom presses no button on a synthetic Enter or Space keydown, so a press is a
  * `click`, and those keys are asserted unhandled by the strip's own listener.
  */
@@ -31,6 +32,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -157,7 +159,7 @@ describe('the published EditorTabs', () => {
       'activePanelOnly',
     ]);
     assert.deepEqual(described.props.onSelect, { kind: 'callback', required: true });
-    assert.equal(described.root, 'fabricate');
+    assert.equal(described.root, 'any');
     assert.equal(described.overlays, false);
   });
 
@@ -586,14 +588,19 @@ describe('what the published EditorTabs refuses', () => {
       assertRefused(overrides, tail);
     });
   }
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
-    const shell = companionTarget(targets);
-    assert.throws(() => ui().mount('EditorTabs', { target: shell, props: stripProps(() => {}) }), {
-      name: 'TypeError',
-      message: `${REFUSAL}EditorTabs needs a Fabricate window ancestor`,
-    });
-    assert.equal(shell.childNodes.length, 0);
+describe('the published EditorTabs in a companion’s own shell', () => {
+  it('draws its tablist inside one standalone style root, its tab stop is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const handle = ui().mount('EditorTabs', { target, props: stripProps(() => {}) });
+    await settle();
+    const strip = standaloneRootIn(target).firstElementChild;
+    assert.equal(strip.getAttribute('role'), 'tablist');
+    const stop = target.querySelector('[role="tab"][tabindex="0"]');
+    assert.ok(strip.contains(stop), 'target’s tab stop is the strip’s');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });
 

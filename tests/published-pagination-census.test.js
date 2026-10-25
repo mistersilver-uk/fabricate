@@ -26,7 +26,7 @@ import {
   staleAncestors,
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
-import { SHIPPED, byName } from './helpers/publishedComponentGate.js';
+import { SHIPPED, byName, gatedRoot } from './helpers/publishedComponentGate.js';
 
 const COMPONENT = 'src/ui/svelte/components/Pagination.svelte';
 const SHEET = 'styles/fabricate-list-primitives.css';
@@ -112,7 +112,7 @@ describe('the module sheet and every component style against the published Pagin
     );
     const entry = entryNamed('Pagination');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root],
+      [Object.keys(entry.props), gatedRoot(entry)],
       [
         [
           'totalCount',
