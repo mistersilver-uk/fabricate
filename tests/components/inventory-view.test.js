@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import {
+  buildBulkPromptData,
+  waitForPrompt,
+} from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 import {
   CHECK_EVIDENCE_RAW_MODULES,
@@ -33,6 +37,11 @@ import {
 } from '../helpers/foundryBridgeModules.js';
 import { choosePageSize, pageSizeValue, pageSizeValues } from '../helpers/page-size-control.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
+import {
+  ROLL_PROMPT_COMPILED_MODULES,
+  ROLL_PROMPT_PATH,
+  ROLL_PROMPT_RAW_MODULES,
+} from '../helpers/rollPromptHarnessModules.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -46,6 +55,10 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-inventory-view-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The real roll prompt host and its closure, for the bulk prompt's own Escape (issue 2661).
+    'src/ui/theme.js',
+    'src/ui/svelte/apps/crafting/rollPromptHost.js',
+    ...ROLL_PROMPT_RAW_MODULES,
     // The salvage action's state the inspector header and panel share (issue 1518).
     'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
@@ -129,6 +142,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
+    ...ROLL_PROMPT_COMPILED_MODULES,
   ],
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
   // picker, which resolves its portal host by walking up to the nearest Fabricate application
@@ -3845,6 +3859,44 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
 
     assert.deepEqual(calls.bulkClear, [], 'the selection underneath is kept');
     assert.equal(reached, 2, 'the key reaches the modal from the field and from the dialog');
+  });
+
+  it('dismisses the bulk roll prompt once on an Escape on its dialog element and keeps the selection', async () => {
+    const { openRollPromptModal } = await harness.loadRawModule(
+      'src/ui/svelte/apps/crafting/rollPromptHost.js'
+    );
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+    target.querySelector('[data-inventory-bulk-salvage]').focus();
+    const view = buildBulkPromptData({
+      count: 1,
+      subjects: [{ name: 'Ore', need: { kind: 'dc', dc: 18 } }],
+    });
+    const noChoice = { options: [], maxPicks: 1, defaultSelectedIds: [] };
+    const loadComponent = () => harness.loadRuneModule(ROLL_PROMPT_PATH);
+    const pending = waitForPrompt(view, false, noChoice, (data) =>
+      openRollPromptModal(data, { loadComponent })
+    );
+    let dialog = null;
+    for (let attempt = 0; attempt < 20 && !dialog; attempt += 1) {
+      await new Promise((done) => setImmediate(done));
+      dialog = document.querySelector('[data-roll-prompt]');
+    }
+    assert.ok(Boolean(dialog), 'the real bulk roll prompt is open');
+
+    dialog.focus();
+    fire(dialog, 'keydown', { key: 'Escape' });
+
+    assert.deepEqual(await pending, { confirmed: false }, 'the prompt is dismissed');
+    await settle();
+    assert.ok(!document.querySelector('[data-roll-prompt]'), 'and its dialog is gone');
+    assert.deepEqual(calls.bulkClear, [], 'the selection underneath is kept');
   });
 
   it('does NOT arm Escape when the selection is empty', async () => {

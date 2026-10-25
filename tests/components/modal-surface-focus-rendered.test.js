@@ -1,9 +1,10 @@
 /**
  * The shared `Modal`'s dialog element as a focus target (issues 2661, 2662), in a real browser
- * under the real sheet, in the manager and the player-app hosts, with and without `trapFocus`: a
- * press on its surface focuses it with no ring and its resting elevation, a later key draws no
- * ring, Escape is its own, Tab enters it at the close control's ring, and Chromium's accessibility
- * tree names it modal only when it traps focus.
+ * under the real sheet loaded in `layer(modules)` as Foundry loads it, so the component's unlayered
+ * styles outrank it, in the manager and the player-app hosts, with and without `trapFocus`: a press
+ * on its surface focuses it with no ring and its resting elevation, a later key draws no ring,
+ * Escape is its own, Tab and Shift+Tab enter it at a control's ring, its width falls back to 560px,
+ * and Chromium's accessibility tree names it modal only when it traps focus.
  * Limit: Chromium only; Foundry 14's Electron client is not measured here.
  */
 import assert from 'node:assert/strict';
@@ -15,6 +16,7 @@ const fixtureServer = createViteFixtureServer({ styleMountPrefix: '/@overlay-hos
 
 const DIALOG = '[data-manager-modal]';
 const CLOSE = '[data-manager-modal-close]';
+const DONE = '[data-modal-done]';
 
 before(async () => {
   await fixtureServer.start();
@@ -29,17 +31,31 @@ const frames = (page) =>
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
   );
 
-/** The fixture with the dialog open in `host`, `<body data-heard>` recording bubbling window keydowns. */
+/**
+ * The fixture with the dialog open in `host` over the sheet in `layer(modules)`, and
+ * `<body data-heard>` recording bubbling window keydowns.
+ */
 async function openDialog(host, trap) {
   const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(
     fixtureServer.url(
-      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal&trap=${trap ? 1 : 0}`
+      `/tests/fixtures/overlay-host/index.html?host=${host}&component=modal&layer=modules&trap=${trap ? 1 : 0}`
     ),
     { waitUntil: 'load' }
   );
   await page.waitForFunction(() => globalThis.__overlayHostFixtureReady === true);
   await page.waitForSelector(DIALOG);
+  const sheet = await page.evaluate(() => {
+    const imports = [...document.styleSheets]
+      .flatMap((entry) => [...entry.cssRules])
+      .filter((rule) => rule instanceof CSSImportRule && rule.href.endsWith('fabricate.css'));
+    return {
+      flat: Boolean(document.querySelector('link[href$="fabricate.css"]')),
+      layers: imports.map((rule) => rule.layerName),
+      loaded: imports.every((rule) => rule.styleSheet.cssRules.length > 0),
+    };
+  });
+  assert.deepEqual(sheet, { flat: false, layers: ['modules'], loaded: true });
   await page.evaluate(() => {
     document.body.dataset.heard = '';
     globalThis.addEventListener('keydown', (event) => {
@@ -70,6 +86,13 @@ async function pressHeaderBand(page) {
   await frames(page);
 }
 
+/** A real pointer press at a point inside the footer band, left of its button. */
+async function pressFooterBand(page) {
+  const band = await page.locator('.manager-modal-footer').boundingBox();
+  await page.mouse.click(band.x + 10, band.y + band.height / 2);
+  await frames(page);
+}
+
 /** A real pointer press on the body text. */
 async function pressBodyText(page) {
   await page.locator('[data-modal-text]').click();
@@ -95,6 +118,7 @@ for (const host of ['manager', 'app']) {
       for (const [label, pressSurface] of [
         ['the header band', pressHeaderBand],
         ['the body text', pressBodyText],
+        ['the footer band', pressFooterBand],
       ]) {
         it(`focuses the dialog on a press on ${label}, with no ring and its resting elevation, also after a key and before one`, async () => {
           const page = await openDialog(host, trap);
@@ -116,6 +140,7 @@ for (const host of ['manager', 'app']) {
             await frames(page);
             const keyed = await dialogState(page);
             assert.equal(keyed.focused, true, 'focus stays on the dialog');
+            assert.equal(keyed.focusVisible, true, 'the key makes its focus keyboard-visible');
             assert.equal(keyed.boxShadow, rest.boxShadow, 'a later key keeps the elevation');
             assert.equal(keyed.outline, 'none', 'and draws no ring');
           } finally {
@@ -138,22 +163,37 @@ for (const host of ['manager', 'app']) {
         }
       });
 
-      it('moves focus from the dialog to the close control on Tab, with its 2px ring', async () => {
+      for (const [key, control, label] of [
+        ['Tab', CLOSE, 'the close control'],
+        ['Shift+Tab', DONE, 'the last control'],
+      ]) {
+        it(`moves focus from the dialog to ${label} on ${key}, with its 2px ring`, async () => {
+          const page = await openDialog(host, trap);
+          try {
+            await pressHeaderBand(page);
+            await page.keyboard.press(key);
+            await frames(page);
+            const ring = await page.evaluate((selector) => {
+              const target = document.querySelector(selector);
+              const style = getComputedStyle(target);
+              return {
+                focused: document.activeElement === target,
+                focusVisible: target.matches(':focus-visible'),
+                outline: `${style.outlineWidth} ${style.outlineStyle}`,
+              };
+            }, control);
+            assert.deepEqual(ring, { focused: true, focusVisible: true, outline: '2px solid' });
+          } finally {
+            await page.close();
+          }
+        });
+      }
+
+      it('keeps the 560px fallback width with no width prop', async () => {
         const page = await openDialog(host, trap);
         try {
-          await pressHeaderBand(page);
-          await page.keyboard.press('Tab');
-          await frames(page);
-          const ring = await page.evaluate((selector) => {
-            const close = document.querySelector(selector);
-            const style = getComputedStyle(close);
-            return {
-              focused: document.activeElement === close,
-              focusVisible: close.matches(':focus-visible'),
-              outline: `${style.outlineWidth} ${style.outlineStyle}`,
-            };
-          }, CLOSE);
-          assert.deepEqual(ring, { focused: true, focusVisible: true, outline: '2px solid' });
+          const box = await page.locator(DIALOG).boundingBox();
+          assert.equal(box.width, 560);
         } finally {
           await page.close();
         }

@@ -64,6 +64,27 @@ function dispatchWithWindowListener(element, event) {
   return seen;
 }
 
+/**
+ * Dispatches `event` on `element` with a bubbling `keydown` listener on each of `nodes`, each
+ * `[name, node]`, and returns the names that heard it.
+ */
+function dispatchHeard(element, event, nodes) {
+  const heard = [];
+  const stops = nodes.map(([name, node]) => {
+    const listen = () => {
+      heard.push(name);
+    };
+    node.addEventListener('keydown', listen);
+    return () => node.removeEventListener('keydown', listen);
+  });
+  try {
+    element.dispatchEvent(event);
+  } finally {
+    for (const stop of stops) stop();
+  }
+  return heard;
+}
+
 const q = (selector) => document.querySelector(selector);
 
 const press = () => new document.defaultView.MouseEvent('mousedown', { bubbles: true });
@@ -446,13 +467,18 @@ for (const trapFocus of [false, true]) {
       assert.ok(document.activeElement === dialog, 'the dialog takes focus');
     });
 
-    it('closes once on an Escape on the dialog element, claims it and keeps it from the window', async () => {
+    it('closes once on an Escape on the dialog element, claims it and keeps it from above the host', async () => {
       const { dialog, calls } = await focusedDialog();
+      const host = dialog.parentElement;
       const event = escape();
-      const seen = dispatchWithWindowListener(dialog, event);
+      const heard = dispatchHeard(dialog, event, [
+        ['host', host],
+        ['above', host.parentElement],
+        ['window', document.defaultView],
+      ]);
       assert.equal(calls.length, 1, 'onClose is called once');
       assert.equal(event.defaultPrevented, true);
-      assert.deepEqual(seen, [], 'no bubbling keydown listener on the window hears it');
+      assert.deepEqual(heard, [], 'no bubbling keydown listener on the host or above hears it');
     });
 
     for (const [label, shiftKey, hook] of [

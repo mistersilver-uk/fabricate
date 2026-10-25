@@ -19,6 +19,25 @@ const componentKind = params.get('component') ?? 'popover';
 const frameLeft = Number(params.get('frameLeft') ?? 220);
 const frameTop = Number(params.get('frameTop') ?? 140);
 
+/**
+ * Swap the flat module sheet for an `@import` into the cascade layer `layer`, as Foundry loads a
+ * module's styles in `layer(modules)`, so an unlayered component style outranks every rule in it.
+ *
+ * @param {string} layer The cascade layer's name.
+ */
+async function loadSheetInLayer(layer) {
+  const flat = document.querySelector('link[href$="fabricate.css"]');
+  const layered = document.createElement('style');
+  layered.textContent = `@import url('${new URL(flat.href).pathname}') layer(${layer});`;
+  const loaded = new Promise((resolve, reject) => {
+    layered.addEventListener('load', resolve, { once: true });
+    layered.addEventListener('error', reject, { once: true });
+  });
+  document.head.append(layered);
+  await loaded;
+  flat.remove();
+}
+
 function element(tag, className, styles) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -227,6 +246,9 @@ const COMPONENTS = {
     },
   ],
 };
+
+// `?layer=<name>` measures the product cascade rather than the flat sheet.
+if (params.get('layer')) await loadSheetInLayer(params.get('layer'));
 
 const [Component, props] = COMPONENTS[componentKind] ?? COMPONENTS.popover;
 mount(Component, { target: mountPoint, props });
