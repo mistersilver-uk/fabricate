@@ -3,7 +3,7 @@
  * three selectors that name its root, `fabricate-modal`, which are Well's modal-fill rule, the roll
  * prompt's height rule, which no published dialog matches, and Modal's own close-control paint;
  * the module sheet's `.manager-muted` rules that can restyle the subtitle; the close control's
- * module ring; and the header band's inks, the subtitle's pinned shortfall for shortfall.
+ * module ring; and the header band's inks.
  * Limit: the census shares `published-component-manifest.test.js`'s sheet-reach limits.
  */
 import assert from 'node:assert/strict';
@@ -18,7 +18,12 @@ import {
   importClosure,
 } from './helpers/publishedComponentGate.js';
 import { collectStyleCorpus, rulesIn, splitSelectorList } from './helpers/styleBlockScan.js';
-import { propertiesOf, shortfalls, themePalettes } from './helpers/themePaletteContrast.js';
+import {
+  declaredToken,
+  propertiesOf,
+  shortfalls,
+  themePalettes,
+} from './helpers/themePaletteContrast.js';
 
 const COMPONENT = 'src/ui/svelte/components/Modal.svelte';
 const WELL = 'src/ui/svelte/components/Well.svelte';
@@ -176,18 +181,14 @@ describe('the inks on the published Modal’s header band', () => {
     assert.deepEqual(shortfalls(themes, '--fab-text-muted', ['--fab-bg-2'], 3), []);
   });
 
-  it('clears 4.5:1 for the subtitle’s Manager ink on the header band in every palette', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-text-muted', ['--fab-bg-2']), []);
-  });
-
-  it('falls short of 4.5:1 for the subtitle’s own ink on the header band in six palettes, recorded and not fixed', () => {
-    assert.deepEqual(shortfalls(themes, '--fab-text-subtle', ['--fab-bg-2']), [
-      'fabricate: --fab-text-subtle on --fab-bg-2 3.54:1',
-      'ironblood-forge: --fab-text-subtle on --fab-bg-2 3.34:1',
-      'hearth-herb: --fab-text-subtle on --fab-bg-2 3.40:1',
-      'starglass-arcana: --fab-text-subtle on --fab-bg-2 3.48:1',
-      'foundry-native: --fab-text-subtle on --fab-bg-2 3.47:1',
-      'sovereign: --fab-text-subtle on --fab-bg-2 3.78:1',
-    ]);
+  it('clears 4.5:1 for the subtitle on the header band in every palette', () => {
+    const ink = declaredToken(
+      rulesIn(collectStyleCorpus()[COMPONENT]),
+      '.manager-modal-subtitle',
+      'color',
+      COMPONENT
+    );
+    assert.equal(ink, '--fab-text-muted');
+    assert.deepEqual(shortfalls(themes, ink, ['--fab-bg-2']), []);
   });
 });

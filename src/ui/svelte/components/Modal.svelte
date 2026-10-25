@@ -338,7 +338,7 @@
 
   .manager-modal-subtitle {
     margin: 1px 0 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     font-weight: 500;
     line-height: normal;
