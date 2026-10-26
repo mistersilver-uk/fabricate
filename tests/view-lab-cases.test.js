@@ -64,6 +64,7 @@ import {
   buildChecksNavItems,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+import { ACTION_TONES, managerHeaderActionClass } from '../src/ui/managerExtensions.js';
 import { PUBLISHED_COMPONENT_MANIFEST } from '../src/ui/publishedComponentManifest.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -2598,6 +2599,40 @@ test('the issue-id and manager-view predicates reject a value nothing declares',
   assert.equal(isDeclaredIssueId('noName'), true);
   assert.equal(buildExpectViewPredicate().accepts('neverEver'), false);
   assert.equal(buildExpectViewPredicate().accepts('components'), true);
+});
+
+test('every header-action class pin equals a class managerHeaderActionClass can produce', () => {
+  const producible = new Set(ACTION_TONES.map((tone) => managerHeaderActionClass({ tone })));
+  const pins = VIEW_LAB_CASES.flatMap((viewCase) =>
+    (viewCase.expectAttributes ?? [])
+      .filter((pin) => pin.name === 'class' && pin.selector.includes('[data-manager-header-action'))
+      .map((pin) => ({ id: viewCase.id, selector: pin.selector, value: pin.value }))
+  );
+  assert.ok(pins.length >= 3, `only ${pins.length} header-action class pins found`);
+  assert.deepEqual(
+    pins.filter((pin) => !producible.has(pin.value)),
+    [],
+    'these pins are no class string managerHeaderActionClass produces for any ACTION_TONES member'
+  );
+
+  // Membership alone would pass a swap, so each companion action is pinned to its own tone.
+  const chrome = getCaseById('manager-world-downtime-test-companion-chrome');
+  const tonesBySelector = {
+    '[data-manager-header-action="lab-back"]': 'ghost',
+    '[data-manager-header-action="lab-delete"]': 'danger',
+    '[data-manager-header-action="lab-save"]': 'primary',
+  };
+  for (const [selector, tone] of Object.entries(tonesBySelector)) {
+    const pin = chrome.expectAttributes.find(
+      (entry) => entry.name === 'class' && entry.selector === selector
+    );
+    assert.ok(Boolean(pin), `${selector} no longer pins a class`);
+    assert.equal(
+      pin.value,
+      managerHeaderActionClass({ tone }),
+      `${selector} is not the ${tone} tone`
+    );
+  }
 });
 
 test('the hooks the capture driver hard-codes still exist in the UI', () => {
