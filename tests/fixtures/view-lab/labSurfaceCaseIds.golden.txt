@@ -65,6 +65,9 @@ manager-published-action-menu-specimen
 manager-published-action-menu-choice
 manager-published-modal-specimen
 manager-published-modal-close
+published-standalone
+published-standalone-light
+published-standalone-in-window
 player-gathering-environments
 fabricate-app-shell
 player-inventory

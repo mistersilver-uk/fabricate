@@ -1,6 +1,7 @@
 /**
  * The primitives published through `game.fabricate.api.ui`, in publication order: each entry is a
- * frozen `{ name, path, version, props, rest, root, restOn?, tooltip?, overlays?, lazy? }`,
+ * frozen `{ name, path, version, props, rest, root, restOn?, tooltip?, overlays?, lazy?,
+ * standaloneRoot? }`,
  * appended and never interleaved, and a breaking change to one bumps its own `version` (issue
  * 2426). A prop is `{ kind, required?, requiredWhen?, element?, args? }`, its kind `'data' |
  * 'text' | 'slot' | 'callback' | 'aria'`:
@@ -16,7 +17,9 @@
  * on that control with the rest keys (issue 2452). `overlays: true` marks an entry that opens an
  * overlay, which the seam hosts by its mount's `overlayHost` chain; absent, it opens none (issue
  * 2454). `lazy: true` marks an entry whose code `load` fetches, which no entry before `Kicker` may
- * state (issue 2455).
+ * state (issue 2455). `standaloneRoot: true`, on an `'any'` entry alone, marks one the seam draws
+ * under the standalone style root in a target with no Fabricate root; `describe` leaves it out
+ * (issue 2456).
  */
 export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
   Object.freeze({
@@ -178,7 +181,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       children: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'EmptyState',
@@ -226,7 +230,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       'aria-describedby': Object.freeze({ kind: 'aria' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     restOn: 'control',
   }),
   Object.freeze({
@@ -241,7 +246,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       'aria-describedby': Object.freeze({ kind: 'aria' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     restOn: 'control',
   }),
   Object.freeze({
@@ -259,7 +265,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       onChange: Object.freeze({ kind: 'callback', required: true, args: 1 }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'SearchField',
@@ -271,7 +278,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       ariaLabel: Object.freeze({ kind: 'data', required: true }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Select',
@@ -311,7 +319,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       children: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Well',
@@ -322,7 +331,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       children: Object.freeze({ kind: 'slot' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Callout',
@@ -353,7 +363,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       'aria-expanded': Object.freeze({ kind: 'aria' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
     restOn: 'control',
     tooltip: true,
   }),
@@ -370,7 +381,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       activePanelOnly: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'RadioCardGroup',
@@ -387,7 +399,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       disabledOptions: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'SegmentedControl',
@@ -402,7 +415,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: true,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'Pagination',
@@ -426,7 +440,8 @@ export const PUBLISHED_COMPONENT_MANIFEST = Object.freeze([
       density: Object.freeze({ kind: 'data' }),
     }),
     rest: false,
-    root: 'fabricate',
+    root: 'any',
+    standaloneRoot: true,
   }),
   Object.freeze({
     name: 'IconPicker',

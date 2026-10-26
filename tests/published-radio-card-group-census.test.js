@@ -32,6 +32,7 @@ import {
   SHIPPED,
   byName,
   everyStylesheet,
+  gatedRoot,
   selectorsNaming,
   writtenSelector,
 } from './helpers/publishedComponentGate.js';
@@ -101,7 +102,7 @@ describe('the module sheet and every component style against the published Radio
     );
     const entry = entryNamed('RadioCardGroup');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root],
+      [Object.keys(entry.props), gatedRoot(entry)],
       [
         [
           'options',

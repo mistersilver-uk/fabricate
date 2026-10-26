@@ -66,6 +66,7 @@ import {
   everyStylesheet,
   focusableElements,
   followedProps,
+  gatedRoot,
   importClosure,
   isComponent,
   isControlTag,
@@ -137,6 +138,8 @@ const FOCUSABLE_REACH = Object.freeze({
   // One tab button for each item of `tabs`.
   'src/ui/svelte/components/EditorTabs.svelte: button': 'tabs',
   'src/ui/svelte/components/IconButton.svelte: button': 'always',
+  // The dialog element, a `tabindex="-1"` target drawn while `open` (issue 2661).
+  'src/ui/svelte/components/Modal.svelte: div[data-manager-modal]': 'open',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-action]': 'action',
   'src/ui/svelte/components/Notice.svelte: button[data-notice-dismiss]': 'dismissable',
   // One radio for each item of `options`.
@@ -897,14 +900,15 @@ function pairFaults(id, strip, mark) {
 }
 
 /**
- * What a reached control's focus mark breaks. At `any`, its file holds one `:focus` rule declaring
- * exactly `outline: none` and `box-shadow: none`, then one `:focus-visible` rule drawing the module
- * ring, each outside any at-rule, on a subject made only of the element's static classes, the
- * first naming no more of them than the second. At another root the module ring names each tag it
- * can draw as a control, every tag where it states `tabindex`, or an attribute it states.
+ * What a reached control's focus mark breaks, at the root `gatedRoot` judges. At `any`, its file
+ * holds one `:focus` rule declaring exactly `outline: none` and `box-shadow: none`, then one
+ * `:focus-visible` rule drawing the module ring, each outside any at-rule, on a subject made only
+ * of the element's static classes, the first naming no more of them than the second. At another
+ * root the module ring names each tag it can draw as a control, every tag where it states
+ * `tabindex`, or an attribute it states.
  */
 function focusMarkFaults({ id, node, tags, ast, entry }, moduleRule = moduleRing()) {
-  if (entry.root !== 'any') {
+  if (gatedRoot(entry) !== 'any') {
     if (moduleRule.attributes.some((name) => attributeOf(node, name))) return [];
     const every = Boolean(attributeOf(node, 'tabindex'));
     return tags
@@ -1338,14 +1342,14 @@ const onlyOn = (rule, classes) =>
  * states a `style:` directive or a `style` attribute the drawn closure does not hold falsy. A rule `rings` pins for its file is exempt as
  * `scopedRingFaults` judges it, so is one whose every selector names a class `unreachedClasses`
  * answers, and so is every rule holding no `:global` in a file the drawn closure does not reach.
- * Vacuous for a closure that draws no reached control, and at `any` but for a pin, which that
- * root never takes.
+ * Vacuous for a closure that draws no reached control, and at `any`, the root `gatedRoot` judges,
+ * but for a pin, which that root never takes.
  */
 function focusRuleFaults(entry, controls, pins, reader, rings = SCOPED_RINGS) {
   const drawn = drawnClosure(entry, reader);
   const components = [...importClosure(entry.path, reader)].filter((file) => isComponent(file));
   const reached = controls.filter((control) => isReached(control, pins));
-  if (entry.root === 'any') {
+  if (gatedRoot(entry) === 'any') {
     return components
       .filter((file) => Object.hasOwn(rings, file))
       .map((file) => `${file} pins a scoped ring under an entry whose root is any`);

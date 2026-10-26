@@ -241,12 +241,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one;
   // the outcome tiers' Failure row is its formatted null endpoint (issue 2357). Then the two
-  // specimens that mount it through the published seam (issue 2452).
+  // specimens that mount it through the published seam (issue 2452), and the three that mount it
+  // with and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/Stepper.svelte': Object.freeze([
     'manager-gathering-economy-actors',
     'manager-checks-parity-outcomes-multiply',
     'manager-published-steppers-specimen',
     'manager-published-steppers-button-focus',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
@@ -258,7 +262,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per
-  // state. Then the three specimens that mount it through the published seam (issue 2452).
+  // state. Then the three specimens that mount it through the published seam (issue 2452), and the
+  // three that mount it with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
     'coverage-mode-routed-check-checks',
@@ -266,6 +271,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
     'manager-published-toggles-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The range bar's marker (issue 2431), drawn only by the time-of-day bar: its clock line and dot.
   'src/ui/svelte/components/RangeBarMarker.svelte': Object.freeze([
@@ -279,8 +287,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-time-of-day-bar',
   ]),
   // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame,
-  // plus the captions issue 2532's kicker reaches, two scoped captions it must leave alone, and the
-  // specimen that mounts it through the published seam (issue 2601).
+  // plus the captions issue 2532's kicker reaches, two scoped captions it must leave alone, the
+  // specimen that mounts it through the published seam (issue 2601), and the three that mount it
+  // with and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
@@ -295,14 +304,21 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-roll-prompt-basic',
     'manager-import-folder-mapping',
     'manager-published-field-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches
   // only its neutral state, so the specimen that mounts it through the published seam (issue 2601)
-  // shows every role, the two compact sizes and the keyboard-focused ghost-danger.
+  // shows every role, the two compact sizes and the keyboard-focused ghost-danger. Then the three
+  // that mount it with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
     'manager-published-icon-buttons-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections: the
   // pane host, the gathering panel, and the three hosts that pad their own content (issue 2546).
@@ -315,8 +331,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-vocabulary',
   ]),
   // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
-  // Tools library card, the compact form in the task editor and the entry systems card, and the
-  // specimen that mounts it through the published seam (issue 2453).
+  // Tools library card, the compact form in the task editor and the entry systems card, the
+  // specimen that mounts it through the published seam (issue 2453), and the three that mount it
+  // with and without a Fabricate root above its target (issue 2679).
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
@@ -329,9 +346,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-01-library-1280x720',
     'world-component-entry-systems',
     'manager-published-search-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The card shell (issue 1427), extracted from 80 hand-written inspector-card sections, and the
-  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card.
+  // tool and travel inspectors whose cards issue 2315 moved off a pane-sized card. Then the three
+  // specimens that mount it with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
@@ -340,6 +361,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-world-travel-realms-normal',
     'manager-world-travel-map-normal',
     'manager-world-travel-map-empty',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
@@ -372,8 +396,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-validation',
     'player-salvage',
     'player-gathering-events',
-    // The strip mounted through the published seam, keyboard-selected (issue 2601).
+    // The strip mounted through the published seam, keyboard-selected (issue 2601), and the three
+    // that mount it with and without a Fabricate root above its target (issue 2679).
     'manager-published-tabs-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
@@ -460,8 +488,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-crafting-settings',
     'manager-checks-crafting-modifiers',
     'fabricate-journal-lifecycle-ingredient-route',
-    // The group mounted through the published seam, keyboard-chosen (issue 2601).
+    // The group mounted through the published seam, keyboard-chosen (issue 2601), and the three
+    // that mount it with and without a Fabricate root above its target (issue 2679).
     'manager-published-option-cards-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze([
@@ -684,12 +716,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
   // the roll prompt's additional-dice control, and the specimen that mounts it through the
-  // published seam (issue 2601).
+  // published seam (issue 2601), and the three that mount it with and without a Fabricate root
+  // above its target (issue 2456).
   'src/ui/svelte/components/Well.svelte': Object.freeze([
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
     'manager-published-well-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
   'src/ui/svelte/components/Chip.svelte': Object.freeze([
@@ -697,13 +733,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
   ]),
   // The player window draws it in the journal's run action bar: the primary, then the danger and
-  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452).
+  // neutral pair. Then the three specimens that mount it through the published seam (issue 2452),
+  // and the three that mount it with and without a Fabricate root above its target (issue 2456).
   'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
     'manager-published-leaves-specimen',
     'manager-published-controls-specimen',
     'manager-published-buttons-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The arm-then-confirm control (issue 2563): the three bulk-delete cards and a knowledge row, armed.
   'src/ui/svelte/components/ArmedDangerButton.svelte': Object.freeze([
@@ -722,6 +762,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The pager mounted through the published seam: a keyboard page turn and a size choice (issue 2646).
     'manager-published-pagination-specimen',
     'manager-published-pagination-size-specimen',
+    // The three that mount it with and without a Fabricate root above its target (issue 2679).
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
   // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
@@ -737,8 +781,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
     'manager-recipe-edit-results-rolled',
     'player-journal-stacked',
-    // The control mounted through the published seam, keyboard-chosen (issue 2644).
+    // The control mounted through the published seam, keyboard-chosen (issue 2644), and the three
+    // that mount it with and without a Fabricate root above its target (issue 2679).
     'manager-published-segmented-specimen',
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
   ]),
   // The expression field (issue 2465): the cases that draw it, in a shell, an amount box and the baseline.
   'src/ui/svelte/components/RollDataExpressionInput.svelte': Object.freeze([

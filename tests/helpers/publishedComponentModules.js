@@ -26,6 +26,7 @@ export const PUBLISHED_RAW_MODULES = Object.freeze([
   'src/ui/publishedComponentValues.js',
   'src/ui/publishedComponentManifest.js',
   'src/ui/publishedComponentOverlays.js',
+  'src/ui/publishedComponentStandaloneRoot.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/theme.js',
   'src/ui/svelte/util/dropRateTier.js',
@@ -104,6 +105,15 @@ export function companionTarget(shells) {
   const target = fabricateTarget(shells, 'companion-sheet');
   assert.ok(!target.closest('.fabricate, .fabricate-app, .fabricate-manager'), 'no app root');
   return target;
+}
+
+/** The standalone style root a mount wrote in `target`, asserted the only element there (issue 2456). */
+export function standaloneRootIn(target) {
+  assert.equal(target.children.length, 1, 'one element in target');
+  const root = target.firstElementChild;
+  assert.equal(root.className, 'fabricate fabricate-standalone-root');
+  assert.equal(root.style.display, 'contents');
+  return root;
 }
 
 /** Runs `run` with `css` in the document and a theme named on its root, then removes both. */

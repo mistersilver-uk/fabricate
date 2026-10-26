@@ -17,6 +17,14 @@ import { chromium } from 'playwright';
 
 import { specificityOf } from '../../scripts/lib/stylesheetSelectorCensus.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
+import {
+  CARD_COMPARED,
+  COMPARED,
+  TOGGLE_COMPARED,
+  TOGGLE_KNOB_COMPARED,
+  TOGGLE_LABEL_COMPARED,
+  TOGGLE_TRACK_COMPARED,
+} from '../fixtures/published-components/comparedProperties.js';
 import { classesNotWritten } from '../helpers/optionCardsMarkup.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -640,16 +648,6 @@ function specificity(selectorText) {
   return new Set(each).size === 1 ? each[0] : each.join(' | ');
 }
 
-/** The six properties acceptance 2 compares, computed, per control, across the three hosts. */
-const COMPARED = Object.freeze([
-  'min-height',
-  'border-radius',
-  'box-sizing',
-  'line-height',
-  'font-family',
-  'font-size',
-]);
-
 /** What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`. */
 const FIELD_COMPARED = Object.freeze([
   'appearance',
@@ -706,73 +704,6 @@ const TOOLBAR_COMPARED = Object.freeze([
   'font-family',
   'font-size',
   'line-height',
-]);
-
-/** And on the card's own `<section>` — the padding, the hairline border on ALL four edges. */
-const CARD_COMPARED = Object.freeze([
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-  'border-top-width',
-  'border-top-style',
-  'border-top-color',
-  'border-radius',
-  'background-color',
-  'display',
-  'flex-direction',
-  'gap',
-  'min-height',
-  'font-family',
-  'font-size',
-  'line-height',
-]);
-
-/** What acceptance 2 compares on the switch itself — its root `<button>`, which IS the control. */
-const TOGGLE_COMPARED = Object.freeze([
-  'max-width',
-  'height',
-  'border-radius',
-  'border-top-width',
-  'border-top-style',
-  'display',
-  'align-items',
-  'gap',
-  'font-family',
-  'font-size',
-  'line-height',
-]);
-
-/** The 38x22 rail and the 18x18 knob, which is the geometry the switch is recognisable by. */
-const TOGGLE_TRACK_COMPARED = Object.freeze([
-  'width',
-  'height',
-  'border-radius',
-  'border-top-width',
-  'border-top-style',
-  'border-top-color',
-  'background-color',
-  'background-clip',
-  'box-sizing',
-  'padding-top',
-  'display',
-  'align-items',
-]);
-const TOGGLE_KNOB_COMPARED = Object.freeze([
-  'width',
-  'height',
-  'border-radius',
-  'background-color',
-  'display',
-  'margin-left',
-]);
-/** The reading beside the rail, whose type is the family's own at (0,2,0). */
-const TOGGLE_LABEL_COMPARED = Object.freeze([
-  'font-size',
-  'font-weight',
-  'line-height',
-  'overflow',
-  'text-overflow',
 ]);
 
 /** What acceptance 2 compares on the slider's two INPUTS, which are the controls it owns. */

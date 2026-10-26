@@ -224,6 +224,12 @@
   color-scheme: dark;
 }
 
+/* The standalone style root (`publishedComponentStandaloneRoot.js`): the display: contents element a published component is drawn in where its target has no Fabricate root. It states the Fabricate window's ink and dark scheme and paints no ground, so the companion supplies one. */
+.fabricate.fabricate-standalone-root {
+  color: var(--fab-text);
+  color-scheme: dark;
+}
+
 /* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed: (1) description, (2) I/O + steps readout, (3) check pill — and NEVER the lock, enable or edit controls (issue 1010). */
 @container fabricate-recipes (max-width: 714px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-description {
