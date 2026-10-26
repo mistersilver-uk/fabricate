@@ -1141,11 +1141,11 @@ function heldInventoryCases() {
           worldAt(context, { recipes: hydrateRecipes(context.modules, context.fixture.recipes) }),
         craftingDescription:
           'The player crafting SUMMARY phase at this inventory size — the corpus-wide browse ' +
-          'half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying ' +
+          'half only (issue 1075). Corpus pinned at 6 recipes so the ONLY thing varying ' +
           'across the series is held-stack count. The detail phase a real app open also runs ' +
           'is measured on the component-library axis instead (issue 1204).',
         inventoryDescription:
-          'The Inventory tab open at this inventory size, same pinned 20-row corpus.',
+          'The Inventory tab open at this inventory size, same pinned 6-recipe corpus.',
       }),
     ];
   });

@@ -449,7 +449,7 @@ export const SCALE_PROFILES = Object.freeze({
     description:
       'THE INVENTORY AXIS. 100 / 500 / 1,000 held stacks (70% resolving to NO component) across ' +
       'one crafting actor and 2 source actors, against a 5,000-component library and a pinned ' +
-      '20-recipe corpus.',
+      '6-recipe corpus.',
     construction: 'literal payloads',
     requiresNodeModules: false,
     ceiling:
