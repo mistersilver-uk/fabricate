@@ -1,7 +1,7 @@
 /**
  * Pins the observable revision, attribution and reload-delta behaviour of both crafting-data
  * managers (issue 1694), so the same assertions prove the `RevisionBookkeeping` extraction
- * changed nothing. Authored against the unchanged managers and unmodified afterwards.
+ * changed nothing. Authored against the unchanged managers; later edits only add pins.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -18,6 +18,7 @@ import {
   SYS_A,
   SYS_B,
   twoSystemWorld,
+  withdrawableSnapshot,
   withRecipe,
   withSystem,
 } from '../helpers/scopedInvalidationWorld.js';
@@ -85,12 +86,6 @@ const announcements = (calls) =>
 
 /** A recipe no fixture holds, born disabled so the alchemy signature gate is not the subject. */
 const newRecipe = () => persistedRecipe('r-new', SYS_A, `${SYS_A}-c0`, { enabled: false });
-
-/** A repository seam whose replicated snapshot a test can withdraw between two reloads. */
-function withdrawable(records) {
-  const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
-  return seam;
-}
 
 describe('CraftingSystemManager save advances exactly the scopes its change names', () => {
   it('advances every stored system for the whole-corpus save, which names nothing', async () => {
@@ -325,7 +320,7 @@ describe('the reload delta is one-shot', () => {
 
   it('leaves nothing readable when the reload reads no snapshot at all', () => {
     twoSystemWorld();
-    const seam = withdrawable([{ id: SYS_A, name: 'A' }]);
+    const seam = withdrawableSnapshot([{ id: SYS_A, name: 'A' }]);
     const systemManager = new CraftingSystemManager(new RecipeManager(), { repository: seam });
 
     assert.equal(systemManager.reload(), true);
