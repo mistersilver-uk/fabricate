@@ -2812,14 +2812,16 @@ const select = fabUi.mount('Select', { target, props: props() });
 `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
 A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
 So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
-`valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too; a stage whose `valueText` is absent or `''` announces its percentage.
+`valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so state the percentage in it too.
+A stage whose `valueText` is absent, `''` or not a string announces its percentage.
 Pass a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
 A Fabricate that predates `valueText` ignores it and announces the percentage.
 A member other than `name`, `label`, `valueText` and `value` is private, `id` among them, and an empty `stages` draws the named group with no bar.
 `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
 `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
 A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so keep each name short.
-Each caption carries its stage's `name` as its native tooltip (`title`), so a name the ellipsis cuts is shown whole under the pointer; a caption with no `name` carries none.
+Each caption carries its stage's `name` as its native tooltip (`title`), so a name the ellipsis cuts is shown whole under the pointer.
+A caption with no `name` carries none.
 `ariaLabel` is required and names the group, final display text, as "Forging progress".
 It also names the one bar of a one-stage list whose stage has no label or name.
 Rest `data-*` attributes land on the group root.

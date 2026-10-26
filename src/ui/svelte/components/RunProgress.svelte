@@ -1,7 +1,8 @@
 <!-- Run progress presents caller-supplied stage and time state without advancing execution: a run
      heading over `StageBars`, which names its group by the kicker when one is drawn and by
      `ariaLabel` otherwise. An unnamed stage of several is labelled "Stage n of m", a named one reads
-     "p%, stage n of m" as its bar's `valueText`, and a lone one takes the group's name. -->
+     "p%, stage n of m" as its bar's `valueText` with p the whole percent truncated, so an unfinished
+     stage never reads 100%, and a lone one takes the group's name. -->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import Kicker from './Kicker.svelte';
