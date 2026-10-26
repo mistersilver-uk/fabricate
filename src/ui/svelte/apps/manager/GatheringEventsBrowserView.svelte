@@ -540,11 +540,11 @@
                   'FABRICATE.Admin.Manager.Environment.Events.ToggleNamed',
                   'Toggle {name}'
                 ).replace('{name}', eventName(event))}
-                onclick={(event) => {
-                  event.stopPropagation();
+                onclick={(domEvent) => {
+                  domEvent.stopPropagation();
                   onToggleEventEnabled(selectedSystemId, event.id, event.enabled === false);
                 }}
-                onkeydown={(event) => event.stopPropagation()}
+                onkeydown={(domEvent) => domEvent.stopPropagation()}
               />
             </span>
             <span
