@@ -1138,7 +1138,7 @@ for (const [name, scenario] of [
     const at = journal.findIndex(([call]) => call === `run.${name}`);
     const returned = journal.find(([call]) => call === 'returned')[1];
 
-    assert.ok(at >= 0, `the ${name} call was reached`);
+    assert.ok(at !== -1, `the ${name} call was reached`);
     assert.ok(Object.hasOwn(returned, 'salvageRun') && returned.salvageRun === null, 'the run is nulled');
     assert.deepEqual(
       journal.slice(at + 1).filter(([call]) => call.startsWith('run.') && call !== 'run.canProceedTimeGate'),

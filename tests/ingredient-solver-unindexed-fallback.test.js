@@ -4,8 +4,8 @@
  * are reachable only by calling the modules directly. Each must answer exactly what the indexed
  * branch answers, while consulting the probe or matcher the index would have made unnecessary.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 const { buildPassIndexDefault } = await import('../src/models/ingredientAssignment.js');
 const { buildEssenceIndex, essenceBlockMember, resolveEssenceBlock } =

@@ -4,8 +4,8 @@
  * source they do not own is refused with the owner message instead of a Foundry permission throw.
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { createFabricateFacadeHarness, makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
 

@@ -824,7 +824,7 @@ function setupValidateAndGrant({
   globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
   globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => canControlActor } : null) };
 
-  const behavior = interactableBehavior({ system, tokens, ...(testPoint !== undefined ? { testPoint } : {}) });
+  const behavior = interactableBehavior({ system, tokens, ...(testPoint === undefined ? {} : { testPoint }) });
   const region = behavior.parent;
   const scene = region.parent;
   globalThis.game.scenes = { get: (id) => (id === 'scene-1' ? scene : null) };
