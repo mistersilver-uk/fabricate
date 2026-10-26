@@ -178,12 +178,14 @@ test('recipeLostItsShape reads STEP sets and results, not only the recipe-level 
 function stepOf(id, { option = 'tin', result = 'bar' } = {}) {
   return {
     id,
-    ingredientSets: [{ id: `${id}-set`, ingredientGroups: [{ options: [{ componentId: option }] }] }],
+    ingredientSets: [
+      { id: `${id}-set`, ingredientGroups: [{ options: [{ componentId: option }] }] },
+    ],
     resultGroups: [{ id: `${id}-rg`, results: [{ componentId: result }] }],
   };
 }
 
-test('a cascade that empties ONE step of a multi-step recipe clamps the whole recipe', () => {
+test('a cascade that empties one step of a multi-step recipe clamps the whole recipe', () => {
   const threeStep = {
     id: 'r-three',
     craftingSystemId: 'sys',

@@ -744,13 +744,17 @@ test('1129: a converted multi-step recipe left with no executable path is DISABL
 });
 
 
-test('1910: a three-step recipe left with one empty step is DISABLED by the component delete', async () => {
+test('1910: a three-step recipe left with one empty step is disabled by the component delete', async () => {
   notifications.length = 0;
   const recipeManager = makeRecipeManager();
   const step = (id, result) => ({
     id,
     ingredientSets: [
-      { id: `${id}-set`, essences: {}, ingredientGroups: [{ id: `${id}-g`, options: [{ componentId: 'wood' }] }] }
+      {
+        id: `${id}-set`,
+        essences: {},
+        ingredientGroups: [{ id: `${id}-g`, options: [{ componentId: 'wood' }] }]
+      }
     ],
     resultGroups: [{ id: `${id}-rg`, results: [{ componentId: result }] }]
   });

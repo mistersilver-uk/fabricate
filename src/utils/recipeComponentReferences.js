@@ -59,7 +59,7 @@ export function recipeReferencesAnyComponent(recipe, componentIds) {
 
 /**
  * Whether a rewritten recipe has lost an ingredient set or its results and must be clamped to
- * disabled. A recipe with explicit steps has lost its shape when ANY step has no ingredient set or
+ * disabled. A recipe with explicit steps has lost its shape when any step has no ingredient set or
  * no result group, as `Recipe.validate` reports it; one without steps reads its own sets and results.
  */
 export function recipeLostItsShape(updated) {

@@ -35,7 +35,11 @@ const CASES = [
   ['a stage tool', 'tools', { step: { toolIds: ['hammer'] } }],
   ['a named set Tool in routed mode', 'tools', { sets: [ROUTED_SET_TOOL], system: ROUTED }],
   ['a set Tool in a simple system', null, { sets: [ROUTED_SET_TOOL] }],
-  ['an unnamed set Tool in routed mode', null, { sets: [{ ...ROUTED_SET_TOOL, name: '' }], system: ROUTED }],
+  [
+    'an unnamed set Tool in routed mode',
+    null,
+    { sets: [{ ...ROUTED_SET_TOOL, name: '' }], system: ROUTED },
+  ],
   ['a recipe tool', 'tools', { recipe: { toolIds: ['hammer'] } }],
   [
     'a usable check',
