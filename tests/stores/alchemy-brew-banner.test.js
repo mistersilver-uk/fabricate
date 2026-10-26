@@ -71,6 +71,17 @@ const cases = [
     '',
   ],
   [
+    'a failed brew that awarded nothing',
+    {
+      success: false,
+      results: null,
+      message: 'FABRICATE.Alchemy.FailureResult',
+      disposition: 'failed',
+    },
+    'check-failed',
+    '',
+  ],
+  [
     'a fizzle',
     { success: false, disposition: 'no-match', runId: 'run-2', consumed: true },
     'no-match-fizzle',
