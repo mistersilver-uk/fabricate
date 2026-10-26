@@ -5,6 +5,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { stripComments } from '../helpers/sourceScan.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
@@ -562,24 +564,49 @@ test('a spread roster is followed one level into the file that declares it', () 
   assert.deepEqual(unread, [], 'each reaches Select only through a nested SELECT_COMPILED_MODULES');
 });
 
-test('every inspected suite resolves at least one real component, so none passes vacuously', () => {
-  // The RATCHET on the guard above.
+const SELF_SUITE = 'tests/components/mounted-harness-primitive-allowlist.test.js';
+
+/** Whether comment-stripped `text` imports or calls the shared mounted-component harness. */
+const usesMountedHarness = (text) => {
+  const code = stripComments(text);
+  return (
+    /\bcreateMountedComponentHarness\s*\(/.test(code) ||
+    /\bimport\s*\{[^}]*\bcreateMountedComponentHarness\b[^}]*\}/.test(code)
+  );
+};
+
+/** Whether comment-stripped `text` imports the scoped-screen factories' module. */
+const importsScopeMountModules = (text) =>
+  /\bfrom\s*['"][^'"]*componentScopeMountModules\.js['"]/.test(stripComments(text));
+
+/** The suites in `corpus` (path to text) that compile a tree this parser cannot read. */
+function unreadableSuites(corpus) {
   const unreadable = [];
-  for (const suitePath of repoPathsUnder('tests', '.test.js')) {
-    const suite = readRepoFile(suitePath);
+  for (const [suitePath, suite] of Object.entries(corpus)) {
     // The same CALL form as the guard above.
     if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
-    if (suite.includes('createMountedComponentHarness')) continue;
+    // This file resolves no component of its own: its strings are fixtures for the guard above.
+    if (suitePath === SELF_SUITE) continue;
+    // Both factories carry their own closure, and a suite that only mentions them in prose has none.
+    if (usesMountedHarness(suite)) continue;
     // The scoped-screen factories (`tests/helpers/componentScopeMountModules.js`) hand a suite
-    // its `compiledModules` as a RETURN VALUE, not as a literal it declares, and they carry
-    // their own closure exactly as `createMountedComponentHarness` does — so a suite that only
-    // reads that manifest back (issue 1371's rendered catalogue suite walks it for scoped
-    // `<style>` blocks) names no path this parser can read, and is not vacuous for it.
-    if (suite.includes('componentScopeMountModules.js')) continue;
+    // its `compiledModules` as a RETURN VALUE, not as a literal it declares, so a suite that only
+    // reads that manifest back (issue 1371's rendered catalogue suite) names no path this parser
+    // can read, and is not vacuous for it.
+    if (importsScopeMountModules(suite)) continue;
 
     const compiled = new Set(compiledPathsOf(suite, suitePath));
     if (!componentPaths.some((path) => compiled.has(path))) unreadable.push(suitePath);
   }
+  return unreadable;
+}
+
+test('every inspected suite resolves at least one real component, so none passes vacuously', () => {
+  // The RATCHET on the guard above.
+  const corpus = Object.fromEntries(
+    repoPathsUnder('tests', '.test.js').map((suitePath) => [suitePath, readRepoFile(suitePath)])
+  );
+  const unreadable = unreadableSuites(corpus);
 
   assert.deepEqual(
     unreadable,
@@ -588,6 +615,26 @@ test('every inspected suite resolves at least one real component, so none passes
       'empty set for them and reports clean whatever they render:\n- ' +
       unreadable.join('\n- ')
   );
+});
+
+test('a suite that only mentions a harness is still inspected, and one that uses it is not', () => {
+  // Assembled at run time, so this file never imports or calls a harness itself: only the
+  // self-exclusion keeps it out of the live walk above.
+  const harness = ['createMounted', 'ComponentHarness'].join('');
+  const scopeModule = ['../helpers/componentScope', 'MountModules.js'].join('');
+  const none = 'h({ @KEY: [] });';
+  const corpus = {
+    'tests/mention-comment.test.js': syntheticSuite(`// ${harness}({ x });`, none),
+    'tests/mention-block.test.js': syntheticSuite(`/* from '${scopeModule}' */`, none),
+    'tests/uses-harness.test.js': syntheticSuite(`const m = ${harness}({});`, none),
+    'tests/imports-harness.test.js': syntheticSuite(`import { ${harness} } from './h.js';`, none),
+    'tests/imports-scope.test.js': syntheticSuite(`import { scoped } from '${scopeModule}';`, none),
+    [SELF_SUITE]: syntheticSuite(none),
+  };
+  assert.deepEqual(unreadableSuites(corpus), [
+    'tests/mention-comment.test.js',
+    'tests/mention-block.test.js',
+  ]);
 });
 
 // The declared APPLICATION ROOTS a shared primitive may live under.
