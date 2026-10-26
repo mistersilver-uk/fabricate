@@ -176,3 +176,26 @@ test('the timed twin produces + learns WITHOUT re-consuming (components spent at
   assert.equal(calls.learn, 1, 'still learns at FINISH');
   assert.equal(outcome.result.disposition, 'produced-on-failure');
 });
+
+test('the timed twin with an EMPTY failure group replies a plain failed disposition', async () => {
+  const { engine, calls } = failureHarness({ failureGroupItems: [] });
+  const outcome = await engine._finishAlchemySimpleFailure({
+    craftingActor: ACTOR,
+    componentSourceActors: [{ items: [] }],
+    recipe: RECIPE,
+    executionRecipe: RECIPE,
+    step: {},
+    stepIndex: 0,
+    ingredientSet: { id: 'set-1' },
+    consumedItems: [],
+    consumedRunRefs: [],
+    toolItems: [],
+    resolvedEssences: {},
+    checkResult: { success: false, outcome: 'fail', message: 'Failed', data: {} },
+    runManager: { completeStepFailure: async () => {} },
+    run: { id: 'run-1' },
+  });
+  assert.equal(outcome.result.disposition, 'failed');
+  assert.equal(outcome.result.results, null, 'an empty failure group produces no items');
+  assert.equal(calls.learn, 1, 'still learns at FINISH');
+});
