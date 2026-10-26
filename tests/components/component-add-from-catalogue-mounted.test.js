@@ -593,7 +593,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
       'with the banded frame’s 26px close'
     );
     assert.equal(root.getAttribute('role'), 'dialog');
-    assert.equal(root.getAttribute('aria-modal'), 'true');
+    assert.ok(!root.hasAttribute('aria-modal'), 'traps no focus, so it is not announced as modal');
     assert.match(root.querySelector('h3').textContent, /Add from catalogue to Forge/);
     assert.ok(
       Boolean(document.querySelector('[data-manager-modal-close]')),

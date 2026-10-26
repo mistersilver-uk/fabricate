@@ -455,7 +455,7 @@ describe('the published Modal names', () => {
     await settle();
     const dialog = dialogIn();
     assert.equal(dialog.getAttribute('role'), 'dialog');
-    assert.equal(dialog.getAttribute('aria-modal'), 'true');
+    assert.ok(!dialog.hasAttribute('aria-modal'), 'not announced as modal, as it traps no focus');
     assert.equal(dialog.getAttribute('aria-label'), REQUIRED.title);
     assert.ok(!dialog.hasAttribute('aria-describedby'), 'no description');
     const heading = dialog.querySelector('h3');
@@ -900,6 +900,54 @@ describe('focus and the published Modal', () => {
     update({ open: false });
     await settle();
     assert.ok(document.activeElement === opener, 'and as it closes');
+  });
+});
+
+describe('the published Modal dialog as a focus target (issue 2661)', () => {
+  /** An open dialog whose footer slot holds a companion button, with the dialog element focused. */
+  async function focusedDialog() {
+    const mounted = mountModal();
+    await settle();
+    const last = companionButton(mounted.handle.slot('footer'));
+    const dialog = dialogIn();
+    dialog.focus();
+    return { ...mounted, dialog, last };
+  }
+
+  it('is a tabindex -1 target held off Foundry, stating no inline style', async () => {
+    const { dialog } = await focusedDialog();
+    assert.equal(dialog.getAttribute('tabindex'), '-1');
+    assert.equal(dialog.getAttribute('data-keyboard-focus'), 'true');
+    assert.ok(!dialog.getAttribute('style'), 'no inline style');
+    assert.ok(document.activeElement === dialog, 'the dialog takes focus');
+  });
+
+  it('calls onClose once on an Escape on the dialog element, which reaches no bubbling listener on the host or the window', async () => {
+    const { dialog, calls } = await focusedDialog();
+    const host = dialog.parentElement;
+    const keys = hearing('keydown', [
+      ['host', host],
+      ['above', host.parentElement],
+      ['window', document.defaultView],
+    ]);
+    let event;
+    try {
+      event = press(dialog, 'Escape');
+    } finally {
+      keys.stop();
+    }
+    assert.deepEqual(calls, [[]]);
+    assert.equal(event.defaultPrevented, true);
+    assert.deepEqual(keys.heard, []);
+  });
+
+  it('moves focus from the dialog element to the close control on Tab and to the last slot control on Shift+Tab', async () => {
+    const { dialog, last } = await focusedDialog();
+    assert.equal(press(dialog, 'Tab').defaultPrevented, true);
+    assert.ok(document.activeElement === closeIn(), 'Tab focuses the close control');
+    dialog.focus();
+    assert.equal(press(dialog, 'Tab', { shiftKey: true }).defaultPrevented, true);
+    assert.ok(document.activeElement === last, 'Shift+Tab focuses the last control');
   });
 });
 

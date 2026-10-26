@@ -3,7 +3,7 @@
 /* Tokens: the self-hosted font faces, the :root design tokens and scales, the six [data-fabricate-theme] palettes and the derived --fab-control-outline token. Nothing here paints an element. */
 @import url("fabricate-tokens.css");
 
-/* Every Fabricate window: heading normalisation, the module's one reduced-motion block (it also reaches the chat cards, dice tiles and canvas prompt), the player app shell root and its resize floor, the module focus-ring pair with its text-field and validation-focus variants, and the module utilities (fab-truncate, fab-stack, fab-cluster). Strays: the nav rail's count pip and the journal fact-card heading. */
+/* Every Fabricate window: heading normalisation, the module's one reduced-motion block (it also reaches the chat cards, dice tiles and canvas prompt), the player app shell root and its resize floor, the module focus-ring pair with its text-field and validation-focus variants and the Modal dialog's exemption from its ring, and the module utilities (fab-truncate, fab-stack, fab-cluster). Strays: the nav rail's count pip and the journal fact-card heading. */
 @import url("fabricate-base.css");
 
 /* The manager's frame: the manager root and its host resets (font floor, text-field baseline), the titlebar, the page header and its action cluster, the body grid with the rail and its collapsed form, and each route's .manager-main row template. Shared family kept here: the manager button treatment (the fabricate-button root's 34px rung, ghost, dashed, full-width, and the save-failed alert). */

@@ -44,8 +44,8 @@
   $effect(() => {
     if (!bulkActive) return;
     function handleEscape(event) {
-      // A modal on top, such as the bulk roll prompt, owns its own Escape.
-      if (event.target?.closest?.('[aria-modal="true"]')) return;
+      // Every `Modal` on top, such as the bulk roll prompt, owns its own Escape, `aria-modal` or not.
+      if (event.target?.closest?.('.fabricate-modal')) return;
       if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();

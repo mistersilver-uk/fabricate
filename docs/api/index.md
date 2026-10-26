@@ -3569,14 +3569,14 @@ With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
 An Escape held down calls it again on each repeat.
 It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
 Fabricate does not close the dialog itself: it stays open until your `update` closes it or you call `destroy`, so to keep it open, as before a step that would lose work, do nothing.
-If you close the dialog while focus is inside it, or in the panel of a component with an overlay that you mount in a slot, first move focus to an element of your own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
+If you close the dialog while focus is on it or inside it, or in the panel of a component with an overlay that you mount in a slot, first move focus to an element of your own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
 
 - Fabricate moves no focus: when the dialog opens, focus stays where it was, so move it into your own content from a later task, as from a `setTimeout`, once the dialog is drawn.
-- Tab moves focus as the browser does, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
+- Tab moves focus as the browser does from any element but the dialog itself, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
 - Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
-- The dialog is announced as modal, so a screen reader may keep its reading cursor inside the dialog while it is open, though Tab can still move focus to the window behind, which the screen reader may treat as hidden; so move focus into the dialog when it opens and back to its opener when it closes.
+- The dialog is a `role="dialog"` named by `title` and is not announced as modal, because Tab can move focus out of it and the window behind it still takes input; move focus into the dialog when it opens and back to its opener when it closes.
 - An Enter held on the control that opened the dialog presses whatever then holds focus on each repeat, so move focus into the dialog onto an element that does not act on Enter, or ignore a `keydown` whose `repeat` is `true`.
-- A pointer press on the dialog's surface, outside every control, moves focus to the page, where Foundry's keybindings apply.
+- A pointer press on the dialog's surface, outside every control, moves focus to the dialog itself, which holds Foundry's keybindings off and draws no focus ring, so Escape then calls `onClose` as Escape in the dialog does, and Tab or Shift+Tab then moves focus to its first or its last control, unless an open ApplicationV1 `Dialog` takes the Tab, as above.
 - Escape pressed while focus is in the dialog calls `onClose`, prevents its default and stops at the dialog, so a field you draw in a slot does not clear on it, Foundry's dismiss keybinding closes no window and an open ApplicationV1 `Dialog` does not close.
 - Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so your own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
 - An element of yours in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published component mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
@@ -3595,7 +3595,7 @@ Its width, height and placement are otherwise private.
 Your own window or dialog carries no Fabricate root, so the dialog is refused there with `Modal needs a Fabricate window ancestor`.
 The close control's keyboard ring is the window's accent ring, 2px wide and 2px clear of the control, and it clears 3:1 against the header band in every palette.
 The title and the subtitle clear 4.5:1 against the header band in every palette, and the close glyph clears 3:1 against it in every palette.
-An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control you drew there; `destroy` removes the dialog, so where a control in it holds focus, move focus to an element of your own first.
+An `update` while the dialog is open redraws its header in place and keeps its slot elements, so focus stays on a control you drew there; `destroy` removes the dialog, so where the dialog or a control in it holds focus, move focus to an element of your own first.
 A dialog opened after Foundry 14 moves the window is placed and heard in the window that then holds `target`, as [Overlays](#overlays) states.
 A dialog left open across a move hears no outside press or outside Escape in the new window and still hears those of the window it left; in the new window it judges an expanded control from its attribute as it then stands, not as the key went down.
 Its frame, band, type and spacing figures, its colours beyond what this section states, its width, height and placement, the element it keeps in `target`, and its `manager-modal-*` classes and `data-manager-modal*` hooks are private.
