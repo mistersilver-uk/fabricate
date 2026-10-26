@@ -880,7 +880,7 @@ It mutates no input, throws no `FatalMigrationError`, and skips a malformed envi
    An untouched corpus returns the INPUT ARRAY itself with `migratedCount` 0.
 7. **Idempotence is proven twice**: the pure function re-run is byte-identical with `migratedCount` 0 because there is no force list left to find, AND the runner's version gate blocks re-entry.
    Neither depends on the other, which is what makes a regression in either one visible.
-8. **The transform is SHARED with the export-payload upcast** (`applyManualCompositionForceFold`), not reimplemented, and `migrateExportPayload` applies it branch-independently.
+8. **The transform is SHARED with the export-payload upcast** (`applyManualCompositionForceFold`), not reimplemented, and `migrateExportPayload` applies it branch-independently, with the CLEAR keyed on the bundle's own `schemaVersion` (*import-export*).
    Import is a second ingress for the very records this pass rescues, because `importReferenceResolver` carries `forcedTaskIds` and `forcedEventIds` through import untouched; see *import-export*.
 9. **Mutated setting keys:** `environments` (rewritten in place).
    The runner's payload does not grow: `environments` is already one of the settings it threads, so unlike `1.26.0`, `1.27.0` and `1.28.0` this pass adds no read, snapshot, pass or writeback point.
@@ -1103,9 +1103,9 @@ Records the mark that keeps every existing subject check-modifier pick rolling, 
    A NON-ARRAY mark is the unknown-basis sentinel and bounds nothing already.
    The other three rules read the mark as the SOURCE rather than as a bound, so an empty one already means "nothing rolls" there and seeding it would ADD modifiers to every roll.
 6. **IDEMPOTENT**, guarded by the seeded mark itself: a second pass finds a non-empty mark and returns at the same test that made it non-empty.
-7. **THE EXPORT-PAYLOAD UPCAST RUNS THE SAME PER-SYSTEM TRANSFORM ON ITS LEGACY BRANCH ONLY**, over the bundle's one system with its own recipes and gathering slice, ordered AFTER the `1.28.0` character-libraries lift so the catalogue the intersection needs is known.
-   It is the one field-level derivation there that is NOT branch-independent, because its guard is the DATA SHAPE this change turned into an answer: on the current-schema branch — which runs on every payload forever — seeding would restore a mark the GM deliberately emptied and pin every sibling subject on every export/import round trip, breaking the selection triple's round-trip requirement (`import-export/spec.md` § Round-trip integrity).
-   A bundle carrying no schema marker predates the upgrade by construction, so only there is the empty mark the un-asked question this pass repairs; a bundle stamped at the current schema but exported before the upgrade is the accepted residual, on the same terms as the `1.29.0` automatic force-list clear.
+7. **THE EXPORT-PAYLOAD UPCAST RUNS THE SAME PER-SYSTEM TRANSFORM ONLY ON A BUNDLE BELOW SCHEMA `6`** (an absent or non-integer `schemaVersion` included), on either branch, over the bundle's one system with its own recipes and gathering slice, ordered AFTER the `1.28.0` character-libraries lift so the catalogue the intersection needs is known.
+   It is keyed on the bundle's own version rather than run branch-independently, because its guard is the DATA SHAPE this change turned into an answer: seeding a bundle exported since `1.33.0` would restore a mark the GM deliberately emptied and pin every sibling subject on every export/import round trip, breaking the selection triple's round-trip requirement (`import-export/spec.md` § Round-trip integrity).
+   A bundle below schema `6` predates the upgrade by construction, so only there is the empty mark the un-asked question this pass repairs; a schema-`6` bundle exported before the upgrade is the accepted residual.
 8. **THE DOWNGRADE IS LOSSLESS**, in data and in behaviour, and is declared `downgradeLosesData: false`.
    Nothing is removed: the pass only adds ids to a mark and an empty pick to a record that had none.
    `1.32.0` reads the mark as a plain default rather than as a bound, so a subject with its own picks rolls exactly those picks there, and one carrying the authored `[]` resolves to no eligible modifier — which is what it resolved to under the empty mark it used to inherit.
