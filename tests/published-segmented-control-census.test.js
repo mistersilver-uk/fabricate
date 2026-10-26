@@ -25,7 +25,7 @@ import {
   staleAncestors,
   syntheticCensus,
 } from './helpers/publishedComponentCensus.js';
-import { SHIPPED, byName, declarationsOf } from './helpers/publishedComponentGate.js';
+import { SHIPPED, byName, declarationsOf, gatedRoot } from './helpers/publishedComponentGate.js';
 
 const COMPONENT = 'src/ui/svelte/components/SegmentedControl.svelte';
 
@@ -93,7 +93,7 @@ describe('the module sheet and every component style against the published Segme
     );
     const entry = entryNamed('SegmentedControl');
     assert.deepEqual(
-      [Object.keys(entry.props), entry.root],
+      [Object.keys(entry.props), gatedRoot(entry)],
       [['options', 'value', 'onChange', 'ariaLabel', 'fill', 'density'], 'fabricate'],
       'a published tone, shape, icon-only run, density rung, class or wider root reopens the census'
     );

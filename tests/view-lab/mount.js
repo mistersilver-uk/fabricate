@@ -802,6 +802,8 @@ const LAB_SPECIMENS = Object.freeze({
   'published-action-menu': () => import('./fixtures/PublishedActionMenu.svelte'),
   // Issue 2656: a reagent's rename dialog, opened and closed by the companion's own updates.
   'published-modal': () => import('./fixtures/PublishedModal.svelte'),
+  // Issue 2456: the five entries that state a standalone style root, in one target with no Fabricate root and in one under it.
+  'published-standalone': () => import('./fixtures/PublishedStandalone.svelte'),
 });
 // view-lab-region:end
 

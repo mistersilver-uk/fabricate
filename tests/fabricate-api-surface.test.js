@@ -414,7 +414,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: { children: slot },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       EmptyState: {
@@ -453,7 +453,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       StatusToggle: {
@@ -466,7 +466,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-describedby': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Stepper: {
@@ -482,7 +482,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           onChange: { kind: 'callback', required: true },
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       SearchField: {
@@ -494,7 +494,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           ariaLabel: required,
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Select: {
@@ -522,14 +522,14 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
         version: 1,
         props: { as: required, children: slot },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Well: {
         version: 1,
         props: { label: optional, children: slot },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Callout: {
@@ -558,7 +558,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           'aria-expanded': { kind: 'aria', required: false },
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       EditorTabs: {
@@ -572,7 +572,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           activePanelOnly: optional,
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       RadioCardGroup: {
@@ -588,7 +588,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           disabledOptions: optional,
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       SegmentedControl: {
@@ -602,7 +602,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           density: optional,
         },
         rest: true,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       Pagination: {
@@ -625,7 +625,7 @@ describe('bindFabricateGlobal publishes the stable namespaces', () => {
           density: optional,
         },
         rest: false,
-        root: 'fabricate',
+        root: 'any',
         overlays: false,
       },
       IconPicker: {

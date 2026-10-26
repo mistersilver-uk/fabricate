@@ -55,7 +55,19 @@ function readAppOptions(appId) {
   return parseObjectLiteralAfter(source, 'static DEFAULT_OPTIONS =', app.optionsSource);
 }
 
-for (const appId of Object.keys(APP_CHROME)) {
+const fabricateApps = Object.keys(APP_CHROME).filter((appId) => APP_CHROME[appId].optionsSource);
+
+test('the one window with no options source is the classless companion frame', () => {
+  const sourceless = Object.keys(APP_CHROME).filter((appId) => !APP_CHROME[appId].optionsSource);
+  assert.deepEqual(sourceless, ['fabricate-standalone-companion']);
+  assert.deepEqual(
+    [...APP_CHROME[sourceless[0]].classes],
+    [],
+    'a frame with no ancestor of the `fabricate` class is what a standalone style root is measured under'
+  );
+});
+
+for (const appId of fabricateApps) {
   test(`${appId}: the chrome spec matches the real DEFAULT_OPTIONS`, () => {
     const actual = readAppOptions(appId);
     const expected = APP_CHROME[appId];

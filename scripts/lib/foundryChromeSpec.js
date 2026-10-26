@@ -261,6 +261,26 @@ export const APP_CHROME = Object.freeze({
     minHeight: 0,
     optionsSource: 'src/ui/InteractablesManagerApp.svelte.js',
   }),
+  // A companion's own window, not a Fabricate one: the frame class is `application` alone, so
+  // nothing in it has a `.fabricate` ancestor. It declares no `optionsSource` because no Fabricate
+  // class exists to restate.
+  'fabricate-standalone-companion': Object.freeze({
+    id: 'fabricate-standalone-companion',
+    tag: 'div',
+    classes: Object.freeze([]),
+    window: Object.freeze({
+      title: 'FABRICATE.App.Title',
+      icon: 'fa-solid fa-flask',
+      resizable: false,
+      contentTag: 'section',
+      contentClasses: Object.freeze([]),
+      controls: Object.freeze([]),
+    }),
+    position: Object.freeze({ width: 1024, height: 640 }),
+    minWidth: 0,
+    minHeight: 0,
+    optionsSource: null,
+  }),
 });
 
 export const APP_CHROME_IDS = Object.freeze(Object.keys(APP_CHROME));

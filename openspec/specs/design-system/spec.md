@@ -623,6 +623,7 @@ A class that carries no meaning beyond a repeated declaration set — visually-h
 A utility MUST be declared ONCE and rooted at `.fabricate`, the class every Fabricate application root emits, never once per application root; its callers carry it in markup.
 A published component restates the visually hidden declaration set in its own scoped stylesheet, recorded with the reason that it renders under a companion's ancestor, so the `.fabricate` ancestor is not guaranteed (`ui-extension-points` § Ownership, strings and theme); `TierTrack`'s `.fab-tier-track-hidden` is the first (issue 2424).
 `Meter`'s `.fab-meter-hidden` is the next (issue 2448).
+A published component Fabricate draws under the standalone style root does not restate it, because that element carries `.fabricate` (issue 2456).
 
 The Foundry-core focus reset and its paired `:focus-visible` ring follow the same rooting rule WITHOUT A MARKUP CLASS, as a root-scoped element-selector rule on `.fabricate` itself.
 They are not a class and no element gains a class attribute for them; conflating the two mechanisms would imply markup edits the reset does not need.
@@ -2515,7 +2516,9 @@ It dismisses on an outside click and on Escape.
 An Escape inside the dialog stops there in every mode, so Foundry's dismiss keybinding never hears it.
 An Escape outside it, which dismisses it only with `closeOnOutsideClick`, goes on to Foundry.
 An expanded control inside it, judged as the key goes down, keeps its own Escape.
-A panel such a control portals outside the dialog is outside it, as a `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape there dismisses the modal too.
+A panel a control in the dialog opens counts as inside it wherever it is portaled, as a `Select`'s list and a `SetPicker`'s query field do, so a press or an Escape there does not dismiss the modal.
+The dialog element is a focus target, `tabindex="-1"` carrying `data-keyboard-focus="true"`, so a pointer press on its surface outside every control focuses the dialog, Foundry's keybindings stay held off, and Tab or Shift+Tab from it moves to its first or its last control, the close control being the first; it keeps its elevation and draws no focus ring (issue 2661).
+The dialog carries `aria-modal="true"` only with `trapFocus`, which keeps Tab inside it and owns every key while it is open; without it Tab can move focus out of the dialog and the window behind still takes keyboard input, so it is a `role="dialog"` named by its title and is not announced as modal (issue 2662).
 A step that would lose work confirms first.
 `Modal` is published through `game.fabricate.api.ui` (issue 2656) with only `open`, `title`, `subtitle`, `closeLabel`, `closeOnOutsideClick`, `onClose`, `body` and `footer`, as its group in `ui-extension-points` states.
 `Modal`'s subtitle inks `--fab-text-muted` and clears 4.5:1 on the `--fab-bg-2` header band in every palette, because it is small text and `--fab-text-subtle` falls under that floor in six of seven palettes (issue 2670).
@@ -2537,6 +2540,13 @@ Its behavioural differences from the flow are additive `Modal` props whose defau
 - **WHEN** the import folder mapping is open and the user presses Escape on its match-by-name checkbox
 - **THEN** the modal is dismissed once and Foundry's dismiss keybinding closes no window
 - **AND** Escape on an open category list closes that list and leaves the modal open
+
+#### Scenario: A press on the dialog's surface
+
+- **WHEN** the import report is open and the user presses its header band outside the close control
+- **THEN** focus is on the dialog and no keyboard ring and no elevation change is drawn
+- **AND** a following Escape dismisses the modal once and Foundry's dismiss keybinding closes no window
+- **AND** the import report's dialog carries no `aria-modal`, while the roll prompt's carries `aria-modal="true"`
 
 #### Scenario: A roll prompt opens outside every Fabricate window
 

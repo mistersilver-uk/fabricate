@@ -1,0 +1,65 @@
+/*
+ * Minimal stand-in for Foundry core's button rules in `@layer elements.forms`, which
+ * `foundry-core-min.css` does not carry: the properties `.agents/docs/foundry-and-architecture.md`
+ * records core declaring on every `button` (V13.351 and V14.365), its hover face, its focus ring
+ * and glow, and `--button-size` at its `2em` default. The colours are stand-ins; what a published
+ * control is held to is drawing the same over them in every host.
+ */
+@layer reset, variables, elements, blocks, applications;
+
+@layer variables {
+  :root {
+    --font-sans: 'Helvetica Neue', Arial, sans-serif;
+    --button-size: 2em;
+    --button-background-color: rgb(200 196 186);
+    --button-border-color: rgb(120 116 108);
+    --button-text-color: rgb(25 24 19);
+    --button-hover-background-color: rgb(225 222 214);
+    --button-hover-border-color: rgb(80 76 70);
+    --button-hover-text-color: rgb(0 0 0);
+    --button-focus-outline-color: rgb(255 100 0);
+  }
+}
+
+@layer elements {
+  @layer forms {
+    a.button,
+    button {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.25rem;
+      height: var(--button-size);
+      min-height: var(--button-size);
+      padding: 0 0.5rem;
+      background: var(--button-background-color);
+      border: 1px solid var(--button-border-color);
+      border-radius: 4px;
+      color: var(--button-text-color);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-14);
+      line-height: normal;
+      text-decoration: none;
+      cursor: pointer;
+      transition: 0.5s;
+    }
+
+    a.button:hover,
+    button:hover {
+      background: var(--button-hover-background-color);
+      border-color: var(--button-hover-border-color);
+      color: var(--button-hover-text-color);
+    }
+
+    a.button:focus,
+    button:focus {
+      outline: 1px solid var(--button-focus-outline-color);
+      box-shadow: 0 0 4px var(--button-focus-outline-color);
+    }
+
+    a.button > *,
+    button > * {
+      pointer-events: none;
+    }
+  }
+}
