@@ -2072,25 +2072,25 @@ In an ingredient set it is the crafter deciding what to spend.
 In a result set it is the REWARD being selected — by the player, or by the roll, as the requirement "A result-side choice group states who chooses and how many it awards" specifies.
 A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
 
-The ROUTED modes select exactly one result set per craft attempt, which is what makes the group and not the individual result row their unit of routing.
+The ROUTED modes select exactly one result set per craft attempt, which is what makes the result set and not the individual result row their unit of routing.
 That is a property of those modes and not of the model: `progressive` awards EVERY result set whose difficulty threshold the roll meets or exceeds, which is the stated distinction between it and the routed modes.
 A surface that assumes single selection everywhere renders progressive wrongly.
 
-Under `routedByIngredients` the set the crafter satisfies names exactly one group, and several sets MAY name the same group.
-A set MUST NOT name more than one group: the engine would have no basis to choose between them.
-Under `routedByCheck` the check outcome tier names the group, several tiers MAY name the same group, and the check is required.
+Under `routedByIngredients` the set the crafter satisfies names exactly one result set, and several ingredient sets MAY name the same result set.
+A set MUST NOT name more than one result set: the engine would have no basis to choose between them.
+Under `routedByCheck` the check outcome tier names the result set, several tiers MAY name the same result set, and the check is required.
 A failure-marked tier is offered for assignment only where the system's failure-result policy permits results on failure, as `ui-system-studio` specifies.
 Where the policy forbids it, the tier is not offered, an assignment already authored stays on disk and stops routing, and the overview's row for that tier reads "routing not permitted by this system" in place of its select.
 
 A result set is a CONTAINER in every mode, and the routed modes MUST NOT reduce it to a routing target.
-Wherever a group appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
-Assignment is possible from EITHER end — the set or tier names its group, or the group takes a source — because a GM arrives at the relation from both directions.
+Wherever a result set appears it holds the rows and choice groups it produces AND states what routes into it, so a GM authoring what a tier awards does so in one place rather than assigning in one surface and editing in another.
+Assignment is possible from EITHER end — the set or tier names its result set, or the result set takes a source — because a GM arrives at the relation from both directions.
 
 The routing relation MUST be stated in BOTH directions.
-The thing that routes names its group, and the GROUP names its sources: the ingredient sets that select it, or the outcome tiers that do.
-Without the inbound direction a GM editing a group cannot tell what reaches it, and cannot tell that editing it changes what two sets or two tiers award.
-Where several sources share a group, each source says the target is shared and how many sources hold it.
-A group with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
+The thing that routes names its result set, and the RESULT SET names its sources: the ingredient sets that select it, or the outcome tiers that do.
+Without the inbound direction a GM editing a result set cannot tell what reaches it, and cannot tell that editing it changes what two sets or two tiers award.
+Where several sources share a result set, each source says the target is shared and how many sources hold it.
+A result set with NO inbound route states that in place, with the action that fixes it, rather than waiting for validation to report it.
 
 Each source MUST show the set a craft EFFECTIVELY awards, not only an explicit assignment.
 Where nothing names its target explicitly, the target is the mode's fallback and the source marks it with a "default" hint, so an inherited target reads differently from a chosen one.
@@ -2105,7 +2105,7 @@ The routing surface MUST surface two authoring hazards rather than leaving them 
 A value between two fixed tiers that no tier claims is a GAP: the roll matches nothing, the craft is rolled but unrouted, and it fails outright rather than degrading.
 The overview draws a gap in place as a blocked row naming the unclaimed values, with no target select and with the "Edit outcome tiers" action, because the fix belongs to the system's tiers rather than to the recipe.
 Its blocking severity is owned by the Checks Studio, which reports it as the readiness issue `rangeGap` that `resolution-modes` specifies, and recipe readiness MUST NOT raise it a second time.
-A group that no set and no tier reaches, explicitly or by fallback, is UNREACHABLE: authored, valid, and never producible.
+A result set that no ingredient set and no tier reaches, explicitly or by fallback, is UNREACHABLE: authored, valid, and never producible.
 
 The routing is authored in TWO surfaces, and neither is a copy of the other.
 
@@ -2117,27 +2117,27 @@ On the set card, an assignment that stays on disk but does not route is listed s
 Both write the same field, and assignment therefore works from either end.
 
 An overview row reserves a fixed trailing column for its shared-target marker, so the control naming the set sits at one position down the list and a marker on one row does not move the control on another.
-Creating a set or a group is an adder beneath that list, and a newly created group is immediately selectable from every row above it.
-Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns groups to those tiers and edits the tiers themselves in the Checks Studio, which an "Edit outcome tiers" action beside the list opens.
+Creating an ingredient set or a result set is an adder beneath that list, and a newly created result set is immediately selectable from every row above it.
+Under `routedByCheck` the tier list belongs to the SYSTEM rather than to the recipe, so the surface states that the recipe assigns result sets to those tiers and edits the tiers themselves in the Checks Studio, which an "Edit outcome tiers" action beside the list opens.
 
 A mode change that would reduce the permitted cardinality MUST state what it will delete before the switch rather than reporting it afterwards.
 
 #### Scenario: A recipe offers the player a choice of reward
 
 - **WHEN** a GM authors alternatives inside a result set
-- **THEN** the group renders the same choice group used on the ingredient side
+- **THEN** the result set renders the same choice group used on the ingredient side
 - **AND** the player picks at award time: one under any one of, up to N under up to N
 
 #### Scenario: A GM opens a result set two tiers share
 
 - **WHEN** a GM opens a result set that two outcome tiers route to
-- **THEN** the group names both tiers as its sources
+- **THEN** the result set names both tiers as its sources
 - **AND** each of those tiers states that its target is shared
 
 #### Scenario: A result set has no inbound route
 
 - **WHEN** a result set is reached by no ingredient set and no outcome tier, explicitly or by fallback
-- **THEN** the group states that it is unreachable, in place
+- **THEN** the result set states that it is unreachable, in place
 - **AND** it offers the action that routes something to it
 
 #### Scenario: Two outcome tiers award the same thing
