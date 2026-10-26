@@ -239,6 +239,21 @@ test('signal 3 (centre point) alone admits when membership is empty and Foundry 
   );
 });
 
+test('signal 3 prefers the DOCUMENT centre over a present placeable whose centre lags (issue 1006)', () => {
+  const staleObject = { center: { x: 900, y: 900 } };
+  const viaGetCenterPoint = rectRegion(RECT);
+  const token = containmentToken(CENTRE_INSIDE, { object: staleObject });
+  assert.equal(regionContainsTokenDocument(viaGetCenterPoint, token), true, 'the stale placeable does not deny');
+  assert.deepEqual(viaGetCenterPoint.testPointCalls[0], { x: 110, y: 110, elevation: 0 });
+
+  // Without getCenterPoint the computed document centre is the source, and still beats the placeable.
+  const viaComputed = rectRegion(RECT);
+  const computedToken = containmentToken(CENTRE_INSIDE, { object: staleObject });
+  delete computedToken.getCenterPoint;
+  assert.equal(regionContainsTokenDocument(viaComputed, computedToken), true);
+  assert.deepEqual(viaComputed.testPointCalls[0], { x: 110, y: 110, elevation: 0 });
+});
+
 test('membership naming a DIFFERENT region falls through, and signal 3 answers both ways', () => {
   const region = rectRegion(RECT);
   const elsewhere = rectRegion({ ...RECT, id: 'region-elsewhere', uuid: 'Scene.s.Region.elsewhere' });

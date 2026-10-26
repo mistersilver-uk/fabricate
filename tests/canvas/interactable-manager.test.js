@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
 import { placedBehavior } from '../helpers/interactableFixtures.js';
-import { gridScene, tokenDoc as tokenDocFake } from '../helpers/regionContainmentFakes.js';
+import { gridScene, rectRegion, tokenDoc as tokenDocFake } from '../helpers/regionContainmentFakes.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
 
 const GLOBAL_KEYS = ['game', 'Hooks', 'canvas', 'foundry', 'CONFIG', 'ui'];
@@ -505,6 +505,7 @@ test('(d) dialog cancel → NO region created (abort)', async () => {
  * the scene, and every token document in `scene.tokens` carries that same scene as its `parent`.
  */
 function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true, tokens = [], gridSize = 100 } = {}) {
+  // An explicit `testPoint: null` builds a region with none; only `undefined` takes the default.
   const scene = gridScene({ id: sceneId, gridSize });
   // `tokens` may be a factory, so a token document can be parented to THIS scene as Foundry does.
   scene.tokens.contents.push(...(typeof tokens === 'function' ? tokens(scene) : tokens));
@@ -823,7 +824,7 @@ function setupValidateAndGrant({
   globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
   globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => canControlActor } : null) };
 
-  const behavior = interactableBehavior({ system, tokens, ...(testPoint ? { testPoint } : {}) });
+  const behavior = interactableBehavior({ system, tokens, ...(testPoint !== undefined ? { testPoint } : {}) });
   const region = behavior.parent;
   const scene = region.parent;
   globalThis.game.scenes = { get: (id) => (id === 'scene-1' ? scene : null) };
@@ -919,14 +920,12 @@ test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is den
 // the requester's scene, so no token document here has a placeable.
 const CONTAINMENT_RECT = { x: 100, y: 100, w: 100, h: 100 };
 
-/** A region testPoint recording every submitted point on `calls`. */
+/** A region testPoint recording every submitted point on `calls`, delegating to the shared rect fake. */
 function recordingRectTestPoint(calls, rect = CONTAINMENT_RECT) {
+  const { testPoint } = rectRegion(rect);
   return (point) => {
     calls.push(point);
-    const px = Number(point?.x);
-    const py = Number(point?.y);
-    if (!Number.isFinite(px) || !Number.isFinite(py)) return false;
-    return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+    return testPoint(point);
   };
 }
 
@@ -963,6 +962,46 @@ test('validateAndGrant DENIES TOKEN_NOT_INSIDE when the token is genuinely outsi
 
     assert.equal(ok, false, 'a genuine miss still denies — the fix is not a blanket grant');
     assert.equal(deniedReason(emits), 'TOKEN_NOT_INSIDE');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant DENIES a token outside a region that has no testPoint (no blanket grant at the call site, issue 1006)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    // A `testPoint`-less region only occurs when the fixture asks for it; `testInsideRegion` still answers.
+    const { manager, region, emits, request } = setupValidateAndGrant({
+      testPoint: null,
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1', insideRegion: false })]
+    });
+    assert.ok(region.testPoint === null, 'the region really has no testPoint');
+
+    const ok = await manager.validateAndGrant(request);
+
+    assert.equal(ok, false);
+    assert.equal(deniedReason(emits), 'TOKEN_NOT_INSIDE');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant applies the region elevation band through the shared rect fake (issue 1006)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const banded = { ...CONTAINMENT_RECT, elevationBand: { bottom: 10, top: 30 } };
+    const outOfBand = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint([], banded),
+      tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1', elevation: 50 })]
+    });
+    assert.equal(await outOfBand.manager.validateAndGrant(outOfBand.request), false, 'an out-of-band token is denied');
+    assert.equal(deniedReason(outOfBand.emits), 'TOKEN_NOT_INSIDE');
+
+    const inBand = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint([], banded),
+      tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1', elevation: 20 })]
+    });
+    assert.equal(await inBand.manager.validateAndGrant(inBand.request), true, 'an in-band token is admitted');
   } finally {
     restoreGlobals(saved);
   }
