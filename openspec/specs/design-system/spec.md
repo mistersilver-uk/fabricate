@@ -1008,6 +1008,7 @@ A caller MUST NOT restate the panel's edge, tile, title or hint, though it MAY p
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.
 `Button`'s `busy` sets `aria-busy` and `aria-disabled` and never `disabled`; the caller changes `children`, because the primitive draws no busy label.
 `ArmedDangerButton` draws its busy face through that prop, so a confirmed write keeps the control focused and refuses a second press, and only its own `disabled` disables it natively.
+A disabled `ArmedDangerButton` MUST draw `Button`'s disabled face whether or not it is armed; the armed fill MUST paint only an enabled control, and an armed control's hover ink MUST reach 4.5:1 against the fill it hovers on.
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
@@ -1096,6 +1097,11 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **WHEN** a GM confirms an armed `ArmedDangerButton` and its caller sets `busy`
 - **THEN** the control keeps keyboard focus, carries `aria-busy` and `aria-disabled` and no `disabled`, and its label and accessible name read its `busyLabel`
 - **AND** a press while it is busy confirms nothing
+
+#### Scenario: A disabled armed control draws the disabled face
+
+- **WHEN** an `ArmedDangerButton` is rendered armed with `disabled` set
+- **THEN** it keeps `data-armed="true"` and its armed label, and draws `Button`'s disabled face rather than the `--fab-danger` fill
 
 #### Scenario: A change writes its own motion
 
