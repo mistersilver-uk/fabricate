@@ -109,7 +109,7 @@
       text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
         'Edit difficulty and complications on {name}'
-      ).replace('{name}', componentName(result.componentId))}
+      ).replace('{name}', () => componentName(result.componentId))}
     {macroNames}
     {triggerLabels}
     adderClass="manager-salvage-stage-add"

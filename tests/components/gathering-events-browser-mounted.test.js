@@ -74,4 +74,19 @@ describe('the gathering events browser row toggle (issue 2025)', () => {
     mountView();
     assert.equal(toggleOf('ev-off').getAttribute('aria-label'), 'Toggle Thorn Snare');
   });
+
+  it('names a row’s controls literally for an event whose name carries $ patterns (issue 1292)', () => {
+    const name = "Pit $& $` $' end";
+    mountView({ events: [{ id: 'ev-dollar', name, enabled: true }] });
+    const labels = [
+      ...target.querySelectorAll(':scope [data-gathering-event-id="ev-dollar"] [aria-label]'),
+    ].map((control) => control.getAttribute('aria-label'));
+    for (const expected of [
+      `Toggle ${name}`,
+      `Edit ${name}`,
+      `Gathering event actions for ${name}`,
+    ]) {
+      assert.ok(labels.includes(expected), `${expected} among ${JSON.stringify(labels)}`);
+    }
+  });
 });

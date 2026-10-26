@@ -12,6 +12,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { fill } from '../../../../../utils/fillPlaceholders.js';
   import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
@@ -32,13 +33,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function fill(value, data) {
-    return Object.entries(data).reduce(
-      (result, [name, replacement]) => result.replace(`{${name}}`, String(replacement)),
-      value
-    );
   }
 
   // `recipeItemTypeFromRecipeCount` returns a diagnostic enum, not display copy, so the mapping to
