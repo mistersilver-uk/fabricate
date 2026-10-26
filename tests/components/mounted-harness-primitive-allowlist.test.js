@@ -247,7 +247,7 @@ const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value
 
 // A bare identifier element of a roster body: alone between `[`, `,` or a line start and `,` or the
 // body's end, so `...NAME`, `NAME(…)` and `NAME.x` are not elements.
-const BARE_ELEMENT = /(?:^|[,[])\s*([A-Za-z_$][\w$]*)\s*(?=,|$)/gm;
+const BARE_ELEMENT = /(?:^|[,[])\s*([A-Za-z_$][\w$]*)\s*(?=,|$)/g;
 const withoutComments = (text) =>
   text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
 
@@ -372,7 +372,10 @@ function importedArraysOf(source, fromFile) {
       ])
     );
     for (const raw of names.split(',')) {
-      const name = raw.trim().split(/\s+as\s+/).at(-1);
+      const name = raw
+        .trim()
+        .split(/\s+as\s+/)
+        .at(-1);
       if (declared.has(name)) pairs.push([name, declared.get(name)]);
     }
   }
@@ -525,7 +528,14 @@ test('an element no single path constant binds is left unread, not failed', () =
       `const CARD = '${INSPECTOR_CARD}';`,
       'h({ @KEY: [CARD] });'
     ),
-    'a call': syntheticSuite("h({ @KEY: [component('X')] });"),
+    'a call': syntheticSuite(
+      `const component = '${BULK_DELETE_CARD}';`,
+      "h({ @KEY: [component('X')] });"
+    ),
+    'a spread constant': syntheticSuite(
+      `const CARD = '${BULK_DELETE_CARD}';`,
+      'h({ @KEY: [...CARD] });'
+    ),
   };
   for (const [label, suite] of Object.entries(unread)) {
     assert.deepEqual(gapsIn(SYNTHETIC_SUITE, suite).named, [], `${label} stays unread`);
@@ -574,9 +584,9 @@ test('every inspected suite resolves at least one real component, so none passes
   assert.deepEqual(
     unreadable,
     [],
-    'these suites compile components the parser cannot read, so the guard above holds over an '
-      + 'empty set for them and reports clean whatever they render:\n- '
-      + unreadable.join('\n- ')
+    'these suites compile components the parser cannot read, so the guard above holds over an ' +
+      'empty set for them and reports clean whatever they render:\n- ' +
+      unreadable.join('\n- ')
   );
 });
 
