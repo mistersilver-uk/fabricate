@@ -13,7 +13,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `closeOnOutsideClick` | boolean | `true` | `false` keeps a stray click, and an Escape outside the dialog, from dismissing; Escape inside it still calls `onClose`. |
-  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled. |
+  | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled; only then is the dialog `aria-modal` (issue 2662). |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
@@ -31,32 +31,44 @@
     written `aria-expanded="false"` by the time the key reaches the dialog. The window comes before
     the document in every capture path, so the record precedes every document capture listener
     whatever its registration order.
+  - A panel a control inside the dialog opened, or a panel opened from such a panel, counts as
+    inside it wherever it is portaled, by `overlaysOpenedFrom` in `util/overlayHost.js`: a press
+    there dismisses nothing, and its Escape is left to the panel, judged from the same record.
+  - The dialog element is a `tabindex="-1"` focus target held off Foundry's keybindings, so a press
+    on its surface focuses it; Tab or Shift+Tab from it moves to its first or its last control in
+    every mode (issue 2661).
   - The dialog's host is acquired through the overlay chain and given back when it is destroyed.
   - Published through `game.fabricate.api.ui` with `open`, `title`, `subtitle`, `closeLabel`,
     `closeOnOutsideClick`, `onClose`, `body` and `footer` only (`ui-extension-points`' issue 2656
-    group): a published dialog moves no focus, and an Escape a companion's slot content does not
-    keep stops at it; `tests/components/published-modal-mounted.test.js`.
+    group): a published dialog moves no focus and states no inline style, and an Escape a
+    companion's slot content does not keep stops at it; `tests/components/published-modal-mounted.test.js`.
 
   Limits: a window capture listener registered before the dialog opens that collapses on Escape
   still runs first. A dialog left open across a move to another window gets no record in the new
-  window and reads the live attribute there, and one left open across a Foundry 14 window move keeps
-  hearing the old window. A panel such a control portals outside the dialog is outside it, as a
-  `SetPicker`'s query field is, so with `closeOnOutsideClick` an Escape or a press there dismisses
-  the modal too. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
+  window and reads the live attribute there, and whether the key came from a panel opened inside,
+  live too; one left open across a Foundry 14 window move keeps hearing the old window. A document
+  capture listener registered before the dialog opened that releases such a panel on mousedown
+  runs first, and the press then counts as outside; a `Modal` opened in another's slot counts as
+  outside it. Escape on the close IconButton no longer reaches its delegated tooltip hide; the
   tooltip hides when the dialog is destroyed or focus leaves.
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
   import IconButton from './IconButton.svelte';
-  import { acquireOverlayHost, releaseOverlayHost } from '../util/overlayHost.js';
+  import {
+    acquireOverlayHost,
+    heldBy,
+    overlaysOpenedFrom,
+    releaseOverlayHost,
+  } from '../util/overlayHost.js';
 
   let {
     open = false,
     title = '',
     subtitle = '',
     closeLabel = 'Close',
-    width = '560px',
+    width = '',
     dialogProps = {},
     onClose = () => {},
     body = undefined,
@@ -99,12 +111,9 @@
     return event.composedPath?.()[0] ?? event.target;
   }
 
-  // True when `node` is in `container`, or in a shadow root whose host chain reaches it.
-  function heldBy(container, node) {
-    for (let at = node; at; at = at.getRootNode?.().host) {
-      if (container?.contains?.(at)) return true;
-    }
-    return false;
+  // True when `origin` is in a panel that counts as inside `container`; see Invariants.
+  function inPanelOpenedFrom(container, origin) {
+    return overlaysOpenedFrom(container).some((panel) => heldBy(panel, origin));
   }
 
   // True when `origin` sits in an expanded control that `container` holds, looking through open
@@ -125,7 +134,12 @@
     if (typeof view?.addEventListener !== 'function') return {};
     const record = (event) => {
       if (event.key !== 'Escape') return;
-      escapeRecord = { event, expanded: expandedIn(node, originOf(event)) };
+      const origin = originOf(event);
+      escapeRecord = {
+        event,
+        expanded: expandedIn(node, origin),
+        nested: inPanelOpenedFrom(node, origin),
+      };
     };
     view.addEventListener('keydown', record, true);
     return {
@@ -145,10 +159,18 @@
     return event.composedPath?.().includes(dialog) ?? Boolean(dialog?.contains?.(event.target));
   }
 
+  // An Escape is judged from the window's record, taken before a panel can close and release
+  // itself; a mousedown, or a key in a document with no window, live.
+  function fromPanelOpenedInside(event) {
+    if (escapeRecord?.event === event) return escapeRecord.nested;
+    return inPanelOpenedFrom(dialog, originOf(event));
+  }
+
   // An outside mousedown or an Escape that did not come from inside the dialog. Escape inside it
   // is `handleKeydown`'s, so it is not closed twice, nor is an expanded control's.
   function dismissFromOutside(event) {
     if (event?.type === 'keydown' && (event.isComposing || cameFromInside(event))) return;
+    if (fromPanelOpenedInside(event)) return;
     requestClose();
   }
 
@@ -193,6 +215,18 @@
     return { destroy: () => doc.removeEventListener('keydown', stop) };
   }
 
+  // From the dialog element Tab enters it in every mode; from inside it only `trapFocus` wraps.
+  function handleTab(event) {
+    const node = event.currentTarget;
+    const inside = focusables(node);
+    if (inside.length === 0) return;
+    const active = node.ownerDocument.activeElement;
+    const edge = event.shiftKey ? inside[0] : inside.at(-1);
+    if (active !== node && (!trapFocus || (active !== edge && inside.includes(active)))) return;
+    event.preventDefault();
+    (event.shiftKey ? inside.at(-1) : inside[0]).focus();
+  }
+
   function handleKeydown(event) {
     if (event.isComposing) return;
     if (event.key === 'Escape') {
@@ -209,14 +243,7 @@
       }
       return;
     }
-    if (event.key !== 'Tab' || !trapFocus) return;
-    const inside = focusables(event.currentTarget);
-    if (inside.length === 0) return;
-    const active = event.currentTarget.ownerDocument.activeElement;
-    const edge = event.shiftKey ? inside[0] : inside.at(-1);
-    if (active !== edge && inside.includes(active)) return;
-    event.preventDefault();
-    (event.shiftKey ? inside.at(-1) : inside[0]).focus();
+    if (event.key === 'Tab') handleTab(event);
   }
 
   // A node listener rather than a delegated handler: it runs before Foundry's window-level one.
@@ -237,9 +264,11 @@
       class="fabricate-modal"
       bind:this={dialog}
       role="dialog"
-      aria-modal="true"
+      aria-modal={trapFocus ? 'true' : undefined}
       aria-label={title}
-      style={`--manager-modal-width: ${width};`}
+      tabindex="-1"
+      data-keyboard-focus="true"
+      style={width && `--manager-modal-width: ${width};`}
       data-manager-modal
       {...dialogProps}
       use:portal={(node) => acquireHost(node)}

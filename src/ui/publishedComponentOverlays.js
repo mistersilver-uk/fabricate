@@ -5,6 +5,7 @@
  * `close` releases every container still held. The contract is
  * `openspec/specs/ui-extension-points/spec.md` § Published UI Components.
  */
+import { themeAttributes } from './publishedComponentStandaloneRoot.js';
 import {
   OVERLAY_HOST_SELECTOR,
   acquireStandaloneOverlayLayer,
@@ -12,23 +13,8 @@ import {
   registerOverlayChain,
   unregisterOverlayChain,
 } from './svelte/util/overlayHost.js';
-import { FABRICATE_THEME_ATTRIBUTE } from './theme.js';
 
 const KEEP = () => {};
-
-// A Foundry 14 detached window's <html> holds a copy of the main one's attributes made when it
-// opened, stale after a theme change, so the walk stops below it and falls back to the main one.
-function themeAttributes(target) {
-  const main = globalThis.document?.documentElement;
-  const top = target.ownerDocument?.documentElement;
-  let themed = target;
-  while (themed && themed !== top && !themed.hasAttribute?.(FABRICATE_THEME_ATTRIBUTE)) {
-    themed = themed.parentElement;
-  }
-  const source = themed && themed !== top ? themed : main;
-  const theme = source?.getAttribute?.(FABRICATE_THEME_ATTRIBUTE);
-  return theme ? { [FABRICATE_THEME_ATTRIBUTE]: theme } : {};
-}
 
 /** The option while it is in the target's document, else the nearest overlay root, else the layer. */
 function placeFor(target, option) {

@@ -15,7 +15,8 @@ const SHELL_PATH = 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.sv
 /** The row and the three members it composes: its whole compiled closure. */
 const HEADER_CLOSURE = [
   HEADER_PATH,
-  ...['Button', 'Medallion'].map((name) => `src/ui/svelte/components/${name}.svelte`),
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
 ];
 
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
