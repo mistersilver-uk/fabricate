@@ -22,7 +22,7 @@ import { getSetting, setSetting, SETTING_KEYS, RECIPE_ITEM_FLAG_STAMP_TARGET, CO
 import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
 import {
   buildWorldEssenceMergeRemapNotice,
-  forcedReplacementFlagPath,
+  forcedReplacementFlagWriters,
   hasPendingWorldEssenceMerge,
   mayClearWorldEssenceMergeMap,
   mayClearWorldScopeRekeyMap,
@@ -326,8 +326,6 @@ async function runWorldEssenceMergeFlagRemap() {
  * `Document#update` merges without deleting, so a merge write would keep the retired key.
  */
 async function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  // A write that did not throw counts as landed; the overstatement reaches no gate.
-  const replace = (document, path, value) => document?.update?.({ [path]: value });
   const summary = await remapEssenceFlagsAcrossActors({
     actors: game.actors ?? [],
     mergeMap,
@@ -336,10 +334,7 @@ async function applyWorldEssenceMergeFlagRemap(mergeMap) {
       options.bare
         ? (document?.getFlag?.('fabricate', key) ?? fallback)
         : getFabricateFlag(document, key, fallback),
-    replaceFabricateFlag: (document, key, value) =>
-      replace(document, forcedReplacementFlagPath(key), value),
-    replaceBareFlag: (document, key, value) =>
-      replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
+    ...forcedReplacementFlagWriters(),
   });
   console.debug?.('Fabricate | world essence merge flag remap complete', summary);
 

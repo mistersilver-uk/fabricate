@@ -8,12 +8,19 @@ import test from 'node:test';
 
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
 import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
+import {
+  deletedKey,
+  forEachReplacementForm,
+  isForcedReplacement,
+  recordWrite,
+  replacedKey,
+} from './helpers/forcedDeletion.js';
 import { buildEssenceMergeCorpus } from './helpers/worldScopeCorpus.js';
 import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 import { SETTING_KEYS, WORLD_SCOPE_IDENTITY_FLAG_TARGET } from '../src/config/settings.js';
 import {
-  forcedReplacementFlagPath,
+  forcedReplacementFlagWriters,
   hasPendingWorldEssenceMerge,
   planItemIdentityFlagRemap,
   readWorldEssenceMergeMap,
@@ -49,7 +56,7 @@ test('actual equivalent-essence merge and flag remap preserve captured history t
       document.id = actor.id;
       document.uuid = actor.uuid;
       document.items = [];
-      const result = await runEssenceRemap([document], forcedReplacementWriters(), merged.worldEssenceMergeMap);
+      const result = await runEssenceRemap([document], forcedReplacementFlagWriters(), merged.worldEssenceMergeMap);
       assert.equal(result.remappedRunContainers, 1);
       afterRemap = document.getFlag('fabricate', 'fabricate.craftingRuns');
       const remappedRun = Object.values(afterRemap.active)[0];
@@ -438,11 +445,12 @@ function mergeRecursiveWithoutDeletions(original, other) {
 
 /**
  * A document whose `update()` expands a dotted path and applies the merge semantics above,
- * honouring the `==` forced-replacement prefix on the last segment.
+ * honouring a forced replacement or deletion on the last segment in its V13 or V14 form.
  */
 function makeMergeDocument(flags) {
   const document = {
     flags,
+    updateCalls: [],
     getFlag(scope, key) {
       let node = flags?.[scope];
       for (const segment of String(key).split('.')) {
@@ -452,6 +460,7 @@ function makeMergeDocument(flags) {
       return node === undefined ? undefined : structuredClone(node);
     },
     async update(changes) {
+      recordWrite(document.updateCalls, changes);
       for (const [path, value] of Object.entries(changes)) {
         const segments = path.split('.');
         const leaf = segments.pop();
@@ -460,24 +469,16 @@ function makeMergeDocument(flags) {
           if (!isObject(node[segment])) node[segment] = {};
           node = node[segment];
         }
-        if (leaf.startsWith('==')) node[leaf.slice(2)] = value;
-        else node[leaf] = mergeRecursiveWithoutDeletions(node[leaf], value);
+        const replaced = replacedKey(leaf, value);
+        const deleted = deletedKey(leaf, value);
+        if (replaced) node[replaced.key] = replaced.value;
+        else if (deleted === null) node[leaf] = mergeRecursiveWithoutDeletions(node[leaf], value);
+        else delete node[deleted];
       }
       return document;
     },
   };
   return document;
-}
-
-/** The production write seams, built exactly as `applyWorldEssenceMergeFlagRemap` builds them. */
-function forcedReplacementWriters() {
-  const replace = (document, path, value) => document.update({ [path]: value });
-  return {
-    replaceFabricateFlag: (document, key, value) =>
-      replace(document, forcedReplacementFlagPath(key), value),
-    replaceBareFlag: (document, key, value) =>
-      replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
-  };
 }
 
 /** The plain merge writers `setFabricateFlag` would have produced, for the hazard control. */
@@ -677,7 +678,7 @@ test('the FORCED-REPLACEMENT write removes the retired key and preserves every s
       },
     },
   });
-  const summary = await runEssenceRemap([actor], forcedReplacementWriters());
+  const summary = await runEssenceRemap([actor], forcedReplacementFlagWriters());
 
   const nested = actor.flags.fabricate.fabricate;
   assert.deepEqual(
@@ -705,7 +706,7 @@ test('the doubly-nested item override is remapped, summed, and forced-replaced',
   const item = makeMergeDocument({
     fabricate: { fabricate: { essences: { 'fire-a': 2, 'fire-b': 1, keep: 7 } } },
   });
-  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementWriters());
+  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementFlagWriters());
   assert.deepEqual(item.flags.fabricate.fabricate.essences, { 'fire-b': 3, keep: 7 });
   assert.equal(summary.remappedItemOverrides, 1);
   assert.equal(summary.scannedItems, 1);
@@ -713,7 +714,7 @@ test('the doubly-nested item override is remapped, summed, and forced-replaced',
 
 test('an AMBIGUOUS item-override key is left exactly as it is', async () => {
   const item = makeMergeDocument({ fabricate: { fabricate: { essences: { 'shared-e': 1 } } } });
-  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementWriters());
+  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementFlagWriters());
   assert.deepEqual(
     item.flags.fabricate.fabricate.essences,
     { 'shared-e': 1 },
@@ -723,15 +724,23 @@ test('an AMBIGUOUS item-override key is left exactly as it is', async () => {
   assert.equal(summary.remappedItemOverrides, 0);
 });
 
-test('the forced-replacement path is the `==` prefix on the LAST segment, at both depths', () => {
-  assert.equal(
-    forcedReplacementFlagPath('craftingRuns'),
-    'flags.fabricate.fabricate.==craftingRuns'
-  );
-  assert.equal(
-    forcedReplacementFlagPath('gatheringRuns', { bare: true }),
-    'flags.fabricate.==gatheringRuns'
-  );
+forEachReplacementForm('each writer sends one forced replacement at its own flag depth', async (form) => {
+  form.apply();
+  const { replaceFabricateFlag, replaceBareFlag } = forcedReplacementFlagWriters();
+  const document = makeMergeDocument({
+    fabricate: { fabricate: { craftingRuns: { stale: 1 } }, gatheringRuns: { stale: 1 } },
+  });
+  await replaceFabricateFlag(document, 'craftingRuns', { active: {} });
+  await replaceBareFlag(document, 'gatheringRuns', { history: [] });
+
+  assert.deepEqual(document.updateCalls, [
+    form.expect({ 'flags.fabricate.fabricate.==craftingRuns': { active: {} } }),
+    form.expect({ 'flags.fabricate.==gatheringRuns': { history: [] } }),
+  ]);
+  const [[, written]] = Object.entries(document.updateCalls[0]);
+  assert.equal(isForcedReplacement(written), form.v14, 'V14 writes the operator, V13 the plain map');
+  assert.deepEqual(document.flags.fabricate.fabricate.craftingRuns, { active: {} });
+  assert.deepEqual(document.flags.fabricate.gatheringRuns, { history: [] });
 });
 
 // --- the no-throw-per-document rule ----------------------------------------
@@ -749,7 +758,7 @@ test('a refused write is a LOCKED skip and a broken document is a SKIPPED ERROR'
   const good = makeMergeDocument({ fabricate: { fabricate: { essences: { 'fire-a': 1 } } } });
   const summary = await runEssenceRemap(
     [{ items: [broken, locked, good] }],
-    forcedReplacementWriters()
+    forcedReplacementFlagWriters()
   );
   assert.equal(summary.skippedErrors, 1);
   assert.equal(summary.lockedSkips, 1);
@@ -772,7 +781,7 @@ test('a world with no pending merge never walks the actor corpus', async () => {
     actors,
     mergeMap: { systems: {}, retired: MERGE_MAP.retired },
     readFlag,
-    ...forcedReplacementWriters(),
+    ...forcedReplacementFlagWriters(),
   });
   assert.deepEqual(walked, []);
   assert.equal(summary.scannedActors, 0);
@@ -791,12 +800,12 @@ function walkingOnly(game, actors) {
   return () => (game.actors = original);
 }
 
-test(
+forEachReplacementForm(
   'the ready sequence gates both 1.30.0 writes together, then repairs restamp → 1.30.0 → 1.34.0 ' +
     'by forced replacement, before the description check',
-  { timeout: 300000 },
-  async () => {
+  async (form) => {
     await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+      form.apply();
       const main = await loadModule('/src/main.js');
       // The migration pass would advance `migrationVersion` before the one-shots read it.
       main.default._runMigrations = async () => {};
@@ -904,6 +913,12 @@ test(
       // Every write a single `{path: value}` update: no `setFlag`, and no `{recursive: false}`,
       // which would replace the whole `flags` field and every other module's flags with it.
       assert.deepEqual(writes, [1, 1, 1], 'one forced replacement per container, nothing else');
+      // `src/main.js` composes the shared writers, so the operator form is its own, not a mirror's.
+      for (const changes of [...actor.updateCalls, ...item.updateCalls]) {
+        for (const value of Object.values(changes)) {
+          assert.equal(isForcedReplacement(value), form.v14, 'V14 operator, V13 `==` key');
+        }
+      }
     });
   }
 );

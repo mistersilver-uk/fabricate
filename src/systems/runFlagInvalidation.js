@@ -3,8 +3,8 @@
  * write on another client made stale. `setFabricateFlag` stores crafting and salvage DOUBLY nested
  * at `flags.fabricate.fabricate.<container>` (see `.agents/docs/foundry-and-architecture.md`);
  * gathering's bare `setFlag` stores `flags.fabricate.gatheringRuns`. A forced replacement arrives
- * as `flags.fabricate.fabricate.==craftingRuns` (issue 1654). A probe at the wrong depth or
- * spelling silently never fires.
+ * as `flags.fabricate.fabricate.==craftingRuns` on V13 and as an operator at the plain path on V14
+ * (issues 1654, 2052). A probe at the wrong depth or spelling silently never fires.
  */
 
 import { hasByPath, pathSegments } from '../utils/objectPath.js';
