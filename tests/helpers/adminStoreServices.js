@@ -71,8 +71,10 @@ function systemWriteMethods(system, systemWrites) {
   return {
     updateSystem: async (id, updates = {}) => {
       systemWrites.push({ kind: 'updateSystem', id, updates });
-      if (id !== system.id) return null;
-      Object.assign(system, updates);
+      if (id !== system.id) throw new Error(`Crafting system not found: ${id}`);
+      const { features, ...rest } = updates;
+      Object.assign(system, rest);
+      if (features) system.features = { ...system.features, ...features };
       return system;
     },
   };
@@ -114,7 +116,7 @@ export function createServices(system, recipes = [], capture = [], overrides = {
   const systemManager = {
     getSystems: () => systems,
     getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => system.items || [],
+    getItems: () => [],
     ...(systemWrites ? systemWriteMethods(system, systemWrites) : {}),
     updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
       capture.push({ systemId, recipeItemId, patch });
