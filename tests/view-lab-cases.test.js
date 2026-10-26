@@ -3191,6 +3191,7 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'expectVisible: viewCase.expectVisible ?? null',
     'expectContained: viewCase.expectContained ?? []',
     'expectCenterHit: viewCase.expectCenterHit ?? null',
+    'await assertCentreHit(page, selector, label)',
     'expectClick: viewCase.expectClick ?? null',
     'expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null',
     'expectOverflowY: viewCase.expectOverflowY ?? null',

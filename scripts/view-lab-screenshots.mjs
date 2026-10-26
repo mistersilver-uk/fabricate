@@ -48,7 +48,7 @@ import {
   publishableCases,
   TOLERATED_WARNINGS,
 } from './lib/viewLabCases.js';
-import { assertContained } from './lib/viewLabClaims.js';
+import { assertCentreHit, assertContained } from './lib/viewLabClaims.js';
 import { assertComputedCensus } from './lib/viewLabComputedCensus.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
@@ -286,17 +286,7 @@ async function renderPage(
 
     // One selector, or a list of them, each owning the pointer target at its centre.
     for (const selector of [expectCenterHit ?? []].flat()) {
-      const hit = await page.evaluate((query) => {
-        const element = globalThis.document.querySelector(query);
-        if (!element) return false;
-        const box = element.getBoundingClientRect();
-        const target = globalThis.document.elementFromPoint(
-          box.left + box.width / 2,
-          box.top + box.height / 2
-        );
-        return target === element || element.contains(target);
-      }, selector);
-      if (!hit) throw new Error(`${label}: ${selector} does not own its centre pointer target.`);
+      await assertCentreHit(page, selector, label);
     }
 
     if (expectClick) {

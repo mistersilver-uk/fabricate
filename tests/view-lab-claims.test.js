@@ -1,11 +1,11 @@
-/** The View Lab's containment claim (issue 1544), measured on a fake page and judged for real. */
+/** The View Lab's containment (issue 1544) and centre-hit (issue 2304) claims, run on a fake page. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { assertContained } from '../scripts/lib/viewLabClaims.js';
+import { assertCentreHit, assertContained } from '../scripts/lib/viewLabClaims.js';
 
-/** An element whose bounding rect is `left, top, width, height`. */
-function element(left, top, width, height) {
+/** An element whose bounding rect is `left, top, width, height`, containing `children`. */
+function element(left, top, width, height, children = []) {
   const node = {
     getBoundingClientRect: () => ({
       left,
@@ -17,19 +17,26 @@ function element(left, top, width, height) {
       x: left,
       y: top,
     }),
-    contains: (other) => other === node,
+    contains: (other) => other === node || children.includes(other),
   };
   return node;
 }
 
-/** A page whose `evaluate` runs its callback against a document of `elements` by selector. */
-function fakePage(elements) {
-  const page = { evaluations: 0 };
+/**
+ * A page whose `evaluate` runs its callback against a document of `elements` by selector, where
+ * `elementFromPoint` answers `hit` and records each point it was asked about in `probes`.
+ */
+function fakePage(elements, { hit = null } = {}) {
+  const page = { evaluations: 0, probes: [] };
+  const elementFromPoint = (x, y) => {
+    page.probes.push([x, y]);
+    return hit;
+  };
   page.evaluate = async (callback, argument) => {
     page.evaluations += 1;
     const previous = globalThis.document;
     Object.assign(globalThis, {
-      document: { querySelector: (selector) => elements[selector] ?? null },
+      document: { querySelector: (selector) => elements[selector] ?? null, elementFromPoint },
     });
     try {
       return callback(argument);
@@ -125,4 +132,65 @@ test('a zero-width or zero-height target is clipped, while any positive size is 
       'thin'
     )
   );
+});
+
+const BUTTON = '.toggle';
+
+/** A page whose one element, at `width` x `height`, is the hit target at any point when `owns`. */
+function centrePage(width, height, { owns = true } = {}) {
+  const button = element(100, 40, width, height);
+  return fakePage({ [BUTTON]: button }, { hit: owns ? button : element(0, 0, 1920, 1080) });
+}
+
+test('a target that owns the hit at its centre passes, and the centre is the point probed', async () => {
+  const page = centrePage(40, 20);
+  await assert.doesNotReject(assertCentreHit(page, BUTTON, 'centre'));
+  assert.deepEqual(page.probes, [[120, 50]]);
+});
+
+test('a hit on a descendant of the target counts as the target owning it', async () => {
+  const label = element(110, 45, 20, 10);
+  const button = element(100, 40, 40, 20, [label]);
+  await assert.doesNotReject(
+    assertCentreHit(fakePage({ [BUTTON]: button }, { hit: label }), BUTTON, 'child')
+  );
+});
+
+test('a missing target is named as missing before anything is measured', async () => {
+  const page = fakePage({});
+  await assert.rejects(
+    assertCentreHit(page, BUTTON, 'absent'),
+    /^Error: absent: \.toggle was not found, so it owns no pointer target\.$/
+  );
+  assert.deepEqual(page.probes, [], 'no point is probed for an element that does not exist');
+});
+
+test('a target covered at its centre does not own its pointer target', async () => {
+  await assert.rejects(
+    assertCentreHit(centrePage(40, 20, { owns: false }), BUTTON, 'covered'),
+    /^Error: covered: \.toggle does not own its centre pointer target\.$/
+  );
+});
+
+test('a target under 1px on either axis has collapsed, even when it owns its centre', async () => {
+  for (const [name, width, height] of [
+    ['zero-wide', 0, 20],
+    ['zero-high', 40, 0],
+    ['sub-pixel', 0.99, 20],
+  ]) {
+    await assert.rejects(
+      assertCentreHit(centrePage(width, height), BUTTON, name),
+      new RegExp(
+        String.raw`^Error: ${name}: \.toggle has collapsed to ${width}x${height}, so its centre pointer target proves nothing\.$`
+      )
+    );
+  }
+  await assert.doesNotReject(assertCentreHit(centrePage(1, 1), BUTTON, 'one-pixel'));
+});
+
+test('half a pixel passes containment and fails the centre hit', async () => {
+  const thin = element(110, 45, 0.5, 10);
+  const page = fakePage({ '.panel': PANEL, '.badge': thin, [BUTTON]: thin }, { hit: thin });
+  await assert.doesNotReject(assertContained(page, CLAIM, 'thin'));
+  await assert.rejects(assertCentreHit(page, BUTTON, 'thin'), /has collapsed to 0\.5x10/);
 });

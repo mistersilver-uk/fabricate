@@ -1,6 +1,6 @@
 /**
- * The View Lab's `expectContained` claim: each element is measured in the page and judged here, and
- * a missing container, a missing target and a clipped target each fail with their own message.
+ * The View Lab's `expectContained` and `expectCenterHit` claims. Each element is measured in the
+ * page and judged here, and every way a claim fails has its own message.
  */
 
 /** A target contained in its container has a positive size and lies inside it on every edge. */
@@ -46,4 +46,40 @@ export async function assertContained(page, expectation, label) {
   const verdict = judgeContainment(measured);
   if (verdict.ok) return;
   throw new Error(`${label}: ${CONTAINMENT_MESSAGES[verdict.reason](expectation, verdict)}`);
+}
+
+/**
+ * A target owns its centre hit only when it is at least 1px on both axes: a collapsed box whose
+ * overflowing content still owns its centre point proves nothing about where a pointer lands.
+ */
+function judgeCentreHit({ found, box, owns }) {
+  if (!found) return { ok: false, reason: 'target-missing' };
+  if (box.width < 1 || box.height < 1) return { ok: false, reason: 'collapsed', box };
+  if (!owns) return { ok: false, reason: 'not-owned', box };
+  return { ok: true };
+}
+
+const CENTRE_HIT_MESSAGES = {
+  'target-missing': (selector) => `${selector} was not found, so it owns no pointer target.`,
+  collapsed: (selector, { box }) =>
+    `${selector} has collapsed to ${box.width}x${box.height}, so its centre pointer target proves nothing.`,
+  'not-owned': (selector) => `${selector} does not own its centre pointer target.`,
+};
+
+/** Throw unless the element `selector` names owns the pointer target at its own centre. */
+export async function assertCentreHit(page, selector, label) {
+  const measured = await page.evaluate((query) => {
+    const element = globalThis.document.querySelector(query);
+    if (!element) return { found: false, box: null, owns: false };
+    const { left, top, width, height } = element.getBoundingClientRect();
+    const target = globalThis.document.elementFromPoint(left + width / 2, top + height / 2);
+    return {
+      found: true,
+      box: { left, top, width, height },
+      owns: target === element || element.contains(target),
+    };
+  }, selector);
+  const verdict = judgeCentreHit(measured);
+  if (verdict.ok) return;
+  throw new Error(`${label}: ${CENTRE_HIT_MESSAGES[verdict.reason](selector, verdict)}`);
 }
