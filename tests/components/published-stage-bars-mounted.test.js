@@ -210,11 +210,12 @@ describe('the published StageBars under a bare ancestor', () => {
     assert.equal(handle.update(forging('45%, stage 2 of 2')), true);
     await settle();
     assert.deepEqual(readings(), [null, '45%, stage 2 of 2']);
-    assert.ok(
-      target.querySelectorAll('[role="progressbar"]')[1] === before,
+    assert.equal(
+      target.querySelectorAll('[role="progressbar"]')[1],
+      before,
       'the same bar node, so nothing remounted'
     );
-    handle.update(forging(undefined));
+    assert.equal(handle.update(forging(undefined)), true);
     await settle();
     assert.deepEqual(readings(), [null, null], 'a dropped valueText leaves the percentage');
     handle.destroy();
