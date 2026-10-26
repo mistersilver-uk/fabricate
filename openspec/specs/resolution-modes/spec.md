@@ -604,6 +604,8 @@ A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, 
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.
 The measurement is SPAN-INTERIOR ONLY: a set that simply does not cover every value the die can roll is not a gap, because `2d20` rolls 2–40 and a GM who authors 7–34 has authored a deliberate window.
 Invalid and overlapping ranges are excluded from the measurement first, since both already raise their own `critical` and a `start > end` range would otherwise manufacture a phantom gap.
+A fixed tier's bounds are read as authored and never coerced, so a tier with no finite `start` is not placed: it ranks nowhere, no total matches it, and no forced outcome or tier step lands on it, as a tier with no finite `end` already holds nothing.
+A saved tier always has a finite `start`, since the normalizer stores a missing one as 0, so this reaches only unnormalized or draft input.
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value in the check's direction, so a lower `start` ranks higher under.
@@ -613,6 +615,7 @@ Because no tier routes on this failure, the blocked tier's own `breakTools` flag
 The default (null/unset) imposes no override, so the outcome is the final tier.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
+So does one naming a fixed tier with no finite `start`.
 The gate is fixed-type only; relative-type routed checks ignore it.
 It is enforced in the shared routed-check runner (`runFormulaRouted`) through an optional minimum-tier parameter that is no-op by default, so salvage and gathering routed checks are unaffected.
 Runtime scope: the minimum-success-tier gate is `routedByCheck`-only.
