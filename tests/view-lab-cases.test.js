@@ -49,9 +49,15 @@ import {
   MODIFIER_INCOMPATIBLE_VERBS as RUNNER_MODIFIER_INCOMPATIBLE_VERBS,
   PRESS_KEYS as RUNNER_PRESS_KEYS,
 } from '../scripts/lib/viewLabSteps.js';
-import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
+import {
+  CHECK_TO_ISSUES as RECIPE_CHECK_TO_ISSUES,
+  evaluateRecipeReadiness,
+} from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
-import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import {
+  CHECK_READINESS_ISSUE_IDS,
+  CHECK_SECTION_IDS,
+} from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   CHECKS_VIEWS,
@@ -2536,6 +2542,62 @@ test('the combination-rule scan reads expectSelector, not only steps', () => {
   ).map((viewCase) => viewCase.id);
   assert.ok(fromSteps.length > 0, 'no case CLICKS a combination rule any more');
   assert.notDeepEqual(fromExpect, fromSteps, 'the two fields must be genuinely distinct sets');
+});
+
+// Environment and recipe-only ids (`EnvironmentValidationTab`, `RecipeValidationTab`) are outside
+// this union: a case naming one adds it here, or exports its list from the product (issue 1105).
+const DECLARED_ISSUE_IDS = new Set([
+  ...CHECK_READINESS_ISSUE_IDS,
+  ...Object.values(RECIPE_CHECK_TO_ISSUES).flat(),
+]);
+const isDeclaredIssueId = (value) => DECLARED_ISSUE_IDS.has(value);
+
+/**
+ * Every exact `[attr="value"]` a registry selector names; a prefix match (`^=`) is not one. It reads
+ * the fields `caseSelectors` does: steps, expectSelector and expectLayout.
+ */
+function exactAttributeValues(attr) {
+  const pattern = new RegExp(String.raw`\[${escapeForRegExp(attr)}="([^"]*)"\]`, 'g');
+  const found = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const selector of caseSelectors(viewCase)) {
+      for (const match of selector.matchAll(pattern))
+        found.push({ id: viewCase.id, value: match[1] });
+    }
+  }
+  return found;
+}
+
+test('every data-issue and data-manager-view value a registry selector names is declared', () => {
+  const issues = exactAttributeValues('data-issue');
+  const views = exactAttributeValues('data-manager-view');
+  // Occurrences, not distinct values: the registry names few distinct ids many times.
+  assert.ok(issues.length >= 40, `only ${issues.length} data-issue selectors found`);
+  assert.ok(views.length > 0, 'no data-manager-view selector found');
+
+  const { accepts } = buildExpectViewPredicate();
+  const describe = (entries) =>
+    entries.map((entry) => `${entry.id}: "${entry.value}"`).join('\n  ');
+  const badIssues = issues.filter((entry) => !isDeclaredIssueId(entry.value));
+  const badViews = views.filter((entry) => !accepts(entry.value));
+  assert.deepEqual(
+    badIssues,
+    [],
+    `these selectors name a readiness id no product list declares, so they match nothing:\n  ${describe(badIssues)}`
+  );
+  assert.deepEqual(
+    badViews,
+    [],
+    `these selectors name a manager view the shell never renders:\n  ${describe(badViews)}`
+  );
+});
+
+test('the issue-id and manager-view predicates reject a value nothing declares', () => {
+  assert.equal(isDeclaredIssueId('neverEver'), false);
+  assert.equal(isDeclaredIssueId('noRollFormula'), true);
+  assert.equal(isDeclaredIssueId('noName'), true);
+  assert.equal(buildExpectViewPredicate().accepts('neverEver'), false);
+  assert.equal(buildExpectViewPredicate().accepts('components'), true);
 });
 
 test('the hooks the capture driver hard-codes still exist in the UI', () => {
