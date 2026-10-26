@@ -25,6 +25,7 @@ import {
   SMOKE_SOURCE_SEGMENTS,
   withinOneModule,
 } from './helpers/interactablesSmokeLocators.js';
+import { alternativesOf } from './helpers/patternAlternatives.js';
 
 import {
   buildScreenshotMarkdown,
@@ -2040,6 +2041,22 @@ describe('UI PR screenshot evidence', () => {
       const resolves = recipe.matches.some(pattern => tracked.some(file => pattern.test(file)));
       assert.ok(resolves, `${recipe.id} has no match pattern resolving to a tracked file`);
     }
+  });
+
+  it('keeps every recipe match pattern, and each of its alternatives, pointed at a tracked file', () => {
+    const tracked = spawnSync('git', ['ls-files'], { encoding: 'utf8' })
+      .stdout.split(/\r?\n/)
+      .map(line => line.replaceAll('\\', '/'))
+      .filter(Boolean);
+    const strands = regex => tracked.every(file => !regex.test(file));
+    const expansions = VIEW_RECIPES.flatMap(recipe => recipe.matches.flatMap(pattern => alternativesOf(pattern)));
+    assert.ok(expansions.length > 100, `only ${expansions.length} expansions; the guard is near-vacuous`);
+    const stranded = VIEW_RECIPES.flatMap(recipe =>
+      recipe.matches.flatMap(pattern =>
+        [pattern, ...alternativesOf(pattern)].filter(strands).map(regex => `${recipe.id}: ${pattern} → ${regex}`),
+      ),
+    );
+    assert.deepEqual(stranded, [], 'point each at the current path of its file, or remove it');
   });
 
   it('keeps every recipe smoke label backed by a real smoke-harness screenshot', () => {

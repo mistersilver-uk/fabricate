@@ -2,7 +2,7 @@
  * The Manager shell, the crafting-system browser and the system editor.
  */
 
-import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
+import { ANCHORED_POPOVER_SOURCES, BROWSER_LIST_STATE_MATCH } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 /** A weather value long enough to outrun the inspector column's trigger, and the id it slugs to. */
@@ -49,6 +49,7 @@ export const CASES = Object.freeze([
       // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
+      BROWSER_LIST_STATE_MATCH,
     ],
   }),
   managerCase({

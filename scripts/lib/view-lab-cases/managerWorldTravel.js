@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+  ENVIRONMENT_EDITOR_STATE_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
@@ -710,6 +711,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/environmentReadiness\.js$/,
       // The host: it owns the tab panel wrapper and `is-inspector-hidden`, which only this tab reaches.
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      ...ENVIRONMENT_EDITOR_STATE_MATCHES,
     ],
   }),
 ]);

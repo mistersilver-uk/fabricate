@@ -33,9 +33,11 @@ import {
   hasUiChanges,
   isExemptByLabel,
   main,
+  mapChangedFilesToViews,
   upsertScreenshotsBlock,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+// CODE POINT, not `localeCompare`: compared id lists must order identically on every machine.
 import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   BLOCK_END,
@@ -1577,6 +1579,7 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
     'src/ui/model/componentBrowserModel.js',
+    'src/utils/bulkSelectionModel.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
     'scripts/lib/viewLabCases.js',
     REGISTRY_PATH,
@@ -1788,6 +1791,185 @@ describe('one managed block per body, read the way the publisher writes it (issu
         published
       );
       assert.deepEqual(parsed.outsideBlock, [HUMAN_URL], published);
+    });
+  }
+});
+
+/** The Tool Studio's own views: the recipes `toolStudio.js`, a file no other recipe names, maps to. */
+const TOOL_STUDIO_VIEW_IDS = mapChangedFilesToViews([
+  'src/ui/svelte/apps/manager/tools/toolStudio.js',
+]).map((view) => view.id);
+
+const ENVIRONMENT_EDITOR_FRAMES = Object.freeze({
+  cases: [
+    'manager-environment-edit-placeholder',
+    'manager-environment-edit-events',
+    'manager-environment-validation',
+  ],
+  views: ['manager-environments'],
+});
+
+/**
+ * Render modules that are not themselves `.svelte` files, each with the exact View Lab cases and
+ * gate views a change to it alone selects (issues 1790, 1891, 1901): a representative frame per
+ * screen it feeds, never the shell's whole set.
+ */
+const MODULE_FRAMES = Object.freeze({
+  'src/ui/model/browserGroupCounts.js': {
+    cases: [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+      'manager-essences-normal',
+    ],
+    views: ['manager-recipes-grouped-continuation', 'manager-components-grouped-continuation'],
+  },
+  'src/ui/model/browserPagination.js': {
+    cases: [
+      'manager-recipes-grouped-continuation',
+      'manager-components-grouped-continuation',
+      'world-tool-catalogue-page-two',
+      'world-component-catalogue-bulk',
+    ],
+    views: ['manager-recipes-grouped-continuation', 'manager-components-grouped-continuation'],
+  },
+  'src/ui/model/complicationSummary.js': {
+    cases: [
+      'manager-component-complications-collapsed',
+      'manager-component-complications-salvage-stage-strip',
+      'manager-recipe-complications-stage-strip',
+    ],
+    views: ['manager-component-edit'],
+  },
+  'src/ui/model/componentBulkEditModel.js': {
+    cases: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ],
+    views: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ],
+  },
+  'src/ui/model/matchFolderVocabulary.js': {
+    cases: ['manager-import-folder-mapping'],
+    views: ['manager-import-folder-mapping'],
+  },
+  'src/ui/model/recipeAccessRoster.js': {
+    cases: ['manager-recipe-edit-access-rail', 'manager-recipe-edit-access-inspector'],
+    views: ['manager-recipe-edit-access-rail'],
+  },
+  'src/ui/model/vocabularyCascade.js': {
+    cases: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
+    views: ['manager-tags-categories'],
+  },
+  'src/ui/model/vocabularyUsage.js': {
+    cases: [
+      'manager-tags-categories-normal',
+      'manager-tags-categories-tags-tab',
+      'world-vocabulary-tags',
+      'manager-recipe-edit-tag-picker',
+    ],
+    views: ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
+  },
+  'src/ui/model/environmentComposition.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/model/environmentValidation.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminEnvironmentDraftSection.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminEnvironmentWriteActions.js': ENVIRONMENT_EDITOR_FRAMES,
+  'src/ui/svelte/stores/adminCurrencySection.js': {
+    cases: [
+      'currency-actor-property',
+      'currency-macro',
+      'currency-actor-inventory',
+      'manager-world-currency-subunit-expanded',
+    ],
+    views: ['manager-currency'],
+  },
+  'src/ui/svelte/stores/adminToolDraftSection.js': {
+    cases: [
+      'manager-tool-editor-dirty-1280x720',
+      'manager-tool-editor-save-failed',
+      'manager-tool-parity-03-breakage-1280x720',
+      'manager-tool-parity-05-validation-1280x720',
+    ],
+    views: TOOL_STUDIO_VIEW_IDS,
+  },
+  'src/ui/svelte/stores/adminKnowledgeSection.js': {
+    cases: [
+      'manager-knowledge-scope-switch',
+      'manager-knowledge-loading',
+      'manager-knowledge-error',
+    ],
+    views: ['manager-knowledge', 'manager-knowledge-delete-armed'],
+  },
+  'src/ui/svelte/apps/manager/browserListState.svelte.js': {
+    cases: [
+      'manager-default-selection',
+      'manager-environments-browse-normal',
+      'manager-gathering-tasks-browse-normal',
+      'manager-gathering-events-normal',
+      'manager-tool-parity-01-library-1280x720',
+      'manager-components-normal',
+      'manager-essences-normal',
+      'manager-recipes-normal',
+    ],
+    views: [
+      'manager-systems',
+      'manager-environments',
+      'manager-gathering-tasks',
+      'manager-gathering-events',
+      'manager-components-grouped-continuation',
+      'manager-essences',
+      'manager-recipes-grouped-continuation',
+      ...TOOL_STUDIO_VIEW_IDS,
+    ],
+  },
+  'src/ui/svelte/apps/manager/bulkSelection.svelte.js': {
+    cases: [
+      'manager-components-bulk-edit',
+      'manager-essences-bulk-edit',
+      'manager-recipes-bulk-edit',
+    ],
+    views: [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-essences',
+      'manager-recipes-bulk-edit',
+      'manager-recipes-bulk-edit-unstaged',
+    ],
+  },
+});
+
+/** A module selects a representative frame per screen it feeds; this many is a whole surface. */
+const MODULE_FRAME_CEILING = 8;
+
+/** The shells whose selections a module must not inherit wholesale. */
+const SHELL_FILES = Object.freeze([
+  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  'src/ui/svelte/stores/adminStore.js',
+]);
+
+describe('a render module selects the frames that draw it (issues 1790, 1891, 1901)', () => {
+  const sorted = (ids) => [...ids].sort(byCodePoint);
+  const shellSelections = SHELL_FILES.map((file) =>
+    mapChangedFilesToCases([file]).map((viewCase) => viewCase.id)
+  );
+
+  for (const [path, expected] of Object.entries(MODULE_FRAMES)) {
+    it(`${path} selects its own cases and views, and arms the gate`, () => {
+      assert.ok(hasUiChanges([path]), `${path} no longer arms the gate, so this row is moot`);
+      const cases = mapChangedFilesToCases([path]).map((viewCase) => viewCase.id);
+      assert.ok(cases.length <= MODULE_FRAME_CEILING, `${cases.length} cases is a whole surface`);
+      for (const [index, shell] of shellSelections.entries()) {
+        assert.ok(
+          shell.some((id) => !cases.includes(id)),
+          `${path} inherits every frame ${SHELL_FILES[index]} selects`
+        );
+      }
+      assert.deepEqual(sorted(cases), sorted(expected.cases));
+      const views = mapChangedFilesToViews([path]).map((view) => view.id);
+      assert.deepEqual(sorted(views), sorted(expected.views));
     });
   }
 });

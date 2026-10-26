@@ -4,11 +4,17 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  BROWSER_GROUP_COUNTS_MATCH,
+  BROWSER_PAGINATION_MATCH,
   COMPONENT_EDITOR_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
+  VOCABULARY_USAGE_MATCH,
 } from './caseConstants.js';
 import { choosePageSize, managerCase, previewAsActor } from './caseFactories.js';
+
+/** Category and tag deletion's cascade planning, which these frames' delete controls drive (issue 1790). */
+const VOCABULARY_CASCADE_MATCH = /^src\/ui\/model\/vocabularyCascade\.js$/;
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -1220,6 +1226,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BROWSER_GROUP_COUNTS_MATCH,
+      BROWSER_PAGINATION_MATCH,
     ],
   }),
   // THE THREE VOCABULARY FRAMES, all three kept through issue 1915's convergence. `-tags-tab` is
@@ -1255,6 +1263,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_USAGE_MATCH,
+      VOCABULARY_CASCADE_MATCH,
     ],
   }),
   managerCase({
@@ -1279,6 +1289,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_USAGE_MATCH,
     ],
   }),
   managerCase({
@@ -1320,6 +1331,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
+      VOCABULARY_CASCADE_MATCH,
     ],
   }),
   parityCase({

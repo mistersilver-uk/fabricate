@@ -10,8 +10,12 @@ import {
   REQUIREMENT_SUGGESTION,
   STAGE_COMPLICATION_LIST_MATCH,
   TYPEAHEAD_COMBOBOX_SOURCE,
+  VOCABULARY_USAGE_MATCH,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
+
+/** The access rail's player and character rows (issue 1790). */
+const RECIPE_ACCESS_ROSTER_MATCH = /^src\/ui\/model\/recipeAccessRoster\.js$/;
 
 /** A component row's name field: the two other kinds that share the field mark themselves. */
 const COMPONENT_NAME_FIELD =
@@ -772,6 +776,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
       ...ANCHORED_POPOVER_SOURCES,
+      VOCABULARY_USAGE_MATCH,
     ],
   }),
   // A second tag picked from the catalogue, the panel closed through the tab so the pointer leaves
@@ -2159,6 +2164,7 @@ export const CASES = Object.freeze([
       // The manager router and the Crafting entry model (issue 1151), as `manager-books-scrolls-normal` records.
       /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
+      RECIPE_ACCESS_ROSTER_MATCH,
     ],
   }),
   managerCase({
@@ -2180,6 +2186,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      RECIPE_ACCESS_ROSTER_MATCH,
     ],
   }),
   managerCase({
