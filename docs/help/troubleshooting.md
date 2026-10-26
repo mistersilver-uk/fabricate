@@ -199,7 +199,7 @@ The system's **Overview** lists the same warning under **Recipes** as **A result
    In the **Routing** card, look for a result set that no row's dropdown has chosen.
 2. Re-point an ingredient set to the result set from its row's dropdown.
    You can also open the **Results** tab and choose **Assign** on the result set's card.
-   A result set that no ingredient set leads to shows **Nothing — unreachable** on its line, except the reserved failure result set, whose line does not show it even though the warning still names it.
+   A result set that no ingredient set leads to shows **Nothing — unreachable** on its line, the reserved failure result set included, because this mode never awards it on a failed check.
 3. If you do not need the result set, remove it from the **Results** tab.
 4. A result set that is reached only by default raises no warning.
 
