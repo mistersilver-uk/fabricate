@@ -191,6 +191,37 @@ describe('the published StageBars under a bare ancestor', () => {
     assert.deepEqual(reports, []);
   });
 
+  it("writes a stage's valueText as its bar's reading, and an update changes it in place", async () => {
+    const forging = (valueText) => ({
+      stages: [
+        { name: 'Gather', value: 100 },
+        { name: 'Refine', valueText, value: 40 },
+      ],
+      currentIndex: 1,
+      ariaLabel: 'Forging progress',
+    });
+    const { target, handle } = mountStages(forging('40%, stage 2 of 2'));
+    const readings = () =>
+      [...target.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-valuetext')
+      );
+    const [, before] = target.querySelectorAll('[role="progressbar"]');
+    assert.deepEqual(readings(), [null, '40%, stage 2 of 2'], 'the seam strips no valueText');
+    assert.equal(handle.update(forging('45%, stage 2 of 2')), true);
+    await settle();
+    assert.deepEqual(readings(), [null, '45%, stage 2 of 2']);
+    assert.ok(
+      target.querySelectorAll('[role="progressbar"]')[1] === before,
+      'the same bar node, so nothing remounted'
+    );
+    handle.update(forging(undefined));
+    await settle();
+    assert.deepEqual(readings(), [null, null], 'a dropped valueText leaves the percentage');
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
   it('draws one caption line in its muted ink from :root[data-fabricate-theme]', async () => {
     await underSheet(
       ':root[data-fabricate-theme] { --fab-text-muted: rgb(7, 8, 9); }',
