@@ -10,18 +10,12 @@
  * in the main suite.
  *
  * A CHANGE TO THIS FILE SELECTS SURFACE COVERAGE — one frame of every route and tab the lab
- * renders, not one region of it — and that is a decision rather than an oversight (issue 1049).
- * Three of the lab's other inputs are narrowed from their own diff — the case registry per case
- * literal, `labActors.js` per fixture table, `mount.js` per marked region — and the obvious next
- * move is to narrow this one too, on the grounds that argument parsing and the step vocabulary
- * cannot change a pixel while the render path can. That distinction is not drawable from a diff of this module. `runSteps`' verb table,
- * `assertViewportFits`, the console-error gate, the readiness wait and the `frame.screenshot()`
- * call are interleaved here, and `commandApps` reads `process.argv` and drives the render in the
- * same function — so a region map over this file would have to cut through the middle of a
- * function, and a wrong cut fails in the silent direction: a run that photographs frames its own
- * driver just changed and publishes them as unaffected. The narrowings that do exist are the ones
- * whose regions are declarative data with a readership that can be read off the render path; this
- * file is neither.
+ * renders — rather than a narrowing from its own diff (issue 1049), and so does a change to the
+ * step runner (`viewLabSteps.js`) it calls. The readiness wait, the console-error gate and the
+ * `frame.screenshot()` call share `renderPage`, and
+ * `commandApps` both reads `process.argv` and drives the render, so no region of this file can be
+ * shown not to change a frame; a wrong cut would publish frames its own driver changed as
+ * unaffected.
  *
  * Coverage rather than the whole corpus is the OTHER half of that decision (`LAB_SURFACE_CASES` in
  * `scripts/lib/viewLabCases.js`). What a change to this driver has to prove is that the driver
@@ -63,6 +57,7 @@ import {
   rejectDuplicateEvidence,
   resolveRenderConcurrency,
 } from './lib/viewLabRenderPool.js';
+import { runCaseSteps } from './lib/viewLabSteps.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -126,109 +121,6 @@ async function startLabServer() {
   await server.listen();
   const port = server.config.server.port;
   return { baseUrl: `http://127.0.0.1:${port}`, close: () => server.close() };
-}
-
-/** The click modifiers Playwright accepts. */
-const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
-const PRESS_KEYS = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ContextMenu', 'Enter', 'Space', 'Tab'];
-
-/** The verbs a `modifiers` step may not carry. */
-const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];
-
-/** Drive a case to its named view state. */
-async function runSteps(page, steps, label, scratch) {
-  for (const step of steps) {
-    // A `{selector}` step clicks a stable element id — preferred wherever the UI offers one, since
-    // it survives a label change. A string step is a rail entry matched by its label.
-    if (typeof step === 'object') {
-      const element = page.locator(step.selector);
-      if ((await element.count()) === 0) {
-        throw new Error(
-          `${label}: nothing matches "${step.selector}" — the case cannot reach its view state`
-        );
-      }
-      const target = element.first();
-
-      // `modifiers` is a modifier on the click, not a sixth verb: it does not choose which action
-      // runs, it changes how the default one runs.
-      const modifiers = 'modifiers' in step ? [step.modifiers].flat() : null;
-      if (modifiers) {
-        // A modifier paired with a non-click verb would be dropped without a word, and the case
-        // would capture the UNMODIFIED state under its own name — a frame of the wrong state,
-        // published as evidence of the right one. Split such a step into two instead.
-        const paired = MODIFIER_INCOMPATIBLE_VERBS.filter((verb) => verb in step);
-        if (paired.length > 0) {
-          throw new Error(
-            `${label}: step for "${step.selector}" pairs \`modifiers\` with \`${paired.join('`, `')}\` — ` +
-              `a modifier only applies to a click, so it would be silently dropped and the case ` +
-              `would publish a frame of the unmodified state. Split it into two steps.`
-          );
-        }
-        const unknown = modifiers.filter((name) => !CLICK_MODIFIERS.includes(name));
-        if (unknown.length > 0) {
-          throw new Error(
-            `${label}: step for "${step.selector}" names unknown modifier(s) ` +
-              `${unknown.map((name) => JSON.stringify(name)).join(', ')} — ` +
-              `Playwright accepts ${CLICK_MODIFIERS.join(', ')}`
-          );
-        }
-      }
-
-      // Six verbs, because a click alone cannot reach every state the smoke photographs.
-      if ('select' in step) {
-        // A `<select>` whose chosen value changes the screen — the system currency strategy picker
-        // and the recipe category filter both work this way.
-        await target.selectOption(step.select);
-      } else if ('fill' in step) {
-        // Typed input. The only route to a DIRTY form: `data-system-details-dirty` appears on an
-        // `input` event, so no click reaches it.
-        await target.fill(step.fill);
-      } else if ('upload' in step) {
-        // A native `<input type="file">`.
-        const payload = join(scratch, `${label}.json`);
-        writeFileSync(payload, step.upload);
-        await target.setInputFiles(payload);
-      } else if (step.scroll) {
-        // Element exists but sits below an inner panel's fold.
-        await target.scrollIntoViewIfNeeded();
-      } else if ('press' in step) {
-        if (!PRESS_KEYS.includes(step.press)) {
-          throw new Error(
-            `${label}: step for "${step.selector}" names unknown key ${JSON.stringify(step.press)} — ` +
-              `press accepts ${PRESS_KEYS.join(', ')}`
-          );
-        }
-        await target.press(step.press);
-      } else {
-        await target.click(modifiers ? { modifiers } : {});
-      }
-
-      await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
-      continue;
-    }
-
-    const selector = '.manager-nav-button';
-    const name = step;
-
-    // Scoped and exact-prefixed, deliberately.
-    const matches = page
-      .locator(selector)
-      .filter({ hasText: new RegExp(String.raw`^\s*${escapeForRegExp(name)}(\s|$)`) });
-    const count = await matches.count();
-    if (count === 0) {
-      const available = await page.locator(selector).allInnerTexts();
-      throw new Error(
-        `${label}: no "${selector}" element labelled "${name}" — the case cannot reach its view state.\n` +
-          `  available: ${available.map((text) => JSON.stringify(text.replaceAll(/\s+/g, ' ').trim())).join(', ')}`
-      );
-    }
-    await matches.first().click();
-    await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
-  }
-}
-
-function escapeForRegExp(value) {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**
@@ -333,7 +225,7 @@ async function renderPage(
     );
     if (failure) throw new Error(`${label}: ${failure}`);
 
-    if (steps.length > 0) await runSteps(page, steps, label, scratch);
+    if (steps.length > 0) await runCaseSteps(page, steps, { label, scratch });
 
     // The hard gate against the failure this harness is most exposed to: a step that clicks
     // something, changes nothing, and captures whichever screen happened to be showing.

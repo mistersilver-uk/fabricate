@@ -57,12 +57,12 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
- * the Foundry shim it renders against, its capture, layout and census helpers and the radius
+ * the Foundry shim it renders against, its capture, step, layout and census helpers and the radius
  * ladder the census reads, this index and the case files it reads — but not the Primitive Lab
  * below, which no app frame renders.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/(?:foundryChromeSpec|radiusLadder)\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|ComputedCensus|LayoutAssertion|RenderPool|Shards|Steps)\.js$|scripts\/lib\/(?:foundryChromeSpec|radiusLadder)\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
 
 /** The Primitive Lab's page and directory, which `npm run lab:check` verifies (issue 2377). */
 const PRIMITIVE_LAB_PATTERN = /^tests\/view-lab\/primitives(?:\/|\.html$)/;
