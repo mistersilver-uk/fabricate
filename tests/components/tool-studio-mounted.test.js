@@ -901,13 +901,13 @@ describe('Tool Studio editor (mounted)', () => {
 
     buttons[0].focus();
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    assert.equal(document.activeElement, buttons[1]);
+    assert.ok(document.activeElement === buttons[1], 'focus is on the second button');
     buttons[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
-    assert.equal(document.activeElement, buttons[2]);
+    assert.ok(document.activeElement === buttons[2], 'focus is on the third button');
     buttons[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
-    assert.equal(document.activeElement, buttons[0]);
+    assert.ok(document.activeElement === buttons[0], 'focus is on the first button');
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-    assert.equal(document.activeElement, buttons[2]);
+    assert.ok(document.activeElement === buttons[2], 'focus is on the third button');
     assert.deepEqual(tabs, ['requirements', 'validation', 'breakage', 'validation']);
   });
 
@@ -1297,7 +1297,7 @@ describe('Tool Studio editor (mounted)', () => {
     firstPopover.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     assert.equal(document.querySelector('.manager-travel-popover'), null);
-    assert.equal(document.activeElement, trigger);
+    assert.ok(document.activeElement === trigger, 'focus is on the trigger');
 
     trigger.click();
     await tick();
@@ -1306,7 +1306,7 @@ describe('Tool Studio editor (mounted)', () => {
     outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     await tick();
     assert.equal(document.querySelector('.manager-travel-popover'), null);
-    assert.equal(document.activeElement, trigger);
+    assert.ok(document.activeElement === trigger, 'focus is on the trigger');
     outside.remove();
   });
 

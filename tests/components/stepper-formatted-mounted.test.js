@@ -329,7 +329,7 @@ describe('Stepper formatted mode: the keyboard', () => {
       assert.ok(event.defaultPrevented);
       assert.deepEqual(reachedWindow, [], 'core.dismiss never sees an Escape that undid an edit');
       assert.equal(input.value, '×½', 'the committed display is back');
-      assert.equal(globalThis.document.activeElement, input, 'focus stays in the field');
+      assert.ok(globalThis.document.activeElement === input, 'focus stays in the field');
       blur(input);
       assert.deepEqual(calls, [], 'so a later blur has nothing to commit');
       key(input, 'Escape');

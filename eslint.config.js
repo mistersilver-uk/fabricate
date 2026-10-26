@@ -605,6 +605,20 @@ export default [
       // expects a constructor (`typeof X === 'function'`); converting them to
       // plain objects breaks those `typeof`/`new` call sites.
       'unicorn/no-static-only-class': 'off',
+      // `node:assert` serialises a failing DOM node to build its diff, and a mounted element's
+      // circular tree exhausts the heap. Compare focus by identity: `assert.ok(a === b, why)`.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='assert']" +
+            '[callee.property.name=/^(equal|strictEqual|deepEqual|deepStrictEqual|notEqual|notStrictEqual)$/]' +
+            " > MemberExpression.arguments[property.name='activeElement']",
+          message:
+            'Do not hand a DOM node to an equality assertion: a failure walks the element tree ' +
+            'until the heap dies. Use `assert.ok(document.activeElement === node, why)`.',
+        },
+      ],
     },
   },
 
