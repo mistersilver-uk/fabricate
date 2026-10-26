@@ -12,7 +12,7 @@
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import { Window } from 'happy-dom';
 
@@ -330,20 +330,70 @@ describe('the published Modal opens and closes only through update', () => {
     assert.ok(!listboxIn(), 'no list is left in the host');
   });
 
-  it('leaves a slot-mounted published Select’s list open in the host when an update closes the dialog, as the group states', async () => {
-    const { api, handle, update } = mountModal();
+  it('closes a slot-mounted published Select’s list when an update closes the dialog, and its trigger reads aria-expanded false when the dialog opens again', async () => {
+    const { api, handle, target: modalTarget, update } = mountModal();
     await settle();
     const { target } = mountIn(api, handle.slot('body'), 'Select', { ...SELECT, onChange() {} });
-    target.querySelector('button').click();
+    const trigger = target.querySelector('button');
+    trigger.click();
     flushSync();
     await settle();
     assert.ok(listboxIn(), 'the list is open');
+    const host = modalTarget.parentElement;
+    assert.equal(host.children.length, 3, 'target, the dialog’s container and the list’s');
     update({ open: false });
     flushSync();
     await settle();
     assert.ok(!dialogIn(), 'the dialog is gone');
-    assert.ok(listboxIn(), 'the list stays until its mount closes it or is destroyed');
+    assert.ok(!listboxIn(), 'the list is gone');
+    assert.equal(host.children.length, 1, 'and no Select container is left in the host');
+    update({ open: true });
+    await settle();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
   });
+
+  /** Each slot entry with an open panel, and the `update` that detaches the slot holding it. */
+  const DETACHING = [
+    ['Select', 'open: false', { open: false }, '[role="listbox"]'],
+    ['Select', 'body: false', { body: false }, '[role="listbox"]'],
+    ['ActionMenu', 'open: false', { open: false }, '[role="menu"]'],
+  ];
+  for (const [name, label, next, panelHook] of DETACHING) {
+    it(`moves no focus and calls nothing as an update of ${label} closes a slot-mounted published ${name}’s open panel`, async () => {
+      const shellTarget = fabricateTarget(shells, 'fabricate fabricate-app');
+      const opener = companionButton(shellTarget.parentElement);
+      const { api, handle, update } = mountModal({}, { target: shellTarget });
+      await settle();
+      const callback = recorder();
+      const props =
+        name === 'Select'
+          ? { ...SELECT, onChange: callback.record }
+          : {
+              items: [{ id: 'rename', label: 'Rename reagent' }],
+              ariaLabel: 'Reagent actions',
+              onSelect: callback.record,
+            };
+      const { target } = mountIn(api, handle.slot('body'), name, props);
+      target.querySelector('button').click();
+      flushSync();
+      await settle();
+      assert.ok(document.querySelector(panelHook), 'the panel is open');
+      opener.focus();
+      assert.ok(document.activeElement === opener, 'the companion moved focus to its opener first');
+      const { HTMLElement } = document.defaultView;
+      const focus = mock.method(HTMLElement.prototype, 'focus');
+      try {
+        update(next);
+        await settle();
+        assert.ok(!document.querySelector(panelHook), 'the panel is gone');
+        assert.ok(document.activeElement === opener, 'focus stays on the opener');
+        assert.equal(focus.mock.callCount(), 0, 'nothing is focused');
+      } finally {
+        focus.mock.restore();
+      }
+      assert.deepEqual(callback.calls, [], `the ${name} calls nothing`);
+    });
+  }
 
   it('leaves no dialog, container or layer when destroyed while open', async () => {
     const { handle } = mountModal({}, { target: fabricateTarget(shells, 'fabricate') });
@@ -663,27 +713,60 @@ for (const closeOnOutsideClick of [true, false]) {
       assert.deepEqual(calls, []);
     });
 
-    it(
-      closeOnOutsideClick
-        ? 'closes an opened published IconPicker’s list on an Escape in its query field, and calls onClose once'
-        : 'closes an opened published IconPicker’s list on an Escape in its query field, and calls nothing',
-      async () => {
-        const { api, calls, handle } = await open();
-        const { target } = mountIn(api, handle.slot('body'), 'IconPicker', {
-          ...PICKER,
-          onChange() {},
-        });
-        target.querySelector('button').click();
+    it('closes an opened published IconPicker’s list on an Escape in its query field, calls nothing, and focus is on the IconPicker trigger', async () => {
+      const { api, calls, handle } = await open();
+      const { target } = mountIn(api, handle.slot('body'), 'IconPicker', {
+        ...PICKER,
+        onChange() {},
+      });
+      const trigger = target.querySelector('button');
+      trigger.click();
+      flushSync();
+      await settle();
+      const field = document.querySelector('[role="dialog"]:not([data-manager-modal]) input');
+      assert.ok(field, 'the list is open with its query field');
+      press(field, 'Escape');
+      await settle();
+      assert.ok(!document.querySelector('[role="dialog"]:not([data-manager-modal])'), 'closed');
+      assert.deepEqual(calls, []);
+      assert.ok(document.activeElement === trigger, 'focus is on the trigger');
+    });
+
+    it('calls nothing for a press on a slot-mounted published ActionMenu’s item, whose click chooses it, nor for an Escape in its menu, which closes it', async () => {
+      const { api, calls, handle } = await open();
+      const chosen = [];
+      const { target } = mountIn(api, handle.slot('body'), 'ActionMenu', {
+        items: [
+          { id: 'rename', label: 'Rename reagent' },
+          { id: 'delete', label: 'Delete reagent' },
+        ],
+        ariaLabel: 'Reagent actions',
+        onSelect: (id) => {
+          chosen.push(id);
+        },
+      });
+      const trigger = target.querySelector('button');
+      const openMenu = async () => {
+        trigger.click();
         flushSync();
         await settle();
-        const field = document.querySelector('[role="dialog"]:not([data-manager-modal]) input');
-        assert.ok(field, 'the list is open with its query field');
-        press(field, 'Escape');
-        await settle();
-        assert.ok(!document.querySelector('[role="dialog"]:not([data-manager-modal])'), 'closed');
-        assert.equal(calls.length, closeOnOutsideClick ? 1 : 0);
-      }
-    );
+        return document.querySelector('[role="menu"]');
+      };
+      const item = (await openMenu()).querySelector('[role="menuitem"]');
+      pointer(item, 'mousedown');
+      assert.ok(item.isConnected, 'the press leaves the menu open');
+      item.click();
+      flushSync();
+      await settle();
+      assert.deepEqual(chosen, ['rename'], 'the click chooses the item');
+      const menu = await openMenu();
+      assert.ok(menu, 'the menu opens again');
+      press(menu.querySelector('[role="menuitem"]'), 'Escape');
+      await settle();
+      assert.ok(!document.querySelector('[role="menu"]'), 'the Escape closed the menu');
+      assert.ok(document.activeElement === trigger, 'focus is on the trigger');
+      assert.deepEqual(calls, []);
+    });
 
     it(
       closeOnOutsideClick
@@ -736,8 +819,8 @@ describe('outside presses on the published Modal', () => {
   });
 
   /** An open dialog with a published Select in its body slot, its list opened from the trigger. */
-  async function withOpenSelect(closeOnOutsideClick, selectHost) {
-    const mounted = mountModal({ closeOnOutsideClick });
+  async function withOpenSelect(closeOnOutsideClick, selectHost, options = {}) {
+    const mounted = mountModal({ closeOnOutsideClick }, options);
     await settle();
     const slot = mounted.handle.slot('body');
     const target = doc(slot).createElement('div');
@@ -753,11 +836,12 @@ describe('outside presses on the published Modal', () => {
   }
 
   for (const closeOnOutsideClick of [true, false]) {
-    it(`calls onClose ${closeOnOutsideClick ? 'once' : 'never'} for a mousedown on a slot-mounted Select’s list with ${closeOnOutsideClick}`, async () => {
+    it(`calls nothing for a mousedown on a slot-mounted Select’s list with ${closeOnOutsideClick}, and the list is still open`, async () => {
       const { calls, list } = await withOpenSelect(closeOnOutsideClick, null);
       assert.ok(!dialogIn().contains(list), 'the list is drawn outside the dialog');
       pointer(list, 'mousedown');
-      assert.equal(calls.length, closeOnOutsideClick ? 1 : 0);
+      assert.deepEqual(calls, []);
+      assert.ok(list.isConnected, 'the list is still open');
     });
 
     it(`calls nothing for a mousedown or an Escape in that Select’s list when its overlayHost is in the slot, with ${closeOnOutsideClick}`, async () => {
@@ -770,6 +854,37 @@ describe('outside presses on the published Modal', () => {
       assert.deepEqual(calls, []);
     });
   }
+
+  it('calls nothing for a mousedown on a slot-mounted Select’s list in the standalone layer, and once for one on the page', async () => {
+    const { calls, list } = await withOpenSelect(true, null, {
+      target: fabricateTarget(shells, 'fabricate'),
+    });
+    assert.ok(list.closest(LAYER), 'the list is drawn in the standalone layer');
+    pointer(list, 'mousedown');
+    assert.deepEqual(calls, []);
+    pointer(document.body, 'mousedown');
+    assert.deepEqual(calls, [[]]);
+  });
+
+  it('calls onClose once for a mousedown in a Modal mounted in the body slot, which counts as outside', async () => {
+    const outer = mountModal();
+    await settle();
+    const inner = recorder();
+    mountIn(outer.api, outer.handle.slot('body'), 'Modal', {
+      ...REQUIRED,
+      title: 'Confirm the rename',
+      open: true,
+      onClose: inner.record,
+    });
+    await settle();
+    const innerDialog = [...document.querySelectorAll(DIALOG_HOOK)].find(
+      (dialog) => dialog.getAttribute('aria-label') === 'Confirm the rename'
+    );
+    assert.ok(!dialogIn().contains(innerDialog), 'the inner dialog is drawn outside the outer');
+    pointer(innerDialog, 'mousedown');
+    assert.deepEqual(outer.calls, [[]], 'the outer dialog is dismissed once');
+    assert.deepEqual(inner.calls, [], 'the inner one hears a press inside it');
+  });
 });
 
 describe('focus and the published Modal', () => {

@@ -1,8 +1,9 @@
 /**
  * The overlay host registry and the seam's shared standalone layer (issue 2454), with stand-in
  * chains: the nearest registered target above an anchor wins, an overlay opened inside another's
- * container joins that chain, a held overlay keeps its container, and the layer is counted per
- * document. The real chain is `components/published-overlays-mounted.test.js`'s.
+ * container joins that chain, a held overlay keeps its container, the layer is counted per
+ * document, and each held overlay is known by what it was opened from (issue 2660).
+ * The real chain is `components/published-overlays-mounted.test.js`'s.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -13,7 +14,9 @@ const {
   acquireOverlayHost,
   acquireStandaloneOverlayLayer,
   createOverlayContainer,
+  heldBy,
   overlayHostRect,
+  overlaysOpenedFrom,
   registerOverlayChain,
   releaseOverlayHost,
   resetOverlayHostDiagnostics,
@@ -127,6 +130,132 @@ describe('acquireOverlayHost', () => {
   });
 });
 
+describe('heldBy', () => {
+  it('answers false for a target that is not a node, as a Window', () => {
+    assert.equal(heldBy(element(), document.defaultView), false);
+    assert.equal(heldBy(element(), null), false);
+  });
+
+  it('never hands a target that is not a node to contains, which throws on one in a browser', () => {
+    const strict = {
+      contains(node) {
+        if (typeof node?.nodeType !== 'number') throw new TypeError('not a Node');
+        return false;
+      },
+    };
+    assert.equal(heldBy(strict, document.defaultView), false);
+  });
+
+  it('answers true for a node in the container and for one in an open shadow root under it', () => {
+    const container = element();
+    const inside = element('span', container);
+    const hostNode = element('div', container);
+    const shadow = hostNode.attachShadow({ mode: 'open' });
+    const deep = document.createElement('i');
+    shadow.append(deep);
+    assert.equal(heldBy(container, inside), true);
+    assert.equal(heldBy(container, deep), true);
+    assert.equal(heldBy(element(), inside), false);
+  });
+});
+
+describe('overlaysOpenedFrom', () => {
+  const acquired = [];
+  /** Acquires a panel named `name` from `anchor`, released after the test. */
+  function acquire(name, anchor, overlay = element()) {
+    overlay.dataset.probe = name;
+    acquired.push(overlay);
+    acquireOverlayHost(overlay, anchor, { component: 'Probe' });
+    return overlay;
+  }
+  /** The probe names `root`'s answer holds, sorted, so a failure prints no element. */
+  const openedFrom = (root) =>
+    overlaysOpenedFrom(root)
+      .map((overlay) => overlay.dataset.probe)
+      .sort((a, b) => a.localeCompare(b));
+  afterEach(() => {
+    for (const overlay of acquired) releaseOverlayHost(overlay);
+    acquired.length = 0;
+  });
+
+  it('answers [] while no overlay is held', () => {
+    assert.deepEqual(openedFrom(element()), []);
+  });
+
+  it('counts an overlay acquired from an anchor in root, by the class walk and by a chain', () => {
+    const root = element();
+    root.className = 'fabricate-app';
+    acquire('walked', element('button', root));
+    const target = element('div', root);
+    const chain = standInChain(element('section'));
+    registerOverlayChain(target, chain);
+    try {
+      acquire('chained', element('button', target));
+      assert.deepEqual(chain.log, ['acquire'], 'the chain hosts the second');
+      assert.deepEqual(openedFrom(root), ['chained', 'walked']);
+      assert.deepEqual(openedFrom(element()), [], 'another root holds neither');
+    } finally {
+      unregisterOverlayChain(target, chain);
+    }
+  });
+
+  it('forgets an overlay once it is released', () => {
+    const root = element();
+    const overlay = acquire('released', element('button', root));
+    releaseOverlayHost(overlay);
+    assert.deepEqual(openedFrom(root), []);
+  });
+
+  it('never answers root itself, nor stores an overlay acquired from itself', () => {
+    const outer = element();
+    const root = element('div', outer);
+    acquire('root', element('button', root), root);
+    const dialog = element('div', outer);
+    acquire('dialog', dialog, dialog);
+    assert.deepEqual(openedFrom(root), [], 'root is not its own panel');
+    assert.deepEqual(openedFrom(outer), ['root'], 'the self-anchored dialog is not stored');
+  });
+
+  for (const [label, anchorOf] of [
+    ['null', () => null],
+    ['a text node', () => document.createTextNode('x')],
+  ]) {
+    it(`forgets an overlay re-acquired from ${label}`, () => {
+      const root = element();
+      const overlay = acquire('moved', element('button', root));
+      acquire('moved', anchorOf(), overlay);
+      assert.deepEqual(openedFrom(root), []);
+      assert.deepEqual(openedFrom(document.body), [], 'no entry is left anywhere');
+    });
+  }
+
+  it('follows a re-acquire whose anchor left root', () => {
+    const [first, second] = [element(), element()];
+    const overlay = acquire('moved', element('button', first));
+    acquire('moved', element('button', second), overlay);
+    assert.deepEqual(openedFrom(first), [], 'the old root no longer holds it');
+    assert.deepEqual(openedFrom(second), ['moved']);
+  });
+
+  it('counts an overlay opened from inside a counted one, to a fixed point', () => {
+    const root = element();
+    const [third, second, first] = [element(), element(), element()];
+    acquire('third', element('button', second), third);
+    acquire('second', element('button', first), second);
+    acquire('first', element('button', root), first);
+    acquire('elsewhere', element('button'));
+    assert.deepEqual(openedFrom(root), ['first', 'second', 'third']);
+  });
+
+  it('counts an anchor inside an open shadow root that root holds', () => {
+    const root = element();
+    const anchor = document.createElement('button');
+    element('span', root).attachShadow({ mode: 'open' }).append(anchor);
+    acquire('shadowed', anchor);
+    assert.deepEqual(openedFrom(root), ['shadowed']);
+  });
+});
+
 describe('overlayHostRect', () => {
   it('measures a container’s host, because a container draws no box', () => {
     const host = element('section');
@@ -182,6 +311,27 @@ describe('anchoredPopover under a registered chain', () => {
     assert.equal(host.children.length, 1, 'a new one on reopening');
     handle.destroy();
     unregisterOverlayChain(target, chain);
+  });
+});
+
+describe('anchoredPopover when its layout throws at setup', () => {
+  it('leaves no registry entry and no panel in the host', () => {
+    const app = element();
+    app.className = 'fabricate-app';
+    const trigger = element('button', app);
+    const panel = element();
+    assert.throws(
+      () =>
+        anchoredPopover(panel, {
+          component: 'ThrowingPopover',
+          trigger,
+          layout() {
+            throw new Error('layout failed');
+          },
+        }),
+      /layout failed/
+    );
+    assert.deepEqual(overlaysOpenedFrom(app), [], 'the registry holds nothing');
   });
 });
 

@@ -66,6 +66,29 @@ function dispatchWithWindowListener(element, event) {
 
 const q = (selector) => document.querySelector(selector);
 
+const press = () => new document.defaultView.MouseEvent('mousedown', { bubbles: true });
+
+/** A panel on `<body>` holding an input, as a picker's portaled list does. */
+function panelWithField() {
+  const panel = document.createElement('div');
+  panel.innerHTML = '<input data-panel-field>';
+  document.body.append(panel);
+  return { panel, field: panel.querySelector('[data-panel-field]') };
+}
+
+/** Runs `run(panel, field)` with a panel acquired from `anchor`, released however it ends. */
+async function withPanel(anchor, run) {
+  const { acquireOverlayHost, releaseOverlayHost } = await harness.loadRawModule(OVERLAY_HOST_PATH);
+  const { panel, field } = panelWithField();
+  acquireOverlayHost(panel, anchor, { component: 'Probe' });
+  try {
+    return await run(panel, field);
+  } finally {
+    releaseOverlayHost(panel);
+    panel.remove();
+  }
+}
+
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
@@ -218,6 +241,96 @@ for (const closeOnOutsideClick of [true, false]) {
           assert.deepEqual(seen, ['Escape']);
         }
       );
+    });
+
+    describe('a panel opened from inside the dialog', () => {
+      it('calls nothing for a press in it or an Escape on a field in it', async () => {
+        const calls = await open();
+        await withPanel(q('[data-plain]'), (panel, field) => {
+          panel.dispatchEvent(press());
+          field.dispatchEvent(escape());
+          assert.deepEqual(calls, []);
+        });
+      });
+
+      for (const [label, registeredBefore] of [
+        ['registered before the dialog mounts', true],
+        ['registered after the dialog is open', false],
+      ]) {
+        it(`judges an Escape as it goes down, with a listener ${label} that releases the panel`, async () => {
+          const overlayHost = await harness.loadRawModule(OVERLAY_HOST_PATH);
+          const { panel, field } = panelWithField();
+          const release = (event) => {
+            if (event.key === 'Escape') overlayHost.releaseOverlayHost(panel);
+          };
+          const listen = () => document.addEventListener('keydown', release, { capture: true });
+          if (registeredBefore) listen();
+          try {
+            const calls = await open();
+            if (!registeredBefore) listen();
+            overlayHost.acquireOverlayHost(panel, q('[data-plain]'), {});
+            field.dispatchEvent(escape());
+            const dialog = q('[data-manager-modal]');
+            assert.equal(
+              overlayHost.overlaysOpenedFrom(dialog).length,
+              0,
+              'the panel was released'
+            );
+            assert.deepEqual(calls, []);
+          } finally {
+            document.removeEventListener('keydown', release, { capture: true });
+            overlayHost.releaseOverlayHost(panel);
+            panel.remove();
+          }
+        });
+      }
+
+      it('judges a later press by its own origin, not by an earlier Escape in a panel', async () => {
+        const calls = await open();
+        await withPanel(q('[data-plain]'), (panel, field) => {
+          field.dispatchEvent(escape());
+          assert.deepEqual(calls, [], 'the Escape in the panel dismisses nothing');
+        });
+        document.body.dispatchEvent(press());
+        assert.deepEqual(
+          calls,
+          closeOnOutsideClick ? [[]] : [],
+          'a later press on the page decides alone'
+        );
+      });
+
+      it('counts a panel opened from a panel the dialog opened', async () => {
+        const calls = await open();
+        await withPanel(q('[data-plain]'), async (first) => {
+          const anchor = document.createElement('button');
+          first.append(anchor);
+          await withPanel(anchor, (second, field) => {
+            second.dispatchEvent(press());
+            field.dispatchEvent(escape());
+            assert.deepEqual(calls, []);
+          });
+        });
+      });
+
+      if (closeOnOutsideClick) {
+        it('still calls onClose once for a press and for an Escape in a panel opened from outside', async () => {
+          const outside = document.createElement('div');
+          outside.className = 'fabricate-app';
+          outside.innerHTML = '<button type="button">Elsewhere</button>';
+          document.body.append(outside);
+          try {
+            const calls = await open();
+            await withPanel(outside.firstChild, (panel, field) => {
+              panel.dispatchEvent(press());
+              assert.deepEqual(calls, [[]], 'the press dismisses');
+              field.dispatchEvent(escape());
+              assert.deepEqual(calls, [[], []], 'and so does the Escape');
+            });
+          } finally {
+            outside.remove();
+          }
+        });
+      }
     });
 
     describe('the close control', () => {
@@ -387,6 +500,47 @@ describe('Modal host and window lifecycle', () => {
       assert.equal(event.defaultPrevented, true);
     } finally {
       delete document.defaultView;
+    }
+  });
+
+  it('leaves an Escape in a panel the dialog opened to it in a document with no window', async () => {
+    const calls = [];
+    const view = document.defaultView;
+    Object.defineProperty(document, 'defaultView', { configurable: true, get: () => null });
+    try {
+      await harness.mount({ open: true, title: 'Probe', body, onClose: closeInto(calls) });
+      await withPanel(q('[data-plain]'), (panel, field) => {
+        field.dispatchEvent(new view.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        assert.deepEqual(calls, [], 'judged live, with no record to read');
+      });
+    } finally {
+      delete document.defaultView;
+    }
+  });
+
+  it('counts a panel inside only the dialog that opened it, with two dialogs open', async () => {
+    const [aCalls, bCalls] = [[], []];
+    await harness.mount({ open: true, title: 'A', body, onClose: closeInto(aCalls) });
+    const { mount, unmount, flushSync } =
+      await import('../../node_modules/svelte/src/index-client.js');
+    const { default: Modal } = await harness.loadRawModule(`${MODAL_PATH}.js`);
+    const second = document.createElement('div');
+    second.className = 'fabricate-manager';
+    document.body.append(second);
+    const b = mount(Modal, {
+      target: second,
+      props: { open: true, title: 'B', body, onClose: closeInto(bCalls) },
+    });
+    flushSync();
+    try {
+      await withPanel(harness.target.querySelector('[data-plain]'), (panel) => {
+        panel.dispatchEvent(press());
+      });
+      assert.deepEqual(aCalls, [], 'the dialog that opened the panel stays');
+      assert.deepEqual(bCalls, [[]], 'the other one is dismissed once');
+    } finally {
+      unmount(b);
+      second.remove();
     }
   });
 
