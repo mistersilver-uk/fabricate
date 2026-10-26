@@ -1773,6 +1773,7 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
 // through this function, and `runFormulaRouted` resolves a real roll through it too.
 
 const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
+const { fixedRangeHolds } = await import('../src/systems/checkRouting.js');
 
 test('executed simple evidence records the raw sum/over comparison under a forced success', async () => {
   stubRoll(8, [{ number: 1, faces: 20, total: 8, results: [{ result: 8 }] }]);
@@ -2246,4 +2247,42 @@ test('classifyCheckTotal: a forced outcome BYPASSES the recipe minimum-success-t
   assert.equal(forced.minTierFailed, false, 'a natural crit is never judged by a recipe minimum');
   assert.equal(forced.matched?.id, 'slag', 'the forced tier routes, minimum or not');
   assert.equal(forced.blockedOutcomeId, null, 'and no tier is reported as blocked');
+});
+
+// A fixed tier with no finite `start` is unplaced, never a tier starting at 0 (issue 2521).
+const DRAFTY = { id: 'drafty', name: 'Drafty', success: false, start: null, end: 8 };
+const BOTCH = { id: 'botch', name: 'Botch', success: false, start: 1, end: 8 };
+const HIGH = { id: 'high', name: 'High', success: true, start: 9, end: 20 };
+const fixedArgs = (total, fixedOutcomes, extra = {}) => ({
+  type: 'fixed',
+  total,
+  dc: 0,
+  comparison: 'meet',
+  relativeOutcomes: [],
+  fixedOutcomes,
+  triggers: [],
+  ...extra,
+});
+
+test('classifyCheckTotal: a fixed tier with no start is never matched', () => {
+  for (let total = 0; total <= 8; total += 1) {
+    assert.equal(
+      classifyCheckTotal(fixedArgs(total, [DRAFTY, HIGH])).matched,
+      null,
+      `total ${total} falls in the unplaced tier's span and matches nothing`
+    );
+  }
+  assert.equal(classifyCheckTotal(fixedArgs(9, [DRAFTY, HIGH])).matched?.id, 'high');
+});
+
+test('classifyCheckTotal: a forced failure skips a tier with no start', () => {
+  const triggers = [{ id: 'f', condition: { type: 'rollTotal', operator: '==', value: 12 }, outcome: 'failure' }];
+  const { matched } = classifyCheckTotal(fixedArgs(12, [DRAFTY, BOTCH, HIGH], { triggers }));
+  assert.equal(matched?.id, 'botch', 'the lowest placed failure tier, not the unplaced one');
+});
+
+test('fixedRangeHolds: a missing bound holds nothing, never a bound of 0', () => {
+  assert.equal(fixedRangeHolds({ start: 0, end: 5 }, 0), true);
+  assert.equal(fixedRangeHolds({ start: null, end: 5 }, 0), false);
+  assert.equal(fixedRangeHolds({ start: 0, end: null }, 0), false);
 });

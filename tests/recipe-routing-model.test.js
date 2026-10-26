@@ -392,15 +392,12 @@ function classifyTier(system, mode, recipe, tier, { forced = false } = {}) {
   return { checkResult: { outcome: matched?.name ?? null, success }, matched, minTierFailed };
 }
 
-const NULL_START =
-  'Backlog 1: the engine coerces a null start to 0 and blocks a tier the editor routes';
-
 /**
  * Asserts one tier's source against the engine. A failure tier the minimum gates is compared on
- * its forced-failure path, its natural roll awarding nothing; a `coercesNullStart` tier asserts
- * the null-start divergence by name.
+ * its forced-failure path, its natural roll awarding nothing. A fixed tier with no finite `start`
+ * is unplaced: no roll matches it, while the editor's `targets` stay the authoring claim.
  */
-function assertTierParity(context, tier, source, coercesNullStart) {
+function assertTierParity(context, tier, source) {
   const { service, system, mode, recipe, step, ingredientSet } = context;
   const award = (checkResult) =>
     awardedIndexes(service, system, { recipe, step, ingredientSet, checkResult });
@@ -409,9 +406,10 @@ function assertTierParity(context, tier, source, coercesNullStart) {
   if (!source) {
     return assert.deepEqual(awarded, [], `the unoffered tier ${tier.name} awards nothing`);
   }
-  if (coercesNullStart.includes(tier.id)) {
-    assert.deepEqual(awarded, [], `${NULL_START}: ${tier.name}`);
-    return assert.ok(source.targets.length > 0, `${NULL_START}: ${tier.name}`);
+  if (system.craftingCheck.routed.type === 'fixed' && !Number.isFinite(tier.start)) {
+    assert.notEqual(natural.matched?.id, tier.id, `the unplaced ${tier.name} is never matched`);
+    assert.deepEqual(awarded, [], `the unplaced ${tier.name} awards nothing`);
+    return assert.ok(source.targets.length > 0, `the editor still offers ${tier.name}`);
   }
   if (tier.success === true || !natural.minTierFailed) {
     return assert.deepEqual(source.targets, awarded, `tier ${tier.name}`);
@@ -431,7 +429,7 @@ function assertTierParity(context, tier, source, coercesNullStart) {
  * Asserts the model built for one scope against the engine: every offered source's `targets` are
  * the awarded groups, and every tier the policy does not offer awards nothing.
  */
-function assertParity({ system, recipe, step = null, mode, expected, coercesNullStart = [] }) {
+function assertParity({ system, recipe, step = null, mode, expected }) {
   const service = new ResolutionModeService({ getSystem: () => system });
   assert.ok(recipe.craftingSystemId, 'premise: the fixture names its system');
   assert.equal(service.getMode(recipe), mode, 'premise: the fixture runs the intended mode');
@@ -469,7 +467,7 @@ function assertParity({ system, recipe, step = null, mode, expected, coercesNull
   const context = { service, system, mode, recipe, step, ingredientSet: scope.ingredientSets[0] };
   for (const tier of outcomes) {
     const source = model.sources.find(({ id }) => id === tier.id);
-    assertTierParity(context, tier, source, coercesNullStart);
+    assertTierParity(context, tier, source);
   }
   if (expected) assert.deepEqual(byHow(model), expected);
   return model;
@@ -985,7 +983,6 @@ describe('parity: the minimum success tier', () => {
           't-low'
         ),
         mode: 'routedByCheck',
-        coercesNullStart: direction === 'under' ? ['t-fine', 't-great'] : [],
       });
       assert.equal(model.minimum, null);
       assert.ok(model.sources.every(({ blockedReason }) => blockedReason === null));
@@ -1006,12 +1003,7 @@ describe('parity: the minimum success tier', () => {
         ],
         't-fine'
       );
-      const model = assertParity({
-        system,
-        recipe,
-        mode: 'routedByCheck',
-        coercesNullStart: direction === 'over' ? ['t-wild'] : [],
-      });
+      const model = assertParity({ system, recipe, mode: 'routedByCheck' });
       assert.deepEqual(byHow(model), [
         ['t-botch', 'explicit', null],
         ['t-fine', 'explicit', null],
