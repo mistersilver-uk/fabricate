@@ -40,8 +40,8 @@
   }
 
   function readingOf(stage) {
-    const text = stage?.valueText;
-    return typeof text === 'string' && text ? text : undefined;
+    const reading = stage?.valueText;
+    return typeof reading === 'string' && reading ? reading : undefined;
   }
 
   function nameOf(stage) {
