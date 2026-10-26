@@ -109,13 +109,14 @@ describe('the published StageBars under a bare ancestor', () => {
       [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) => [
         caption.textContent,
         caption.getAttribute('aria-hidden'),
+        caption.getAttribute('title'),
       ]),
       [
-        ['1 Gather', 'true'],
-        ['2 Refine', 'true'],
-        ['3 ', 'true'],
+        ['1 Gather', 'true', 'Gather'],
+        ['2 Refine', 'true', 'Refine'],
+        ['3 ', 'true', null],
       ],
-      'each caption is its position and its name, hidden from assistive technology'
+      'each caption is its position and its name, hidden from assistive technology and titled by its name'
     );
     assert.ok(!group.querySelector('button, a, input, [tabindex]'), 'it draws no control');
     handle.destroy();
@@ -187,6 +188,38 @@ describe('the published StageBars under a bare ancestor', () => {
     handle.destroy();
     await settle();
     assert.equal(target.children.length, 0);
+    assert.deepEqual(reports, []);
+  });
+
+  it("writes a stage's valueText as its bar's reading, and an update changes it in place", async () => {
+    const forging = (valueText) => ({
+      stages: [
+        { name: 'Gather', value: 100 },
+        { name: 'Refine', valueText, value: 40 },
+      ],
+      currentIndex: 1,
+      ariaLabel: 'Forging progress',
+    });
+    const { target, handle } = mountStages(forging('40%, stage 2 of 2'));
+    const readings = () =>
+      [...target.querySelectorAll('[role="progressbar"]')].map((bar) =>
+        bar.getAttribute('aria-valuetext')
+      );
+    const [, before] = target.querySelectorAll('[role="progressbar"]');
+    assert.deepEqual(readings(), [null, '40%, stage 2 of 2'], 'the seam strips no valueText');
+    assert.equal(handle.update(forging('45%, stage 2 of 2')), true);
+    await settle();
+    assert.deepEqual(readings(), [null, '45%, stage 2 of 2']);
+    assert.equal(
+      target.querySelectorAll('[role="progressbar"]')[1],
+      before,
+      'the same bar node, so nothing remounted'
+    );
+    assert.equal(handle.update(forging(undefined)), true);
+    await settle();
+    assert.deepEqual(readings(), [null, null], 'a dropped valueText leaves the percentage');
+    handle.destroy();
+    await settle();
     assert.deepEqual(reports, []);
   });
 

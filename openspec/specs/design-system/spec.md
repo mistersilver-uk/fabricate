@@ -1128,6 +1128,8 @@ A search field (`SearchField`) takes exactly one naming route, `label`, `ariaLab
 A typeahead (`Typeahead`) takes exactly one of the same three, hands it to its field, and names its suggestion list by the same route, so the list and the field cannot read differently.
 A bar is named by its stage's `label`, else its `name`; the one bar of a one-stage group with neither takes the group's own name, because "Stage 1 of 1" states a position where there is nothing to choose between.
 An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
+A bar's reading is its stage's `valueText` where the caller passes a non-empty one and its percentage otherwise: `RunProgress` passes "p%, stage n of m" through the `FABRICATE.Common.StageBars.Position` key for each named stage of several, whose name states no position, and none for an unnamed one, whose label does; `p` is the stage's whole percent, truncated, so a stage short of done never reads 100%.
+A named stage's caption is ellipsized on overflow with its stage's name as its `title`, as an entry's time is; the caption stays `aria-hidden`, so the title is a pointer affordance and the bar's own name is what is announced.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
@@ -1187,6 +1189,11 @@ The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fa
 - **WHEN** a screen reader reaches a tile in the tint popover
 - **THEN** it announces the colour's name and selected state within a listbox named by the palette label
 - **AND** only the selected tile announces selected
+
+#### Scenario: A named stage of several announces its position
+
+- **WHEN** `RunProgress` draws three stages of which only the first is named, Gather, with the first done
+- **THEN** Gather's bar carries `aria-valuetext` "100%, stage 1 of 3" and each unnamed bar carries none
 
 ### Requirement: Shared primitives share one API convention
 

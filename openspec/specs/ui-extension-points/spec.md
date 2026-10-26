@@ -1111,13 +1111,18 @@ Each group states the accepted values of every key that entry publishes.
 
 - **`StageBars`.**
   - It is the design system's stage instrument: one bar per stage, side by side, in a `group`, each bar a `progressbar` with its own value, for how far a staged process has come; it draws no control.
-  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
+  - `stages` is required and lists the stages in drawn order, each `{ name?, label?, valueText?, value }`: `value` is the stage's fill, 0–100 and clamped, `name` is final display text drawn as the stage's caption while `numbered`, and `label` is final display text that names the stage's bar.
     A bar is named by its stage's `label`, else its `name`, else, in a list of one stage only, by the group's own name.
     So in a list of two or more stages each stage requires a `label` or a `name`: a stage with neither has no accessible name, which Fabricate does not refuse.
-    A member other than `name`, `label` and `value` is private, and an empty `stages` draws the named group with no bar.
+    `valueText` is final display text the bar announces as its reading in place of its percentage, as "40%, stage 3 of 4", so the companion states the percentage in it too; a stage whose `valueText` is absent or `''` announces its percentage.
+    The companion passes a non-blank string, because one of only spaces is written as it stands rather than replaced by the percentage.
+    Naming `valueText` is additive, and `StageBars`' `version` stays 1: before it a stage's `valueText` was unnamed and so private.
+    `describe` cannot tell a companion whether the running Fabricate announces it, and one that predates it announces the percentage.
+    A member other than `name`, `label`, `valueText` and `value` is private, and an empty `stages` draws the named group with no bar.
   - `currentIndex` is the index of the stage being worked, and defaults to `0`: its bar carries `aria-current="step"` and takes the accent until it fills, a filled bar takes the success tone, and every other bar the neutral one.
   - `numbered` is `true` or `false`, and defaults to `true`: while it is `true` each bar draws a caption beneath it, hidden from assistive technology, holding its position counted from `1` and then its `name`; a stage with no `name` draws its position alone.
     A caption is drawn on one line and cut off with an ellipsis where it is wider than its bar, so the companion keeps each name short.
+    Each caption carries its stage's `name` as its native tooltip (`title`), so a name the ellipsis cuts is shown whole under the pointer; a caption with no `name` carries none.
   - `ariaLabel` is required and names the group, final display text, as "Forging progress".
     It also names the one bar of a one-stage list whose stage has no label or name.
   - Rest `data-*` attributes land on the group root.
@@ -1715,7 +1720,7 @@ A nested mount's handle answers `false` from `update` from then on, and the comp
 - A companion writes no `fabricate`, `fabricate-app` or `fabricate-manager` class on an element it owns.
 - A `data-*` name Fabricate writes is private as its classes are: a companion passes only rest names that carry its own module id, because Fabricate styles some of its own elements by a `data-*` hook.
 - A published component draws only its declared content and, inside a content slot, the companion's own, draws a control only where its group says so, and adds no premium signal.
-It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
+It opens no portal, popover or dialog but the overlay its group states, and no tooltip but the one the `IconButton` group states and a native `title` where its own group states one, as `IconPicker`'s trigger and `StageBars`' captions do, writes nothing to `document.body` beyond what Foundry's tooltip manager writes for that tooltip, settings, flags or hooks, and nothing to `document.head` beyond Svelte's injected stylesheet, moves no focus but among the tabs of one `EditorTabs` strip, off a `Pagination` arrow that an `update` disables or removes, into and out of an `IconPicker`'s open list, and into, among the items of and out of an `ActionMenu`'s open menu, as each group states (the platform moves it among one `RadioCardGroup`'s or one `SegmentedControl`'s radios on the arrow keys, as each group states), and makes no network request except to load an image path the companion passes.
 `load` is the one call that fetches code, and only a lazy entry's; `mount` and `mountMany` fetch none.
 An entry whose `overlays` is `true` opens its overlay and may write the standalone layer to `target.ownerDocument.body`, as Overlays states.
 - A published component is not a live region unless its group says it is.
@@ -1860,6 +1865,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `StageBars` with `stages` and `ariaLabel` into a target under no Fabricate ancestor
 - **THEN** it draws a group named by `ariaLabel` holding one `progressbar` per stage, each named by its stage's `label`, else its `name`
 - **AND** the one bar of a one-stage list whose stage has neither takes the group's name, and an empty `stages` draws the named group with no bar
+- **AND** a stage's `valueText` is its bar's `aria-valuetext`, and while `numbered` each caption's `title` is its stage's `name`
 - **AND** its import closure reads no Foundry global
 
 #### Scenario: A published field
