@@ -201,7 +201,7 @@ async function main() {
     // error throws only after steps are clean.
     const outcome = evaluateSmokeOutcome({ steps: results.steps, consoleErrors });
     if (outcome.reason === 'console-errors') {
-      results.errors = consoleErrors;
+      results.errors = outcome.errors;
     }
     if (outcome.throws) {
       throw new Error(outcome.message);

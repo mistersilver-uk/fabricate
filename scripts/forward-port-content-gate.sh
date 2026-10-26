@@ -230,12 +230,22 @@ resolution_path_absent() {
   ! git ls-tree -r --name-only "$1" | LC_ALL=C grep -qxF -- "$2"
 }
 
+# True when a tree-ish records a blob at a path that cannot be read. An absent path is not
+# unreadable: resolution_blob_lines reads it as the empty set.
+resolution_blob_unreadable() {
+  local oid
+  oid="$(resolution_blob_oid "$1" "$2")"
+  [ -n "$oid" ] && ! git cat-file blob "$oid" >/dev/null 2>&1
+}
+
 # One path's blob as a sorted, unique set of its non-blank lines. An absent blob is the EMPTY set.
+# `-a` and `LC_ALL=C` read every blob as text: GNU grep prints nothing for input it deems binary,
+# so one NUL byte would otherwise make the whole blob the empty set (issue 1599).
 resolution_blob_lines() {
   local oid
   oid="$(resolution_blob_oid "$1" "$2")"
   [ -n "$oid" ] || return 0
-  git cat-file blob "$oid" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u || true
+  git cat-file blob "$oid" | LC_ALL=C grep -a -v '^[[:space:]]*$' | LC_ALL=C sort -u || true
 }
 
 # The union described above, one path per line, sorted and unique.
@@ -408,17 +418,20 @@ verify_resolution() {
   # repository's own contributing guide included) legitimately contains those characters.
   # A path the resolution DELETED has no blob to read, and that is a resolution this design intends
   # to support, so it is skipped. An empty blob oid for a path that IS still in the tree is a lookup
-  # that failed, not a deletion, and skipping it would silently exempt that path from this check and
-  # from A7 — so it refuses as unverifiable instead.
+  # that failed, not a deletion, and a recorded blob that cannot be read would count no markers and
+  # no lines; skipping either would silently exempt that path from this check and from A7 — so each
+  # refuses as unverifiable instead.
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     oid="$(resolution_blob_oid HEAD "$path")"
-    if [ -z "$oid" ]; then
-      resolution_path_absent HEAD "$path" && continue
+    if [ -z "$oid" ] && resolution_path_absent HEAD "$path"; then
+      continue
+    fi
+    if [ -z "$oid" ] || resolution_blob_unreadable HEAD "$path"; then
       echo "::error::${path} is recorded in the tree this run would push, but its content could not be read, so it could be checked neither for unresolved differences nor for invented lines. That is unverifiable rather than a refusal."
       return 2
     fi
-    markers="$(git cat-file blob "$oid" | grep -c -E '^(<{7}|\|{7}|={7}|>{7})( |$)' || true)"
+    markers="$(git cat-file blob "$oid" | LC_ALL=C grep -a -c -E '^(<{7}|\|{7}|={7}|>{7})( |$)' || true)"
     if [ "${markers:-0}" -gt 0 ]; then
       echo "::error::${path} still carries ${markers} line(s) marking a difference that was never resolved, so a partially-resolved file would land on main. Finish resolving it, recompute the resolution, and dispatch again."
       return 1
@@ -434,6 +447,11 @@ verify_resolution() {
     [ -n "$path" ] || continue
     # A6 has already refused the unreadable case, so an empty oid here is a genuine deletion.
     [ -n "$(resolution_blob_oid HEAD "$path")" ] || continue
+    # An unreadable parent blob reads as the empty set, which would name every line taken from it.
+    if resolution_blob_unreadable "$p1" "$path" || resolution_blob_unreadable "$p2" "$path"; then
+      echo "::error::${path} is recorded on origin/main or origin/release, but that version's content could not be read, so whether the resolution invented a line in it could not be established. That is unverifiable rather than a refusal."
+      return 2
+    fi
     invented="$(LC_ALL=C comm -23 <(resolution_blob_lines HEAD "$path") \
       <({
         resolution_blob_lines "$p1" "$path"
