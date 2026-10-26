@@ -27,6 +27,7 @@ When the feature is on, the Crafting Admin panel's left rail grows a **Gathering
 
 The gathering check itself is authored beside the crafting and salvage checks.
 See [Checks › Gathering]({% link checks/gathering.md %}).
+Known limitation: that page still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
 
 The stamina, modifier and visibility-gate fields on these pages accept roll expressions.
 Those are not a gathering concept — the same syntax runs the crafting checks, tool bonuses and complications too.

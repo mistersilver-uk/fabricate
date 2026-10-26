@@ -190,7 +190,8 @@ Clearing visibility removes the gate only when the task already had one saved.
 A task uses these rules when you choose **Check** on its **Gathering resolution** card.
 
 Check tasks do not carry their own result-selection setting.
-They are resolved by the system's gathering check, which you configure once for the whole system.
+They are resolved by the system's gathering check, which is authored on **Checks › Gathering**.
+Known limitation: **Checks › Gathering** still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** and the gathering check's roll cannot be authored there ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
 When a Check task is attempted, the gathering check rolls and produces a named outcome.
 That outcome name is matched to a result set by name, and the matching set is awarded.
 
@@ -215,11 +216,10 @@ See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage
 > Once you choose another mode, Progressive is no longer a choice for that task.
 
 A legacy Progressive task spends a value from the **system's** gathering check, not from the task.
-That check is authored on **Checks › Gathering**, beside the crafting and salvage checks.
+The award mode (equal, partial, or exceed) is the system's too, and a task contributes only its results.
+Both belong to **Checks › Gathering**, beside the crafting and salvage checks.
+Known limitation: **Checks › Gathering** still chooses its editor from a system-level gathering mode that no screen can set any more, so on a system left at the default it shows a read-only **Fixed d100 roll** and the gathering check's roll cannot be authored there ([issue #2696](https://github.com/mistersilver-uk/fabricate/issues/2696)).
 See [Gathering Checks]({% link checks/gathering.md %}).
-
-The award mode (equal, partial, or exceed) is the system's too, authored beside the roll on **Checks › Gathering**.
-A task contributes only its results.
 
 {% include screenshot.html case="manager-checks-gathering" %}
 
@@ -293,7 +293,7 @@ With the **Check-driven** source, the gathering check decides whether every requ
 Each Tool retains its own mechanic, but that mechanic is not evaluated while this source is active.
 Retained limited-use counters also remain unchanged while check-driven authority is active.
 This applies to a task resolved by **Check** and to a legacy Progressive task, because each rolls a gathering check for the breakage triggers to read.
-A **d100** task rolls no check, so check-driven breakage cannot fire for it and its required tools are never force-broken under this source.
+A **Direct** or **d100** task rolls no check, so check-driven breakage cannot fire for it and its required tools are never force-broken under this source.
 This is separate from the **Tool breakage outcome** setting above.
 The source decides whether a tool breaks.
 The outcome setting decides what a broken tool does to the gather.
