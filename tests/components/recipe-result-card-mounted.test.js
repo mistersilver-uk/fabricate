@@ -32,6 +32,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...RESULT_ROW_RAW_MODULES,
     'src/ui/model/complicationSummary.js',
+    'src/ui/svelte/apps/manager/complicationVocabularies.js',
     'src/ui/svelte/apps/manager/recipe/setDrafts.js',
   ],
   runeModules: TYPEAHEAD_RUNE_MODULES,

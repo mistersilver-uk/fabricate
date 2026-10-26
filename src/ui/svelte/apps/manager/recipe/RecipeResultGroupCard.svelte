@@ -28,6 +28,10 @@
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import SetCard from '../../../components/SetCard.svelte';
   import ProgressiveStageList from '../ProgressiveStageList.svelte';
+  import {
+    complicationMacroNames,
+    complicationTriggerLabels,
+  } from '../complicationVocabularies.js';
   import { defaultSetName } from './setDrafts.js';
 
   let {
@@ -71,7 +75,13 @@
     onRemove = () => {},
     // Deep link from a progressive row's read-only difficulty badge to the component editor.
     onOpenComponent = () => {},
+    // The system's script macros and check triggers, which a stage's complication sentence names.
+    macroOptions = [],
+    complicationTriggerOptions = [],
   } = $props();
+
+  const macroNames = $derived(complicationMacroNames(macroOptions));
+  const triggerLabels = $derived(complicationTriggerLabels(complicationTriggerOptions));
 
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
@@ -308,6 +318,8 @@
       editLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}
       editTitle={openComponentHint}
       editAriaLabel={(item) => `${openComponentHint} — ${componentOf(item)?.name}`}
+      {macroNames}
+      {triggerLabels}
       adderClass="fabricate-set-card-adder"
       onItemChange={(item, index, value) => updateItem(index, fromValue(item, value))}
       onReorder={(from, to) => reorderItem(from, to)}

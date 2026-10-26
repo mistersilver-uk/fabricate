@@ -323,6 +323,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
+    // The result card's stage-list vocabularies (issue 2446).
+    'src/ui/svelte/apps/manager/complicationVocabularies.js',
     'src/systems/characterPrerequisites.js',
     // The gathering host's seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
