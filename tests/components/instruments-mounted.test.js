@@ -441,6 +441,13 @@ describe('StageBars (mounted)', () => {
       ['1 Draw', '2 Fold', '3 '],
       'numbered by default, each caption its position and its name, never its label'
     );
+    assert.deepEqual(
+      [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) =>
+        caption.getAttribute('title')
+      ),
+      ['Draw', 'Fold', null],
+      "each named caption's title is its stage's whole name, never its label or position"
+    );
     assert.ok(!group.querySelector('button'), 'choosing a stage is not this instrument');
   });
 

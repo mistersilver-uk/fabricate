@@ -109,13 +109,14 @@ describe('the published StageBars under a bare ancestor', () => {
       [...group.querySelectorAll('.fab-stage-bars-caption')].map((caption) => [
         caption.textContent,
         caption.getAttribute('aria-hidden'),
+        caption.getAttribute('title'),
       ]),
       [
-        ['1 Gather', 'true'],
-        ['2 Refine', 'true'],
-        ['3 ', 'true'],
+        ['1 Gather', 'true', 'Gather'],
+        ['2 Refine', 'true', 'Refine'],
+        ['3 ', 'true', null],
       ],
-      'each caption is its position and its name, hidden from assistive technology'
+      'each caption is its position and its name, hidden from assistive technology and titled by its name'
     );
     assert.ok(!group.querySelector('button, a, input, [tabindex]'), 'it draws no control');
     handle.destroy();
