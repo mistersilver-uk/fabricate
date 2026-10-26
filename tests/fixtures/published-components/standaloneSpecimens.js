@@ -1,7 +1,8 @@
 /**
- * The specimens the standalone style root's rendered admission test draws (issue 2456): each
- * widened entry's props, covering every value of the vocabularies that test reads from the
- * components, and the computed properties it compares element by element.
+ * The specimens the standalone style root's rendered admission test draws (issues 2456, 2679):
+ * each widened entry's props, covering every value of the vocabularies that test reads from the
+ * components, with the target width, slot content and nested mount a specimen states, its reach,
+ * and the computed properties the test compares element by element and on each pseudo-element.
  */
 
 import {
@@ -15,65 +16,327 @@ import {
 
 const press = () => {};
 
-/** Each widened entry's specimens, by id, with the props each mounts with. */
+/** The properties a focus ring changes, and those the search shell's lit border changes. */
+const RING = Object.freeze(['outline-style', 'outline-width', 'outline-color']);
+const SHELL_BORDER = Object.freeze([
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+]);
+
+/**
+ * What a specimen answers to, each selector read inside its target: `focus` is the element Tab
+ * from the sentinel reaches, or `null` where nothing is reachable; `mark` the element and
+ * properties its keyboard mark changes, the focused element's ring by default; `hover` an enabled,
+ * unselected target whose compared properties the pointer changes, or `null`; `inert` marks a
+ * disabled hover target, or one the family draws no hover state on, drawn alike under the pointer
+ * but not required to change.
+ */
+const reach = (focus, hover = focus, mark = {}) => ({
+  focus,
+  mark: { selector: mark.selector ?? focus, properties: mark.properties ?? RING },
+  hover,
+  inert: mark.inert === true,
+});
+const UNREACHABLE = reach(null, null);
+const inertHover = (hover) => ({ ...reach(null, hover), inert: true });
+
+const button = (props) => ({ props, reach: reach('button') });
+const disabledButton = (props) => ({ props, reach: inertHover('button') });
+
+const unboundedStepper = (props) => ({
+  value: 3,
+  ariaLabel: 'Batch size',
+  decrementLabel: 'Fewer',
+  incrementLabel: 'More',
+  onChange: press,
+  ...props,
+});
+const stepper = (props) => unboundedStepper({ min: 0, max: 10, ...props });
+
+const SEGMENTS = Object.freeze([
+  { value: 'all', label: 'All' },
+  { value: 'owned', label: 'Owned' },
+  { value: 'missing', label: 'Missing' },
+]);
+export const segmentedProps = (props) => ({
+  options: SEGMENTS,
+  value: 'all',
+  ariaLabel: 'Show',
+  onChange: press,
+  ...props,
+});
+const SEGMENT_HOVER = '.manager-segment:not(.is-active, .is-disabled)';
+const chosenSegment = (props) => ({
+  props: segmentedProps(props),
+  reach: reach('input:checked', SEGMENT_HOVER, { selector: '.manager-segment.is-active' }),
+});
+
+const CARDS = Object.freeze([
+  {
+    value: 'forge',
+    label: 'Forge',
+    description: 'Heat and hammer the stock',
+    icon: 'fas fa-hammer',
+  },
+  { value: 'brew', label: 'Brew', description: 'Simmer it over a low flame', icon: 'fas fa-flask' },
+  { value: 'hand', label: 'By hand' },
+]);
+export const cardsProps = (props) => ({
+  options: CARDS,
+  value: 'forge',
+  legend: 'Method',
+  onChange: press,
+  ...props,
+});
+const CARD_HOVER = '.manager-resolution-option:not(.is-active, .is-disabled)';
+const chosenCard = (props) => ({
+  props: cardsProps(props),
+  width: 480,
+  reach: reach('input:checked', CARD_HOVER),
+});
+
+const TABS = Object.freeze([
+  { id: 'overview', label: 'Overview', icon: 'fas fa-scroll' },
+  { id: 'steps', label: 'Steps' },
+  { id: 'results', label: 'Results' },
+]);
+const tabs = (props) => ({
+  props: {
+    tabs: TABS,
+    activeTab: 'steps',
+    ariaLabel: 'Recipe sections',
+    idStem: 'standalone',
+    onSelect: press,
+    ...props,
+  },
+  width: 360,
+  reach: reach('[role="tab"][tabindex="0"]', '[role="tab"]:not(.is-active)'),
+});
+
+export const pagerProps = (props) => ({
+  totalCount: 42,
+  pageSize: 10,
+  pageIndex: 0,
+  pageSizeOptions: [10, 25, 50],
+  onPageChange: press,
+  onPageSizeChange: press,
+  ariaLabel: 'Recipes pages',
+  navLabel: 'Recipes page navigation',
+  previousLabel: 'Previous page',
+  nextLabel: 'Next page',
+  perPageLabel: 'Per page',
+  rangeTemplate: 'Showing {first}–{last} of {total}',
+  pageTemplate: 'Page {page} of {total}',
+  ...props,
+});
+const NEXT = '[data-pagination-next]';
+const PREVIOUS = '[data-pagination-prev]';
+
+const CAPTION = '<span id="standalone-field-caption">Batch name</span>';
+
+/** Each widened entry's specimens, by id. */
 export const STANDALONE_SPECIMENS = Object.freeze({
+  InspectorCard: Object.freeze({
+    'card-filled': { props: { children: true }, reach: UNREACHABLE },
+  }),
   Button: Object.freeze({
-    'button-neutral': { role: 'neutral', children: 'Clear filters', onclick: press },
-    'button-primary': { role: 'primary', children: 'Craft', onclick: press },
-    'button-ghost': { role: 'ghost', children: 'Cancel', onclick: press },
-    'button-dashed': { role: 'dashed', children: 'Add step', onclick: press },
-    'button-danger': { role: 'danger', children: 'Delete', onclick: press },
-    'button-warning': { role: 'warning', children: 'Override', onclick: press },
-    'button-full-width': { fullWidth: true, children: 'Start batch', onclick: press },
-    'button-disabled': { disabled: true, children: 'Not yet', onclick: press },
+    'button-neutral': button({ role: 'neutral', children: 'Clear filters', onclick: press }),
+    'button-primary': button({ role: 'primary', children: 'Craft', onclick: press }),
+    'button-ghost': button({ role: 'ghost', children: 'Cancel', onclick: press }),
+    'button-dashed': button({ role: 'dashed', children: 'Add step', onclick: press }),
+    'button-danger': button({ role: 'danger', children: 'Delete', onclick: press }),
+    'button-warning': button({ role: 'warning', children: 'Override', onclick: press }),
+    'button-full-width': button({ fullWidth: true, children: 'Start batch', onclick: press }),
+    'button-disabled': disabledButton({ disabled: true, children: 'Not yet', onclick: press }),
+  }),
+  StatusToggle: Object.freeze({
+    'toggle-off': button({ on: false, ariaLabel: 'Group by category', onclick: press }),
+    'toggle-on': button({ on: true, ariaLabel: 'Hidden tasks', onclick: press }),
+  }),
+  Stepper: Object.freeze({
+    'stepper-mid': { props: stepper({}), reach: reach('[data-stepper-decrement]') },
+    'stepper-at-min': {
+      props: stepper({ value: 0 }),
+      reach: reach('input', '[data-stepper-increment]'),
+    },
+    'stepper-at-max': { props: stepper({ value: 10 }), reach: reach('[data-stepper-decrement]') },
+    'stepper-unbounded': {
+      props: unboundedStepper({ value: 1.5, step: 0.5 }),
+      reach: reach('[data-stepper-decrement]'),
+    },
+  }),
+  SearchField: Object.freeze({
+    'search-empty': {
+      props: { placeholder: 'Search recipes', ariaLabel: 'Search recipes' },
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
+    },
+    'search-holding': {
+      props: { value: 'iron', placeholder: 'Search recipes', ariaLabel: 'Search recipes' },
+      reach: reach('input', '.fabricate-search', {
+        selector: '.fabricate-search',
+        properties: SHELL_BORDER,
+        inert: true,
+      }),
+    },
+  }),
+  Field: Object.freeze({
+    'field-text-input': {
+      props: { as: 'div', children: true },
+      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption" aria-describedby="standalone-field-hint"><small id="standalone-field-hint">Shown to players</small>`,
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-textarea': {
+      props: { as: 'div', children: true },
+      slot: `${CAPTION}<textarea aria-labelledby="standalone-field-caption"></textarea>`,
+      reach: reach('textarea', 'textarea', { inert: true }),
+    },
+    'field-nested-stepper': {
+      props: { as: 'div', children: true },
+      slot: CAPTION,
+      nest: { name: 'Stepper', props: stepper({ ariaLabel: 'Batch name size' }) },
+      reach: reach('[data-stepper-decrement]', '[data-stepper-increment]'),
+    },
+    'field-label-host': {
+      props: { as: 'label', children: true },
+      slot: '<span>Batch name</span><input type="text" placeholder="Moonpetal tonic">',
+      reach: reach('input', 'input', { inert: true }),
+    },
+    'field-fieldset-host': {
+      props: { as: 'fieldset', children: true },
+      slot: `${CAPTION}<input type="text" placeholder="Moonpetal tonic" aria-labelledby="standalone-field-caption">`,
+      reach: reach('input', 'input', { inert: true }),
+    },
+  }),
+  Well: Object.freeze({
+    'well-labelled': { props: { label: 'Chosen reagents', children: true }, reach: UNREACHABLE },
+    'well-unlabelled': { props: { children: true }, reach: UNREACHABLE },
   }),
   IconButton: Object.freeze({
-    'icon-button-neutral': { icon: 'fas fa-gear', ariaLabel: 'Settings', onclick: press },
-    'icon-button-primary': {
+    'icon-button-neutral': button({ icon: 'fas fa-gear', ariaLabel: 'Settings', onclick: press }),
+    'icon-button-primary': button({
       role: 'primary',
       icon: 'fas fa-plus',
       ariaLabel: 'Add',
       onclick: press,
-    },
-    'icon-button-ghost': { role: 'ghost', icon: 'fas fa-eye', ariaLabel: 'Show', onclick: press },
-    'icon-button-danger': {
+    }),
+    'icon-button-ghost': button({
+      role: 'ghost',
+      icon: 'fas fa-eye',
+      ariaLabel: 'Show',
+      onclick: press,
+    }),
+    'icon-button-danger': button({
       role: 'danger',
       icon: 'fas fa-trash',
       ariaLabel: 'Remove',
       onclick: press,
-    },
-    'icon-button-ghost-danger': {
+    }),
+    'icon-button-ghost-danger': button({
       role: 'ghost-danger',
       icon: 'fas fa-xmark',
       ariaLabel: 'Discard',
       onclick: press,
-    },
-    'icon-button-size-24': { size: 24, icon: 'fas fa-pen', ariaLabel: 'Edit', onclick: press },
-    'icon-button-size-26': { size: 26, icon: 'fas fa-copy', ariaLabel: 'Copy', onclick: press },
-    'icon-button-disabled': {
+    }),
+    'icon-button-size-24': button({
+      size: 24,
+      icon: 'fas fa-pen',
+      ariaLabel: 'Edit',
+      onclick: press,
+    }),
+    'icon-button-size-26': button({
+      size: 26,
+      icon: 'fas fa-copy',
+      ariaLabel: 'Copy',
+      onclick: press,
+    }),
+    'icon-button-disabled': disabledButton({
       disabled: true,
       icon: 'fas fa-lock',
       ariaLabel: 'Locked',
       onclick: press,
+    }),
+  }),
+  EditorTabs: Object.freeze({
+    'tabs-second-active': tabs({}),
+    'tabs-none-active': tabs({ activeTab: '' }),
+    'tabs-active-panel-only': tabs({ activePanelOnly: true }),
+  }),
+  RadioCardGroup: Object.freeze({
+    'cards-row': chosenCard({}),
+    'cards-stacked-three': chosenCard({
+      options: CARDS.map((card) => ({ icon: 'fas fa-hand', ...card })),
+      layout: 'stacked',
+      columns: 3,
+    }),
+    'cards-one-column': chosenCard({ columns: 1 }),
+    'cards-disabled': {
+      props: cardsProps({ disabled: true }),
+      width: 480,
+      reach: inertHover('.manager-resolution-option:not(.is-active)'),
+    },
+    'cards-disabled-option': chosenCard({
+      disabledOptions: [{ value: 'brew', reason: 'Needs a cauldron' }],
+    }),
+    'cards-unchosen': {
+      props: cardsProps({ value: '' }),
+      width: 480,
+      reach: reach('input', CARD_HOVER),
     },
   }),
-  StatusToggle: Object.freeze({
-    'toggle-off': { on: false, ariaLabel: 'Group by category', onclick: press },
-    'toggle-on': { on: true, ariaLabel: 'Hidden tasks', onclick: press },
+  SegmentedControl: Object.freeze({
+    'segmented-default': chosenSegment({}),
+    'segmented-fill': chosenSegment({ fill: true }),
+    'segmented-compact': chosenSegment({ density: 'compact' }),
+    'segmented-field': chosenSegment({ density: 'field' }),
+    'segmented-inline': chosenSegment({ density: 'inline' }),
+    'segmented-icon-disabled': chosenSegment({
+      options: [
+        { value: 'all', label: 'All', icon: 'fas fa-list' },
+        { value: 'owned', label: 'Owned' },
+        { value: 'missing', label: 'Missing', disabled: true },
+      ],
+    }),
+    'segmented-unselected': {
+      props: segmentedProps({ value: '' }),
+      reach: reach('input', SEGMENT_HOVER, { selector: '.manager-segment' }),
+    },
   }),
-  InspectorCard: Object.freeze({
-    'card-filled': { children: true },
-  }),
-  Well: Object.freeze({
-    'well-labelled': { label: 'Chosen reagents', children: true },
-    'well-unlabelled': { children: true },
+  Pagination: Object.freeze({
+    'pagination-first-wide': { props: pagerProps({}), width: 560, reach: reach(NEXT) },
+    'pagination-last-wide': {
+      props: pagerProps({ pageIndex: 4 }),
+      width: 560,
+      reach: reach(PREVIOUS),
+    },
+    'pagination-first-narrow': { props: pagerProps({}), width: 336, reach: reach(NEXT) },
+    'pagination-compact': {
+      props: pagerProps({ density: 'compact' }),
+      width: 336,
+      reach: reach(NEXT),
+    },
+    'pagination-no-sizes': {
+      props: pagerProps({ pageSizeOptions: [] }),
+      width: 336,
+      reach: reach(NEXT),
+    },
+    'pagination-persistent-single': {
+      props: pagerProps({ totalCount: 6, pageSizeOptions: [], persistent: true }),
+      width: 336,
+      reach: inertHover(NEXT),
+    },
   }),
 });
 
 /**
  * The computed properties compared on every element drawn: every list the three-host test
- * compares for these controls, then the remaining border edges, the ink and scheme, the focus
- * ring, the motion and the disabled face the admission clause reads.
+ * compares for these controls, then the remaining border edges, the ink and scheme, the type, the
+ * focus ring, the motion and the disabled face the admission clause reads.
  */
 export const STANDALONE_COMPARED = Object.freeze([
   ...new Set([
@@ -89,16 +352,43 @@ export const STANDALONE_COMPARED = Object.freeze([
     'border-right-style',
     'border-bottom-style',
     'border-left-style',
+    ...SHELL_BORDER,
     'flex-wrap',
     'color',
     'color-scheme',
     'opacity',
     'cursor',
-    'outline-style',
-    'outline-width',
-    'outline-color',
+    'appearance',
+    'text-align',
+    'letter-spacing',
+    'text-transform',
+    'visibility',
+    'background-image',
+    'text-decoration-line',
+    'font-style',
+    'text-shadow',
+    'filter',
+    'white-space',
+    'word-spacing',
+    'accent-color',
+    'resize',
+    ...RING,
     'outline-offset',
     'box-shadow',
     'transition-duration',
   ]),
+]);
+
+/** What is compared on each element's `::before` and `::after`, and on an input's `::placeholder`. */
+export const STANDALONE_PSEUDO_COMPARED = Object.freeze([
+  'content',
+  'display',
+  'width',
+  'height',
+  'background-color',
+  'color',
+  'border-top-width',
+  'border-right-width',
+  'border-bottom-width',
+  'border-left-width',
 ]);

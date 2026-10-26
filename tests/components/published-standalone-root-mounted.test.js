@@ -1,9 +1,11 @@
 /**
- * The standalone style root (issue 2456) on Fabricate's real Svelte runtime: each widened entry
- * draws under one in a target with no Fabricate root and under none in a Fabricate window, judged
- * through the content slots that own a target; an unwidened entry nested there is still refused
- * (M16), as is a shadow root, in this realm and a second window's; and `destroy`, a fault and a
- * companion's re-render leave `target` as it was. The theme is read as the overlay layer reads it.
+ * The standalone style root (issues 2456, 2679) on Fabricate's real Svelte runtime: each widened
+ * entry draws under one in a target with no Fabricate root and under none in a Fabricate window,
+ * judged through the content slots that own a target, a stepper in a bare field's slot included;
+ * an unwidened entry nested there is still refused (M16), as is a shadow root, in this realm and a
+ * second window's; radio groups drawn side by side in one bare form keep their own names; and
+ * `destroy`, a fault and a companion's re-render leave `target` as it was. The theme is read as
+ * the overlay layer reads it.
  * Limit: happy-dom resolves no cascade, so what the root draws is
  * `published-standalone-root-rendered.test.js`'s.
  */
@@ -16,6 +18,11 @@ import { Window } from 'happy-dom';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { applyFabricateTheme } from '../../src/ui/theme.js';
 import { PROBE_ENTRY } from '../fixtures/published-components/probeEntry.js';
+import {
+  cardsProps,
+  pagerProps,
+  segmentedProps,
+} from '../fixtures/published-components/standaloneSpecimens.js';
 import {
   FAULT_REPORT,
   PUBLISHED_ADAPTER,
@@ -37,6 +44,13 @@ const THEME = 'data-fabricate-theme';
 const ROOT = '.fabricate-standalone-root';
 const PROBE = 'tests/fixtures/published-components/PublishedProbe.svelte';
 
+const STEPPER = Object.freeze({
+  value: 2,
+  ariaLabel: 'Batch size',
+  decrementLabel: 'Fewer',
+  incrementLabel: 'More',
+  onChange() {},
+});
 /** Each widened entry with props it mounts with. */
 const WIDENED = Object.freeze({
   Button: { children: 'Clear filters', onclick() {} },
@@ -44,6 +58,22 @@ const WIDENED = Object.freeze({
   StatusToggle: { on: false, ariaLabel: 'Group by category', onclick() {} },
   InspectorCard: { children: true },
   Well: { label: 'Chosen reagents', children: true },
+  Stepper: STEPPER,
+  SearchField: { ariaLabel: 'Search recipes', placeholder: 'Name or tag' },
+  Field: { as: 'div', children: true },
+  EditorTabs: {
+    tabs: [
+      { id: 'overview', label: 'Overview' },
+      { id: 'steps', label: 'Steps' },
+    ],
+    activeTab: 'overview',
+    ariaLabel: 'Recipe sections',
+    idStem: 'companion',
+    onSelect() {},
+  },
+  RadioCardGroup: cardsProps({}),
+  SegmentedControl: segmentedProps({}),
+  Pagination: pagerProps({}),
 });
 const BUTTON = WIDENED.Button;
 /** Each slot owner a nested target sits in, with its props but the slot. */
@@ -51,8 +81,13 @@ const OWNERS = Object.freeze({
   EmptyState: { title: 'No projects yet' },
   InspectorCard: {},
   Well: { label: 'Chosen reagents' },
+  Field: { as: 'div' },
 });
-const FIELD = Object.freeze({ as: 'div', children: true });
+const SELECT = Object.freeze({
+  options: [{ value: 'iron', label: 'Iron' }],
+  ariaLabel: 'Metal',
+  onChange() {},
+});
 
 const harness = createMountedComponentHarness({
   repoRoot: resolve(import.meta.dirname, '../..'),
@@ -209,14 +244,79 @@ describe('a widened entry and the standalone style root', () => {
     assert.ok(drawnSlot.closest(ROOT), 'the drawn slot is inside the standalone style root');
     const needs = {
       name: 'TypeError',
-      message: `${REFUSAL}Field needs a Fabricate window ancestor`,
+      message: `${REFUSAL}Select needs a Fabricate window ancestor`,
     };
-    assert.throws(() => seam.mount('Field', { target: drawnSlot, props: FIELD }), needs);
+    assert.throws(() => seam.mount('Select', { target: drawnSlot, props: SELECT }), needs);
     const { handle, inner } = detachedSlotTarget(seam, 'Well', companionTarget(targets));
-    assert.throws(() => seam.mount('Field', { target: inner, props: FIELD }), needs);
+    assert.throws(() => seam.mount('Select', { target: inner, props: SELECT }), needs);
     assert.equal(inner.childNodes.length, 0);
     card.destroy();
     handle.destroy();
+  });
+
+  it('a Stepper in a bare Field’s drawn slot writes no second root, and destroying the field ends it', () => {
+    const seam = ui();
+    const target = companionTarget(targets);
+    const field = seam.mount('Field', { target, props: WIDENED.Field });
+    flushSync();
+    const holder = document.createElement('div');
+    field.slot('children').append(holder);
+    const stepper = seam.mount('Stepper', { target: holder, props: STEPPER });
+    flushSync();
+    assert.ok(holder.firstElementChild.classList.contains('fab-stepper'), 'drawn straight in it');
+    assert.equal(target.querySelectorAll(ROOT).length, 1, "one root, in the field's target");
+    field.destroy();
+    assert.equal(stepper.update(STEPPER), false, 'the stepper ended with the field');
+    assert.equal(target.childNodes.length, 0, "the field's target is empty");
+  });
+
+  it('a Stepper in a bare Field’s detached slot writes no root', () => {
+    const seam = ui();
+    const { handle, inner } = detachedSlotTarget(seam, 'Field', companionTarget(targets));
+    seam.mount('Stepper', { target: inner, props: STEPPER });
+    flushSync();
+    assert.ok(inner.firstElementChild.classList.contains('fab-stepper'), 'drawn straight in it');
+    assert.ok(Boolean(inner.closest(ROOT)), "inside the field's root once the slot is drawn");
+    handle.destroy();
+  });
+});
+
+describe('radio groups side by side in one bare form', () => {
+  it('keep their own names: checking a radio in any one leaves every other group’s choice', () => {
+    const form = document.createElement('form');
+    document.body.append(form);
+    targets.push(form);
+    const seam = ui();
+    const groups = [
+      ['SegmentedControl', segmentedProps({})],
+      ['SegmentedControl', segmentedProps({})],
+      ['RadioCardGroup', cardsProps({})],
+      ['RadioCardGroup', cardsProps({})],
+      ['Pagination', pagerProps({})],
+      ['Pagination', pagerProps({})],
+    ].map(([name, props]) => {
+      const target = document.createElement('div');
+      form.append(target);
+      seam.mount(name, { target, props });
+      flushSync();
+      return [...target.querySelectorAll('input[type="radio"]')];
+    });
+    const checked = () => groups.map((radios) => radios.filter((radio) => radio.checked).length);
+    assert.deepEqual(checked(), [1, 1, 1, 1, 1, 1], 'each group has one choice');
+    for (const [index, radios] of groups.entries()) {
+      const chosen = groups.map((group) => group.find((radio) => radio.checked));
+      radios.find((radio) => !radio.checked).checked = true;
+      assert.ok(!chosen[index].checked, `group ${index}'s own choice moved`);
+      const others = chosen.filter((radio, at) => at !== index).map((radio) => radio.checked);
+      assert.deepEqual(others, [true, true, true, true, true], `group ${index} moved no other`);
+    }
+    const [one, two] = ['one', 'two'].map((value) =>
+      Object.assign(document.createElement('input'), { type: 'radio', name: 'probe', value })
+    );
+    form.append(one, two);
+    one.checked = true;
+    two.checked = true;
+    assert.ok(!one.checked, 'two radios of one name in this form uncheck each other');
   });
 });
 

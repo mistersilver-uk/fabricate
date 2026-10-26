@@ -1,10 +1,11 @@
 /**
  * The published `RadioCardGroup` on Fabricate's real Svelte runtime (issue 2601), through a fresh
- * seam registered with the adapter's own table, under the Fabricate window root it needs: the named
- * fieldset and its native radios, each named by its option's `label` and sharing one name unique to
- * the mount, a press and a key with the one `value` its `onChange` takes, a declined change put
- * back and an accepted one drawn, the disabled forms, the reason, the `columns` coercion, the
- * hidden legend, every refusal the entry adds, and an empty `options`.
+ * seam registered with the adapter's own table, under a Fabricate window root and the standalone
+ * style root it is drawn under in a companion's own shell (issue 2679): the named fieldset and its
+ * native radios, each named by its option's `label` and sharing one name unique to the mount, a
+ * press and a key with the one `value` its `onChange` takes, a declined change put back and an
+ * accepted one drawn, the disabled forms, the reason, the `columns` coercion, the hidden legend,
+ * every refusal the entry adds, and an empty `options`.
  * Limit: happy-dom runs no radio arrow navigation, so the key clause asserts the keys pass the
  * group unhandled and simulates the platform's check; the View Lab case presses the real key.
  */
@@ -28,6 +29,7 @@ import {
   recordEscapes,
   settle,
   shippedSeam,
+  standaloneRootIn,
   underSheet,
 } from '../helpers/publishedComponentModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -156,7 +158,7 @@ describe('the published RadioCardGroup', () => {
       'disabledOptions',
     ]);
     assert.deepEqual(described.props.onChange, { kind: 'callback', required: true });
-    assert.equal(described.root, 'fabricate');
+    assert.equal(described.root, 'any');
     assert.equal(described.overlays, false);
   });
 
@@ -437,13 +439,18 @@ describe('what the published RadioCardGroup refuses', () => {
       assertRefused(overrides, tail);
     });
   }
+});
 
-  it('refuses a companion’s own shell (M16), and renders nothing', () => {
-    const shell = companionTarget(targets);
-    assert.throws(
-      () => ui().mount('RadioCardGroup', { target: shell, props: groupProps(() => {}) }),
-      { name: 'TypeError', message: `${REFUSAL}RadioCardGroup needs a Fabricate window ancestor` }
-    );
-    assert.equal(shell.childNodes.length, 0);
+describe('the published RadioCardGroup in a companion’s own shell', () => {
+  it('draws its fieldset inside one standalone style root, the checked radio is reached, and destroy leaves the shell empty', async () => {
+    const target = companionTarget(targets);
+    const handle = ui().mount('RadioCardGroup', { target, props: groupProps(() => {}) });
+    await settle();
+    const fieldset = standaloneRootIn(target).firstElementChild;
+    assert.equal(fieldset.localName, 'fieldset');
+    const checked = target.querySelector('input[type="radio"]:checked');
+    assert.ok(fieldset.contains(checked), 'target’s checked radio is the group’s');
+    handle.destroy();
+    assert.equal(target.childNodes.length, 0);
   });
 });

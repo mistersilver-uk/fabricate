@@ -369,7 +369,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 ## Published UI Components
 
 This section is the other direction of extension: a companion renders a Fabricate primitive into an element it owns, rather than contributing into a Fabricate window.
-Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; widening the remaining `'fabricate'` entries is the rest of phase 2 (issue #2427).
+Phase 1 (issue #2426) publishes the seam and its first data-only leaf primitive; issue #2448 publishes more data-only leaves; issue #2451 publishes content and fault handling through the seam; issue #2452 publishes callbacks and the first control; issue #2453 publishes bound values; issue #2454 publishes the overlay host and its first overlay entry; issue #2455 publishes `StageBars`, lazy entries and `mountMany`; issue #2601 publishes `Field`, `Well`, `Callout`, `IconButton`, `EditorTabs` and `RadioCardGroup`; issue #2644 publishes `SegmentedControl`; issue #2646 publishes `Pagination`; issue #2647 publishes `IconPicker`; issue #2652 publishes `ActionMenu`; issue #2656 publishes `Modal`; issue #2456 publishes the standalone style root and widens `Button`, `IconButton`, `StatusToggle`, `InspectorCard` and `Well` to `'any'`; issue #2679 widens `Field`, `SearchField`, `Stepper`, `SegmentedControl`, `RadioCardGroup`, `EditorTabs` and `Pagination`; widening the four overlay entries, `Select`, `IconPicker`, `ActionMenu` and `Modal`, is issue #2680, the rest of phase 2 (issue #2427).
 
 ### The descriptor
 
@@ -581,7 +581,7 @@ The element carries the classes `fabricate` and `fabricate-standalone-root`, no 
 Registration refuses a `standaloneRoot` that is neither absent nor `true`, and one on a `root` other than `'any'`, as The manifest and versioning states.
 - The standalone style root is judged at `mount` and `mountMany` only, is never an overlay host, and is removed by `destroy` and by a fault, so `target` is left as it was.
 It is removed by reference, wherever it then is; a companion's re-render that already took it away with the old content leaves nothing to remove, and supersedes the claim as it does any mount's.
-- It states the Fabricate window's ink and its dark colour scheme and paints no ground: in a window or dialog of its own the companion paints `--fab-bg-1` on `target`, or nests the entry in an `InspectorCard` or `Well`, as for `Callout`, because on Foundry's light theme every `Button` and `IconButton` role but `primary`, and the switch's off face, otherwise fall short of their contrast floors.
+- It states the Fabricate window's ink and its dark colour scheme and paints no ground: in a window or dialog of its own the companion paints `--fab-bg-1` on `target`, or nests the entry in an `InspectorCard` or `Well`, as for `Callout`, because on Foundry's light theme whatever an entry draws on `target`'s ground rather than on a fill of its own otherwise falls short of its contrast floor: every `Button` and `IconButton` role but `primary`, the switch's off face, `Field`'s ink and the caption and hint the companion draws in its slot, `SearchField`'s and `Stepper`'s ink on their translucent shells, `SegmentedControl`'s labels at `density` `'default'`, `EditorTabs`' tabs and a compact `Pagination`'s summary, page-size caption and arrows; `RadioCardGroup`'s cards and a default `Pagination` bar paint their own ground.
 `--fab-bg-1` on `target` resolves from the document's theme, which agrees with the standalone style root's except in a detached window (issue 2432).
 - A companion's content in a content slot of such a mount takes the Fabricate window's ink, dark colour scheme, palette tokens, focus ring and reduced-motion rule, as it does in a Fabricate window; Fabricate's heading normalisation does not reach it, so a heading there takes Foundry's own face and ink.
 - An entry whose root is `'fabricate'` or `'manager'`, mounted in a content slot of such a mount with no Fabricate root above, is refused.
@@ -591,7 +591,9 @@ It is removed by reference, wherever it then is; a companion's re-render that al
 - A document sheet disables every control in its form when the document is not editable, so a companion mounts after `super._onRender`.
 - A Font Awesome glyph's box follows the Font Awesome the running build ships, which the admission clause does not measure.
 - An entry is drawn under the standalone style root only where its admission clause holds: mounted in a bare ApplicationV2 `.window-content`, every element it draws computes the same styles and border box as with the same props in the player window, over the core-min fixture and, where the harvest exists, Foundry 14.365's core sheet, at rest, under keyboard focus, under the pointer and under reduced motion.
-Core's container rules (`.standard-form`, `.form-footer`, `.dialog-buttons`) size such a control in a dialog or form sheet as they size any button, an ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.
+Core's container rules (`.standard-form`, `.form-group`, `.form-fields`, `.form-footer`, `.dialog-buttons`) reach such a control or text input in a dialog or form sheet wherever they select a descendant or set a custom property the entry does not state, as `.standard-form button` sets `--button-size`, and a DialogV2's content is always a `.standard-form`; the admission clause does not measure them, core's `fieldset`, `legend`, radio and `textarea` rules are measured only where the harvest exists, an ApplicationV1 window is not a supported target, and Foundry 13 is unmeasured.
+The harvested arm draws under no Foundry theme class.
+- Chromium draws a search field's cancel button and a number field's spin buttons itself, in the dark colour scheme, and computes no author style for them, so the admission clause does not read them.
 - A design-system row scoped `manager-only` is not published (issue #2456): the rows that take a Fabricate record shape are domain-coupled, and `InspectorPanel` and the `Bulk*` rows need the Manager's scroller and `--fab-manager-inspector-*` tokens; a later issue may publish one as `root: 'manager'`.
 The rows are `BulkDeleteCard`, `BulkEditPanelShell`, `InspectorPanel`, `BulkEditSection`, `BulkSelectionToolbar`, `BulkStagingInset`, `ProgressiveStageList`, `IconFactRow`, `InlineRenameField`, `InlineVocabularyAdd`, `ModifierLibraryRow`, `RollDataExpressionInput`, `SubjectModifierPicker`, `VocabularyShell`, `VocabularyShellPanel`, `EssenceChip`, `CompositionList`, `GatheringModifierEditor`, `RecipeResultGroupCard`, `PickerRow`, `ChoiceGroup`, `PickerRowAmount`, `KindAdder`, `RecipeResultsSection`, `ScopedEntrySystemsCard`, `CheckCharacterValueField`, `CheckOptionGroup`, `PreviewAsPicker`, `OverridePlayerSees`, `SetCard` and `RoutingOverview`.
 
@@ -635,6 +637,8 @@ The gate also holds that the closure of an `overlays: true` entry imports no `re
 
 - A published component draws a control only where its group says so, and each control is a native element: a `<button type="button">`, an `<input>`, a `<select>` or a `<textarea>`.
 - A control never submits a `<form>` it is mounted in, except that a text-like `<input>` submits it on Enter as implicit submission does (through the form's first submit button, or alone where it is the form's only text field) and fires a bubbling `change` that a form with `submitOnChange` submits on, and a `RadioCardGroup` or `SegmentedControl` radio, or a `Pagination` page-size radio, fires a bubbling `change` on each choice that such a form submits on too; in Foundry a submit closes a DialogV2 and saves an editable document sheet.
+That exception reaches a radio and a number input too where the form has a submit button: Enter there submits the form, as on a text-like input.
+- A `reset` of the `<form>` a control is in changes what it shows and reports nothing, and an `update` that passes the same value does not redraw it, so the companion resets no form a published control is in, or destroys and mounts the control again (read from Svelte 5.56 source, not run).
 - A `<button>` carries `data-keyboard-focus="true"` on itself, so Foundry runs none of its keybindings while it holds focus; an `<input>`, a `<select>` and a `<textarea>` hold them off without it.
 Where the entry's rest keys land on the control itself, `data-keyboard-focus` is refused (M13), so the companion cannot replace it.
 - A button is pressed by pointer, Enter or Space, as the platform presses a native button, and handles no other key itself unless its group names the key, as the `EditorTabs` group does: a `keydown` listener of the companion's above `target` still receives every key, except from a `Select` or `IconPicker` trigger, which stops each key, and an `ActionMenu` trigger, which stops ArrowDown and ArrowUp, as each group states, and Foundry's keybindings stay held off as the bullet above states.
@@ -646,7 +650,7 @@ In an ApplicationV1 `Dialog` Enter presses no control: that dialog takes Enter a
 Tab moves focus as the browser does, except in an open `ActionMenu` menu, where it closes the menu and returns focus to the trigger, as its group states, and Escape still closes a DialogV2 while a control holds focus, because a DialogV2 listens for Escape on its own element.
 In any other window Escape closes nothing while a control holds focus, because closing a window on Escape is one of the keybindings held off; an open ApplicationV1 `Dialog` still closes, because it listens for Escape on the document, unless the key is pressed in an open `Modal` dialog, which stops it at the dialog unless an expanded control there keeps it, and asks the companion to close that `Modal`, as its group states.
 An open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog` and moves focus to its own button.
-- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, as its group states.
+- A control draws its own mark for keyboard focus where the entry's `root` is `'any'` and Fabricate does not draw it under the standalone style root; otherwise it shows the Fabricate window's accent ring, 2px wide, at the offset the entry's group states, except an `ActionMenu` item, whose 1px accent ring is drawn inside its edge, and a `SearchField`, whose shell's 1px border takes the accent while its input draws no ring, as each group states; a text-like input or textarea the companion draws in a `Field`'s content slot shows the field's 1px accent ring, inset 1px, as that group states.
 Where the entry's rest keys land on the control itself, `data-validation-focused` and `data-essence-sort-direction` are refused (M13): they are names Fabricate's own stylesheet reads off its own buttons, whose effect is private, and the first, under a Fabricate root, draws the keyboard ring on a control that does not hold focus.
 - A control's accessible name is text the companion passes through a key its group names, or its own visible text that an `aria` key its group names points at, and Fabricate supplies none, except an `IconPicker` row, which its group names by its glyph's `label`.
 Where a key carries the name, `aria-label` is refused (M13), and so is `aria-labelledby` unless the entry's group names it as an `aria` key.
@@ -1032,7 +1036,7 @@ Each group states the accepted values of every key that entry publishes.
     The stepper does not catch Escape: the input holds Foundry's keybindings off, so Escape in it closes a window only where Interactive components says so.
     In a `<form>`, Enter in the input submits it as implicit submission does, with or without a submit button where the input is the form's only text field, and each step fires a bubbling `change` that a form with `submitOnChange` submits on, so the companion mounts the stepper in no `<form>`, Foundry's or its own.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window that holds `target` in no `<form>`; a DialogV2's content is always a `<form>`, so the companion does not mount the stepper in one, as the bullet on Enter states; the companion gives `target` `display: flex` and aligns its own label to the stepper by centring.
   - The input and the two buttons are the only focusable elements inside `target`.
     An `update` keeps all three, so focus stays where it is; `destroy` removes them, so where one holds focus the companion moves focus first.
   - The keyboard ring is the accent, 2px wide, drawn at the focused input's or button's own edge and inside the stepper's own outer edge, so the companion leaves no room for it, provided nothing of its own clips inside the stepper's box.
@@ -1057,10 +1061,10 @@ Each group states the accepted values of every key that entry publishes.
   - Enter in the input, outside IME composition, cancels the implicit submission of the `<form>` the input is in, so the field never submits a form, and reports nothing.
     The field has no `name`, so it adds nothing to a form's data, and a form with `submitOnChange` still submits on the bubbling `change` the input fires when it loses focus after an edit.
   - It stops the propagation of no key: every key reaches a companion's listener above `target`, the input holds Foundry's keybindings off, and Escape closes a window only where Interactive components says so.
-  - In a DialogV2, Escape clears the query and closes the dialog; a companion that must keep the dialog open stops it in its own `keydown`.
+  - In a DialogV2, Escape closes the dialog, because the dialog listens for it on its own element; whether the query is cleared first is not stated; a companion that must keep the dialog open stops it in its own `keydown`.
   - A DialogV2 companion that wants Enter to confirm handles Enter in its own listener above `target`, because the field cancels the form's implicit submission.
   - Rest `data-*` attributes land on the `<label>` root, never on the input, so the entry reserves no rest name.
-  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window, as the default 38px shell at radius 9; it fills the width of `target`, which the companion gives `display: flex`.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog, as the default 38px shell at radius 9; it fills the width of `target`, which the companion gives `display: flex`.
   - The keyboard mark is the design system's text-field variant for a field whose wrapper draws the box: while the input holds focus the shell's 1px border takes the accent and the input draws no ring of its own, so the companion leaves no room for one.
   - An `update` keeps the input, so focus and the caret stay where they are unless the query is replaced; `destroy` removes it, so where it holds focus the companion moves focus first.
 - **Private:** `SearchField`'s sizes beyond its height and corner, its glyph and colours beyond what its group states, what it draws for a `value` that is not a string, and how Fabricate redraws a search field in its own toolbars, rosters and cards.
@@ -1141,7 +1145,7 @@ Each group states the accepted values of every key that entry publishes.
     It clears 3:1 against the control's `--fab-bg-1` fill in every palette, and against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` beyond its edge, and not against `--fab-bg-3`, where two palettes fall short, so the companion draws the field on those four grounds.
   - Rest `data-*` attributes land on the column root.
   - The field never moves its content slot while it is requested.
-  - It needs a Fabricate window ancestor, because its column and chrome come from Fabricate's module sheet.
+  - Its column and chrome come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
   - Fabricate draws nothing focusable in the field: an `update` keeps the column and its content slot, so focus stays on a control the companion drew there; `destroy` removes them, so where that control holds focus the companion moves focus first.
 - **`Well`.**
   - It is the design system's well, the container level below a card, for a group of related content inside a card's content slot.
@@ -1255,10 +1259,9 @@ Each group states the accepted values of every key that entry publishes.
   - An `update` keeps every tab whose `id` it keeps, so focus stays on it; one that drops the focused tab's item, and `destroy`, remove that tab, so where it holds focus the companion moves focus first.
   - The strip adds no listener of its own to the document and stops the propagation of no key, so wherever the pointer rests, Escape reaches the companion's `keydown` listeners on its path, the document's among them.
   - Rest `data-*` attributes land on the tablist, never on a tab.
-  - It needs a Fabricate window ancestor, because its row, its tabs and their ring come from Fabricate's module sheet, and it is drawn the same in the Manager and the player window.
+  - Its row, its tabs and their ring come from Fabricate's module sheet, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
     The row wraps onto a further row when `target` is narrower than its tabs.
     An empty `tabs` draws the named tablist with no tab, so pass at least one item where the strip must be reachable.
-    A companion's own window or dialog carries no Fabricate root, so the strip is refused there (M16).
   - The keyboard ring is the accent, 2px wide and 2px clear of the tab, so it reaches 4px beyond the tab on every side, and the companion leaves that much inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2` in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the strip on one of those four grounds.
 - **`RadioCardGroup`.**
@@ -1289,10 +1292,9 @@ Each group states the accepted values of every key that entry publishes.
     The radios carry a private `name`, unique to the mount, so the chosen value appears under that name in a form's data, except while the group is disabled, and a document sheet's schema discards the key: the companion reads the choice from `onChange`, never from the form.
     The group consumes no key, so where the platform applies implicit submission to a focused radio, Enter submits the `<form>` it is in; the companion mounts it in no form whose submit it does not want.
   - Rest `data-*` attributes land on the fieldset, never on a card or a radio.
-  - It needs a Fabricate window ancestor, because its cards, chips and radios come from Fabricate's module sheet, rooted at `.fabricate-option-cards`, so its root is `fabricate`, and it is drawn the same in the Manager and the player window.
-    It reflows to fewer tracks only under a Fabricate host that names `fabricate-option-host`; when and how it reflows is private.
+  - Its cards, chips and radios come from Fabricate's module sheet, rooted at `.fabricate-option-cards`, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
+    It reflows to fewer tracks only under a Fabricate host that names `fabricate-option-host`, a name the companion gives no element, so under the standalone style root it never reflows and the companion chooses `columns` for the width of `target`; when and how it reflows is private.
     An empty `options` draws the named fieldset with no card and no radio, so nothing inside `target` takes focus; the companion passes at least one option where the group must be reachable.
-    A companion's own window or dialog carries no Fabricate root, so the group is refused there (M16).
   - The radio's keyboard ring is the accent, 2px wide and 2px clear, drawn on the card's own ground.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, and against a chosen card's `--fab-surface-soft` over `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the group on one of those four grounds.
 - **Private:** `Field`'s gap, its type figures beyond the column's, the chrome's figures and colours beyond what its group states, and how Fabricate redraws a field and its control in its own rows, cards and rails; `Well`'s padding and corner figures, the space below its label, and how Fabricate draws a well in its own option groups and roll prompt; `Callout`'s padding, corner, edge, gap and type figures, the glyph each tone draws by default, its `data-callout-*` attributes, and how Fabricate lays a callout out in its own entries and cards; `IconButton`'s default rung's side, its corner and glyph size, each role's colours and edge beyond what its group states, the delay before Foundry shows its hover tooltip, and how Fabricate redraws an icon button in its own rows, pager and inspectors; `EditorTabs`' padding, rule, type and colour figures beyond what its group states, and how Fabricate draws a tab strip in its own editors; `RadioCardGroup`'s card, chip, radio and type figures, its `data-radio-card-*` and `data-tool-choice-*` hooks, the width it reflows at, and how Fabricate draws option cards in its own editors.
@@ -1329,9 +1331,8 @@ Each group states the accepted values of every key that entry publishes.
     The radios carry a private `name` that a document sheet's schema discards, and a form carries the value as a string: Foundry's `FormDataExtended` carries the checked radio's value even while that radio is disabled, as long as another radio of the control is enabled, and a native `FormData` omits a disabled radio; read the choice from `onChange`, never from the form.
     Where the browser's implicit submission covers a focused radio, Enter submits the form through its first submit button, which in `DialogV2.confirm` is Yes, so mount the control in no form whose submit you do not want.
   - Rest `data-*` attributes land on the radiogroup, never on a segment or a radio.
-  - It needs a Fabricate window ancestor and is drawn the same in the Manager and the player window.
+  - It is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
     An empty `options` draws the named radiogroup with no segment and no radio, so nothing inside `target` takes focus; pass at least one option where the control must be reachable.
-    A companion's own window or dialog carries no Fabricate root, so the control is refused there (M16).
   - The keyboard ring is the accent, 2px wide and 2px clear of the segment, so it reaches 4px beyond the segment and 1px beyond the track's outer edge, and the companion leaves room for it inside any edge of its own that clips.
     The ring clears 3:1 against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, against the track's fill over each, and against the selected segment's fill over the track's, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts the control on one of those four grounds.
 - **Private:** `SegmentedControl`'s track and segment figures, each rung's height and type size, its colours beyond what its group states, what it draws for a private option member or `density`, and how Fabricate draws a segmented control in its own rows, pager and editors.
@@ -1358,7 +1359,7 @@ Each group states the accepted values of every key that entry publishes.
     A size the companion declines leaves the previous size's radio checked, and focus on the radio the key reached, drawn unchecked.
   - `persistent` is `true` or `false` and defaults to `false`.
     With `true` the pager is always drawn, and an arrow that leads nowhere is disabled.
-    With `false` the pager is drawn only while `totalCount` is greater than the smallest of `pageSize` and `pageSizeOptions`, and its navigation only while there is more than one page; otherwise `target` is empty and nothing inside it takes focus.
+    With `false` the pager is drawn only while `totalCount` is greater than the smallest of `pageSize` and `pageSizeOptions`, and its navigation only while there is more than one page; otherwise it draws nothing, so `target` is empty under a Fabricate root and holds only the empty standalone style root elsewhere, and nothing inside it takes focus.
     While focus is inside the pager it stays drawn, and it is removed once focus leaves it.
   - `density` is `'default'` or `'compact'` and defaults to `'default'`; any other value is private.
     `'default'` draws the bar on its own `--fab-bg-1` fill.
@@ -1382,8 +1383,7 @@ Each group states the accepted values of every key that entry publishes.
   - An arrow submits no `<form>`.
     A size choice fires a bubbling `change` as `SegmentedControl`'s group states, so a form with `submitOnChange` submits on it; the companion reads the size from `onPageSizeChange`, never from the form.
   - It takes no rest keys, so a `data-*` key is refused (M8).
-  - It needs a Fabricate window ancestor, because its bar, arrows and ring come from Fabricate's module sheet, rooted at `.fabricate-pagination`, and it is drawn the same in the Manager and the player window.
-    A companion's own window or dialog carries no Fabricate root, so the pager is refused there (M16).
+  - Its bar, arrows and ring come from Fabricate's module sheet, rooted at `.fabricate-pagination`, and it is drawn the same in the Manager, the player window and, under the standalone style root, a companion's own window or dialog.
   - The arrows' keyboard ring is the accent, 2px wide and 2px clear of the arrow, so it reaches 4px beyond the arrow, and the page-size control's ring reaches as `SegmentedControl`'s group states.
     The ring clears 3:1 against the default bar's `--fab-bg-1` and, under `'compact'`, against `--fab-bg-0`, `--fab-bg-1`, `--fab-surface` and `--fab-bg-2`, in every palette, and falls short against `--fab-bg-3` in two, so the companion mounts a compact pager on one of those four grounds and leaves room for the ring inside any edge of its own that clips.
 - **Private:** `Pagination`'s bar, arrow, label and type figures, its colours beyond what its group states, its `data-pagination-*` hooks, what it draws for a `totalCount`, `pageSize`, `pageIndex` or offered size outside what its group states, and how Fabricate draws a pager in its own browse columns, rails and inspectors.
@@ -1769,15 +1769,22 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 
 #### Scenario: A required ancestor root
 
-- **WHEN** a companion mounts `Field` into a target with no `.fabricate` ancestor
-- **THEN** `mount` throws `Field needs a Fabricate window ancestor`, and nothing is rendered
+- **WHEN** a companion mounts `Select` into a target with no `.fabricate` ancestor
+- **THEN** `mount` throws `Select needs a Fabricate window ancestor`, and nothing is rendered
 
 #### Scenario: A standalone style root
 
 - **WHEN** a companion mounts `Button` into a target in its own ApplicationV2 window, under no Fabricate root, with the same `font-family`, `font-size` and `line-height` on both targets
 - **THEN** `mount` throws nothing, `describe('Button').root` is `'any'`, and the button is drawn inside one `display: contents` element in `target`
 - **AND** its computed styles equal those of the same props mounted in the player window
-- **AND** `destroy` leaves `target` empty, and a `Field` mounted in an `InspectorCard`'s content slot there throws M16
+- **AND** `destroy` leaves `target` empty, and a `Select` mounted in an `InspectorCard`'s content slot there throws M16
+
+#### Scenario: A labelled stepper in a companion's window
+
+- **WHEN** a companion mounts `Field` with `as: 'div'` and `children: true` into a target in its own ApplicationV2 window, inside no `<form>`, under no Fabricate root, with the same `font-family`, `font-size` and `line-height` as a target in the player window, draws a caption `<span id>` in its content slot, and mounts `Stepper` with its required keys and an `ariaLabel` containing the caption's words into an element it appends there below the caption
+- **THEN** one standalone style root is written, in the field's `target`, and none in the stepper's `target`
+- **AND** the field and the stepper compute the same styles as the same two mounted the same way in the player window
+- **AND** destroying the field destroys the stepper first and leaves the field's `target` empty
 
 #### Scenario: A notice announces
 
@@ -1837,7 +1844,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `SearchField` with `ariaLabel` and `onValueChange` inside a Fabricate window, and the user types `iron`
 - **THEN** Fabricate calls `onValueChange('iron', '')` once, and `handle.value('value')` answers `'iron'`
 - **AND** a clear the browser makes calls `onValueChange('', 'iron')`, and Enter in the field inside a `<form>` submits nothing
-- **AND** a mount that omits `ariaLabel` throws M9, and one into a target with no `.fabricate` ancestor throws M16
+- **AND** a mount that omits `ariaLabel` throws M9, and a mount into a target with no Fabricate root draws it under the standalone style root
 
 #### Scenario: A published select
 
@@ -1860,7 +1867,7 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **WHEN** a companion mounts `Field` with `as: 'div'` and `children: true` inside a Fabricate window, and draws a caption `<span id>` and a text `<input>` whose `aria-labelledby` names it in the content slot
 - **THEN** the field draws one `<div>` column holding the slot, and the input takes the field's chrome and its inset 1px ring
 - **AND** an `update` keeps focus on the input, and `destroy` leaves `target` empty
-- **AND** a mount that omits `as` throws M9, and one into a target with no `.fabricate` ancestor throws M16
+- **AND** a mount that omits `as` throws M9, and a mount into a target with no Fabricate root draws it under the standalone style root
 
 #### Scenario: A published well
 

@@ -8620,7 +8620,34 @@ test('the standalone specimen cases draw the entries that state a standalone roo
       .sort(byCodePoint),
     'the fixture mounts every entry that states a standalone root, and no other'
   );
-  for (const hook of ['data-lab-standalone-ground', 'data-lab-standalone-target']) {
+  const frozen = (node) => (node.callee?.property?.name === 'freeze' ? node.arguments[0] : node);
+  const columns = frozen(
+    [...walkNodes(instance)].find(
+      (node) => node.type === 'VariableDeclarator' && node.id.name === 'COLUMNS'
+    ).init
+  ).elements.map((column) => frozen(column).elements.map((key) => key.value));
+  assert.equal(columns.flat().length, 11, 'the fixture lays eleven targets in its columns');
+  for (const id of [
+    'published-standalone',
+    'published-standalone-light',
+    'published-standalone-in-window',
+  ]) {
+    for (const [index, keys] of columns.entries()) {
+      for (const key of keys) {
+        assert.ok(
+          getCaseById(id).expectSelector.includes(
+            `[data-lab-standalone-column="${index + 1}"] > [data-lab-standalone-target="${key}"]`
+          ),
+          `${id} asserts what the ${key} target in column ${index + 1} draws`
+        );
+      }
+    }
+  }
+  for (const hook of [
+    'data-lab-standalone-ground',
+    'data-lab-standalone-column',
+    'data-lab-standalone-target',
+  ]) {
     assert.ok(
       holds(fragment, (node) => node.type === 'Attribute' && node.name === hook),
       `the fixture writes the ${hook} hook the cases name`

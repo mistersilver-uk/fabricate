@@ -101,7 +101,20 @@ describe('the published-components descriptor', () => {
 
 describe('an entry drawn under the standalone style root', () => {
   const STANDALONE = Object.freeze({ ...ZETA, name: 'Standalone', standaloneRoot: true });
-  const WIDENED = ['InspectorCard', 'Button', 'StatusToggle', 'Well', 'IconButton'];
+  const WIDENED = [
+    'InspectorCard',
+    'Button',
+    'StatusToggle',
+    'Stepper',
+    'SearchField',
+    'Field',
+    'Well',
+    'IconButton',
+    'EditorTabs',
+    'RadioCardGroup',
+    'SegmentedControl',
+    'Pagination',
+  ];
 
   it('describes the entry without standaloneRoot, which only its group states', () => {
     const { ui } = seamWith({ table: [ZETA, STANDALONE] });
