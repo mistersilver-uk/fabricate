@@ -58,17 +58,20 @@ export function recipeReferencesAnyComponent(recipe, componentIds) {
 }
 
 /**
- * Whether a rewritten recipe has lost its ingredient sets or its results entirely and must
- * therefore be clamped to disabled.
+ * Whether a rewritten recipe has lost an ingredient set or its results and must be clamped to
+ * disabled. A recipe with explicit steps has lost its shape when ANY step has no ingredient set or
+ * no result group, as `Recipe.validate` reports it; one without steps reads its own sets and results.
  */
 export function recipeLostItsShape(updated) {
+  const steps = Array.isArray(updated?.steps) ? updated.steps : [];
+  if (steps.length > 0) {
+    return steps.some(
+      (step) => !(step?.ingredientSets?.length > 0) || !(step?.resultGroups?.length > 0)
+    );
+  }
   const hasResults =
-    (updated?.resultGroups?.length || 0) > 0 ||
-    (updated?.results?.length || 0) > 0 ||
-    (updated?.steps || []).some((step) => (step?.resultGroups?.length || 0) > 0);
-  const hasIngredientSets =
-    (updated?.ingredientSets?.length || 0) > 0 ||
-    (updated?.steps || []).some((step) => (step?.ingredientSets?.length || 0) > 0);
+    (updated?.resultGroups?.length || 0) > 0 || (updated?.results?.length || 0) > 0;
+  const hasIngredientSets = (updated?.ingredientSets?.length || 0) > 0;
   return !hasIngredientSets || !hasResults;
 }
 

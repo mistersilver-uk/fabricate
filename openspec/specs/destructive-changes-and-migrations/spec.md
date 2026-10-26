@@ -100,7 +100,9 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 3. Every component still carrying the essence has that quantity stripped, so no component is left naming a deleted essence.
 4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.
    A group left with no options is dropped, and a set left with no ingredient groups, ingredients or essences is dropped.
-5. A recipe left with no ingredient sets, or with no results, is clamped to disabled.
+5. A recipe left with no ingredient sets or no results is clamped to disabled.
+   A recipe with explicit steps is clamped when ANY step is left with no ingredient set or no result group, the derived-incompleteness rule of `recipes-and-steps` § Validation Contracts (issue 1910).
+   The component delete cascade applies the same clamp through the same predicate.
    A result group that was ALREADY empty when the cascade ran is retained rather than pruned — the reserved `role: 'failure'` group and a non-terminal step's deliberately empty group are authored data, not residue (issue 1907) — so the cascade never prunes an authored empty group.
 6. Each rewritten recipe is re-saved as an INCOMPLETE authoring shell (`allowIncomplete`), because a recipe stripped of its only requirement is deliberately persisted rather than deleted.
 7. The rewrites run BEFORE the crafting-system write.

@@ -744,6 +744,37 @@ test('1129: a converted multi-step recipe left with no executable path is DISABL
 });
 
 
+test('1910: a three-step recipe left with one empty step is DISABLED by the component delete', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const step = (id, result) => ({
+    id,
+    ingredientSets: [
+      { id: `${id}-set`, essences: {}, ingredientGroups: [{ id: `${id}-g`, options: [{ componentId: 'wood' }] }] }
+    ],
+    resultGroups: [{ id: `${id}-rg`, results: [{ componentId: result }] }]
+  });
+  recipeManager.getRecipes({}).push(
+    makeRecipe({
+      id: 'recipe-three-step',
+      name: 'Three Steps',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [],
+      resultGroups: [],
+      steps: [step('st1', 'bar'), step('st2', 'iron'), step('st3', 'bar')]
+    })
+  );
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteComponents('sys', ['iron']);
+
+  const update = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-three-step');
+  assert.ok(update, 'the recipe names iron as a step result');
+  assert.deepEqual(update.updates.steps[1].resultGroups, [], 'step 2 lost its only result group');
+  assert.equal(update.updates.enabled, false, 'one empty step makes the whole recipe uncraftable');
+});
+
 test('1129: a batched delete emits exactly ONE recipes-changed signal, and never zero', async () => {
   notifications.length = 0;
   const recipeManager = makeRecipeManager();
