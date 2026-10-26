@@ -506,7 +506,7 @@ It is created by `target.ownerDocument`, carries `display: contents` and no othe
 The element Fabricate holds it in is private.
 - A child of a content slot that draws nothing still takes the host's gap.
 A host spaces a content slot's children by `gap`, except where its group states it draws them in normal flow, as `Well` does; the companion then fills that slot with one element of its own that lays out its content.
-- Fabricate attaches the element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and a companion's components, effects, listeners and bound values inside it keep running.
+- Fabricate attaches the element wherever the component draws that content slot, and detaches it with its contents intact while it does not; a detached element is disconnected, and a companion's components, effects, listeners and bound values inside it keep running, though an overlay entry mounted in it closes its open panel, as Overlays states.
 Each detach and attach is a DOM removal and insertion, so the browser resets what it resets on those: an `<iframe>` reloads, playing media pauses, focus and scroll positions inside the slot element are lost, CSS animations restart, and a custom element receives `disconnectedCallback` and `connectedCallback`.
 That happens when the content slot is omitted and requested again, when an `update` makes the component replace the element holding it, and when a Foundry 14 window is detached or re-attached, which also moves the content to another document.
 - A companion fills it by mounting its own component into it, or by appending an element it owns.
@@ -589,11 +589,17 @@ On an entry whose `overlays` is not `true` it is checked by M18 and otherwise ig
 The `<div>` carries `display: contents` and no other attribute, so the host stays the panel's containing block; it, the panel and the panel's elements and hooks are private.
 The standalone layer, its class and its `data-fabricate-theme` copy are private too.
 - The panel is not clipped by `target`'s overflow, because it is drawn in its host; place `overlayHost` where it is not clipped.
-- An overlay's outside-press, Escape and scroll listeners bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
+- An overlay's outside-press, Escape and scroll listeners, and the watch an open `Select`, `IconPicker` or `ActionMenu` keeps for its `target` leaving that document, bind to the document that holds it, and its resize listener and a `Modal` dialog's record of each Escape to that document's window; it reads that window's viewport, computed style and font loading, and tells a node or an element by `nodeType`, never `instanceof`.
 An overlay whose document has no window stays closed.
 - An overlay opened inside a published mount nested in another's content slot takes the nested mount's chain, and one opened from inside another overlay's panel takes that panel's.
 An overlay drawn by Fabricate outside every published mount keeps its own host as before.
 - `destroy` and a fault close every overlay the mount holds open: each panel and its `<div>` are removed, Fabricate's runtime releases the `<div>`'s listeners, and a layer no overlay still uses is removed, so nothing of the overlay is left in any document.
+- The panel of a `Select`, an `IconPicker` or an `ActionMenu` also closes when its `target` is disconnected while the mount is live, as when an `update` of the component whose content slot holds that mount detaches the slot.
+Its panel and `<div>` are removed, focus is not moved, so focus left in the panel goes to the page, and the entry calls no callback.
+A `target` that is removed and inserted again within one run of script keeps its panel open.
+A panel stays watched in the document it opened in, so after a Foundry 14 move a detach in the new window does not close it.
+A `target` inside a shadow root closes its panel when that root's host leaves the document, and not when the removal happens inside the shadow root.
+A `Modal` mounted in another `Modal`'s content slot is not closed by this: its dialog stays open after an `update` detaches that slot, so the companion destroys it first and mounts it again when the outer dialog reopens.
 - Fabricate does not follow a mount from one window to another: a companion destroys the mount and mounts again in `_onDetach` and `_onAttach`, and that `destroy` closes any open overlay.
 Foundry moves an application rendered with `renderChild` into its parent's detached window without calling its `_onDetach`, and an overlay opened after any move is placed and heard in the new window.
 - An entry whose import closure reaches `actions/portal.js`, `actions/anchoredPopover.js`, `actions/typeaheadPanel.js` or `actions/dismissOnOutsideClick.js` opens an overlay, so it states `overlays: true`; Fabricate's manifest gate holds this.
@@ -1391,7 +1397,7 @@ Each group states the accepted values of every key that entry publishes.
     Typing narrows the rows to the glyphs the query matches, and an empty query lists them all; which glyphs a query matches and their order are private.
     ArrowDown and ArrowUp move the active row, which the field names with `aria-activedescendant`, and Home and End do so only from the caret's edge; Enter chooses the active row, and with no active row does nothing.
     A choice closes the list and returns focus to the trigger.
-    Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window, though a `Modal` the picker is mounted in with `closeOnOutsideClick` `true` also calls its `onClose`, as that group states; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
+    Escape in the query field closes the list without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; an open ApplicationV1 `Dialog` still closes, as Interactive components states.
     A press outside the list closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
     With focus on the page, the next Escape reaches Foundry, which asks every open window to close.
     Tab moves focus as the browser does and leaves the list open until the next press outside it; Escape pressed once focus has left the query field still closes the list and returns focus to the trigger, and it also reaches Foundry, which closes every open window unless the element then focused takes keyboard input (issue 2598).
@@ -1445,7 +1451,7 @@ Each group states the accepted values of every key that entry publishes.
     A second press on the trigger closes the menu without choosing and moves no focus, so focus goes where the pointer press puts it, which in Chromium, Foundry's desktop client, is the trigger.
     In the menu, ArrowDown and ArrowUp move focus to the next and the previous enabled item, wrapping at either end, and Home and End move it to the first and the last.
     A choice calls `onSelect`, closes the menu, and then returns focus to the trigger, so focus that `onSelect` moves before it returns goes back to the trigger, and a companion that moves focus in response moves it from a later task, as from a `setTimeout`.
-    Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog` also closes is private.
+    Escape in the menu closes it without choosing and returns focus to the trigger before the key reaches Foundry, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
     Tab and Shift+Tab in the menu close it without choosing and return focus to the trigger.
     A press on a disabled item or between the items chooses nothing and leaves the menu open, and the arrow keys still move among the enabled items.
     A press outside the menu closes it without choosing, and focus goes where the press puts it: to the element pressed when that element, or an element around it, takes focus, and otherwise to the page.
@@ -1480,9 +1486,7 @@ Each group states the accepted values of every key that entry publishes.
     While `open` is `false`, `target` holds no element, and while it is `true`, `target` holds one empty element of Fabricate's, which is private.
     `update` replaces every key, so each `update` passes `open` with the dialog's other keys, `title`, `closeLabel` and `onClose` among them.
     An `update` that passes `open: false` detaches the slot elements with their contents intact, and `open: true` attaches the same elements again, so the content-slot rules on detaching apply on every close and open, and a companion's components, effects and listeners in them keep running.
-    The list of an overlay entry the companion mounts in a slot stays open in the window after such an `update`, until the user dismisses it or the companion destroys that mount, so the companion destroys that mount first and mounts it again when the dialog reopens.
-    No prop of a published entry closes its list.
-    A list drawn in an `overlayHost` inside the slot is detached with the slot instead.
+    An overlay entry the companion mounts in a slot closes its open panel when such an `update` detaches the slot, as Overlays states, so when the dialog opens again that entry's trigger has `aria-expanded` `"false"`.
   - `title` is required and is final display text, drawn as the dialog's level-3 heading, and it is the dialog's accessible name.
     `subtitle` is optional final display text drawn under the title in a quieter, smaller ink than the title, and it is neither part of the name nor announced as the dialog's description.
     `closeLabel` is required and names the close control, as "Close", and it is also that control's tooltip, shown as the `IconButton` group states.
@@ -1493,16 +1497,19 @@ Each group states the accepted values of every key that entry publishes.
     The dialog's height is capped, so the companion scrolls tall content inside one element of its own in the body, which it gives `min-height: 0` and `overflow: auto`, and `tabindex="0"` when it holds no control, so the keyboard can scroll it.
     A companion's dialog holds at least one control of its own, so focus has somewhere to go when it opens; a dialog that only informs puts its acknowledging button in the footer.
   - `closeOnOutsideClick` is `true` or `false` and defaults to `true`.
-    With `true`, a pointer press anywhere in the document outside the dialog calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside the dialog.
+    With `true`, a pointer press anywhere in the document outside the dialog and outside every panel that counts as inside it, as the lines below state, calls `onClose` as its `mousedown` fires, whichever button it is, and so does Escape pressed while focus is outside both.
     A press on the control that opened the dialog is an outside press too, and its own `click` follows `onClose`, so a companion whose opener opens the dialog on every press passes `false`, or ignores a `click` whose press began while the dialog was open.
-    A press in the panel of an overlay entry the companion mounts in a slot, as a `Select`'s list, is outside the dialog, and so is focus in that panel, as in an `IconPicker`'s query field, so with `true` a press or an Escape there calls `onClose` as well as closing that panel.
-    A companion that mounts such an entry in a slot passes `false`, or passes that entry an `overlayHost` inside the slot, where its panel is inside the dialog, which clips what overflows it.
+    A panel counts as inside the dialog from when it opens until it closes, wherever it is drawn, when a control inside the dialog opened it or a panel that counts as inside it did, as a `Select`'s list, an `IconPicker`'s list and query field and an `ActionMenu`'s menu that the companion mounts in a slot.
+    A press in such a panel does not call `onClose`, and the panel takes it as its own group states, so a click on an option chooses it as it does outside a dialog.
+    Escape pressed while focus is in such a panel is left to that panel: the dialog neither calls `onClose` nor stops it, and the panel closes and returns focus to its trigger in the dialog, so Foundry's dismiss keybinding closes no window; whether an open ApplicationV1 `Dialog`, which listens for Escape itself, also closes is private.
+    A `Modal` the companion mounts in a slot does not count as inside the dialog, so with `true` a press or an Escape in its dialog calls this dialog's `onClose` too.
+    An `overlayHost` inside the slot draws a panel inside the dialog, which clips what overflows it.
     With `false`, neither a press nor an Escape outside the dialog calls `onClose`.
   - `onClose` is a required callback, called with no argument, when the user asks to close the dialog: a press on the close control by pointer, Enter or Space, Escape in the dialog, and, as `closeOnOutsideClick` states, a press or an Escape outside it.
     An Escape held down calls it again on each repeat.
     It is not called by `mount`, `update`, `destroy` or a press inside the dialog.
     Fabricate does not close the dialog itself: it stays open until the companion's `update` passes `open: false` or the companion calls `destroy`, so a companion that must keep it open, as before a step that would lose work, does nothing.
-    A companion that closes the dialog while focus is inside it first moves focus to an element of its own, as the opener, because removing the focused control leaves focus on the page.
+    A companion that closes the dialog while focus is inside it, or in a panel of an overlay entry it mounts in a slot, first moves focus to an element of its own, as the opener, because removing the focused control, or detaching a slot that holds the panel's trigger, leaves focus on the page.
   - Fabricate moves no focus: when the dialog opens, focus stays where it was, and the companion moves it into its own content from a later task, as from a `setTimeout`, once the dialog is drawn.
     Tab moves focus as the browser does, so it can leave the dialog, except that an open ApplicationV1 `Dialog` in the main window takes a Tab pressed anywhere outside that `Dialog`, in this dialog too, and moves focus to its own button.
     Nothing covers the window behind the dialog, which still takes pointer and keyboard input.
@@ -1513,7 +1520,7 @@ Each group states the accepted values of every key that entry publishes.
     Escape pressed on an element inside the dialog whose `aria-expanded` is `"true"` when the key goes down, or inside one, is left to that element: the dialog neither calls `onClose` nor stops it, so a companion's own expanded control stops the Escape it handles, or the key reaches Foundry's dismiss keybinding wherever the element then focused does not take keyboard input.
     A companion element in a slot that stops Escape itself keeps the dialog from calling `onClose`, and so does a published entry mounted there that stops every key, as a `Select`'s or an `IconPicker`'s trigger does.
     Escape reaches the companion's own `keydown` listeners inside the dialog's slots before it stops.
-    Escape with focus on the page, or on an element outside the dialog that Foundry does not treat as taking keyboard input, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
+    Escape with focus on the page, or on an element that Foundry does not treat as taking keyboard input and that is outside both the dialog and every panel that counts as inside it, reaches Foundry's dismiss keybinding, which, unless it first cancels a canvas drag or closes Foundry's main menu, a context menu or a tour, asks every open window to close, and when none closes releases the controlled objects or opens the main menu; with `closeOnOutsideClick` `true` it also calls `onClose`.
     Escape on the close control leaves the tooltip it shows under keyboard focus open until focus leaves the control or the dialog closes.
     Every other key and every press inside the dialog bubbles to its host and the host's ancestors, never through the `Modal`'s own `target`.
   - The dialog is the entry's overlay, so `describe('Modal').overlays` is `true`, and it is drawn in the host the `overlayHost` chain picks when it opens, as Overlays states.
@@ -1896,6 +1903,18 @@ A companion that owns the ApplicationV2 re-mounts in `_onDetach` and `_onAttach`
 - **THEN** Fabricate calls `onClose` once, the Escape reaches no bubble-phase `keydown` listener above the dialog's host, and Foundry's dismiss keybinding closes no window
 - **AND** the dialog stays open until the companion's `update` passes `open: false` with its other keys
 - **AND** a mount that omits `closeLabel` throws M9, and one that passes `trapFocus` throws M8
+
+#### Scenario: A panel opened from a published dialog
+
+- **WHEN** a companion mounts `Modal` with `closeOnOutsideClick` `true`, mounts a `Select` in its `body` slot, opens the list and clicks one of its options
+- **THEN** the `Select` calls its `onChange` and Fabricate does not call the `Modal`'s `onClose`
+- **AND** a press on the window outside the dialog and outside the list then calls `onClose` once
+
+#### Scenario: A panel left open by an update that detaches its slot
+
+- **WHEN** a companion mounts `Modal` with `open: true`, mounts a `Select` in its `body` slot, opens the list and calls `update` with `open: false`
+- **THEN** the list and its `<div>` are removed from the host and the `Select` calls no callback
+- **AND** an `update` with `open: true` attaches the same slot with the `Select`'s trigger having `aria-expanded` `"false"`
 
 #### Scenario: An overlay host
 

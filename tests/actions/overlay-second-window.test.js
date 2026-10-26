@@ -2,8 +2,9 @@
  * The overlay plumbing inside a second happy-dom `Window`, the stand-in for a Foundry 14 detached
  * window (issue 2454): each action binds its listeners to the node's own document and window and
  * reads that window's viewport and style, and tells a node by `nodeType`. Each clause except the
- * `portal in a second window` pair, which pins what happy-dom 20's shared classes already give, is
- * red against an action that reads the global `document`, `window` or `instanceof`.
+ * `portal in a second window` pair, which pins what happy-dom 20's shared classes already give, and
+ * the two `onDetached` clauses, which pin the watch's stated limit (issue 2671), is red against an
+ * action that reads the global `document`, `window` or `instanceof`.
  * Limit: happy-dom 20 shares its classes between Windows, so its second Window's nodes pass this
  * realm's `instanceof`; a node of another realm is stood in by an object no class of this realm
  * recognises, which carries `nodeType` as a detached window's node does.
@@ -344,6 +345,37 @@ describe('dismissOnOutsideClick in a second window', () => {
     handle.destroy();
     outside.dispatchEvent(new second.MouseEvent('mousedown', { bubbles: true }));
     assert.equal(dismissed.length, 2, 'a destroyed action leaves no listener');
+  });
+
+  // happy-dom delivers mutation records from a microtask, and a later task sees them all.
+  const settle = () => new Promise((done) => setTimeout(done, 0));
+
+  it('calls no onDetached for a node adopted into the second window, nor for a later removal there', async () => {
+    const node = document.createElement('div');
+    document.body.append(node);
+    const calls = [];
+    const handle = dismissOnOutsideClick(node, {
+      onDetached: () => {
+        calls.push('detached');
+      },
+    });
+    doc.body.append(doc.adoptNode(node));
+    await settle();
+    assert.ok(node.ownerDocument === doc && node.isConnected, 'moved and connected');
+    assert.deepEqual(calls, [], 'connected again when the mutation is read');
+    node.remove();
+    await settle();
+    assert.deepEqual(calls, [], 'the document it moved to is not watched');
+    handle.destroy();
+  });
+
+  it('destroys a watching action after its window has closed without throwing', async () => {
+    const closing = new Window({ url: 'http://localhost/closing' });
+    const node = closing.document.createElement('div');
+    closing.document.body.append(node);
+    const handle = dismissOnOutsideClick(node, { onDetached: () => {} });
+    await closing.happyDOM.close();
+    assert.doesNotThrow(() => handle.destroy());
   });
 });
 
