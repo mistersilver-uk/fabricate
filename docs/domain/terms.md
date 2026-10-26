@@ -877,6 +877,24 @@ Canonical mapping: `GatheringTask.timeRequirement`, `GatheringRun.timeGate`
 
 Spec reference: openspec/specs/gathering-and-harvesting/spec.md
 
+## Global Current Condition
+
+Written by `setConditions`, `setWeather` and `setTimeOfDay`; a system with no persisted `conditions` block inherits it directly.
+It never gates on its own: composition reads the owning system's current.
+
+Canonical mapping: `gatheringConfig.conditions`; `GatheringRichStateService.setConditions`
+
+Spec reference: openspec/specs/gathering-and-harvesting/spec.md
+
+## System Current Condition
+
+A system whose options do not offer a newly set global tag keeps its current unchanged.
+The public `updateGatheringConditions({ environmentId, conditions })` branch writes an `environment.conditions` value that composition overwrites with this one, so it is inert.
+
+Canonical mapping: `gatheringConfig.systems[systemId].conditions[kind].current`; `GatheringRichStateService.composeEnvironment`, `buildListingMetadata`
+
+Spec reference: openspec/specs/gathering-and-harvesting/spec.md
+
 ## Required Tool Display State
 
 A tool is `damaged` when the only matching items carry `flags.fabricate.toolBroken === true`, or when no working item matches and the actor holds the tool's `onBreak.replaceWith` broken-variant target: either an item matching the Component identified by `replacementTarget: { type: "component", componentId }` (with legacy `replacementComponentId` read forward as that form), or an item whose live/source UUID references include the direct-Item `replacementTarget: { type: "item", itemUuid }`.
