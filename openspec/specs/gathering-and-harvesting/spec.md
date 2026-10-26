@@ -1622,6 +1622,9 @@ Event redaction follows the effective `eventVisibility` tier for the viewer (§S
 Because a GM viewer always resolves to `full` and a non-GM viewer defaults to `encounterChance`, by default a non-GM viewer of a **targeted** environment receives `events: []` while a GM viewer receives the full list; `[]` is also emitted for locked entries.
 The listing additionally emits the effective `eventVisibility` tier as a field so the player UI can render the appropriate event affordance.
 Event models are informational only: they carry no attempt action and no provider diagnostics.
+12. A task row's `rich.conditions` (`{ weather, timeOfDay }`) is the owning crafting system's current condition — `systems[systemId].conditions[kind].current`, falling back to the global current only when the system has no persisted `conditions` block — the same value the runtime gate and the environment-level `conditions` read, never the global value alone.
+It names no task, weight or drop data and is emitted unchanged on an opaque blind row.
+The same value is recorded as `economyEvidence.conditions` for a new attempt.
 
 ## Tool Usage Semantics
 
