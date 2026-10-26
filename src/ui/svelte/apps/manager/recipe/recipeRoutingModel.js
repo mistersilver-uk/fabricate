@@ -43,7 +43,7 @@ function setSource(set, index, groups, setName) {
 /**
  * Whether a fixed check's minimum blocks a success tier, comparing `start` in the check's direction
  * as `checkRouting.minSuccessTierFailed` does. A forced failure skips that gate, so a failure tier
- * is never blocked, and a non-finite `start` never blocks where the engine coerces it to 0.
+ * is never blocked, and a non-finite `start` never blocks.
  */
 function belowMinimum(tier, start, minimum, direction) {
   if (tier.success !== true || !minimum || !Number.isFinite(start)) return false;
