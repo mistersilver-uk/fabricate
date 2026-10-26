@@ -2281,6 +2281,20 @@ test('classifyCheckTotal: a forced failure skips a tier with no start', () => {
   assert.equal(matched?.id, 'botch', 'the lowest placed failure tier, not the unplaced one');
 });
 
+test('classifyCheckTotal: a tier step down from the lowest placed tier never lands on a tier with no start', () => {
+  const stepDown = {
+    ...STEP_UP_ONE,
+    condition: { ...STEP_UP_ONE.condition, value: 5 },
+    tierStep: { mode: 'down', steps: 1 },
+  };
+  const diceGroups = [{ groupId: 0, group: '1d20', sum: 5, results: [5] }];
+  const classified = classifyCheckTotal(
+    fixedArgs(5, [DRAFTY, BOTCH, HIGH], { triggers: [stepDown], diceGroups })
+  );
+  assert.equal(classified.matched?.id, 'botch', 'the step clamps at Botch rather than reaching Drafty');
+  assert.equal(classified.tierStepApplied, null, 'the clamped step moves nothing');
+});
+
 test('fixedRangeHolds: a missing bound holds nothing, never a bound of 0', () => {
   assert.equal(fixedRangeHolds({ start: 0, end: 5 }, 0), true);
   assert.equal(fixedRangeHolds({ start: null, end: 5 }, 0), false);
