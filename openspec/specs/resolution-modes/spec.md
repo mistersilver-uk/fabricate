@@ -898,7 +898,8 @@ It was previously modelled, normalized, GM-authorable, captured onto every salva
 #### Player Result Order (per-user runtime state)
 
 - The order is stored as a list of **result ids**, not indices, so it survives a GM editing the recipe.
-- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<componentId>`.
+- Keys are namespaced by scope: `recipe:<recipeId>` and `salvage:<systemId>:<componentId>`.
+- The salvage key is system-qualified because component ids are not globally unique (copy-mode import preserves them), so a component-id-only key would let two systems' components share one order.
 - One key per recipe, not per step.
 - The order is a **standing preference**: it applies to every craft of that recipe until the player changes it, and is NOT a per-attempt gesture.
 - It is stored per-user **within a world**, not per-account globally: the same player in a second world starts from the authored order.
@@ -933,7 +934,7 @@ Capturing the order at start makes the executing user irrelevant, which makes th
 - A salvage with **no run record uses the authored order**, and there is deliberately **no settings fallback**; adding one would reintroduce the executing-user read the capture exists to prevent.
 - Salvage gates on the permission at **read time, not capture time**, so a GM toggling the permission off mid-run takes effect on that run's award.
 The captured order is retained but ignored.
-- The player-facing salvage surface writes only the **standing preference** under `salvage:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
+- The player-facing salvage surface writes only the **standing preference** under `salvage:<systemId>:<componentId>` and relies on the existing run-record capture; it MUST NOT thread an order into the salvage call.
 The "no settings fallback" rule above is unaffected by that surface existing and MUST NOT be relaxed.
 - A pending debounced order write MUST be **flushed before a salvage run starts**: the capture happens once, at start, so a run begun inside the debounce window captures the **stale** order.
 

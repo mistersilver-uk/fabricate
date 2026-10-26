@@ -753,7 +753,7 @@ The failure branch builds the salvage recipe view the success branch builds.
   The permission is gated at read time, so a GM toggling it off mid-run takes effect on that run.
   The Inventory tab's salvage panel (`InventorySalvagePanel.svelte`) is the first UI caller of
   `CraftingEngine.salvage`: players reorder Progressive stages via the store's reorder/reset
-  actions persisted under the `salvage:<componentId>` scope, honouring
+  actions persisted under the `salvage:<systemId>:<componentId>` scope, honouring
   `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-crafting-app` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
 
