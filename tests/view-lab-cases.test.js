@@ -2319,7 +2319,10 @@ test('the two alert frames assert their alert is inside the box that clips it', 
   // that cannot fail, which is the same defect one level down.
   const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
   assert.match(driver, /expectContained: viewCase\.expectContained \?\? \[\]/);
-  assert.match(driver, /for \(const expectation of expectContained\)/);
+  assert.match(
+    driver,
+    /for \(const expectation of expectContained\) await assertContained\(page, expectation, label\);/
+  );
 });
 
 test('resource-node interval evidence reaches over-time controls at both required window sizes', () => {
@@ -4401,6 +4404,7 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
     'scripts/lib/viewLabSteps.js',
+    'scripts/lib/viewLabClaims.js',
     'scripts/lib/viewLabRenderPool.js',
     'scripts/lib/viewLabShards.js',
     'scripts/lib/viewLabComputedCensus.js',

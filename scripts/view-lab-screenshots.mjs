@@ -11,11 +11,10 @@
  *
  * A CHANGE TO THIS FILE SELECTS SURFACE COVERAGE — one frame of every route and tab the lab
  * renders — rather than a narrowing from its own diff (issue 1049), and so does a change to the
- * step runner (`viewLabSteps.js`) it calls. The readiness wait, the console-error gate and the
- * `frame.screenshot()` call share `renderPage`, and
+ * step runner (`viewLabSteps.js`) or the claim checks (`viewLabClaims.js`) it calls. The readiness
+ * wait, the console-error gate and the `frame.screenshot()` call share `renderPage`, and
  * `commandApps` both reads `process.argv` and drives the render, so no region of this file can be
- * shown not to change a frame; a wrong cut would publish frames its own driver changed as
- * unaffected.
+ * shown not to change a frame; a wrong cut would publish frames its own driver changed as unaffected.
  *
  * Coverage rather than the whole corpus is the OTHER half of that decision (`LAB_SURFACE_CASES` in
  * `scripts/lib/viewLabCases.js`). What a change to this driver has to prove is that the driver
@@ -49,6 +48,7 @@ import {
   publishableCases,
   TOLERATED_WARNINGS,
 } from './lib/viewLabCases.js';
+import { assertContained } from './lib/viewLabClaims.js';
 import { assertComputedCensus } from './lib/viewLabComputedCensus.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
@@ -282,28 +282,7 @@ async function renderPage(
       if (!visible) throw new Error(`${label}: expected ${expectVisible} to be visibly rendered.`);
     }
 
-    for (const expectation of expectContained) {
-      const contained = await page.evaluate(({ container, target }) => {
-        const outer = globalThis.document.querySelector(container);
-        const inner = globalThis.document.querySelector(target);
-        if (!outer || !inner) return false;
-        const outerBox = outer.getBoundingClientRect();
-        const innerBox = inner.getBoundingClientRect();
-        return (
-          innerBox.width > 0 &&
-          innerBox.height > 0 &&
-          innerBox.left >= outerBox.left &&
-          innerBox.right <= outerBox.right &&
-          innerBox.top >= outerBox.top &&
-          innerBox.bottom <= outerBox.bottom
-        );
-      }, expectation);
-      if (!contained) {
-        throw new Error(
-          `${label}: ${expectation.target} is clipped or extends outside ${expectation.container}.`
-        );
-      }
-    }
+    for (const expectation of expectContained) await assertContained(page, expectation, label);
 
     // One selector, or a list of them, each owning the pointer target at its centre.
     for (const selector of [expectCenterHit ?? []].flat()) {
